@@ -9,7 +9,7 @@
 - **`languages`** : référentiel des langues, avec leur code ISO 639-1, ou ISO 639-3 à défaut, et leur nom français.
 - **`language_forms`** : formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux et trois lettres, nom anglais.
 - **`ror_organizations`** : organisations du Research Organization Registry, chargées depuis son dump. `structures.ror_id` les relie au référentiel interne.
-- **`ror_relations`** : relations parent/enfant entre organisations ROR.
+- **`ror_relations`** : relations parent/enfant entre organisations ROR. `interfaces.cli.maintenance.report_ror_coherence` les compare à `structure_parents`.
 - **`ror_dump_imports`** : imports du dump ROR, avec la date de chaque import.
 
 ## `ops` : exploitation

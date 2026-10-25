@@ -112,6 +112,34 @@ class StructureDashboardResponse(BaseModel):
     top_countries: list[StructureTopCountry]
 
 
+class StructurePartner(BaseModel):
+    """Organisation partenaire d'une structure : un ROR des auteurs de ses publications, avec le nombre de copublications."""
+
+    ror_id: str
+    name: str | None
+    """Nom du référentiel ROR ; absent quand le ROR est plus récent que le référentiel importé."""
+    country_code: str | None
+    country_name: str | None
+    types: list[str]
+    publications: int
+
+
+class PartnerFacetOption(BaseModel):
+    value: str
+    label: str
+    count: int
+
+
+class StructurePartnersResponse(PaginatedResponse):
+    """Organisations partenaires d'une structure, les plus fréquentes en tête, et les options de leurs filtres."""
+
+    partners: list[StructurePartner]
+    years: list[PartnerFacetOption]
+    """Années des copublications, chacune avec son nombre de publications."""
+    countries: list[PartnerFacetOption]
+    types: list[PartnerFacetOption]
+
+
 class StructureDeletionImpact(BaseModel):
     """Ce que la suppression d'une structure emporte."""
 
@@ -140,6 +168,19 @@ class StructuresQueries(Protocol):
     ) -> list[SubjectFrequency]: ...
 
     def get_structure_dashboard(self, structure_id: int) -> StructureDashboardResponse: ...
+
+    def get_structure_partners(
+        self,
+        structure_id: int,
+        *,
+        years: list[int],
+        countries: list[str],
+        types: list[str],
+        page: int,
+        per_page: int,
+    ) -> StructurePartnersResponse:
+        """Organisations partenaires des publications de la structure (`publication_rors`), hors ses propres ROR et ceux de ses tutelles, ancêtres compris."""
+        ...
 
     def get_name_form(self, form_id: int) -> NameFormOut | None: ...
 

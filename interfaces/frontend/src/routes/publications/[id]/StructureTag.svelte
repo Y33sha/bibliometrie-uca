@@ -16,27 +16,9 @@
 </script>
 
 {#if structIsLabo(structures, sid)}
-  <a href={resolve(`laboratories/${sid}${tab ? `?tab=${tab}` : ''}`)} class="struct-tag"
+  <a href={resolve(`laboratories/${sid}${tab ? `?tab=${tab}` : ''}`)} class="structure-tag"
     >{structLabelById(structures, sid)}</a
   >
 {:else}
-  <span class="struct-tag">{structLabelById(structures, sid)}</span>
+  <span class="structure-tag">{structLabelById(structures, sid)}</span>
 {/if}
-
-<style>
-  .struct-tag {
-    display: inline-block;
-    padding: 1px 6px;
-    background: var(--accent-light);
-    border-radius: 3px;
-    font-size: 0.8rem;
-    color: var(--accent);
-    font-weight: 500;
-    margin-right: 3px;
-    text-decoration: none;
-  }
-  a.struct-tag:hover {
-    background: #d0e3f4;
-    text-decoration: none;
-  }
-</style>

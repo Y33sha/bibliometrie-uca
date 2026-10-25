@@ -84,6 +84,11 @@ class TestGetTitle:
     def test_strips_whitespace(self):
         assert get_title({"title": ["  Spaced  "]}) == "Spaced"
 
+    def test_reduces_whitespace(self):
+        assert get_title({"title": ["Imprimitive\n   complex  reflection groups"]}) == (
+            "Imprimitive complex reflection groups"
+        )
+
     def test_none_when_empty_list(self):
         assert get_title({"title": []}) is None
 

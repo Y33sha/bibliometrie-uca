@@ -5,6 +5,8 @@
 	export interface TabDef {
 		id: string;
 		label: string;
+		/** Nombre d'éléments de l'onglet, affiché à côté du libellé. */
+		count?: number;
 	}
 
 	interface Props {
@@ -48,6 +50,7 @@
 	{#each tabs as t (t.id)}
 		<button class="tab" class:active={activeTab === t.id} onclick={() => switchTab(t.id)}>
 			{t.label}
+			{#if t.count != null}<span class="tab-count">{t.count.toLocaleString('fr-FR')}</span>{/if}
 		</button>
 	{/each}
 </div>

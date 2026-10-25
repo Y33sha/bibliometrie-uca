@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconButton from '#lib/components/IconButton.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -181,7 +182,7 @@
 				{/snippet}
 			</Picker>
 		{:else}
-			<button class="btn btn-sm" onclick={() => openEdit(pub)}>Modifier</button>
+			<IconButton icon="edit" label="Modifier" onclick={() => openEdit(pub)} />
 			<button class="btn btn-sm btn-merge" onclick={() => openMerge(pub.id)}>Fusionner…</button>
 		{/if}
 	{/snippet}
@@ -211,14 +212,14 @@
 <style>
 	h2 { font-size: 1.2rem; font-weight: 600; margin: 0 0 12px; }
 
-	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
+	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
 	.muted { color: var(--muted); }
 
 	.blocking-panel {
-		background: #fef3e0; border: 1px solid #e8a838;
-		border-radius: 6px; padding: 12px 16px; margin: 12px 0;
+		background: var(--warning-light); border: 1px solid var(--warning);
+		border-radius: var(--radius); padding: 12px 16px; margin: 12px 0;
 	}
 	.blocking-header {
 		display: flex; justify-content: space-between; align-items: center;
@@ -228,8 +229,8 @@
 	.blocking-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 	.blocking-table th {
 		text-align: left; padding: 4px 8px; font-weight: 600; color: var(--muted);
-		border-bottom: 1px solid #e8a838;
+		border-bottom: 1px solid var(--warning);
 	}
-	.blocking-table td { padding: 6px 8px; border-bottom: 1px solid #f0d9b0; vertical-align: top; }
+	.blocking-table td { padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--warning) 40%, white); vertical-align: top; }
 	.blocking-table tr:last-child td { border-bottom: none; }
 </style>

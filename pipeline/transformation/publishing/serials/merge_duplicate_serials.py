@@ -25,7 +25,7 @@ from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.serials.serial_label import serial_label
 from pipeline.transformation.publishing.serials.store import SerialStore
 
-LABEL = "Fusion des revues en double"
+LABEL = "Fusion des publications en série en double"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 MergeSerials = Callable[[int, int], None]

@@ -17,7 +17,6 @@ _PLATFORM_TYPES = frozenset(
     {
         SerialType.REPOSITORY,
         SerialType.PREPRINT_SERVER,
-        SerialType.EBOOK_PLATFORM,
         SerialType.BOOK_SERIES,
     }
 )

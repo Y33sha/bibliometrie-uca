@@ -108,6 +108,6 @@
   }
   .toolbar input {
     width: 250px;
-    background: white;
+    background: var(--card);
   }
 </style>

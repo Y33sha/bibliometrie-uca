@@ -157,7 +157,7 @@
     gap: 4px;
   }
   .identifier-chip {
-    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-family: var(--mono);
     font-size: 0.72rem;
   }
   /* Identifiant authentifié par le chercheur : statut protégé, aucune action — le bouclier remplace les boutons confirmer/rejeter. */
@@ -170,7 +170,7 @@
   .btn-add-id {
     padding: 2px 8px;
     border: 1px dashed var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: none;
     font-size: 0.8rem;
     cursor: pointer;
@@ -201,7 +201,7 @@
   .id-form input {
     padding: 3px 6px;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
     font-size: 0.85rem;
     font-family: inherit;
   }

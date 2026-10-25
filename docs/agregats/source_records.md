@@ -1,6 +1,6 @@
 # Source_records — cycle de vie
 
-*À jour le 2026-10-23.*
+*À jour le 2026-10-25.*
 
 Un enregistrement source est l'image d'un document dans **une** source — HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref, DataCite — avant toute fusion. C'est la couche qui garde ce que chaque source a dit, une ligne par couple source et identifiant dans cette source. Elle naît d'un import direct : la phase `normalize` transforme les données brutes déposées dans `staging` en enregistrements typés. Le pipeline seul y écrit ; l'API ne fait que les lire.
 
@@ -11,6 +11,7 @@ Un enregistrement source est l'image d'un document dans **une** source — HAL, 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
 | `source_records` | Image d'un document dans une source | `(source, source_id)`, `publication_id`, `doi`, `doc_type`, `external_ids`, `raw_doc_type`, `title_normalized`, `corrections`, `source_extras` |
+| `source_record_locations` | Copies du document que donne la source (fiche [plateformes](platforms.md)) | `(source_record_id, url)`, `version`, `is_oa`, `platform_id` |
 | `source_contributions` | Contribution source d'auteur pour cette source | `source_record_id`, `contributor_information_id`, `author_position`, `roles`, `in_perimeter` |
 | `contributor_information` | Informations du contributeur dédoublonnées | `author_name_normalized`, `identifiers`, `key_hash` |
 | `source_contribution_addresses` | Lien entre une contribution source et ses adresses | `source_contribution_id`, `address_id` |
@@ -26,7 +27,7 @@ Une seule phase crée ces lignes, `normalize`, et une seule autre modifie leurs 
 
 Lors d'un réimport, le rattachement à la publication est préservé, les identifiants externes sont réunis, le DOI est conservé et le type de document cède la place au plus récent. La normalisation des identifiants et le calcul du titre normalisé ont lieu à la lecture de la source, pas en SQL.
 
-`normalize` écrit aussi les tables satellites : les contributions sources sont réécrites en bloc, les informations du contributeur dédoublonnées, les adresses créées au besoin et reliées aux contributions sources. La vue matérialisée reliant contributions sources et structures, elle, est produite par la phase `affiliations`.
+`normalize` écrit aussi les tables satellites : les localisations sont réécrites à chaque normalisation, les contributions sources réécrites en bloc, les informations du contributeur dédoublonnées, les adresses créées au besoin et reliées aux contributions sources. La vue matérialisée reliant contributions sources et structures, elle, est produite par la phase `affiliations`.
 
 **`metadata_correction`.** Trois sous-étapes, chacune dans sa transaction : rattachement à une revue par l'espace de noms du DOI, corrections portant sur un enregistrement isolé, puis corrections portant sur un groupe. Elles modifient les colonnes typées et conservent la valeur d'origine dans `corrections`, sous des clés qui ne se recouvrent pas. Chaque passage repart des données brutes reconstituées, si bien qu'il se rejoue sans dommage et rattrape une correction devenue caduque. Toute modification met l'enregistrement source dans la file de regroupement, `source_record_keys_queue`.
 
@@ -53,7 +54,7 @@ Les valeurs lues sont déjà corrigées.
 
 ## Lecture par l'API
 
-Le détail d'une publication montre sa **provenance** : la liste de ses enregistrements source, les auteurs de l'import le plus récent pour chaque source, et les identifiants externes réunis. Aucune page ne présente ces enregistrements pour eux-mêmes — ils apparaissent comme la traçabilité d'une publication.
+Le détail d'une publication montre sa **provenance** : les auteurs de l'import le plus récent pour chaque source, les copies d'accès tirées des localisations, et les sources qui référencent la publication sans en donner de copie. Aucune page ne présente ces enregistrements pour eux-mêmes — ils apparaissent comme la traçabilité d'une publication.
 
 ## Points d'attention
 

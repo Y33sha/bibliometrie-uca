@@ -50,6 +50,13 @@ def test_article_sans_conteneur():
     assert determine_container_type(_describe(raw_doc_type="journal-article")) == (None, None)
 
 
+def test_plateforme_d_ebooks_sans_conteneur():
+    """Cas réel : ScanR donne pour revue d'un livre typé « other » la plateforme d'ebooks de son éditeur."""
+    assert determine_container_type(
+        _describe(source="scanr", raw_doc_type="other", journal_title="ENS Éditions eBooks")
+    ) == (None, None)
+
+
 def test_chapitre_livre_et_collection():
     """Cas réel : chapitre d'un livre de la collection IFIP AICT."""
     series, volume = determine_container_type(

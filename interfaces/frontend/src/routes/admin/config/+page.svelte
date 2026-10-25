@@ -1,4 +1,5 @@
 <script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
   import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
@@ -273,7 +274,7 @@
           {@render inlineEdit(key)}
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(key)}>Modifier</button>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
         {/if}
       </div>
     {/if}
@@ -287,7 +288,7 @@
           {@render inlineEdit(cap.key)}
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(cap.key)}>Modifier</button>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(cap.key)} />
         {/if}
       </div>
     {/if}
@@ -296,7 +297,7 @@
 
 <!-- ═══ DÉLAIS ═══ -->
 <h3 class="section-title">Délais de réinterrogation</h3>
-<p class="help-text">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
+<p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
 <div class="config-grid">
   {#each DELAYS as delay (delay.key)}
     {@const item = configByKey(delay.key)}
@@ -307,7 +308,7 @@
           {@render inlineEdit(delay.key)}
         {:else}
           <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
-          <button class="btn btn-sm" onclick={() => startEdit(delay.key)}>Modifier</button>
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(delay.key)} />
         {/if}
       </div>
     {/if}
@@ -318,8 +319,8 @@
 <h3 class="section-title">Périmètres</h3>
 
 <h4 class="subsection-title">Définition des périmètres</h4>
-<p class="help-text">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<table class="perimeters-table">
+<p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
+<table class="data-table perimeters-table">
   <thead>
     <tr>
       <th>Code</th>
@@ -343,8 +344,8 @@
         </td>
         <td class="num">{perim.structure_count}</td>
         <td class="perim-actions">
-          <button class="btn btn-sm" onclick={() => openPerimEdit(perim)}>Modifier</button>
-          <button class="btn btn-sm btn-danger" onclick={() => deletePerimeter(perim.id)}>Supprimer</button>
+          <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
+          <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
         </td>
       </tr>
     {/each}
@@ -355,7 +356,7 @@
 </div>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
-<table class="perimeters-table">
+<table class="data-table perimeters-table">
   <thead>
     <tr>
       <th class="role-phase-col">Phase</th>
@@ -456,14 +457,6 @@
   }
   .section-title {
     margin: 24px auto 8px;
-    padding: 4px 10px;
-    background: none;
-    color: #5b9ea0;
-    font-size: 0.8rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-bottom: 2px solid #5b9ea0;
     max-width: 800px;
   }
   /* Bouton « Nouveau périmètre » sous la table, aligné à gauche de la colonne centrée. */
@@ -471,16 +464,9 @@
     max-width: 800px;
     margin: 8px auto 0;
   }
-  .help-text {
-    background: var(--accent-light);
-    border: 1px solid #c4d8ed;
-    border-radius: 5px;
-    padding: 8px 12px;
-    margin: 4px auto 12px;
+  .info-box {
     max-width: 800px;
-    font-size: 0.85rem;
-    color: #2c3e50;
-    line-height: 1.5;
+    margin: 4px auto 12px;
   }
   .subsection-title {
     font-size: 0.85rem;
@@ -490,10 +476,10 @@
     max-width: 800px;
   }
 
+  /* Une liste par section, réglages séparés par des filets. */
   .config-grid {
     display: flex;
     flex-direction: column;
-    gap: 8px;
     max-width: 800px;
     margin: 0 auto 8px;
   }
@@ -501,13 +487,14 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 12px;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 5px;
+    min-height: 44px;
+    padding: 4px 4px 4px 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .config-row:last-child {
+    border-bottom: none;
   }
   .config-label {
-    font-weight: 600;
     font-size: 0.9rem;
     min-width: 180px;
   }
@@ -521,11 +508,11 @@
   }
   .config-editor-inline {
     width: 80px;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
     padding: 3px 6px;
     border: 1px solid var(--accent);
-    border-radius: 3px;
+    border-radius: var(--radius);
     flex: 1;
   }
   .config-actions-inline {
@@ -535,38 +522,14 @@
   }
 
   .perimeters-table {
-    width: 100%;
     max-width: 800px;
     margin: 0 auto 10px;
-    border-collapse: collapse;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
   }
-  .perimeters-table th,
   .perimeters-table td {
-    padding: 7px 12px;
-    text-align: left;
     vertical-align: middle;
-    border-bottom: 1px solid var(--border-subtle);
   }
-  .perimeters-table thead th {
-    background: var(--surface);
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-  .perimeters-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-  .perimeters-table .num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+  .perimeters-table td.num {
     color: var(--accent);
-    white-space: nowrap;
   }
   /* La colonne des structures racines absorbe la largeur disponible : les colonnes suivantes (Total, actions) se réduisent à leur contenu et se collent au bord droit. */
   .perimeters-table .perim-structs {
@@ -576,7 +539,7 @@
     margin: 0;
   }
   .perim-code {
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: 0.8rem;
     color: var(--muted);
     white-space: nowrap;
@@ -603,8 +566,8 @@
     gap: 4px;
     font-size: 0.85rem;
     padding: 2px 8px;
-    border-radius: 10px;
-    background: #f0f0f0;
+    border-radius: var(--radius-pill);
+    background: var(--surface);
   }
 
   .remove {
@@ -618,11 +581,11 @@
   }
   .perim-search-results {
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     margin-top: 4px;
     max-height: 200px;
     overflow-y: auto;
-    background: white;
+    background: var(--card);
   }
   .picker-item {
     display: block;
@@ -643,7 +606,7 @@
     font-size: 0.9rem;
     font-family: inherit;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
   }
   /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
   .role-phase {

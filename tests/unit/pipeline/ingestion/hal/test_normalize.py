@@ -24,6 +24,7 @@ from pipeline.ingestion.hal.normalize import (
     build_hal_external_ids,
     extract_hal_author_block,
     get_container_facts,
+    get_locations,
     get_title,
     hal_source_record,
     page_range,
@@ -200,6 +201,37 @@ def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
     _record(doc)
     normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
     assert len(calls) == 1
+
+
+class TestGetLocations:
+    def test_depot_avec_fichier_ouvert(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-01",
+            "fileMain_s": "https://hal.science/hal-01/document",
+            "licence_s": "http://creativecommons.org/licenses/by/",
+        }
+        [location] = get_locations(doc, None)
+        assert (location.url, location.pdf_url, location.is_oa) == (
+            "https://hal.science/hal-01",
+            "https://hal.science/hal-01/document",
+            True,
+        )
+        assert location.platform.openalex_id == "S4306402512"
+
+    def test_depot_sans_fichier_ferme(self):
+        [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)
+        assert (location.pdf_url, location.is_oa) == (None, False)
+
+    def test_fichier_sous_embargo_ferme(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-03",
+            "fileMain_s": "https://hal.science/hal-03/document",
+        }
+        [location] = get_locations(doc, date(2099, 1, 1))
+        assert location.is_oa is False
+
+    def test_sans_page_de_depot(self):
+        assert get_locations({}, None) == []
 
 
 class TestParseTeiIsbns:

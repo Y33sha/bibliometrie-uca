@@ -659,13 +659,6 @@
 </div>
 
 <style>
-	/* Local CSS variables for status colors */
-	.page-addresses {
-		--warning: #c68a19;
-		--warning-light: #fef5e0;
-		--highlight: #fff3b0;
-	}
-
 	/* Stats bar */
 	.structure-bar {
 		display: flex;
@@ -675,7 +668,7 @@
 		padding: 8px 12px;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		flex-wrap: wrap;
 	}
 	.structure-label {
@@ -695,12 +688,12 @@
 	}
 	.stat-badge {
 		padding: 3px 10px;
-		border-radius: 12px;
+		border-radius: var(--radius-pill);
 		font-weight: 500;
 	}
 	.stat-total {
-		background: #f0f0ee;
-		color: #666;
+		background: var(--surface);
+		color: var(--muted);
 	}
 	.stat-detected {
 		background: var(--accent-light);
@@ -708,7 +701,7 @@
 	}
 	.stat-pending {
 		background: var(--warning-light);
-		color: var(--warning);
+		color: var(--warning-text);
 	}
 	.stat-rejected {
 		background: var(--danger-light);
@@ -722,10 +715,10 @@
 	.structure-filter {
 		padding: 6px 10px;
 		border: 1px solid var(--accent);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.95rem;
 		font-family: inherit;
-		background: white;
+		background: var(--card);
 		font-weight: 600;
 		color: var(--accent);
 	}
@@ -733,7 +726,7 @@
 	/* Filtres composables */
 	.filters-zone {
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		background: var(--card);
 		padding: 8px 12px;
 		margin-bottom: 10px;
@@ -744,10 +737,10 @@
 	.filters-zone select {
 		padding: 6px 10px;
 		border: 1px solid var(--border);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.95rem;
 		font-family: inherit;
-		background: white;
+		background: var(--card);
 	}
 	.filters-row {
 		display: flex;
@@ -805,7 +798,7 @@
 		gap: 4px;
 		font-size: 0.8rem;
 		padding: 2px 4px 2px 8px;
-		border-radius: 10px;
+		border-radius: var(--radius-pill);
 		background: var(--accent-light);
 		color: var(--accent);
 		font-weight: 500;
@@ -827,9 +820,9 @@
 	}
 	.pred-remove {
 		border: 1px solid var(--border);
-		background: white;
+		background: var(--card);
 		color: var(--muted);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		cursor: pointer;
 		padding: 2px 7px;
 		line-height: 1;
@@ -843,9 +836,9 @@
 	}
 	.add-btn {
 		border: 1px dashed var(--border);
-		background: white;
+		background: var(--card);
 		color: var(--accent);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		cursor: pointer;
 		padding: 3px 10px;
 		font-size: 0.85rem;
@@ -877,7 +870,7 @@
 	.addr-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		margin-bottom: 6px;
 		transition: border-color 0.15s;
 	}
@@ -919,7 +912,7 @@
 		display: inline-block;
 		font-size: 0.8rem;
 		padding: 1px 7px;
-		border-radius: 10px;
+		border-radius: var(--radius-pill);
 		background: var(--accent-light);
 		color: var(--accent);
 		font-weight: 500;
@@ -928,7 +921,7 @@
 		display: inline-block;
 		font-size: 0.8rem;
 		padding: 1px 7px;
-		border-radius: 10px;
+		border-radius: var(--radius-pill);
 		font-weight: 500;
 	}
 	.struct-confirmed {
@@ -937,11 +930,11 @@
 	}
 	.struct-pending {
 		background: var(--warning-light);
-		color: var(--warning);
+		color: var(--warning-text);
 	}
 	.struct-rejected {
-		background: #f0f0ee;
-		color: #999;
+		background: var(--surface);
+		color: var(--muted);
 		text-decoration: line-through;
 	}
 
@@ -971,7 +964,7 @@
 
 	.publication-row {
 		padding: 5px 0;
-		border-bottom: 1px solid #f0f0ee;
+		border-bottom: 1px solid var(--border-subtle);
 		font-size: 0.85rem;
 	}
 	.publication-row:last-child {
@@ -992,11 +985,11 @@
 
 	/* Buttons (page-specific) */
 	.btn-reset {
-		color: #888;
+		color: var(--muted);
 	}
 	.btn-reset:hover {
-		background: #f0f0f0;
-		border-color: #888;
+		background: var(--hover);
+		border-color: var(--muted);
 	}
 
 	/* Batch bar */
@@ -1004,7 +997,7 @@
 		background: var(--accent);
 		color: white;
 		padding: 8px 16px;
-		border-radius: 6px;
+		border-radius: var(--radius);
 		margin-bottom: 10px;
 		display: flex;
 		align-items: center;
@@ -1016,7 +1009,7 @@
 	}
 	.batch-bar button {
 		padding: 4px 12px;
-		border-radius: 4px;
+		border-radius: var(--radius);
 		border: 1px solid rgba(255, 255, 255, 0.3);
 		background: transparent;
 		color: white;

@@ -24,7 +24,7 @@ def build_metrics(
     created = resolution.get(f"{GroupOutcome.CREATE}:{GroupMatchReason.NAME}", 0)
 
     metrics = PhaseMetrics()
-    metrics.add(seen=resolution.get("groups", 0), new=created, updated=sum(attached.values()))
+    metrics.add(seen=resolution.get("groups", 0), new=created)
     # Clés techniques : le frontend donne les libellés.
     metrics.details["table"] = {
         "rows": [

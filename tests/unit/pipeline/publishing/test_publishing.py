@@ -50,13 +50,14 @@ def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, merge_duplicate_serials=fusion)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
-    assert lignes[:3] == [
+    assert lignes[:4] == [
         "▶ Éditeurs",
         "  ├─ Éditeurs des préfixes DOI Crossref : rien à faire",
-        "  └─ Éditeurs des préfixes DOI DataCite : rien à faire",
+        "  ├─ Éditeurs des préfixes DOI DataCite : rien à faire",
+        "  └─ Autres noms des éditeurs : rien à faire",
     ]
-    assert "▶ Revues" in lignes and "▶ Monographies" in lignes
-    assert "  ├─ Fusion des revues en double : 2 revues fusionnées" in lignes
+    assert "▶ Publications en série" in lignes and "▶ Monographies" in lignes
+    assert "  ├─ Fusion des publications en série en double : 2 revues fusionnées" in lignes
     assert lignes[-1] == "  └─ Nature des monographies : rien à faire"
 
 
@@ -74,5 +75,7 @@ def test_acces_non_configure_saute_les_taches_a_source(contexte, caplog):
         metrics = _run(contexte, appels, credentials_missing="clé absente")
     assert "enrich_serials_from_openalex" not in appels
     assert "merge_duplicate_serials" in appels  # tâche sans source
-    assert "Type des revues sur OpenAlex : sautée, accès non configuré" in caplog.text
+    assert (
+        "Type des publications en série sur OpenAlex : sautée, accès non configuré" in caplog.text
+    )
     assert {s["code"] for s in metrics.signals} == {"source_unconfigured"}

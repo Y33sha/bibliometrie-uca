@@ -53,14 +53,14 @@
     </div>
     <nav class="site-nav" class:open={mobileNavOpen}>
       <div class="nav-dropdown" role="navigation" class:active={isPipeline}>
-        <button class="nav-link" class:active={isPipeline}>Pipeline &#x25BE;</button>
+        <button class="nav-link" class:active={isPipeline}>Pipeline <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
           <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isReferentiels}>
-        <button class="nav-link" class:active={isReferentiels}>Référentiels &#x25BE;</button>
+        <button class="nav-link" class:active={isReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
           <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
@@ -71,7 +71,7 @@
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isAddresses}>
-        <button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
+        <button class="nav-link" class:active={isAddresses}>Adresses <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
@@ -91,7 +91,7 @@
       <a href={resolve('laboratories')} class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
       <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
       <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
-        <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
+        <button class="nav-link" class:active={isPublicReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
           <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
@@ -101,7 +101,7 @@
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isHalProblems}>
-        <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
+        <button class="nav-link" class:active={isHalProblems}>Problèmes HAL <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
           <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
@@ -130,33 +130,12 @@
   }
   :global(body) {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-family: var(--font);
+    font-variant-numeric: tabular-nums;
     font-size: 1rem;
     line-height: 1.5;
     color: var(--text);
     background: var(--bg);
-  }
-  :global(:root) {
-    --bg: #f8f7f4;
-    --card: #ffffff;
-    --text: #2c2c2c;
-    --muted: #6b7280;
-    --accent: #3b6b9e;
-    --border: #e5e5e0;
-    --hover: #efede6; /* fond de survol des éléments cliquables (lignes, items de liste) */
-    --gold: #ffd700;
-    --diamond: #d0d4fb;
-    --hybrid: #b366f2;
-    --bronze: #cd7f32;
-    --bronze-text: #9a5a1e; /* bronze assombri, lisible en texte sur fond clair */
-    --green: #5ec62c;
-    --green-text: #3f7a28; /* voie green assombrie, lisible en texte sur fond clair */
-    --open: #57b82e; /* vert « accès ouvert » (indicateur générique) */
-    --open-text: #3f7a28; /* « accès ouvert » assombri, lisible en texte sur fond clair */
-    --embargoed: #b08900;
-    --closed: #555;
-    --unknown: #bbb;
-    --header-height: 46px; /* hauteur du menu supérieur fixe (sticky top:0) */
   }
   :global(*, *::before, *::after) {
     box-sizing: border-box;
@@ -167,11 +146,16 @@
     -webkit-appearance: none;
     padding: 6px 10px;
     border: 1px solid var(--border);
-    border-radius: 4px;
-    background: white;
+    border-radius: var(--radius);
+    background: var(--card);
     font-family: inherit;
     font-size: 0.95rem;
     color: inherit;
+  }
+  :global(:where(input[type="search"]):focus) {
+    outline: none;
+    border-color: var(--accent-mid);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-mid) 20%, transparent);
   }
   :global(input[type="search"]::-webkit-search-cancel-button) {
     -webkit-appearance: none;
@@ -187,7 +171,7 @@
     margin-right: 10px;
   }
   .site-header {
-    background: #5b9ea0;
+    background: var(--nav-public);
     color: white;
     padding: 0 24px;
     display: flex;
@@ -200,23 +184,24 @@
     z-index: 300;
   }
   .site-header.admin {
-    background: #3d7a7c;
+    background: var(--nav-admin);
   }
   .site-header.admin .nav-dropdown-menu {
-    background: #4d8a8c;
+    background: var(--nav-admin-menu);
   }
   .nav-toggle {
     display: none;
     background: none;
     border: none;
-    color: white;
+    color: inherit;
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
     padding: 0 6px;
-    height: 46px;
+    height: var(--header-height);
   }
   .site-title {
+    white-space: nowrap;
     font-family: "Ubuntu", sans-serif;
     font-size: 1.15rem;
     font-weight: 500;
@@ -225,7 +210,7 @@
   .site-title-admin {
     font-size: 0.8rem;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
     margin-left: 6px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -233,74 +218,79 @@
   .site-nav {
     display: flex;
     align-items: center;
-    gap: 0;
+    gap: 2px;
     height: 100%;
   }
+  /* Rubrique : pastille arrondie, fond plus clair pour la rubrique active. */
   .nav-link {
-    color: rgba(255, 255, 255, 0.7);
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
-    font-size: 0.95rem;
-    padding: 0 14px;
-    height: 46px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    padding: 0 12px;
+    height: 34px;
     display: flex;
     align-items: center;
     border: none;
+    border-radius: var(--radius);
     background: none;
     cursor: pointer;
     font-family: inherit;
-    transition: color 0.15s;
+    transition: background 0.15s, color 0.15s;
   }
   .nav-link:hover {
     color: white;
+    background: rgba(255, 255, 255, 0.1);
   }
   .nav-icon {
     display: inline-flex;
     margin-right: 7px;
     font-size: 0.9em;
   }
-  .nav-link.active {
+  .nav-link.active,
+  .nav-dropdown.active > .nav-link {
     color: white;
-    box-shadow: inset 0 -2px 0 white;
+    background: rgba(255, 255, 255, 0.18);
   }
   .nav-switch-link {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 0.85rem;
     margin-left: 12px;
-    border-left: 1px solid rgba(255, 255, 255, 0.15);
   }
   .nav-switch-link:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: white;
   }
   .nav-dropdown {
     position: relative;
-    height: 46px;
+    height: 100%;
     display: flex;
     align-items: center;
-  }
-  .nav-dropdown.active > .nav-link {
-    color: white;
-    box-shadow: inset 0 -2px 0 white;
   }
   .nav-dropdown:hover > .nav-dropdown-menu {
     display: block;
   }
+  .nav-dropdown:hover > .nav-link .chevron {
+    transform: rotate(180deg);
+  }
   .nav-dropdown-menu {
     display: none;
     position: absolute;
-    top: 46px;
+    top: 100%;
     left: 0;
-    background: #4a8c8e;
-    border-radius: 0 0 5px 5px;
-    min-width: 150px;
+    padding: 4px 0;
+    background: var(--nav-public-menu);
+    border-radius: 0 0 var(--radius) var(--radius);
+    min-width: 170px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 100;
   }
   .nav-dropdown-menu a {
     display: block;
-    padding: 9px 16px;
-    color: rgba(255, 255, 255, 0.8);
+    padding: 8px 16px;
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
   }
   .nav-dropdown-menu a:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -310,14 +300,25 @@
     color: white;
     font-weight: 600;
   }
+
   .container {
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px;
   }
 
-  /* ── Responsive : hamburger + menu vertical sous 860px ── */
-  @media (max-width: 860px) {
+  /* ── Largeur intermédiaire : rubriques sans icône, plus serrées, pour tenir sur une ligne ── */
+  @media (max-width: 1100px) {
+    .nav-icon {
+      display: none;
+    }
+    .nav-link {
+      padding: 0 9px;
+    }
+  }
+
+  /* ── Responsive : hamburger + menu vertical sous 940px ── */
+  @media (max-width: 940px) {
     .nav-toggle {
       display: flex;
       align-items: center;
@@ -325,19 +326,19 @@
     .site-nav {
       display: none;
       position: absolute;
-      top: 46px;
+      top: var(--header-height);
       left: 0;
       right: 0;
       flex-direction: column;
       align-items: stretch;
       height: auto;
       padding: 4px 0;
-      background: #5b9ea0;
+      background: var(--nav-public);
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
       z-index: 200;
     }
     .site-header.admin .site-nav {
-      background: #3d7a7c;
+      background: var(--nav-admin);
     }
     .site-nav.open {
       display: flex;
@@ -349,6 +350,7 @@
       height: auto;
       width: 100%;
       padding: 11px 22px;
+      border-radius: 0;
     }
     .nav-dropdown {
       height: auto;
@@ -368,7 +370,6 @@
     }
     .nav-switch-link {
       margin-left: 0;
-      border-left: none;
       border-top: 1px solid rgba(255, 255, 255, 0.15);
     }
   }

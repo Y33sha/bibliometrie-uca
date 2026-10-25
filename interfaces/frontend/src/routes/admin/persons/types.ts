@@ -14,6 +14,7 @@ export type PersonListResponse = components["schemas"]["PersonListResponse"];
 export type OtherPerson = components["schemas"]["OtherPersonOut"];
 export type PersonSearchResult = components["schemas"]["PersonSearchResult"];
 export type PersonExclusion = components["schemas"]["PersonExclusion"];
+export type CurationPerson = components["schemas"]["CurationPersonOut"];
 
 // ── Extensions UI (champs ajoutés côté front) ──
 type NameFormContributionRef = components["schemas"]["NameFormContributionRef"];

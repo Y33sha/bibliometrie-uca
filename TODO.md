@@ -1,6 +1,12 @@
 python -m interfaces.cli.oneshot.backfill_source_record_publishers
 python -m interfaces.cli.oneshot.apply_known_platforms
 run_pipeline --only publications
+python -m interfaces.cli.oneshot.detach_ebook_platforms
+python -m interfaces.cli.oneshot.apply_known_platforms
+python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store --sources hal,openalex
+run_pipeline --from normalize --sources hal,openalex --no-extras
+python -m interfaces.cli.oneshot.merge_publisher_aliases
+python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles
 
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
@@ -26,6 +32,7 @@ run_pipeline --only publications
 * [ ] identifiants mal placés et neutralisés par le pipeline: auditer
 * [ ] récupérer date de publication complète au lieu de l'année seule
 * [ ] doublons dans journal_name_forms.form_normalized
+* [ ] "Additional file" sur figshare: comment regrouper les pièces liées à un même article?
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
@@ -45,10 +52,10 @@ run_pipeline --only publications
 * [ ] volet latéral pour Editeurs et Revues
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
-* [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne)
+* [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories; `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne); impact (citations, fwci, top10)
+* [ ] masquer de l'interface les DOI qui ne résolvent pas
 
 # Cas particuliers, bizarreries à élucider
-* [ ] 164107: pourquoi type autre?
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"
 * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
 * [ ] 182637 et 182636: vérifier si DataCite indique relation
@@ -56,8 +63,6 @@ run_pipeline --only publications
 * [ ] fusion entre article et conference_paper: 12362
 * [ ] 165425: fusion d'un article et d'un dataset
 * [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
-* [ ] "Total phase persons : 3 new, 51333 updated" comment est-ce possible, avec 14k personnes en base?
-* [ ] 172655 titre mal formé (notation mathématique mal développée)
 * 116323: comment empêcher la fusion de l'ouvrage et de ses chapitres?
 * 100685: pourquoi preprint?
 * 138474: 1 seul document alors que le preprint devrait être distinct
@@ -65,6 +70,8 @@ run_pipeline --only publications
 * 221243: pourquoi pas fusionné avec son hal-id?
 * 81408: openalex, source hal; mais pas de doc hal correpondant
 * 27059: Epidemiological impact ofNeisseria gonorrhoeaeandChlamydia trachomatisscreening in men having sex with men: a modelling study => normaliser toutes les balises en espaces puis supprimer les espaces doubles
+* "(No longer) Hiking hypothetical trails in one direction: How unidirectional comparisons hinder theoretical progress in social psychology, and how reversing the direction of comparisons can advance it" => openalex type "article"
+* "L'aléa algorithmique" non fusionné avec l'enregistrement hal
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
@@ -72,7 +79,6 @@ run_pipeline --only publications
 * stats en compte fractionnaire vs compte entier
 * collaborations nationales et internationales: identification des structures partenaires; évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
-* citation count / cité par... (DOI)
 * OpenAPC: j'ai utilisé les données sur les APC UCA, mais il faudrait partir du dump complet et matcher tous les DOI des publis UCA pour voir quels établissements ont payé les APC quand ce n'est pas l'UCA
 ## Détails techniques
 * mettre en place des slugs pour les URL (au moins pour labos et personnes)?

@@ -1,8 +1,12 @@
 <script lang="ts">
+  import { cssVar } from "#lib/components/charts/cssVar.js";
   import { onDestroy, onMount } from "svelte";
   import { DataSet, Network } from "vis-network/standalone";
   import type { Node, Edge, Options } from "vis-network/standalone";
   import type { components } from "#lib/api/schema.js";
+
+  // Palette tournante des sujets, non sémantique.
+  const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
   type SubjectNeighbor = components["schemas"]["SubjectNeighborOut"];
@@ -20,11 +24,6 @@
   let container: HTMLDivElement | undefined = $state();
   let network: Network | undefined;
 
-  /** Palette identique à SubjectsCloud, pour cohérence visuelle entre le nuage et le graphe. Couleur stable par sujet via hash de l'id. */
-  const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
-  function colorFor(id: number): string {
-    return PALETTE[id % PALETTE.length];
-  }
 
   /** Taille de police adaptative au range du graphe en cours. */
   function nodeFontSize(
@@ -84,11 +83,11 @@
     const allUsages = [subject.usage_count, ...neighbors.map((n) => n.usage_count)];
     const minUsage = Math.min(...allUsages);
     const maxUsage = Math.max(...allUsages);
-    // Texte nu : la couleur vient de la palette stable par id (mêmes règles que SubjectsCloud) ; le centre est agrandi pour rester identifiable une fois la physique figée.
+    // Texte nu : la couleur vient d'une palette tournante, stable pour un même sujet ; le centre est agrandi pour rester identifiable une fois la physique figée.
     const fontFor = (id: number, usageCount: number, isCenter: boolean) => ({
       size: nodeFontSize(usageCount, minUsage, maxUsage) + (isCenter ? 6 : 0),
-      color: colorFor(id),
-      face: "system-ui, sans-serif",
+      color: PALETTE[id % PALETTE.length],
+      face: cssVar("font"),
     });
     const nodes: Node[] = [
       {
@@ -130,7 +129,7 @@
       },
       edges: {
         scaling: { min: 1, max: 8 },
-        color: { color: "#cbd5e1", highlight: "#64748b", hover: "#64748b" },
+        color: { color: cssVar("border"), highlight: cssVar("muted"), hover: cssVar("muted") },
         smooth: { enabled: true, type: "continuous", roundness: 0.3 },
       },
       physics: {
@@ -199,8 +198,8 @@
   .graph {
     width: 100%;
     height: 70vh;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
   }
 </style>

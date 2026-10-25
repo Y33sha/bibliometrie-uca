@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-25)
 """Applique au stock la liste des plateformes connues (`domain.platforms.registry`).
 
-Les plateformes prennent le type que leur donne la liste, à défaut entrepôt. Les enregistrements sources des publications dont le DOI a un préfixe de plateforme d'éditeurs passent dans la file de réconciliation : la phase `publications` recalcule ensuite leur éditeur. Idempotent.
+Les plateformes prennent le nom et le type que leur donne la liste, à défaut le type entrepôt. Les enregistrements sources des publications dont le DOI a un préfixe de plateforme d'éditeurs passent dans la file de réconciliation : la phase `publications` recalcule ensuite leur éditeur. Idempotent.
 
 Usage :
     python -m interfaces.cli.oneshot.apply_known_platforms [--dry-run]
@@ -14,6 +14,7 @@ import os
 
 from sqlalchemy import Connection, text
 
+from domain.normalize import normalize_text
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import KNOWN_PLATFORMS
 from infrastructure.db.engine import get_sync_engine
@@ -21,6 +22,24 @@ from infrastructure.db.queues import Queue, enqueue
 from infrastructure.observability.log import setup_logger
 
 log = setup_logger("apply_known_platforms", os.path.dirname(__file__))
+
+
+def rename_platforms(conn: Connection) -> int:
+    """Donne à chaque plateforme de la liste le nom de la liste. Rend le nombre de plateformes renommées."""
+    known = [(i, p.name) for p in KNOWN_PLATFORMS for i in p.openalex_ids]
+    return conn.execute(
+        text("""
+            UPDATE platforms p SET name = k.name, name_normalized = k.name_normalized
+            FROM unnest(CAST(:ids AS text[]), CAST(:names AS text[]), CAST(:normalized AS text[]))
+                AS k(openalex_id, name, name_normalized)
+            WHERE p.openalex_id = k.openalex_id AND p.name <> k.name
+        """),
+        {
+            "ids": [i for i, _ in known],
+            "names": [n for _, n in known],
+            "normalized": [normalize_text(n) for _, n in known],
+        },
+    ).rowcount
 
 
 def retype_platforms(conn: Connection) -> int:
@@ -67,10 +86,14 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="compte sans rien écrire")
     args = parser.parse_args()
     with get_sync_engine().connect() as conn:
+        renamed = rename_platforms(conn)
         retyped = retype_platforms(conn)
         queued = enqueue_platform_prefix_records(conn)
         log.info(
-            "%d plateformes retypées, %d enregistrements sources à réconcilier", retyped, queued
+            "%d plateformes renommées, %d retypées, %d enregistrements sources à réconcilier",
+            renamed,
+            retyped,
+            queued,
         )
         if args.dry_run:
             conn.rollback()

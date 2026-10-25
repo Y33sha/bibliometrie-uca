@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { asset, resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
@@ -54,41 +55,41 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	function sortArrow(asc: PublicationSort, desc: PublicationSort): string {
-		return sort === asc ? '▲' : sort === desc ? '▼' : '';
+	function sortDirection(asc: PublicationSort, desc: PublicationSort): 'asc' | 'desc' | null {
+		return sort === asc ? 'asc' : sort === desc ? 'desc' : null;
 	}
 	function sortActive(asc: PublicationSort, desc: PublicationSort): boolean {
 		return sort === asc || sort === desc;
 	}
 
-	const inscrArrow = $derived(sortArrow('inscription_asc', 'inscription_desc'));
+	const inscrSort = $derived(sortDirection('inscription_asc', 'inscription_desc'));
 	const inscrActive = $derived(sortActive('inscription_asc', 'inscription_desc'));
-	const soutArrow = $derived(sortArrow('soutenance_asc', 'soutenance_desc'));
+	const soutSort = $derived(sortDirection('soutenance_asc', 'soutenance_desc'));
 	const soutActive = $derived(sortActive('soutenance_asc', 'soutenance_desc'));
-	const titleArrow = $derived(sortArrow('title_asc', 'title_desc'));
+	const titleSort = $derived(sortDirection('title_asc', 'title_desc'));
 	const titleActive = $derived(sortActive('title_asc', 'title_desc'));
 </script>
 
 <div class="table-scroll">
-<table class="theses-table">
+<table class="data-table theses-table">
 	<thead>
 		<tr>
 			<th
 				class="col-date sortable"
 				class:active={inscrActive}
 				onclick={() => onToggleSort('inscription_asc', 'inscription_desc')}
-			>Inscription {inscrArrow}</th>
+			>Inscription <SortChevron direction={inscrSort} /></th>
 			<th
 				class="col-date sortable"
 				class:active={soutActive}
 				onclick={() => onToggleSort('soutenance_asc', 'soutenance_desc')}
-			>Soutenance {soutArrow}</th>
+			>Soutenance <SortChevron direction={soutSort} /></th>
 			<th class="col-author">Auteur</th>
 			<th
 				class="col-title sortable"
 				class:active={titleActive}
 				onclick={() => onToggleSort('title_asc', 'title_desc')}
-			>Titre {titleArrow}</th>
+			>Titre <SortChevron direction={titleSort} /></th>
 			<th class="col-status">Statut</th>
 			{#if showLabsColumn}
 				<th class="col-labs">Laboratoire(s)</th>
@@ -215,42 +216,24 @@
 
 <style>
 	.theses-table {
-		width: 100%;
 		min-width: 720px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
 		font-size: 0.9rem;
-	}
-	.theses-table th {
-		text-align: left;
-		padding: 6px 8px;
-		border-bottom: 2px solid var(--border);
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		background: var(--surface);
-		white-space: nowrap;
-	}
-	.theses-table td {
-		padding: 5px 8px;
-		border-bottom: 1px solid var(--border);
-		vertical-align: top;
-	}
-	.theses-table tbody tr:hover {
-		background: var(--surface-hover);
 	}
 
 	.col-author {
 		width: 160px;
-		font-size: 0.9rem;
 	}
 	.col-date {
 		width: 85px;
 		text-align: center;
-		font-size: 0.85rem;
 		white-space: nowrap;
+	}
+	/* Taille propre aux cellules : l'en-tête garde la typographie commune des tableaux. */
+	td.col-author {
+		font-size: 0.9rem;
+	}
+	td.col-date {
+		font-size: 0.85rem;
 	}
 	.col-date .date-month {
 		font-size: 0.75rem;
@@ -274,25 +257,17 @@
 		text-align: center;
 	}
 
-	.sortable {
-		cursor: pointer;
-		user-select: none;
-	}
-	.sortable.active {
-		color: var(--accent);
-	}
-
 	.status-badge {
 		font-size: 0.75rem;
 		padding: 2px 6px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 	}
 	.status-badge.soutenue {
 		background: var(--success-light);
 		color: var(--success);
 	}
 	.status-badge.en-cours {
-		background: #fff3e0;
-		color: #e65100;
+		background: var(--attention-light);
+		color: var(--attention);
 	}
 </style>

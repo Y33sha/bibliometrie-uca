@@ -1,6 +1,6 @@
 #  Création et résolution des publications
 
-*À jour le 2026-10-13.*
+*À jour le 2026-10-25.*
 
 ```mermaid
 flowchart LR
@@ -50,4 +50,4 @@ Une `source_record` modifiée (insérée, re-normalisée, corrigée) est marqué
 
 ## Rafraîchissement des métadonnées
 
-Une fois les rattachements posés, les métadonnées de chaque publication touchée sont recalculées par agrégation de ses `source_records`. La licence de la version éditeur (`license`) suit un ordre de sources propre, et la licence du fichier déposé (`deposit_license`) vient de HAL. Les publications vidées de toutes leurs `source_records` sont supprimées.
+Une fois les rattachements posés, les métadonnées de chaque publication touchée sont recalculées par agrégation de ses `source_records`. La licence de la version éditeur (`license`) suit un ordre de sources propre, et la licence du fichier déposé (`deposit_license`) vient de HAL. L'éditeur est celui de la date de publication : le titulaire du préfixe du DOI Crossref, à défaut le premier éditeur des enregistrements sources selon le classement des sources. Le préfixe d'une plateforme d'éditeurs ne compte pas, et une production hébergée sans être publiée n'a pas d'éditeur (`domain/publishers/attribution.py`). Les publications vidées de toutes leurs `source_records` sont supprimées.

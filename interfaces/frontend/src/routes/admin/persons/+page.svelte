@@ -638,10 +638,10 @@
     width: 100%;
     padding: 10px 16px;
     margin-bottom: 12px;
-    background: #fff3e0;
-    border: 1px solid #ffcc80;
-    border-radius: 6px;
-    color: #e65100;
+    background: var(--attention-light);
+    border: 1px solid color-mix(in srgb, var(--attention) 40%, white);
+    border-radius: var(--radius);
+    color: var(--attention);
     font-size: 0.9rem;
     font-weight: 500;
     cursor: pointer;
@@ -649,6 +649,6 @@
     transition: background 0.15s;
   }
   .orphan-link:hover {
-    background: #ffe0b2;
+    background: color-mix(in srgb, var(--attention) 25%, white);
   }
 </style>

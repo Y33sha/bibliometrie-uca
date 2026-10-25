@@ -99,7 +99,7 @@ export interface paths {
         };
         /**
          * Stats Entity Facet
-         * @description Facette contextuelle des éditeurs ou des revues : les premières entités sous les filtres actifs, avec leur décompte.
+         * @description Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
          *
          *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
          */
@@ -397,7 +397,7 @@ export interface paths {
         };
         /**
          * Resolve Entity Label
-         * @description Libellé d'une revue ou d'un éditeur par son identifiant.
+         * @description Libellé d'une entité de facette par son identifiant : un entier, ou un ROR pour une organisation partenaire.
          *
          *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection. Le libellé étant le même sous tous les jeux de filtres, la lecture est unique quel que soit le contexte qui affiche la facette.
          */
@@ -818,6 +818,26 @@ export interface paths {
          * @description Adresses rattachées à la structure, le rattachement rejeté écarté.
          */
         get: operations["get_structure_addresses_api_structures__structure_id__addresses_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/{structure_id}/partners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Structure Partners
+         * @description Organisations partenaires de la structure, classées par nombre de copublications : les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles. Filtres par année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules.
+         */
+        get: operations["get_structure_partners_api_structures__structure_id__partners_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2562,6 +2582,16 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AccessLinkOut
+         * @description Copie ouverte d'une publication, nommée par sa plateforme (`domain.publications.access`).
+         */
+        AccessLinkOut: {
+            /** Label */
+            label: string;
+            /** Url */
+            url: string;
+        };
         /** AddIdentifier */
         AddIdentifier: {
             id_type: components["schemas"]["PersonIdentifierType"];
@@ -3119,7 +3149,7 @@ export interface components {
         /** EntityFacetItem */
         EntityFacetItem: {
             /** Id */
-            id: number;
+            id: number | string;
             /** Label */
             label: string;
             /** Count */
@@ -3157,7 +3187,7 @@ export interface components {
         };
         /**
          * ExternalIdentifierOut
-         * @description Identifiant externe agrégé d'une publication (arXiv, PMID, PMCID, NNT), pour la sidebar.
+         * @description Identifiant externe agrégé d'une publication (PMID, NNT), pour la sidebar.
          */
         ExternalIdentifierOut: {
             /** Type */
@@ -3894,6 +3924,15 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** PartnerFacetOption */
+        PartnerFacetOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Count */
+            count: number;
+        };
         /** PerimeterCreate */
         PerimeterCreate: {
             /** Code */
@@ -4367,6 +4406,12 @@ export interface components {
             keywords: string[];
             /** Relations */
             relations: components["schemas"]["RelatedPublicationOut"][];
+            /** Access Url */
+            access_url: string | null;
+            /** Access */
+            access: components["schemas"]["AccessLinkOut"][];
+            /** Referenced By */
+            referenced_by: components["schemas"]["SourceRecordOut"][];
             /** External Identifiers */
             external_identifiers: components["schemas"]["ExternalIdentifierOut"][];
         };
@@ -4920,7 +4965,7 @@ export interface components {
          * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`.
          * @enum {string}
          */
-        SerialType: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
+        SerialType: "journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
         /**
          * SerialTypeChange
          * @description Valeur de `serial_type` dont la modale admin demande l'impact avant de confirmer l'édition.
@@ -5335,6 +5380,46 @@ export interface components {
             api_ids: {
                 [key: string]: string[];
             } | null;
+        };
+        /**
+         * StructurePartner
+         * @description Organisation partenaire d'une structure : un ROR des auteurs de ses publications, avec le nombre de copublications.
+         */
+        StructurePartner: {
+            /** Ror Id */
+            ror_id: string;
+            /** Name */
+            name: string | null;
+            /** Country Code */
+            country_code: string | null;
+            /** Country Name */
+            country_name: string | null;
+            /** Types */
+            types: string[];
+            /** Publications */
+            publications: number;
+        };
+        /**
+         * StructurePartnersResponse
+         * @description Organisations partenaires d'une structure, les plus fréquentes en tête, et les options de leurs filtres.
+         */
+        StructurePartnersResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Partners */
+            partners: components["schemas"]["StructurePartner"][];
+            /** Years */
+            years: components["schemas"]["PartnerFacetOption"][];
+            /** Countries */
+            countries: components["schemas"]["PartnerFacetOption"][];
+            /** Types */
+            types: components["schemas"]["PartnerFacetOption"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * StructureRef
@@ -5762,6 +5847,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5796,12 +5882,13 @@ export interface operations {
     stats_entity_facet_api_stats_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "serial" | "person" | "subject";
+                kind: "publisher" | "serial" | "person" | "subject" | "partner";
                 entity_search?: string;
                 lab_id?: string;
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5840,6 +5927,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5901,6 +5989,7 @@ export interface operations {
                 year?: string;
                 publisher_id?: string;
                 serial_id?: string;
+                partner_ror?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5976,6 +6065,7 @@ export interface operations {
                 language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6006,7 +6096,7 @@ export interface operations {
     publications_entity_facet_api_publications_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "serial" | "person" | "subject";
+                kind: "publisher" | "serial" | "person" | "subject" | "partner";
                 entity_search?: string;
                 search?: string;
                 lab_id?: string;
@@ -6029,6 +6119,7 @@ export interface operations {
                 language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6082,6 +6173,7 @@ export interface operations {
                 language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6287,6 +6379,7 @@ export interface operations {
                 language?: string;
                 hal_status?: string;
                 in_perimeter?: string;
+                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6317,8 +6410,8 @@ export interface operations {
     resolve_entity_label_api_entity_labels_get: {
         parameters: {
             query: {
-                kind: "publisher" | "serial" | "person" | "subject";
-                entity_id: number;
+                kind: "publisher" | "serial" | "person" | "subject" | "partner";
+                entity_id: string;
             };
             header?: never;
             path?: never;
@@ -7115,6 +7208,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructureAddressesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_structure_partners_api_structures__structure_id__partners_get: {
+        parameters: {
+            query?: {
+                year?: string;
+                country?: string;
+                type?: string;
+                page?: number;
+                per_page?: number;
+            };
+            header?: never;
+            path: {
+                structure_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructurePartnersResponse"];
                 };
             };
             /** @description Validation Error */

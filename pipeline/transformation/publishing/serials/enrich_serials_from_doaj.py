@@ -1,4 +1,4 @@
-"""Import du dump CSV DOAJ dans `serials.doaj_payload` (DOAJ = source de vérité).
+"""Import du dump CSV DOAJ dans `serials.doaj_payload` (DOAJ = source de vérité), et typage en revue des entrées présentes dans le DOAJ.
 
 Bulk, set-based : indexe les `serials` par leurs ISSN en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
 
@@ -18,6 +18,7 @@ from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
 from domain.publications.identifiers import ISSN
 from domain.serials.issns import IssnStatus
+from domain.serials.serial import SerialType
 from domain.types import JsonValue
 from infrastructure.db.scalars import scalar_datetime_or_none
 from infrastructure.db.tables import serial_issns, serials
@@ -26,6 +27,7 @@ from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import waiting
 from pipeline.runtime.observability.signals import signal_source_unavailable
+from pipeline.transformation.publishing.serials.store import TYPE_NOT_MANUAL
 
 LABEL = "Import du DOAJ"
 """Libellé de la sous-étape dans le journal de la phase."""
@@ -92,6 +94,15 @@ def reset_is_in_doaj(conn: Connection) -> int:
     """Efface le drapeau `is_in_doaj` de toutes les revues où il est posé, le dump DOAJ faisant autorité — l'import le re-pose ensuite sur les revues matchées. Retourne le nombre de drapeaux effacés."""
     return conn.execute(
         update(serials).where(serials.c.is_in_doaj).values(is_in_doaj=False)
+    ).rowcount
+
+
+def type_doaj_serials_as_journals(conn: Connection) -> int:
+    """Type en revue les entrées de type inconnu présentes dans le DOAJ, qui répertorie seulement des revues. Un type saisi à la main reste en l'état. Retourne le nombre d'entrées typées."""
+    return conn.execute(
+        update(serials)
+        .where(serials.c.is_in_doaj, serials.c.serial_type == SerialType.UNKNOWN, TYPE_NOT_MANUAL)
+        .values(serial_type=SerialType.JOURNAL)
     ).rowcount
 
 
@@ -184,10 +195,25 @@ def run_enrich_serials_from_doaj(
     refresh_after_days: int,
     download_dump: DownloadDump,
 ) -> PhaseMetrics:
-    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours.
+    """Télécharge et importe le dump DOAJ quand le dernier import date de plus de `refresh_after_days` jours, puis type en revue les entrées présentes dans le DOAJ (`type_doaj_serials_as_journals`).
 
     Un dump inaccessible laisse le référentiel inchangé et signale la source indisponible : la phase continue, l'import est repris au run suivant.
     """
+    metrics = _import_doaj(
+        conn, logger, refresh_after_days=refresh_after_days, download_dump=download_dump
+    )
+    type_doaj_serials_as_journals(conn)
+    return metrics
+
+
+def _import_doaj(
+    conn: Connection,
+    logger: logging.Logger,
+    *,
+    refresh_after_days: int,
+    download_dump: DownloadDump,
+) -> PhaseMetrics:
+    """Import du dump DOAJ de `run_enrich_serials_from_doaj`."""
     last = doaj_last_import_at(conn)
     refresh_delay = timedelta(days=refresh_after_days)
     if last is not None and last > datetime.now(UTC) - refresh_delay:

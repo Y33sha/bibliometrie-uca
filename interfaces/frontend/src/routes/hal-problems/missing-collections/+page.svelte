@@ -6,7 +6,7 @@
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular } from '#lib/labels.js';
+	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
@@ -93,14 +93,14 @@
 			<div class="publication-card">
 				<div class="publication-meta-line">
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+					{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
+					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
 					{#if pub.hal_links.length}
 						{#each pub.hal_links as link (link.source_id)}
-							<a href={link.record_url} target="_blank" rel="noopener" class="hal-badge">{link.source_id}</a>
+							<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
 						{/each}
 					{/if}
 					{#if pub.doi}
@@ -117,7 +117,7 @@
 	.lab-select {
 		padding: 6px 10px;
 		border: 2px solid var(--accent);
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.9rem;
 		font-family: inherit;
 		font-weight: 600;
@@ -129,27 +129,19 @@
 	.publication-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 10px 14px;
 	}
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 	.meta-badge { flex-shrink: 0; }
 	.badge-hors-uca {
-		display: inline-block; padding: 1px 8px; background: #fff3e0;
-		border: 1px solid #ffb74d; border-radius: 3px; font-size: 0.78rem;
-		color: #e65100; font-weight: 600; flex-shrink: 0;
+		display: inline-block; padding: 1px 8px; background: var(--attention-light);
+		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: var(--radius); font-size: 0.78rem;
+		color: var(--attention); font-weight: 600; flex-shrink: 0;
 	}
-	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
-	.publication-link:hover { text-decoration: underline; }
 	.hal-list {
 		display: flex; flex-wrap: wrap; gap: 6px;
 		align-items: center; margin-top: 6px; padding-left: 20px;
 	}
-	.hal-badge {
-		display: inline-block; padding: 2px 8px; background: #1a6fb5;
-		border-radius: 4px; font-size: 0.82rem; color: #fff;
-		text-decoration: none; font-weight: 500;
-	}
-	.hal-badge:hover { background: #145a94; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); }
 </style>

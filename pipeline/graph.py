@@ -517,6 +517,32 @@ TASKS: tuple[Task, ...] = (
         network="datacite",
     ),
     _task(
+        "publishing.merge_duplicate_publishers",
+        "publishing",
+        reads=(
+            "source_records.publisher_id",
+            "source_records.publication_id",
+            "publications.doi_prefix",
+            "doi_prefixes.ra",
+            "doi_prefixes.publisher_id",
+            "publishers.id",
+            "publishers.name",
+        ),
+        writes=(
+            "publishers.id",
+            "source_records.publisher_id",
+            "publications.publisher_id",
+            "serials.publisher_id",
+            "monographs.publisher_id",
+            "apc_payments.publisher_id",
+            "publisher_name_forms",
+            "serial_name_forms",
+            "merge_redirects",
+        ),
+        # Un autre nom ne détient aucun préfixe DOI : la fusion laisse `doi_prefixes` en l'état.
+        previous_run=("source_records", "publications", "publishers"),
+    ),
+    _task(
         "publishing.enrich_serials_from_openalex",
         "publishing",
         reads=(
@@ -621,6 +647,29 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
+        "publishing.type_journal_serials",
+        "publishing",
+        reads=(
+            "serials.id",
+            "serials.title",
+            "serials.serial_type",
+            "serials.manual_fields",
+            "serial_issns",
+            "source_records.corrections",
+            "source_records.doc_type",
+            "source_records.serial_id",
+        ),
+        writes=("serials.serial_type",),
+        previous_run=(
+            "serials",
+            "serial_issns",
+            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            "source_records.corrections",
+            "source_records.doc_type",
+            "source_records.serial_id",
+        ),
+    ),
+    _task(
         "publishing.learn_serial_doi_namespaces",
         "publishing",
         reads=(
@@ -635,8 +684,20 @@ TASKS: tuple[Task, ...] = (
     _task(
         "publishing.enrich_serials_from_doaj",
         "publishing",
-        reads=("serial_issns", "serials.doaj_imported_at", "config"),
-        writes=("serials.is_in_doaj", "serials.doaj_payload", "serials.doaj_imported_at"),
+        reads=(
+            "serial_issns",
+            "serials.doaj_imported_at",
+            "serials.is_in_doaj",
+            "serials.serial_type",
+            "serials.manual_fields",
+            "config",
+        ),
+        writes=(
+            "serials.is_in_doaj",
+            "serials.doaj_payload",
+            "serials.doaj_imported_at",
+            "serials.serial_type",
+        ),
         previous_run=("serial_issns", "serials"),
         network="doaj",
     ),
@@ -1030,8 +1091,11 @@ TASKS: tuple[Task, ...] = (
             "contributions.roles",
             "aligned_source_contributions",
             "persons.exclusion",
+            "source_contribution_rors",
+            "ror_relations",
+            "structures.ror_id",
         ),
-        writes=("contribution_structures", "publication_structures"),
+        writes=("contribution_structures", "publication_structures", "publication_rors"),
     ),
     _task(
         "finalize.purge_publications",

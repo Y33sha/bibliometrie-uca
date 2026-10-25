@@ -148,19 +148,16 @@ def is_hal_location(loc: OpenalexLocation) -> bool:
     return False
 
 
-def should_skip_publisher_serial(loc: OpenalexLocation | None) -> bool:
-    """True si la primary_location désigne une plateforme : ni publisher ni journal ne sont cherchés pour ce work.
-
-    Couvre HAL, theses.fr, tout autre repository (Zenodo, SPIRE, etc.) et les plateformes d'ebooks. `None` (pas de primary) → False (rare en pratique).
-    """
+def names_publisher(loc: OpenalexLocation | None) -> bool:
+    """Indique si la source de la primary_location nomme l'éditeur du work. HAL, theses.fr et tout autre repository (Zenodo, SPIRE, etc.) hébergent le work sans le publier. Sans primary_location (rare en pratique), la source est réputée nommer l'éditeur."""
     if loc is None:
-        return False
-    return (
-        is_hal_location(loc)
-        or is_theses_fr_location(loc)
-        or is_repository_location(loc)
-        or loc.source_type == "ebook platform"
-    )
+        return True
+    return not (is_hal_location(loc) or is_theses_fr_location(loc) or is_repository_location(loc))
+
+
+def names_serial(loc: OpenalexLocation | None) -> bool:
+    """Indique si la source de la primary_location est la revue ou la collection du work. Une plateforme d'ebooks a l'éditeur pour organisation hôte, et ne contient aucun document."""
+    return names_publisher(loc) and (loc is None or loc.source_type != "ebook platform")
 
 
 # =============================================================

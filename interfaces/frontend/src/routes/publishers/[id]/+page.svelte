@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
@@ -10,8 +11,8 @@
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/oaColors.js';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import { oaStatusColor } from '#lib/components/charts/cssVar.js';
+	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import type { components } from '#lib/api/schema.js';
 
 	type PublisherDetail = components['schemas']['Publisher'];
@@ -31,8 +32,6 @@
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
-	let canGoBack = $state(false);
-
 	let dashboard = $state<PublisherDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
@@ -88,9 +87,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack =
-			(window as any).navigation?.canGoBack ??
-			document.referrer.startsWith(window.location.origin);
 		await Promise.all([loadPublisher(), loadTypeLabels()]);
 		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
@@ -102,10 +98,7 @@
 	<title>{pageTitle(publisher?.name ?? 'Éditeur')}</title>
 </svelte:head>
 
-{#if canGoBack}
-	<!-- svelte-ignore a11y_invalid_attribute -->
-	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+	<Breadcrumb trail={[{ label: 'Éditeurs', path: 'publishers' }]} current={publisher?.name} />
 
 {#if error}
 	<div class="no-results">Éditeur introuvable</div>
@@ -113,34 +106,32 @@
 	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Header -->
-	<div class="p-header">
-		<h1 class="p-title">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{publisher.name}
 		</h1>
-		<div class="p-meta">
-			<div class="meta-row">
-				<span class="meta-label">Type</span>
-				<span class="type-tag">
-					{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
-				</span>
-				{#if publisher.country}
-					<span class="meta-label">Pays</span>
-					<span class="type-tag">{publisher.country.toUpperCase()}</span>
-				{/if}
-				{#if publisher.openalex_id}
-					<span class="meta-label">OpenAlex</span>
-					<span class="id-badge">{publisher.openalex_id}</span>
-				{/if}
-			</div>
-			{#if publisher.doi_prefixes.length > 0}
-				<div class="meta-row">
-					<span class="meta-label">Préfixes DOI</span>
-					{#each publisher.doi_prefixes as p (p.prefix)}
-						<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
-					{/each}
-				</div>
+		<div class="entity-meta">
+			<span class="entity-meta-label">Type</span>
+			<span class="entity-tag">
+				{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
+			</span>
+			{#if publisher.country}
+				<span class="entity-meta-label">Pays</span>
+				<span class="entity-tag">{publisher.country.toUpperCase()}</span>
+			{/if}
+			{#if publisher.openalex_id}
+				<span class="entity-meta-label">OpenAlex</span>
+				<span class="id-badge">{publisher.openalex_id}</span>
 			{/if}
 		</div>
+		{#if publisher.doi_prefixes.length > 0}
+			<div class="entity-meta">
+				<span class="entity-meta-label">Préfixes DOI</span>
+				{#each publisher.doi_prefixes as p (p.prefix)}
+					<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
+				{/each}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Tabs -->
@@ -166,7 +157,7 @@
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<SubjectsCloud {subjects} />
+							<SubjectBars {subjects} />
 						{/if}
 					</div>
 
@@ -225,45 +216,8 @@
 {/if}
 
 <style>
-	.p-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 20px 24px;
-	}
-	.p-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
-	.p-meta { display: flex; flex-direction: column; gap: 6px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-	}
-	.id-badge { margin-right: 4px; }
-	.type-tag {
-		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
-		margin-right: 8px;
-	}
 
-	.tab-content { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 
-	.dash-grid {
-		display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-	}
-	@media (max-width: 900px) {
-		.dash-grid { grid-template-columns: 1fr; }
-	}
-	.dash-card-wide { grid-column: 1 / -1; }
-	.dash-card {
-		background: var(--card); border: 1px solid var(--border);
-		border-radius: 6px; padding: 16px;
-	}
-	.dash-card h3 {
-		font-size: 0.95rem; font-weight: 600; margin: 0 0 12px;
-	}
 	.muted { color: var(--muted); }
 </style>

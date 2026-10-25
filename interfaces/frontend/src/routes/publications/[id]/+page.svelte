@@ -1,7 +1,7 @@
 <script lang="ts">
+  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
-  import { onMount } from "svelte";
   import { apiDetail } from "#lib/api/index.js";
   import { titleText } from "#lib/utils.js";
   import PublicationAbstract from "#lib/components/PublicationAbstract.svelte";
@@ -14,8 +14,6 @@
   import SubjectsBlock from "./SubjectsBlock.svelte";
 
   const publicationId = $derived(page.params.id);
-  let canGoBack = $state(false);
-
   let data = $state<PubResponse | null>(null);
   let error = $state(false);
 
@@ -56,28 +54,13 @@
     });
   });
 
-  onMount(() => {
-    canGoBack =
-      (window as any).navigation?.canGoBack ??
-      document.referrer.startsWith(window.location.origin);
-  });
 </script>
 
 <svelte:head>
   <title>{pageTitle(titleText(pub?.title).slice(0, 80) || "Publication")}</title>
 </svelte:head>
 
-{#if canGoBack}
-  <!-- svelte-ignore a11y_invalid_attribute -->
-  <a
-    href="#"
-    class="back-link"
-    onclick={(e) => {
-      e.preventDefault();
-      history.back();
-    }}>&larr; Retour</a
-  >
-{/if}
+<Breadcrumb trail={[{ label: "Publications", path: "publications" }]} current={titleText(pub?.title)} />
 
 {#if error}
   <div class="publication-header"><div class="no-results">Publication introuvable</div></div>
@@ -115,7 +98,13 @@
       </div>
     </div>
 
-    <PublicationSidebar {pub} sources={data!.sources} externalIds={data!.external_identifiers} />
+    <PublicationSidebar
+      {pub}
+      bestCopyUrl={data!.access_url}
+      access={data!.access}
+      referencedBy={data!.referenced_by}
+      externalIds={data!.external_identifiers}
+    />
   </div>
 {/if}
 
@@ -123,7 +112,7 @@
   .publication-header {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 20px 24px;
     margin-bottom: 16px;
   }
@@ -146,7 +135,7 @@
   .detail-body {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 8px 24px;
     margin-bottom: 16px;
   }

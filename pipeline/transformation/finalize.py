@@ -2,7 +2,7 @@
 
 Tâches (`pipeline.graph`), chacune dans sa transaction :
 
-1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `contribution_structures`, `publication_structures`.
+1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `contribution_structures`, `publication_structures`, `publication_rors`.
 2. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
 3. **éditeur des revues** — recalcule l'éditeur de chaque revue d'après ses publications (`serial_publishers`).
 4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
@@ -73,6 +73,11 @@ def refresh_publication_structures(conn: Connection) -> None:
     conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_structures"))
 
 
+def refresh_publication_rors(conn: Connection) -> None:
+    """ROR des auteurs de chaque publication, ancêtres compris : lit `publication_structures`, rafraîchie avant."""
+    conn.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY publication_rors"))
+
+
 @dataclass(frozen=True)
 class FinalizePhase:
     # Suppressions des référentiels vides, dans l'ordre : (libellé, runner). Le câblage les fournit.
@@ -95,6 +100,7 @@ class FinalizePhase:
             with ctx.open_tx() as conn:
                 refresh_contribution_structures(conn)
                 refresh_publication_structures(conn)
+                refresh_publication_rors(conn)
             return _timed(t0)
 
         def purge(ctx: PhaseContext) -> PhaseMetrics:

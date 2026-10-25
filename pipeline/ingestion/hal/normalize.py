@@ -11,6 +11,7 @@ from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
 from domain.persons.contributor_name import ContributorName
+from domain.platforms.registry import HAL
 from domain.publications.contribution_roles import map_role
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
@@ -29,6 +30,7 @@ from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.locations import LocationFacts, known_platform_facts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -121,6 +123,23 @@ def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> s
         hal_text_field(doc.get("linkExtId_s")),
         embargo_until,
     )
+
+
+def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
+    """La page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`) et sa licence. La copie est ouverte quand un fichier est déposé, hors embargo actif (`embargo_until`). Une copie sous embargo s'ouvre quand elle est renormalisée après la levée."""
+    uri = hal_text_field(doc.get("uri_s"))
+    if not uri:
+        return []
+    file_main = hal_text_field(doc.get("fileMain_s"))
+    return [
+        LocationFacts(
+            url=uri,
+            pdf_url=file_main,
+            license=normalize_license(hal_text_field(doc.get("licence_s"))),
+            is_oa=file_main is not None and embargo_until is None,
+            platform=known_platform_facts(HAL),
+        )
+    ]
 
 
 # =============================================================
@@ -550,6 +569,11 @@ class HalNormalizer(SourceNormalizer):
 
     def container_facts(self, doc: Document) -> ContainerDescription:
         return get_container_facts(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return get_locations(
+            doc, active_embargo_until(hal_text_field(doc.get("label_xml")), today())
+        )
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

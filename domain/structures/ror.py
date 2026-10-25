@@ -33,6 +33,20 @@ class RorType(StrEnum):
     OTHER = "other"
 
 
+ROR_TYPE_LABELS_FR: dict[RorType, str] = {
+    RorType.ARCHIVE: "Archive",
+    RorType.COMPANY: "Entreprise",
+    RorType.EDUCATION: "Enseignement",
+    RorType.FACILITY: "Laboratoire ou équipement",
+    RorType.FUNDER: "Financeur",
+    RorType.GOVERNMENT: "Organisme public",
+    RorType.HEALTHCARE: "Santé",
+    RorType.NONPROFIT: "Association ou fondation",
+    RorType.OTHER: "Autre",
+}
+"""Libellés des types d'organisation du ROR, servis par l'API."""
+
+
 @dataclass(frozen=True, slots=True)
 class RorOrganization:
     """Organisation du ROR. `country_code` est le code ISO 3166-1 en minuscules de la première localisation."""

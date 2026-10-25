@@ -4,57 +4,59 @@
   import { accessTag } from "#lib/labels.js";
   import { licenseLabels } from "#lib/licenses.js";
   import { sourceLabel, sourceOrder } from "#lib/sources.svelte.js";
-  import type { ExternalId, PubDetail, Source } from "./types";
+  import type { AccessLink, ExternalId, PubDetail, Source } from "./types";
 
   const {
     pub,
-    sources,
+    bestCopyUrl,
+    access,
+    referencedBy,
     externalIds,
-  }: { pub: PubDetail; sources: Source[]; externalIds: ExternalId[] } = $props();
+  }: {
+    pub: PubDetail;
+    bestCopyUrl: string | null;
+    access: AccessLink[];
+    referencedBy: Source[];
+    externalIds: ExternalId[];
+  } = $props();
 
-  // NCBI sert un favicon unique pour PubMed et PMC : on les distingue par la valeur, pas le logo.
   const EXT_META: Record<string, { label: string; icon: string; url: (v: string) => string }> = {
-    arxiv: { label: "arXiv", icon: asset('icons/arxiv.png'), url: (v) => `https://arxiv.org/abs/${v}` },
     pmid: {
       label: "PubMed",
       icon: asset('icons/ncbi.png'),
       url: (v) => `https://pubmed.ncbi.nlm.nih.gov/${v}`,
     },
-    pmcid: {
-      label: "PMC",
-      icon: asset('icons/ncbi.png'),
-      url: (v) => `https://www.ncbi.nlm.nih.gov/pmc/articles/${v}/`,
-    },
     nnt: { label: "Thèses.fr", icon: asset('icons/theses.ico'), url: (v) => `https://theses.fr/${v}` },
   };
 
+  // Plateformes connues dont l'interface a l'icône, par leur nom (`domain/platforms/registry.py`).
+  const PLATFORM_ICONS: Record<string, string> = {
+    HAL: asset('icons/hal.ico'),
+    arXiv: asset('icons/arxiv.png'),
+    "PubMed Central": asset('icons/ncbi.png'),
+  };
+
   const orderedSources = $derived([
-    ...sourceOrder().flatMap((src) => sources.filter((s) => s.source === src)),
-    ...sources.filter((s) => !sourceOrder().includes(s.source)),
+    ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
+    ...referencedBy.filter((s) => !sourceOrder().includes(s.source)),
   ]);
 
   // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
   const primarySources = $derived(orderedSources.filter((s) => !s.is_secondary));
   const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
 
-  const access = $derived(accessTag(pub.oa_status));
+  const accessState = $derived(accessTag(pub.oa_status));
 
   let labels = $state<Record<string, string>>({});
   $effect(() => {
     if (pub.license || pub.deposit_license) licenseLabels().then((l) => (labels = l)).catch(() => {});
   });
 
-  // Lien d'accès, dérivé (pas de champ URL unique en base) :
-  //   closed / embargoed → aucun lien ; green → dépôt HAL ; sinon → DOI.
-  // Exception green : un DOI DataCite (Zenodo, figshare, arXiv…) pointe vers le dépôt réel ; le dépôt HAL correspondant est souvent une coquille vide : on préfère alors le DOI.
+  // Le bouton d'accès mène à la meilleure copie ouverte, à défaut au DOI ; une publication fermée ou sous embargo n'en a pas.
   const accessUrl = $derived.by(() => {
     const oa = pub.oa_status;
     if (oa === "closed" || oa === "embargoed") return null;
-    if (oa === "green" && pub.doi_ra !== "DataCite") {
-      const hal = sources.find((s) => s.source === "hal");
-      if (hal) return hal.record_url;
-    }
-    return pub.doi ? `https://doi.org/${pub.doi}` : null;
+    return bestCopyUrl ?? (pub.doi ? `https://doi.org/${pub.doi}` : null);
   });
 </script>
 
@@ -66,8 +68,8 @@
         <path d="M7 17L17 7M17 7H8M17 7v9" />
       </svg>
     </a>
-  {:else if access}
-    <div class="access-status {access.cls}">
+  {:else if accessState}
+    <div class="access-status {accessState.cls}">
       {#if pub.oa_status === "embargoed"}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="10" />
@@ -79,7 +81,25 @@
           <path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
       {/if}
-      {access.label}
+      {accessState.label}
+    </div>
+  {/if}
+
+  {#if access.length > 0}
+    <div class="sidebar-block">
+      <div class="detail-sublabel">Accès</div>
+      <div class="sidebar-sources">
+        {#each access as copy (copy.url)}
+          <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
+            <span class="source-tag">
+              {#if PLATFORM_ICONS[copy.label]}
+                <img src={PLATFORM_ICONS[copy.label]} alt={copy.label} />
+              {/if}
+            </span>
+            <span class="row-label">{copy.label}</span>
+          </a>
+        {/each}
+      </div>
     </div>
   {/if}
 
@@ -112,16 +132,16 @@
       target="_blank"
       rel="noopener"
       class="source-row"
-      title="{sourceLabel(s.source)} : {s.source_id}"
+      title={s.source_id}
     >
       <SourceTag source={s.source} />
-      <span class="source-id">{s.source_id}</span>
+      <span class="row-label">{sourceLabel(s.source)}</span>
     </a>
   {/snippet}
 
   {#if orderedSources.length > 0 || externalIds.length > 0}
     <div class="sidebar-block">
-      <div class="detail-sublabel">Sources</div>
+      <div class="detail-sublabel">Référencé par</div>
       <div class="sidebar-sources">
         {#each primarySources as s (s.source + s.source_id)}
           {@render sourceRow(s)}
@@ -132,14 +152,14 @@
             target="_blank"
             rel="noopener"
             class="source-row"
-            title="{EXT_META[e.type]?.label ?? e.type} : {e.value}"
+            title={e.value}
           >
             <span class="source-tag">
               {#if EXT_META[e.type]?.icon}
                 <img src={EXT_META[e.type].icon} alt={EXT_META[e.type]?.label} />
               {/if}
             </span>
-            <span class="source-id">{e.value}</span>
+            <span class="row-label">{EXT_META[e.type]?.label ?? e.type}</span>
           </a>
         {/each}
       </div>
@@ -161,7 +181,7 @@
   .detail-sidebar {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 16px;
     align-self: start;
     position: sticky;
@@ -174,7 +194,7 @@
     justify-content: center;
     gap: 6px;
     padding: 9px 12px;
-    background: var(--section-heading);
+    background: var(--accent);
     color: white;
     font-weight: 600;
     font-size: 0.95rem;
@@ -234,7 +254,7 @@
     align-items: center;
     gap: 8px;
     padding: 4px 8px;
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: var(--surface);
     text-decoration: none;
   }
@@ -245,7 +265,7 @@
   .source-row:hover :global(.source-tag) {
     transform: scale(1.15);
   }
-  .source-id {
+  .row-label {
     font-size: 0.82rem;
     color: var(--text);
     overflow: hidden;

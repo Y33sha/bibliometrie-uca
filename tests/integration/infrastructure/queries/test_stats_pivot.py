@@ -5,7 +5,8 @@ from sqlalchemy import text
 from application.ports.read_models.stats_queries import StatsFilters
 from infrastructure.read_models.stats.pivot import run_pivot
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
-from tests.integration.helpers.structures import insert_structure
+from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
+from tests.integration.helpers.structures import insert_structure, insert_tutelle
 
 
 def _piv(conn, measure, groups, doc_types=("article", "review")):
@@ -176,3 +177,59 @@ class TestApcAmount:
             filters=StatsFilters(has_apc=["yes"]),
         )
         assert res.rows == [{"value": 1}]
+
+
+class TestPartner:
+    def test_group_and_filter_by_partner(self, sa_sync_conn):
+        """Un établissement compte les publications de ses laboratoires."""
+        insert_ror_tree(sa_sync_conn)
+        lab = insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold")
+        insert_author(sa_sync_conn, lab, "W1", "0lab00001")
+        other = insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold")
+        insert_author(sa_sync_conn, other, "W2", "0ger00001")
+        refresh_publication_rors(sa_sync_conn)
+
+        res = _piv(sa_sync_conn, "publication_count", ["partner"])
+        assert {r["partner"]: r["value"] for r in res.rows} == {
+            "Université": 1,
+            "Laboratoire": 1,
+            "Labor": 1,
+        }
+        filtered = run_pivot(
+            sa_sync_conn,
+            measure="publication_count",
+            groups=[],
+            perimeter_structure_ids=[],
+            filters=StatsFilters(partner_rors=["0univ0001"]),
+        )
+        assert filtered.rows == [{"value": 1}]
+
+    def test_partner_excludes_own_structures_and_their_tutelles(self, sa_sync_conn):
+        """Sans laboratoire sélectionné, les ROR du périmètre, de ses tutelles et leurs ancêtres sont exclus."""
+        insert_ror_tree(sa_sync_conn)
+        lab = insert_structure(sa_sync_conn, "LAB", name="Laboratoire")
+        sa_sync_conn.execute(
+            text("UPDATE structures SET ror_id = '0lab00001' WHERE id = :id"), {"id": lab}
+        )
+        publication = insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold")
+        insert_author(sa_sync_conn, publication, "W1", "0lab00001")
+        insert_author(sa_sync_conn, publication, "W2", "0ger00001")
+        refresh_publication_rors(sa_sync_conn)
+
+        def partners() -> dict[str, int]:
+            res = run_pivot(
+                sa_sync_conn,
+                measure="publication_count",
+                groups=["partner"],
+                perimeter_structure_ids=[lab],
+                filters=StatsFilters(),
+            )
+            return {r["partner"]: r["value"] for r in res.rows}
+
+        assert partners() == {"Labor": 1}
+        tutelle = insert_structure(sa_sync_conn, "TUT", name="Tutelle")
+        sa_sync_conn.execute(
+            text("UPDATE structures SET ror_id = '0ger00001' WHERE id = :id"), {"id": tutelle}
+        )
+        insert_tutelle(sa_sync_conn, tutelle, child_id=lab)
+        assert partners() == {}

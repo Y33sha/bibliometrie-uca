@@ -40,7 +40,7 @@ def _row(
     row_id,
     doc_type,
     doi,
-    title="t",
+    title=None,
     corrections=None,
     raw_doi="10.1/x",
     canonical_doi=None,
@@ -51,7 +51,7 @@ def _row(
         row_id,
         doc_type,
         doi,
-        title,
+        f"titre {'abcdefghij'[row_id % 10]}" if title is None else title,
         corrections or {},
         raw_doi,
         canonical_doi,
@@ -60,7 +60,15 @@ def _row(
     )
 
 
-def _m(member_id, doc_type, title="t", canonical_doi=None, same_work_case=None) -> DoiClusterMember:
+_OWN_TITLE = object()
+
+
+def _m(
+    member_id, doc_type, title=_OWN_TITLE, canonical_doi=None, same_work_case=None
+) -> DoiClusterMember:
+    """Membre de groupe ; sans titre donné, chaque membre a le sien."""
+    if title is _OWN_TITLE:
+        title = f"titre {'abcdefghij'[member_id % 10]}"
     return DoiClusterMember(member_id, doc_type, title, canonical_doi, same_work_case)
 
 
@@ -237,6 +245,12 @@ def test_version_d_un_autre_prefixe_laisse_les_regles_ouvrage_s_appliquer():
 def test_book_and_chapter_chapter_loses_doi():
     group = [_m(1, "book"), _m(2, "book_chapter")]
     assert _resoudre(group) == [DoiClusterDecision(2, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
+
+
+def test_chapitre_au_titre_de_l_ouvrage_garde_le_doi():
+    """Même œuvre typée livre par une source et chapitre par une autre : rien à corriger."""
+    group = [_m(1, "book", "surf a contre courant"), _m(2, "book_chapter", "surf a contre courant")]
+    assert _resoudre(group) == []
 
 
 def test_only_book_no_correction():

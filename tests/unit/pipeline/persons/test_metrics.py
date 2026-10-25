@@ -45,6 +45,6 @@ def test_le_resume_garde_les_compteurs_du_rattachement_et_des_autres_taches():
     assert summary["name_forms_inserted"] == 7
 
 
-def test_les_compteurs_generiques_suivent_les_contributions_examinees_et_rattachees():
+def test_les_compteurs_generiques_suivent_les_contributions_examinees_et_les_personnes_creees():
     metrics = _metrics()
-    assert (metrics.seen, metrics.new, metrics.updated) == (10, 0, 8)
+    assert (metrics.seen, metrics.new, metrics.updated) == (10, 0, 0)

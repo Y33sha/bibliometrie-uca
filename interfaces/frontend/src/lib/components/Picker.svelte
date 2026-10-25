@@ -92,9 +92,9 @@
   .picker-container {
     position: relative;
     margin: 8px 0;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--accent);
-    border-radius: 5px;
+    border-radius: var(--radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     max-width: 380px;
     z-index: 50;
@@ -104,7 +104,7 @@
     padding: 7px 10px;
     border: none;
     border-bottom: 1px solid var(--border);
-    border-radius: 5px 5px 0 0;
+    border-radius: var(--radius) var(--radius) 0 0;
     font-size: 0.95rem;
     outline: none;
     font-family: inherit;
@@ -127,7 +127,7 @@
     padding: 3px 6px;
     font-size: 0.85rem;
     border: 1px solid var(--accent);
-    border-radius: 3px;
+    border-radius: var(--radius);
     font-family: inherit;
   }
   .picker-results {
@@ -138,9 +138,9 @@
     z-index: 50;
     min-width: 350px;
     max-width: 600px;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   }
   .picker-item {
@@ -174,7 +174,7 @@
     outline: none;
   }
   .picker-item.disabled {
-    color: var(--text-muted);
+    color: var(--muted);
     cursor: default;
   }
 </style>

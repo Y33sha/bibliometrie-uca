@@ -5,7 +5,7 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular } from '#lib/labels.js';
+	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -59,14 +59,14 @@
 			<div class="publication-card">
 				<div class="publication-meta-line">
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+					{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{structureLabel(lab)}</span>{/each}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
+					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
 					{#if pub.hal_links.length}
 						{#each pub.hal_links as link (link.source_id)}
-							<a href={link.record_url} target="_blank" rel="noopener" class="hal-badge">{link.source_id}</a>
+							<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
 						{/each}
 					{/if}
 					{#if pub.doi}
@@ -85,23 +85,15 @@
 	.publication-card {
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 10px 14px;
 	}
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 	.meta-badge { flex-shrink: 0; }
 	.lab-badge { background: var(--success-light); color: var(--success); font-weight: 500; }
-	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
-	.publication-link:hover { text-decoration: underline; }
 	.hal-list {
 		display: flex; flex-wrap: wrap; gap: 6px;
 		align-items: center; margin-top: 6px; padding-left: 20px;
 	}
-	.hal-badge {
-		display: inline-block; padding: 2px 8px; background: #1a6fb5;
-		border-radius: 4px; font-size: 0.82rem; color: #fff;
-		text-decoration: none; font-weight: 500;
-	}
-	.hal-badge:hover { background: #145a94; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); }
 </style>

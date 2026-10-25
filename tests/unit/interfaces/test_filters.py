@@ -6,7 +6,13 @@ Le découpage par virgules garde les URL lisibles, mais soustrait la liste à la
 import pytest
 from fastapi import HTTPException
 
-from interfaces.api.filters import parse_int_csv, parse_ints, parse_str_csv, parse_vocabulary_csv
+from interfaces.api.filters import (
+    parse_int_csv,
+    parse_ints,
+    parse_ror_csv,
+    parse_str_csv,
+    parse_vocabulary_csv,
+)
 
 
 class TestListeDEntiers:
@@ -73,3 +79,16 @@ class TestVocabulaireFerme:
             parse_vocabulary_csv("a,z", allowed={"a", "b"}, param="doc_type")
         assert leve.value.status_code == 422
         assert "z" in leve.value.detail
+
+
+class TestListeDeRor:
+    def test_forme_courte_depuis_une_url(self):
+        assert parse_ror_csv("https://ror.org/01a8ajp46,03vgfxd91", param="p") == [
+            "01a8ajp46",
+            "03vgfxd91",
+        ]
+
+    def test_ror_invalide_refuse(self):
+        with pytest.raises(HTTPException) as exc:
+            parse_ror_csv("pas-un-ror", param="partner_ror")
+        assert exc.value.status_code == 422

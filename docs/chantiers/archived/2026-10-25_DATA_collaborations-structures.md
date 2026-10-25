@@ -52,7 +52,9 @@ Lecture par source :
 - HAL : ROR des structures du TEI auxquelles l'auteur est affilié.
 - DataCite : `affiliationIdentifier` de schéma ROR. Les trois adaptateurs qui interrogent `/dois` (extraction, `fetch_missing`, `fetch_stale`) partagent le paramètre `affiliation=true`.
 
-**Périmètre résolu par la phase `affiliations`.** Une vue matérialisée associe chaque contribution source consolidée à ses ROR, sur le modèle de `group_structures`. Dans le périmètre, ce sont les ROR des structures résolues par `affiliations`. Hors périmètre, ce sont les ROR des sources, moins ceux du périmètre.
+**ROR par publication.** La vue matérialisée `publication_rors (publication_id, ror_id, cited)` réunit les ROR de tous les auteurs d'une publication, périmètre compris : ceux que donnent les sources pour les contributions sources alignées, et ceux des structures que la phase `affiliations` reconnaît (`publication_structures`). Les contributions sans personne en sont ; celles d'une personne qui n'en est pas une (`not_a_person`) en sont exclues. Chaque ROR entre avec ses ancêtres de `ror_relations` : un établissement compte aussi les publications de ses laboratoires, et la lecture reste une jointure simple. `cited` distingue les ROR cités des ancêtres ajoutés. Distinguer les coauteurs relèverait d'une vue par contribution, hors de ce chantier.
+
+**Affichage.** Les organisations partenaires sont listées telles quelles, laboratoires et établissements mêlés. Le lecteur filtre par type, par pays et par période. Elles excluent les ROR propres aux structures étudiées : ceux de ces structures, de leurs tutelles et leurs ancêtres ROR. Les structures étudiées sont la structure de l'onglet, les laboratoires sélectionnés, ou sans sélection tout le périmètre.
 
 **Cohérence des référentiels.** Un rapport compare `structure_parents` à `ror_relations` dans les deux sens, par clôture transitive. Un parent ROR est couvert s'il est un ancêtre dans `structure_parents`. Une tutelle est couverte si son parent est un ancêtre dans le ROR. Chaque écart se corrige dans `structure_parents` ou se signale au ROR.
 
@@ -77,23 +79,21 @@ Lecture par source :
 
 ### 3. Vue consolidée
 
-La consolidation par auteur dépend du chantier `archived/2026-10-24_DATA_alignement-auteurs.md` : 97 % des contributions sources hors périmètre n'ont pas de personne.
-
-- [ ] Vue matérialisée des ROR par contribution source consolidée, rafraîchie par le pipeline.
-- [ ] Tests : ROR du périmètre exclus des ROR des sources ; ROR des structures résolues par `affiliations` inclus.
+- [x] Vue matérialisée `publication_rors`, avec les ancêtres des ROR cités, rafraîchie par la phase `finalize`. Base locale : 1 171 033 lignes, dont 828 037 ROR cités, sur 75 436 publications ; 87 s de calcul.
+- [x] Tests : ancêtres ajoutés, contributions sans personne comprises, fausses entités écartées.
 
 ### 4. Interface
 
-- [ ] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
-- [ ] Facette « Organisation partenaire » dans la recherche de publications.
-- [ ] Dimension « partenaire » dans le pivot des statistiques.
-- [ ] Export du réseau (CSV, GEXF) pour Gephi ou VOSviewer.
+- [x] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
+- [x] Facette « Organisation partenaire » dans la recherche de publications.
+- [x] Dimension « partenaire » dans le pivot des statistiques, filtrable.
 
 ### 5. Mise à jour de la documentation
 
-- [ ] `docs/` : référentiel ROR, table de liens, vue consolidée.
+- [x] `docs/` : référentiel ROR, table de liens, vue consolidée, organisations partenaires.
 
 ## Questions ouvertes
 
-- Agrégation des nœuds : ROR cités, ou établissements obtenus par `ror_relations`.
 - Faux positifs des sources hors périmètre : accord de deux sources ; vérification par un service externe (ISTEX…) dans un chantier distinct.
+- Carte des collaborations par ville. Le dump ROR donne la ville et les coordonnées de chaque organisation (`locations[].geonames_details`) ; `ror_organizations` garde seulement le pays.
+- Export du réseau des collaborations pour Gephi ou VOSviewer. Le corpus contient seulement les publications du périmètre : les liens entre partenaires se limitent à leurs copublications avec le périmètre. Une analyse de réseau complète passe par OpenAlex.

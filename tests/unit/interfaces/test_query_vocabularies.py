@@ -28,6 +28,10 @@ LISTES_LIBRES: dict[tuple[str, str], str] = {
     ("publishers.py", "country"): (
         "Mêmes codes pays que la liste des publications, même liaison, même comportement."
     ),
+    ("structures.py", "country"): (
+        "Mêmes codes pays que la liste des publications, liés à une comparaison `= ANY` : une "
+        "valeur inconnue ne rend aucune ligne, au lieu d'annuler le filtre."
+    ),
     ("persons.py", "department"): (
         "Libellés de départements issus de l'extraction du référentiel des personnels : ils "
         "vivent dans les données, pas dans le code."

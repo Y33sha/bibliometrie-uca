@@ -18,7 +18,10 @@ Filtrable par:
 - laboratoire,
 - voie *open access*,
 - licence de la version éditeur,
-- paiement d'APC.
+- paiement d'APC,
+- éditeur, revue, [organisation partenaire](../glossaire.md#organisation-partenaire).
+
+L'éditeur, la revue et l'organisation partenaire servent aussi d'axe de comparaison.
 
 Restreint aux publications de type article et *review*.<!--TODO: glossaire? et voir si d'autres types sont pertinents--> Quels que soient les filtres en place, un bouton "Voir les publications" donne accès à la liste complète des publications concernées.
 
@@ -39,6 +42,7 @@ Liste des publications filtrable par :
 - licence de la version éditeur,
 - paiement d'[APC](../glossaire.md#apc),
 - pays des co-auteurs,
+- [organisation partenaire](../glossaire.md#organisation-partenaire),
 - sources.
 
 Filtre de recherche (interroge le titre et les sujets liés).
@@ -51,7 +55,7 @@ Certaines colonnes+facettes sont masquées par défaut: un bouton permet de choi
 
 ### Détails `/publications/{id}`
 
-Vue détaillée : métadonnées, licences de la version éditeur et du dépôt HAL, auteurs, sources contributrices.
+Vue détaillée : métadonnées, licences de la version éditeur et du dépôt HAL, auteurs. Le bouton « Accéder » mène à la meilleure copie ouverte, à défaut au DOI. La section « Accès » donne la meilleure copie ouverte de chaque plateforme : la version éditeur passe avant la version acceptée, puis la version soumise. La section « Référencé par » donne les bases qui référencent la publication sans en donner de copie.
 
 Vue alignée des auteurs par source pour détecter d'éventuelles incohérences.<!--TODO: à supprimer de l'UI publique, à réserver à une future page admin.-->
 
@@ -108,6 +112,7 @@ Onglets:
 - Publications;
 - Thèses;
 - Personnes: affiche les personnes liées à ce laboratoire via une publication (ne repose pas sur l'affiliation renseignée dans la base RH);
+- Collaborations: [organisations partenaires](../glossaire.md#organisation-partenaire), classées par nombre de copublications, filtrables par année, pays et type; le nombre de copublications mène à la liste des publications concernées;
 - Adresses (adresses ayant permis la détection de ce laboratoire dans les publications).
 
 ![Laboratory Details](../img/screenshots/laboratories_id_dashboard.png)

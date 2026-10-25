@@ -1,4 +1,6 @@
 <script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
+  import RhCheck from "#lib/components/RhCheck.svelte";
   import { resolve } from "$app/paths";
   import { api } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
@@ -145,12 +147,10 @@
           <span class="drawer-last">{titleCase(person.last_name)}</span>
           {titleCase(person.first_name)}
         </a>
-        {#if person.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+        {#if person.has_rh}<RhCheck />{/if}
       </div>
       <div class="drawer-head-actions">
-        <button class="icon-btn" title="Modifier le nom" aria-label="Modifier le nom" onclick={startEdit}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
-        </button>
+        <IconButton icon="edit" label="Modifier le nom" onclick={startEdit} />
         <select
           class="exclusion-select"
           class:excluded={!!person.exclusion}
@@ -232,7 +232,7 @@
                 <span class="person-last">{titleCase(sp.last_name)}</span>
                 {titleCase(sp.first_name)}
               </button>
-              {#if sp.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+              {#if sp.has_rh}<RhCheck />{/if}
               <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
                 {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
               </span>
@@ -260,7 +260,7 @@
             <strong>{r.last_name}</strong>
             {r.first_name}
             {#if r.department_name}<span class="merge-dept">{r.department_name}</span>{/if}
-            {#if r.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+            {#if r.has_rh}<RhCheck />{/if}
           {/snippet}
         </Picker>
       {:else}
@@ -273,11 +273,11 @@
   .btn-merge-inline {
     padding: 2px 8px;
     border: 1px dashed var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: none;
     font-size: 0.8rem;
     cursor: pointer;
-    color: var(--text-muted);
+    color: var(--muted);
     font-family: inherit;
   }
   .btn-merge-inline:hover {
@@ -287,7 +287,7 @@
   }
   .merge-dept {
     font-size: 0.8rem;
-    color: var(--text-muted);
+    color: var(--muted);
     margin-left: 6px;
   }
   .person-head {
@@ -308,7 +308,7 @@
     text-decoration: none;
   }
   .drawer-name-link:hover {
-    color: #2563eb;
+    color: var(--accent);
     text-decoration: underline;
   }
   .drawer-last {
@@ -332,37 +332,23 @@
   .edit-input {
     width: 128px;
     padding: 4px 6px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
     font-size: 0.9rem;
-  }
-  .icon-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 3px;
-    color: #888;
-    display: inline-flex;
-    align-items: center;
-    border-radius: 4px;
-  }
-  .icon-btn:hover {
-    color: var(--accent, #1976d2);
-    background: #f0f0f0;
   }
   .exclusion-select {
     font-size: 0.8rem;
     padding: 2px 4px;
-    color: #555;
+    color: var(--muted);
   }
   .exclusion-select.excluded {
-    color: var(--danger, #c0392b);
+    color: var(--danger);
   }
   .drawer-meta {
     display: flex;
     gap: 14px;
     align-items: center;
-    color: #555;
+    color: var(--muted);
     font-size: 0.85rem;
     margin-bottom: 18px;
   }
@@ -377,7 +363,7 @@
     font-size: 0.85rem;
   }
   .rh-info dt {
-    color: #888;
+    color: var(--muted);
   }
   .rh-info dd {
     margin: 0;
@@ -386,7 +372,7 @@
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #888;
+    color: var(--muted);
     margin: 0 0 8px;
   }
   .sharing-list {
@@ -410,22 +396,22 @@
     text-align: left;
   }
   .sharing-name:hover {
-    color: #2563eb;
+    color: var(--accent);
     text-decoration: underline;
   }
   .sharing-forms {
     font-size: 0.72rem;
-    color: #888;
+    color: var(--muted);
   }
   .tag {
     display: inline-block;
     font-size: 0.8rem;
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-weight: 500;
   }
   .tag-excluded {
-    background: #fdecea;
-    color: #b71c1c;
+    background: var(--danger-light);
+    color: var(--danger);
   }
 </style>

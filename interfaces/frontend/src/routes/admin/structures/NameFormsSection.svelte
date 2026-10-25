@@ -1,4 +1,6 @@
 <script lang="ts">
+  import HelpTip from "#lib/components/HelpTip.svelte";
+  import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
   import type { NameForm, Structure } from "./types";
   import { SHORT_FORM_MAX_LENGTH } from "./types";
@@ -12,6 +14,7 @@
     addFormExcluding = $bindable(),
     newFormCtx,
     ctxPickerOpen,
+    ctxPickerFormId,
     ctxPickerResults,
     ctxPickerSearch = $bindable(),
     ctxPickerEl = $bindable(),
@@ -35,6 +38,8 @@
     addFormExcluding: boolean;
     newFormCtx: (number | string)[];
     ctxPickerOpen: boolean;
+    /** Forme dont on édite le contexte ; `null` pour la forme en cours d'ajout. */
+    ctxPickerFormId: number | null;
     ctxPickerResults: Structure[];
     ctxPickerSearch: string;
     ctxPickerEl: HTMLDivElement | undefined;
@@ -55,7 +60,7 @@
 <h3 class="section-title">Identification dans les publications</h3>
 
 <h3>
-  Formes de noms ({forms.length})
+  Formes de noms <span class="count-pill">{forms.length}</span>
   <button
     class="btn-help-icon"
     onclick={() => {
@@ -82,23 +87,23 @@
   >
 </h3>
 {#if formsHelpOpen}
-  <p class="help-text">
+  <p class="info-box">
     Les formes de nom servent à identifier les affiliations des publications via les adresses
     associées aux publications. Les changements seront pris en compte à la prochaine exécution du
     pipeline. Pour une prise en compte immédiate, relancer à partir de l'étape
     <code>affiliations</code> : <code>python run_pipeline.py --from affiliations</code>
   </p>
 {/if}
-<table class="forms-table">
+<table class="data-table forms-table">
   <thead>
     <tr
-      ><th class="col-badge"></th><th>Forme</th><th>Contexte requis</th><th></th></tr
+      ><th class="col-badge"></th><th>Forme</th><th>Contexte requis <HelpTip text="La forme de nom identifie la structure seulement si au moins une autre structure est reconnue dans l'adresse." /></th><th></th></tr
     >
   </thead>
   <tbody>
     {#if forms.length === 0}
       <tr>
-        <td colspan="4" style="text-align:center;color:var(--text-muted)"> Aucune forme </td>
+        <td colspan="4" style="text-align:center;color:var(--muted)"> Aucune forme </td>
       </tr>
     {:else}
       {#each forms as f (f.id)}
@@ -117,59 +122,23 @@
           <td class="form-text">{f.form_text}</td>
           <td>
             {#if f.is_excluding}
-              <span class="sufficient-label">—</span>
+              <span class="none-label">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
                 <span class="ctx-tag">
                   {ctxLabel(x)}
-                  <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)}>x</button>
+                  <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
                 </span>
               {/each}
-              <button class="btn-add-tiny" onclick={() => onopenCtxPicker(f.id)}> + </button>
+              {@render ctxAdd(f.id)}
             {:else}
-              <span class="sufficient-label">suffisant</span>
-              <button class="btn-add-tiny" onclick={() => onopenCtxPicker(f.id)}> + </button>
+              <span class="none-label">—</span>
+              {@render ctxAdd(f.id)}
             {/if}
           </td>
-          <td style="white-space:nowrap">
-            <button class="btn-icon" onclick={() => oneditForm(f)} title="Modifier">
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path
-                  d="m15 5 4 4"
-                /></svg
-              >
-            </button>
-            <button
-              class="btn-icon btn-icon-danger"
-              onclick={() => ondeleteForm(f.id)}
-              title="Supprimer"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                ><line x1="18" y1="6" x2="6" y2="18" /><line
-                  x1="6"
-                  y1="6"
-                  x2="18"
-                  y2="18"
-                /></svg
-              >
-            </button>
+          <td class="row-actions" style="white-space:nowrap">
+            <IconButton icon="edit" label="Modifier la forme" onclick={() => oneditForm(f)} />
+            <IconButton icon="delete" label="Supprimer la forme" onclick={() => ondeleteForm(f.id)} />
           </td>
         </tr>
       {/each}
@@ -215,55 +184,56 @@
     {#each newFormCtx as x}
       <span class="ctx-tag">
         {ctxLabel(x)}
-        <button class="ctx-remove" onclick={() => onremoveNewCtx(x)}>x</button>
+        <button class="ctx-remove" onclick={() => onremoveNewCtx(x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
       </span>
     {/each}
-    <button class="btn-add-tiny" onclick={() => onopenCtxPicker(null)}>+</button>
-    {#if newFormCtx.length === 0}
-      <span class="ctx-hint">(suffisant)</span>
-    {/if}
+    {@render ctxAdd(null)}
   </div>
 {/if}
 
-<!-- Context picker -->
-{#if ctxPickerOpen}
-  <Picker
-    results={ctxPickerResults}
-    bind:search={ctxPickerSearch}
-    bind:element={ctxPickerEl}
-    onpick={(cs) => onpickCtx(cs.id)}
-    onclose={oncloseCtxPicker}
-    placeholder="Rechercher une structure…"
-  >
-    {#snippet header()}
-      <div class="ctx-picker-shortcuts">
-        <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
-        <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; suffisant </button>
-      </div>
-    {/snippet}
-    {#snippet item(cs)}
-      <span class="type-badge type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
-      {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
-    {/snippet}
-  </Picker>
-{/if}
+<!-- Ajout d'un contexte : le sélecteur s'ouvre à la place du bouton. -->
+{#snippet ctxAdd(formId: number | null)}
+  {#if ctxPickerOpen && ctxPickerFormId === formId}
+    <Picker
+      floating
+      results={ctxPickerResults}
+      bind:search={ctxPickerSearch}
+      bind:element={ctxPickerEl}
+      onpick={(cs) => onpickCtx(cs.id)}
+      onclose={oncloseCtxPicker}
+      placeholder="Rechercher une structure…"
+    >
+      {#snippet header()}
+        <div class="ctx-picker-shortcuts">
+          <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
+          <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; aucun contexte </button>
+        </div>
+      {/snippet}
+      {#snippet item(cs)}
+        <span class="structure-type structure-type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
+        {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
+      {/snippet}
+    </Picker>
+  {:else}
+    <button class="btn-add" onclick={() => onopenCtxPicker(formId)}>+ contexte</button>
+  {/if}
+{/snippet}
 
 <style>
-  .section-title {
-    margin: 20px -14px 10px !important;
-    padding: 6px 14px !important;
-    background: #5b9ea0;
-    color: white !important;
-    font-size: 0.75rem !important;
-    border-radius: 3px;
-  }
-  h3 {
-    margin: 12px 0 6px;
+  h3:not(.section-title) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 8px;
     font-size: 0.95rem;
     font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  }
+  .count-pill {
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
   }
   .btn-help-icon {
     background: none;
@@ -278,32 +248,7 @@
   .btn-help-icon:hover {
     color: var(--accent);
   }
-  .help-text {
-    background: var(--accent-light);
-    border: 1px solid #c4d8ed;
-    border-radius: 5px;
-    padding: 8px 12px;
-    margin: 4px 0 8px;
-    font-size: 0.85rem;
-    color: #2c3e50;
-    line-height: 1.5;
-  }
-  .forms-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-  }
-  .forms-table th {
-    text-align: left;
-    padding: 5px 8px;
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    border-bottom: 2px solid var(--border);
-    font-weight: 600;
-  }
   .forms-table td {
-    padding: 5px 8px;
-    border-bottom: 1px solid var(--border-subtle);
     vertical-align: middle;
   }
   .forms-table td:last-child {
@@ -311,10 +256,10 @@
     text-align: right;
   }
   .forms-table .excluding {
-    background: #fff3e0;
+    background: var(--attention-light);
   }
   .form-text {
-    font-family: "SF Mono", Consolas, monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
   }
   .col-badge {
@@ -325,7 +270,7 @@
   .match-badge {
     font-size: 0.65rem;
     padding: 1px 5px;
-    border-radius: 8px;
+    border-radius: var(--radius);
     font-weight: 500;
     white-space: nowrap;
   }
@@ -344,9 +289,9 @@
   .ctx-tag {
     font-size: 0.7rem;
     padding: 1px 5px;
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: var(--warning-light);
-    color: #8a6d10;
+    color: var(--warning-text);
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -365,67 +310,29 @@
   .ctx-remove:hover {
     color: var(--danger);
   }
-  .sufficient-label {
-    color: var(--success);
-    font-size: 0.8rem;
-  }
-  .btn-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 26px;
-    height: 26px;
-    padding: 0;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    background: none;
-    cursor: pointer;
+  .none-label {
     color: var(--muted);
   }
-  .btn-icon:hover {
-    background: var(--hover);
-    color: var(--accent);
-    border-color: var(--accent);
-  }
-  .btn-icon-danger:hover {
-    color: var(--danger);
-    border-color: var(--danger);
-  }
-  .btn-add-tiny {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: white;
-    color: var(--accent);
-    font-size: 0.8rem;
-    font-weight: bold;
-    cursor: pointer;
-    vertical-align: middle;
-    line-height: 1;
-    padding: 0;
-  }
-  .btn-add-tiny:hover {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
-  }
+  /* Formulaire d'ajout sous le tableau, sur un fond léger. */
   .add-row {
     display: flex;
-    gap: 4px;
-    margin-top: 8px;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 12px;
+    padding: 10px 12px;
     align-items: center;
+    background: var(--surface);
+    border-radius: var(--radius);
   }
   .add-row input:not([type]) {
-    flex: 1;
-    padding: 4px 6px;
+    flex: 1 1 260px;
+    height: 34px;
+    padding: 0 10px;
     border: 1px solid var(--border);
-    border-radius: 3px;
+    border-radius: var(--radius);
+    background: var(--card);
     font-size: 0.85rem;
-    font-family: inherit;
+    font-family: var(--mono);
   }
   .checkbox-label {
     font-size: 0.8rem;
@@ -441,12 +348,7 @@
     font-size: 0.85rem;
   }
   .ctx-label-text {
-    color: var(--text-muted);
-  }
-  .ctx-hint {
-    color: var(--text-muted);
-    font-size: 0.8rem;
-    margin-left: 4px;
+    color: var(--muted);
   }
   .ctx-picker-shortcuts {
     padding: 6px 10px;

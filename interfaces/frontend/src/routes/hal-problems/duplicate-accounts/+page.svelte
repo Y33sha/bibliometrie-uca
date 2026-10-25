@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RhCheck from "#lib/components/RhCheck.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
@@ -49,7 +50,7 @@
 {:else if list.items.length === 0}
   <div class="no-results">Aucun doublon détecté</div>
 {:else}
-  <table class="publication-table">
+  <table class="data-table">
     <thead>
       <tr>
         <th>Personne</th>
@@ -60,11 +61,11 @@
       {#each list.items as p}
         <tr>
           <td>
-            <a href={resolve(`persons/${p.person_id}`)} class="person-link">
+            <a href={resolve(`persons/${p.person_id}`)} class="entity-link">
               {titleCase(p.first_name)}
               {titleCase(p.last_name)}
             </a>
-            {#if p.has_rh}<span class="rh-check" title="Fichier RH">&#10003;</span>{/if}
+            {#if p.has_rh}<RhCheck />{/if}
           </td>
           <td class="hal-accounts">
             {#each p.hal_accounts as ha}
@@ -105,36 +106,8 @@
   .count {
     font-size: 0.9rem;
   }
-  .publication-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  .publication-table thead th {
-    background: var(--surface);
-    padding: 8px 12px;
-    text-align: left;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-    border-bottom: 2px solid var(--border);
-  }
-  .publication-table tbody tr {
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .publication-table tbody tr:hover {
-    background: var(--surface-hover);
-  }
-  .publication-table td {
-    padding: 8px 12px;
+  .data-table td {
     font-size: 0.9rem;
-    vertical-align: top;
-  }
-  .person-link {
-    font-weight: 500;
   }
   .hal-accounts {
     display: flex;
@@ -151,7 +124,7 @@
   .hal-id {
     color: var(--accent);
     text-decoration: none;
-    font-family: monospace;
+    font-family: var(--mono);
     font-size: 0.8rem;
   }
   .hal-id:hover {
@@ -165,7 +138,7 @@
     color: var(--muted);
     background: var(--border-subtle);
     padding: 1px 6px;
-    border-radius: 3px;
+    border-radius: var(--radius);
   }
   .hal-secondary-id {
     font-size: 0.8rem;

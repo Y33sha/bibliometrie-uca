@@ -35,6 +35,7 @@ class DocType(StrEnum):
     DATA_PAPER = "data_paper"
     PROCEEDINGS = "proceedings"
     MEDIA = "media"
+    PHYSICAL_OBJECT = "physical_object"
 
 
 DOC_TYPES: tuple[DocType, ...] = tuple(DocType)
@@ -90,5 +91,6 @@ DOC_TYPE_FAMILIES: dict[str, tuple[DocType, ...]] = {
         DocType.LETTER,
         DocType.BOOK_REVIEW,
         DocType.PROCEEDINGS,
+        DocType.PHYSICAL_OBJECT,
     ),
 }

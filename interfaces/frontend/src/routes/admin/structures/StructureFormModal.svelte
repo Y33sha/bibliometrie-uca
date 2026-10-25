@@ -63,7 +63,7 @@
     margin-top: 10px;
     padding: 8px;
     border: 1px solid var(--border);
-    border-radius: 4px;
+    border-radius: var(--radius);
     background: var(--surface-hover);
   }
   .api-ids-section summary {

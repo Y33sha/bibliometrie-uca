@@ -227,7 +227,7 @@
 	{/if}
 </div>
 
-<table class="addr-table">
+<table class="data-table addr-table">
 	<thead>
 		<tr>
 			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
@@ -280,30 +280,20 @@
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;
-		background: var(--accent-light); border-radius: 6px; font-size: 0.9rem;
+		background: var(--accent-light); border-radius: var(--radius); font-size: 0.9rem;
 	}
-	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: 4px; }
+	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); }
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
 	.proposal-tag {
 		display: inline-flex; align-items: center; gap: 4px;
-		padding: 2px 8px; background: #fff8e1; color: #856404;
-		border: 1px dashed #f5a623; border-radius: 3px; cursor: pointer;
+		padding: 2px 8px; background: var(--warning-light); color: var(--warning-text);
+		border: 1px dashed var(--warning); border-radius: var(--radius); cursor: pointer;
 		font-size: 0.78rem; font-weight: 500; white-space: nowrap;
 	}
-	.proposal-tag:hover { background: #ffecb3; }
+	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
-	.addr-table {
-		width: 100%; border-collapse: collapse; table-layout: fixed;
-		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
-	}
-	.addr-table thead th {
-		background: var(--surface); padding: 8px 10px; text-align: left;
-		font-size: 0.85rem; font-weight: 600; color: var(--muted);
-		border-bottom: 2px solid var(--border);
-	}
-	.addr-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.addr-table tbody tr:hover { background: var(--surface-hover); }
-	.addr-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: middle; }
+	.addr-table { table-layout: fixed; }
+	.addr-table td { font-size: 0.9rem; vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
@@ -311,15 +301,15 @@
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 6px; background: var(--success-light);
-		border-radius: 3px; font-size: 0.78rem; color: var(--success); white-space: nowrap;
+		border-radius: var(--radius); font-size: 0.78rem; color: var(--success); white-space: nowrap;
 	}
 	.tag-remove {
 		background: none; border: none; cursor: pointer;
-		color: #888; font-size: 0.8rem; padding: 0 1px; line-height: 1;
+		color: var(--muted); font-size: 0.8rem; padding: 0 1px; line-height: 1;
 	}
 	.tag-remove:hover { color: var(--danger); }
 	.add-country {
-		padding: 2px 4px; border: 1px solid var(--border); border-radius: 3px;
+		padding: 2px 4px; border: 1px solid var(--border); border-radius: var(--radius);
 		font-size: 0.75rem; width: 32px; color: var(--muted); cursor: pointer;
 	}
 </style>

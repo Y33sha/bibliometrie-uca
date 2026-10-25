@@ -17,7 +17,6 @@ from domain.serials.issns import SerialIssn
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
-from pipeline.ingestion.openalex import normalize as normalize_openalex
 from pipeline.ingestion.openalex.normalize import (
     OpenalexNormalizer,
     _extract_openalex_orcid,
@@ -98,7 +97,10 @@ class TestGetLocations:
         }
         [location] = get_locations(work)
         assert location.platform is not None
-        assert location.platform.platform_type is PlatformType.PREPRINT_SERVER
+        assert (location.platform.name, location.platform.platform_type) == (
+            "arXiv",
+            PlatformType.PREPRINT_SERVER,
+        )
 
     def test_un_entrepot_donne_sa_plateforme_et_son_identifiant_oai(self):
         work = {
@@ -126,13 +128,33 @@ class TestGetLocations:
                 version="submittedVersion",
                 license=License.CC_BY,
                 is_oa=True,
-                platform=PlatformFacts(
-                    "S4306402512",
-                    "HAL (Le Centre pour la Communication Scientifique Directe)",
-                    PlatformType.REPOSITORY,
-                ),
+                platform=PlatformFacts("S4306402512", "HAL", PlatformType.REPOSITORY),
             )
         ]
+
+    def test_une_page_pubmed_rangee_sous_pmc_devient_la_page_pmc(self):
+        source = {
+            "id": "https://openalex.org/S2764455111",
+            "type": "repository",
+            "display_name": "PubMed Central",
+        }
+        work = {
+            "locations": [
+                {
+                    "landing_page_url": "https://pubmed.ncbi.nlm.nih.gov/41760695/",
+                    "pdf_url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC12988236/pdf/a.pdf",
+                    "source": source,
+                },
+                {"landing_page_url": "https://pubmed.ncbi.nlm.nih.gov/1/", "source": source},
+            ]
+        }
+        with_pdf, without_pdf = get_locations(work)
+        assert with_pdf.url == "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12988236/"
+        assert with_pdf.platform is not None
+        assert (without_pdf.url, without_pdf.platform) == (
+            "https://pubmed.ncbi.nlm.nih.gov/1/",
+            None,
+        )
 
     def test_une_revue_ne_donne_pas_de_plateforme(self):
         work = {
@@ -397,6 +419,23 @@ class TestOpenalexSourceRecordMetadata:
         )
         assert record.container_title is None
 
+    def test_conteneur_sans_revue(self):
+        """Une source de congrès sans revue identifiée donne le titre du conteneur ; une archive non."""
+        conference = {"display_name": "ICRA 2024", "type": "conference"}
+        archive = {
+            "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+            "type": "repository",
+        }
+        titles = [
+            openalex_source_record(
+                {"title": "T", "primary_location": {"source": source}},
+                staging_id=1,
+                containers=_NO_CONTAINERS,
+            ).container_title
+            for source in (conference, archive)
+        ]
+        assert titles == ["ICRA 2024", None]
+
 
 # ── openalex_source_record (cas limites) ─────────────────────────
 
@@ -492,21 +531,36 @@ class TestOpenalexSourceRecord:
             },
         }
 
-    def test_biblio_skipped_when_primary_is_repository(self, monkeypatch):
-        """Si should_skip_publisher_serial renvoie True, publisher/journal absents de biblio."""
-
-        class _PrimaryStub:
-            source_display_name = None
-
-        monkeypatch.setattr(normalize_openalex, "parse_primary_location", lambda w: _PrimaryStub())
-        monkeypatch.setattr(normalize_openalex, "is_theses_fr_location", lambda p: False)
-        monkeypatch.setattr(normalize_openalex, "should_skip_publisher_serial", lambda p: True)
+    def test_biblio_skipped_when_primary_is_repository(self):
+        """Un entrepôt héberge le work sans le publier : ni éditeur ni revue dans biblio."""
         work = {
             "id": "https://openalex.org/W1",
-            "primary_location": {"source": {"host_organization_name": "HAL"}},
+            "primary_location": {
+                "source": {
+                    "type": "repository",
+                    "display_name": "Zenodo",
+                    "host_organization_name": "CERN",
+                }
+            },
         }
         captured = self._call(work)
         assert captured.biblio is None
+
+    def test_ebook_platform_names_publisher_only(self):
+        """Une plateforme d'ebooks donne l'éditeur, pas la revue."""
+        work = {
+            "id": "https://openalex.org/W1",
+            "primary_location": {
+                "source": {
+                    "id": "https://openalex.org/S4306463240",
+                    "type": "ebook platform",
+                    "display_name": "ENS Éditions eBooks",
+                    "host_organization_name": "École normale supérieure Editions",
+                }
+            },
+        }
+        captured = self._call(work)
+        assert captured.biblio == {"publisher": "École normale supérieure Editions"}
 
     def test_theses_fr_nnt_passed_through_to_external_ids(self):
         """Le NNT d'une localisation principale theses.fr va dans external_ids."""

@@ -8,9 +8,10 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.serials.issns import IssnStatus, SerialIssn, received_issns
 from domain.serials.serial import OaModel
 from domain.serials.series import ContainerLevel, container_level, series_title
-from domain.serials.titles import names_a_dated_event, names_proceedings
+from domain.serials.titles import names_a_dated_event, names_ebook_platform, names_proceedings
 from domain.source_records.doc_types import map_doc_type
 
+_ARTICLE = "article"
 _BOOK = "book"
 _BOOK_CHAPTER = "book_chapter"
 _CONFERENCE_PAPER = "conference_paper"
@@ -85,11 +86,18 @@ def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) ->
     return conference * 2 > total
 
 
+def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
+    """Indique si la majorité stricte des documents d'une revue sont des articles, d'après le type brut de chacun : `(source, type brut)`."""
+    records = list(records)
+    articles = sum(_ARTICLE in _doc_types(raw_doc_type, source) for source, raw_doc_type in records)
+    return articles * 2 > len(records)
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ContainerDescription:
     """Ce qu'une source dit du conteneur d'un document, tous niveaux mêlés.
 
-    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection, avec le support que donne la source ; la construction les normalise (`received_issns`).
+    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection, avec le support que donne la source ; la construction les normalise (`received_issns`). Elle retire aussi les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
     """
 
     source: str
@@ -108,6 +116,10 @@ class ContainerDescription:
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "issns", received_issns(self.issns))
+        for name in ("journal_title", "collection_title", "book_title"):
+            title = getattr(self, name)
+            if title and names_ebook_platform(title):
+                object.__setattr__(self, name, None)
 
     @property
     def has_issn(self) -> bool:

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -6,10 +7,11 @@
 	import { api, apiDetail, auth, contributions } from '#lib/api/index.js';
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import OaBar from '#lib/components/charts/OaBar.svelte';
+	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
+	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -19,8 +21,6 @@
 	import type { components } from '#lib/api/schema.js';
 
 	const personId = $derived(page.params.id);
-	let canGoBack = $state(false);
-
 	// --- Types ---
 	type Person = components['schemas']['PersonProfileCore'];
 	type Identifier = components['schemas']['PersonIdentifierOut'];
@@ -68,13 +68,6 @@
 	let dashPubsByYear: { year: number; count: number }[] = $state([]);
 	let dashOa = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
 	let dashSubjects: SubjectFrequency[] = $state([]);
-
-	const oaSegments = $derived([
-		{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
-		{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
-		{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
-		{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' }
-	]);
 
 	const displayName = $derived(
 		profile
@@ -140,7 +133,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 		auth.check().then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		if (personId) await loadProfile(personId);
 	});
@@ -151,29 +143,22 @@
 	<title>{pageTitle(displayName || 'Personne')}</title>
 </svelte:head>
 
-{#if canGoBack}
-<!-- svelte-ignore a11y_invalid_attribute -->
-<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+<Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current={displayName} />
 
 {#if error}
-	<div class="profile-header">
-		<div class="no-results">Personne introuvable</div>
-	</div>
+	<div class="no-results">Personne introuvable</div>
 {:else if !profile}
-	<div class="profile-header">
-		<div class="loading">Chargement…</div>
-	</div>
+	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Profile header -->
-	<div class="profile-header">
-		<h1 class="profile-name">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{titleCase(profile.first_name)}
-			<span class="profile-last">{titleCase(profile.last_name)}</span>
+			<span>{titleCase(profile.last_name)}</span>
 		</h1>
-		<div class="profile-meta">
+		<div class="entity-meta">
 			{#if profile.role_title}
-				<span class="role-badge">{profile.role_title}</span>
+				<span class="entity-tag">{profile.role_title}</span>
 			{/if}
 			{#if profile.department_name}
 				<span>{profile.department_name}</span>
@@ -205,28 +190,27 @@
 			{#if !dashboardLoaded}
 				<div class="loading">Chargement…</div>
 			{:else}
+				<KeyFigures
+					items={[
+						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
+						...(dashOa.total > 0
+							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
+							: []),
+						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }] : []),
+					]}
+				/>
 				<div class="dash-grid">
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectsCloud subjects={dashSubjects} />
-					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
-						<BarChart
-							labels={dashPubsByYear.map((d) => String(d.year))}
-							values={dashPubsByYear.map((d) => d.count)}
-							datasetLabel="Publications"
-						/>
+						<PublicationsByYearChart data={dashPubsByYear} />
 					</div>
 					<div class="dash-card">
-						<h3>Open Access</h3>
-						<DoughnutChart segments={oaSegments} />
-						{#if dashOa.total > 0}
-							<div class="oa-summary">
-								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
-								({dashOa.open_access.toLocaleString('fr-FR')} / {dashOa.total.toLocaleString('fr-FR')})
-							</div>
-						{/if}
+						<h3>Open access</h3>
+						<OaBar oa={dashOa} />
+					</div>
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectBars subjects={dashSubjects} />
 					</div>
 				</div>
 			{/if}
@@ -264,7 +248,7 @@
 			{:else}
 				{#each thesesSections as section (section.role)}
 					<h3 class="thesis-role-heading">{section.label}</h3>
-					<table class="publication-table">
+					<table class="data-table">
 						<thead>
 							<tr>
 								<th style="width:160px">Auteur</th>
@@ -278,7 +262,7 @@
 								<tr>
 									<td>{#if t.author_person_id}<a href={resolve(`persons/${t.author_person_id}`)}>{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
 									<td><a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a></td>
-									<td>{#each t.structure_ids as sid}<a href={resolve(`laboratories/${sid}`)} class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
+									<td>{#each t.structure_ids as sid}<a href={resolve(`laboratories/${sid}`)} class="structure-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
 									<td>{t.publication_year ?? ''}</td>
 								</tr>
 							{/each}
@@ -297,7 +281,7 @@
 			{:else if addresses.items.length === 0}
 				<div class="no-results">Aucune adresse</div>
 			{:else}
-				<table>
+				<table class="data-table">
 					<thead>
 						<tr>
 							<th>Adresse</th>
@@ -311,7 +295,7 @@
 								<td>
 									{#if a.structures?.length}
 										{#each a.structures as s (s.id)}
-											<span class="struct-tag">{structureLabel(s)}</span>
+											<span class="structure-tag">{structureLabel(s)}</span>
 										{/each}
 									{/if}
 								</td>
@@ -326,97 +310,15 @@
 {/if}
 
 <style>
-	/* Dashboard */
-	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-	@media (max-width: 760px) {
-		.dash-grid { grid-template-columns: 1fr; }
-	}
-	.dash-card-wide { grid-column: 1 / -1; }
-	.dash-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 16px;
-		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
-	}
-	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
-	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
-
 	.thesis-role-heading {
 		font-size: 1rem;
 		font-weight: 600;
 		margin: 20px 0 8px;
-		color: var(--fg);
+		color: var(--text);
 	}
 	.thesis-role-heading:first-child { margin-top: 0; }
-	.profile-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 20px 24px;
-		margin-bottom: 0;
-	}
-	.profile-name { font-size: 1.45rem; font-weight: 600; margin: 0 0 6px; }
-	.profile-last { font-weight: 600; }
-	.profile-meta {
-		display: flex;
-		gap: 16px;
-		align-items: center;
-		flex-wrap: wrap;
-		font-size: 0.95rem;
-		color: var(--muted);
-	}
-	.role-badge {
-		display: inline-block;
-		padding: 2px 8px;
-		background: var(--border-subtle);
-		border-radius: 3px;
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
-	/* Shared table styles */
-	.tab-content table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.tab-content thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.tab-content tbody tr:last-child { border-bottom: none; }
-	.tab-content tbody tr:hover { background: var(--surface-hover); }
-	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
-	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag) { color: var(--accent); text-decoration: none; }
-	.tab-content td a:not(.id-badge, .lab-tag, .struct-tag, .source-tag):hover { text-decoration: underline; }
 
-	/* Theses tab utilise aussi .publication-table */
-	.publication-table td { vertical-align: top; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
-	.struct-tag {
-		display: inline-block;
-		padding: 2px 7px;
-		background: var(--accent-light);
-		border-radius: 3px;
-		font-size: 0.8rem;
-		color: var(--accent);
-		font-weight: 500;
-		margin: 1px 2px;
-		text-decoration: none;
-	}
-	a.struct-tag:hover {
-		background: #d0e3f4;
-		text-decoration: none;
-	}
 </style>

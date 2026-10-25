@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -134,10 +135,10 @@
 		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
-	function sortArrow(col: 'name' | 'serials' | 'publications'): string {
-		if (currentSort === `${col}_asc`) return '▲';
-		if (currentSort === `${col}_desc`) return '▼';
-		return '';
+	function sortDirection(col: 'name' | 'serials' | 'publications'): 'asc' | 'desc' | null {
+		if (currentSort === `${col}_asc`) return 'asc';
+		if (currentSort === `${col}_desc`) return 'desc';
+		return null;
 	}
 
 	function publisherTypeLabel(value: string | null): string {
@@ -186,20 +187,20 @@
 </div>
 
 <div class="table-scroll">
-<table class="publishers-table">
+<table class="data-table publishers-table">
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('name')}>
-				Nom {sortArrow('name')}
+				Nom <SortChevron direction={sortDirection('name')} />
 			</th>
 			<th>Type</th>
 			<th>Pays</th>
 			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
-				{serialsHeader} {sortArrow('serials')}
+				{serialsHeader} <SortChevron direction={sortDirection('serials')} />
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis {sortArrow('publications')}
+				Publis <SortChevron direction={sortDirection('publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>
@@ -208,7 +209,7 @@
 		{#each publishers.items as p (p.id)}
 			<tr>
 				<td>
-					<a href={resolve(`publishers/${p.id}`)} class="publisher-link">{p.name}</a>
+					<a href={resolve(`publishers/${p.id}`)} class="entity-link">{p.name}</a>
 					{#each crossrefMemberIds(p.doi_prefixes) as member (member)}
 						<a
 							class="crossref-link"
@@ -230,7 +231,7 @@
 				</td>
 				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
-				{#if actionCell}<td class="actions">{@render actionCell(p)}</td>{/if}
+				{#if actionCell}<td class="actions row-actions">{@render actionCell(p)}</td>{/if}
 			</tr>
 		{/each}
 		{#if publishers.items.length === 0}
@@ -251,35 +252,8 @@
 />
 
 <style>
-	.publishers-table {
-		width: 100%;
-		min-width: 620px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.publishers-table thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.publishers-table thead th.num { text-align: right; }
-	.publishers-table thead th.sortable { cursor: pointer; user-select: none; }
-	.publishers-table thead th.sortable:hover { color: var(--accent); }
-	.publishers-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.publishers-table tbody tr:last-child { border-bottom: none; }
-	.publishers-table tbody tr:hover { background: var(--surface-hover); }	.publishers-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.publishers-table td.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-		color: var(--muted);
-	}
+	.publishers-table { min-width: 620px; }
+	.publishers-table td.num { color: var(--muted); }
 	.muted { color: var(--muted); }
 
 	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
@@ -288,12 +262,11 @@
 		background: var(--border-subtle);
 		color: var(--muted);
 		padding: 1px 6px;
-		border-radius: 8px;
+		border-radius: var(--radius);
 		font-size: 0.75rem;
 		font-variant-numeric: tabular-nums;
 		white-space: nowrap;
 	}
 
-	.publisher-link { font-weight: 500; }
 	.actions { white-space: nowrap; position: relative; }
 </style>

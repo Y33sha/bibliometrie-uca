@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `contributions` — supprime les revues vides.
+"""Sous-étape de la phase `finalize` — supprime les revues vides.
 
 Une revue vide n'a ni enregistrement, ni publication, ni monographie, ni paiement APC. Ses formes de nom partent avec elle : un enregistrement de ce titre chez cet éditeur crée de nouveau sa revue. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
 """
@@ -13,7 +13,7 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.transformation.publishing.serials.serial_label import serial_label
 from pipeline.transformation.publishing.serials.store import SerialSummary
 
-LABEL = "Revues vides"
+LABEL = "Publications en série vides"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 _EMPTY_SERIALS = text(f"""

@@ -1,13 +1,13 @@
 # Schéma `sources`
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-25.*
 
 Tables sources : les *records* non dédupliqués, normalisés à partir des payloads des API tierces. Toutes les sources partagent les mêmes tables, discriminées par la colonne `source` (enum `source_type` : hal, openalex, wos, scanr, theses, crossref, datacite).
 
 ## Tables
 
 - **`source_records`** : un enregistrement par document par source. Relié à `publications` via `publication_id` (peut être NULL si pas encore rattaché). Contient les métadonnées (doc_type, raw_doc_type, oa_status, abstract, keywords, topics, biblio, source_extras).
-- **`source_record_locations`** : localisations d'un enregistrement source, réécrites à chaque normalisation : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, plateforme. OpenAlex donne toutes les copies d'un document, Crossref la page vers laquelle résout le DOI.
+- **`source_record_locations`** : localisations d'un enregistrement source, réécrites à chaque normalisation : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, plateforme. OpenAlex donne toutes les copies d'un document, Crossref la page vers laquelle résout le DOI, HAL la page du dépôt et le fichier déposé. L'identifiant arXiv et le PMCID d'un enregistrement, quelle que soit sa source, donnent une copie ouverte sur arXiv et PubMed Central.
 - **`source_contributions`** : une contribution source — un auteur sur un document source. `person_id` la relie à la personne, `contributor_information_id` à ses informations du contributeur. `collective` marque une contribution source collective (collaboration, consortium…), sans personne. La contribution qu'elle atteste se déduit de son enregistrement source et de sa personne : celle du couple (publication de l'enregistrement source, personne). Ses adresses passent par `source_contribution_addresses`, d'où la matview `source_contribution_structures` dérive ses structures.
 - **`contributor_information`** : le nom normalisé et les identifiants d'une contribution source. Une ligne par combinaison distincte, que `source_contributions.contributor_information_id` référence : toutes les contributions sources aux mêmes informations la partagent.
 - **`source_contribution_addresses`** : table de liaison `source_contributions ↔ addresses`. Permet aux normalizers de partager une même chaîne d'adresse normalisée (`addresses.raw_text` → `addresses.normalized_text`) entre plusieurs contributions, et alimente la résolution structure ↔ adresse de la phase `affiliations`.

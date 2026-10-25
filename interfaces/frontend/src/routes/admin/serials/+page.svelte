@@ -1,4 +1,5 @@
 <script lang="ts">
+	import IconButton from '#lib/components/IconButton.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { replaceState } from '$app/navigation';
@@ -235,7 +236,7 @@
 				{/snippet}
 			</Picker>
 		{:else}
-			<button class="btn btn-sm" onclick={() => openEdit(j)}>Modifier</button>
+			<IconButton icon="edit" label="Modifier" onclick={() => openEdit(j)} />
 			<button class="btn btn-sm btn-merge" onclick={() => openMerge(j)}>Fusionner…</button>
 		{/if}
 	{/snippet}
@@ -275,7 +276,7 @@
 {/if}
 
 <style>
-	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: 3px; cursor: pointer; padding: 2px 8px; }
+	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
 
 	.muted { color: var(--muted); }

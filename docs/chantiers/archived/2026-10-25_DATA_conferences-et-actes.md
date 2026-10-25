@@ -4,7 +4,7 @@
 
 Le type `conference_paper` regroupe tout ce qui relève d'une conférence : texte publié dans des actes, résumé, communication orale. Le chantier vise à distinguer le texte publié dans des actes (`conference_paper`) de la communication (type « conférence », à créer).
 
-Les volumes d'actes sont des monographies (`monographs.proceedings`), rattachées à leur série dans `journals` (chantier [Monographies](DATA_monographies.md)).
+Les volumes d'actes sont des monographies (`monographs.proceedings`), rattachées à leur série dans `journals` (chantier [Monographies](2026-10-25_DATA_monographies.md)).
 
 ### Traces de publication
 
@@ -94,9 +94,6 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
     La valeur 0 est fausse pour 44 % des communications à volume d'actes : actes IEEE, ACM, Winter Simulation Conference déclarés sans actes. Sans trace en base, les deux valeurs se distinguent. Sur 30 enregistrements sources à 1, 22 portent des pages, un éditeur, un ISBN, une série ou un titre de source ; plusieurs sont des recueils de résumés (« Book of abstracts », « Recueil des résumés »). Sur 30 enregistrements sources à 0, un seul a l'un de ces champs.
 - [x] Lire les ISBN de HAL, dans le TEI (chantier Monographies)
 - [x] Importer l'enregistrement Crossref des communications à DOI (type, ISBN, congrès)
-- [ ] Reconnaître les résumés publiés en numéro de supplément
-- [ ] Reconnaître un résumé à son nombre de pages : un article d'actes d'une seule page est un résumé (AAAI, `10.1609/aaai.v40i47.41377`, page 39862). Les pages sont dans `biblio` : `page` chez Crossref, `pages` chez HAL, `first_page` et `last_page` chez OpenAlex, WoS et DataCite. À vérifier sur trois volumes SPIE qu'OpenAlex désigne comme résumés.
-- [ ] Retyper les séries d'actes classées `journal` ou `book_series`. Audit d'une règle à la majorité des monographies : correcte pour l'essentiel de `book_series` à `proceedings` (29 séries, dont quelques séries mixtes à vérifier) ; fausse sur les revues, où elle retype European Respiratory Journal et manque Journal of Physics: Conference Series.
 - [x] Vérifier le drapeau `proceedings` des monographies. Il marquait seulement les volumes dont un enregistrement se déclare issu d'un congrès, et ne redevenait jamais faux. Il manquait les volumes d'actes de chapitres Crossref sans congrès déclaré (LNCS, SODA). La sous-étape `type_proceedings_volumes` le recalcule à chaque run : enregistrement issu d'un congrès, collection typée recueil d'actes, ou titre anglais d'actes. Les « Actes du colloque » de sciences humaines restent des livres. Simulation : 65 volumes d'actes reconnus, 8 volumes repassent en livre (EUROCALL 2021, ESAFORM 2021).
 
 ### Phase 3 — Volumes d'actes
@@ -104,15 +101,11 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
 - [x] Dédoublonner les volumes
 - [x] Rattacher les communications à leur volume
 
-### Phase 4 — Recherche externe
-- [ ] Retrouver par son titre le DOI d'une communication sans DOI, dans les disciplines à actes
-- [ ] Évaluer l'API IEEE
-
-### Phase 5 — `container_title`
+### Phase 4 — `container_title`
 - [x] Rattacher les chapitres à leur livre en base (chantier Monographies)
-- [ ] Traiter les noms d'archive
+- [x] Noms d'archive : sans revue identifiée, OpenAlex donnait pour titre de conteneur le nom de la source de la localisation principale, archive ou entrepôt compris (« HAL (Le Centre pour la Communication Scientifique Directe) » sur 30 230 enregistrements sources, arXiv, Zenodo, Figshare, theses.fr). Ce nom reste seulement quand la source peut être une revue (`bfbb69425`). Les autres sources ne donnent pas de nom de plateforme. Stock : renormalisation d'OpenAlex.
 
-### Phase 6 — Type `conference`
+### Phase 5 — Type `conference`
 - [x] Valeur `conference` de l'enum `doc_type`, libellé « Conférence », famille « Annexes et divers ». WoS `meeting abstract` et OpenAlex `conference-abstract` y mènent (`fa8c7f8b4`).
 - [x] Extraction HAL de `proceedings_s`, `serie_s` et `source_s`, rangés dans `source_extras` (`68cae439d`). Les pages et l'éditeur sont déjà dans `biblio`.
 - [x] Crossref : sous-type des `posted-content` et forme de présentation des résumés Copernicus (`5d22d3fb0`).
@@ -122,6 +115,9 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
 
 ## Questions ouvertes
 
+- **Résumés en numéro de supplément.** 234 articles du périmètre paraissent dans un numéro de supplément (`biblio.issue`) : résumés de congrès (*Blood*, *Journal of Crohn's and Colitis*, *Cancer Research*), mais aussi articles de numéros spéciaux (*Comptes Rendus Géoscience*). Les codes de résumé en tête de titre sont trop variés pour trancher (« P3647 », « P–021 », « THU0724-HPR », « 847 | »). 294 publications de supplément sont déjà de type `conference`.
+- **Résumé d'une seule page.** Sur 2 726 articles de congrès à pages connues, 375 ont une première et une dernière page identiques, presque tous chez OpenAlex. Ce sont surtout des numéros d'article (*PoS*, *EPJ Web of Conferences*, *Nuclear Instruments and Methods*), pas des pages : le signal est inexploitable tel quel.
+- **Séries d'actes classées `journal` ou `book_series`.** Une règle à la majorité des monographies est juste pour l'essentiel de `book_series` à `proceedings` (29 séries, dont quelques séries mixtes), fausse sur les revues : elle retype *European Respiratory Journal* et manque *Journal of Physics: Conference Series*.
 - Le colloque, en tant qu'événement, mérite-t-il une entité distincte des actes ? Le rapprochement des noms doit alors distinguer les éditions (année, numéro).
 - Retrouver le DOI manquant d'un enregistrement source HAL par son titre vaut pour tous les types de documents : chantier à part ?
-- Points laissés en attente par le chantier [Types de documents](archived/2026-06-19_METIER_doc-types.md) : WoS `Article; Proceedings Paper`, posters et communications partageant un DOI.
+- Points laissés en attente par le chantier [Types de documents](2026-06-19_METIER_doc-types.md) : WoS `Article; Proceedings Paper`, posters et communications partageant un DOI.

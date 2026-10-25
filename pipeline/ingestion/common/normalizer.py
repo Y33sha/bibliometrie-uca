@@ -17,7 +17,7 @@ from domain.publications.metadata import has_minimal_publication_metadata
 from domain.serials.containers import ContainerDescription
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
-from pipeline.ingestion.common.locations import LocationFacts, LocationStore
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore, identifier_locations
 from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -163,10 +163,11 @@ class SourceNormalizer(ABC):
             if facts is not None
             else Containers(None, None)
         )
-        source_record_id = self._record_store.upsert_source_record(
-            replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
+        record = replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
+        source_record_id = self._record_store.upsert_source_record(record)
+        self._location_store.replace_locations(
+            source_record_id, [*self.locations(doc), *identifier_locations(record.external_ids)]
         )
-        self._location_store.replace_locations(source_record_id, self.locations(doc))
         sync_source_contributions(
             self._contribution_store,
             self.SOURCE,

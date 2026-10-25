@@ -1,7 +1,7 @@
 <script lang="ts">
+  import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
-  import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
@@ -252,7 +252,10 @@
 <svelte:window onclick={handleOutsideClick} />
 
 <div class="page-feedback">
-  <p class="back-link"><a href={resolve(currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : 'admin/addresses')}>← Affiliations des adresses</a></p>
+  <Breadcrumb
+    trail={[{ label: "Affiliations", path: currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses" }]}
+    current="Qualité de la détection"
+  />
   <h2>Qualité de la détection</h2>
 
   <!-- Stats row -->
@@ -288,7 +291,7 @@
   {/if}
 
   <!-- Help text -->
-  <div class="help-text">
+  <div class="info-box">
     <strong>{helpText.title}</strong> &mdash; {helpText.body}
   </div>
 
@@ -416,7 +419,7 @@
   .stat-card {
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     padding: 12px 18px;
     text-align: center;
     flex: 1;
@@ -456,20 +459,6 @@
   }
 
   /* Help text */
-  .back-link {
-    margin: 0 0 4px;
-    font-size: 0.85rem;
-  }
-  .help-text {
-    background: var(--accent-light);
-    border: 1px solid #c4d8ed;
-    border-radius: 5px;
-    padding: 10px 14px;
-    margin-bottom: 16px;
-    font-size: 0.95rem;
-    color: #2c3e50;
-    line-height: 1.5;
-  }
 
   /* Toolbar */
   .toolbar {
@@ -478,11 +467,11 @@
   .structure-filter {
     padding: 6px 10px;
     border: 1px solid var(--accent);
-    border-radius: 4px;
+    border-radius: var(--radius);
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--accent);
-    background: white;
+    background: var(--card);
     font-family: inherit;
   }
 
@@ -502,16 +491,16 @@
   .tab-btn {
     padding: 6px 14px;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--card);
     font-size: 0.95rem;
     cursor: pointer;
     font-family: inherit;
   }
   .tab-btn:first-child {
-    border-radius: 4px 0 0 4px;
+    border-radius: var(--radius) 0 0 var(--radius);
   }
   .tab-btn:last-child {
-    border-radius: 0 4px 4px 0;
+    border-radius: 0 var(--radius) var(--radius) 0;
   }
   .tab-btn:not(:first-child) {
     border-left: none;
@@ -528,7 +517,7 @@
 
   /* Table */
   .addr-text {
-    font-family: "SF Mono", "Consolas", monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
     line-height: 1.4;
     word-break: break-word;
@@ -544,7 +533,7 @@
     display: inline-block;
     font-size: 0.8rem;
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
     font-weight: 500;
     margin: 1px 2px;
   }
@@ -554,16 +543,16 @@
   }
   .struct-detected {
     background: var(--warning-light);
-    color: #8a6d10;
+    color: var(--warning-text);
   }
   .struct-manual {
     background: var(--accent-light);
-    color: #2c5e8a;
-    border: 1px dashed #a0c0e0;
+    color: var(--accent);
+    border: 1px dashed color-mix(in srgb, var(--accent) 40%, white);
   }
   .struct-rejected {
-    background: #f5f5f5;
-    color: #999;
+    background: var(--surface);
+    color: var(--muted);
     text-decoration: line-through;
   }
 
@@ -572,9 +561,9 @@
     font-size: 0.8rem;
     margin-top: 4px;
     padding: 4px 8px;
-    background: #fef8e8;
-    border: 1px solid #f0e4b8;
-    border-radius: 4px;
+    background: var(--warning-light);
+    border: 1px solid color-mix(in srgb, var(--warning) 40%, white);
+    border-radius: var(--radius);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -584,9 +573,9 @@
     color: var(--muted);
   }
   .form-text {
-    font-family: "SF Mono", "Consolas", monospace;
+    font-family: var(--mono);
     font-weight: 600;
-    color: #8a6d10;
+    color: var(--warning-text);
   }
   .form-ctx {
     color: var(--muted);
@@ -594,8 +583,8 @@
   .form-action {
     padding: 1px 6px;
     border: 1px solid var(--border);
-    border-radius: 3px;
-    background: white;
+    border-radius: var(--radius);
+    background: var(--card);
     font-size: 0.7rem;
     cursor: pointer;
     font-weight: 500;
@@ -616,9 +605,9 @@
   .ctx-picker-inline {
     position: fixed;
     z-index: 100;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--accent);
-    border-radius: 5px;
+    border-radius: var(--radius);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
     width: 320px;
   }
@@ -671,8 +660,8 @@
   .picker-shortcuts button {
     padding: 2px 8px;
     border: 1px solid var(--border);
-    border-radius: 3px;
-    background: white;
+    border-radius: var(--radius);
+    background: var(--card);
     font-size: 0.8rem;
     cursor: pointer;
     font-family: inherit;

@@ -5,28 +5,27 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
-
-### En pause
-
-- [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
 
 ### Non commencé
 
-- [Collaborations entre structures](DATA_collaborations-structures.md)
-- [Conférences et actes](DATA_conferences-et-actes.md)
+- [Contenu des dashboards de structure et de personne](METIER_dashboards.md)
+- [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Monographies](DATA_monographies.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
-- [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
-- [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
+- [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
-- [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-10-25 — [Refonte visuelle du frontend](archived/2026-10-25_STYLE_refonte-visuelle.md)
+- 2026-10-25 — [Collaborations entre structures](archived/2026-10-25_DATA_collaborations-structures.md)
+- 2026-10-25 — [Monographies](archived/2026-10-25_DATA_monographies.md)
+- 2026-10-25 — [Gestion et dédoublonnage assistés de la base personnes](archived/2026-10-25_DATA_personnes-dedoublonnage-assiste.md)
+- 2026-10-25 — [Conférences et actes](archived/2026-10-25_DATA_conferences-et-actes.md)
+- 2026-10-25 — [Revues divergentes selon les sources](archived/2026-10-25_DATA_revues-divergentes-entre-sources.md)
+- 2026-10-25 — [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md)
 - 2026-10-24 — [Résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md)
 - 2026-10-24 — [Alignement des auteurs d'une publication](archived/2026-10-24_DATA_alignement-auteurs.md)
 - 2026-10-23 — [Cycle de vie des publications et des référentiels](archived/2026-10-23_CODE_cycle-de-vie-des-publications.md)

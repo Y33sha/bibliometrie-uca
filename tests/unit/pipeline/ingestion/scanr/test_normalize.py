@@ -63,7 +63,7 @@ class TestScanrSourceRecordBiblio:
             {
                 "source": {
                     "title": "Journal of Physics",
-                    "serialIssns": ["0022-3727", "1361-6463"],
+                    "journalIssns": ["0022-3727", "1361-6463"],
                 }
             },
         )
@@ -81,7 +81,7 @@ class TestScanrSourceRecordBiblio:
                 "source": {
                     "publisher": "Elsevier",
                     "title": "Journal of Physics",
-                    "serialIssns": ["0022-3727"],
+                    "journalIssns": ["0022-3727"],
                 }
             },
         )
@@ -264,6 +264,10 @@ class TestGetTitle:
     def test_titre_en_clair(self):
         assert get_title({"title": "Un titre"}) == "Un titre"
 
+    def test_titre_recopie_de_crossref_sans_mathml_aplati(self):
+        title = "Measurement of \n                $$\\tau $$\n                    τ\n              polarisation"
+        assert get_title({"title": {"default": title}}) == "Measurement of $$\\tau $$ polarisation"
+
 
 class TestEditeurEtConteneur:
     def test_sans_editeur_nomme_aucun_editeur(self):
@@ -278,7 +282,7 @@ class TestEditeurEtConteneur:
     def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste, sans support : ils restent de support inconnu."""
         facts = get_container_facts(
-            {"source": {"title": "J. Things", "serialIssns": ["1234-5679", "8765-4326"]}}
+            {"source": {"title": "J. Things", "journalIssns": ["1234-5679", "8765-4326"]}}
         )
         assert facts.journal_title == "J. Things"
         assert facts.issns == (SerialIssn(issn="1234-5679"), SerialIssn(issn="8765-4326"))
@@ -295,6 +299,23 @@ class TestEditeurEtConteneur:
             {"type": "book-chapter", "source": {"title": "Presses de Sciences Po eBooks"}}
         )
         assert facts.book_title is None
+
+
+class TestThese:
+    """La source d'une thèse ScanR est l'université de soutenance, pas un conteneur."""
+
+    _DOC = {
+        "type": "thesis",
+        "source": {"title": "Université Clermont Auvergne (2021-...)", "publisher": "ABES"},
+    }
+
+    def test_aucun_conteneur(self):
+        assert _normalizer().container_facts(self._DOC) is None
+
+    def test_ni_titre_de_conteneur_ni_revue_dans_la_biblio(self):
+        captured = scanr_source_record(self._DOC, 1, "nnt2023clfac001", _NO_CONTAINERS)
+        assert captured.container_title is None
+        assert captured.biblio == {"publisher": "ABES"}
 
 
 class TestScanrSourceRecordMetadonnees:

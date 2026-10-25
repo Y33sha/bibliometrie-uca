@@ -170,7 +170,7 @@
     font-weight: 600;
   }
   .drawer-title:hover {
-    color: #2563eb;
+    color: var(--accent);
     text-decoration: underline;
   }
   .comparison {
@@ -181,7 +181,7 @@
   .comparison th,
   .comparison td {
     padding: 6px 10px;
-    border-bottom: 1px solid var(--border-subtle, #eee);
+    border-bottom: 1px solid var(--border-subtle);
     text-align: left;
     vertical-align: top;
   }
@@ -193,9 +193,9 @@
     position: sticky;
     top: -16px;
     z-index: 2;
-    background: #fff;
+    background: var(--card);
     border-bottom: none;
-    box-shadow: inset 0 -2px 0 var(--border, #e0e0e0);
+    box-shadow: inset 0 -2px 0 var(--border);
     white-space: nowrap;
   }
   /* Colonnes des enregistrements sources : la marge gauche reçoit le numéro de position des auteurs. */
@@ -215,8 +215,8 @@
     position: sticky;
     left: 0;
     z-index: 1;
-    background: #fff;
-    color: #666;
+    background: var(--card);
+    color: var(--muted);
     font-weight: 600;
     white-space: nowrap;
   }
@@ -225,10 +225,10 @@
   }
   tr.divergent td,
   tr.divergent .field {
-    background: #fff8e6;
+    background: var(--warning-light);
   }
   tr.divergent .field {
-    box-shadow: inset 3px 0 0 #f0a020;
+    box-shadow: inset 3px 0 0 var(--warning);
   }
   .record-head {
     display: inline-flex;
@@ -237,25 +237,25 @@
   }
   .record-id {
     font-weight: 400;
-    color: #666;
+    color: var(--muted);
     font-size: 0.8rem;
   }
   .absent {
-    color: #bbb;
+    color: var(--text-faint);
   }
   .note {
-    color: #888;
+    color: var(--muted);
     font-size: 0.78rem;
     margin-top: 2px;
   }
   .failure {
-    color: #888;
+    color: var(--muted);
   }
   .section-row th,
   .section-row td {
-    border-bottom: 2px solid var(--border, #e0e0e0);
+    border-bottom: 2px solid var(--border);
     padding-top: 14px;
-    color: #444;
+    color: var(--text);
   }
   .author-cell {
     position: relative;
@@ -264,7 +264,7 @@
     position: absolute;
     left: 0;
     width: calc(var(--position-gutter) - 6px);
-    color: #999;
+    color: var(--muted);
     font-size: 0.75rem;
     font-variant-numeric: tabular-nums;
     text-align: right;
@@ -274,13 +274,13 @@
     font-weight: 600;
   }
   .info {
-    color: #888;
+    color: var(--muted);
     cursor: help;
     margin-left: 3px;
   }
   .countries,
   .roles {
-    color: #888;
+    color: var(--muted);
     font-size: 0.75rem;
     margin-left: 4px;
   }

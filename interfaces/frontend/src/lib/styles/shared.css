@@ -1,25 +1,74 @@
 /* ============================================================
    Shared CSS — bibliometrie-uca
-   Classes used across multiple pages, extracted to avoid duplication.
-   Imported globally in +layout.svelte.
+   Variables CSS de l'application et classes communes à plusieurs pages.
+   Importé globalement dans +layout.svelte.
    ============================================================ */
 
-/* ── Semantic color variables (used by admin pages) ── */
+/* ── Variables ── */
 :root {
+	/* Texte */
+	--text: #1d2433;
+	--text-secondary: #5b6474;
+	--muted: #6b7280;          /* texte discret */
+	--text-faint: #a3a9b3;     /* valeurs nulles ou absentes */
+
+	/* Surfaces et lignes */
+	--bg: #fbfbfa;             /* fond de page */
+	--card: #ffffff;
+	--surface: #f4f5f7;        /* fonds de panneaux, en-têtes de tableau */
+	--hover: #eef1f2;          /* survol des éléments cliquables (boutons, items de liste) */
+	--surface-hover: #f7f8f9;  /* survol des lignes de tableau */
+	--border: #e3e6ea;
+	--border-subtle: #eef0f2;  /* séparateurs légers */
+
+	/* Accent */
+	--accent: #1f5f5f;         /* texte, bouton plein, titres de section */
+	--accent-mid: #2f8a8a;     /* trait d'onglet actif, focus */
+	--accent-light: #e6f2f2;   /* fond de pastille, encart */
+	--accent-soft: #a9d0d0;    /* barre de graphique atténuée (année en cours) */
+
+	/* Barre de navigation */
+	--nav-public: #2f7f7f;
+	--nav-public-menu: #286e6e; /* sous-menus déroulants */
+	--nav-admin: #1f5f5f;
+	--nav-admin-menu: #2a6c6c;
+
+	/* États */
 	--success: #2a7d4f;
 	--success-light: #e6f4ec;
-	--danger: #c0392b;
-	--danger-light: #fbeaea;
+	--danger: #b42318;
+	--danger-light: #fbe9e7;
 	--warning: #d4a017;
 	--warning-light: #fef8e8;
-	--accent-light: #e8f0f8;
-	--text-muted: #777;
-	/* Neutres clairs (surfaces) — valeurs dominantes consolidées. */
-	--surface: #f5f4f1;        /* fonds de panneaux, en-têtes de tableau */
-	--surface-hover: #fafaf8;  /* survol/zébrure des lignes */
-	--border-subtle: #f0efec;  /* séparateurs légers (border-bottom) */
-	--section-heading: #3d7a7c; /* teal foncé du menu — titres de section */
-	--section-heading-light: #e4efef; /* teal pâle — survol des tags du corps */
+	--warning-text: #856404;    /* assombri, lisible en texte sur fond clair */
+	--attention: #e65100;       /* élément à traiter : orphelin, hors collection, exclusion */
+	--attention-light: #fff3e0;
+
+	/* Infobulles */
+	--tooltip-bg: #333;
+
+	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
+	--open: #2e9b4f;       /* ouvert, toutes voies confondues */
+	--open-text: #22743c;  /* assombri, lisible en texte sur fond clair */
+	--embargoed: #d29a1e;
+	--closed: #4b5260;
+	--unknown: #c9ced6;
+	--diamond: #d0d4fb;
+	--gold: #ffd700;
+	--hybrid: #b366f2;
+	--bronze: #cd7f32;
+	--bronze-text: #9a5a1e; /* assombri, lisible en texte sur fond clair */
+	--green: #5ec62c;
+	--green-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
+
+	/* Polices */
+	--font: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--mono: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+
+	/* Gabarit */
+	--header-height: 46px; /* hauteur du menu supérieur fixe */
+	--radius: 8px;
+	--radius-pill: 999px;
 }
 
 /* ── Liens ── */
@@ -45,17 +94,34 @@
 .toolbar input[type='text' i] {
 	padding: 6px 10px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.95rem;
 	font-family: inherit;
 }
 
+/* Champ de recherche d'une barre d'outils, loupe à gauche. */
+.toolbar input[type='search']:not(.facet-search) {
+	height: 36px;
+	padding: 0 12px 0 34px;
+	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px center;
+}
+
+/* Menu déroulant natif au gabarit des boutons de filtre : sans bordure, flèche dessinée, fond au survol. */
 .toolbar select {
-	padding: 6px 10px;
-	border: 1px solid var(--border);
-	border-radius: 4px;
-	font-size: 0.95rem;
-	font-family: inherit;
+	appearance: none;
+	height: 34px;
+	padding: 0 26px 0 10px;
+	border: none;
+	border-radius: var(--radius);
+	background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 500;
+	color: var(--text);
+	cursor: pointer;
+}
+.toolbar select:hover {
+	background-color: var(--hover);
 }
 
 /* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
@@ -68,19 +134,55 @@
 	flex: 1;
 }
 
-/* Toolbar card variant (with background, border, padding) */
+/* Zone recherche et filtres d'une liste. Le fond de page masque les lignes qui défilent sous la barre collante ; un filet la sépare du tableau. */
 .toolbar-card {
-	padding: 10px 14px;
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: 6px;
+	padding: 10px 0;
+	background: var(--bg);
+	border-bottom: 1px solid var(--border);
 }
 
-/* Sticky toolbar variant */
+/* Barre collante sous le menu supérieur */
 .toolbar-sticky {
 	position: sticky;
-	top: 46px;
+	top: var(--header-height);
 	z-index: 50;
+}
+
+/* Action principale d'une barre d'outils (lien vers une autre vue) */
+.toolbar-action {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 36px;
+	padding: 0 14px;
+	border-radius: var(--radius);
+	background: var(--accent);
+	color: white;
+	font-size: 0.9rem;
+	font-weight: 600;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.toolbar-action:hover {
+	background: color-mix(in srgb, var(--accent), black 20%);
+	text-decoration: none;
+}
+
+/* ── Chevron (menus, facettes, en-têtes triés) : `.up` le retourne, pour un panneau ouvert ou un tri croissant ── */
+.chevron {
+	display: inline-block;
+	flex-shrink: 0;
+	width: 11px;
+	height: 11px;
+	margin-left: 4px;
+	vertical-align: -1px;
+	background: currentColor;
+	opacity: 0.75;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+	transition: transform 0.15s;
+}
+.chevron.up {
+	transform: rotate(180deg);
 }
 
 /* ── Facettes : bouton, panneau et options des filtres de liste (FacetDropdown, EntityFilter, PresenceFilterToggle) ── */
@@ -92,22 +194,24 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	padding: 6px 10px;
-	border: 1px solid var(--border);
-	border-radius: 4px;
-	background: var(--card);
-	font-size: 0.95rem;
+	height: 34px;
+	padding: 0 10px;
+	border: none;
+	border-radius: var(--radius);
+	background: transparent;
+	font-size: 0.9rem;
 	cursor: pointer;
 	color: var(--text);
 	white-space: nowrap;
 	font-family: inherit;
 }
 .facet-btn:hover {
-	border-color: #ccc;
+	background: var(--hover);
 }
 .facet-btn.has-selection {
-	border-color: var(--accent);
 	background: var(--accent-light);
+	color: var(--accent);
+	font-weight: 500;
 }
 /* Nombre de valeurs sélectionnées, sur le bouton. */
 .facet-badge {
@@ -118,17 +222,11 @@
 	min-width: 18px;
 	height: 18px;
 	padding: 0 5px;
-	border-radius: 9px;
+	border-radius: var(--radius-pill);
 	background: var(--accent);
 	color: white;
 	font-size: 0.8rem;
 	font-weight: 600;
-}
-.facet-arrow {
-	flex-shrink: 0;
-	margin-left: 2px;
-	font-size: 0.7rem;
-	color: var(--muted);
 }
 .facet-panel {
 	min-width: 220px;
@@ -138,7 +236,7 @@
 	padding: 6px 0;
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 6px;
+	border-radius: var(--radius);
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 	z-index: 100;
 }
@@ -148,7 +246,7 @@
 	margin: 2px 6px 6px;
 	padding: 5px 8px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.85rem;
 }
 .facet-options label {
@@ -160,7 +258,7 @@
 	cursor: pointer;
 }
 .facet-options label:hover {
-	background: #f5f5f2;
+	background: var(--hover);
 }
 .facet-options input[type='checkbox'],
 .facet-options input[type='radio'] {
@@ -179,7 +277,7 @@
 	margin-left: auto;
 	padding-left: 12px;
 	font-size: 0.8rem;
-	color: #888;
+	color: var(--muted);
 }
 
 /* Conteneur de tableau scrollable horizontalement (petit écran). */
@@ -197,74 +295,62 @@
 		position: sticky;
 		top: 0;
 		z-index: 1;
+		background: var(--bg);
 	}
 }
 
-/* ── Count badge (usually in toolbar) ── */
+/* ── Nombre de résultats (barre d'outils) ── */
 .count {
 	margin-left: auto;
 	font-size: 0.85rem;
-	color: var(--muted);
+	color: var(--text-secondary);
 	white-space: nowrap;
 }
 
-/* ── Export button ── */
+/* ── Action secondaire discrète (export) ── */
 .export-btn {
-	padding: 4px 10px;
-	border: 1px solid var(--border);
-	border-radius: 4px;
-	background: var(--card);
-	font-size: 0.85rem;
-	color: var(--muted);
+	display: inline-flex;
+	align-items: center;
+	height: 36px;
+	padding: 0 12px;
+	border: none;
+	border-radius: var(--radius);
+	background: transparent;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 500;
+	color: var(--accent);
 	text-decoration: none;
 	cursor: pointer;
 	white-space: nowrap;
 }
 
 .export-btn:hover {
-	border-color: var(--accent);
-	color: var(--accent);
+	background: var(--hover);
+	text-decoration: none;
 }
 
 /* ── Data table ── */
+/* Tableau sans cadre : en-têtes en petites capitales, lignes séparées par des filets pâles. */
 .data-table {
 	width: 100%;
 	border-collapse: collapse;
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: 6px;
-	/* Pas d'overflow: hidden : clipperait les dropdowns positionnés en absolute. */
 }
 
-.data-table thead tr:first-child th:first-child {
-	border-radius: 6px 0 0 0;
-}
-
-.data-table thead tr:first-child th:last-child {
-	border-radius: 0 6px 0 0;
-}
-
-.data-table tbody tr:last-child td:first-child {
-	border-radius: 0 0 0 6px;
-}
-
-.data-table tbody tr:last-child td:last-child {
-	border-radius: 0 0 6px 0;
-}
-
-.data-table th {
+.data-table thead th {
 	text-align: left;
-	padding: 8px 10px;
-	font-size: 0.85rem;
+	padding: 10px 12px;
+	font-size: 0.7rem;
 	font-weight: 600;
-	color: var(--muted);
-	border-bottom: 2px solid var(--border);
-	background: var(--surface);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--text-secondary);
+	border-bottom: 1px solid var(--border);
 	white-space: nowrap;
 }
 
 .data-table td {
-	padding: 7px 10px;
+	padding: 10px 12px;
 	font-size: 0.95rem;
 	border-bottom: 1px solid var(--border-subtle);
 	vertical-align: top;
@@ -274,13 +360,68 @@
 	border-bottom: none;
 }
 
-.data-table tr:hover td {
+.data-table tbody tr:hover td {
 	background: var(--surface-hover);
+}
+
+/* Actions secondaires d'une ligne (modifier, supprimer, exclure) : visibles au survol de la ligne ou au focus clavier, sur les écrans à pointeur. */
+@media (hover: hover) {
+	.data-table .row-actions > * {
+		opacity: 0;
+		transition: opacity 0.1s;
+	}
+	.data-table tr:hover .row-actions > *,
+	.data-table .row-actions:focus-within > * {
+		opacity: 1;
+	}
+}
+
+/* Liens de structure dans un tableau : texte simple, les pastilles étant réservées aux valeurs codées par couleur. */
+.data-table .lab-tag {
+	padding: 0;
+	margin-right: 6px;
+	background: none;
+}
+.data-table .lab-tag:hover {
+	background: none;
+	text-decoration: underline;
 }
 
 .num {
 	text-align: right;
 	font-variant-numeric: tabular-nums;
+}
+
+.data-table th.num {
+	text-align: right;
+}
+
+.data-table td.num {
+	white-space: nowrap;
+}
+
+/* Tableau d'une file de triage : colonnes de largeur fixe, lignes regroupées par `tbody.group`. */
+.triage-table {
+	table-layout: fixed;
+	font-size: 0.9rem;
+}
+.triage-table th,
+.triage-table td {
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+.triage-table tbody.group {
+	border-top: 2px solid var(--border);
+}
+.triage-table .group-head th {
+	padding: 8px 12px;
+	text-align: left;
+	background: var(--accent-light);
+	color: var(--text);
+}
+.triage-table .action {
+	text-align: right;
+	white-space: nowrap;
 }
 
 /* ── Sortable columns ── */
@@ -289,18 +430,16 @@
 	user-select: none;
 }
 
-.sortable:hover {
+.sortable:hover,
+.sortable.active {
 	color: var(--accent);
 }
 
 .sort-arrow {
-	font-size: 0.75rem;
-	margin-left: 3px;
-	color: #bbb;
+	color: var(--text-faint);
 }
 
-.sortable.active .sort-arrow,
-th.sorted .sort-arrow {
+.sortable.active .sort-arrow {
 	color: var(--accent);
 	opacity: 1;
 }
@@ -320,19 +459,6 @@ th.sorted .sort-arrow {
 	font-size: 0.95rem;
 	color: var(--muted);
 	margin: -10px 0 16px;
-}
-
-/* ── Back link ── */
-.back-link {
-	display: inline-block;
-	margin-bottom: 12px;
-	font-size: 0.95rem;
-	color: var(--accent);
-	text-decoration: none;
-}
-
-.back-link:hover {
-	text-decoration: underline;
 }
 
 /* ── Champs de formulaire dans une modale (composant Modal) ── */
@@ -366,7 +492,7 @@ th.sorted .sort-arrow {
 	width: 100%;
 	padding: 6px 8px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
+	border-radius: var(--radius);
 	font-size: 0.95rem;
 	font-family: inherit;
 }
@@ -375,46 +501,110 @@ th.sorted .sort-arrow {
 	resize: vertical;
 }
 
-/* ── Tabs (detail pages) ── */
+/* ── En-tête d'une page entité (structure, personne, revue, éditeur, monographie, sujet) ── */
+.entity-header {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+.entity-title {
+	margin: 0;
+	font-size: 1.85rem;
+	line-height: 1.2;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+}
+/* Sigle à côté du titre. */
+.entity-acronym {
+	margin-left: 10px;
+	font-size: 1.25rem;
+	font-weight: 500;
+	letter-spacing: 0;
+	color: var(--muted);
+}
+/* Ligne de métadonnées : suites de libellé + valeurs. */
+.entity-meta {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px 8px;
+	font-size: 0.85rem;
+	color: var(--text-secondary);
+}
+.entity-meta-label {
+	font-size: 0.7rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--muted);
+}
+.entity-meta-label:not(:first-child) {
+	margin-left: 14px;
+}
+.entity-tag {
+	display: inline-block;
+	padding: 3px 9px;
+	border-radius: var(--radius-pill);
+	background: var(--surface);
+	color: var(--text-secondary);
+	font-size: 0.85rem;
+}
+.entity-tag-accent {
+	background: var(--accent-light);
+	color: var(--accent);
+	font-weight: 500;
+}
+.entity-meta .id-badge {
+	padding: 3px 9px;
+	border-radius: var(--radius-pill);
+	font-size: 0.85rem;
+	font-weight: 500;
+}
+
+/* ── Onglets (TabNav, HubTabs) ── */
 .tabs {
 	display: flex;
-	gap: 0;
-	background: var(--card);
-	border-left: 1px solid var(--border);
-	border-right: 1px solid var(--border);
-	border-bottom: 1px solid var(--border);
-	border-radius: 0 0 6px 6px;
-	margin-bottom: 16px;
-	overflow: hidden;
+	gap: 28px;
+	margin: 28px 0 24px;
+	/* Filet en ombre interne : le trait de l'onglet actif le recouvre sans déborder du conteneur. */
+	box-shadow: inset 0 -1px 0 var(--border);
+	overflow-x: auto;
+	overflow-y: hidden;
 }
-
 .tab {
-	flex: 1;
-	padding: 10px 16px;
+	display: inline-flex;
+	align-items: baseline;
+	gap: 6px;
+	padding: 10px 0;
 	border: none;
-	background: var(--surface);
-	font-size: 0.95rem;
+	border-bottom: 3px solid transparent;
+	background: none;
+	font: inherit;
+	font-size: 0.9rem;
 	font-weight: 500;
-	color: var(--muted);
+	color: var(--text-secondary);
+	white-space: nowrap;
 	cursor: pointer;
-	font-family: inherit;
-	border-right: 1px solid var(--border);
-	transition: background 0.15s, color 0.15s;
 }
-
-.tab:last-child {
-	border-right: none;
-}
-
 .tab:hover {
-	background: #eae9e5;
 	color: var(--text);
 }
-
 .tab.active {
-	background: var(--card);
+	color: var(--text);
+	font-weight: 600;
+	border-bottom-color: var(--accent-mid);
+}
+.tab-count {
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--muted);
+}
+.tab.active .tab-count {
+	padding: 1px 7px;
+	border-radius: var(--radius-pill);
+	background: var(--accent-light);
 	color: var(--accent);
-	box-shadow: inset 0 -2px 0 var(--accent);
+	font-weight: 600;
 }
 
 /* ── Pub table column widths ── */
@@ -435,7 +625,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	padding: 2px 7px;
 	background: var(--accent-light);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.8rem;
 	color: var(--accent);
 	text-decoration: none;
@@ -443,7 +633,7 @@ th.sorted .sort-arrow {
 }
 
 .id-badge:hover {
-	background: #d4e4f3;
+	background: color-mix(in srgb, var(--accent) 20%, white);
 	color: var(--accent);
 	text-decoration: none;
 }
@@ -454,7 +644,7 @@ th.sorted .sort-arrow {
 }
 
 .id-badge.id-confirmed:hover {
-	background: #d0eadb;
+	background: color-mix(in srgb, var(--success) 20%, white);
 	color: var(--success);
 }
 
@@ -605,7 +795,7 @@ th.sorted .sort-arrow {
 
 /* Lien DOI : l'icône seule, sans pastille, qui prend la couleur d'accent au survol. */
 .source-doi {
-	color: var(--text-muted);
+	color: var(--muted);
 }
 
 .source-doi:hover {
@@ -630,7 +820,7 @@ th.sorted .sort-arrow {
 .source-tag-label {
 	display: inline-block;
 	padding: 1px 5px;
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.7rem;
 	font-weight: 600;
 	margin-right: 2px;
@@ -661,7 +851,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	font-size: 0.8rem;
 	padding: 1px 7px;
-	border-radius: 10px;
+	border-radius: var(--radius-pill);
 	background: var(--accent-light);
 	color: var(--accent);
 	font-weight: 500;
@@ -669,19 +859,179 @@ th.sorted .sort-arrow {
 }
 
 .lab-tag:hover {
-	background: #d0e4f4;
+	background: color-mix(in srgb, var(--accent) 20%, white);
 }
 
-/* ── Role / tutelle tag (neutral) ── */
-.role-tag,
+/* ── Pastille de structure (lien vers la page de la structure) ── */
+.structure-tag {
+	display: inline-block;
+	padding: 1px 6px;
+	background: var(--accent-light);
+	border-radius: var(--radius);
+	font-size: 0.8rem;
+	color: var(--accent);
+	font-weight: 500;
+	margin: 1px 3px 1px 0;
+	text-decoration: none;
+}
+a.structure-tag:hover {
+	background: color-mix(in srgb, var(--accent) 20%, white);
+	text-decoration: none;
+}
+
+/* ── Tutelle tag (neutral) ── */
 .tutelle-tag {
 	display: inline-block;
 	padding: 2px 7px;
 	background: var(--border-subtle);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.8rem;
 	color: var(--muted);
 	white-space: nowrap;
+}
+
+/* ── Pastille de type de structure (`structure-type structure-type-{type}`) ── */
+.structure-type {
+	font-size: 0.7rem;
+	padding: 1px 6px;
+	border-radius: var(--radius);
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+	white-space: nowrap;
+	background: #f0f0f0;
+	color: #555;
+}
+.structure-type-universite { background: #e8d4f0; color: #6b2e8a; }
+.structure-type-onr { background: #d4e8f0; color: #2e6b8a; }
+.structure-type-chu { background: #f0d4d4; color: #8a2e2e; }
+.structure-type-ecole { background: #f0e8d4; color: #8a6b2e; }
+.structure-type-labo { background: var(--accent-light); color: var(--accent); }
+.structure-type-site { background: var(--success-light); color: var(--success); }
+.structure-type-equipe { background: #d4f0ec; color: #2e8a7d; }
+.structure-type-admin { background: #dde3ea; color: #3d5266; }
+
+/* ── Dashboard d'une entité (structure, personne, revue, éditeur) ── */
+.dash-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 44px 48px;
+}
+@media (max-width: 760px) {
+	.dash-grid {
+		grid-template-columns: 1fr;
+	}
+}
+.dash-card-wide {
+	grid-column: 1 / -1;
+}
+/* Bloc de graphique, sans cadre : un titre de section suffit. */
+.dash-card {
+	min-width: 0; /* autorise la cellule de grille à rétrécir sous la largeur du canvas */
+}
+.dash-card h3 {
+	margin: 0 0 20px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
+}
+/* Part d'une modalité, sous un graphique en anneau. */
+.dash-summary {
+	text-align: center;
+	font-size: 0.9rem;
+	color: var(--muted);
+	margin-top: 8px;
+}
+
+/* ── Files de triage (administration des référentiels) ── */
+.triage-intro {
+	font-size: 0.85rem;
+	color: var(--muted);
+	margin: 4px 0 14px;
+	max-width: 75ch;
+}
+.triage-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.triage-item {
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 10px 12px;
+}
+/* Nom de personne cliquable, ouvre le drawer de la personne. */
+.triage-person {
+	background: none;
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	font: inherit;
+	color: inherit;
+	text-align: left;
+}
+.triage-person:hover {
+	color: var(--accent);
+	text-decoration: underline;
+}
+.triage-person-last {
+	font-weight: 600;
+}
+
+/* Forme de nom dérivée du nom canonique de la personne. */
+.canonical-tag {
+	font-size: 0.68rem;
+	color: var(--muted);
+	background: var(--surface);
+	border-radius: var(--radius);
+	padding: 0 6px;
+}
+
+/* ── Lien vers la notice HAL (pages Problèmes HAL) ── */
+.hal-link-badge {
+	display: inline-block;
+	padding: 2px 8px;
+	background: #1a6fb5;
+	border-radius: var(--radius);
+	font-size: 0.82rem;
+	color: white;
+	text-decoration: none;
+	font-weight: 500;
+}
+.hal-link-badge:hover {
+	background: color-mix(in srgb, #1a6fb5, black 20%);
+}
+
+/* ── Pastille DOAJ d'une revue ── */
+.badge-doaj {
+	font-size: 0.7rem;
+	padding: 1px 6px;
+	background: var(--success);
+	color: white;
+	border-radius: var(--radius);
+	margin-left: 6px;
+	vertical-align: middle;
+	font-weight: 600;
+	letter-spacing: 0.3px;
+	text-decoration: none;
+}
+a.badge-doaj:hover {
+	background: color-mix(in srgb, var(--success), black 20%);
+}
+
+/* ── Titre de section : petites capitales en couleur d'accent ── */
+.section-title,
+.dash-card h3,
+.detail-label {
+	color: var(--accent);
+	font-size: 0.8rem;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+}
+.section-title {
+	margin: 24px 0 10px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
 }
 
 /* ── Meta badge (detail pages) ── */
@@ -689,7 +1039,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	padding: 2px 8px;
 	background: var(--border-subtle);
-	border-radius: 3px;
+	border-radius: var(--radius);
 	font-size: 0.85rem;
 	color: var(--muted);
 	font-weight: 500;
@@ -744,7 +1094,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	font-size: 0.7rem;
 	padding: 1px 6px;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	font-weight: 600;
 }
 
@@ -788,7 +1138,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	font-size: 0.78rem;
 	padding: 2px 8px;
-	border-radius: 8px;
+	border-radius: var(--radius);
 	font-weight: 600;
 }
 .access-open {
@@ -809,7 +1159,7 @@ th.sorted .sort-arrow {
 	display: inline-block;
 	font-size: 0.75rem;
 	padding: 1px 5px;
-	border-radius: 3px;
+	border-radius: var(--radius);
 	background: var(--success-light);
 	color: var(--success);
 	font-weight: 500;
@@ -817,8 +1167,8 @@ th.sorted .sort-arrow {
 }
 
 .apc-other {
-	background: #f0f0f0;
-	color: #888;
+	background: var(--surface);
+	color: var(--muted);
 }
 
 .apc-cell {
@@ -827,34 +1177,35 @@ th.sorted .sort-arrow {
 }
 
 /* ── Type label ── */
-.type-label {
-	font-size: 0.8rem;
-	color: var(--muted);
+/* Pastille de type de document, teintée par `--type-color` (`docTypeColor()`). */
+.type-pill {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: var(--radius-pill);
+	background: color-mix(in srgb, var(--type-color) 16%, white);
+	color: color-mix(in srgb, var(--type-color), black 45%);
+	font-size: 0.75rem;
+	font-weight: 600;
+	white-space: nowrap;
 }
 
-/* ── RH checkmark ── */
+/* ── Coche : personne présente dans l'extraction du SI RH ── */
 .rh-check {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 15px;
-	height: 15px;
-	border-radius: 50%;
-	background: var(--accent);
-	color: white;
-	font-size: 0.7rem;
-	font-weight: 700;
-	margin-left: 4px;
-	vertical-align: middle;
-	line-height: 1;
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	margin-left: 5px;
+	vertical-align: -2px;
+	background: var(--accent-mid);
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='m8.5 12 2.5 2.5 4.5-5'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
 /* ── Buttons ── */
 .btn {
 	padding: 5px 12px;
 	border: 1px solid var(--border);
-	border-radius: 4px;
-	background: var(--card, white);
+	border-radius: var(--radius);
+	background: var(--card);
 	cursor: pointer;
 	font-size: 0.85rem;
 	font-family: inherit;
@@ -864,7 +1215,7 @@ th.sorted .sort-arrow {
 }
 
 .btn:hover {
-	background: #f0f0f0;
+	background: var(--hover);
 }
 
 .btn:disabled {
@@ -887,9 +1238,9 @@ th.sorted .sort-arrow {
 }
 
 .btn-confirm:hover {
-	background: #1e5e3b;
+	background: color-mix(in srgb, var(--success), black 20%);
 	color: white;
-	border-color: #1e5e3b;
+	border-color: color-mix(in srgb, var(--success), black 20%);
 }
 
 .btn-danger {
@@ -899,9 +1250,9 @@ th.sorted .sort-arrow {
 }
 
 .btn-danger:hover {
-	background: #962018;
+	background: color-mix(in srgb, var(--danger), black 20%);
 	color: white;
-	border-color: #962018;
+	border-color: color-mix(in srgb, var(--danger), black 20%);
 }
 
 .btn-primary {
@@ -911,14 +1262,14 @@ th.sorted .sort-arrow {
 }
 
 .btn-primary:hover {
-	background: #2d5a87;
+	background: color-mix(in srgb, var(--accent), black 20%);
 	color: white;
-	border-color: #2d5a87;
+	border-color: color-mix(in srgb, var(--accent), black 20%);
 }
 
 /* Boutons outline (petits boutons icône ✕ ✓) */
 .btn-danger-outline {
-	background: white;
+	background: var(--card);
 	color: var(--danger);
 	border-color: var(--danger);
 }
@@ -930,7 +1281,7 @@ th.sorted .sort-arrow {
 }
 
 .btn-confirm-outline {
-	background: white;
+	background: var(--card);
 	color: var(--success);
 	border-color: var(--success);
 }
@@ -978,7 +1329,7 @@ th.sorted .sort-arrow {
 }
 
 .btn-distinct {
-	color: var(--text-muted);
+	color: var(--muted);
 }
 
 .btn-distinct:hover:not(:disabled) {
@@ -991,11 +1342,11 @@ th.sorted .sort-arrow {
 }
 
 .btn-skip {
-	color: var(--text-muted);
+	color: var(--muted);
 }
 
 .btn-skip:hover:not(:disabled) {
-	background: #f0f0f0;
+	background: var(--hover);
 }
 
 .btn-skip:disabled {
@@ -1004,14 +1355,27 @@ th.sorted .sort-arrow {
 }
 
 /* ── Publication title link ── */
-.publication-title {
+/* Lien vers la page d'une entité (titre, nom) : couleur d'accent, en semi-gras. */
+.publication-title,
+.entity-link {
 	font-weight: 500;
 	color: var(--accent);
 	text-decoration: none;
 }
 
-.publication-title:hover {
+.publication-title:hover,
+.entity-link:hover {
 	text-decoration: underline;
+}
+
+button.entity-link {
+	padding: 0;
+	border: none;
+	background: none;
+	font: inherit;
+	font-weight: 500;
+	text-align: left;
+	cursor: pointer;
 }
 
 .journal-cell {
@@ -1026,15 +1390,15 @@ th.sorted .sort-arrow {
 	text-decoration: underline;
 }
 
-/* ── Info box (hal-problems, feedback) ── */
+/* ── Encart d'information ── */
 .info-box {
-	background: #f0f7ff;
-	border: 1px solid #c4daf4;
-	border-radius: 6px;
-	padding: 12px 16px;
+	background: var(--accent-light);
+	border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
+	border-radius: var(--radius);
+	padding: 8px 14px;
 	font-size: 0.9rem;
-	color: #2c5282;
-	margin-bottom: 16px;
+	color: var(--text);
+	margin-bottom: 12px;
 	line-height: 1.5;
 }
 
@@ -1050,8 +1414,8 @@ th.sorted .sort-arrow {
 }
 
 .modal-content {
-	background: white;
-	border-radius: 8px;
+	background: var(--card);
+	border-radius: var(--radius);
 	padding: 24px;
 	max-width: 700px;
 	width: 90%;
@@ -1083,9 +1447,6 @@ th.sorted .sort-arrow {
 	padding-top: 4px;
 }
 .detail-label {
-	font-size: 0.98rem;
-	font-weight: 600;
-	color: var(--section-heading);
 	margin: 0 0 9px;
 }
 .detail-tags {
@@ -1099,7 +1460,7 @@ th.sorted .sort-arrow {
 	align-items: center;
 	gap: 5px;
 	padding: 3px 10px;
-	border-radius: 12px;
+	border-radius: var(--radius-pill);
 	font-size: 0.85rem;
 	line-height: 1.35;
 	white-space: nowrap;
@@ -1108,14 +1469,14 @@ th.sorted .sort-arrow {
 	text-decoration: none;
 }
 .detail-tags a:hover {
-	background: var(--section-heading-light);
-	color: var(--section-heading);
+	background: var(--accent-light);
+	color: var(--accent);
 }
 /* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre, plus petit, subordonné. */
 .detail-sublabel {
 	font-size: 0.8rem;
 	font-weight: 600;
-	color: var(--section-heading);
+	color: var(--accent);
 	margin: 12px 0 7px;
 }
 
@@ -1125,9 +1486,9 @@ th.sorted .sort-arrow {
 	display: inline-flex;
 	align-items: center;
 	gap: 3px;
-	border: 1px solid #d0d8e0;
-	background: #f0f4f8;
-	border-radius: 3px;
+	border: 1px solid var(--border);
+	background: var(--surface);
+	border-radius: var(--radius);
 	padding: 2px 7px;
 	font-size: 0.8rem;
 	text-align: left;
@@ -1139,15 +1500,15 @@ th.sorted .sort-arrow {
 }
 .status-chip.rejected {
 	background: var(--danger-light);
-	border-color: #e0a8a0;
-	color: #721c24;
+	border-color: color-mix(in srgb, var(--danger) 40%, white);
+	color: var(--danger);
 	opacity: 0.7;
 	text-decoration: line-through;
 }
 .status-chip.ambiguous {
-	background: #fff3e0;
-	border-color: #e0c080;
-	color: #8a6d3b;
+	background: var(--attention-light);
+	border-color: color-mix(in srgb, var(--warning) 40%, white);
+	color: var(--warning-text);
 }
 button.status-chip {
 	font: inherit;
@@ -1159,6 +1520,52 @@ button.status-chip:hover {
 	filter: brightness(0.97);
 }
 /* Bouton icône carré ; compose avec .btn + une variante outline (.btn-confirm-outline / .btn-danger-outline). */
+/* Bouton d'ajout discret (« + Ajouter ») : texte en couleur d'accent, fond au survol. */
+.btn-add {
+	height: 28px;
+	padding: 0 10px;
+	border: none;
+	border-radius: var(--radius-pill);
+	background: none;
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	color: var(--accent);
+	cursor: pointer;
+	white-space: nowrap;
+}
+.btn-add:hover {
+	background: var(--hover);
+}
+
+/* Bouton réduit à son icône (composant IconButton) : sans bordure, fond au survol, rouge au survol pour une suppression. */
+.icon-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: var(--radius);
+	background: none;
+	color: var(--text-secondary);
+	cursor: pointer;
+	vertical-align: middle;
+}
+.icon-btn:hover:not(:disabled) {
+	background: var(--hover);
+	color: var(--accent);
+}
+.icon-btn-danger:hover:not(:disabled) {
+	background: var(--danger-light);
+	color: var(--danger);
+}
+.icon-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
 .btn-icon-sm {
 	width: 22px;
 	height: 22px;
@@ -1177,10 +1584,10 @@ button.status-chip:hover {
 	width: 22px;
 	height: 22px;
 	padding: 0;
-	border: 1px solid #ccc;
-	border-radius: 3px;
-	background: #fff;
-	color: #999;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card);
+	color: var(--muted);
 	cursor: pointer;
 	line-height: 1;
 	transition: all 0.12s;

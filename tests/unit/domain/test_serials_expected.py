@@ -118,12 +118,11 @@ class TestMappingCoverage:
         assert set(EXPECTED_OA_STATUSES_BY_OA_MODEL) == {m.value for m in OA_MODELS}
 
     def test_serial_type_keys_documented(self):
-        # Les 7 valeurs de l'enum serial_type.
+        # Les valeurs de l'enum serial_type, hors `unknown`.
         assert set(EXPECTED_DOC_TYPES_BY_SERIAL_TYPE) == {
             "journal",
             "proceedings",
             "book_series",
-            "ebook_platform",
             "preprint_server",
             "repository",
             "media",

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { autofocus } from '#lib/actions/focus.js';
@@ -33,6 +34,7 @@
 	import { licenseLabels } from '#lib/licenses.js';
 	import {
 		docTypeSingular,
+		docTypeColor,
 		docTypePlural,
 		docTypeFamilies,
 		publicationsDocTypes,
@@ -311,6 +313,14 @@
 			hideWhenEmpty: true,
 		},
 		{
+			key: 'partner',
+			control: 'entity',
+			label: 'Organisation partenaire',
+			param: 'partner_ror',
+			entity: 'partner',
+			group: 'Auteurs',
+		},
+		{
 			key: 'countries',
 			control: 'checkbox',
 			label: 'Pays',
@@ -387,13 +397,14 @@
 		if (publisherId) p.set('publisher_id', publisherId);
 		const serialId = fixedId(externalFilters?.serialId) ?? entity.serial.join(',');
 		if (serialId) p.set('serial_id', serialId);
+		if (entity.partner.length) p.set('partner_ror', entity.partner.join(','));
 		return resolve('stats') + '?' + paramsToQuery(p);
 	});
 
 	// Sort display
-	const yearSortArrow = $derived(currentSort === 'year_asc' ? '▲' : currentSort === 'year_desc' ? '▼' : '');
-	const titleSortArrow = $derived(currentSort === 'title_asc' ? '▲' : currentSort === 'title_desc' ? '▼' : '');
-	const apcSortArrow = $derived(currentSort === 'apc_asc' ? '▲' : currentSort === 'apc_desc' ? '▼' : '');
+	const yearSort = $derived(currentSort === 'year_asc' ? 'asc' : currentSort === 'year_desc' ? 'desc' : null);
+	const titleSort = $derived(currentSort === 'title_asc' ? 'asc' : currentSort === 'title_desc' ? 'desc' : null);
+	const apcSort = $derived(currentSort === 'apc_asc' ? 'asc' : currentSort === 'apc_desc' ? 'desc' : null);
 	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
 	const titleSortActive = $derived(currentSort === 'title_asc' || currentSort === 'title_desc');
 	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');
@@ -567,7 +578,7 @@
 </script>
 
 {#if showFilterBanner && subjectBannerText}
-	<div class="filter-banner">Filtre actif : {subjectBannerText}</div>
+	<div class="info-box">Filtre actif : {subjectBannerText}</div>
 {/if}
 
 <div class="toolbar-card toolbar-sticky publication-toolbar">
@@ -575,7 +586,7 @@
 		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 		<span class="count">{listing.total} publication{listing.total > 1 ? 's' : ''}</span>
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
-		{#if showStatsLink}<a href={statsUrl} class="publication-link">Statistiques &rarr;</a>{/if}
+		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
 	</div>
 	<div class="toolbar publication-toolbar-facets">
 		<span class="facets-label">Filtrer par&nbsp;:</span>
@@ -583,9 +594,9 @@
 			{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
 		{/each}
 		<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
-			Plus de filtres
+			{showMoreFilters ? 'Cacher les filtres' : 'Plus de filtres'}
 			{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
-			<span class="more-filters-arrow">{showMoreFilters ? '▴' : '▾'}</span>
+			<span class="chevron" class:up={showMoreFilters} aria-hidden="true"></span>
 		</button>
 	</div>
 	{#if showMoreFilters}
@@ -593,8 +604,7 @@
 			{#each sections.groups as g (g.label)}
 				{@const shown = g.filters.filter((f) => isShown(f, optionCount))}
 				{#if shown.length}
-					<div class="filter-group">
-						<span class="filter-group-label">{g.label}</span>
+					<div class="filter-group" role="group" aria-label={g.label} title={g.label}>
 						{#each shown as f (f.key)}{@render filterControl(f)}{/each}
 					</div>
 				{/if}
@@ -615,23 +625,23 @@
 {/snippet}
 
 <div class="table-scroll">
-<table class="publication-table">
+<table class="data-table publication-table">
 	<thead>
 		<tr>
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
-				An. <span class="sort-arrow">{yearSortArrow}</span>
+				An. <SortChevron direction={yearSort} />
 			</th>{/if}
 			<th class="sortable publication-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
-				Titre <span class="sort-arrow">{titleSortArrow}</span>
+				Titre <SortChevron direction={titleSort} />
 			</th>
 			{#if col('serial')}<th class="publication-col-journal">Revue</th>{/if}
 			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
-				APC <span class="sort-arrow">{apcSortArrow}</span>
+				APC <SortChevron direction={apcSort} />
 			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
@@ -653,7 +663,7 @@
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === activePublicationId}>
 					{#if showAdminExclude}
-						<td class="exclude-cell">
+						<td class="exclude-cell row-actions">
 							{#if p.contribution_id != null}
 								<button class="exclude-btn" title="Exclure ce lien auteur–publication"
 									onclick={() => onExcludeClick(p)}>✕</button>
@@ -661,7 +671,7 @@
 						</td>
 					{/if}
 					{#if col('type')}<td>
-						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
+						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					<td><a href={resolve(`publications/${p.id}`)} class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
@@ -786,93 +796,42 @@
 	.license-cell {
 		font-size: 0.8rem;
 	}
-	.filter-banner {
-		background: var(--accent-light);
-		border: 1px solid #c4d8ed;
-		border-radius: 5px;
-		padding: 8px 14px;
-		margin-bottom: 12px;
-		font-size: 0.95rem;
-		color: #2c3e50;
-	}
 	/* Deux lignes : commandes (recherche extensible, compte, exports, lien stats) puis facettes. */
 	.publication-toolbar { display: flex; flex-direction: column; gap: 8px; }
 	.publication-toolbar .toolbar { margin-bottom: 0; }
 	.publication-search { flex: 1; min-width: 220px; }
-	.publication-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		padding: 6px 12px;
-		background: var(--accent);
-		color: white;
-		text-decoration: none;
-		border-radius: 5px;
-		font-size: 0.9rem;
-		font-weight: 500;
-		white-space: nowrap;
-	}
-	.publication-link:hover { opacity: 0.9; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.more-filters-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		padding: 6px 10px;
-		border: 1px dashed var(--border);
-		border-radius: 4px;
+		height: 34px;
+		padding: 0 10px;
+		border: none;
+		border-radius: var(--radius);
 		background: none;
 		font: inherit;
-		font-size: 0.95rem;
-		color: var(--accent);
+		font-size: 0.9rem;
+		color: var(--text-secondary);
 		white-space: nowrap;
 		cursor: pointer;
 	}
 	.more-filters-btn:hover,
-	.more-filters-btn.open { border-color: var(--accent); }
-	.more-filters-arrow { font-size: 0.7rem; }
-	/* Panneau « Plus de filtres » : une ligne par rubrique, libellé à gauche. */
+	.more-filters-btn.open { background: var(--hover); }
+	/* Facettes optionnelles sur une ligne, rubriques séparées par un filet vertical. */
 	.more-filters {
 		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		padding-top: 8px;
-		border-top: 1px solid var(--border-subtle);
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 0;
 	}
-	.filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-	.filter-group-label {
-		width: 130px;
-		flex-shrink: 0;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
+	.filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+	.filter-group + .filter-group {
+		margin-left: 10px;
+		padding-left: 10px;
+		border-left: 1px solid var(--border);
 	}
-	.publication-table {
-		width: 100%;
-		min-width: 760px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé (coins arrondis restent visuellement corrects grâce à border-collapse). */
-	}
-	.publication-table th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.publication-table td {
-		padding: 7px 10px;
-		border-bottom: 1px solid var(--border-subtle);
-		font-size: 0.95rem;
-		vertical-align: top;
-	}
-	.publication-table tr:hover td { background: var(--surface-hover); }
+	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
 
@@ -880,7 +839,7 @@
 	.hal-badge {
 		display: inline-block;
 		padding: 2px 7px;
-		border-radius: 3px;
+		border-radius: var(--radius);
 		font-size: 0.8rem;
 		font-weight: 500;
 		white-space: nowrap;
@@ -897,8 +856,8 @@
 	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
 	.exclude-btn {
 		background: none; border: none; cursor: pointer;
-		color: #ccc; font-size: 0.85rem; padding: 2px 4px;
-		border-radius: 3px; line-height: 1; transition: color 0.15s, background 0.15s;
+		color: var(--text-faint); font-size: 0.85rem; padding: 2px 4px;
+		border-radius: var(--radius); line-height: 1; transition: color 0.15s, background 0.15s;
 	}
-	.exclude-btn:hover { color: var(--danger); background: #fdeaea; }
+	.exclude-btn:hover { color: var(--danger); background: var(--danger-light); }
 </style>

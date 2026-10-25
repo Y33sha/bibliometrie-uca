@@ -1,4 +1,5 @@
 <script lang="ts">
+  import RhCheck from "#lib/components/RhCheck.svelte";
   import { untrack } from "svelte";
   import { persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
@@ -47,7 +48,7 @@
   });
 </script>
 
-<p class="intro">
+<p class="triage-intro">
   Formes de nom portées par <strong>plusieurs personnes</strong>, avec au moins un lien à
   valider. Une personne au nom <em>incompatible</em> avec la forme est probablement une
   erreur de rattachement (à rejeter) ; deux personnes compatibles sont soit des
@@ -59,9 +60,9 @@
 {:else if list.items.length === 0 && !list.loading}
   <div class="empty">Aucune forme ambiguë à trancher.</div>
 {:else}
-  <div class="forms">
+  <div class="triage-list">
     {#each list.items as form (form.name_form)}
-      <div class="form-block">
+      <div class="triage-item">
         <div class="form-head">
           <span class="form-name">{form.name_form}</span>
           <span class="form-count">{form.persons.length} personnes</span>
@@ -70,7 +71,7 @@
           {#each form.persons as p (p.person_id)}
             <div class="person-row" class:incompatible={!p.compatible}>
               {#if p.canonical}
-                <span class="canonical" title="Forme dérivée du nom de la personne, confirmée d'office"
+                <span class="canonical-tag" title="Forme dérivée du nom de la personne, confirmée d'office"
                   >nom</span
                 >
               {:else}
@@ -94,11 +95,11 @@
                 >
               </span>
               {/if}
-              <button class="person-link" onclick={() => onopenPerson(p.person_id)}>
-                <span class="person-last">{titleCase(p.last_name)}</span>
+              <button class="triage-person" onclick={() => onopenPerson(p.person_id)}>
+                <span class="triage-person-last">{titleCase(p.last_name)}</span>
                 {titleCase(p.first_name)}
               </button>
-              {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
+              {#if p.has_rh}<RhCheck />{/if}
               {#if !p.compatible}
                 <span class="incompat-tag" title="Nom canonique incompatible avec la forme">
                   incompatible
@@ -115,22 +116,6 @@
 {/if}
 
 <style>
-  .intro {
-    font-size: 0.85rem;
-    color: #555;
-    margin: 4px 0 14px;
-    max-width: 70ch;
-  }
-  .forms {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-  .form-block {
-    border: 1px solid var(--border, #e0e0e0);
-    border-radius: 6px;
-    padding: 10px 12px;
-  }
   .form-head {
     display: flex;
     align-items: baseline;
@@ -139,18 +124,11 @@
   }
   .form-name {
     font-weight: 600;
-    font-family: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    font-family: var(--mono);
   }
   .form-count {
     font-size: 0.78rem;
-    color: #888;
-  }
-  .canonical {
-    font-size: 0.68rem;
-    color: #888;
-    background: #f0f0f0;
-    border-radius: 8px;
-    padding: 0 6px;
+    color: var(--muted);
   }
   .form-persons {
     display: flex;
@@ -162,31 +140,11 @@
     align-items: center;
     gap: 8px;
   }
-  .person-link {
-    background: none;
-    border: none;
-    padding: 0;
-    cursor: pointer;
-    font: inherit;
-    color: inherit;
-    text-align: left;
-  }
-  .person-link:hover {
-    color: #2563eb;
-    text-decoration: underline;
-  }
-  .person-last {
-    font-weight: 600;
-  }
   .incompat-tag {
     font-size: 0.72rem;
-    color: var(--danger, #c0392b);
-    border: 1px solid var(--danger, #c0392b);
-    border-radius: 3px;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
     padding: 0 5px;
-  }
-  .empty {
-    padding: 20px;
-    color: #888;
   }
 </style>

@@ -1,6 +1,6 @@
 # Publications — cycle de vie
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-25.*
 
 Une publication est la référence unifiée d'un document : plusieurs enregistrements sources décrivant le même article ne donnent qu'une publication. Elle est **entièrement dérivée, jamais saisie** — la phase `publications` regroupe les enregistrements sources, et `refresh_from_sources` recalcule l'état consolidé depuis leur union.
 
@@ -54,7 +54,7 @@ L'API n'écrit rien sur les publications. Une valeur consolidée fausse se corri
 
 | Usage | Ce qui est servi |
 |---|---|
-| Détail (`GET /api/publications/{id}`) | Métadonnées consolidées jointes à la revue et à l'éditeur, provenance par source, auteurs consolidés et auteurs tels que chaque source les donne, relations entrantes et sortantes, sujets, identifiants externes |
+| Détail (`GET /api/publications/{id}`) | Métadonnées consolidées jointes à la publication en série et à l'éditeur, provenance par source, auteurs consolidés et auteurs tels que chaque source les donne, relations entrantes et sortantes, sujets, copies d'accès et sources qui référencent la publication (fiche [plateformes](platforms.md)), identifiants PubMed et theses.fr |
 | Enregistrements sources (`GET /api/publications/{id}/sources`) | Métadonnées de chaque enregistrement source : identifiants, titre, type, année, langue, statut d'accès, revue avec ses ISSN, éditeur, conteneur, volume, numéro, pages. La revue et l'éditeur y figurent deux fois : l'entrée du référentiel et le nom donné par la source |
 | Listes, facettes, export | Liste paginée et export CSV, avec une douzaine de facettes dont le laboratoire, le statut de dépôt HAL et les frais de publication |
-| Statistiques et tableaux croisés | Ventilations par année, statut d'accès, type de document, laboratoire, éditeur et revue ; collaborations d'après les pays |
+| Statistiques et tableaux croisés | Ventilations par année, statut d'accès, type de document, laboratoire, éditeur et publication en série ; collaborations d'après les pays |

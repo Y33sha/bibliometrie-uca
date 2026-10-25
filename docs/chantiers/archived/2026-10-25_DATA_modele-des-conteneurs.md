@@ -8,7 +8,7 @@ Le conteneur d'une publication est ce qui la publie ou l'héberge. Le schéma en
 - `publishing.monographs`, que référence `publications.monograph_id` : livres et volumes d'actes, avec ou sans ISBN, avec un `journal_id` vers leur collection ;
 - `publications.container_title`, un titre libre quand aucune des deux tables ne convient.
 
-Le chantier [Monographies](DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
+Le chantier [Monographies](2026-10-25_DATA_monographies.md) sépare les livres et les volumes d'actes, dans `monographs`, des séries dont ils font partie, dans `journals`.
 
 `journals` réunit encore des choses de natures différentes. Son type (`journal_type`) vaut :
 
@@ -92,9 +92,9 @@ Usages du type dans le code :
 
 ### Points des autres fiches que le modèle conditionne
 
-- [Conférences et actes](DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
-- [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
-- [Monographies](DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
+- [Conférences et actes](2026-10-25_DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
+- [Revues divergentes selon les sources](2026-10-25_DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
+- [Monographies](2026-10-25_DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
 
 ## Décisions
 
@@ -149,7 +149,7 @@ Usages du type dans le code :
 - [x] Liste fermée des plateformes connues, dans le domaine (`domain/platforms/registry.py`) : serveurs de preprints et plateformes d'éditeurs. Une plateforme prend le type de la liste, à défaut entrepôt. Le bilan Science ouverte la lit (`b72bc40b1`).
 - [x] Préfixe DOI d'une plateforme d'éditeurs : ni son titulaire ni un enregistrement source qui le nomme ne donnent l'éditeur de la publication, qui vient des autres sources (`b72bc40b1`).
 - [x] Stock : oneshot `apply_known_platforms`, puis phase `publications`. 23 serveurs de preprints. Sur 4 834 publications à préfixe de plateforme d'éditeurs, 4 240 ont un éditeur, aucune la plateforme ; 584 articles de revue restent sans éditeur (OpenEdition 316, Cairn 238). « OpenEdition Journals » (109 publications) est une variante de nom d'OpenEdition, que la fusion de la phase 7 résout.
-- [ ] Entrées de `serials` de type `repository` et `preprint_server` converties en plateformes.
+- [ ] Entrées de `serials` de type `repository` et `preprint_server` converties en plateformes ; valeur `repository` du modèle open access retirée.
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex, quand un usage le demande.
 
 ### Phase 4 — Lectures de l'éditeur
@@ -162,29 +162,32 @@ Usages du type dans le code :
 
 - [x] Renommage de `journals` en `serials`, et de `monographs.journal_id` en `serial_id` (`f73c03b0e`, `947a58f45`). La migration réécrit les valeurs stockées : saisies manuelles, redirections, audit, corrections, métriques de l'historique des phases.
 - [x] Phase `publishers_journals` renommée `publishing`, du nom du schéma et du paquet qui portent ses référentiels (`e8655117a`).
-- [ ] Sources OpenAlex « … eBooks » (type `ebook_platform`, absent du modèle) : rattachement à l'éditeur qu'elles nomment.
-- [ ] Enrichissements limités à la nature qu'ils décrivent.
-- [ ] Endpoints, pages et filtres.
+- [x] Plateformes d'ebooks. Un titre « … eBooks », nom qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur et que ScanR reprend comme revue, n'est le titre d'aucun conteneur. Une localisation principale OpenAlex sur une plateforme d'ebooks donne l'éditeur de son organisation hôte (`d153cf532`). Type `ebook_platform` retiré (`48fbf4cf0`).
+- [x] Stock : oneshot `detach_ebook_platforms` (46 revues, 83 enregistrements sources détachés, 4 043 titres de conteneur retirés), puis phases `publications` et `finalize`.
+- [x] Une entrée de type inconnu présente dans le DOAJ devient une revue : 52 entrées `unknown` y sont. Les autres enrichissements touchent seulement des revues, sauf une dizaine d'entrées (`865aeaf95`).
+- [x] Localisations HAL : la page du dépôt et le fichier déposé, ouverte quand un fichier est déposé hors embargo (`5a6223609`). Localisations tirées des identifiants arXiv et PMCID, quelle que soit la source ; une plateforme connue prend le nom de la liste (`24f0d24f1`).
+- [x] Accès d'une publication d'après ses localisations : meilleure copie ouverte de chaque plateforme, par version puis par ordre d'arrivée ; sur HAL, la copie que donne HAL décide de l'ouverture. Le bouton « Accéder » mène à la meilleure copie, à défaut au DOI ; la liste omet la copie désignée par le DOI. « Référencé par » remplace la liste des sources : toutes sauf Crossref et DataCite, et HAL quand HAL figure parmi les liens d'accès. Les adresses des copies échappent à la règle des hôtes écrits dans le code ; le serveur en vérifie le schéma (`c23128941`, `7b06e34f7`, `bac85aabe`).
+- [x] Stock : oneshot `apply_known_platforms` (noms des plateformes connues), puis réhydratation et renormalisation de HAL et d'OpenAlex, seules sources qui portent des identifiants arXiv et PMCID.
 
 ### Phase 6 — Documentation
 
-- [ ] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`.
+- [x] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`, dont la fiche [plateformes et localisations](../../agregats/platforms.md).
 
 ### Phase 7 — Défauts antérieurs au chantier
 
-- [ ] Base de production : fusion manuelle des éditeurs en double (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, De Gruyter et Walter de Gruyter, AIP et AIP Publishing, variantes de SIAM, de World Scientific et de John Libbey Eurotext). Marques d'un éditeur (BioMed Central, Birkhäuser, Lippincott) : fusion ou non à trancher.
-- [ ] Titulaires de préfixe « Éditions Techniques [1987-1994] » et « Éditions du Juris-classeur [2009] » sur des revues LexisNexis : à examiner.
-- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `serials`.
-- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](DATA_preprints-et-versions.md).
+- [x] Éditeurs en double : un éditeur que nomment les sources rejoint le titulaire Crossref de ses préfixes quand au moins 5 de ses enregistrements sources, dont 90 % chez ce titulaire, et des noms compatibles concordent ; 155 fusions sur la base locale (`1e5903a17`). Les marques et les éditeurs rachetés restent distincts (BioMed Central, Birkhäuser, Mary Ann Liebert).
+- [x] Oneshot `merge_publisher_aliases` : 57 autres noms qui résistent à la règle (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, AIP, Optica, SPIE…), ici puis en production.
+- [x] Entrées de type inconnu dont la majorité stricte des documents sont des articles, d'après le type donné par chaque source : typées revues (563 sur 773 entrées `unknown` de la base locale).
+- [x] Thèses ScanR : l'université de soutenance ne donne ni publication en série ni titre de conteneur. 1 452 enregistrements de thèses ScanR rattachés à 66 entrées, dont 60 n'ont pas d'autre usage.
+- [x] Stock : réhydratation et renormalisation de ScanR, puis phases `publications` et `finalize`.
+- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](../DATA_preprints-et-versions.md).
 
 ## Questions ouvertes
 
-- Une publication peut-elle avoir à la fois une série, une monographie et une ou plusieurs localisations ?
-- Sort des entrées `unknown`.
+- Sort des entrées `unknown` restantes, qui ne contiennent en majorité ni articles ni articles de congrès : environ 150 sur la base locale.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
-- **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer. Le lieu d'un domaine peut rester inconnu.
 - **Maintenance des référentiels.** Chaque table a son régime : recalcul à chaque run, mise à jour incrémentale par file d'attente, ou valeur posée une fois (typage OpenAlex, `doi_prefixes`). Comment rafraîchir une valeur posée une fois ? `doi_prefixes` attribue à Hindawi un préfixe dont Wiley détient les DOI.
 - **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
-- **Éditeur d'une revue d'après le Sudoc.** La notice Sudoc de l'ISSN donne les éditeurs successifs et leurs périodes (zone 214, à défaut 210, sous-zones `c` et `d`) : *Multitudes*, Éditions Exils (2000-2004), Multitudes (2004-2006), Éditions Amsterdam (2006-2011), Éditions Inculte (depuis 2012). C'est la seule source qui nomme l'éditeur d'une revue diffusée par une plateforme. Limites relevées : notices sans zone d'éditeur (*animal*, *Annals of Oncology*, *Revue européenne des sciences sociales*), périodes qui se chevauchent (*Finance* : Presses universitaires de France 1982-2023, Presses universitaires de Grenoble 2005-2023). La revérification Sudoc des revues relirait ces zones. Mesure sur les 584 articles à préfixe de plateforme sans éditeur, de 233 revues : 476 ont un éditeur Sudoc pour leur année, 55 une zone d'éditeur sans période qui couvre l'année, 49 une notice sans zone d'éditeur, 4 aucune notice. 233 ont plusieurs éditeurs pour l'année : la notice garde la première mention, à date ouverte (« Féret & Fils 1899- »), à côté des suivantes (« Éditions Bière 1972- »). Retenir la mention la plus récente qui couvre l'année en laisse 37 ambiguës, dont des imprimeurs et des diffuseurs (« Corlet impr. », « diff. Belin »). Les noms sont les formes du catalogue (« Éd. Eska », « Féret & Fils [etc.] ») : rattachés par leurs formes de nom, ils créeraient des variantes d'éditeurs existants.
+- **Éditeur d'une revue d'après le Sudoc.** La notice Sudoc de l'ISSN donne les éditeurs successifs et leurs périodes (zone 214, à défaut 210, sous-zones `c` et `d`) : *Multitudes*, Éditions Exils (2000-2004), Multitudes (2004-2006), Éditions Amsterdam (2006-2011), Éditions Inculte (depuis 2012). C'est la seule source qui nomme l'éditeur d'une revue diffusée par une plateforme. Limites relevées : notices sans zone d'éditeur (*animal*, *Annals of Oncology*, *Revue européenne des sciences sociales*), périodes qui se chevauchent (*Finance* : Presses universitaires de France 1982-2023, Presses universitaires de Grenoble 2005-2023). La revérification Sudoc des revues relirait ces zones. Mesure sur les 584 articles à préfixe de plateforme sans éditeur, de 233 revues : 476 ont un éditeur Sudoc pour leur année, 55 une zone d'éditeur sans période qui couvre l'année, 49 une notice sans zone d'éditeur, 4 aucune notice. 233 ont plusieurs éditeurs pour l'année : la notice garde la première mention, à date ouverte (« Féret & Fils 1899- »), à côté des suivantes (« Éditions Bière 1972- »). Retenir la mention la plus récente qui couvre l'année en laisse 37 ambiguës, dont des imprimeurs et des diffuseurs (« Corlet impr. », « diff. Belin »). Les noms sont les formes du catalogue (« Éd. Eska », « Féret & Fils [etc.] ») : rattachés par leurs formes de nom, ils créeraient des variantes d'éditeurs existants. HAL et ScanR donnent déjà ces mentions pour éditeur : 148 éditeurs de la base sont des mentions de catalogue à éditeurs successifs (« Éditions Techniques [1987-1994] - Éditions du Juris-classeur [1995-2004] - LexisNexis [2005-....] »), pour 1 155 publications. 130 se découpent en segments nom et période ; retenir le segment de l'année de publication les ramènerait à leurs éditeurs.
 - **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui a un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.serial_id` en désigne une seule : laquelle ?
 - **Ouvrage en plusieurs volumes** (« Current Developments in Biotechnology and Bioengineering »). Chaque volume est-il une monographie, et qu'est-ce qui les relie ?

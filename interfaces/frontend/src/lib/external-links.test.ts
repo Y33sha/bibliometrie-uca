@@ -1,6 +1,7 @@
 /* Hôtes que l'interface peut désigner dans un lien.
  *
- * Toute adresse affichée porte un hôte écrit dans le code.
+ * Toute adresse affichée porte un hôte écrit dans le code, sauf les copies ouvertes d'une
+ * publication, hébergées sur des centaines de sites.
  * Deux vérifications le tiennent : les URL littérales des sources visent un hôte de la liste
  * ci-dessous, et tout attribut `href` d'un gabarit passe par une fonction de composition
  * plutôt que par une valeur reçue de l'API.
@@ -40,7 +41,7 @@ const HOTES_AFFICHABLES = new Set([
  * les valeurs internes désignent une route de l'application. */
 const COMPOSITION =
 	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
-const INTERNE = /^(pubsUrl|statsUrl|accessUrl)$/;
+const INTERNE = /^(pubsUrl|statsUrl)$/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement. */
 const ROUTE = /^resolve\(/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
@@ -48,6 +49,10 @@ const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
  * source, composé par l'API : l'hôte y est écrit dans le code et l'identifiant encodé
  * (`domain/sources/registry.py`, `source_record_url`). */
 const VERIFIE_COTE_SERVEUR = /^[a-z]+\.(doaj_url|record_url|record_urls\.[a-z]+)$/;
+/* Copie ouverte d'une publication, et bouton d'accès qui y mène à défaut du DOI : l'hôte vient
+ * des données, le serveur vérifie seulement le schéma `http` ou `https`
+ * (`domain/publications/access.py`). */
+const COPIE_OUVERTE = /^(copy\.url|accessUrl)$/;
 
 const URL_LITTERALE = /https?:\/\/([A-Za-z0-9._-]+)/g;
 const LIAISON_HREF = /href=\{([^}]*)\}/g;
@@ -92,6 +97,7 @@ describe('hôtes des liens affichés', () => {
 				const e = expression.trim();
 				if (COMPOSITION.test(e) || INTERNE.test(e) || ROUTE.test(e)) continue;
 				if (TABLE_IDENTIFIANTS.test(e) || VERIFIE_COTE_SERVEUR.test(e)) continue;
+				if (COPIE_OUVERTE.test(e)) continue;
 				directs.push(`${e} (${fichier})`);
 			}
 		}

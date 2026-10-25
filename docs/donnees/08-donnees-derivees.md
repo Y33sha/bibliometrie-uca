@@ -1,18 +1,19 @@
 # Données dérivées
 
-*À jour le 2026-10-23.*
+*À jour le 2026-10-25.*
 
 Certaines données sont des **dérivés** recalculés à partir d'autres tables — vues matérialisées, tables satellites, colonnes dénormalisées. Ils existent pour accélérer la lecture (éviter à chaque requête des jointures ou des agrégations coûteuses) au prix d'une duplication qu'il faut tenir à jour. Cette page recense ces artefacts et la façon dont leur fraîcheur est maintenue.
 
 ## Vues matérialisées
 
-Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupart en `REFRESH … CONCURRENTLY`, qui suppose un index unique). Aucune n'est écrite directement.
+Le pipeline les rafraîchit, la plupart en `REFRESH … CONCURRENTLY`, qui suppose un index unique. Aucune n'est écrite directement.
 
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
 | `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
-| `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `contributions` |
-| `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `contributions` |
+| `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `finalize` |
+| `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `finalize` |
+| `publication_rors` | ROR des contributions sources alignées des auteurs (`source_contribution_rors`) et des structures de `publication_structures`, avec leurs ancêtres de `ror_relations` ; `cited` distingue les ROR cités | phase `finalize` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
 
 ## Tables dérivées
@@ -27,10 +28,11 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | Colonne | Tables | Rafraîchie par |
 |---|---|---|
 | `perimeter_evidence`, d'où `in_perimeter` | `source_contributions` | phase `affiliations` |
-| `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `contributions` |
+| `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `finalize` |
 | `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
 | `is_corresponding`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
-| `publication_count` | `serials`, `publishers` | phase `contributions` |
+| `publication_count` | `serials`, `publishers` | phase `finalize` |
+| `publisher_id` | `serials` | phase `finalize`, d'après les publications |
 | `publication_count` | `addresses` | phase `publications` |
 | `usage_count` | `subjects` | phase `subjects` |
 

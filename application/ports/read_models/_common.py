@@ -57,11 +57,12 @@ class FacetOption(BaseModel):
     count: int
 
 
-EntityKind = Literal["publisher", "serial", "person", "subject"]
+EntityKind = Literal["publisher", "serial", "person", "subject", "partner"]
 
 
 class EntityFacetItem(BaseModel):
-    id: int
+    id: int | str
+    """Identifiant de l'entité : un entier, ou un ROR pour une organisation partenaire."""
     label: str
     count: int
 

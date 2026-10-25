@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -10,8 +11,8 @@
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/oaColors.js';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import { oaStatusColor } from '#lib/components/charts/cssVar.js';
+	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
@@ -33,8 +34,6 @@
 	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
 	const monographsTabLabel = $derived(journal?.serial_type ? MONOGRAPHS_TAB_LABELS[journal.serial_type] : undefined);
 	let error = $state(false);
-	let canGoBack = $state(false);
-
 	let dashboard = $state<SerialDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
@@ -99,9 +98,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack =
-			(window as any).navigation?.canGoBack ??
-			document.referrer.startsWith(window.location.origin);
 		const labelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
 			serialTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		});
@@ -120,10 +116,7 @@
 	<title>{pageTitle(journal?.title ?? 'Revue')}</title>
 </svelte:head>
 
-{#if canGoBack}
-	<!-- svelte-ignore a11y_invalid_attribute -->
-	<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+	<Breadcrumb trail={[{ label: 'Revues', path: 'journals' }]} current={journal?.title} />
 
 {#if error}
 	<div class="no-results">Revue introuvable</div>
@@ -131,8 +124,8 @@
 	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Header -->
-	<div class="j-header">
-		<h1 class="j-title">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{journal.title}
 			{#if journal.is_in_doaj}
 				{#if journal.doaj_url}
@@ -142,37 +135,35 @@
 				{/if}
 			{/if}
 		</h1>
-		<div class="j-meta">
-			<div class="meta-row">
-				{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-					<span class="meta-label">{issnLabel(issn)}</span>
-					<span class="id-badge">{issn.issn}</span>
-				{/each}
-			</div>
-			<div class="meta-row">
-				{#if journal.publisher_name}
-					<span class="meta-label">Éditeur</span>
-					{#if journal.publisher_id}
-						<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
-					{:else}
-						<span class="publisher-link">{journal.publisher_name}</span>
-					{/if}
+		<div class="entity-meta">
+			{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
+				<span class="entity-meta-label">{issnLabel(issn)}</span>
+				<span class="id-badge">{issn.issn}</span>
+			{/each}
+		</div>
+		<div class="entity-meta">
+			{#if journal.publisher_name}
+				<span class="entity-meta-label">Éditeur</span>
+				{#if journal.publisher_id}
+					<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
+				{:else}
+					<span class="publisher-link">{journal.publisher_name}</span>
 				{/if}
-				{#if journal.serial_type}
-					<span class="meta-label">Type</span>
-					<span class="type-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
-				{/if}
-				{#if journal.oa_model}
-					<span class="meta-label">OA</span>
-					<span class="type-tag">{journal.oa_model}</span>
-				{/if}
-				{#if journal.apc_amount != null}
-					<span class="meta-label">APC</span>
-					<span class="type-tag">
-						{journal.apc_amount} {journal.apc_currency ?? ''}
-					</span>
-				{/if}
-			</div>
+			{/if}
+			{#if journal.serial_type}
+				<span class="entity-meta-label">Type</span>
+				<span class="entity-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
+			{/if}
+			{#if journal.oa_model}
+				<span class="entity-meta-label">OA</span>
+				<span class="entity-tag">{journal.oa_model}</span>
+			{/if}
+			{#if journal.apc_amount != null}
+				<span class="entity-meta-label">APC</span>
+				<span class="entity-tag">
+					{journal.apc_amount} {journal.apc_currency ?? ''}
+				</span>
+			{/if}
 		</div>
 	</div>
 
@@ -198,7 +189,7 @@
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<SubjectsCloud {subjects} />
+							<SubjectBars {subjects} />
 						{/if}
 					</div>
 
@@ -237,7 +228,7 @@
 								{/each}
 							</dl>
 							<button class="toggle-raw" onclick={() => (showRawDoaj = !showRawDoaj)}>
-								{showRawDoaj ? '▾ Masquer' : '▸ Voir'} le payload DOAJ brut
+								{showRawDoaj ? 'Masquer' : 'Voir'} le payload DOAJ brut <span class="chevron" class:up={showRawDoaj} aria-hidden="true"></span>
 							</button>
 							{#if showRawDoaj}
 								<pre class="raw-payload">{JSON.stringify(journal.doaj_payload, null, 2)}</pre>
@@ -271,54 +262,9 @@
 {/if}
 
 <style>
-	.j-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 20px 24px;
-	}
-	.j-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
-	.j-meta { display: flex; flex-direction: column; gap: 6px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-	}
-	.id-badge { margin-right: 8px; }
-	.publisher-link { font-size: 0.95rem; }
-	span.publisher-link { color: var(--muted); }
-	.type-tag {
-		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: 10px; font-size: 0.85rem;
-	}
-	.badge-doaj {
-		font-size: 0.7rem; padding: 2px 6px; background: var(--success);
-		color: white; border-radius: 8px; margin-left: 8px;
-		vertical-align: middle; font-weight: 600; letter-spacing: 0.3px;
-		text-decoration: none;
-	}
-	a.badge-doaj:hover { background: #256528; }
 
-	.tab-content { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 
-	.dash-grid {
-		display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-	}
-	@media (max-width: 760px) {
-		.dash-grid { grid-template-columns: 1fr; }
-	}
-	.dash-card-wide { grid-column: 1 / -1; }
-	.dash-card {
-		background: var(--card); border: 1px solid var(--border);
-		border-radius: 6px; padding: 16px;
-	}
-	.dash-card h3 {
-		font-size: 0.95rem; font-weight: 600; margin: 0 0 12px;
-	}
 	.muted { color: var(--muted); }
 	.small { font-size: 0.8rem; font-weight: 400; }
 
@@ -334,7 +280,7 @@
 	}
 	.toggle-raw:hover { text-decoration: underline; }
 	.raw-payload {
-		background: var(--surface); padding: 12px; border-radius: 4px;
+		background: var(--surface); padding: 12px; border-radius: var(--radius);
 		font-size: 0.8rem; max-height: 400px; overflow: auto;
 		white-space: pre-wrap; word-break: break-word;
 	}

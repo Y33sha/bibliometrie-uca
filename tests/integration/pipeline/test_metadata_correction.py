@@ -332,7 +332,14 @@ def _apply_cluster(conn) -> int:
 
 def test_chapter_loses_doi_of_its_book(sa_sync_conn):
     conn = sa_sync_conn
-    book = _typed_source_record(conn, source_id="b1", doi="10.1/x", doc_type="book")
+    book = _typed_source_record(
+        conn,
+        source_id="b1",
+        doi="10.1/x",
+        doc_type="book",
+        title="Le livre",
+        title_normalized="le livre",
+    )
     chapter = _typed_source_record(conn, source_id="c1", doi="10.1/x", doc_type="book_chapter")
 
     assert _apply_cluster(conn) == 1  # seul le chapitre
@@ -364,7 +371,14 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
 
 def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
     conn = sa_sync_conn
-    book = _typed_source_record(conn, source_id="b1", doi="10.1/x", doc_type="book")
+    book = _typed_source_record(
+        conn,
+        source_id="b1",
+        doi="10.1/x",
+        doc_type="book",
+        title="Le livre",
+        title_normalized="le livre",
+    )
     chapter = _typed_source_record(conn, source_id="c1", doi="10.1/x", doc_type="book_chapter")
     assert _apply_cluster(conn) == 1
     assert _apply_cluster(conn) == 0  # idempotent

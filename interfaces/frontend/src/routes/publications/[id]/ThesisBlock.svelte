@@ -94,9 +94,7 @@
     margin-bottom: 16px;
   }
   .section-title {
-    font-size: 1.05rem;
-    font-weight: 600;
-    margin: 0 0 8px;
+    margin-top: 0;
   }
   .thesis-dl {
     display: grid;
@@ -105,7 +103,7 @@
     margin: 0;
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     overflow: hidden;
   }
   .thesis-dl dt,

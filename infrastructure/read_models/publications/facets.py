@@ -51,6 +51,8 @@ from infrastructure.read_models.filters import (
     monograph_id_clause,
     no_lab_clause,
     oa_clause,
+    own_structure_ids,
+    partner_clause,
     person_clause,
     publisher_id_clause,
     search_clause,
@@ -138,6 +140,8 @@ class _PublicationFacetsBuilder:
             clauses.append(subject_clause(f.subject_ids))
         if skip != "person":
             clauses.append(author_clause(f.author_id))
+        if skip != "partner":
+            clauses.append(partner_clause(f.partner_rors))
         return assemble_where(clauses)
 
     # ── Facettes ────────────────────────────────────────────────
@@ -504,5 +508,11 @@ def publications_entity_facet(
     builder._preload_lab_hal_col()
     where_sql, binds = builder._clauses_skipping(kind)
     return entity_facet_rows(
-        conn, kind=kind, where_sql=where_sql, binds=binds, search=search, limit=limit
+        conn,
+        kind=kind,
+        where_sql=where_sql,
+        binds=binds,
+        search=search,
+        limit=limit,
+        own_structure_ids=own_structure_ids(filters.lab_ids, perimeter_structure_ids),
     )

@@ -33,7 +33,6 @@ EXPECTED_DOC_TYPES_BY_SERIAL_TYPE: dict[str, frozenset[str]] = {
     ),
     "proceedings": frozenset({"conference_paper", "conference", "other"}),
     "book_series": frozenset({"book", "book_chapter", "other"}),
-    "ebook_platform": frozenset({"book", "book_chapter", "other"}),
     "preprint_server": frozenset({"preprint", "other"}),
     "repository": frozenset(
         {

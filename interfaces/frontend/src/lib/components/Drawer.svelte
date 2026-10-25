@@ -49,7 +49,7 @@
 <style>
   .drawer-backdrop {
     position: fixed;
-    top: var(--header-height, 46px);
+    top: var(--header-height);
     left: 0;
     right: 0;
     bottom: 0;
@@ -61,10 +61,10 @@
   }
   .drawer {
     position: fixed;
-    top: var(--header-height, 46px);
+    top: var(--header-height);
     right: 0;
-    height: calc(100vh - var(--header-height, 46px));
-    background: #fff;
+    height: calc(100vh - var(--header-height));
+    background: var(--card);
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
     z-index: 91;
     display: flex;
@@ -76,7 +76,7 @@
     align-items: flex-start;
     gap: 12px;
     padding: 16px 18px;
-    border-bottom: 1px solid var(--border, #e0e0e0);
+    border-bottom: 1px solid var(--border);
   }
   .drawer-head-content {
     flex: 1;
@@ -88,11 +88,11 @@
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
-    color: #888;
+    color: var(--muted);
     padding: 0 4px;
   }
   .drawer-close:hover {
-    color: #333;
+    color: var(--text);
   }
   .drawer-body {
     flex: 1;

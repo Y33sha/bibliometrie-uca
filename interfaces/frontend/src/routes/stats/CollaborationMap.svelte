@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Chart } from 'chart.js';
+	import { Chart } from '#lib/components/charts/chart.js';
 	import { ChoroplethController, GeoFeature, ColorScale, ProjectionScale } from 'chartjs-chart-geo';
 	import { feature as topoFeature } from 'topojson-client';
 	import type { Topology } from 'topojson-specification';
@@ -7,6 +7,7 @@
 	import iso from 'i18n-iso-countries';
 	import frLocale from 'i18n-iso-countries/langs/fr.json';
 	import { latestRequest } from '#lib/api/index.js';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import type { components } from '#lib/api/schema.js';
 
 	iso.registerLocale(frLocale);
@@ -103,8 +104,8 @@
 					projection: { axis: 'x', projection: 'naturalEarth1' },
 					color: {
 						axis: 'x',
-						interpolate: 'blues',
-						missing: '#ececec',
+						interpolate: tealScale(),
+						missing: cssVar('surface'),
 						min: 0,
 						max: colorMax,
 						ticks: { precision: 0 },
@@ -125,6 +126,14 @@
 			}
 		};
 	});
+
+	/** Dégradé du teal clair (`--accent-light`) au teal foncé (`--accent`), pour l'échelle de couleur de la carte. */
+	function tealScale(): (t: number) => string {
+		const hex = (name: string) => cssVar(name).replace('#', '');
+		const rgb = (h: string) => [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16));
+		const [from, to] = [rgb(hex('accent-light')), rgb(hex('accent'))];
+		return (t) => `rgb(${from.map((c, k) => Math.round(c + (to[k] - c) * t)).join(', ')})`;
+	}
 </script>
 
 <div class="collab-map">
@@ -145,12 +154,12 @@
 		min-height: 360px;
 		background: var(--card);
 		border: 1px solid var(--border);
-		border-radius: 6px;
+		border-radius: var(--radius);
 		padding: 16px;
 	}
 	.collab-caption {
 		text-align: center;
-		color: var(--text-muted, #666);
+		color: var(--muted);
 		font-size: 0.85rem;
 		margin-top: 0.5rem;
 	}

@@ -80,7 +80,7 @@
     padding: 8px 12px;
     margin-top: 2px;
     border: 1px dashed var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: transparent;
     color: var(--muted);
     cursor: pointer;
@@ -103,7 +103,7 @@
     text-align: left;
     padding: 10px 12px;
     border: 1px solid var(--border);
-    border-radius: 6px;
+    border-radius: var(--radius);
     background: var(--card);
     cursor: pointer;
     font: inherit;
@@ -128,18 +128,18 @@
   }
   .run-id {
     font-weight: 600;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
     font-size: 0.85rem;
   }
   .run-date {
     color: var(--muted);
     font-size: 0.8rem;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .run-duration {
     margin-left: auto;
     font-size: 0.8rem;
-    font-family: "JetBrains Mono", monospace;
+    font-family: var(--mono);
   }
   .run-sub {
     display: flex;

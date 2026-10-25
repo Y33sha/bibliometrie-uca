@@ -17,6 +17,7 @@ from application.ports.read_models.structures_queries import (
     StructureDetailResponse,
     StructureListItem,
     StructureOut,
+    StructurePartnersResponse,
     StructuresQueries,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
@@ -24,6 +25,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.structures import commands as structure_commands
+from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
 from interfaces.api.deps import (
     audit_repo,
@@ -33,7 +35,7 @@ from interfaces.api.deps import (
     structure_repo,
     structures_queries,
 )
-from interfaces.api.filters import parse_vocabulary_csv
+from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     DeletedResponse,
     NameFormCreate,
@@ -234,6 +236,27 @@ def get_structure_addresses(
 ) -> StructureAddressesResponse:
     """Adresses rattachées à la structure, le rattachement rejeté écarté."""
     return queries.get_structure_addresses(structure_id, page=page, per_page=per_page)
+
+
+@router.get("/{structure_id}/partners", response_model=StructurePartnersResponse)
+def get_structure_partners(
+    structure_id: int,
+    year: str = Query(""),
+    country: str = Query(""),
+    type: str = Query(""),  # noqa: A002 — nom du paramètre de requête
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructurePartnersResponse:
+    """Organisations partenaires de la structure, classées par nombre de copublications : les ROR des auteurs de ses publications, ancêtres compris, hors ceux de la structure et de ses tutelles. Filtres par année de publication, pays et type d'organisation ROR, valeurs séparées par des virgules."""
+    return queries.get_structure_partners(
+        structure_id,
+        years=parse_int_csv(year, param="year"),
+        countries=[c.lower() for c in parse_str_csv(country)],
+        types=parse_vocabulary_csv(type, allowed=tuple(RorType), param="type"),
+        page=page,
+        per_page=per_page,
+    )
 
 
 @router.get("/{structure_id}/dashboard", response_model=StructureDashboardResponse)

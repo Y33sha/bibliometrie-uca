@@ -109,7 +109,7 @@
 		{#if activeCount > 0}
 			<span class="facet-badge">{activeCount}</span>
 		{/if}
-		<span class="facet-arrow">&#9662;</span>
+		<span class="chevron" class:up={open} aria-hidden="true"></span>
 	</button>
 
 	{#if open}
@@ -158,7 +158,7 @@
 		text-align: left;
 	}
 	.item-row:hover {
-		background: #f5f5f2;
+		background: var(--hover);
 	}
 	.state-icon {
 		display: inline-flex;
@@ -166,11 +166,11 @@
 		justify-content: center;
 		width: 20px;
 		height: 20px;
-		border-radius: 4px;
+		border-radius: var(--radius);
 		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--muted);
-		background: #f0f0f0;
+		background: var(--surface);
 		flex-shrink: 0;
 	}
 	.state-icon.state-yes {
@@ -187,7 +187,7 @@
 	}
 	.item-count {
 		font-size: 0.8rem;
-		color: #888;
+		color: var(--muted);
 		margin-left: auto;
 	}
 </style>

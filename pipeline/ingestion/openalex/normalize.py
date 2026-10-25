@@ -2,13 +2,19 @@
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from urllib.parse import urlsplit
 
 from domain.countries import normalize_country_code
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType, is_catalog_record
-from domain.platforms.registry import known_platform_of_source
+from domain.platforms.registry import PMC_ARTICLE_URL, PUBMED_CENTRAL, known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
-from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
+from domain.publications.identifiers import (
+    clean_doi,
+    extract_doi_from_url,
+    extract_hal_id_from_url,
+    normalize_pmcid,
+)
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -46,9 +52,10 @@ from pipeline.ingestion.openalex.payload import (
     extract_nnt_from_location,
     is_theses_fr_location,
     map_openalex_oa_status,
+    names_publisher,
+    names_serial,
     parse_primary_location,
     short_openalex_id,
-    should_skip_publisher_serial,
 )
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -112,6 +119,9 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
         if not url or is_catalog_record(url):
             continue
         location_id = as_str(loc.get("id")) or ""
+        platform = _repository(as_mapping(loc.get("source")))
+        if platform and platform.openalex_id in PUBMED_CENTRAL.openalex_ids:
+            url, platform = _pmc_copy(url, pdf_url, platform)
         locations.append(
             LocationFacts(
                 url=url,
@@ -120,24 +130,34 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
                 version=as_str(loc.get("version")),
                 license=normalize_license(as_str(loc.get("license"))),
                 is_oa=as_bool(loc.get("is_oa")),
-                platform=_repository(as_mapping(loc.get("source"))),
+                platform=platform,
             )
         )
     return locations
 
 
+def _pmc_copy(
+    url: str, pdf_url: str | None, platform: PlatformFacts
+) -> tuple[str, PlatformFacts | None]:
+    """Adresse et plateforme d'une copie que OpenAlex range sous PubMed Central. Une page PubMed n'est pas une copie sur PMC : l'adresse devient la page de l'article sur PMC, d'après le PMCID de son PDF, à défaut la copie perd sa plateforme."""
+    if urlsplit(url).hostname != "pubmed.ncbi.nlm.nih.gov":
+        return url, platform
+    if pmcid := normalize_pmcid(pdf_url):
+        return PMC_ARTICLE_URL.format(pmcid), platform
+    return url, None
+
+
 def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
-    """Plateforme d'une source OpenAlex de type `repository`, nommée comme OpenAlex la nomme. Son type est celui de la liste des plateformes connues, à défaut entrepôt."""
+    """Plateforme d'une source OpenAlex de type `repository`. Une plateforme de la liste des plateformes connues en prend le nom et le type ; une autre est un entrepôt, nommé comme OpenAlex le nomme."""
     if as_str(source.get("type")) != "repository":
         return None
     openalex_id = short_openalex_id(as_str(source.get("id")) or "")
     name = as_str(source.get("display_name"))
     if not openalex_id or not name:
         return None
-    known = known_platform_of_source(openalex_id)
-    return PlatformFacts(
-        openalex_id, name, known.platform_type if known else PlatformType.REPOSITORY
-    )
+    if known := known_platform_of_source(openalex_id):
+        return PlatformFacts(openalex_id, known.name, known.platform_type)
+    return PlatformFacts(openalex_id, name, PlatformType.REPOSITORY)
 
 
 def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str | None:
@@ -263,7 +283,7 @@ def openalex_source_record(  # noqa: C901
 ) -> SourceRecordUpsert:
     """Enregistrement source OpenAlex d'un work.
 
-    `primary` est la localisation principale déjà analysée ; la fonction l'analyse en son absence. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale.
+    `primary` est la localisation principale déjà analysée ; la fonction l'analyse en son absence. Sans revue identifiée, le titre du conteneur est le nom de la source de la localisation principale, quand cette source peut être une revue (`names_serial`).
     """
     openalex_id = short_openalex_id(as_str(work.get("id")) or "")
     if primary is None:
@@ -286,13 +306,11 @@ def openalex_source_record(  # noqa: C901
     is_retracted = bool(work.get("is_retracted"))
 
     # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/serials créés via find_or_create_*.
-    # L'éditeur et la revue sont ignorés pour les primary locations qui ne représentent pas un éditeur (HAL, theses.fr, Zenodo, etc.), même critère que la création.
+    # Mêmes critères que la création : l'éditeur et la revue sont ignorés pour une primary location qui héberge le work sans le publier (HAL, theses.fr, Zenodo, etc.), la revue pour une plateforme d'ebooks.
     raw_biblio = as_mapping(work.get("biblio"))
-    source = (
-        {}
-        if should_skip_publisher_serial(primary)
-        else as_mapping(as_mapping(work.get("primary_location")).get("source"))
-    )
+    primary_source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
+    publisher_source = primary_source if names_publisher(primary) else {}
+    source = primary_source if names_serial(primary) else {}
     issn_l = as_str(source.get("issn_l"))
     issns = [i for e in as_sequence(source.get("issn")) if (i := as_str(e)) and i != issn_l]
     biblio_json = compact_biblio(
@@ -300,7 +318,7 @@ def openalex_source_record(  # noqa: C901
         issue=as_str(raw_biblio.get("issue")),
         first_page=as_str(raw_biblio.get("first_page")),
         last_page=as_str(raw_biblio.get("last_page")),
-        publisher=as_str(source.get("host_organization_name")),
+        publisher=as_str(publisher_source.get("host_organization_name")),
         journal_title=as_str(source.get("display_name")),
         journal_issn=issns[0] if issns else None,
         journal_eissn=issns[1] if len(issns) > 1 else None,
@@ -317,9 +335,9 @@ def openalex_source_record(  # noqa: C901
     topics = extract_topics(work)
     topics_json = topics if topics else None
 
-    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, plateforme) garde sa forme brute dans `source_extras`, sans licence normalisée.
+    # Licence de la localisation principale seule : HAL et Crossref donnent celles de leurs propres localisations. Une localisation sans éditeur (archive, entrepôt) garde sa forme brute dans `source_extras`, sans licence normalisée.
     raw_license = as_str(as_mapping(work.get("primary_location")).get("license"))
-    publisher_license = None if should_skip_publisher_serial(primary) else raw_license
+    publisher_license = raw_license if names_publisher(primary) else None
 
     return SourceRecordUpsert(
         source="openalex",
@@ -332,8 +350,11 @@ def openalex_source_record(  # noqa: C901
         raw_doc_type=as_str(work.get("type")),
         serial_id=containers.serial_id,
         monograph_id=containers.monograph_id,
+        # Une archive, un entrepôt ou une plateforme d'ebooks héberge le work sans le contenir.
         container_title=(
-            primary.source_display_name if primary and not containers.serial_id else None
+            primary.source_display_name
+            if primary and names_serial(primary) and not containers.serial_id
+            else None
         ),
         raw_language=as_str(work.get("language")),
         biblio=biblio_json,
@@ -473,12 +494,12 @@ class OpenalexNormalizer(SourceNormalizer):
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
     def publisher(self, doc: Document) -> PublisherFacts | None:
-        if should_skip_publisher_serial(parse_primary_location(doc)):
+        if not names_publisher(parse_primary_location(doc)):
             return None
         return get_publisher(doc)
 
     def container_facts(self, doc: Document) -> ContainerDescription | None:
-        if should_skip_publisher_serial(parse_primary_location(doc)):
+        if not names_serial(parse_primary_location(doc)):
             return None
         return get_container_facts(doc)
 

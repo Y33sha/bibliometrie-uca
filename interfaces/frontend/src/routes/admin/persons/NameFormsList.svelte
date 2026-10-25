@@ -39,7 +39,7 @@
   <div class="chip-row">
     <span class="chip-controls">
       {#if isCanonical(nf)}
-        <span class="canonical" title="Forme dérivée du nom canonique">nom</span>
+        <span class="canonical-tag" title="Forme dérivée du nom canonique">nom</span>
       {:else}
         <button
           class="toggle-btn confirm"
@@ -111,7 +111,8 @@
 {#if rejectedForms.length}
   <details class="rejected-forms" bind:open={showRejected}>
     <summary>
-      {showRejected ? "masquer les formes rejetées ▲" : "afficher les formes rejetées ▼"}
+      {showRejected ? "masquer les formes rejetées" : "afficher les formes rejetées"}
+      <span class="chevron" class:up={showRejected} aria-hidden="true"></span>
     </summary>
     <div class="forms-list">
       {#each rejectedForms as nf}
@@ -135,30 +136,23 @@
   }
   .publication-count {
     font-size: 0.72rem;
-    color: #666;
+    color: var(--muted);
     white-space: nowrap;
   }
   .publication-count.zero {
-    color: #bbb;
+    color: var(--text-faint);
   }
   .shared {
     font-size: 0.72rem;
-    color: #8a6d3b;
+    color: var(--warning-text);
     white-space: nowrap;
-  }
-  .canonical {
-    font-size: 0.68rem;
-    color: #888;
-    background: #f0f0f0;
-    border-radius: 8px;
-    padding: 0 6px;
   }
   .empty {
     font-size: 0.8rem;
-    color: #8a6d10;
-    background: var(--warning-light, #fff3e0);
+    color: var(--warning-text);
+    background: var(--warning-light);
     padding: 1px 7px;
-    border-radius: 10px;
+    border-radius: var(--radius-pill);
   }
   .rejected-forms {
     margin-top: 8px;
@@ -168,13 +162,13 @@
     list-style: none;
     cursor: pointer;
     font-size: 0.75rem;
-    color: #888;
+    color: var(--muted);
   }
   .rejected-forms summary::-webkit-details-marker {
     display: none;
   }
   .rejected-forms summary:hover {
-    color: var(--accent, #1976d2);
+    color: var(--accent);
   }
   .rejected-forms[open] summary {
     margin-bottom: 4px;

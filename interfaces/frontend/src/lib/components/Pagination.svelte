@@ -51,16 +51,19 @@
 		margin: 16px 0;
 	}
 	button {
-		padding: 5px 12px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--card);
+		min-width: 34px;
+		height: 34px;
+		padding: 0 10px;
+		border: none;
+		border-radius: var(--radius);
+		background: transparent;
+		color: var(--text-secondary);
 		cursor: pointer;
 		font-size: 0.95rem;
 		font-family: inherit;
 	}
 	button:hover:not(:disabled):not(.active) {
-		background: #f0f0f0;
+		background: var(--hover);
 	}
 	button.active:hover {
 		background: color-mix(in srgb, var(--accent) 85%, black);
@@ -72,7 +75,7 @@
 	button.active {
 		background: var(--accent);
 		color: white;
-		border-color: var(--accent);
+		font-weight: 600;
 	}
 	.page-info {
 		font-size: 0.95rem;

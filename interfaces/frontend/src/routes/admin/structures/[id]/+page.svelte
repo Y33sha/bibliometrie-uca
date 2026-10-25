@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
+  import IconButton from "#lib/components/IconButton.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
@@ -252,9 +254,6 @@
     ctxPickerSearch = "";
     ctxPickerOpen = true;
     relationPickerOpen = false;
-    requestAnimationFrame(() => {
-      ctxPickerEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
   }
 
   async function pickCtx(item: number | string) {
@@ -395,7 +394,7 @@
       ctxPickerOpen &&
       ctxPickerEl &&
       !ctxPickerEl.contains(target) &&
-      !target.classList.contains("btn-add-tiny")
+      !target.classList.contains("btn-add")
     ) {
       ctxPickerOpen = false;
     }
@@ -417,27 +416,27 @@
   <title>{pageTitle("Admin - Structure")}</title>
 </svelte:head>
 
-<p class="back-link"><a href={resolve('admin/structures')}>← Retour aux structures</a></p>
+<Breadcrumb trail={[{ label: "Structures", path: "admin/structures" }]} current={detail?.structure.acronym || detail?.structure.name} />
 
 {#if !detail}
   <p class="loading">Chargement…</p>
 {:else}
   {@const s = detail.structure}
-  <div class="panel">
+  <div>
     <div class="detail-header">
-      <span class="type-badge type-{s.type}">{s.type}</span>
+      <span class="structure-type structure-type-{s.type}">{s.type}</span>
       <h2>
-        {#if s.acronym}<strong>{s.acronym}</strong> · {s.name}{:else}{s.name}{/if}
+        {#if s.acronym}<strong>{s.acronym}</strong> <span class="name-separator">·</span> {s.name}{:else}{s.name}{/if}
       </h2>
-      <button class="btn btn-sm" onclick={openEditModal}>Éditer</button>
-      <button class="btn btn-danger btn-sm" onclick={deleteStructure}>Supprimer</button>
+      <IconButton icon="edit" label="Modifier la structure" onclick={openEditModal} />
+      <IconButton icon="delete" label="Supprimer la structure" onclick={deleteStructure} />
     </div>
 
     <h3 class="section-title">Détails</h3>
     <div class="details-inline">
       {#if s.ror_id}
         <span class="detail-item">
-          <span class="detail-label">ROR</span>
+          <span class="field-label">ROR</span>
           <a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="id-badge"
             >{rorShortId(s.ror_id)}</a
           >
@@ -445,13 +444,13 @@
       {/if}
       {#if s.rnsr_id}
         <span class="detail-item">
-          <span class="detail-label">RNSR</span>
+          <span class="field-label">RNSR</span>
           <span>{s.rnsr_id}</span>
         </span>
       {/if}
       {#if s.hal_collection}
         <span class="detail-item">
-          <span class="detail-label">Collection HAL</span>
+          <span class="field-label">Collection HAL</span>
           <a
             href={halCollectionUrl(s.hal_collection)}
             target="_blank"
@@ -463,7 +462,7 @@
     </div>
     {#if s.api_ids && Object.keys(s.api_ids).length}
       <div class="api-ids-display">
-        <span class="detail-label">Paramètres requête API :</span>
+        <span class="field-label">Paramètres requête API :</span>
         {#each Object.entries(s.api_ids) as [src, ids]}
           <span class="api-id-item">
             <span class="api-id-source">{src}</span>
@@ -478,6 +477,7 @@
       {tutelles}
       {tutellesDe}
       {relationPickerOpen}
+      {pickerDirection}
       {relationPickerResults}
       bind:relationPickerSearch
       bind:relationPickerEl
@@ -497,6 +497,7 @@
       bind:addFormExcluding
       {newFormCtx}
       {ctxPickerOpen}
+      {ctxPickerFormId}
       {ctxPickerResults}
       bind:ctxPickerSearch
       bind:ctxPickerEl
@@ -539,34 +540,10 @@
 {/if}
 
 <style>
-  .back-link {
-    margin: 0 0 4px;
-    font-size: 0.85rem;
-  }
   .loading {
     color: var(--muted);
   }
 
-  .panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px;
-  }
-  .panel h2 {
-    margin: 0 0 10px;
-    font-size: 1.05rem;
-    font-weight: 600;
-  }
-
-  .section-title {
-    margin: 20px -14px 10px !important;
-    padding: 6px 14px !important;
-    background: #5b9ea0;
-    color: white !important;
-    font-size: 0.75rem !important;
-    border-radius: 3px;
-  }
   .details-inline {
     display: flex;
     flex-wrap: wrap;
@@ -579,49 +556,12 @@
     align-items: center;
     gap: 5px;
   }
-  .detail-label {
+  .field-label {
     color: var(--muted);
     font-weight: 500;
     font-size: 0.8rem;
   }
 
-  .type-badge {
-    font-size: 0.7rem;
-    padding: 1px 6px;
-    border-radius: 8px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    white-space: nowrap;
-  }
-  :global(.type-universite) {
-    background: #e8d4f0;
-    color: #6b2e8a;
-  }
-  :global(.type-onr) {
-    background: #d4e8f0;
-    color: #2e6b8a;
-  }
-  :global(.type-chu) {
-    background: #f0d4d4;
-    color: #8a2e2e;
-  }
-  :global(.type-ecole) {
-    background: #f0e8d4;
-    color: #8a6b2e;
-  }
-  :global(.type-labo) {
-    background: var(--accent-light);
-    color: var(--accent);
-  }
-  :global(.type-site) {
-    background: var(--success-light);
-    color: var(--success);
-  }
-  :global(.type-autre) {
-    background: #f0f0f0;
-    color: #555;
-  }
 
   .detail-header {
     display: flex;
@@ -632,7 +572,16 @@
   .detail-header h2 {
     flex: 1;
     margin: 0;
-    font-size: 1.3rem;
+    font-size: 1.6rem;
+    font-weight: 500;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+  .detail-header h2 strong {
+    font-weight: 700;
+  }
+  .name-separator {
+    color: var(--muted);
   }
 
   .api-ids-display {

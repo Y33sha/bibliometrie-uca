@@ -61,6 +61,23 @@ class TestUpsertSourceRecord:
         ).one()
         assert tuple(row) == ("article", "ART", "en", "English")
 
+    def test_ebook_platform_is_no_container_title(self, sa_sync_conn):
+        staging_id = _thesis_staging(sa_sync_conn)
+        store = SourceRecordStore(sa_sync_conn)
+        platform = store.upsert_source_record(
+            _row(staging_id, container_title="ENS Éditions eBooks")
+        )
+        book = store.upsert_source_record(
+            _row(staging_id, source_id="2023ABC002", container_title="Actes du colloque")
+        )
+        titles = dict(
+            sa_sync_conn.execute(
+                text("SELECT id, container_title FROM source_records WHERE id IN (:a, :b)"),
+                {"a": platform, "b": book},
+            ).all()
+        )
+        assert titles == {platform: None, book: "Actes du colloque"}
+
     def test_reimport_keeps_row_identity(self, sa_sync_conn):
         """La clé `(source, source_id)` traverse les imports : l'id reste stable pour les tables qui la référencent."""
         staging_id = _thesis_staging(sa_sync_conn)

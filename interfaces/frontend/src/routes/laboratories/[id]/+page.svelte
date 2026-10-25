@@ -1,4 +1,5 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -7,18 +8,21 @@
 	import { structureLabel } from '#lib/structureLabels.js';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import OaBar from '#lib/components/charts/OaBar.svelte';
+	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
+	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import ThesesListView from '#lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import PartnersTab from './PartnersTab.svelte';
 
 	const labId = $derived(page.params.id);
-	let canGoBack = $state(false);
-
 	// --- Types ---
 	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureOut'];
@@ -33,7 +37,7 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'addresses'];
+	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', 'addresses'];
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
@@ -59,15 +63,9 @@
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
 
-	const oaSegments = $derived([
-		{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
-		{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
-		{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
-		{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' }
-	]);
 	const collabSegments = $derived([
-		{ label: 'International', value: dashCollab.international, color: '#3b6b9e' },
-		{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' }
+		{ label: 'International', value: dashCollab.international, color: cssVar('accent-mid') },
+		{ label: 'Domestique', value: dashCollab.domestic, color: cssVar('border') }
 	]);
 
 	const tutelles = $derived(parents);
@@ -117,8 +115,6 @@
 	}
 
 	onMount(async () => {
-		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
-
 		// Restore cross-tab state from URL (les filtres publications sont restaurés par PublicationsListView lui-même).
 		const restored = url.restoreFromUrl(page.url.searchParams);
 		if (restored.addrPage) addresses.page = restored.addrPage as number;
@@ -146,58 +142,49 @@
 	<title>{pageTitle(lab ? structureLabel(lab) : 'Laboratoire')}</title>
 </svelte:head>
 
-{#if canGoBack}
-<!-- svelte-ignore a11y_invalid_attribute -->
-<a href="#" class="back-link" onclick={(e) => { e.preventDefault(); history.back(); }}>&larr; Retour</a>
-{/if}
+<Breadcrumb trail={[{ label: 'Labos', path: 'laboratories' }]} current={lab?.acronym || lab?.name} />
 
 {#if error}
-	<div class="lab-header">
-		<div class="no-results">Laboratoire introuvable</div>
-	</div>
+	<div class="no-results">Laboratoire introuvable</div>
 {:else if !lab}
-	<div class="lab-header">
-		<div class="loading">Chargement…</div>
-	</div>
+	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Header -->
-	<div class="lab-header">
-		<h1 class="lab-name">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{lab.name}
 			{#if lab.acronym}
-				<span class="lab-acronym">({lab.acronym})</span>
+				<span class="entity-acronym">{lab.acronym}</span>
 			{/if}
 		</h1>
-		<div class="lab-meta">
-			<div class="meta-row">
-				{#if lab.ror_id}
-					<span class="meta-label">ROR</span>
-					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
-						{rorShortId(lab.ror_id)}
-					</a>
-				{/if}
-				{#if lab.rnsr_id}
-					<span class="meta-label">RNSR</span>
-					<span class="id-badge">{lab.rnsr_id}</span>
-				{/if}
-				{#if lab.hal_collection}
-					<span class="meta-label">HAL</span>
-					<a
-						href="https://hal.science/{lab.hal_collection}"
-						target="_blank"
-						rel="noopener"
-						class="id-badge"
-					>
-						{lab.hal_collection}
-					</a>
-				{/if}
-				{#if tutelles.length}
-					<span class="meta-label">Tutelles</span>
-					{#each tutelles as t (t.id)}
-						<span class="tutelle-tag">{structureLabel(t)}</span>
-					{/each}
-				{/if}
-			</div>
+		<div class="entity-meta">
+			{#if lab.ror_id}
+				<span class="entity-meta-label">ROR</span>
+				<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
+					{rorShortId(lab.ror_id)}
+				</a>
+			{/if}
+			{#if lab.rnsr_id}
+				<span class="entity-meta-label">RNSR</span>
+				<span class="id-badge">{lab.rnsr_id}</span>
+			{/if}
+			{#if lab.hal_collection}
+				<span class="entity-meta-label">HAL</span>
+				<a
+					href="https://hal.science/{lab.hal_collection}"
+					target="_blank"
+					rel="noopener"
+					class="id-badge"
+				>
+					{lab.hal_collection}
+				</a>
+			{/if}
+			{#if tutelles.length}
+				<span class="entity-meta-label">Tutelles</span>
+				{#each tutelles as t (t.id)}
+					<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
+				{/each}
+			{/if}
 		</div>
 	</div>
 
@@ -208,6 +195,7 @@
 			{ id: 'publications', label: 'Publications' },
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
 			{ id: 'persons', label: 'Personnes' },
+			{ id: 'collaborations', label: 'Collaborations' },
 			{ id: 'addresses', label: 'Adresses' },
 		]}
 		onswitch={onTabSwitch}
@@ -220,34 +208,29 @@
 			{#if !dashboardLoaded}
 				<div class="loading">Chargement…</div>
 			{:else}
+				<KeyFigures
+					items={[
+						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
+						...(dashOa.total > 0
+							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
+							: []),
+						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses' }] : []),
+					]}
+				/>
 				<div class="dash-grid">
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectsCloud subjects={dashSubjects} />
-					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
-						<BarChart
-							labels={dashPubsByYear.map((d) => String(d.year))}
-							values={dashPubsByYear.map((d) => d.count)}
-							datasetLabel="Publications"
-						/>
+						<PublicationsByYearChart data={dashPubsByYear} />
 					</div>
 					<div class="dash-card">
-						<h3>Open Access</h3>
-						<DoughnutChart segments={oaSegments} />
-						{#if dashOa.total > 0}
-							<div class="oa-summary">
-								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
-								({dashOa.open_access.toLocaleString('fr-FR')} / {dashOa.total.toLocaleString('fr-FR')})
-							</div>
-						{/if}
+						<h3>Open access</h3>
+						<OaBar oa={dashOa} />
 					</div>
 					<div class="dash-card">
 						<h3>Collaborations internationales (articles)</h3>
 						<DoughnutChart segments={collabSegments} />
 						{#if dashCollab.total_articles > 0}
-							<div class="oa-summary">
+							<div class="dash-summary">
 								{Math.round(dashCollab.international / dashCollab.total_articles * 100)} % international
 								({dashCollab.international.toLocaleString('fr-FR')} / {dashCollab.total_articles.toLocaleString('fr-FR')} articles)
 							</div>
@@ -259,9 +242,12 @@
 							labels={dashTopCountries.map((c) => c.name)}
 							values={dashTopCountries.map((c) => c.count)}
 							datasetLabel="Articles"
-							color="#e8a838"
 							horizontal
 						/>
+					</div>
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectBars subjects={dashSubjects} />
 					</div>
 				</div>
 			{/if}
@@ -304,10 +290,17 @@
 		</div>
 	{/if}
 
+	<!-- Tab: Collaborations -->
+	{#if activeTab === 'collaborations'}
+		<div class="tab-content">
+			<PartnersTab labId={lab.id} />
+		</div>
+	{/if}
+
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			<table>
+			<table class="data-table">
 				<thead>
 					<tr>
 						<th>Adresse</th>
@@ -339,74 +332,14 @@
 {/if}
 
 <style>
-	/* Header */
-	.lab-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 20px 24px;
-		margin-bottom: 0;
-	}
-	.lab-name { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
-	.lab-acronym { font-size: 1.05rem; color: var(--muted); font-weight: 400; }
-	.lab-meta { display: flex; flex-direction: column; gap: 6px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-	}
-	.tutelle-tag { background: var(--accent-light); color: var(--accent); }
-	.id-badge { margin-right: 8px; }
 
-	/* Dashboard */
-	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-	@media (max-width: 760px) {
-		.dash-grid { grid-template-columns: 1fr; }
-	}
-	.dash-card-wide { grid-column: 1 / -1; }
-	.dash-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 16px;
-		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
-	}
-	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
-	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
-
-	/* Shared table styles */
-	.tab-content table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé. Les coins arrondis restent visuellement corrects grâce à border-collapse. */
-	}
-	.tab-content thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.tab-content tbody tr:last-child { border-bottom: none; }
-	.tab-content tbody tr:hover { background: var(--surface-hover); }
-	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
 	.status-tag {
 		display: inline-block;
 		padding: 2px 7px;
-		border-radius: 3px;
+		border-radius: var(--radius);
 		font-size: 0.8rem;
 		font-weight: 500;
 	}

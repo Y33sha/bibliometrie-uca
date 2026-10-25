@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
   import { goto } from "$app/navigation";
@@ -59,15 +60,15 @@
   <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
 </svelte:head>
 
-<a href={resolve('subjects')} class="back">← Retour à la liste</a>
+<Breadcrumb trail={[{ label: "Sujets", path: "subjects" }]} current={data?.subject.label} />
 
   {#if error}
     <div class="error">Sujet introuvable.</div>
   {:else if !data}
     <p class="loading">Chargement…</p>
   {:else}
-    <div class="header">
-      <h1>{data.subject.label}</h1>
+    <div class="entity-header">
+      <h1 class="entity-title">{data.subject.label}</h1>
     </div>
     <TabNav
       tabs={[
@@ -108,26 +109,6 @@
   {/if}
 
 <style>
-  .back {
-    color: var(--muted);
-    text-decoration: none;
-    font-size: 0.9rem;
-    margin-bottom: 8px;
-  }
-  .back:hover {
-    text-decoration: underline;
-  }
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-  h1 {
-    margin: 0;
-    font-size: 1.4rem;
-  }
   .graph-wrapper {
     width: 100%;
   }
@@ -142,7 +123,7 @@
     color: var(--muted);
   }
   .error {
-    color: var(--danger, #dc2626);
+    color: var(--danger);
     font-style: italic;
   }
 </style>

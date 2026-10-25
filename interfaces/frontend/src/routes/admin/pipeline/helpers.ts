@@ -8,18 +8,18 @@ export const STATUS_LABEL: Record<Status, string> = {
   error: "Erreur",
 };
 
-// Couleurs sémantiques (indépendantes du thème) pour les cases du ruban et les pastilles.
+// Couleurs de statut des cases du ruban et des pastilles, insérées dans des attributs `style`.
 export const CELL_COLOR: Record<Status | "ghost", string> = {
-  ok: "#1a7f37",
-  warning: "#9a6700",
-  error: "#c0392b",
+  ok: "var(--success)",
+  warning: "var(--warning)",
+  error: "var(--danger)",
   ghost: "var(--border)",
 };
 
 export const CELL_BG: Record<Status | "ghost", string> = {
-  ok: "#d8f0dd",
-  warning: "#fff0c2",
-  error: "#fbe0dd",
+  ok: "var(--success-light)",
+  warning: "var(--warning-light)",
+  error: "var(--danger-light)",
   ghost: "transparent",
 };
 

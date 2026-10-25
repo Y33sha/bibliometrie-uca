@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
+from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
@@ -57,13 +58,11 @@ def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_title(msg: Mapping[str, JsonValue]) -> str | None:
+    """Premier titre du payload, nettoyé par `drop_flattened_mathml`."""
     titles = msg.get("title") or []
-    if isinstance(titles, list) and titles:
-        first = titles[0]
-        if isinstance(first, str) and first.strip():
-            return first.strip()
-    if isinstance(titles, str) and titles.strip():
-        return titles.strip()
+    first = titles[0] if isinstance(titles, list) and titles else titles
+    if isinstance(first, str) and (title := drop_flattened_mathml(first)):
+        return title
     return None
 
 

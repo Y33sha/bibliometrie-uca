@@ -97,6 +97,7 @@ class PublicationFilters:
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: list[str] = field(default_factory=list)
     subject_ids: list[int] = field(default_factory=list)
+    partner_rors: list[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -254,10 +255,17 @@ class SourceRecordOut(BaseModel):
 
 
 class ExternalIdentifierOut(BaseModel):
-    """Identifiant externe agrégé d'une publication (arXiv, PMID, PMCID, NNT), pour la sidebar."""
+    """Identifiant externe agrégé d'une publication (PMID, NNT), pour la sidebar."""
 
-    type: str  # "arxiv" | "pmid" | "pmcid" | "nnt"
+    type: str  # "pmid" | "nnt"
     value: str
+
+
+class AccessLinkOut(BaseModel):
+    """Copie ouverte d'une publication, nommée par sa plateforme (`domain.publications.access`)."""
+
+    label: str
+    url: str
 
 
 class ConsolidatedContributionOut(BaseModel):
@@ -348,6 +356,12 @@ class PublicationDetailResponse(BaseModel):
     subjects: list[SubjectOut]
     keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
     relations: list[RelatedPublicationOut]
+    access_url: str | None
+    """Adresse de la meilleure copie ouverte."""
+    access: list[AccessLinkOut]
+    """Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI."""
+    referenced_by: list[SourceRecordOut]
+    """Sources qui référencent la publication sans en donner de copie : toutes, sauf Crossref et DataCite, que couvre le DOI, et HAL quand HAL figure parmi les liens d'accès."""
     external_identifiers: list[ExternalIdentifierOut]
 
 

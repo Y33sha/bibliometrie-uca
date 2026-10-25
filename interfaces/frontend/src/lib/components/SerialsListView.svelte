@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -155,10 +156,10 @@
 		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
-	function sortArrow(col: 'title' | 'publisher' | 'publications'): string {
-		if (currentSort === col) return '▲';
-		if (currentSort === '-' + col) return '▼';
-		return '';
+	function sortDirection(col: 'title' | 'publisher' | 'publications'): 'asc' | 'desc' | null {
+		if (currentSort === col) return 'asc';
+		if (currentSort === '-' + col) return 'desc';
+		return null;
 	}
 
 	function formatIssns(j: Serial): string {
@@ -228,21 +229,21 @@
 </div>
 
 <div class="table-scroll">
-<table class="journals-table">
+<table class="data-table journals-table">
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('title')}>
-				Titre {sortArrow('title')}
+				Titre <SortChevron direction={sortDirection('title')} />
 			</th>
 			<th>ISSN</th>
 			{#if !publisherFixed}
 				<th class="sortable" onclick={() => setSort('publisher')}>
-					Éditeur {sortArrow('publisher')}
+					Éditeur <SortChevron direction={sortDirection('publisher')} />
 				</th>
 			{/if}
 			<th>Type</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis {sortArrow('publications')}
+				Publis <SortChevron direction={sortDirection('publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>
@@ -251,7 +252,7 @@
 		{#each serials.items as j (j.id)}
 			<tr>
 				<td>
-					<a href={resolve(`journals/${j.id}`)} class="journal-link">{j.title}</a>
+					<a href={resolve(`journals/${j.id}`)} class="entity-link">{j.title}</a>
 					{#if j.is_in_doaj}
 						{#if j.doaj_url}
 							<a class="badge-doaj" href={j.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
@@ -264,7 +265,7 @@
 					<td class="muted">
 						{#if j.publisher_name}
 							{#if j.publisher_id}
-								<a href={resolve(`publishers/${j.publisher_id}`)} class="publisher-link">{j.publisher_name}</a>
+								<a href={resolve(`publishers/${j.publisher_id}`)}>{j.publisher_name}</a>
 							{:else}
 								{j.publisher_name}
 							{/if}
@@ -273,7 +274,7 @@
 				{/if}
 				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
 				<td class="num">{j.publication_count.toLocaleString('fr-FR')}</td>
-				{#if actionCell}<td class="actions">{@render actionCell(j)}</td>{/if}
+				{#if actionCell}<td class="actions row-actions">{@render actionCell(j)}</td>{/if}
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}
@@ -299,36 +300,8 @@
 		width: 280px;
 	}
 
-	.journals-table {
-		width: 100%;
-		min-width: 660px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-	}
-	.journals-table thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.journals-table thead th.num { text-align: right; }
-	.journals-table thead th.sortable { cursor: pointer; user-select: none; }
-	.journals-table thead th.sortable:hover { color: var(--accent); }
-	.journals-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.journals-table tbody tr:last-child { border-bottom: none; }
-	.journals-table tbody tr:hover { background: var(--surface-hover); }
-	.journals-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.journals-table td.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-		color: var(--muted);
-	}
+	.journals-table { min-width: 660px; }
+	.journals-table td.num { color: var(--muted); }
 	.issn-cell {
 		color: var(--muted);
 		font-size: 0.85rem;
@@ -337,19 +310,6 @@
 	}
 	.muted { color: var(--muted); }
 
-	.journal-link { font-weight: 500; }
 
-	.badge-doaj {
-		font-size: 0.7rem;
-		padding: 1px 5px;
-		background: var(--success);
-		color: white;
-		border-radius: 8px;
-		margin-left: 6px;
-		vertical-align: middle;
-		font-weight: 600;
-		text-decoration: none;
-	}
-	:global(a.badge-doaj:hover) { background: #256528; }
 	.actions { white-space: nowrap; position: relative; }
 </style>

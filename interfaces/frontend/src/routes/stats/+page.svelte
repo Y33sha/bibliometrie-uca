@@ -3,8 +3,8 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
-	import { Chart, registerables } from 'chart.js';
-	import ChartDataLabels from 'chartjs-plugin-datalabels';
+	import { Chart } from '#lib/components/charts/chart.js';
+	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
@@ -25,8 +25,6 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 
-	Chart.register(...registerables, ChartDataLabels);
-
 	// Chaque changement de filtre relance le graphe : la requête précédente, encore en vol, est annulée.
 	const pivotRequest = latestRequest();
 
@@ -43,6 +41,7 @@
 	// Facettes éditeur / revue : seul l'id (état canonique) ; le libellé de la pastille est résolu par EntityFilter.
 	let selectedSerialId = $state<string | null>(null);
 	let selectedPublisherId = $state<string | null>(null);
+	let selectedPartnerRor = $state<string | null>(null);
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -97,15 +96,8 @@
 	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
-		// La carte des collaborations ne groupe sur rien : toutes les facettes filtrables restent offertes.
-		const grouped = isCollab ? new Set<string>() : new Set([primaryBy, groupBy].filter(Boolean));
-		const out = new Set<string>();
-		for (const d of pivotSchema.dimensions) {
-			if (!d.filterable) continue;
-			if (grouped.has(d.key) && !d.ordinal) continue;
-			out.add(d.key);
-		}
-		return out;
+		// Une facette reste offerte même quand le graphique compare sur sa dimension : elle restreint alors les valeurs comparées.
+		return new Set(pivotSchema.dimensions.filter((d) => d.filterable).map((d) => d.key));
 	});
 
 	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
@@ -114,8 +106,8 @@
 	const OA_ACCESS_LABELS: Record<string, string> = {
 		ouvert: 'Ouvert', embargo: 'Sous embargo', ferme: 'Fermé', indetermine: 'Indéterminé',
 	};
-	const OA_ACCESS_VAR: Record<string, string> = {
-		ouvert: '--open', embargo: '--embargoed', ferme: '--closed', indetermine: '--unknown',
+	const OA_ACCESS_STATUS: Record<string, string> = {
+		ouvert: 'open', embargo: 'embargoed', ferme: 'closed', indetermine: 'unknown',
 	};
 	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
 
@@ -131,9 +123,9 @@
 		if (dim === 'license') return facets.options.licenses.find((o) => o.value === value)?.text ?? value;
 		return value;
 	}
-	function dimColor(dim: string, value: string, idx: number, cs: CSSStyleDeclaration): string {
-		if (dim === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
-		if (dim === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
+	function dimColor(dim: string, value: string, idx: number): string {
+		if (dim === 'oa_voie') return oaStatusColor(value) ?? PALETTE[idx % PALETTE.length];
+		if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? PALETTE[idx % PALETTE.length];
 		if (dim === 'doc_type_grouped') return docTypeGroupedColors[value] ?? PALETTE[idx % PALETTE.length];
 		if (dim === 'license') return licenseColors[value] ?? PALETTE[idx % PALETTE.length];
 		return PALETTE[idx % PALETTE.length];
@@ -185,23 +177,15 @@
 	function onPrimaryChange() {
 		// Le groupement primaire ne peut pas être aussi la comparaison.
 		if (groupBy === primaryBy) groupBy = '';
-		onAxisChange(primaryBy);
+		onAxisChange();
 	}
 	function onGroupByChange() {
-		onAxisChange(groupBy);
+		onAxisChange();
 	}
-	function onAxisChange(dim: string) {
+	function onAxisChange() {
 		chartPage = 1; // changer d'axe repart de la première page
-		// Comparer/grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
-		let cleared = false;
-		if (dim === 'oa_voie' && selectedOa.length > 0) { selectedOa = []; cleared = true; }
-		if (dim === 'license' && selectedLicenses.length > 0) { selectedLicenses = []; cleared = true; }
-		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
-		if (dim === 'publisher' && selectedPublisherId) { selectedPublisherId = null; cleared = true; }
-		if (dim === 'serial' && selectedSerialId) { selectedSerialId = null; cleared = true; }
 		syncUrl();
-		if (cleared) refresh();
-		else loadChart();
+		loadChart();
 	}
 
 	// --- Filter params (partagés par le graphe et les facettes) ---
@@ -215,6 +199,7 @@
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
 		if (selectedSerialId) p.set('serial_id', selectedSerialId);
+		if (selectedPartnerRor) p.set('partner_ror', selectedPartnerRor);
 		return p;
 	}
 
@@ -245,6 +230,7 @@
 			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			serialId: { type: 'single', urlKey: 'serial_id' },
+			partnerRor: { type: 'single', urlKey: 'partner_ror' },
 			measure: { type: 'single', urlKey: 'measure', defaultValue: 'publication_count' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
@@ -265,6 +251,7 @@
 			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			publisherId: selectedPublisherId ?? '',
 			serialId: selectedSerialId ?? '',
+			partnerRor: selectedPartnerRor ?? '',
 			measure,
 			primaryBy,
 			groupBy,
@@ -277,16 +264,9 @@
 
 	// --- Derived: publications link ---
 	const pubsUrl = $derived.by(() => {
-		const p = new URLSearchParams();
-		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
-		if (selectedYears.length) p.set('year', selectedYears.join(','));
-		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
-		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (selectedLicenses.length) p.set('license', selectedLicenses.join(','));
+		// Les entités passent par leur identifiant ; la liste résout elle-même le libellé de la pastille.
+		const p = chartParams();
 		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
-		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
-		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
-		if (selectedSerialId) p.set('serial_id', selectedSerialId);
 		return resolve('publications') + '?' + paramsToQuery(p);
 	});
 
@@ -331,7 +311,6 @@
 		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans comparaison, le groupement passe en abscisse, en barres simples.
 		const xDim = comparison || primaryBy;
 		const stackDim = comparison ? primaryBy : '';
-		const cs = getComputedStyle(document.documentElement);
 
 		const stackValues = stackDim ? orderedValues(stackDim, rows) : [];
 
@@ -366,7 +345,7 @@
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (measureDef?.label ?? 'Publications'),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
+			backgroundColor: stackDim ? dimColor(stackDim, sv, i) : cssVar('accent'),
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
@@ -375,7 +354,7 @@
 		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
 		if (chartMode === 'part' && !stackDim) {
 			const values = datasets[0].data as number[];
-			const colors = cats.map((cv, i) => dimColor(xDim, cv, i, cs));
+			const colors = cats.map((cv, i) => dimColor(xDim, cv, i));
 			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i] }));
 			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
 				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);
@@ -476,7 +455,7 @@
 					intersect: true
 				},
 				scales: {
-					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 30 ? l.slice(0, 30) + '…' : l; } } },
+					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 45 ? l.slice(0, 45) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
 						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
 						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
@@ -525,6 +504,10 @@
 		selectedSerialId = id;
 		onFilterChange();
 	}
+	function onPartnerFilter(ror: string | null) {
+		selectedPartnerRor = ror;
+		onFilterChange();
+	}
 
 	onMount(async () => {
 		// Restore state from URL params
@@ -539,6 +522,7 @@
 			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
 		if (restored.serialId) selectedSerialId = restored.serialId as string;
+		if (restored.partnerRor) selectedPartnerRor = restored.partnerRor as string;
 		if (restored.measure !== undefined) measure = restored.measure as string;
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
@@ -633,7 +617,7 @@
 			</button>
 		{/if}
 	{/if}
-	<a class="publication-link" href={pubsUrl}>Voir les publications &rarr;</a>
+	<a class="toolbar-action pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
 <!-- Ligne 2 : filtres à facettes, dérivés du registre `pivotSchema` (cf. `facetKeys`). -->
 <div class="toolbar facets-row">
@@ -655,6 +639,9 @@
 	{/if}
 	{#if facetKeys.has('publisher')}
 		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
+	{/if}
+	{#if facetKeys.has('partner')}
+		<EntityFilter label="Organisation partenaire" endpoint="/api/stats/facets" kind="partner" buildParams={chartParams} selected={selectedPartnerRor ? [selectedPartnerRor] : []} onchange={(ids) => onPartnerFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('license')}
 		<FacetDropdown label="Licence" options={facets.options.licenses} bind:selected={selectedLicenses} onchange={onFilterChange} tooltip="Licence de la version éditeur" />
@@ -680,7 +667,7 @@
 {/if}
 <div class="chart-area">
 	<canvas bind:this={chartCanvas}></canvas>
-	<button type="button" class="chart-export" onclick={exportChartPng}>Export PNG</button>
+	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
 {#if chartCatTotal > CHART_PAGE_SIZE}
 	<Pagination
@@ -700,42 +687,14 @@
 		flex-direction: column;
 		min-height: 0;
 	}
-	.publication-link {
-		margin-left: auto;
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		padding: 8px 14px;
-		background: var(--accent);
-		color: white;
-		text-decoration: none;
-		border-radius: 5px;
-		font-size: 0.95rem;
-		font-weight: 500;
-	}
-	.publication-link:hover { opacity: 0.9; }
+	.pubs-link { margin-left: auto; }
 
-	.toolbar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 12px;
-	}
 	.facets-row { margin-bottom: 16px; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.groupby {
 		font-size: 0.9rem;
 		color: var(--muted);
 		white-space: nowrap;
-	}
-	.groupby select {
-		font-family: inherit;
-		font-size: 0.9rem;
-		padding: 5px 8px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: white;
 	}
 	/* Séparateur vertical léger entre les groupes de contrôles du pivot. */
 	.sep {
@@ -748,31 +707,34 @@
 		font-family: inherit;
 		font-size: 1rem;
 		line-height: 1;
-		padding: 5px 9px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: white;
-		color: var(--muted);
+		height: 34px;
+		padding: 0 10px;
+		border: none;
+		border-radius: var(--radius);
+		background: transparent;
+		color: var(--text-secondary);
 		cursor: pointer;
 	}
 	.sort-dir:hover {
 		background: var(--hover);
 	}
+	/* Légende au-dessus du graphique, alignée à gauche ; la place à droite revient à l'export. */
 	.legend {
 		display: flex;
-		gap: 12px;
-		justify-content: center;
+		flex-wrap: wrap;
+		gap: 6px 18px;
 		margin-bottom: 8px;
-		font-size: 0.8rem;
-		color: var(--muted);
+		padding-right: 120px;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
 	}
 	.legend-dot {
 		display: inline-block;
 		width: 10px;
 		height: 10px;
-		border-radius: 2px;
-		margin-right: 3px;
-		vertical-align: middle;
+		border-radius: 3px;
+		margin-right: 6px;
+		vertical-align: -1px;
 	}
 
 	/* Colonne pleine hauteur : barres d'outils, légende et pagination gardent leur hauteur naturelle, le diagramme occupe l'espace restant du viewport. Hauteur = viewport moins l'en-tête fixe et le padding vertical du conteneur. */
@@ -783,10 +745,7 @@
 	}
 
 	.chart-area {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 16px;
+		padding-top: 40px;
 		margin-bottom: 16px;
 		position: relative;
 		flex: 1 1 auto;
@@ -794,25 +753,8 @@
 	}
 	.chart-export {
 		position: absolute;
-		top: 8px;
-		right: 8px;
-		padding: 4px 10px;
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		background: var(--card);
-		font-size: 0.85rem;
-		color: var(--muted);
-		cursor: pointer;
-		font-family: inherit;
-		opacity: 0;
-		transition: opacity 0.15s;
-	}
-	.chart-area:hover .chart-export {
-		opacity: 1;
-	}
-	.chart-export:hover {
-		border-color: var(--accent);
-		color: var(--accent);
+		top: 0;
+		right: 0;
 	}
 
 </style>
