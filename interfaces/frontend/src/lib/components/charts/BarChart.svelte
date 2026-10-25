@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cssColor } from '#lib/components/charts/cssColor.js';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
 	let {
@@ -13,8 +13,8 @@
 		labels: string[];
 		values: number[];
 		datasetLabel?: string;
-		/** Couleur des barres ; défaut = variable CSS `--accent`. */
-		color?: string;
+		/** Couleur des barres, unique ou une par barre ; défaut = variable CSS `--accent-mid`. */
+		color?: string | string[];
 		/** Barres horizontales (axe des valeurs en X). */
 		horizontal?: boolean;
 		height?: number;
@@ -29,7 +29,7 @@
 			chart = null;
 		}
 		if (!canvas || values.length === 0) return;
-		const barColor = color ?? cssColor('accent');
+		const barColor = color ?? cssVar('accent-mid');
 		const valueScale = { beginAtZero: true, ticks: { precision: 0 } };
 		const categoryScale = { grid: { display: false } };
 
@@ -43,9 +43,11 @@
 				indexAxis: horizontal ? 'y' : 'x',
 				responsive: true,
 				maintainAspectRatio: false,
+				// Place pour les valeurs affichées au bout des barres.
+				layout: { padding: horizontal ? { right: 32 } : { top: 20 } },
 				plugins: {
 					legend: { display: false },
-					datalabels: { color: '#fff', font: { weight: 'bold', size: 12 } }
+					datalabels: { anchor: 'end', align: 'end', font: { weight: 600, size: 11 } }
 				},
 				scales: horizontal
 					? { x: valueScale, y: categoryScale }

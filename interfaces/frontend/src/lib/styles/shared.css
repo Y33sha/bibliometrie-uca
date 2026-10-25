@@ -25,6 +25,7 @@
 	--accent: #1f5f5f;         /* texte, bouton plein, titres de section */
 	--accent-mid: #2f8a8a;     /* trait d'onglet actif, focus */
 	--accent-light: #e6f2f2;   /* fond de pastille, encart */
+	--accent-soft: #a9d0d0;    /* barre de graphique atténuée (année en cours) */
 
 	/* Barre de navigation */
 	--nav-public: #2f7f7f;
@@ -918,7 +919,7 @@ a.structure-tag:hover {
 .dash-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	gap: 16px;
+	gap: 44px 48px;
 }
 @media (max-width: 760px) {
 	.dash-grid {
@@ -928,15 +929,14 @@ a.structure-tag:hover {
 .dash-card-wide {
 	grid-column: 1 / -1;
 }
+/* Bloc de graphique, sans cadre : un titre de section suffit. */
 .dash-card {
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 16px;
 	min-width: 0; /* autorise la cellule de grille à rétrécir sous la largeur du canvas */
 }
 .dash-card h3 {
-	margin: 0 0 12px;
+	margin: 0 0 20px;
+	padding-bottom: 6px;
+	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
 }
 /* Part d'une modalité, sous un graphique en anneau. */
 .dash-summary {

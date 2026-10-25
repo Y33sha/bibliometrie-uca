@@ -26,7 +26,7 @@ Le modèle visuel de départ est la page d'administration « Configuration du pi
 - **Toutes les variables dans un seul `:root`**, dans `shared.css`. Les noms existants sont conservés quand la notion existe déjà (`--accent`, `--muted`, `--text`, `--border`…).
 - **Les couleurs de rôle passent par les variables** : texte, surfaces, bordures, accent, états. Une palette de catégories (sources, types de structure, voies open access, niveaux de relation) est définie une seule fois, dans une classe de `shared.css` ou un module TypeScript commun. Les teintes de survol se calculent depuis la variable avec `color-mix()`.
 - **Un style dupliqué entre composants est factorisé** dans `shared.css`, ou dans un module TypeScript commun pour les palettes de graphiques.
-- **Les graphiques lisent leurs couleurs dans les variables CSS**, par `cssColor()`.
+- **Les graphiques lisent leurs couleurs dans les variables CSS**, par `cssVar()`.
 - **Palette open access agrégée** (ouvert, sous embargo, fermé, indéterminé) commune à toute l'application. Ouvert en vert, embargo en ambre, fermé en gris foncé, indéterminé en gris clair. Pas de rouge. Les voies (diamond, gold, hybrid, bronze, green) gardent leurs couleurs propres.
 - **Police auto-hébergée** dans `static/fonts/` comme Ubuntu, désignée par `--font`. Chiffres tabulaires (`font-variant-numeric: tabular-nums`) sur toute la page.
 - **Filtres de liste sur deux niveaux** : le bouton de filtre affiche le nombre de valeurs choisies, la barre « Filtres actifs » détaille ces valeurs avec une croix par filtre. On ajoute ou retire une valeur depuis le bouton sans supprimer le filtre.
@@ -49,7 +49,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Factoriser les dashboards et leurs palettes : grille et cartes `.dash-*`, anneau open access des dashboards de structure et de personne (composant `OaDoughnut`, couleurs lues dans `--open`, `--embargoed`, `--closed`, `--unknown`), palette des sujets (`subjectColor`) (ea2657f5c)
 - [x] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; variables ajoutées : `--text-faint`, `--warning-text`, `--attention`, `--attention-light`, `--tooltip-bg` (59ee06448)
 - [x] Teintes de survol des couleurs de rôle calculées par `color-mix()` (59ee06448)
-- [x] Faire lire aux graphiques et aux statuts du pipeline leurs couleurs de rôle dans les variables (`cssColor()`) (59ee06448)
+- [x] Faire lire aux graphiques et aux statuts du pipeline leurs couleurs de rôle dans les variables (`cssVar()`) (59ee06448)
 
 ### Étape 1 — Fondations globales
 
@@ -95,12 +95,12 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ### Étape 5 — Dashboards
 
-- [ ] Rangée de chiffres clés en tête d'onglet : publications, part en open access, personnes, thèses
-- [ ] Sujets principaux en barres horizontales (15 premiers)
-- [ ] Publications par année : barres teal, axe vertical à partir de 0, année en cours distinguée (barre claire et mention « en cours »)
-- [ ] Open access en barre empilée horizontale, pourcentage d'ouvert en grand
-- [ ] Graphiques sans carte ni bordure, sous un titre de section
-- [ ] Police `--font` dans les graphiques (Chart.js, nuage de sujets)
+- [x] Rangée de chiffres clés en tête des dashboards de structure et de personne : publications, part en open access, thèses (`KeyFigures`)
+- [x] Sujets principaux en barres horizontales, 15 premiers (`SubjectBars`, à la place du nuage de mots) ; dépendance `d3-cloud` retirée
+- [x] Publications par année : barres teal, axe vertical à partir de 0, année en cours en teinte claire avec la mention « en cours » (`PublicationsByYearChart`) ; valeurs au bout des barres
+- [x] Open access des dashboards de structure et de personne en barre empilée horizontale, part d'ouvert en grand (`OaBar`) ; les dashboards de revue et d'éditeur gardent l'anneau des voies
+- [x] Graphiques sans carte ni bordure, sous un titre de section
+- [x] Police `--font` dans les graphiques : Chart.js initialisé une fois (`chart.ts`), graphe des sujets ; `cssColor()` généralisé en `cssVar()`
 
 ### Étape 6 — Page Statistiques
 
@@ -131,6 +131,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ## Questions ouvertes
 
+- Nombre de personnes dans les chiffres clés d'une structure : la réponse du dashboard ne le contient pas.
 - Police : Source Sans 3 ou Inter, à trancher après essai sur d'autres écrans. La police écartée sera supprimée de `static/fonts/` et de `app.html`.
 - Compteurs dans les onglets d'entité (« Publications 1 849 »). Sans objet pour le dashboard, sans intérêt pour les adresses et les collaborations. Pour les autres onglets, reste à choisir entre le total de l'entité et le total filtré. `TabNav` accepte déjà un compteur.
 - Mode sombre, une fois toutes les couleurs en variables.

@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart } from '#lib/components/charts/chart.js';
-	import { cssColor, oaStatusColor } from '#lib/components/charts/cssColor.js';
+	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
@@ -361,7 +361,7 @@
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (measureDef?.label ?? 'Publications'),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? dimColor(stackDim, sv, i) : cssColor('accent'),
+			backgroundColor: stackDim ? dimColor(stackDim, sv, i) : cssVar('accent'),
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));

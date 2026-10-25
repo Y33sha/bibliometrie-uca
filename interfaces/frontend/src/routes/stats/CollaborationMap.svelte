@@ -7,7 +7,7 @@
 	import iso from 'i18n-iso-countries';
 	import frLocale from 'i18n-iso-countries/langs/fr.json';
 	import { latestRequest } from '#lib/api/index.js';
-	import { cssColor } from '#lib/components/charts/cssColor.js';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import type { components } from '#lib/api/schema.js';
 
 	iso.registerLocale(frLocale);
@@ -105,7 +105,7 @@
 					color: {
 						axis: 'x',
 						interpolate: 'blues',
-						missing: cssColor('surface'),
+						missing: cssVar('surface'),
 						min: 0,
 						max: colorMax,
 						ticks: { precision: 0 },

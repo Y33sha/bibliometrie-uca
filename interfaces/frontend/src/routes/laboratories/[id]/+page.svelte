@@ -7,15 +7,17 @@
 	import { structureLabel } from '#lib/structureLabels.js';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import OaDoughnut from '#lib/components/charts/OaDoughnut.svelte';
-	import { cssColor } from '#lib/components/charts/cssColor.js';
+	import OaBar from '#lib/components/charts/OaBar.svelte';
+	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
+	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import ThesesListView from '#lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PartnersTab from './PartnersTab.svelte';
 
@@ -63,8 +65,8 @@
 	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const collabSegments = $derived([
-		{ label: 'International', value: dashCollab.international, color: cssColor('accent') },
-		{ label: 'Domestique', value: dashCollab.domestic, color: cssColor('border') }
+		{ label: 'International', value: dashCollab.international, color: cssVar('accent-mid') },
+		{ label: 'Domestique', value: dashCollab.domestic, color: cssVar('border') }
 	]);
 
 	const tutelles = $derived(parents);
@@ -212,22 +214,27 @@
 			{#if !dashboardLoaded}
 				<div class="loading">Chargement…</div>
 			{:else}
+				<KeyFigures
+					items={[
+						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
+						...(dashOa.total > 0
+							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
+							: []),
+						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses' }] : []),
+					]}
+				/>
 				<div class="dash-grid">
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectsCloud subjects={dashSubjects} />
-					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
-						<BarChart
-							labels={dashPubsByYear.map((d) => String(d.year))}
-							values={dashPubsByYear.map((d) => d.count)}
-							datasetLabel="Publications"
-						/>
+						<PublicationsByYearChart data={dashPubsByYear} />
 					</div>
 					<div class="dash-card">
-						<h3>Open Access</h3>
-						<OaDoughnut oa={dashOa} />
+						<h3>Open access</h3>
+						<OaBar oa={dashOa} />
+					</div>
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectBars subjects={dashSubjects} />
 					</div>
 					<div class="dash-card">
 						<h3>Collaborations internationales (articles)</h3>
@@ -245,7 +252,6 @@
 							labels={dashTopCountries.map((c) => c.name)}
 							values={dashTopCountries.map((c) => c.count)}
 							datasetLabel="Articles"
-							color={cssColor('warning')}
 							horizontal
 						/>
 					</div>

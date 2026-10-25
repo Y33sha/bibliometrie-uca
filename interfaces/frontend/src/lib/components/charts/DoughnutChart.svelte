@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cssColor } from '#lib/components/charts/cssColor.js';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import type { LegendItem } from 'chart.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
@@ -44,7 +44,7 @@
 	}
 
 	function colorFor(seg: DoughnutSegment, index: number): string {
-		if (isAnomaly(seg)) return cssColor('danger');
+		if (isAnomaly(seg)) return cssVar('danger');
 		return seg.color ?? PALETTE[index % PALETTE.length];
 	}
 
@@ -78,7 +78,7 @@
 									fillStyle: colors[i],
 									strokeStyle: colors[i],
 									lineWidth: 0,
-									fontColor: isAnomaly(s) ? cssColor('danger') : undefined,
+									fontColor: isAnomaly(s) ? cssVar('danger') : undefined,
 									hidden: false,
 									index: i
 								}))

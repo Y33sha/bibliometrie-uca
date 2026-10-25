@@ -6,10 +6,11 @@
 	import { api, apiDetail, auth, contributions } from '#lib/api/index.js';
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import OaDoughnut from '#lib/components/charts/OaDoughnut.svelte';
+	import OaBar from '#lib/components/charts/OaBar.svelte';
+	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
+	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
-	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -194,22 +195,27 @@
 			{#if !dashboardLoaded}
 				<div class="loading">Chargement…</div>
 			{:else}
+				<KeyFigures
+					items={[
+						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
+						...(dashOa.total > 0
+							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
+							: []),
+						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }] : []),
+					]}
+				/>
 				<div class="dash-grid">
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectsCloud subjects={dashSubjects} />
-					</div>
 					<div class="dash-card">
 						<h3>Publications par année</h3>
-						<BarChart
-							labels={dashPubsByYear.map((d) => String(d.year))}
-							values={dashPubsByYear.map((d) => d.count)}
-							datasetLabel="Publications"
-						/>
+						<PublicationsByYearChart data={dashPubsByYear} />
 					</div>
 					<div class="dash-card">
-						<h3>Open Access</h3>
-						<OaDoughnut oa={dashOa} />
+						<h3>Open access</h3>
+						<OaBar oa={dashOa} />
+					</div>
+					<div class="dash-card dash-card-wide">
+						<h3>Sujets principaux</h3>
+						<SubjectBars subjects={dashSubjects} />
 					</div>
 				</div>
 			{/if}
