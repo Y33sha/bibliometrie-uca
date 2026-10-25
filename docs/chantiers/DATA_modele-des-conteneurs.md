@@ -175,7 +175,8 @@ Usages du type dans le code :
 
 ### Phase 7 — Défauts antérieurs au chantier
 
-- [ ] Base de production : fusion manuelle des éditeurs en double (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, De Gruyter et Walter de Gruyter, AIP et AIP Publishing, variantes de SIAM, de World Scientific et de John Libbey Eurotext). Marques d'un éditeur (BioMed Central, Birkhäuser, Lippincott) : fusion ou non à trancher.
+- [x] Éditeurs en double : un éditeur que nomment les sources rejoint le titulaire Crossref de ses préfixes quand au moins 5 de ses enregistrements sources, dont 90 % chez ce titulaire, et des noms compatibles concordent ; 155 fusions sur la base locale (`1e5903a17`). Les marques et les éditeurs rachetés restent distincts (BioMed Central, Birkhäuser, Mary Ann Liebert).
+- [ ] Oneshot `merge_publisher_aliases` : 57 autres noms qui résistent à la règle (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, AIP, Optica, SPIE…), ici puis en production.
 - [x] Thèses ScanR : l'université de soutenance ne donne ni publication en série ni titre de conteneur. 1 452 enregistrements de thèses ScanR rattachés à 66 entrées, dont 60 n'ont pas d'autre usage.
 - [ ] Stock : réhydratation et renormalisation de ScanR, puis phases `publications` et `finalize`.
 - Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](DATA_preprints-et-versions.md).
