@@ -65,8 +65,10 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ### Phase 1 — Échantillon de référence
 
-- [ ] Tirage stratifié de publications : tranches de score OpenAlex, paires de domains rares (Health × Physical, Life × Social…), publications sans autre source qu'OpenAlex, revues généralistes
-- [ ] Qualification à l'œil de chaque lien domain, field et topic OpenAlex : pertinent, aberrant, limite
+- [x] Tirage stratifié de 100 publications (`sample_subject_relevance`) : revues généralistes, publications sans domaine HAL ni discipline theses.fr, paires de domains rares, Health × Life, un seul domain ; 907 libellés OpenAlex. feeb8f8d1
+- [x] Préqualification par Claude, sur le titre, le résumé et la revue
+- [ ] Qualification à l'œil de chaque libellé (domain, field, subfield, topic) : pertinent, aberrant, limite
+- [ ] Accord entre la préqualification et la qualification à l'œil
 - [ ] Taux d'aberration par grain (domain, field, topic) : il dit si une piste au seul grain domain peut suffire
 
 ### Phase 2 — Classifieurs ISTEX
@@ -105,7 +107,6 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ## Questions ouvertes
 
-- **Échantillon de référence** : taille, répartition de la qualification à l'œil.
 - **Stockage des rejets.** Le booléen `rejected` confond rejet automatique et rejet manuel. Un rejet manuel accroché à `publication_id` disparaît avec la publication. Quelle forme donner aux deux ?
 - **Édition manuelle des rejets** : dans ce chantier ou dans [la gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) ?
 - **Provenance des sujets ISTEX**, si les classifieurs donnent des sujets aux publications qui n'en ont pas : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
