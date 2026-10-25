@@ -32,7 +32,7 @@
   <div class="publication-meta">
     {#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
     {#if pub.publication_year}<span class="publication-year">{pub.publication_year}</span>{/if}
-    {#if pub.doi}<a class="publication-doi" href="https://doi.org/{pub.doi}" target="_blank" rel="noopener"><span class="doi-label">DOI</span> {pub.doi}</a>{/if}
+    {#if pub.doi}<span class="publication-doi"><span class="doi-label">DOI</span> <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>{/if}
   </div>
   <h1 class="publication-title-main"><PublicationTitle titre={pub.title} /></h1>
 
@@ -122,10 +122,12 @@
     font-weight: 600;
   }
   .publication-doi {
-    color: var(--text-secondary);
     overflow-wrap: anywhere;
   }
-  .publication-doi:hover {
+  .publication-doi a {
+    color: var(--text-secondary);
+  }
+  .publication-doi a:hover {
     color: var(--accent);
   }
   .doi-label {
