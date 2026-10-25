@@ -70,6 +70,8 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Un seul style d'onglets pour `TabNav` et `HubTabs` : alignés à gauche, sans fond ni bordures latérales, onglet actif en texte foncé semi-gras souligné d'un trait de 2–3 px, filet fin sous l'ensemble
 - [x] Contenu de l'onglet directement sous les onglets, sans carte
 
+- [ ] Fil d'Ariane (« Labos › ACTé ») à la place des liens de retour. Aujourd'hui trois formes coexistent : « ← Retour » (retour dans l'historique du navigateur, affiché seulement s'il existe : fiches labo, personne, revue, éditeur, monographie), « ← Retour aux structures » et « ← Retour à la liste » (lien vers la liste : fiche structure admin, sujet), « ← Affiliations des adresses » (feedback admin)
+
 ### Étape 3 — Recherche, filtres et menus
 
 - [x] Zone recherche et filtres sans carte
