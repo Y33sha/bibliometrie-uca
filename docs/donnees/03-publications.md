@@ -59,7 +59,7 @@ Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décision
 Trois tables alimentées par la phase `subjects` du pipeline :
 
 - **`subjects`** : référentiel des sujets/mots-clés indexés.
-- **`publication_subjects`** : table de liaison publication ↔ sujet (avec score / source).
+- **`publication_subjects`** : table de liaison publication ↔ sujet, avec la source du lien.
 - **`subject_cooccurrences`** : matrice de co-occurrences entre sujets, alimentée à partir de `publication_subjects`.
 
 ## Propriété des tables
