@@ -23,7 +23,7 @@ from application.ports.read_models.serials_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
-from application.services.serials import core as serials_service
+from application.services import serials as serials_service
 from domain.merge import MergedEntity
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,

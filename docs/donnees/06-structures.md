@@ -60,10 +60,10 @@ Légende :
 
 | Table | Auteur | Écrit par |
 |---|---|---|
-| `structures` | admin | `application/services/structures/core.py` |
-| `structure_parents` | admin | `application/services/structures/core.py` |
-| `structure_name_forms` | admin | `application/services/structures/core.py` |
-| `perimeters` | admin | `application/services/perimeters/core.py` |
+| `structures` | admin | `application/services/structures.py` |
+| `structure_parents` | admin | `application/services/structures.py` |
+| `structure_name_forms` | admin | `application/services/structures.py` |
+| `perimeters` | admin | `application/services/perimeters.py` |
 | `perimeter_structures` | pipeline | `refresh_perimeter_structures`, jamais saisie |
 | `addresses` | pipeline | créées par `normalize` (`pipeline/ingestion/common/source_contributions.py`) ; `countries` composé par la phase `countries` |
 | `address_country_candidates` | mixte | pays trouvés par le pipeline (phases `normalize` et `countries`) ; candidats `manual` saisis en admin (`addresses/commands.py`) |

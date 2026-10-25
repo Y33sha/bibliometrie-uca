@@ -26,7 +26,7 @@ from application.ports.repositories.structure_repository import (
     StructureRepository,
     StructureUpdate,
 )
-from application.services.structures import core as structures_service
+from application.services import structures as structures_service
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
 from interfaces.api.deps import (

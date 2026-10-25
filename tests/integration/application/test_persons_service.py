@@ -9,7 +9,7 @@ from application.services.contributions.assign_orphans import (
     assign_orphan_contribution,
     batch_assign_orphan_contributions,
 )
-from application.services.persons.core import (
+from application.services.persons import (
     add_identifier,
     detach_contributions,
     mark_distinct,

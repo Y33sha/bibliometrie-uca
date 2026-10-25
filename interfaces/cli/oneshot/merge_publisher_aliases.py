@@ -15,7 +15,7 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
-from application.services.publishers import core as publishers_service
+from application.services import publishers as publishers_service
 from domain.errors import ConflictError
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger

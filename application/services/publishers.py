@@ -16,7 +16,7 @@ from application.ports.repositories.publisher_repository import (
 )
 from application.ports.repositories.serial_repository import SerialRepository
 from application.services._merge import load_merge_pair
-from application.services.serials.core import merge_serials
+from application.services.serials import merge_serials
 from domain.errors import (
     ConflictError,
     NotFoundError,

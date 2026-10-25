@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
 from application.ports.repositories.config_repository import ConfigRepository
-from application.services.config import core as config_service
+from application.services import config as config_service
 from interfaces.api.deps import (
     admin_user_or_none,
     config_queries,

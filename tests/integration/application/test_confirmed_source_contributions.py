@@ -5,7 +5,7 @@ from sqlalchemy import text
 
 from application.services.contributions.assign_orphans import assign_orphan_contribution
 from application.services.contributions.core import reject_pair
-from application.services.persons.core import update_name_form_status
+from application.services.persons import update_name_form_status
 from domain.errors import PersonAlreadyInPublicationError
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository, person_repository

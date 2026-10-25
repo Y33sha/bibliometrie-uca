@@ -1,8 +1,8 @@
-"""Tests de caractérisation pour application/services/config/core.py."""
+"""Tests de caractérisation pour application/services/config.py."""
 
 import pytest
 
-from application.services.config.core import update_config_value
+from application.services.config import update_config_value
 from domain.errors import NotFoundError
 from infrastructure.repositories import config_repository
 from tests.integration.helpers.config import set_config

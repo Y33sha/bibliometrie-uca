@@ -12,7 +12,7 @@ from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
     PerimeterUpdate,
 )
-from application.services.perimeters import core as perimeters_service
+from application.services import perimeters as perimeters_service
 from interfaces.api.deps import (
     DbConn,
     config_queries,

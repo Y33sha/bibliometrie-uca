@@ -22,7 +22,7 @@ from application.ports.repositories.publisher_repository import (
     PublisherUpdate,
 )
 from application.ports.repositories.serial_repository import SerialRepository
-from application.services.publishers import core as publishers_service
+from application.services import publishers as publishers_service
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (

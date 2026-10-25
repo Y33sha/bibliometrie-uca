@@ -1,6 +1,6 @@
 """Router des personnes : annuaire, profil, files de triage et gestes de curation. Sert `/api/persons/*`.
 
-Les lectures passent par le port `PersonsQueries`, les écritures par le service `application.services.persons.core`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
+Les lectures passent par le port `PersonsQueries`, les écritures par le service `application.services.persons`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
 
 L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
@@ -30,7 +30,7 @@ from application.ports.read_models.persons_queries import (
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
-from application.services.persons import core as persons_service
+from application.services import persons as persons_service
 from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion

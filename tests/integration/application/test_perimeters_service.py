@@ -1,10 +1,10 @@
-"""Tests de caractérisation pour application/services/perimeters/core.py et l'hydratation du PerimeterRepository."""
+"""Tests de caractérisation pour application/services/perimeters.py et l'hydratation du PerimeterRepository."""
 
 import pytest
 from sqlalchemy import text
 
 from application.ports.repositories.perimeter_repository import PerimeterUpdate
-from application.services.perimeters.core import (
+from application.services.perimeters import (
     create_perimeter,
     delete_perimeter,
     update_perimeter,

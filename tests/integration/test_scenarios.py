@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.exc import IntegrityError
 
-from application.services.persons.core import merge_person
+from application.services.persons import merge_person
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository

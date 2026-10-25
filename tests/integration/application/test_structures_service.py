@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/services/structures/core.py.
+"""Tests de caractérisation pour application/services/structures.py.
 
 Couvre create/update/delete sur structures, structure_parents,
 structure_name_forms.
@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import text
 
 from application.ports.repositories.structure_repository import NameFormUpdate, StructureUpdate
-from application.services.structures.core import (
+from application.services.structures import (
     create_name_form,
     create_structure,
     create_tutelle,

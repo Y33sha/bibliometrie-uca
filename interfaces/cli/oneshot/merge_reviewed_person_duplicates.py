@@ -19,7 +19,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from application.services.persons import core as persons_service
+from application.services import persons as persons_service
 from domain.errors import ConflictError
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger

@@ -1,6 +1,6 @@
 """Service des publications en série — écritures sur l'agrégat Serial.
 
-Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `serials.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
+Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers.py` ; les deux agrégats restent liés par `serials.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 
 Le `serial_type` d'une revue alimente des règles de correction du `doc_type` de ses publications. Après une édition ou une fusion, le pipeline rejoue ces corrections (`SerialRecompute`).
 """

@@ -8,11 +8,11 @@ from sqlalchemy import text
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.ports.repositories.serial_repository import SerialIssnInput, SerialUpdate
-from application.services.publishers.core import (
+from application.services.publishers import (
     merge_publishers,
     update_publisher,
 )
-from application.services.serials.core import (
+from application.services.serials import (
     merge_serials,
     requalify_publications_for_serial,
     update_serial,

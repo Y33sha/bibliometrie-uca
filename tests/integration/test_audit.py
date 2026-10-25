@@ -157,7 +157,7 @@ class TestEndToEndServiceIntegration:
         return sa_sync_conn_owner
 
     def test_set_exclusion_emits_event(self, sa_sync_conn):
-        from application.services.persons.core import set_exclusion
+        from application.services.persons import set_exclusion
         from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
@@ -179,7 +179,7 @@ class TestEndToEndServiceIntegration:
 
     def test_set_exclusion_without_context_no_event(self, sa_sync_conn):
         """Hors requête d'administration (pipeline, script), rien n'est consigné, même quand un service écrit."""
-        from application.services.persons.core import set_exclusion
+        from application.services.persons import set_exclusion
         from domain.persons.person import PersonExclusion
         from infrastructure.repositories import person_repository
 
@@ -196,7 +196,7 @@ class TestEndToEndServiceIntegration:
 
     def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
         """`mark_distinct` est idempotent : un appel sur une paire déjà marquée n'émet pas d'événement supplémentaire."""
-        from application.services.persons.core import mark_distinct
+        from application.services.persons import mark_distinct
         from infrastructure.repositories import person_repository
 
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
@@ -213,7 +213,7 @@ class TestEndToEndServiceIntegration:
         assert n == 1
 
     def test_merge_person_emits_event(self, sa_sync_conn):
-        from application.services.persons.core import merge_person
+        from application.services.persons import merge_person
         from infrastructure.repositories import person_repository
 
         target = _person(sa_sync_conn, last_name="A")
@@ -230,7 +230,7 @@ class TestEndToEndServiceIntegration:
     @pytest.mark.parametrize("status", ["confirmed", "rejected"])
     def test_name_form_status_emits_event(self, sa_sync_conn, status):
         """La confirmation comme le rejet d'une forme (action « détacher l'intrus ») émettent l'événement."""
-        from application.services.persons.core import update_name_form_status
+        from application.services.persons import update_name_form_status
         from infrastructure.repositories import contribution_repository, person_repository
 
         person_id = _person(sa_sync_conn)
@@ -275,7 +275,7 @@ class TestEndToEndServiceIntegration:
 
     def test_serial_type_preview_emits_nothing(self, sa_sync_conn):
         """L'aperçu d'un changement de type annule son écriture : aucun événement n'en reste."""
-        from application.services.serials.core import preview_type_change_impact
+        from application.services.serials import preview_type_change_impact
         from domain.serials.serial import SerialType
         from infrastructure.repositories import serial_repository
         from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
