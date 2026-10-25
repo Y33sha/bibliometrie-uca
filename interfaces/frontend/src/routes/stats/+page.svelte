@@ -96,15 +96,8 @@
 	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
 	const facetKeys = $derived.by(() => {
 		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
-		// La carte des collaborations ne groupe sur rien : toutes les facettes filtrables restent offertes.
-		const grouped = isCollab ? new Set<string>() : new Set([primaryBy, groupBy].filter(Boolean));
-		const out = new Set<string>();
-		for (const d of pivotSchema.dimensions) {
-			if (!d.filterable) continue;
-			if (grouped.has(d.key) && !d.ordinal) continue;
-			out.add(d.key);
-		}
-		return out;
+		// Une facette reste offerte même quand le graphique compare sur sa dimension : elle restreint alors les valeurs comparées.
+		return new Set(pivotSchema.dimensions.filter((d) => d.filterable).map((d) => d.key));
 	});
 
 	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
@@ -184,24 +177,15 @@
 	function onPrimaryChange() {
 		// Le groupement primaire ne peut pas être aussi la comparaison.
 		if (groupBy === primaryBy) groupBy = '';
-		onAxisChange(primaryBy);
+		onAxisChange();
 	}
 	function onGroupByChange() {
-		onAxisChange(groupBy);
+		onAxisChange();
 	}
-	function onAxisChange(dim: string) {
+	function onAxisChange() {
 		chartPage = 1; // changer d'axe repart de la première page
-		// Comparer/grouper par une dimension filtrable efface son filtre actif (sinon il resterait, caché).
-		let cleared = false;
-		if (dim === 'oa_voie' && selectedOa.length > 0) { selectedOa = []; cleared = true; }
-		if (dim === 'license' && selectedLicenses.length > 0) { selectedLicenses = []; cleared = true; }
-		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
-		if (dim === 'publisher' && selectedPublisherId) { selectedPublisherId = null; cleared = true; }
-		if (dim === 'serial' && selectedSerialId) { selectedSerialId = null; cleared = true; }
-		if (dim === 'partner' && selectedPartnerRor) { selectedPartnerRor = null; cleared = true; }
 		syncUrl();
-		if (cleared) refresh();
-		else loadChart();
+		loadChart();
 	}
 
 	// --- Filter params (partagés par le graphe et les facettes) ---
