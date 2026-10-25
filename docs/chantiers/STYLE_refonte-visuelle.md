@@ -85,7 +85,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Factoriser : tableaux de liste sur `.data-table`, files de triage des revues sur `.triage-table`, colonnes triables et numériques dans `shared.css`, lien de titre `.publication-title` ; restent à part les tableaux de mise en page propre (run du pipeline, comparaison des sources, ISSN, blocages d'éditeurs)
 - [x] En-têtes de colonnes sans fond, 11–12 px, gris, petites capitales
 - [x] Tableaux sans cadre ; séparateurs de lignes très pâles, fond au survol de la ligne
-- [x] Liens des tableaux en couleur de texte principale, couleur d'accent au survol (`.entity-link`, `.publication-title`, liens sans classe)
+- [x] Liens des tableaux en couleur d'accent, soulignés au survol ; titre ou nom principal en semi-gras (`.entity-link`, `.publication-title`)
 - [x] Colonnes numériques alignées à droite
 - [ ] Pastilles réservées aux valeurs à code couleur (type de document, mode de correspondance)
 - [ ] Boutons d'action par ligne en icônes sans bordure, visibles au survol de la ligne
