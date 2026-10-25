@@ -92,7 +92,7 @@ Usages du type dans le code :
 
 ### Points des autres fiches que le modèle conditionne
 
-- [Conférences et actes](../DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
+- [Conférences et actes](2026-10-25_DATA_conferences-et-actes.md) : noms d'archive dans `container_title`, retypage des séries d'actes typées `journal` ou `book_series`.
 - [Revues divergentes selon les sources](2026-10-25_DATA_revues-divergentes-entre-sources.md) : couples d'une revue et d'un dépôt ou d'un serveur de preprints ; correction de la revue d'après Crossref, qui remplacerait une localisation par une revue.
 - [Monographies](../DATA_monographies.md) : conversion d'une entrée de `journals` en monographie dans l'administration, documentation.
 

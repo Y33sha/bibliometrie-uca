@@ -13,7 +13,6 @@
 ### Non commencé
 
 - [Collaborations entre structures](DATA_collaborations-structures.md)
-- [Conférences et actes](DATA_conferences-et-actes.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Monographies](DATA_monographies.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
@@ -24,6 +23,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-25 — [Conférences et actes](archived/2026-10-25_DATA_conferences-et-actes.md)
 - 2026-10-25 — [Revues divergentes selon les sources](archived/2026-10-25_DATA_revues-divergentes-entre-sources.md)
 - 2026-10-25 — [Modèle des conteneurs](archived/2026-10-25_DATA_modele-des-conteneurs.md)
 - 2026-10-24 — [Résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md)
