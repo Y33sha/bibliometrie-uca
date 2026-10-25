@@ -471,7 +471,7 @@
 					intersect: true
 				},
 				scales: {
-					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 30 ? l.slice(0, 30) + '…' : l; } } },
+					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 45 ? l.slice(0, 45) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
 						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
 						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
@@ -734,21 +734,23 @@
 	.sort-dir:hover {
 		background: var(--hover);
 	}
+	/* Légende au-dessus du graphique, alignée à gauche ; la place à droite revient à l'export. */
 	.legend {
 		display: flex;
-		gap: 12px;
-		justify-content: center;
+		flex-wrap: wrap;
+		gap: 6px 18px;
 		margin-bottom: 8px;
-		font-size: 0.8rem;
-		color: var(--muted);
+		padding-right: 120px;
+		font-size: 0.85rem;
+		color: var(--text-secondary);
 	}
 	.legend-dot {
 		display: inline-block;
 		width: 10px;
 		height: 10px;
-		border-radius: var(--radius);
-		margin-right: 3px;
-		vertical-align: middle;
+		border-radius: 3px;
+		margin-right: 6px;
+		vertical-align: -1px;
 	}
 
 	/* Colonne pleine hauteur : barres d'outils, légende et pagination gardent leur hauteur naturelle, le diagramme occupe l'espace restant du viewport. Hauteur = viewport moins l'en-tête fixe et le padding vertical du conteneur. */
@@ -759,10 +761,7 @@
 	}
 
 	.chart-area {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 16px;
+		padding-top: 40px;
 		margin-bottom: 16px;
 		position: relative;
 		flex: 1 1 auto;
@@ -770,17 +769,8 @@
 	}
 	.chart-export {
 		position: absolute;
-		top: 8px;
-		right: 8px;
-		background: var(--card);
-		opacity: 0;
-		transition: opacity 0.15s;
-	}
-	.chart-area:hover .chart-export {
-		opacity: 1;
-	}
-	.chart-export:hover {
-		background: var(--hover);
+		top: 0;
+		right: 0;
 	}
 
 </style>

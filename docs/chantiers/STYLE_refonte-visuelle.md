@@ -104,11 +104,11 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ### Étape 6 — Page Statistiques
 
-- [ ] Réglages du graphique (indicateur, mesure, comparer par, part, tri) sur une ligne, filtres sur une autre
-- [ ] Graphique sans cadre ; « Export PNG » discret en haut à droite
-- [ ] Légende alignée à gauche au-dessus du graphique
-- [ ] Colonne de libellés plus large, libellé complet au survol
-- [ ] Carte des collaborations : dégradé teal au lieu de bleu
+- [x] Réglages du graphique (indicateur, mesure, comparer par, part, tri) sur une ligne, filtres sur une autre
+- [x] Graphique sans cadre ; « Export PNG » discret en haut à droite, toujours visible
+- [x] Légende alignée à gauche au-dessus du graphique
+- [x] Libellés tronqués à 45 caractères au lieu de 30, libellé complet au survol
+- [x] Carte des collaborations : dégradé teal au lieu de bleu
 
 ### Étape 7 — Pages d'administration
 

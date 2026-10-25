@@ -104,7 +104,7 @@
 					projection: { axis: 'x', projection: 'naturalEarth1' },
 					color: {
 						axis: 'x',
-						interpolate: 'blues',
+						interpolate: tealScale(),
 						missing: cssVar('surface'),
 						min: 0,
 						max: colorMax,
@@ -126,6 +126,14 @@
 			}
 		};
 	});
+
+	/** Dégradé du teal clair (`--accent-light`) au teal foncé (`--accent`), pour l'échelle de couleur de la carte. */
+	function tealScale(): (t: number) => string {
+		const hex = (name: string) => cssVar(name).replace('#', '');
+		const rgb = (h: string) => [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16));
+		const [from, to] = [rgb(hex('accent-light')), rgb(hex('accent'))];
+		return (t) => `rgb(${from.map((c, k) => Math.round(c + (to[k] - c) * t)).join(', ')})`;
+	}
 </script>
 
 <div class="collab-map">
