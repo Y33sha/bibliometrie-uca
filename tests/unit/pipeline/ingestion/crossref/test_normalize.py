@@ -11,6 +11,8 @@ from unittest.mock import MagicMock
 
 from domain.journals.issns import IssnSupport, JournalIssn
 from domain.persons.contributor_name import ContributorName
+from domain.publications.licenses import License
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.crossref.normalize import (
     CrossrefNormalizer,
@@ -28,12 +30,32 @@ from pipeline.ingestion.crossref.normalize import (
     get_issns,
     get_keywords,
     get_language,
+    get_locations,
     get_publication_year,
     get_publisher_name,
     get_title,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import staging_row
+
+
+class TestGetLocations:
+    def test_page_de_resolution_du_doi_avec_la_licence_de_la_version_editeur(self):
+        msg = {
+            "resource": {"primary": {"URL": "https://linkinghub.elsevier.com/retrieve/pii/X"}},
+            "license": [
+                {"URL": "https://creativecommons.org/licenses/by/4.0/", "content-version": "vor"}
+            ],
+            "link": [{"URL": "https://api.elsevier.com/content/article/PII:X"}],
+        }
+        assert get_locations(msg) == [
+            LocationFacts(
+                url="https://linkinghub.elsevier.com/retrieve/pii/X", license=License.CC_BY
+            )
+        ]
+
+    def test_sans_page_de_resolution(self):
+        assert get_locations({"link": [{"URL": "https://api.wiley.com/x"}]}) == []
 
 
 class TestGetDoi:

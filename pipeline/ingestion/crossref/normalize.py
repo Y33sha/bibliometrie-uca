@@ -21,6 +21,7 @@ from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs, as_text
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
@@ -295,6 +296,12 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"author": msg.get("author")}
 
 
+def get_locations(msg: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """Page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte, pas à des copies consultables."""
+    url = as_str(as_mapping(as_mapping(msg.get("resource")).get("primary")).get("URL"))
+    return [LocationFacts(url=url, license=crossref_license(msg.get("license")))] if url else []
+
+
 def crossref_source_record(
     msg: Mapping[str, JsonValue], staging_id: int, containers: Containers
 ) -> SourceRecordUpsert:
@@ -344,6 +351,9 @@ class CrossrefNormalizer(SourceNormalizer):
 
     def container_facts(self, doc: Document) -> ContainerDescription:
         return get_container_facts(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return get_locations(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
