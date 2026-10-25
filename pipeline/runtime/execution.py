@@ -14,7 +14,7 @@ from infrastructure import PROJECT_ROOT
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.transaction import managed_transaction
 from infrastructure.observability.log import setup_logger
-from pipeline.runtime.context import CredentialsMissing, PhaseContext, RunOptions
+from pipeline.runtime.context import CredentialsMissing, PhaseContext, RequestBudget, RunOptions
 
 if TYPE_CHECKING:
     from sqlalchemy import Connection
@@ -36,12 +36,18 @@ def maintain(operation: str) -> None:
         conn.execute(text(operation))
 
 
-def phase_context(options: RunOptions, *, credentials_missing: CredentialsMissing) -> PhaseContext:
-    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run, maintenance des tables, contrôle des identifiants d'accès."""
+def phase_context(
+    options: RunOptions,
+    *,
+    credentials_missing: CredentialsMissing,
+    request_budget: RequestBudget,
+) -> PhaseContext:
+    """Contexte d'exécution remis aux phases : transaction gérée, journal du pipeline, options du run, maintenance des tables, contrôle des identifiants d'accès et débit des sources."""
     return PhaseContext(
         open_tx=open_tx,
         logger=log,
         options=options,
         maintain=maintain,
         credentials_missing=credentials_missing,
+        request_budget=request_budget,
     )

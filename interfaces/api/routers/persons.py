@@ -247,12 +247,16 @@ def update_identifier_status(
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
-    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
 
     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
     """
     result = person_commands.update_identifier_status(
-        conn, ident_id, body.status, repo=repo, audit_repo=audit
+        conn,
+        ident_id,
+        body.status,
+        repo=repo,
+        audit_repo=audit,
     )
     return IdentifierStatusResponse(
         id=result.id, status=result.status, propagated=result.propagated
@@ -461,6 +465,7 @@ def detach_contributions(
     conn: Connection = Depends(db_conn),
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
+    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DetachContributionsResponse:
     """Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet."""
@@ -474,6 +479,7 @@ def detach_contributions(
             ],
             repo=persons,
             contribution_repo=contributions,
+            perimeter_recompute=perimeter_recompute,
             audit_repo=audit,
         )
     )
@@ -490,7 +496,7 @@ def update_name_form_status(
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    `rejected` pose un verrou durable. Les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne : le run suivant les redécide. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
     """
     row = person_commands.update_name_form_status(
         conn,

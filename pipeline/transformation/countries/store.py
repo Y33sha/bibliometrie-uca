@@ -89,26 +89,6 @@ class CountryCandidatesStore:
             ).scalar_one()
         )
 
-    def add_ror(self) -> int:
-        """Ajoute le pays de chaque organisation ROR rattachée à l'affiliation d'une adresse (candidat `ror`), et marque les adresses qui en reçoivent un. Retourne le nombre d'adresses qui reçoivent un candidat."""
-        marked = self._conn.execute(
-            text(
-                """
-                WITH added AS (
-                    INSERT INTO address_country_candidates (address_id, country_code, method)
-                    SELECT DISTINCT scr.address_id, ro.country_code, 'ror'::country_detection_method
-                    FROM source_contribution_rors scr
-                    JOIN ror_organizations ro ON ro.ror_id = scr.ror_id
-                    JOIN countries c ON c.code = ro.country_code
-                    WHERE scr.address_id IS NOT NULL
-                    ON CONFLICT DO NOTHING
-                    RETURNING address_id
-                )"""
-                + _MARK_AND_COUNT_ADDED
-            )
-        ).scalar_one()
-        return int(marked)
-
     def mark_all_for_detection(self) -> int:
         """Marque toutes les adresses : le run suivant refait la détection par le texte et la résolution sur tout le stock. Retourne le nombre d'adresses marquées."""
         return enqueue(self._conn, Queue.ADDRESS_CANDIDATES, "SELECT id FROM addresses", {})

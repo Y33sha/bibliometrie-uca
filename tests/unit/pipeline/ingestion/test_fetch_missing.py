@@ -30,7 +30,7 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
         fetch_hal_by_id=lambda _ctx: PhaseMetrics(new=2),
         fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(new=1),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
-        fetch_doi_one=lambda _ctx, source, _breaker: (
+        fetch_doi_one=lambda _ctx, source: (
             PhaseMetrics(new=5) if source == "openalex" else _non_configuree(source)
         ),
         run_parallel=_sync_run_parallel,
@@ -50,7 +50,7 @@ def test_nnt_channel_only_in_full_mode(contexte):
         fetch_hal_by_id=lambda _ctx: calls.append("id") or PhaseMetrics(),
         fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
-        fetch_doi_one=lambda _ctx, source, _breaker: PhaseMetrics(),
+        fetch_doi_one=lambda _ctx, source: PhaseMetrics(),
         run_parallel=_sync_run_parallel,
     ).run(contexte(mode="daily"))
 
@@ -71,16 +71,14 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
 
 
 def test_la_recherche_par_doi_sans_rien_a_chercher_le_dit(contexte, caplog):
-    journal = _run_doi_only(contexte, lambda _ctx, source, _breaker: PhaseMetrics(), caplog)
+    journal = _run_doi_only(contexte, lambda _ctx, source: PhaseMetrics(), caplog)
     assert f"{LAST_BRANCH}Rien à faire" in journal
 
 
 def test_une_source_qui_a_cherche_suffit_a_taire_le_rien_a_faire(contexte, caplog):
     journal = _run_doi_only(
         contexte,
-        lambda _ctx, source, _breaker: (
-            PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics()
-        ),
+        lambda _ctx, source: PhaseMetrics(seen=3) if source == "openalex" else PhaseMetrics(),
         caplog,
     )
     assert "Rien à faire" not in journal
@@ -92,10 +90,29 @@ def test_une_source_indisponible_n_est_pas_un_rien_a_faire(contexte, caplog):
     )
     journal = _run_doi_only(
         contexte,
-        lambda _ctx, source, _breaker: indisponible if source == "openalex" else PhaseMetrics(),
+        lambda _ctx, source: indisponible if source == "openalex" else PhaseMetrics(),
         caplog,
     )
     assert "Rien à faire" not in journal
+
+
+def test_les_recherches_par_nnt_sans_rien_a_chercher_ferment_leur_section_une_fois(
+    contexte, caplog
+):
+    """Les recherches par NNT dans HAL et dans theses.fr partagent une section : une seule ligne « Rien à faire » la ferme."""
+    with caplog.at_level(logging.INFO, logger="test"):
+        FetchMissingPhase(
+            fetch_hal_by_id=lambda _ctx: PhaseMetrics(seen=2),
+            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
+            run_parallel=_sync_run_parallel,
+        ).run(contexte(mode="full", sources={"hal", "theses"}))
+
+    messages = caplog.messages
+    section = messages.index("▶ Recherche par NNT des thèses trouvées ailleurs")
+    assert messages[section + 1] == f"{LAST_BRANCH}Rien à faire"
+    assert messages.count(f"{LAST_BRANCH}Rien à faire") == 1
 
 
 def test_theses_channel_suit_le_filtre_des_sources(contexte):
@@ -106,7 +123,7 @@ def test_theses_channel_suit_le_filtre_des_sources(contexte):
             fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: calls.append("theses") or PhaseMetrics(),
-            fetch_doi_one=lambda _ctx, source, _breaker: PhaseMetrics(),
+            fetch_doi_one=lambda _ctx, source: PhaseMetrics(),
             run_parallel=_sync_run_parallel,
         )
 
@@ -123,7 +140,7 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
         fetch_hal_by_id=lambda _ctx: calls.append("id") or PhaseMetrics(),
         fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
-        fetch_doi_one=lambda _ctx, source, _breaker: PhaseMetrics(new=3),
+        fetch_doi_one=lambda _ctx, source: PhaseMetrics(new=3),
         run_parallel=_sync_run_parallel,
     ).run(contexte(mode="full", sources={"openalex"}))  # pas de hal → canaux HAL sautés
 

@@ -35,7 +35,7 @@ def test_sans_valeur_rien():
     assert compact_biblio(volume="", publisher=None) is None
 
 
-def test_revue_regroupee_sous_journal():
+def test_revue_regroupee_sous_serial():
     assert compact_biblio(volume="12", publisher="Elsevier", journal_issn="1234-5678") == {
         "volume": "12",
         "publisher": "Elsevier",

@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — recalcule la nature des monographies, volume d'actes ou livre.
+"""Sous-étape de la phase `publishing` — recalcule la nature des monographies, volume d'actes ou livre.
 
 La nature se recalcule à chaque run d'après les enregistrements, la collection et le titre de la monographie (`is_proceedings_volume`) : elle suit les enregistrements quand ils changent, dans un sens comme dans l'autre. La sous-étape suit le typage des collections, dont elle lit le type.
 """
@@ -28,7 +28,7 @@ class MonographProceedingsFacts(NamedTuple):
 
 
 _PROCEEDINGS_FACTS = text(f"""
-    SELECT m.id, m.title, m.proceedings, j.journal_type::text AS collection_type,
+    SELECT m.id, m.title, m.proceedings, j.serial_type::text AS collection_type,
            coalesce(
                array_agg(sr.source::text ORDER BY sr.id) FILTER (WHERE sr.id IS NOT NULL), '{{}}'
            ) AS sources,
@@ -43,9 +43,9 @@ _PROCEEDINGS_FACTS = text(f"""
                '{{}}'
            ) AS declares
     FROM monographs m
-    LEFT JOIN journals j ON j.id = m.journal_id
+    LEFT JOIN serials j ON j.id = m.serial_id
     LEFT JOIN source_records sr ON sr.monograph_id = m.id
-    GROUP BY m.id, j.journal_type
+    GROUP BY m.id, j.serial_type
     ORDER BY m.id
 """)
 

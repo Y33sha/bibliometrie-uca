@@ -37,7 +37,8 @@ from infrastructure.observability.log import (
     set_log_phase,
 )
 from infrastructure.observability.phase_executions import PhaseExecutionRecorder, start_run
-from pipeline.graph import EXTRA_PHASES, PHASE_LABELS, PHASE_ORDER
+from pipeline.graph import EXTRA_PHASES, HARVESTING_PHASES, PHASE_LABELS, PHASE_ORDER
+from pipeline.ingestion.api_params import request_budget
 from pipeline.ingestion.common import (
     fetch_missing,
     fetch_stale,
@@ -57,14 +58,14 @@ from pipeline.runtime.observability.log_format import quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import set_bar_stream, write_above_bars
 from pipeline.runtime.observability.signals import select_targets
+from pipeline.transformation import finalize
 from pipeline.transformation.countries import countries
 from pipeline.transformation.persons import persons
 from pipeline.transformation.publications import oa_status, publications, relations
 from pipeline.transformation.publications.author_grouping import author_grouping
-from pipeline.transformation.publications.contributions import contributions
 from pipeline.transformation.publications.correction import metadata_correction
 from pipeline.transformation.publications.subjects import subjects
-from pipeline.transformation.publishing import publishers_journals, resolve_ra
+from pipeline.transformation.publishing import publishing, resolve_ra
 from pipeline.transformation.structures import affiliations
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
@@ -90,13 +91,13 @@ _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
     "fetch_truncated": fetch_truncated.build,
     "normalize": normalize.build,
     "affiliations": affiliations.build,
-    "publishers_journals": publishers_journals.build,
+    "publishing": publishing.build,
     "metadata_correction": metadata_correction.build,
     "publications": publications.build,
     "author_grouping": author_grouping.build,
     "relations": relations.build,
     "persons": persons.build,
-    "contributions": contributions.build,
+    "finalize": finalize.build,
     "countries": countries.build,
     "subjects": subjects.build,
     "oa_status": oa_status.build,
@@ -417,7 +418,9 @@ def _run_one_phase(
         try:
             result = build().run(
                 phase_context(
-                    _run_options(args, sources), credentials_missing=source_credentials_missing
+                    _run_options(args, sources),
+                    credentials_missing=source_credentials_missing,
+                    request_budget=request_budget,
                 )
             )
         except (KeyboardInterrupt, Exception) as e:
@@ -453,6 +456,9 @@ def _run_one_phase(
 
         duration = time.time() - t0_phase
         metrics = result if isinstance(result, PhaseMetrics) else PhaseMetrics()
+        if name in HARVESTING_PHASES:
+            log.info("")
+            log.info("Total : %s", metrics.as_summary())
         recorder.record(
             phase=name,
             started_at=phase_started_at,

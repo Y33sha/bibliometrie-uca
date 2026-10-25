@@ -4,12 +4,11 @@
 - `fetch_missing_hal_by_nnt` (tâche `fetch_missing.hal_by_nnt`) : NNT de thèses soutenues sans document HAL ; requête Solr `nntId_s`. Réservé au mode `full`.
 - `HalDoiSearch` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
 
-Les deux premières tournent sur un pool de `HAL_MAX_CONCURRENT` workers, avec des écritures séquentielles et un commit tous les `_COMMIT_EVERY` identifiants.
+Les deux premières passent par la boucle commune (`pipeline.ingestion.common.lookup`), sur `HAL_MAX_CONCURRENT` workers.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 
@@ -19,27 +18,18 @@ from sqlalchemy import Connection, text
 from domain.source_records.external_ids import ExternalIdType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
-from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import LookupOutcome, NotFound, Unavailable
-from pipeline.ingestion.api_params import HAL_DELAY
-from pipeline.ingestion.common.doi_search import DoiBatchResult
+from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
-    forget_failed_doi_lookups,
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.lookup import LookupBatch, LookupChannel, look_up, one_at_a_time
 from pipeline.ingestion.hal.api import search_one
-from pipeline.ingestion.hal.fields import extract_doi, extract_id
-from pipeline.runtime.observability.log_format import LAST_BRANCH, nothing_to_do
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progress import track_progress
 
-# HAL ne publie pas de seuil officiel : 5 workers et une pause de HAL_DELAY par worker donnent ~6-7 req/s, sans rafale.
+# Requêtes simultanées à HAL ; le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
 HAL_MAX_CONCURRENT = 5
-
-_COMMIT_EVERY = 50
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(
     source_sql="'hal'", id_type="hal_id", value_sql="h.hal_id"
@@ -107,19 +97,6 @@ def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
     return list(conn.execute(_MISSING_NNTS_SQL, {"retry_after_days": retry_after_days}).scalars())
 
 
-def _stage(conn: Connection, doc: Mapping[str, JsonValue]) -> bool:
-    """Écrit un document HAL dans `staging`. Rend `True` sur une insertion."""
-    inserted, _ = upsert_staging(
-        conn,
-        source="hal",
-        source_id=extract_id(doc),
-        doi=extract_doi(doc),
-        raw_data=doc,
-        entry_mode=StagingEntryMode.FETCH_MISSING_HAL,
-    )
-    return inserted
-
-
 async def _fetch_ids(
     conn: Connection,
     log: logging.Logger,
@@ -130,47 +107,26 @@ async def _fetch_ids(
     ],
     id_type: LookupIdType,
 ) -> PhaseMetrics:
-    """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`.
+    """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`. Un identifiant introuvable est inscrit dans `failed_lookups`.
 
-    Un identifiant introuvable est inscrit dans `failed_lookups`. HAL indisponible laisse l'identifiant de côté, sans comptage : il reste dans la sélection du run suivant.
-
-    `total` = identifiants à chercher, `new` = documents insérés, `extras["not_found"]` = identifiants introuvables.
+    Compteurs de `look_up`, et `extras["not_found"]` = identifiants introuvables.
     """
-    metrics = PhaseMetrics(seen=len(ids))
-    if not ids:
-        nothing_to_do(log)
-        return metrics
-
-    async def _fetch(
-        client: httpx2.AsyncClient, identifier: str
-    ) -> LookupOutcome[Mapping[str, JsonValue]]:
-        fetched = await fetch_one(client, identifier)
-        await asyncio.sleep(HAL_DELAY)
-        return fetched
-
-    with track_progress(len(ids), f"{LAST_BRANCH}HAL", log, count_kept=True) as progress:
-
-        def _write(
-            conn: Connection, identifier: str, result: LookupOutcome[Mapping[str, JsonValue]]
-        ) -> None:
-            if isinstance(result, NotFound):
-                record_failed_lookup(conn, "hal", id_type, identifier)
-                metrics.add(not_found=1)
-            elif not isinstance(result, Unavailable) and extract_id(result):
-                if _stage(conn, result):
-                    metrics.add(new=1)
-                    progress.keep()
-            progress.advance()
-
-        await run_fetch_pool(
-            ids,
-            conn,
+    return await look_up(
+        conn,
+        log,
+        LookupChannel(
+            source="hal",
+            fetch=one_at_a_time(fetch_one),
+            on_absent=lambda conn, identifier: record_failed_lookup(
+                conn, "hal", id_type, identifier
+            ),
+            stage=lambda staging, doc: staging.stage(
+                "hal", doc, entry_mode=StagingEntryMode.FETCH_MISSING_HAL
+            ),
             max_concurrent=HAL_MAX_CONCURRENT,
-            commit_every=_COMMIT_EVERY,
-            fetch=_fetch,
-            write=_write,
-        )
-    return metrics
+        ),
+        ids,
+    )
 
 
 async def fetch_missing_hal_by_id(
@@ -208,27 +164,14 @@ class HalDoiSearch:
     batch_size = 1
     # API Solr publique sans rate-limit documenté : 5 requêtes simultanées restent courtoises.
     max_concurrent = 5
-    request_delay_s = 0.0
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         doi = dois[0]
         outcome = await search_one(client, f'doiId_s:"{doi}"', label=f"DOI {doi}")
         if isinstance(outcome, NotFound):
-            return DoiBatchResult(not_found=[doi])
+            return LookupBatch(absent=[doi])
         if isinstance(outcome, Unavailable):
-            return DoiBatchResult()
-        return DoiBatchResult(records=[outcome])
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        if not extract_id(record):
-            return False
-        inserted, _ = upsert_staging(
-            conn,
-            source="hal",
-            source_id=extract_id(record),
-            doi=extract_doi(record),
-            raw_data=record,
-            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
-        )
-        forget_failed_doi_lookups(conn, "hal", [extract_doi(record)])
-        return inserted
+            return UNAVAILABLE
+        return LookupBatch(records=[outcome])

@@ -6,7 +6,7 @@ Sans identifiants, l'étape est sautée avec un signal `source_unconfigured`, av
 import logging
 from unittest.mock import AsyncMock, patch
 
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, get_current_breaker
 from pipeline.runtime.access_source import access_source
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
@@ -19,28 +19,61 @@ _LOG = logging.getLogger("test")
 
 def _access(execute, *, missing=None):
     return access_source(
-        "crossref", execute, phase="test", logger=_LOG, credentials_missing=lambda _source: missing
+        "crossref",
+        execute,
+        phase="test",
+        logger=_LOG,
+        credentials_missing=lambda _source: missing,
+        request_budget=lambda _source: None,
     )
 
 
 def test_sans_identifiants_l_etape_est_sautee():
     appels = []
 
-    metrics = _access(lambda breaker: appels.append(breaker) or PhaseMetrics(), missing="absent")
+    metrics = _access(lambda: appels.append(True) or PhaseMetrics(), missing="absent")
 
     assert appels == []
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
 
 
-def test_avec_identifiants_l_etape_recoit_le_circuit_breaker():
-    metrics = _access(lambda breaker: PhaseMetrics(new=breaker.threshold))
+def test_avec_identifiants_l_etape_tourne_sous_le_circuit_breaker_de_la_source():
+    sources = []
 
-    assert metrics.new > 0
+    def execute():
+        breaker = get_current_breaker()
+        sources.append(breaker and breaker.source)
+        return PhaseMetrics()
+
+    metrics = _access(execute)
+
+    assert sources == ["crossref"]
+    assert get_current_breaker() is None
     assert metrics.signals == []
 
 
+def test_le_rythme_suit_le_budget_de_la_source():
+    rythmes = []
+
+    def execute():
+        breaker = get_current_breaker()
+        rythmes.append(breaker and breaker.pace)
+        return PhaseMetrics()
+
+    access_source(
+        "crossref",
+        execute,
+        phase="test",
+        logger=_LOG,
+        credentials_missing=lambda _source: None,
+        request_budget=lambda source: 5 if source == "crossref" else None,
+    )
+
+    assert rythmes[0] is not None
+
+
 def test_source_indisponible_signalee():
-    def execute(breaker):
+    def execute():
         raise SourceUnavailableError("crossref")
 
     metrics = _access(execute)
@@ -49,7 +82,9 @@ def test_source_indisponible_signalee():
 
 
 def test_circuit_coupe_signale():
-    def execute(breaker):
+    def execute():
+        breaker = get_current_breaker()
+        assert breaker is not None
         for _ in range(breaker.threshold):
             breaker.record_failure()
         return PhaseMetrics()
@@ -65,7 +100,11 @@ def test_phase_oa_status_skips_without_email():
         patch(_RUN_ENRICH, new_callable=AsyncMock) as run_step,
     ):
         metrics = oa_status.build().run(
-            phase_context(RunOptions(), credentials_missing=lambda _source: "adresse absente")
+            phase_context(
+                RunOptions(),
+                credentials_missing=lambda _source: "adresse absente",
+                request_budget=lambda _source: None,
+            )
         )
 
     run_step.assert_not_called()
@@ -79,7 +118,11 @@ def test_phase_oa_status_runs_with_email():
         patch(_RUN_ENRICH, new_callable=AsyncMock, return_value=PhaseMetrics(new=4)) as run_step,
     ):
         metrics = oa_status.build().run(
-            phase_context(RunOptions(), credentials_missing=lambda _source: None)
+            phase_context(
+                RunOptions(),
+                credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
+            )
         )
 
     run_step.assert_called_once()

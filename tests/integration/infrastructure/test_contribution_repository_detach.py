@@ -1,51 +1,43 @@
-"""Les détachements du repository des contributions retirent la personne et le mode de résolution de la contribution source."""
+"""Les détachements du repository des contributions retirent la personne et le mode de résolution du groupe."""
 
-from sqlalchemy import text
-
+from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository
-from infrastructure.repositories.contribution_repository import detach_rejected_source_contributions
+from infrastructure.repositories.contribution_repository import detach_rejected_groups
+from tests.integration.helpers.groups import group_person, insert_person_group
 from tests.integration.helpers.persons import insert_person, insert_rejected_contribution
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 
-def _source_contribution(conn, publication, person, *, name="jean dupont"):
+def _group(conn, publication, person, *, mode):
+    """Groupe d'une contribution source de forme « jean dupont », rattaché à la personne `person` par le mode `mode`."""
     source_record = insert_source_record(conn, publication, source_id=f"hal-detach-{publication}")
-    return insert_source_contribution(
-        conn,
-        source_record,
-        author_name_normalized=name,
-        person_id=person,
-        resolution_mode="identifier",
+    source_contribution = insert_source_contribution(
+        conn, source_record, author_name_normalized="jean dupont"
     )
-
-
-def _link(conn, source_contribution):
-    return tuple(
-        conn.execute(
-            text("SELECT person_id, resolution_mode FROM source_contributions WHERE id = :id"),
-            {"id": source_contribution},
-        ).one()
-    )
+    return insert_person_group(conn, source_contribution, person_id=person, mode=mode)
 
 
 def test_detachement_d_une_paire_rejetee(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
     publication = insert_publication(sa_sync_conn)
-    source_contribution = _source_contribution(sa_sync_conn, publication, person)
+    group = _group(sa_sync_conn, publication, person, mode="orcid")
     insert_rejected_contribution(sa_sync_conn, publication, person_id=person)
 
-    detach_rejected_source_contributions(sa_sync_conn, person)
+    assert detach_rejected_groups(sa_sync_conn, person) == 1
 
-    assert _link(sa_sync_conn, source_contribution) == (None, None)
+    assert group_person(sa_sync_conn, group) == (None, None)
 
 
-def test_detachement_par_forme_de_nom(sa_sync_conn):
+def test_marquage_par_forme_de_nom(sa_sync_conn):
     person = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-    source_contribution = _source_contribution(
-        sa_sync_conn, insert_publication(sa_sync_conn), person
-    )
+    publication = insert_publication(sa_sync_conn)
+    by_name = _group(sa_sync_conn, publication, person, mode="name")
+    _group(sa_sync_conn, insert_publication(sa_sync_conn), person, mode="orcid")
 
-    contribution_repository(sa_sync_conn).null_person_id_for_name_form(person, "jean dupont")
+    marked = contribution_repository(sa_sync_conn).mark_groups_for_name_form(person, "jean dupont")
 
-    assert _link(sa_sync_conn, source_contribution) == (None, None)
+    assert marked == 1
+    assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {by_name}
+    assert group_person(sa_sync_conn, by_name) == (person, "name")

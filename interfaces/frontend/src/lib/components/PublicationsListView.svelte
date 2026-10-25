@@ -4,7 +4,6 @@
 	import { autofocus } from '$lib/actions/focus';
 	import { page } from '$app/stores';
 	import { base } from '$app/paths';
-	import { halDocUrl, scanrPubUrl } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
 	import EntityFilter from '$lib/components/EntityFilter.svelte';
@@ -61,7 +60,7 @@
 	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
 	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
-	// - `/journals/[id]?tab=publications` (filtre `journal_id` fixe)
+	// - `/journals/[id]?tab=publications` (filtre `serial_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
 	// - `/monographs/[id]` (filtre `monograph_id` fixe)
 	// - `/admin/publications` (un clic sur un titre ouvre le volet de l'administration)
@@ -74,7 +73,7 @@
 		halCollection?: string;
 		personId?: number;
 		personLabel?: string;
-		journalId?: number;
+		serialId?: number;
 		publisherId?: number;
 		monographId?: number;
 	}
@@ -148,7 +147,7 @@
 		{ key: 'type',       label: 'Type' },
 		{ key: 'year',       label: 'Année' },
 		{ key: 'title',      label: 'Titre',      fixed: true },
-		{ key: 'journal',    label: 'Revue' },
+		{ key: 'serial',    label: 'Revue' },
 		{ key: 'publisher',  label: 'Éditeur' },
 		// svelte-ignore state_referenced_locally
 		...(hasFixedLab ? [] : [{ key: 'labs', label: 'Labo(s)' }]),
@@ -231,14 +230,14 @@
 			showColumns: ['hal_status'],
 		},
 		{
-			key: 'journal',
+			key: 'serial',
 			control: 'entity',
 			label: 'Revue',
-			param: 'journal_id',
-			entity: 'journal',
+			param: 'serial_id',
+			entity: 'serial',
 			group: 'Revue et éditeur',
-			fixed: () => fixedId(externalFilters?.journalId),
-			showColumns: ['journal'],
+			fixed: () => fixedId(externalFilters?.serialId),
+			showColumns: ['serial'],
 		},
 		{
 			key: 'publisher',
@@ -248,7 +247,7 @@
 			entity: 'publisher',
 			group: 'Revue et éditeur',
 			fixed: () => fixedId(externalFilters?.publisherId),
-			showColumns: ['journal'],
+			showColumns: ['serial'],
 		},
 		{
 			key: 'apc',
@@ -385,8 +384,8 @@
 		// Éditeur / revue : fixés par la route ou choisis en facette.
 		const publisherId = fixedId(externalFilters?.publisherId) ?? entity.publisher.join(',');
 		if (publisherId) p.set('publisher_id', publisherId);
-		const journalId = fixedId(externalFilters?.journalId) ?? entity.journal.join(',');
-		if (journalId) p.set('journal_id', journalId);
+		const serialId = fixedId(externalFilters?.serialId) ?? entity.serial.join(',');
+		if (serialId) p.set('serial_id', serialId);
 		return base + '/stats?' + paramsToQuery(p);
 	});
 
@@ -626,7 +625,7 @@
 			<th class="sortable publication-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
 				Titre <span class="sort-arrow">{titleSortArrow}</span>
 			</th>
-			{#if col('journal')}<th class="publication-col-journal">Revue</th>{/if}
+			{#if col('serial')}<th class="publication-col-journal">Revue</th>{/if}
 			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
@@ -665,11 +664,11 @@
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					<td><a href="{base}/publications/{p.id}" class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
-					{#if col('journal')}<td class="journal-cell publication-col-journal">
-						{#if p.journal_id}
-							<a href="{base}/journals/{p.journal_id}">{p.journal}</a>
+					{#if col('serial')}<td class="journal-cell publication-col-journal">
+						{#if p.serial_id}
+							<a href="{base}/journals/{p.serial_id}">{p.serial}</a>
 						{:else}
-							{p.journal || ''}
+							{p.serial || ''}
 						{/if}
 					</td>{/if}
 					{#if col('publisher')}<td class="journal-cell publication-col-journal">
@@ -734,28 +733,28 @@
 					{/if}
 					<td class="links-cell">
 						{#if p.hal_id}
-							<a href={halDocUrl(p.hal_id, p.oa_status)} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
+							<a href={p.record_urls.hal} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 								<img src="{base}/icons/hal.ico" alt="HAL" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.openalex_id}
-							<a href="https://openalex.org/{p.openalex_id}" target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
+							<a href={p.record_urls.openalex} target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
 								<img src="{base}/icons/openalex.png" alt="OA" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.scanr_id}
-							<a href={scanrPubUrl(p.scanr_id)} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
+							<a href={p.record_urls.scanr} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
 								<img src="{base}/scanr-icon.svg" alt="ScanR" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.wos_id}
-							<a href="https://www.webofscience.com/wos/woscc/full-record/{p.wos_id}" target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
+							<a href={p.record_urls.wos} target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
 								<img src="{base}/icons/wos.ico" alt="WoS" />
 							</a>
 						{:else}

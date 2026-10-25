@@ -123,7 +123,7 @@ _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 _MARK_GROUPS_OF_UPDATED = enqueue_sql(
     Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
     """
-    SELECT gm.group_id FROM source_contribution_group_members gm
+    SELECT gm.contribution_id FROM aligned_source_contributions gm
     JOIN updated u ON u.id = gm.source_contribution_id
     WHERE u.attributes_changed
     """,

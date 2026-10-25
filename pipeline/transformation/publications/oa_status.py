@@ -1,6 +1,6 @@
 """Phase `oa_status` : verdicts d'Unpaywall sur les DOI des publications (`sources.unpaywall`), et statut open access qui en découle (`publications.oa_status`).
 
-La phase interroge Unpaywall pour les DOI jamais vérifiés ou périmés, et écrit chaque verdict. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI attend le run suivant. Le statut des publications de ces DOI se recalcule ensuite par `publication_oa_status`, à partir de leurs enregistrements sources et du verdict.
+La phase interroge Unpaywall pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et écrit chaque verdict. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI attend le run suivant. Le statut des publications de ces DOI se recalcule ensuite par `publication_oa_status`, à partir de leurs enregistrements sources et du verdict.
 
 Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse du polite pool.
 
@@ -64,12 +64,14 @@ class PublicationOaInputs(NamedTuple):
     signals: list[OaSignal]
 
 
-# DOI des publications sans verdict d'Unpaywall, ou dont le verdict date de plus de `:stale` jours.
+# DOI des publications sans verdict d'Unpaywall, ou dont le verdict date de plus de `:stale` jours. Unpaywall ignore les DOI DataCite : ils sont écartés.
 _STALE_DOIS = """
     SELECT d.doi, u.checked_at
     FROM (SELECT DISTINCT lower(doi) AS doi FROM publications WHERE doi IS NOT NULL) d
     LEFT JOIN unpaywall u ON u.doi = d.doi
-    WHERE u.doi IS NULL OR u.checked_at < now() - make_interval(days => :stale)
+    LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(d.doi, '/', 1)
+    WHERE (u.doi IS NULL OR u.checked_at < now() - make_interval(days => :stale))
+      AND dp.ra IS DISTINCT FROM 'DataCite'
 """
 
 

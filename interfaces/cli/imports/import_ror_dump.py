@@ -15,6 +15,7 @@ from pathlib import Path
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.complements.ror import fetch_ror_dump, read_ror_dump
 from pipeline.transformation.structures.ror import RorStore, import_ror_dump
@@ -49,7 +50,9 @@ def main() -> None:
     with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
         archive_path = tmp.name
     try:
-        dump = fetch_ror_dump(archive_path, user_agent=user_agent, logger=log)
+        # Le dump est déposé sur Zenodo.
+        with source_circuit_breaker("zenodo"):
+            dump = fetch_ror_dump(archive_path, user_agent=user_agent, logger=log)
         _load(archive_path, dump.name)
     finally:
         Path(archive_path).unlink(missing_ok=True)

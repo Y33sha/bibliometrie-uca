@@ -10,8 +10,10 @@ avec driver `postgresql+psycopg` (psycopg3) aligné sur
 Quand une exécution en ligne joue au moins une migration et laisse la base à la tête, les droits des rôles de l'API et du pipeline sont réappliqués (`infrastructure/db/grants.sql`), si ces rôles existent. `grants.sql` décrit le schéma de la tête.
 """
 
+from collections.abc import Collection, Mapping
 from logging.config import fileConfig
 
+from alembic.runtime.migration import MigrationContext, MigrationInfo
 from alembic.script import ScriptDirectory
 from sqlalchemy import engine_from_config, pool
 
@@ -93,7 +95,16 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
         connect_args=_CONNECT_ARGS,
     )
-    applied: list[object] = []
+    applied: list[MigrationInfo] = []
+
+    def record_applied(
+        ctx: MigrationContext,
+        step: MigrationInfo,
+        heads: Collection[object],
+        run_args: Mapping[str, object],
+    ) -> None:
+        applied.append(step)
+
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
@@ -101,7 +112,7 @@ def run_migrations_online() -> None:
             include_object=_include_object,
             include_schemas=True,
             include_name=_include_name,
-            on_version_apply=lambda **kwargs: applied.append(kwargs["step"]),
+            on_version_apply=record_applied,
         )
         with context.begin_transaction():
             context.run_migrations()

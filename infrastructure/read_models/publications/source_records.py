@@ -59,7 +59,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         language_name=r.language_name,
         language_raw=r.language_raw,
         oa_status=r.oa_status,
-        journal_id=r.journal_id,
+        serial_id=r.serial_id,
         journal_title=r.journal_title,
         journal_raw_title=_text(raw_journal, JournalKey.TITLE),
         journal_raw_issn=_text(raw_journal, JournalKey.ISSN),
@@ -80,7 +80,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
-                   {contributor_display_name()} AS full_name, sc.roles, sc.person_id,
+                   {contributor_display_name()} AS full_name, sc.roles, g.person_id,
                    sc.in_perimeter, sc.collective, sc.countries,
                    (SELECT array_agg(structure_id ORDER BY structure_id)
                     FROM ({source_contribution_structure_ids("sc")}) ids) AS structure_ids,
@@ -88,12 +88,12 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
                     FROM source_contribution_addresses sca
                     JOIN addresses addr ON addr.id = sca.address_id
                     WHERE sca.source_contribution_id = sc.id) AS raw_affiliation,
-                   gs.group_id, g.reference_position AS group_position, gs.method::text AS method,
+                   gs.contribution_id, g.reference_position AS group_position, gs.method::text AS method,
                    gs.score, gs.margin
             FROM source_records sr
             JOIN source_contributions sc ON sc.source_record_id = sr.id
-            LEFT JOIN source_contribution_group_members gs ON gs.source_contribution_id = sc.id
-            LEFT JOIN source_contribution_groups g ON g.id = gs.group_id
+            LEFT JOIN aligned_source_contributions gs ON gs.source_contribution_id = sc.id
+            LEFT JOIN contributions g ON g.id = gs.contribution_id
             WHERE sr.publication_id = :pid
             ORDER BY sc.source_record_id, sc.author_position NULLS LAST, sc.id
         """),  # noqa: S608
@@ -112,7 +112,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             structure_ids=r.structure_ids,
             raw_affiliation=r.raw_affiliation,
             countries=r.countries,
-            group_id=r.group_id,
+            contribution_id=r.contribution_id,
             group_position=r.group_position,
             method=r.method,
             score=r.score,
@@ -139,11 +139,11 @@ def get_publication_sources(
                    CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                         THEN sr.raw_language END AS language_raw,
                    sr.oa_status, sr.container_title, sr.biblio,
-                   j.id AS journal_id, j.title AS journal_title,
+                   j.id AS serial_id, j.title AS journal_title,
                    pub.id AS publisher_id, pub.name AS publisher_name
             FROM source_records sr
-            LEFT JOIN journals j ON j.id = sr.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN serials j ON j.id = sr.serial_id
+            LEFT JOIN publishers pub ON pub.id = sr.publisher_id
             LEFT JOIN languages lang ON lang.code = sr.language
             WHERE sr.publication_id = :pid
             ORDER BY sr.source, sr.source_id

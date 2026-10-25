@@ -1,17 +1,16 @@
 """Connexion à la base de test sous le propriétaire du schéma.
 
-Les tests d'intégration de l'API montent leur jeu de données au niveau du module, avant que les fixtures de pytest n'existent, et créent des lignes dans toutes les tables. Ce gestionnaire de contexte leur ouvre un curseur sous le propriétaire, en validation immédiate : ce qu'un module sème est visible du serveur d'API que le test interroge.
+Les tests d'intégration de l'API sèment leur jeu de données dans toutes les tables. Ce gestionnaire de contexte leur ouvre un curseur sous le propriétaire, en validation immédiate : ce qu'un module sème est visible du serveur d'API que le test interroge. `reset_database` remet la base dans son état d'après les migrations.
 """
 
 from __future__ import annotations
 
 import os
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from typing import Any
 
 import psycopg
-import pytest
 from psycopg.rows import dict_row
 
 _ARGS: dict[str, Any] = {
@@ -30,24 +29,39 @@ def owner_pool() -> Iterator[psycopg.Cursor[dict[str, Any]]]:
     conn = psycopg.connect(**_ARGS, row_factory=dict_row)
     conn.autocommit = True
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(row_factory=dict_row) as cur:
             yield cur
     finally:
         conn.close()
 
 
-def truncate_after_module(*tables: str, then: Sequence[str] = ()) -> Callable[[], Iterator[None]]:
-    """Fixture de module qui vide `tables` à la fin du module, puis exécute les instructions `then`.
+# Contenu posé par les migrations : le schéma `ref`, la version Alembic et les réglages par défaut de `ops.config`.
+_REFERENCE_SCHEMAS = ("ref",)
+_REFERENCE_TABLES = ("public.alembic_version", "ops.config")
 
-    Les écritures des tests d'API sont validées dans la base : le module les retire pour ne pas peser sur les suites suivantes. S'emploie au niveau du module : `_cleanup_after_module = truncate_after_module("structures")`.
-    """
+type ConfigRow = tuple[str, str, str | None]
+"""Réglage de `ops.config` : clé, valeur JSON sérialisée, description."""
 
-    @pytest.fixture(scope="module", autouse=True)
-    def _truncate() -> Iterator[None]:
-        yield
-        with owner_pool() as cur:
-            cur.execute(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE")
-            for statement in then:
-                cur.execute(statement)
 
-    return _truncate
+def config_rows() -> list[ConfigRow]:
+    """Réglages de `ops.config`."""
+    with owner_pool() as cur:
+        cur.execute("SELECT key, value::text AS value, description FROM ops.config")
+        return [(r["key"], r["value"], r["description"]) for r in cur.fetchall()]
+
+
+def reset_database(config: Sequence[ConfigRow]) -> None:
+    """Vide toutes les tables hors du contenu posé par les migrations, et remet `ops.config` à `config`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "SELECT format('%%I.%%I', schemaname, tablename) AS name FROM pg_tables "
+            "WHERE schemaname NOT IN ('pg_catalog', 'information_schema') "
+            "AND schemaname <> ALL(%s) AND schemaname || '.' || tablename <> ALL(%s)",
+            (list(_REFERENCE_SCHEMAS), list(_REFERENCE_TABLES)),
+        )
+        tables = [r["name"] for r in cur.fetchall()]
+        cur.execute(f"TRUNCATE TABLE {', '.join(tables)} RESTART IDENTITY CASCADE")
+        cur.execute("DELETE FROM ops.config")
+        cur.executemany(
+            "INSERT INTO ops.config (key, value, description) VALUES (%s, %s::jsonb, %s)", config
+        )

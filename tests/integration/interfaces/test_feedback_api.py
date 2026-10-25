@@ -6,7 +6,6 @@ Couvre :
 - /api/feedback/false-positives : idem
 """
 
-from tests.integration.helpers.db import truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_address,
     seed_address_structure,
@@ -14,11 +13,6 @@ from tests.integration.helpers.seeds import (
     seed_structure_name_form,
     uniq,
 )
-
-_cleanup_after_module = truncate_after_module(
-    "address_structures", "addresses", "structure_name_forms", "structures", "audit_log"
-)
-
 
 # ── /api/feedback/stats ───────────────────────────────────
 

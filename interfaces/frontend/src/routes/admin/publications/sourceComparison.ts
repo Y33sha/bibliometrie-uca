@@ -1,12 +1,12 @@
 import type { components } from '$lib/api/schema';
 import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labels';
-import { SOURCE_ORDER } from '$lib/sources';
+import { sourceOrder } from '$lib/sources.svelte';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceContribution = components['schemas']['SourceContributionOut'];
 
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
-export type CellLink = { kind: 'doi'; doi: string } | { kind: 'journals' | 'publishers'; id: number };
+export type CellLink = { kind: 'doi'; doi: string } | { kind: 'serials' | 'publishers'; id: number };
 
 /** Case du tableau : texte affiché (`null` pour une valeur absente), lien éventuel, et en note le nom donné par la source quand il diffère du référentiel. `title` signale un titre de publication, rendu par `PublicationTitle`. */
 export interface ComparisonCell {
@@ -45,8 +45,9 @@ const IDENTIFIER_LABELS: Record<string, string> = {
 };
 
 function rank(source: string): number {
-	const i = SOURCE_ORDER.indexOf(source);
-	return i < 0 ? SOURCE_ORDER.length : i;
+	const order = sourceOrder();
+	const i = order.indexOf(source);
+	return i < 0 ? order.length : i;
 }
 
 /** Enregistrements dans l'ordre d'affichage des sources, puis par identifiant dans la source. */
@@ -71,7 +72,7 @@ function referentialCell(
 	id: number | null,
 	name: string | null,
 	rawName: string | null,
-	kind: 'journals' | 'publishers',
+	kind: 'serials' | 'publishers',
 ): ComparisonCell {
 	if (id == null) return { text: rawName };
 	const note = rawName && name && normalized(rawName) !== normalized(name) ? rawName : undefined;
@@ -130,10 +131,10 @@ function fields(records: SourceRecord[]): Field[] {
 			compared: (r) => r.publication_year,
 		},
 		{
-			key: 'journal',
-			label: 'Revue',
-			cell: (r) => referentialCell(r.journal_id, r.journal_title, r.journal_raw_title, 'journals'),
-			compared: (r) => (r.journal_id != null ? `#${r.journal_id}` : r.journal_raw_title),
+			key: 'serial',
+			label: 'Publication en série',
+			cell: (r) => referentialCell(r.serial_id, r.journal_title, r.journal_raw_title, 'serials'),
+			compared: (r) => (r.serial_id != null ? `#${r.serial_id}` : r.journal_raw_title),
 		},
 		textField('issn', 'ISSN', (r) => r.journal_raw_issn),
 		textField('eissn', 'e-ISSN', (r) => r.journal_raw_eissn),
@@ -202,7 +203,7 @@ export function authorRows(records: SourceRecord[], contributions: SourceContrib
 	for (const s of contributions) {
 		const col = column.get(s.source_record_id);
 		if (col === undefined) continue;
-		const key = s.group_id != null ? `g${s.group_id}` : `s${s.id}`;
+		const key = s.contribution_id != null ? `g${s.contribution_id}` : `s${s.id}`;
 		members.set(key, [...(members.get(key) ?? []), s]);
 		present.add(col);
 	}

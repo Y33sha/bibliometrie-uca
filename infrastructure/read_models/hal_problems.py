@@ -40,20 +40,22 @@ _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
-# Contributions sources HAL rattachées à une personne, avec la référence d'un compte HAL.
+# Contributions sources HAL membres d'un groupe rattaché à une personne `g.person_id`, avec la référence d'un compte HAL.
 _HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
-    FROM source_contributions sc
+    FROM contributions g
+    JOIN aligned_source_contributions m ON m.contribution_id = g.id
+    JOIN source_contributions sc ON sc.id = m.source_contribution_id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
     WHERE sc.source = 'hal'
-      AND sc.person_id IS NOT NULL
+      AND g.person_id IS NOT NULL
       AND {_HAL_PERSON_ID} IS NOT NULL
 """
 
 # Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
-    SELECT sc.person_id
+    SELECT g.person_id
     {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-    GROUP BY sc.person_id
+    GROUP BY g.person_id
     HAVING COUNT(DISTINCT {_HAL_PERSON_ID}) >= 2
 """
 
@@ -132,7 +134,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
             text(f"""
                 WITH hal_accounts AS (
                     SELECT
-                        sc.person_id,
+                        g.person_id,
                         ({_HAL_PERSON_ID})::int AS hal_person_id,
                         MIN({contributor_display_name()}) AS full_name,
                         MIN({_ORCID}) AS orcid,
@@ -140,7 +142,7 @@ class PgHalProblemsQueries(HalProblemsQueries):
                         MIN({_IDREF}) AS idref,
                         COUNT(*) AS publication_count
                     {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-                    GROUP BY sc.person_id, {_HAL_PERSON_ID}
+                    GROUP BY g.person_id, {_HAL_PERSON_ID}
                 )
                 SELECT p.id AS person_id, p.last_name, p.first_name,
                        (prh.id IS NOT NULL) AS has_rh,

@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from pipeline.transformation.publications.contributions.address_publication_count import (
+from pipeline.transformation.structures.address_publication_count import (
     recompute_address_publication_count,
 )
 from tests.integration.helpers.addresses import insert_address

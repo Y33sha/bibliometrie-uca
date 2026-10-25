@@ -70,7 +70,11 @@ def configuration(monkeypatch):
 
     def _poser(collections: dict[str, str], annees: list[int]) -> None:
         monkeypatch.setattr(harvest, "get_hal_collections", lambda conn: collections)
-        monkeypatch.setattr(common_harvest, "get_years", lambda conn, start_year=None: annees)
+        monkeypatch.setattr(
+            common_harvest,
+            "window_years",
+            lambda conn, *, start_year, year: [year] if year else annees,
+        )
 
     return _poser
 
@@ -127,13 +131,3 @@ def test_sans_collection_refuse(configuration):
     configuration({}, [2024])
     with pytest.raises(HarvestConfigError, match="aucune collection HAL"):
         HalHarvester(MagicMock(), _LOGGER, _client()).run(arguments_du_run())
-
-
-def test_s_arrete_quand_la_source_est_a_bout(configuration):
-    configuration({"C": "Coll"}, [2023, 2024])
-    client = _client()
-    breaker = MagicMock()
-    breaker.tripped = True
-    metrics = HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(), breaker=breaker)
-    assert metrics.total == 0
-    client.fetch_page_cursor.assert_not_called()

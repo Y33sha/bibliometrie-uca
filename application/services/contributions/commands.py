@@ -5,6 +5,7 @@
 
 from sqlalchemy import Connection
 
+from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
@@ -19,30 +20,37 @@ def exclude_contribution(
     *,
     repo: ContributionRepository,
     person_repo: PersonRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
 ) -> None:
     """Rejette une contribution (paire publication/personne) et la détache. Action à sens unique.
 
-    `contribution_id` désigne la ligne de `contributions`, quand les gestes sur les orphelines adressent une contribution source.
+    `contribution_id` désigne une contribution rattachée à une personne.
     """
     contributions_service.exclude_contribution(
-        contribution_id, repo=repo, person_repo=person_repo, audit_repo=audit_repo
+        contribution_id,
+        conn=conn,
+        repo=repo,
+        perimeter_recompute=perimeter_recompute,
+        person_repo=person_repo,
+        audit_repo=audit_repo,
     )
     conn.commit()
 
 
 def assign_orphan_contribution(
     conn: Connection,
-    source_contribution_id: int,
+    contribution_id: int,
     *,
     person_id: int | None = None,
     new_person: tuple[str, str] | None = None,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
-    """Attribue une contribution orpheline à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
+    """Attribue une contribution orpheline, groupe `contribution_id` sans personne, à une personne, en créant celle-ci au besoin (`new_person` = (nom, prénom)). Création et rattachement sont atomiques.
 
     L'un de `person_id` ou `new_person` est exigé : la commande rattache à une personne, qu'elle reçoive laquelle ou de quoi la créer. Sans l'un ni l'autre, elle lève `ValidationError`.
 
@@ -54,9 +62,11 @@ def assign_orphan_contribution(
         raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_contribution(
         person_id,
-        source_contribution_id,
+        contribution_id,
+        conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit_repo,
         force=force,
     )
@@ -67,20 +77,22 @@ def assign_orphan_contribution(
 def batch_assign_orphan_contributions(
     conn: Connection,
     person_id: int,
-    source_contribution_ids: list[int],
+    group_ids: list[int],
     *,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository,
     force: bool = False,
 ) -> int:
-    """Attribue plusieurs contributions orphelines à une même personne. Retourne le nombre assigné."""
+    """Attribue plusieurs contributions orphelines, groupes sans personne, à une même personne. Retourne le nombre de groupes rattachés."""
     assigned = assign_orphans.batch_assign_orphan_contributions(
         person_id,
-        source_contribution_ids,
+        group_ids,
         conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
+        perimeter_recompute=perimeter_recompute,
         audit_repo=audit_repo,
         force=force,
     )

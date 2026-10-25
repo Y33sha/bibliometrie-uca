@@ -11,7 +11,7 @@ import pytest
 from starlette.requests import Request
 
 from domain.errors import (
-    BlockingJournal,
+    BlockingSerial,
     ConflictError,
     DomainError,
     PublisherMergeBlockedError,
@@ -48,10 +48,10 @@ async def test_erreur_de_domaine_non_specialisee_donne_422():
 
 @pytest.mark.asyncio
 async def test_fusion_editeurs_bloquee_enumere_les_paires():
-    bloquante = BlockingJournal(
-        target_journal_id=1,
+    bloquante = BlockingSerial(
+        target_serial_id=1,
         target_title="Nature",
-        source_journal_id=2,
+        source_serial_id=2,
         source_title="Nature",
         reason="ISSN différents",
     )
@@ -60,8 +60,8 @@ async def test_fusion_editeurs_bloquee_enumere_les_paires():
     )
     assert reponse.status_code == 409
     corps = _corps(reponse)
-    assert len(corps["blocking_journals"]) == 1
-    assert corps["blocking_journals"][0]["reason"] == "ISSN différents"
+    assert len(corps["blocking_serials"]) == 1
+    assert corps["blocking_serials"][0]["reason"] == "ISSN différents"
 
 
 @pytest.mark.asyncio

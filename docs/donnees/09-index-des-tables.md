@@ -69,18 +69,19 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `audit_log` | journal des événements (actions admin, fusions) — technique | [ops](07-ref-et-ops.md) |
 | `contributor_information` | informations du contributeur d'une contribution source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
 | `contribution_structures` | *vue matérialisée* : structures liées à une contribution | [publications](03-publications.md) |
-| `contributions` | table consolidée personne × publication | [publications](03-publications.md) |
+| `contributions` | contribution d'un auteur à une publication, avec sa personne | [publications](03-publications.md) |
 | `candidate_dois` | *vue* : DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement | [sources](02-sources.md) |
 | `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [ops](07-ref-et-ops.md) |
+| `aligned_source_contributions` | contribution source alignée dans une contribution | [publications](03-publications.md) |
 | `confirmed_source_contributions` | épinglages admin (must-link) contribution source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
 | `countries` | référentiel des pays | [ref](07-ref-et-ops.md) |
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [publishing](04-publishing.md) |
 | `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de l'échec | [sources](02-sources.md) |
-| `journal_doi_namespaces` | espaces de noms DOI qui désignent une revue | [publishing](04-publishing.md) |
-| `journal_issns` | ISSN des revues | [publishing](04-publishing.md) |
-| `journal_name_forms` | formes de noms pour reconnaître une revue | [publishing](04-publishing.md) |
-| `journals` | référentiel des revues | [publishing](04-publishing.md) |
+| `serial_doi_namespaces` | espaces de noms DOI qui désignent une revue | [publishing](04-publishing.md) |
+| `serial_issns` | ISSN des revues | [publishing](04-publishing.md) |
+| `serial_name_forms` | formes de noms pour reconnaître une revue | [publishing](04-publishing.md) |
+| `serials` | référentiel des revues | [publishing](04-publishing.md) |
 | `language_forms` | formes sous lesquelles les sources désignent une langue | [ref](07-ref-et-ops.md) |
 | `languages` | référentiel des langues | [ref](07-ref-et-ops.md) |
 | `monographs` | livres et volumes d'actes de congrès | [publishing](04-publishing.md) |
@@ -92,6 +93,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `hr_records` | satellite des données RH (import CSV) | [persons](05-persons.md) |
 | `pipeline_phase_executions` | historique d'exécution des phases — technique | [ops](07-ref-et-ops.md) |
 | `place_name_forms` | formes de noms pour la détection des pays | [ref](07-ref-et-ops.md) |
+| `platforms` | lieux qui hébergent des publications | [publishing](04-publishing.md) |
 | `publication_relations` | relations sémantiques entre publications | [publications](03-publications.md) |
 | `publication_structures` | *vue matérialisée* : structures d'une publication | [publications](03-publications.md) |
 | `publication_subjects` | liaison publication ↔ sujet | [publications](03-publications.md) |
@@ -107,6 +109,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `source_contribution_rors` | ROR attribués par la source à une contribution source, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
 | `source_contribution_structures` | *vue matérialisée* : affiliations résolues d'une contribution source | [sources](02-sources.md) |
 | `source_contributions` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
+| `source_record_locations` | localisations d'un enregistrement source | [sources](02-sources.md) |
 | `source_records` | un enregistrement par document par source | [sources](02-sources.md) |
 | `staging` | ingestion brute par source, payload vidé après normalisation | [sources](02-sources.md) |
 | `structure_name_forms` | formes de noms pour la détection des structures | [structures](06-structures.md) |

@@ -6,7 +6,7 @@ Trois sous-étapes, un module chacune :
 
 - `rules` — correction unaire : reclasse le type de document et corrige le statut d'accès ouvert d'un enregistrement d'après ses propres champs, par une table de règles.
 - `shared_doi` — correction du DOI d'un groupe d'enregistrements portant un même DOI (convergence vers l'œuvre canonique, ou nullage d'un DOI recopié à tort).
-- `journal_by_doi` — rattachement d'une revue à un enregistrement via l'espace de noms de son DOI.
+- `serial_by_doi` — rattachement d'une revue à un enregistrement via l'espace de noms de son DOI.
 
 La provenance de chaque correction est tracée par le caller dans la colonne `corrections` de `source_records` ou de `publications`, avec la valeur d'avant correction. Celle d'une publication est recalculée à chaque refresh.
 """

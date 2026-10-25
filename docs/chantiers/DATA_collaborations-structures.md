@@ -52,7 +52,7 @@ Lecture par source :
 - HAL : ROR des structures du TEI auxquelles l'auteur est affilié.
 - DataCite : `affiliationIdentifier` de schéma ROR. Les trois adaptateurs qui interrogent `/dois` (extraction, `fetch_missing`, `fetch_stale`) partagent le paramètre `affiliation=true`.
 
-**Périmètre résolu par la phase `affiliations`.** Une vue matérialisée associe chaque contribution source consolidée à ses ROR, sur le modèle de `contribution_structures`. Dans le périmètre, ce sont les ROR des structures résolues par `affiliations`. Hors périmètre, ce sont les ROR des sources, moins ceux du périmètre.
+**Périmètre résolu par la phase `affiliations`.** Une vue matérialisée associe chaque contribution source consolidée à ses ROR, sur le modèle de `group_structures`. Dans le périmètre, ce sont les ROR des structures résolues par `affiliations`. Hors périmètre, ce sont les ROR des sources, moins ceux du périmètre.
 
 **Cohérence des référentiels.** Un rapport compare `structure_parents` à `ror_relations` dans les deux sens, par clôture transitive. Un parent ROR est couvert s'il est un ancêtre dans `structure_parents`. Une tutelle est couverte si son parent est un ancêtre dans le ROR. Chaque écart se corrige dans `structure_parents` ou se signale au ROR.
 
@@ -77,7 +77,7 @@ Lecture par source :
 
 ### 3. Vue consolidée
 
-La consolidation par auteur dépend du chantier `DATA_alignement-auteurs.md` : 97 % des contributions sources hors périmètre n'ont pas de personne.
+La consolidation par auteur dépend du chantier `archived/2026-10-24_DATA_alignement-auteurs.md` : 97 % des contributions sources hors périmètre n'ont pas de personne.
 
 - [ ] Vue matérialisée des ROR par contribution source consolidée, rafraîchie par le pipeline.
 - [ ] Tests : ROR du périmètre exclus des ROR des sources ; ROR des structures résolues par `affiliations` inclus.

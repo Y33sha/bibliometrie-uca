@@ -5,18 +5,16 @@ Interroge l'API de recherche avec un filtre Solr qui réunit les ORCID (`authORC
 
 from __future__ import annotations
 
-from collections.abc import Mapping
 from typing import ClassVar
 
 from domain.persons.identifiers import PersonIdentifierType
-from domain.types import JsonValue, as_mapping, as_sequence, as_str, at_path
+from domain.types import as_mapping, as_sequence, as_str, at_path
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.hal.api import HalClient
-from pipeline.ingestion.hal.fields import extract_doi, extract_id
 from pipeline.ingestion.hal.harvest import build_query
 
 # Champ Solr de chaque type d'identifiant.
@@ -59,7 +57,3 @@ class HalPersonHarvester(PersonSearchHarvester[HalClient]):
         # Solr rend le marqueur reçu une fois les résultats épuisés.
         done = not records or not following or following == cursor
         return PersonSearchPage(records=records, next_token=None if done else following)
-
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        hal_id = extract_id(record)
-        return (hal_id, extract_doi(record)) if hal_id else None

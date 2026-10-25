@@ -1,6 +1,6 @@
 """Idempotence : normalisation Web of Science."""
 
-from tests.integration.helpers.staging import insert_staging
+from tests.integration.helpers.staging import insert_staging, normalize_pending
 
 WOS_STAGING_DOCS = [
     {
@@ -63,38 +63,7 @@ def insert_wos_staging(conn, docs):
 
 
 def run_normalize_wos(conn):
-    import logging
-
-    from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
-    from pipeline.ingestion.common.source_records import (
-        SourceRecordStore,
-    )
-    from pipeline.ingestion.common.staging import StagingStore
-    from pipeline.ingestion.wos.normalize import process_record
-    from pipeline.transformation.publishing.containers import ContainerStores
-    from pipeline.transformation.publishing.publishers.store import PublisherStore
-
-    record_store = SourceRecordStore(conn)
-    staging_store = StagingStore(conn)
-    contribution_store = SourceContributionStore(conn)
-    logger = logging.getLogger("test")
-    container_stores = ContainerStores.of(conn)
-    publisher_store = PublisherStore(conn)
-
-    rows = staging_store.fetch_pending_staging("wos", limit=10_000)
-    processed = 0
-    for row in rows:
-        if process_record(
-            record_store,
-            logger,
-            row,
-            container_stores=container_stores,
-            publisher_store=publisher_store,
-            staging_store=staging_store,
-            contribution_store=contribution_store,
-        ):
-            processed += 1
-    return processed
+    return normalize_pending(conn, "wos")
 
 
 def _count_wos_tables(conn) -> dict:

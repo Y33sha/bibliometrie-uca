@@ -1,30 +1,26 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `extract_publication_metadata` (cascade publication_year soutenance/inscription, NNT, doc_type), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `insert_source_document` (keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document), `process_contributions` (writer partagé, renormalisation), `process_work` (skip sans titre, happy path, exception), et la classe `ThesesNormalizer` (preload, process_work wrapper, summary_stats).
+Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, discipline, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
 
-Pattern : `FakeSourceRecordStore` + `MagicMock`, pas de DB.
+Pattern : doublures de `tests.helpers.normalize_doubles` + `MagicMock`, pas de DB.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 from unittest.mock import MagicMock
 
-import pytest
-
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.theses import normalize as normalize_theses
+from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
     _build_source_extras,
     build_theses_author_records,
-    extract_publication_metadata,
     extract_theses_author_block,
-    insert_source_document,
-    process_contributions,
-    process_work,
+    get_publication_year,
+    get_title,
+    theses_source_record,
 )
+from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
     FakeSourceRecordStore,
@@ -32,50 +28,34 @@ from tests.helpers.normalize_doubles import (
     staging_row,
 )
 
-# ── extract_publication_metadata ─────────────────────────────────────────
+# ── get_title, get_publication_year ──────────────────────────────────────
 
 
-class TestExtractPublicationMetadata:
-    def test_minimal(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T"})
-        assert meta.title == "T"
-        assert meta.publication_year is None
-        assert meta.nnt is None
-        assert meta.oa_status == "closed"
-        assert meta.journal_id is None
-
-    def test_publication_year_from_soutenance(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T", "dateSoutenance": "15/03/2024"})
-        assert meta.publication_year == 2024
-
-    def test_publication_year_fallback_to_inscription(self):
-        """Si pas de date_soutenance, on prend date_inscription."""
-        meta = extract_publication_metadata(
-            {"titrePrincipal": "T", "datePremiereInscriptionDoctorat": "10/09/2020"}
-        )
-        assert meta.publication_year == 2020
-
-    def test_publication_year_soutenance_wins_over_inscription(self):
-        meta = extract_publication_metadata(
-            {
-                "titrePrincipal": "T",
-                "dateSoutenance": "15/03/2024",
-                "datePremiereInscriptionDoctorat": "10/09/2020",
-            }
-        )
-        assert meta.publication_year == 2024
+class TestExtractors:
+    def test_title(self):
+        assert get_title({"titrePrincipal": "T"}) == "T"
 
     def test_no_title(self):
-        meta = extract_publication_metadata({})
-        assert meta.title is None
+        assert get_title({}) is None
 
-    def test_nnt_normalized(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
-        assert meta.nnt == "2024CLFAC001"
+    def test_no_dates_no_publication_year(self):
+        assert get_publication_year({"titrePrincipal": "T"}) is None
 
-    def test_doi_passthrough(self):
-        meta = extract_publication_metadata({"titrePrincipal": "T", "doi": "10.1/abc"})
-        assert meta.doi == "10.1/abc"
+    def test_publication_year_from_soutenance(self):
+        assert get_publication_year({"titrePrincipal": "T", "dateSoutenance": "15/03/2024"}) == 2024
+
+    def test_publication_year_fallback_to_inscription(self):
+        """Sans date de soutenance, l'année vient de la première inscription."""
+        thesis = {"titrePrincipal": "T", "datePremiereInscriptionDoctorat": "10/09/2020"}
+        assert get_publication_year(thesis) == 2020
+
+    def test_publication_year_soutenance_wins_over_inscription(self):
+        thesis = {
+            "titrePrincipal": "T",
+            "dateSoutenance": "15/03/2024",
+            "datePremiereInscriptionDoctorat": "10/09/2020",
+        }
+        assert get_publication_year(thesis) == 2024
 
 
 # ── _build_source_extras ───────────────────────────────────────────
@@ -137,98 +117,68 @@ class TestBuildSourceMeta:
         assert meta == {"partenaires": [{"nom": "LIMOS", "type": None, "ppn": None}]}
 
 
-# ── insert_source_document ───────────────────────────────────────
+# ── theses_source_record ─────────────────────────────────────────
 
 
-class TestInsertSourceDocument:
-    def _publication_meta(self, **overrides) -> PublicationMetadata:
-        base: dict[str, Any] = {
-            "title": "T",
-            "publication_year": 2024,
-            "doc_type": "thesis",
-            "doi": None,
-            "nnt": None,
-            "oa_status": "closed",
-            "journal_id": None,
-            "container_title": None,
-            "language": None,
-        }
-        base.update(overrides)
-        return PublicationMetadata(**base)
+class TestThesesSourceRecord:
+    def _call(self, thesis: dict) -> SourceRecordUpsert:
+        return theses_source_record(thesis, staging_id=1, theses_id="2024CLFAC001")
 
-    def _call(
-        self,
-        record_store: FakeSourceRecordStore,
-        thesis: dict,
-        *,
-        publication_meta: PublicationMetadata | None = None,
-    ) -> dict:
-        insert_source_document(
-            record_store,
-            thesis,
-            staging_id=1,
-            theses_id="2024CLFAC001",
-            publication_meta=publication_meta or self._publication_meta(),
-        )
-        return record_store.upserted_documents[-1]
+    def test_minimal(self):
+        record = self._call({"titrePrincipal": "T"})
+        assert record.title == "T"
+        assert record.publication_year is None
+        assert record.external_ids is None
+        assert record.oa_status == "closed"
+        assert record.serial_id is None
+
+    def test_nnt_normalized(self):
+        record = self._call({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
+        assert record.external_ids == {"nnt": "2024CLFAC001"}
+
+    def test_doi_passthrough(self):
+        assert self._call({"titrePrincipal": "T", "doi": "10.1/abc"}).doi == "10.1/abc"
 
     def test_nnt_goes_in_external_ids(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(
-            record_store, {}, publication_meta=self._publication_meta(nnt="2024CLFAC001")
-        )
-        assert captured.external_ids == {"nnt": "2024CLFAC001"}
+        record = self._call({"nnt": "2024CLFAC001"})
+        assert record.external_ids == {"nnt": "2024CLFAC001"}
 
     def test_no_nnt_no_external_ids(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {})
-        assert captured.external_ids is None
+        assert self._call({}).external_ids is None
 
     def test_keywords_from_sujets(self):
-        record_store = FakeSourceRecordStore()
         thesis = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
-        captured = self._call(record_store, thesis)
-        assert captured.keywords == ["machine learning", "NLP"]
+        assert self._call(thesis).keywords == ["machine learning", "NLP"]
 
     def test_no_keywords(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {})
-        assert captured.keywords is None
+        assert self._call({}).keywords is None
 
     def test_topics_discipline_only(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"discipline": "Informatique"})
-        assert captured.topics == {"discipline": "Informatique"}
+        assert self._call({"discipline": "Informatique"}).topics == {"discipline": "Informatique"}
 
     def test_topics_with_rameau(self):
-        record_store = FakeSourceRecordStore()
         thesis = {
             "discipline": "Informatique",
             "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
         }
-        captured = self._call(record_store, thesis)
-        assert captured.topics == {
+        assert self._call(thesis).topics == {
             "discipline": "Informatique",
             "rameau": ["Apprentissage automatique"],
         }
 
     def test_no_topics(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {})
-        assert captured.topics is None
+        assert self._call({}).topics is None
 
     def test_source_meta_passed(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {"dateSoutenance": "15/03/2024"})
-        assert captured.source_extras == {"date_soutenance": "2024-03-15"}
+        record = self._call({"dateSoutenance": "15/03/2024"})
+        assert record.source_extras == {"date_soutenance": "2024-03-15"}
 
     def test_title_empty_string_when_none(self):
-        record_store = FakeSourceRecordStore()
-        captured = self._call(record_store, {}, publication_meta=self._publication_meta(title=None))
-        assert captured.title == ""
+        record = self._call({})
+        assert record.title == ""
 
 
-# ── process_contributions ──────────────────────────────────────────────
+# ── build_theses_author_records ──────────────────────────────────
 
 
 def _these(**fields):
@@ -258,54 +208,6 @@ class TestBuildThesesAuthorRecords:
         assert all(r.addresses == [] for r in records)
 
 
-class TestProcessContributions:
-    def test_contributions_sources_ecrites_par_le_writer_partage(self):
-        batch = FakeSourceContributionStore()
-        process_contributions(_these(), 10, contribution_store=batch)
-        assert batch.synced_for == [10]
-        assert [v["author_position"] for v in batch.upserted_batches[0]] == [0, None]
-
-    def test_renormalisation_garde_les_contributions_sources(self):
-        """Une thèse modifiée garde l'identifiant des contributions sources dont les informations du contributeur restent les mêmes, directeur compris."""
-        batch = FakeSourceContributionStore()
-        process_contributions(_these(), 10, contribution_store=batch)
-        modified = _these(rapporteurs=[{"nom": "Durand", "prenom": "Paul"}])
-        process_contributions(modified, 10, contribution_store=batch)
-        assert [len(b) for b in batch.upserted_batches] == [2, 1]
-        assert batch.upserted_batches[1][0]["raw_last_name"] == "Durand"
-
-
-# ── process_work ─────────────────────────────────────────────────
-
-
-class TestProcessWork:
-    def _kwargs(self, record_store=None, staging_store=None):
-        return {
-            "record_store": record_store or FakeSourceRecordStore(),
-            "staging_store": staging_store or FakeStagingStore(),
-            "contribution_store": MagicMock(),
-        }
-
-    def test_happy_path(self, monkeypatch):
-        monkeypatch.setattr(normalize_theses, "aggregate_thesis_persons", lambda thesis: [])
-        sq = FakeStagingStore()
-        row = staging_row(staging_id=42, raw={"titrePrincipal": "T"})
-        result = process_work(staging_row=row, **self._kwargs(staging_store=sq))
-        assert result is True
-        assert sq.marked_done == [42]
-
-    def test_exception_propagated(self, monkeypatch):
-        """process_work laisse remonter l'exception ; le log incombe à la boucle de base."""
-
-        def boom(*args, **kw):
-            raise RuntimeError("kaboom")
-
-        monkeypatch.setattr(normalize_theses, "insert_source_document", boom)
-        row = staging_row(source_id="hal-x", raw={"titrePrincipal": "T"})
-        with pytest.raises(RuntimeError, match="kaboom"):
-            process_work(staging_row=row, **self._kwargs())
-
-
 # ── ThesesNormalizer (classe) ────────────────────────────────────
 
 
@@ -315,7 +217,10 @@ def _make_normalizer():
         logger=logging.getLogger("test"),
         staging_store=FakeStagingStore(),
         record_store=FakeSourceRecordStore(),
-        contribution_store=MagicMock(),
+        container_stores=MagicMock(),
+        publisher_store=MagicMock(),
+        contribution_store=FakeSourceContributionStore(),
+        location_store=MagicMock(),
     )
 
 
@@ -323,9 +228,30 @@ class TestThesesNormalizerClass:
     def test_metadonnees_minimales(self):
         assert _make_normalizer().minimal_metadata(staging_row(raw={})) == (None, None)
 
-    def test_process_work_delegates(self, monkeypatch):
+    def test_sans_editeur_ni_conteneur(self):
         norm = _make_normalizer()
-        norm.preload_caches()
-        monkeypatch.setattr(normalize_theses, "process_work", lambda *a, **kw: True)
-        result = norm.normalize_record(staging_row())
-        assert result is True
+        thesis = _these(titrePrincipal="T")
+        assert norm.publisher(thesis) is None
+        assert norm.container_facts(thesis) is None
+
+    def test_source_record_d_une_these(self):
+        """L'enregistrement source reprend la ligne de staging et les métadonnées lues dans la thèse."""
+        thesis = {"titrePrincipal": "T", "nnt": "2024clfac001", "dateSoutenance": "15/03/2024"}
+        row = staging_row(staging_id=42, source_id="2024CLFAC001", raw=thesis)
+        record = _make_normalizer().source_record(row, thesis, Containers(None, None))
+        assert (record.source, record.source_id, record.staging_id) == (
+            "theses",
+            "2024CLFAC001",
+            42,
+        )
+        assert (record.title, record.publication_year) == ("T", 2024)
+        assert record.external_ids == {"nnt": "2024CLFAC001"}
+        assert record.serial_id is None
+
+    def test_contributions_sources_d_une_these(self):
+        norm = _make_normalizer()
+        records = norm.author_records(norm.author_block(_these()))
+        assert [(r.position, r.roles) for r in records] == [
+            (0, ["author"]),
+            (None, ["thesis_director"]),
+        ]

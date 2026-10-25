@@ -11,7 +11,6 @@ Couvre :
 
 from __future__ import annotations
 
-from tests.integration.helpers.db import truncate_after_module
 from tests.integration.helpers.seeds import (
     seed_add_to_perimeter,
     seed_config,
@@ -27,11 +26,6 @@ def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int
     seed_config("perimeter_persons", "uca")
     seed_add_to_perimeter(lab_id, code="uca", name="test persons perimeter")
     return lab_id
-
-
-_cleanup_after_module = truncate_after_module(
-    "structures", then=["DELETE FROM config WHERE key = 'perimeter_persons'"]
-)
 
 
 class TestDuplicateAccounts:

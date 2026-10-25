@@ -477,22 +477,17 @@ python-version = "3.14.0"
 # exécute en production (`signal.SIGKILL`).
 python-platform = "linux"
 project-excludes = [
-    "**/tests/",
     "**/frontend/",
     "**/bibliometrie_uca.egg-info/",
     "**/.venv/",
     "**/build/",
-    # Code Alembic : `op` et `context` sont ajoutés dynamiquement au module `alembic` à l'import.
-    "**/alembic/",
     # Répertoire de travail local : données brutes et scripts jetables, hors du dépôt.
     "**/data/",
     # Copie de travail de mutmut : double les paquets du projet.
     "**/mutants/",
-    # Scripts jetables (audits, rattrapages), exécutés une fois.
-    "**/interfaces/cli/oneshot/",
 ]
-# Libs tierces non typées : ignorées plutôt que déclarées une à une.
-ignore-missing-imports = ["*"]
+# Bibliothèques tierces sans types, déclarées une à une : un joker masquerait aussi les imports cassés du projet.
+ignore-missing-imports = ["ahocorasick"]
 
 [tool.pyrefly.errors]
 # `Any` explicite interdit, comme les génériques sans paramètre (`dict`, `list`). Les exceptions
@@ -540,6 +535,46 @@ explicit-any = false
 matches = "infrastructure/db/rows.py"
 [tool.pyrefly.sub-config.errors]
 bad-unpacking = false
+
+# Tests et scripts ponctuels : vérifiés pour le code cassé (import d'un nom ou d'un module inexistant, nom inconnu, mot-clé inconnu…). Les annotations et les accès que l'analyse ne prouve pas sûrs, faute de types dans ce code, ne sont pas exigés.
+[[tool.pyrefly.sub-config]]
+matches = "tests/**"
+[tool.pyrefly.sub-config.errors]
+unannotated-return = false
+implicit-any-parameter = false
+implicit-any-type-argument = false
+explicit-any = false
+no-any-return-implicit = false
+no-any-return-explicit = false
+bad-index = false
+bad-argument-type = false
+missing-attribute = false
+not-iterable = false
+unsupported-operation = false
+bad-return = false
+bad-assignment = false
+no-matching-overload = false
+read-only = false
+
+# Même règle pour les scripts ponctuels.
+[[tool.pyrefly.sub-config]]
+matches = "interfaces/cli/oneshot/**"
+[tool.pyrefly.sub-config.errors]
+unannotated-return = false
+implicit-any-parameter = false
+implicit-any-type-argument = false
+explicit-any = false
+no-any-return-implicit = false
+no-any-return-explicit = false
+bad-index = false
+bad-argument-type = false
+missing-attribute = false
+not-iterable = false
+unsupported-operation = false
+bad-return = false
+bad-assignment = false
+no-matching-overload = false
+read-only = false
 
 # ----------------------------------------------------------------------
 # mutmut : tests de mutation du domaine.

@@ -12,9 +12,9 @@ https://developers.openalex.org/
 - Nécessite *mailto* ou clé API (création via un compte gratuit)
 - Requête par institution (filtre `lineage`) + année de publication
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
-- Pagination par cursor, 200 résultats/page, 0.2s de délai
+- Pagination par cursor, 200 résultats/page, à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 
-**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_journals_from_openalex`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md). Met à jour `journals.apc_amount`, `apc_currency` et `journal_type`.
+**Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.apc_amount`, `apc_currency` et `serial_type`.
 
 **Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit `publishers.country` (ISO-2 depuis `country_codes[0]`) là où la base n'en porte pas. Couverture limitée — environ 13 % des éditeurs locaux ont un `openalex_id` — les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
 
@@ -22,6 +22,7 @@ https://developers.openalex.org/
 
 - **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, OA status, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
 - **Licence** : licence de la localisation principale (`primary_location`)
+- **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne. Les fiches du DOAJ, sans copie du texte, sont écartées.
 - **Auteurs** : nom tel qu'il apparaît dans la contribution source, drapeau corresponding, ORCID si présent. Le nom unifié de l'entité auteur OpenAlex est conservé séparément, utilisé uniquement pour vérifier que l'ORCID attribué par OA correspond bien à notre auteur (cf. Particularités).
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
 - **Journaux/éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur

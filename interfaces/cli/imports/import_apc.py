@@ -400,7 +400,7 @@ def import_payments(
         1 for p in in_base + outside_base if conn.execute(_INSERT, p).first() is not None
     )
     map_publications(conn)
-    map_journals(conn)
+    map_serials(conn)
     map_publishers(conn)
     resolver = StructureResolver(load_name_forms(conn))
     unresolved = map_structures(conn, resolver)
@@ -471,18 +471,18 @@ def map_publications(conn: Connection) -> int:
     ).rowcount
 
 
-def map_journals(conn: Connection) -> int:
+def map_serials(conn: Connection) -> int:
     """Rattache à leur revue les paiements dont l'ISSN désigne un ISSN actif d'une revue."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap
-            SET journal_id = i.journal_id
-            FROM journal_issns i
+            SET serial_id = i.serial_id
+            FROM serial_issns i
             WHERE ap.issn IS NOT NULL
               AND ap.issn = i.issn
-              AND i.journal_id IS NOT NULL
+              AND i.serial_id IS NOT NULL
               AND i.status = 'active'
-              AND ap.journal_id IS NULL
+              AND ap.serial_id IS NULL
         """)
     ).rowcount
 

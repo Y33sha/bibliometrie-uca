@@ -24,11 +24,11 @@ class PublicationStore:
 
     # ── Recherches ─────────────────────────────────────────────────
 
-    def find_ids_by_journal_id(self, journal_id: int) -> list[int]:
-        """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `journal_type`) change."""
+    def find_ids_by_serial_id(self, serial_id: int) -> list[int]:
+        """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `serial_type`) change."""
         result = self._conn.execute(
-            text("SELECT id FROM publications WHERE journal_id = :jid ORDER BY id"),
-            {"jid": journal_id},
+            text("SELECT id FROM publications WHERE serial_id = :jid ORDER BY id"),
+            {"jid": serial_id},
         )
         return [row.id for row in result]
 
@@ -56,7 +56,7 @@ class PublicationStore:
                        CAST(p.oa_status AS text) AS oa_status,
                        CAST(p.license AS text) AS license,
                        CAST(p.deposit_license AS text) AS deposit_license,
-                       p.journal_id, p.monograph_id, p.container_title, p.language,
+                       p.serial_id, p.monograph_id, p.publisher_id, p.container_title, p.language,
                        d.abstract, p.is_retracted, p.countries, d.keywords,
                        d.topics, d.biblio, p.source_extras, p.corrections
                 FROM publications p
@@ -78,8 +78,9 @@ class PublicationStore:
             oa_status=m["oa_status"],
             license=m["license"],
             deposit_license=m["deposit_license"],
-            journal_id=m["journal_id"],
+            serial_id=m["serial_id"],
             monograph_id=m["monograph_id"],
+            publisher_id=m["publisher_id"],
             container_title=m["container_title"],
             language=m["language"],
             abstract=m["abstract"],
@@ -108,8 +109,9 @@ class PublicationStore:
                     oa_status = CAST(:oa AS oa_type),
                     license = CAST(:license AS license_type),
                     deposit_license = CAST(:deposit_license AS license_type),
-                    journal_id = :jid,
+                    serial_id = :jid,
                     monograph_id = :mid,
+                    publisher_id = :pid,
                     container_title = :ct,
                     language = :lang,
                     is_retracted = :is_retracted,
@@ -130,8 +132,9 @@ class PublicationStore:
                 "oa": publication.oa_status,
                 "license": publication.license,
                 "deposit_license": publication.deposit_license,
-                "jid": publication.journal_id,
+                "jid": publication.serial_id,
                 "mid": publication.monograph_id,
+                "pid": publication.publisher_id,
                 "ct": publication.container_title,
                 "lang": publication.language,
                 "is_retracted": publication.is_retracted,

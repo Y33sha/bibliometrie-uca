@@ -50,9 +50,11 @@ def person_profile(conn: Connection, person_id: int) -> PersonProfileResponse | 
     theses_count_row = conn.execute(
         text(f"""
             SELECT COUNT(*) AS n
-            FROM source_contributions sc
+            FROM aligned_source_contributions m
+            JOIN contributions g ON g.id = m.contribution_id
+            JOIN source_contributions sc ON sc.id = m.source_contribution_id
             JOIN source_records sr ON sr.id = sc.source_record_id
-            WHERE sc.person_id = :pid
+            WHERE g.person_id = :pid
               AND sc.source = '{Source.THESES.value}'
               AND NOT ({has_author_role("sc")})
               AND sr.publication_id IS NOT NULL
@@ -95,7 +97,7 @@ _THESIS_ROLE_LABELS = {
 def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
     """Thèses et HDR liées à cette personne avec un rôle non-auteur (direction, jury, rapport), soutenues dans l'établissement ou ailleurs.
 
-    Les rôles proviennent de la table `contributions` canonique.
+    Les rôles sont ceux de la contribution de la personne.
     """
     rows = conn.execute(
         text(f"""
@@ -177,12 +179,14 @@ def person_theses(conn: Connection, person_id: int) -> PersonThesesResponse:
 def person_addresses(
     conn: Connection, person_id: int, *, page: int, per_page: int
 ) -> PersonAddressesResponse:
-    """Adresses distinctes utilisées dans les contributions sources de cette personne."""
+    """Adresses distinctes des contributions sources membres des groupes de cette personne."""
     base_where = """a.id IN (
             SELECT DISTINCT sca.address_id
             FROM source_contribution_addresses sca
-            JOIN source_contributions sc ON sc.id = sca.source_contribution_id
-            WHERE sc.person_id = :pid
+            JOIN aligned_source_contributions m
+              ON m.source_contribution_id = sca.source_contribution_id
+            JOIN contributions g ON g.id = m.contribution_id
+            WHERE g.person_id = :pid
         )"""
     count_row = conn.execute(
         text(f"SELECT COUNT(*) AS total FROM addresses a WHERE {base_where}"),

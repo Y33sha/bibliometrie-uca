@@ -1,3 +1,7 @@
+python -m interfaces.cli.oneshot.backfill_source_record_publishers
+python -m interfaces.cli.oneshot.apply_known_platforms
+run_pipeline --only publications
+
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 * [ ] plafond d'interrogations sudoc
@@ -19,6 +23,9 @@
 * [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 * [ ] titres de revues: OpenAlex zappe les apostrophes; corriger
 * [ ] conserver l'historique des structures
+* [ ] identifiants mal placés et neutralisés par le pipeline: auditer
+* [ ] récupérer date de publication complète au lieu de l'année seule
+* [ ] doublons dans journal_name_forms.form_normalized
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)

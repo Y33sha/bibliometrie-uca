@@ -1,4 +1,4 @@
-"""Volet publisher de `publishers_journals` : préfixe DOI → éditeur, une étape par agence d'enregistrement.
+"""Volet publisher de `publishing` : préfixe DOI → éditeur, une étape par agence d'enregistrement.
 
 L'étape Crossref interroge `api.crossref.org/prefixes` pour les préfixes d'agence Crossref ou inconnue. L'étape DataCite interroge `api.datacite.org/prefixes` pour les préfixes d'agence DataCite, et pour ceux d'agence inconnue que Crossref ne connaît pas. Chaque étape renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), corrige l'agence d'un préfixe inconnu qu'elle trouve, puis reconnaît ou crée l'éditeur contre `publisher_name_forms` et l'attache. Un préfixe dont l'API a répondu est marqué vu par l'agence (`crossref_checked_at`, `datacite_checked_at`). Un préfixe dont l'API est indisponible reste en attente du run suivant.
 
@@ -16,7 +16,7 @@ import httpx2
 from sqlalchemy import Connection
 
 from domain.normalize import normalize_text, to_plain_text
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.fetch_pool import run_fetch_pool
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.runtime.observability.log_format import BRANCH, quantity
@@ -72,7 +72,6 @@ def run_resolve_crossref_publishers(
     prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
     fetch_prefix_fn: FetchCrossrefPrefixFn,
-    breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Attache l'éditeur Crossref des préfixes en attente. Un DOI du préfixe, lu avant l'appel, retrouve le membre déposant d'un compte sans dépôt."""
 
@@ -89,7 +88,7 @@ def run_resolve_crossref_publishers(
     def prepare(conn: Connection, row: PendingPublisherPrefix) -> PendingPublisherPrefix:  # noqa: ARG001
         return row._replace(sample_doi=prefix_store.find_doi_with_prefix(row.prefix))
 
-    return _resolve(conn, log, "Crossref", ask, prepare, prefix_store, publisher_store, breaker)
+    return _resolve(conn, log, "Crossref", ask, prepare, prefix_store, publisher_store)
 
 
 def run_resolve_datacite_publishers(
@@ -99,7 +98,6 @@ def run_resolve_datacite_publishers(
     prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
     fetch_prefix_fn: FetchDataCitePrefixFn,
-    breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Attache le provider DataCite des préfixes en attente, et retient le repository qui a déposé les DOI."""
 
@@ -113,7 +111,7 @@ def run_resolve_datacite_publishers(
             return _PrefixAnswer(row.ra)
         return _PrefixAnswer("DataCite", datacite=answer)
 
-    return _resolve(conn, log, "DataCite", ask, None, prefix_store, publisher_store, breaker)
+    return _resolve(conn, log, "DataCite", ask, None, prefix_store, publisher_store)
 
 
 def _resolve(
@@ -124,11 +122,10 @@ def _resolve(
     prepare: Callable[[Connection, PendingPublisherPrefix], PendingPublisherPrefix] | None,
     prefix_store: DoiPrefixStore,
     publisher_store: PublisherStore,
-    breaker: SourceCircuitBreaker | None,
 ) -> PhaseMetrics:
     """Traite les préfixes en attente auprès de l'agence.
 
-    `total` = préfixes traités ; `errors` = préfixes laissés en attente faute de réponse ; `extras` = `publisher_matched` / `publisher_created` / `no_publisher` (préfixe inconnu de l'agence). S'arrête si le `breaker` a coupé.
+    `total` = préfixes traités ; `errors` = préfixes laissés en attente faute de réponse ; `extras` = `publisher_matched` / `publisher_created` / `no_publisher` (préfixe inconnu de l'agence). S'arrête quand le circuit-breaker de la source coupe.
     """
     metrics = PhaseMetrics()
     rows = prefix_store.get_prefixes_pending_publisher(agency)
@@ -188,7 +185,7 @@ def _resolve(
                 prepare=prepare,
             )
         )
-    if breaker is not None and breaker.tripped:
+    if source_tripped():
         log.warning("resolve_publishers : circuit-breaker %s coupé, arrêt", agency)
 
     metrics.report = (
@@ -214,7 +211,7 @@ def _store_publisher_metadata(
     datacite_client_symbol: str | None = None
 
     # Noms mis à plat une fois : servent de nom stocké et de base au nom normalisé (clé de
-    # rapprochement), pour que les deux dérivent de la même valeur (cf. `find_or_create_journal`).
+    # rapprochement), pour que les deux dérivent de la même valeur (cf. `find_or_create_serial`).
     if answer.crossref is not None:
         publisher_name_raw, crossref_member_id = answer.crossref
         publisher_name_raw = to_plain_text(publisher_name_raw)

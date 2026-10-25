@@ -29,8 +29,8 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | `perimeter_evidence`, d'où `in_perimeter` | `source_contributions` | phase `affiliations` |
 | `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `contributions` |
 | `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
-| `is_corresponding`, `roles`, `perimeter_evidence` | `source_contribution_groups` | phase `author_grouping` |
-| `publication_count` | `journals`, `publishers` | phase `contributions` |
+| `is_corresponding`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
+| `publication_count` | `serials`, `publishers` | phase `contributions` |
 | `publication_count` | `addresses` | phase `publications` |
 | `usage_count` | `subjects` | phase `subjects` |
 
@@ -42,8 +42,9 @@ Les phases coûteuses retraitent seulement ce qui a changé depuis la dernière 
 | File | Lignes à reprendre | Phase |
 |---|---|---|
 | `source_record_keys_queue` | enregistrements sources à rattacher à leur publication | `publications` |
-| `publication_contributions_queue` | publications dont les groupes d'auteurs sont à recalculer | `author_grouping` |
-| `source_contribution_group_attributes_queue` | groupes dont les attributs sont à recomposer | `author_grouping` |
+| `publication_contributions_queue` | publications dont les contributions sont à réaligner | `author_grouping` |
+| `contribution_attributes_queue` | contributions dont les attributs sont à recomposer | `author_grouping` |
+| `contribution_resolution_queue` | contributions dont la personne est à redécider | `persons` |
 | `address_candidates_queue` | adresses dont les pays sont à détecter et à résoudre | `countries` |
 | `address_countries_queue` | adresses dont le pays change | `countries` |
 | `source_contribution_countries_queue` | contributions sources dont les pays sont à recalculer | `countries` |

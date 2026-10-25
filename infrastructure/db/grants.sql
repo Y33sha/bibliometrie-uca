@@ -61,7 +61,7 @@ $$;
 -- y compris quand une table en sort.
 
 GRANT INSERT, UPDATE, DELETE ON
-    structures.address_structures, publications.contributions, structures.perimeters, persons.person_name_forms,
+    structures.address_structures, structures.perimeters, persons.person_name_forms,
     persons.persons, persons.rejected_contributions, structures.structure_name_forms, structures.structures
 TO bibliometrie_app;
 
@@ -86,20 +86,21 @@ TO bibliometrie_app;
 -- Une décision sur un ORCID ou un IdRef, ou la correction d'un prénom, marque les
 -- publications à regrouper. Une correction d'adresse marque les enregistrements sources sans
 -- publication qui entrent dans le périmètre, et les groupes des contributions sources dont les
--- indices de périmètre changent. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
+-- indices de périmètre changent. Le rejet d'un identifiant ou d'une forme de nom marque les
+-- groupes dont la personne est à redécider. Le marquage passe par `INSERT … ON CONFLICT DO UPDATE`.
 GRANT INSERT, UPDATE ON
     queues.address_candidates_queue, queues.address_countries_queue,
     queues.publication_contributions_queue, queues.source_record_keys_queue,
-    queues.source_contribution_group_attributes_queue
+    queues.contribution_attributes_queue, queues.contribution_resolution_queue
 TO bibliometrie_app;
 
 GRANT UPDATE, DELETE ON
-    publishing.journal_name_forms, publishing.journals, publications.publications, publishing.publisher_name_forms, publishing.publishers
+    publishing.serial_name_forms, publishing.serials, publications.publications, publishing.publisher_name_forms, publishing.publishers
 TO bibliometrie_app;
 
 -- Les ISSN d'une revue s'éditent à l'administration, et rejoignent la revue qui en absorbe une autre.
 GRANT INSERT, UPDATE, DELETE ON
-    publishing.journal_issns
+    publishing.serial_issns
 TO bibliometrie_app;
 
 GRANT INSERT ON
@@ -112,7 +113,7 @@ TO bibliometrie_app;
 
 GRANT UPDATE ON
     structures.addresses, publishing.apc_payments, ops.config, publishing.doi_prefixes, publishing.monographs, sources.source_contributions,
-    sources.source_records, publications.source_contribution_groups
+    sources.source_records, publications.contributions
 TO bibliometrie_app;
 
 -- Ce qui n'est délibérément pas accordé : TRUNCATE, l'écriture sur les tables du pipeline,

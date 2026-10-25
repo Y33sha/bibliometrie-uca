@@ -11,8 +11,8 @@ from pipeline.ingestion.common.doi_search import get_missing_dois
 from pipeline.ingestion.common.fingerprint import fingerprint
 from pipeline.ingestion.common.stale_refetch import get_stale_source_ids, set_disappeared
 from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
-from tests.integration.helpers.journals import insert_doi_prefix
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
+from tests.integration.helpers.serials import insert_doi_prefix
 from tests.integration.helpers.sources import insert_source_record
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
@@ -324,6 +324,29 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
         assert get_missing_dois(sa_sync_conn, "openalex", retry_after_days=30) == ["10.1234/a"]
 
+    def test_fenetre_d_annees_par_les_enregistrements_sources_de_la_publication(self, sa_sync_conn):
+        """Un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre : OpenAlex date la publication de 2021, ScanR de 2022."""
+        publication_id = _publication(sa_sync_conn, "T", in_perimeter=True)
+        _source_record(
+            sa_sync_conn,
+            publication_id,
+            source="openalex",
+            source_id="W1",
+            doi="10.1234/a",
+            publication_year=2021,
+        )
+        _source_record(
+            sa_sync_conn, publication_id, source="scanr", source_id="S1", publication_year=2022
+        )
+
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=[2022]) == [
+            "10.1234/a"
+        ]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=[2021]) == [
+            "10.1234/a"
+        ]
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30, years=[2020]) == []
+
 
 class TestGetStaleSourceIds:
     def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):
@@ -362,6 +385,27 @@ class TestGetStaleSourceIds:
         _source_record(sa_sync_conn, source="openalex", source_id="W2", publication_year=2023)
         rows = get_stale_source_ids(sa_sync_conn, "openalex", [2023, 2024], after_days=90)
         assert sorted(rows) == ["W2", "W3"]
+
+    def test_une_these_en_cours_est_relue_hors_fenetre(self, sa_sync_conn):
+        """Une thèse en cours n'a pas d'année de soutenance : son année de première inscription ne l'écarte pas."""
+        for sid in ("2005CLF21600", "s367812"):
+            insert_staging(sa_sync_conn, "theses", source_id=sid, seen_days_ago=100)
+        _source_record(
+            sa_sync_conn,
+            source="theses",
+            source_id="2005CLF21600",
+            publication_year=2005,
+            doc_type="thesis",
+        )
+        _source_record(
+            sa_sync_conn,
+            source="theses",
+            source_id="s367812",
+            publication_year=2012,
+            doc_type="ongoing_thesis",
+        )
+        rows = get_stale_source_ids(sa_sync_conn, "theses", [2023, 2024], after_days=90)
+        assert rows == ["s367812"]
 
     def test_no_year_filter_returns_all(self, sa_sync_conn):
         insert_staging(sa_sync_conn, "openalex", source_id="W1", seen_days_ago=100)

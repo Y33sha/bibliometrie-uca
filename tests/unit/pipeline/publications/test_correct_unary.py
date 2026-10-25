@@ -31,7 +31,7 @@ def test_tally_corrections_compte_les_regles():
                 "thesis",
                 None,
                 {},
-                {"doc_type": stash_entry("article", "THESIS_WITH_JOURNAL_TO_ARTICLE")},
+                {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
             ),
         ),
         # deux champs corrigés sur un même enregistrement source → 1 enregistrement source, 2 déclenchements
@@ -42,7 +42,7 @@ def test_tally_corrections_compte_les_regles():
                 "green",
                 {},
                 {
-                    "doc_type": stash_entry("article", "JOURNAL_TYPE_MEDIA_TO_MEDIA"),
+                    "doc_type": stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
                     "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
                 },
             ),
@@ -53,8 +53,8 @@ def test_tally_corrections_compte_les_regles():
     corrected, rule_counts = tally_corrections(updates)
     assert corrected == 2
     assert rule_counts == {
-        "THESIS_WITH_JOURNAL_TO_ARTICLE": 1,
-        "JOURNAL_TYPE_MEDIA_TO_MEDIA": 1,
+        "THESIS_WITH_SERIAL_TO_ARTICLE": 1,
+        "SERIAL_TYPE_MEDIA_TO_MEDIA": 1,
         "EMBARGO_EXPIRED_TO_GREEN": 1,
     }
 
@@ -70,7 +70,7 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
         "title": "Un titre quelconque",
         "doc_type": "article",
         "doi": None,
-        "journal_id": None,
+        "serial_id": None,
         "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
@@ -87,30 +87,30 @@ def test_no_rule_returns_none():
     assert _update(_source_record(doc_type="article")) is None
 
 
-def test_thesis_with_journal_id_and_publisher_doi_is_mistyped_article():
+def test_thesis_with_serial_id_and_publisher_doi_is_mistyped_article():
     # Mistype OpenAlex/ScanR : un article typé thèse, rattaché à un journal, avec un DOI d'éditeur
     # (préfixe ≠ registre de thèses) → article.
-    upd = _update(_source_record(doc_type="thesis", journal_id=42, doi="10.1016/j.ex.2020.01.001"))
+    upd = _update(_source_record(doc_type="thesis", serial_id=42, doi="10.1016/j.ex.2020.01.001"))
     assert upd is not None
     assert upd.corrected.doc_type == "article"
     assert upd.corrected.corrections == {
-        "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE"}
+        "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_SERIAL_TO_ARTICLE"}
     }
 
 
-def test_thesis_with_journal_id_but_thesis_registry_doi_stays_thesis():
-    # DOI ABES (registre des thèses FR) : c'est le DOI propre de la thèse, le journal_id est parasite
+def test_thesis_with_serial_id_but_thesis_registry_doi_stays_thesis():
+    # DOI ABES (registre des thèses FR) : c'est le DOI propre de la thèse, le serial_id est parasite
     # (conflation thèse↔version publiée) → le type reste thèse, pas de correction.
-    assert _update(_source_record(doc_type="thesis", journal_id=42, doi="10.70675/abc123")) is None
+    assert _update(_source_record(doc_type="thesis", serial_id=42, doi="10.70675/abc123")) is None
 
 
-def test_thesis_with_journal_id_no_doi_stays_thesis():
+def test_thesis_with_serial_id_no_doi_stays_thesis():
     # Sans DOI, rien ne distingue le mistype de la conflation : on ne bascule pas, le type reste thèse.
-    assert _update(_source_record(doc_type="thesis", journal_id=42, doi=None)) is None
+    assert _update(_source_record(doc_type="thesis", serial_id=42, doi=None)) is None
 
 
-def test_real_thesis_without_journal_id_untouched():
-    assert _update(_source_record(doc_type="thesis", journal_id=None)) is None
+def test_real_thesis_without_serial_id_untouched():
+    assert _update(_source_record(doc_type="thesis", serial_id=None)) is None
 
 
 def test_retrait_par_cluster_reapplique():
@@ -136,7 +136,7 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
     upd = _update(
         _source_record(
             doc_type="thesis",
-            journal_id=42,
+            serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
             external_ids={"hal_id": ["tel-01", "hal-99", "hal-5"]},
             corrections=removal,
@@ -153,7 +153,7 @@ def test_thesis_to_article_strips_dissertation_keys():
     upd = _update(
         _source_record(
             doc_type="thesis",
-            journal_id=42,
+            serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
             external_ids={"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
         )
@@ -163,7 +163,7 @@ def test_thesis_to_article_strips_dissertation_keys():
     assert upd.corrected.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
     assert upd.corrected.corrections["external_ids"] == {
         "raw": {"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
-        "corrected_by": "THESIS_WITH_JOURNAL_TO_ARTICLE",
+        "corrected_by": "THESIS_WITH_SERIAL_TO_ARTICLE",
     }
 
 
@@ -172,7 +172,7 @@ def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
     upd = _update(
         _source_record(
             doc_type="thesis",
-            journal_id=42,
+            serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
             external_ids={"pmid": "123"},
         )
@@ -183,29 +183,29 @@ def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
     assert "external_ids" not in upd.corrected.corrections
 
 
-def test_journal_id_wins_over_theses_fr_url_conflation():
-    # Conflation thèse↔article : un enregistrement source theses.fr AVEC un journal_id ET un DOI d'éditeur → article
-    # (`journal_id_present: False` garde la règle URL ; `doi_prefix_not_in` distingue l'article
+def test_serial_id_wins_over_theses_fr_url_conflation():
+    # Conflation thèse↔article : un enregistrement source theses.fr AVEC un serial_id ET un DOI d'éditeur → article
+    # (`serial_id_present: False` garde la règle URL ; `doi_prefix_not_in` distingue l'article
     # publié — DOI éditeur — d'une vraie thèse à DOI ABES).
     upd = _update(
         _source_record(
             doc_type="thesis",
-            journal_id=42,
+            serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
             urls=["https://theses.fr/2020X"],
         )
     )
     assert upd is not None
     assert upd.corrected.doc_type == "article"
-    assert upd.corrected.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_JOURNAL_TO_ARTICLE"
+    assert upd.corrected.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
 
 
-def test_journal_media_corrects_and_stashes_the_value_before_correction():
-    upd = _update(_source_record(source="hal", doc_type="article", journal_type="media"))
+def test_serial_media_corrects_and_stashes_the_value_before_correction():
+    upd = _update(_source_record(source="hal", doc_type="article", serial_type="media"))
     assert upd is not None
     assert upd.corrected.doc_type == "media"
     assert upd.corrected.corrections == {
-        "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+        "doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
 
@@ -232,8 +232,8 @@ def test_self_heals_when_rule_no_longer_applies():
     # la correction doit être défaite, le brut canonique 'article' restauré.
     source_record = _source_record(
         doc_type="media",
-        journal_type=None,
-        corrections={"doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}},
+        serial_type=None,
+        corrections={"doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}},
     )
     upd = _update(source_record)
     assert upd is not None
@@ -284,7 +284,7 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
             id=1,
             doc_type="media",
             corrections={
-                "doc_type": {"raw": "article", "corrected_by": "JOURNAL_TYPE_MEDIA_TO_MEDIA"}
+                "doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
             },
         ),
         _source_record(id=2, doc_type="article", urls=["https://theses.fr/2020ABCD"]),

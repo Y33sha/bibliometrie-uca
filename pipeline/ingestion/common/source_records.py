@@ -12,8 +12,10 @@ from datetime import date
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
+from domain.publishers.attribution import source_record_has_publisher
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import normalize_external_ids
 from domain.source_records.languages import language_code
@@ -49,8 +51,10 @@ class SourceRecordUpsert:
     publication_year: int | None = None
     raw_doc_type: str | None = None
     """Type de document dans le vocabulaire de la source."""
-    journal_id: int | None = None
+    serial_id: int | None = None
     monograph_id: int | None = None
+    publisher_id: int | None = None
+    """Éditeur que nomme la source. L'écriture le retire d'une production hébergée sans être publiée (`source_record_has_publisher`)."""
     container_title: str | None = None
     raw_language: str | None = None
     """Langue dans le vocabulaire de la source."""
@@ -134,6 +138,12 @@ class SourceRecordStore:
         params: dict[str, object] = {name: getattr(row, name) for name in _ROW_FIELDS}
         params["title_normalized"] = normalized_title(row.title)
         params["doc_type"] = _doc_type(row)
+        if not source_record_has_publisher(
+            params["doc_type"],
+            row.source,
+            has_container=row.serial_id is not None or row.monograph_id is not None,
+        ):
+            params["publisher_id"] = None
         params["language"] = language_code(row.raw_language, self._forms())
         params["external_ids"] = _external_ids(row)
         return scalar_int(self._conn.execute(_UPSERT_SQL, params))
@@ -246,10 +256,8 @@ def delete_disappeared_source_records(conn: Connection) -> int:
     return _delete_source_records(conn, "s.disappeared_at IS NOT NULL", {})
 
 
-def delete_source_records_before(
-    conn: Connection, start_year: int, *, exempt_sources: tuple[str, ...]
-) -> tuple[int, int]:
-    """Supprime les enregistrements sources parus avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Les enregistrements sources des sources `exempt_sources` restent.
+def delete_source_records_before(conn: Connection, start_year: int) -> tuple[int, int]:
+    """Supprime les enregistrements sources parus avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Une thèse en cours reste : elle n'a pas d'année de soutenance.
 
     Rend le nombre de `source_records` et de lignes de `staging` supprimées.
     """
@@ -258,9 +266,9 @@ def delete_source_records_before(
             text("""
                 SELECT sr.staging_id FROM source_records sr
                 WHERE sr.publication_year < :start_year AND sr.staging_id IS NOT NULL
-                  AND sr.source::text <> ALL(:exempt)
+                  AND sr.doc_type IS DISTINCT FROM CAST(:ongoing AS doc_type)
             """),
-            {"start_year": start_year, "exempt": list(exempt_sources)},
+            {"start_year": start_year, "ongoing": DocType.ONGOING_THESIS},
         ).scalars()
     )
     if not staging_ids:

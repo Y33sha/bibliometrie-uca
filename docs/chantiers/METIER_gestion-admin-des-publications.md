@@ -56,7 +56,7 @@ La fiche [Preprints fusionnés avec leur article par substitution de DOI](archiv
 
 ### 3. Détection des fusions suspectes
 
-Prérequis : phase 3 du chantier [alignement des auteurs](DATA_alignement-auteurs.md). La mesure du recouvrement porte sur les auteurs alignés.
+Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DATA_alignement-auteurs.md). La mesure du recouvrement porte sur les auteurs alignés.
 
 - [ ] Onglet « Recouvrement d'auteurs » et son compteur.
 - [ ] Mesure de sa précision sur des cas relus.

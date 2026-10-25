@@ -8,6 +8,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, computed_field
 
+from domain.sources.registry import Source, source_record_url
+
 
 def page_count(total: int, per_page: int) -> int:
     """Nombre de pages couvrant `total` résultats, zéro sur un résultat vide."""
@@ -30,6 +32,20 @@ class PaginatedResponse(BaseModel):
         return page_count(self.total, self.per_page)
 
 
+class SourceLink(BaseModel):
+    """Identifiant d'un enregistrement source et son lien vers le portail de la source."""
+
+    source_id: str
+    record_url: str
+
+
+def hal_links(halids: list[str] | None) -> list[SourceLink]:
+    """Liens des dépôts HAL `halids`."""
+    return [
+        SourceLink(source_id=h, record_url=source_record_url(Source.HAL, h)) for h in halids or []
+    ]
+
+
 class FacetOption(BaseModel):
     """Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
 
@@ -41,7 +57,7 @@ class FacetOption(BaseModel):
     count: int
 
 
-EntityKind = Literal["publisher", "journal", "person", "subject"]
+EntityKind = Literal["publisher", "serial", "person", "subject"]
 
 
 class EntityFacetItem(BaseModel):

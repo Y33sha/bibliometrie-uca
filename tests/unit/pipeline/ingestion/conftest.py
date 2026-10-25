@@ -10,9 +10,9 @@ import pytest
 from domain.persons.identifiers import PersonIdentifierType
 from domain.sources.staging import StagingEntryMode
 from pipeline.ingestion.common import harvester, person_search
-from pipeline.ingestion.common.staging import UpsertOutcome
+from pipeline.ingestion.common.staging import StagingStore, UpsertOutcome
 
-# Signaux `(inserted, changed)` d'`upsert_staging` pour chaque issue.
+# Signaux `(inserted, changed)` de `StagingStore.upsert` pour chaque issue.
 _SIGNAUX = {
     UpsertOutcome.NEW: (True, False),
     UpsertOutcome.UPDATED: (False, True),
@@ -22,7 +22,7 @@ _SIGNAUX = {
 
 @dataclass(frozen=True)
 class Ecriture:
-    """Un appel à `upsert_staging`."""
+    """Un appel à `StagingStore.upsert`."""
 
     source: str
     source_id: str
@@ -52,8 +52,10 @@ def configuration(monkeypatch):
             )
         monkeypatch.setattr(
             harvester,
-            "get_years",
-            lambda conn, start_year=None: [2024] if annees is None else annees,
+            "window_years",
+            lambda conn, *, start_year, year: (
+                [year] if year else [2024] if annees is None else annees
+            ),
         )
 
     return _poser
@@ -68,7 +70,7 @@ def ecritures(monkeypatch) -> list[Ecriture]:
     ecrits: list[Ecriture] = []
 
     def _upsert(
-        conn,
+        _store,
         *,
         source,
         source_id,
@@ -80,7 +82,7 @@ def ecritures(monkeypatch) -> list[Ecriture]:
         ecrits.append(Ecriture(source, source_id, doi, authors_truncated, entry_mode))
         return _SIGNAUX[raw_data.get("_route", UpsertOutcome.NEW)]
 
-    monkeypatch.setattr(harvester, "upsert_staging", _upsert)
+    monkeypatch.setattr(StagingStore, "upsert", _upsert)
     return ecrits
 
 

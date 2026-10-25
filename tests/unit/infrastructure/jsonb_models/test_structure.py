@@ -49,7 +49,7 @@ class TestStructureApiIds:
         (la liste des sources `api_ids` est connaissance métier centralisée
         dans `domain.sources.STRUCTURE_API_SOURCES`)."""
         with pytest.raises(PydanticValidationError):
-            StructureApiIds(openalex=["I123"], crossref=["10.5281/..."])
+            StructureApiIds.model_validate({"openalex": ["I123"], "crossref": ["10.5281/..."]})
 
     def test_fields_match_domain_whitelist(self):
         """Les champs déclarés du modèle doivent correspondre exactement

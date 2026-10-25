@@ -24,8 +24,11 @@ from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatu
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.structures.structure import StructureType
-from infrastructure.read_models.sql_fragments import name_form_holder, other_name_form_holders
-from infrastructure.sql_fragments import has_author_role, identifier_neutralized
+from infrastructure.read_models.sql_fragments import (
+    name_form_holder,
+    other_name_form_holders,
+)
+from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role, identifier_neutralized
 
 # ── Name-form contributions ────────────────────────────────────────
 
@@ -33,15 +36,14 @@ from infrastructure.sql_fragments import has_author_role, identifier_neutralized
 def name_form_contributions(
     conn: Connection, person_id: int, name_form: str
 ) -> NameFormContributionsResponse:
-    """Contributions sources liées à une personne pour une forme de nom donnée, + autres personnes qui portent cette forme sans l'avoir rejetée."""
+    """Contributions sources d'une personne sous une forme de nom donnée : membres de ses groupes. S'y ajoutent les autres personnes qui portent cette forme sans l'avoir rejetée."""
     auth_rows = conn.execute(
-        text("""
+        text(f"""
             SELECT sc.source, sc.id AS source_contribution_id,
                    sr.publication_id, sr.title, sr.publication_year, sr.doi
-            FROM source_contributions sc
-            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+            FROM {GROUP_MEMBERS}
             JOIN source_records sr ON sr.id = sc.source_record_id
-            WHERE sc.person_id = :pid AND ci.author_name_normalized = :nf
+            WHERE g.person_id = :pid AND ci.author_name_normalized = :nf
             ORDER BY sr.publication_year DESC, sr.title
         """),
         {"pid": person_id, "nf": name_form},
@@ -175,24 +177,13 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = ci.identifiers ->> k.k
     ),
-    -- Couples (personne, informations du contributeur) lus sur l'index `idx_source_contributions_person`, sans accès à la table.
-    person_identities AS MATERIALIZED (
-        SELECT DISTINCT sc.person_id, sc.contributor_information_id
-        FROM source_contributions sc
-        WHERE sc.person_id IS NOT NULL
-          AND sc.contributor_information_id IN (SELECT id FROM pending_identities)
-    ),
+    -- Personnes porteuses : un membre de l'un de leurs groupes a l'identifiant et ne le neutralise pas.
     bearers AS (
-        SELECT DISTINCT pi.person_id, p.id_type, p.id_value
-        FROM person_identities pi
-        JOIN pending_identities p ON p.id = pi.contributor_information_id
-        -- Une contribution source du couple qui ne neutralise pas l'identifiant ; `LIMIT 1` garde la recherche par couple sur l'index.
-        CROSS JOIN LATERAL (
-            SELECT 1 FROM source_contributions sc
-            WHERE sc.person_id = pi.person_id AND sc.contributor_information_id = pi.contributor_information_id
-              AND NOT {identifier_neutralized("p.k")}
-            LIMIT 1
-        ) kept
+        SELECT DISTINCT g.person_id, p.id_type, p.id_value
+        FROM {GROUP_MEMBERS}
+        JOIN pending_identities p ON p.id = ci.id
+        WHERE g.person_id IS NOT NULL
+          AND NOT {identifier_neutralized("p.k")}
     ),
     person_identifier_keys AS (
         SELECT b.* FROM bearers b
@@ -232,15 +223,17 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
             SELECT p.id, p.first_name, p.last_name,
                    EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh,
                    (SELECT count(*) FROM contributions a
-                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS source_contribution_count,
+                    WHERE a.person_id = p.id AND {has_author_role("a")}) AS contribution_count,
                    COALESCE((
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
                        FROM structures s
                        WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
                            SELECT scs.structure_id FROM source_contribution_structures scs
-                           JOIN source_contributions sc ON sc.id = scs.source_contribution_id
-                           WHERE sc.person_id = p.id
+                           JOIN aligned_source_contributions m
+                             ON m.source_contribution_id = scs.source_contribution_id
+                           JOIN contributions g ON g.id = m.contribution_id
+                           WHERE g.person_id = p.id
                        )
                    ), ARRAY[]::text[]) AS labs
             FROM persons p WHERE p.id = ANY(:ids)
@@ -253,7 +246,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
             first_name=r.first_name,
             last_name=r.last_name,
             has_rh=r.has_rh,
-            source_contribution_count=r.source_contribution_count,
+            contribution_count=r.contribution_count,
             labs=list(r.labs or []),
         )
         for r in rows
@@ -374,7 +367,7 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain `contributions`. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
+# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain des contributions. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
@@ -393,11 +386,11 @@ _OVERLAP_DIMENSIONS: dict[str, str] = {
         JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
         WHERE a.person_id = ANY(:ids)
     """,
-    "journals": """
-        SELECT a.person_id AS person, p.journal_id AS val
+    "serials": """
+        SELECT a.person_id AS person, p.serial_id AS val
         FROM contributions a
         JOIN publications p ON p.id = a.publication_id
-        WHERE a.person_id = ANY(:ids) AND p.journal_id IS NOT NULL
+        WHERE a.person_id = ANY(:ids) AND p.serial_id IS NOT NULL
     """,
 }
 
@@ -445,7 +438,7 @@ def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, in
         key=lambda t: (
             t[2]["coauthors"] + t[2]["shared_publications"],
             t[2]["labs"],
-            t[2]["journals"],
+            t[2]["serials"],
         ),
         reverse=True,
     )
@@ -475,7 +468,7 @@ def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplic
                 coauthors=overlaps["coauthors"],
                 shared_publications=overlaps["shared_publications"],
                 labs=overlaps["labs"],
-                journals=overlaps["journals"],
+                serials=overlaps["serials"],
             ),
         )
         for id_a, id_b, overlaps in page_pairs

@@ -18,7 +18,7 @@ from domain.normalize import normalize_text, to_plain_text
 from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
-from domain.sources.registry import Source
+from domain.sources.registry import Source, source_record_url
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     OA_OPEN_STATUSES,
@@ -35,7 +35,6 @@ from infrastructure.read_models.filters import (
     hal_status_clause,
     hal_status_expression,
     in_perimeter_person_clause,
-    journal_id_clause,
     lab_clause,
     language_clause,
     license_clause,
@@ -45,6 +44,7 @@ from infrastructure.read_models.filters import (
     person_clause,
     publisher_id_clause,
     search_clause,
+    serial_id_clause,
     source_clause,
     subject_clause,
     year_clause,
@@ -53,16 +53,6 @@ from infrastructure.sql_fragments import has_author_role, source_extra
 
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
-
-# Gabarits d'URL publique par source, pour la colonne « Sources » des exports CSV.
-_SOURCE_URL = {
-    "hal": "https://hal.science/{}",
-    "openalex": "https://openalex.org/{}",
-    "wos": "https://www.webofscience.com/wos/woscc/full-record/{}",
-    "scanr": "https://scanr.enseignementsup-recherche.gouv.fr/publications/{}",
-    "theses": "https://theses.fr/{}",
-}
-
 
 # Pivot des identifiants source (alias `sd` sur `source_records`) : une colonne `<source>_id`
 # par source d'extraction. Partagé par les deux listes qui exposent cinq identifiants ; l'export
@@ -73,9 +63,13 @@ _SOURCE_ID_COLUMNS = ",\n                    ".join(
 )
 
 
-def _source_links(ids: dict[str, str | None]) -> dict[str, str]:
+def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str, str]:
     """URL publique de chaque source présente (identifiant non nul), pour la colonne « Sources »."""
-    return {source: _SOURCE_URL[source].format(value) for source, value in ids.items() if value}
+    return {
+        source: source_record_url(source, value, oa_status)
+        for source, value in ids.items()
+        if value
+    }
 
 
 def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
@@ -96,7 +90,7 @@ def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
         doc_type_clause(filters.doc_types),
         license_clause(filters.license),
         publisher_id_clause(filters.publisher_id),
-        journal_id_clause(filters.journal_id),
+        serial_id_clause(filters.serial_id),
         monograph_id_clause(filters.monograph_id),
         country_clause(filters.country_values),
         language_clause(filters.language_codes),
@@ -208,7 +202,7 @@ def list_publications(
                 p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                 p.oa_status::text AS oa_status,
                 p.license::text AS license,
-                j.id AS journal_id,
+                j.id AS serial_id,
                 j.title AS journal_title,
                 pub.id AS publisher_id,
                 pub.name AS publisher_name,
@@ -228,6 +222,7 @@ def list_publications(
                     (SELECT ath.person_id
                      FROM contributions ath
                      WHERE ath.publication_id = p.id
+                       AND ath.person_id IS NOT NULL
                        AND {has_author_role("ath")}
                      LIMIT 1)
                  END) AS thesis_author_person_id,
@@ -263,8 +258,8 @@ def list_publications(
                  WHERE ap.publication_id = p.id
                 ) AS apc_details
             FROM publications p
-            LEFT JOIN journals j ON j.id = p.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN serials j ON j.id = p.serial_id
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS},
@@ -297,8 +292,8 @@ def list_publications(
             doc_type=r.doc_type,
             oa_status=r.oa_status,
             license=r.license,
-            journal_id=r.journal_id,
-            journal=r.journal_title,
+            serial_id=r.serial_id,
+            serial=r.journal_title,
             publisher_id=r.publisher_id,
             publisher=r.publisher_name,
             hal_id=r.hal_id,
@@ -487,8 +482,8 @@ def export_publications_csv(
                    {person_lab_filter_a3}
                 ) AS labs
             FROM publications p
-            LEFT JOIN journals j ON j.id = p.journal_id
-            LEFT JOIN publishers pub ON pub.id = j.publisher_id
+            LEFT JOIN serials j ON j.id = p.serial_id
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN LATERAL (
                 SELECT
                     {_SOURCE_ID_COLUMNS}
@@ -519,7 +514,7 @@ def export_publications_csv(
         ("type", "Type"),
         ("year", "Année"),
         ("title", "Titre"),
-        ("journal", "Revue"),
+        ("serial", "Revue"),
         ("publisher", "Éditeur"),
         ("labs", "Laboratoires"),
         ("corr", "Corresp."),
@@ -551,7 +546,8 @@ def _publication_lines(
                 "wos": row.wos_id,
                 "scanr": row.scanr_id,
                 "theses": row.theses_id,
-            }
+            },
+            row.oa_status,
         )
         cell = {
             "Type": row.doc_type or "",
@@ -671,7 +667,8 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
                 "openalex": row.openalex_id,
                 "scanr": row.scanr_id,
                 "theses": row.theses_id,
-            }
+            },
+            row.oa_status,
         )
         access = "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé"
         yield writer.line(

@@ -432,19 +432,13 @@ def subject_clause(subject_ids: list[int]) -> WhereClause | None:
 def publisher_id_clause(publisher_id: int | None) -> WhereClause | None:
     if not publisher_id:
         return None
-    return WhereClause(
-        """EXISTS (
-            SELECT 1 FROM journals j2
-            WHERE j2.id = p.journal_id AND j2.publisher_id = :flt_publisher_id
-        )""",
-        {"flt_publisher_id": publisher_id},
-    )
+    return WhereClause("p.publisher_id = :flt_publisher_id", {"flt_publisher_id": publisher_id})
 
 
-def journal_id_clause(journal_id: int | None) -> WhereClause | None:
-    if not journal_id:
+def serial_id_clause(serial_id: int | None) -> WhereClause | None:
+    if not serial_id:
         return None
-    return WhereClause("p.journal_id = :flt_journal_id", {"flt_journal_id": journal_id})
+    return WhereClause("p.serial_id = :flt_serial_id", {"flt_serial_id": serial_id})
 
 
 def monograph_id_clause(monograph_id: int | None) -> WhereClause | None:
@@ -570,10 +564,10 @@ def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
 _PERSONS_SORT_MAP = {
     "name_asc": "LOWER(p.last_name) ASC, LOWER(p.first_name) ASC",
     "name_desc": "LOWER(p.last_name) DESC, LOWER(p.first_name) DESC",
-    "source_contributions_asc": "source_contribution_count ASC, LOWER(p.last_name) ASC",
-    "source_contributions_desc": "source_contribution_count DESC, LOWER(p.last_name) ASC",
-    "in_perimeter_source_contributions_asc": "in_perimeter_source_contribution_count ASC, LOWER(p.last_name) ASC",
-    "in_perimeter_source_contributions_desc": "in_perimeter_source_contribution_count DESC, LOWER(p.last_name) ASC",
+    "contributions_asc": "contribution_count ASC, LOWER(p.last_name) ASC",
+    "contributions_desc": "contribution_count DESC, LOWER(p.last_name) ASC",
+    "in_perimeter_contributions_asc": "in_perimeter_contribution_count ASC, LOWER(p.last_name) ASC",
+    "in_perimeter_contributions_desc": "in_perimeter_contribution_count DESC, LOWER(p.last_name) ASC",
     "dept_asc": "prh.department_name ASC NULLS LAST, LOWER(p.last_name) ASC",
     "dept_desc": "prh.department_name DESC NULLS LAST, LOWER(p.last_name) ASC",
     "role_asc": "prh.role_title ASC NULLS LAST, LOWER(p.last_name) ASC",

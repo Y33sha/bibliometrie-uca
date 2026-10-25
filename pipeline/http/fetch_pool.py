@@ -10,37 +10,13 @@ Motif partagé par les phases async du pipeline (`fetch_missing`, `fetch_stale`,
 from __future__ import annotations
 
 import asyncio
-import time
 from collections.abc import Awaitable, Callable, Sequence
 
 import httpx2
 from sqlalchemy import Connection
 
-from pipeline.http.circuit_breaker import get_current_breaker
+from pipeline.http.circuit_breaker import source_tripped
 from pipeline.http.tls import tls_context
-
-
-class RequestPace:
-    """Plafond de débit commun à des requêtes simultanées : les départs sont réservés l'un après l'autre, espacés de `1 / max_per_second` seconde.
-
-    Une pause propre à chaque worker donne un débit qui dépend du temps de réponse de la source ; ce rythme partagé le borne quelle que soit la concurrence.
-
-    Un worker que l'ordonnancement retarde part après sa réservation, jamais avant : le nombre de départs sur une durée reste borné, même quand deux d'entre eux se suivent de près après une pause de la boucle d'événements.
-    """
-
-    def __init__(self, max_per_second: float) -> None:
-        self._interval_s = 1 / max_per_second
-        self._next_start = 0.0
-        self._lock = asyncio.Lock()
-
-    async def wait(self) -> None:
-        """Attend le prochain départ autorisé et le réserve."""
-        async with self._lock:
-            now = time.monotonic()
-            start = max(now, self._next_start)
-            self._next_start = start + self._interval_s
-        if start > now:
-            await asyncio.sleep(start - now)
 
 
 async def run_fetch_pool[Item, Fetched](
@@ -54,7 +30,6 @@ async def run_fetch_pool[Item, Fetched](
     prepare: Callable[[Connection, Item], Item] | None = None,
 ) -> None:
     """Traite `items` par un pool de `max_concurrent` workers : `fetch` async concurrent puis `write` sync sérialisé, commit tous les `commit_every` items. S'arrête quand le circuit-breaker courant coupe."""
-    breaker = get_current_breaker()
     db_lock = asyncio.Lock()
     item_iter = iter(items)
     done = 0
@@ -64,7 +39,7 @@ async def run_fetch_pool[Item, Fetched](
         async def worker() -> None:
             nonlocal done
             for item in item_iter:
-                if breaker is not None and breaker.tripped:
+                if source_tripped():
                     return
                 if prepare is not None:
                     async with db_lock:

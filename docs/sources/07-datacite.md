@@ -26,9 +26,9 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 Les deux routes rendent un même DOI sous deux formes. Le hash de détection de changement ignore ces différences et les compteurs de consultation.
 
 - *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
-- Pas de quota contractuel. L'adaptateur reste conservateur (`max_concurrent=3`, `request_delay_s=0.2`) pour ne pas se faire limiter
+- Pas de quota contractuel. Le pipeline s'en tient à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 3 requêtes simultanées (`max_concurrent=3`)
 
-**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par la sous-étape `resolve_datacite_publishers` de la phase [`publishers_journals`](../pipeline/05-publishers-journals.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishers-journals.md#agences-denregistrement-doi-resolve_ra).
+**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par la sous-étape `resolve_datacite_publishers` de la phase [`publishing`](../pipeline/05-publishing.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra).
 
 ## Données récupérées
 
@@ -91,7 +91,7 @@ Les deux routes rendent un même DOI sous deux formes. Le hash de détection de 
 
 ### Relations entre publications
 
-DataCite déclare ses relations dans `relatedIdentifiers[].relationType`, sous des valeurs comme `IsSupplementTo` ou `IsPartOf`. La phase [relations](../pipeline/10-enrichissements.md#relations-entre-publications-relations) les traduit vers son vocabulaire, et écarte celles qui désignent la même œuvre, une citation ou une évaluation.
+DataCite déclare ses relations dans `relatedIdentifiers[].relationType`, sous des valeurs comme `IsSupplementTo` ou `IsPartOf`. La phase [relations](../pipeline/11-enrichissements.md#relations-entre-publications-relations) les traduit vers son vocabulaire, et écarte celles qui désignent la même œuvre, une citation ou une évaluation.
 
 ### `doc_type` à deux niveaux
 
@@ -108,7 +108,7 @@ Les deux champs de type viennent du déposant du DOI : logiciel de l'entrepôt, 
 
 ### Affiliations textuelles
 
-Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_contribution_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les `source_contributions` DataCite dans la cascade de résolution des personnes.
+Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_contribution_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les contributions DataCite dans le rattachement à une personne.
 
 ### DOI liés et concept/version
 

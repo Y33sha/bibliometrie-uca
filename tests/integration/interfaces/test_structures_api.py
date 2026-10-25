@@ -10,18 +10,13 @@ Couvre :
 
 import json
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_structure,
     seed_structure_name_form,
     seed_tutelle,
     uniq,
 )
-
-_cleanup_after_module = truncate_after_module(
-    "structure_name_forms", "structure_parents", "structures", "audit_log"
-)
-
 
 # ── GET /api/structures (list) ──────────────────────────────────
 

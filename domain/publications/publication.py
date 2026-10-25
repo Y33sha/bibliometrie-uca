@@ -30,8 +30,10 @@ class Publication:
     # Licence de la version éditeur, et licence du fichier déposé dans HAL (valeurs de `License`).
     license: str | None = None
     deposit_license: str | None = None
-    journal_id: int | None = None
+    serial_id: int | None = None
     monograph_id: int | None = None
+    # Éditeur à la date de publication (`domain.publishers.attribution`).
+    publisher_id: int | None = None
     container_title: str | None = None
     language: str | None = None
     abstract: str | None = None

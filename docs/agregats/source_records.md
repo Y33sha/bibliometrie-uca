@@ -11,7 +11,7 @@ Un enregistrement source est l'image d'un document dans **une** source — HAL, 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
 | `source_records` | Image d'un document dans une source | `(source, source_id)`, `publication_id`, `doi`, `doc_type`, `external_ids`, `raw_doc_type`, `title_normalized`, `corrections`, `source_extras` |
-| `source_contributions` | Contribution source d'auteur pour cette source | `source_record_id`, `contributor_information_id`, `person_id`, `author_position`, `roles`, `in_perimeter`, `resolution_mode` |
+| `source_contributions` | Contribution source d'auteur pour cette source | `source_record_id`, `contributor_information_id`, `author_position`, `roles`, `in_perimeter` |
 | `contributor_information` | Informations du contributeur dédoublonnées | `author_name_normalized`, `identifiers`, `key_hash` |
 | `source_contribution_addresses` | Lien entre une contribution source et ses adresses | `source_contribution_id`, `address_id` |
 | `source_contribution_structures` | Vue matérialisée : contribution source ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |
@@ -49,7 +49,7 @@ Les valeurs lues sont déjà corrigées.
 
 **Regroupement des doublons.** Chaque enregistrement marqué à reprendre est projeté en jetons de confirmation, les enregistrements partageant un jeton sont reliés, puis la phase décide ce qu'il faut en faire : rapprocher, créer, réunir ou séparer, puis repointer les rattachements.
 
-**Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `contributions` consolide les contributions sources ; la phase `persons` lit les contributions sources du périmètre.
+**Autres lectures.** La phase `subjects` lit les thématiques source par source, en conservant leur provenance ; la phase `author_grouping` aligne les contributions sources de chaque publication ; la phase `persons` lit les contributions sources alignées.
 
 ## Lecture par l'API
 

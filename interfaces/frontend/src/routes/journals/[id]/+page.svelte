@@ -14,12 +14,12 @@
 	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
 	import type { components } from '$lib/api/schema';
 
-	type JournalDetail = components['schemas']['JournalDetailResponse'];
-	type JournalDashboard = components['schemas']['JournalDashboardResponse'];
+	type SerialDetail = components['schemas']['SerialDetailResponse'];
+	type SerialDashboard = components['schemas']['SerialDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
-	const journalId = $derived(Number($page.params.id));
+	const serialId = $derived(Number($page.params.id));
 	const activeTab = $derived(
 		(() => {
 			const t = $page.url.searchParams.get('tab');
@@ -27,15 +27,15 @@
 		})()
 	);
 
-	let journal = $state<JournalDetail | null>(null);
+	let journal = $state<SerialDetail | null>(null);
 
 	// Onglet des monographies, selon le type de la revue : volumes d'une série d'actes, livres d'une collection.
 	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
-	const monographsTabLabel = $derived(journal?.journal_type ? MONOGRAPHS_TAB_LABELS[journal.journal_type] : undefined);
+	const monographsTabLabel = $derived(journal?.serial_type ? MONOGRAPHS_TAB_LABELS[journal.serial_type] : undefined);
 	let error = $state(false);
 	let canGoBack = $state(false);
 
-	let dashboard = $state<JournalDashboard | null>(null);
+	let dashboard = $state<SerialDashboard | null>(null);
 	let subjects = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
 
@@ -58,7 +58,7 @@
 
 	let showRawDoaj = $state(false);
 
-	let journalTypeLabels: Record<string, string> = $state({});
+	let serialTypeLabels: Record<string, string> = $state({});
 
 	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé via le toggle (« Voir payload brut ») pour permettre l'exploration au-delà de cette sélection.
 	const READABLE_DOAJ_FIELDS: { key: string; label: string }[] = [
@@ -73,9 +73,9 @@
 		{ key: 'APC currency', label: 'Devise APC' }
 	];
 
-	async function loadJournal() {
+	async function loadSerial() {
 		try {
-			journal = await apiDetail<JournalDetail>(`/api/journals/${journalId}`);
+			journal = await apiDetail<SerialDetail>(`/api/serials/${serialId}`);
 		} catch {
 			error = true;
 		}
@@ -84,8 +84,8 @@
 	async function loadDashboard() {
 		if (dashboardLoaded) return;
 		const [d, s] = await Promise.all([
-			api<JournalDashboard>(`/api/journals/${journalId}/dashboard`, { key: 'j-dashboard' }),
-			api<SubjectFrequency[]>(`/api/journals/${journalId}/subjects?limit=20`, {
+			api<SerialDashboard>(`/api/serials/${serialId}/dashboard`, { key: 'j-dashboard' }),
+			api<SubjectFrequency[]>(`/api/serials/${serialId}/subjects?limit=20`, {
 				key: 'j-subjects'
 			})
 		]);
@@ -102,10 +102,10 @@
 		canGoBack =
 			(window as any).navigation?.canGoBack ??
 			document.referrer.startsWith(window.location.origin);
-		const labelsP = api<EnumOption[]>('/api/journals/types').then((opts) => {
-			journalTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+		const labelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
+			serialTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
 		});
-		await Promise.all([loadJournal(), labelsP]);
+		await Promise.all([loadSerial(), labelsP]);
 		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
@@ -158,9 +158,9 @@
 						<span class="publisher-link">{journal.publisher_name}</span>
 					{/if}
 				{/if}
-				{#if journal.journal_type}
+				{#if journal.serial_type}
 					<span class="meta-label">Type</span>
-					<span class="type-tag">{journalTypeLabels[journal.journal_type] ?? journal.journal_type}</span>
+					<span class="type-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
 				{/if}
 				{#if journal.oa_model}
 					<span class="meta-label">OA</span>
@@ -252,7 +252,7 @@
 	<!-- Tab: Monographies -->
 	{#if activeTab === 'monographs' && monographsTabLabel}
 		<div class="tab-content">
-			<MonographsListView apiKey={`journal-${journalId}-monographs`} externalFilters={{ journalId }} />
+			<MonographsListView apiKey={`journal-${serialId}-monographs`} externalFilters={{ serialId }} />
 		</div>
 	{/if}
 
@@ -260,9 +260,9 @@
 	{#if activeTab === 'publications'}
 		<div class="tab-content">
 			<PublicationsListView
-				apiKey={`journal-${journalId}-publications`}
-				externalFilters={{ journalId }}
-				basePath={`/journals/${journalId}`}
+				apiKey={`journal-${serialId}-publications`}
+				externalFilters={{ serialId }}
+				basePath={`/journals/${serialId}`}
 				showFilterBanner={false}
 				perPage={50}
 			/>

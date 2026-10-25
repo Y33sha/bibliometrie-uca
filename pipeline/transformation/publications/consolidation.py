@@ -6,7 +6,10 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from domain.publications.aggregation import refresh_from_sources as _refresh_aggregate
+from domain.publications.aggregation import (
+    assign_publisher,
+    refresh_from_sources as _refresh_aggregate,
+)
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
@@ -34,7 +37,7 @@ class _SourceRecordRow(NamedTuple):
     publication_year: int | None
     doc_type: str | None
     doi: str | None
-    journal_id: int | None
+    serial_id: int | None
     monograph_id: int | None
     container_title: str | None
     language: str | None
@@ -48,10 +51,11 @@ class _SourceRecordRow(NamedTuple):
     biblio: dict[str, JsonValue] | None
     source_extras: dict[str, JsonValue] | None
     license: str | None
+    publisher_id: int | None
 
 
 def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
-    """Mapping d'une row SQL `source_records` ⨝ `journals` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
+    """Mapping d'une row SQL `source_records` ⨝ `serials` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
     return SourceRecord(
         id=row.id,
         source=row.source,
@@ -60,7 +64,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
         publication_year=row.publication_year,
         doc_type=row.doc_type,
         doi=row.doi,
-        journal_id=row.journal_id,
+        serial_id=row.serial_id,
         monograph_id=row.monograph_id,
         container_title=row.container_title,
         language=row.language,
@@ -74,6 +78,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
         biblio=row.biblio,
         source_extras=row.source_extras,
         license=row.license,
+        publisher_id=row.publisher_id,
     )
 
 
@@ -88,10 +93,11 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
             SELECT sr.id, sr.source::text AS source, sr.source_id,
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
                    sr.doi,
-                   sr.journal_id, sr.monograph_id, sr.container_title, sr.language,
+                   sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
-                   sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license
+                   sr.topics, sr.biblio, sr.source_extras, sr.license::text AS license,
+                   sr.publisher_id
             FROM source_records sr
             WHERE sr.publication_id = :id
         """),
@@ -113,13 +119,13 @@ def converged_secondary_ids(conn: Connection, publication_id: int) -> frozenset[
     return frozenset(row.id for row in result)
 
 
-def monograph_journal_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict[int, int | None]:
-    """`journal_id` de chaque monographie : sa collection, pour l'agrégation."""
+def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict[int, int | None]:
+    """`serial_id` de chaque monographie : sa collection, pour l'agrégation."""
     rows = conn.execute(
-        text("SELECT id, journal_id FROM monographs WHERE id = ANY(:ids)"),
+        text("SELECT id, serial_id FROM monographs WHERE id = ANY(:ids)"),
         {"ids": list(monograph_ids)},
     )
-    return {r.id: r.journal_id for r in rows}
+    return {r.id: r.serial_id for r in rows}
 
 
 def unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str]:
@@ -134,11 +140,23 @@ def unpaywall_verdicts(conn: Connection, dois: Sequence[str]) -> dict[str, str]:
     return {r.doi: r.oa_status for r in rows}
 
 
-def journal_type_of(conn: Connection, journal_id: int) -> str | None:
-    """`journal_type` d'un journal, pour le rejeu des corrections qui dépendent de la revue. None si le journal n'existe pas ou son type n'est pas posé."""
+def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dict[str, int]:
+    """Titulaire de chaque préfixe DOI Crossref connu, pour l'éditeur des publications."""
+    rows = conn.execute(
+        text(
+            "SELECT prefix, publisher_id FROM doi_prefixes"
+            " WHERE prefix = ANY(:prefixes) AND ra = 'Crossref' AND publisher_id IS NOT NULL"
+        ),
+        {"prefixes": list(prefixes)},
+    )
+    return {r.prefix: r.publisher_id for r in rows}
+
+
+def serial_type_of(conn: Connection, serial_id: int) -> str | None:
+    """`serial_type` d'un journal, pour le rejeu des corrections qui dépendent de la revue. None si le journal n'existe pas ou son type n'est pas posé."""
     return conn.execute(
-        text("SELECT journal_type::text FROM journals WHERE id = :id"),
-        {"id": journal_id},
+        text("SELECT serial_type::text FROM serials WHERE id = :id"),
+        {"id": serial_id},
     ).scalar_one_or_none()
 
 
@@ -174,7 +192,7 @@ class RefreshVerdict(StrEnum):
 def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_records`.
 
-    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
     Une publication sans source rattachée (`NO_SOURCE`), ou dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
@@ -198,14 +216,22 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         sources,
         source_priority=SOURCE_PRIORITY,
         secondary_ids=secondary_ids,
-        monograph_journals=monograph_journal_ids(conn, monograph_ids) if monograph_ids else {},
+        monograph_serials=monograph_serial_ids(conn, monograph_ids) if monograph_ids else {},
         unpaywall=unpaywall_verdicts(conn, dois) if dois else {},
     )
     _apply_canonical_doc_type_correction(
         publication,
-        journal_type=journal_type_of(conn, publication.journal_id)
-        if publication.journal_id is not None
+        serial_type=serial_type_of(conn, publication.serial_id)
+        if publication.serial_id is not None
         else None,
+    )
+    prefixes = [publication.doi.prefix.value] if publication.doi else []
+    assign_publisher(
+        publication,
+        sources,
+        source_priority=SOURCE_PRIORITY,
+        secondary_ids=secondary_ids,
+        prefix_publishers=crossref_prefix_publishers(conn, prefixes) if prefixes else {},
     )
 
     if publication.doc_type in OUT_OF_SCOPE_DOC_TYPES:
@@ -217,21 +243,21 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
 
 
 def _apply_canonical_doc_type_correction(
-    publication: Publication, *, journal_type: str | None
+    publication: Publication, *, serial_type: str | None
 ) -> None:
     """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
 
-    L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication réunit alors un `doc_type` d'une source et un `journal_id` d'une autre, combinaison qu'aucune correction par source n'a vue.
+    L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication réunit alors un `doc_type` d'une source et un `serial_id` d'une autre, combinaison qu'aucune correction par source n'a vue.
 
-    `journal_type` est le type de la revue `publication.journal_id`. Mute `publication.doc_type` et réécrit `publication.corrections` : le type arbitré et la règle, ou rien sans correction. Idempotent.
+    `serial_type` est le type de la revue `publication.serial_id`. Mute `publication.doc_type` et réécrit `publication.corrections` : le type arbitré et la règle, ou rien sans correction. Idempotent.
     """
     corrected = effective_metadata(
         MetadataForCorrection.for_publication(
             title=publication.title,
             doc_type=publication.doc_type,
             doi=str(publication.doi) if publication.doi else None,
-            journal_id=publication.journal_id,
-            journal_type=journal_type,
+            serial_id=publication.serial_id,
+            serial_type=serial_type,
         )
     ).doc_type
     publication.corrections = {}

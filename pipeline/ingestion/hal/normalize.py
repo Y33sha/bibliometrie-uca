@@ -10,8 +10,6 @@ import defusedxml.ElementTree as ET
 from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role
 from domain.publications.doc_types import DocType
@@ -24,37 +22,31 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.licenses import normalize_license
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.publication_metadata import PublicationMetadata
-from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
+from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
     AuthorRecord,
     contributor_identifiers,
-    sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.hal.payload import (
     derive_hal_oa_status,
     extract_hal_source_extras,
     hal_text_field,
 )
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # UTILITAIRES
@@ -67,13 +59,8 @@ def get_title(doc: Mapping[str, JsonValue]) -> str:
 
 
 # =============================================================
-# PUBLISHERS & JOURNALS
+# PUBLISHERS & SERIALS
 # =============================================================
-
-
-def upsert_publisher(publisher_name: str, *, publisher_store: PublisherStore) -> int | None:
-    """Trouve ou crée un éditeur. Délègue au service journals."""
-    return find_or_create_publisher(publisher_name, repo=publisher_store)
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -104,65 +91,35 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
     )
 
 
-def upsert_containers(
-    doc: Mapping[str, JsonValue],
-    publisher_id: int | None,
-    *,
-    container_stores: ContainerStores,
-) -> Containers:
-    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
-    return find_or_create_containers(
-        get_container_facts(doc), publisher_id=publisher_id, stores=container_stores
-    )
-
-
 # =============================================================
 # PUBLICATIONS
 # =============================================================
 
 
-def extract_publication_metadata(
-    doc: Mapping[str, JsonValue], journal_id: int | None, monograph_id: int | None = None
-) -> PublicationMetadata:
-    """Extrait les métadonnées canoniques d'un document HAL.
-
-    Toutes les valeurs sont brutes — pas de transformation de cohérence. `doc_type` est le concat brut `docType_s_docSubType_s` (ex. `ART_review-article`).
-    """
-    title = get_title(doc)
+def get_doc_type(doc: Mapping[str, JsonValue]) -> str | None:
+    """Type brut HAL : `docType_s`, suivi de `docSubType_s` quand HAL en donne un (ex. `ART_review-article`)."""
     raw_type = hal_text_field(doc.get("docType_s")) or ""
     raw_sub = hal_text_field(doc.get("docSubType_s")) or ""
-    doc_type = f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
+    return f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
-    language = hal_text_field(doc.get("language_s"))
 
-    container_title = None
-    if not journal_id:
-        container_title = (
-            hal_text_field(doc.get("bookTitle_s"))
-            or hal_text_field(doc.get("conferenceTitle_s"))
-            or hal_text_field(doc.get("journalTitle_s"))
-        )
+def get_container_title(doc: Mapping[str, JsonValue]) -> str | None:
+    """Titre du livre, du congrès ou de la revue, dans cet ordre."""
+    return (
+        hal_text_field(doc.get("bookTitle_s"))
+        or hal_text_field(doc.get("conferenceTitle_s"))
+        or hal_text_field(doc.get("journalTitle_s"))
+    )
 
-    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
+def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> str | None:
+    """Statut open access tiré de `openAccess_bool`, du fichier déposé, du lien externe et de l'embargo actif."""
     is_open = doc.get("openAccess_bool")
-    return PublicationMetadata(
-        title=title,
-        publication_year=as_int(doc.get("producedDateY_i")),
-        doc_type=doc_type,
-        doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
-        nnt=normalize_nnt(hal_text_field(doc.get("nntId_s"))),
-        oa_status=derive_hal_oa_status(
-            is_open if isinstance(is_open, bool) else None,
-            hal_text_field(doc.get("fileMain_s")),
-            hal_text_field(doc.get("linkExtId_s")),
-            embargo_until,
-        ),
-        embargo_until=embargo_until,
-        journal_id=journal_id,
-        monograph_id=monograph_id,
-        container_title=container_title,
-        language=language,
+    return derive_hal_oa_status(
+        is_open if isinstance(is_open, bool) else None,
+        hal_text_field(doc.get("fileMain_s")),
+        hal_text_field(doc.get("linkExtId_s")),
+        embargo_until,
     )
 
 
@@ -205,25 +162,24 @@ def build_hal_external_ids(
     return external_ids
 
 
-def insert_hal_document(
-    record_store: SourceRecordStore,
+def hal_source_record(
     doc: Mapping[str, JsonValue],
     staging_id: int,
     hal_id: str,
-    publication_meta: PublicationMetadata,
-) -> int:
-    """Crée/retrouve l'entrée source_records pour HAL.
+    containers: Containers,
+) -> SourceRecordUpsert:
+    """Enregistrement source HAL d'un dépôt, identifié par son `hal_id`.
 
-    Les métadonnées canoniques (doi, title, publication_year, doc_type, nnt,
-    journal_id, oa_status, language, container_title) viennent toutes de
-    `publication_meta`, construit en amont par `extract_publication_metadata`. `doc`
-    ne sert ici que pour les extras HAL-spécifiques (collections, abstract,
-    keywords, domaines, biblio, source_extras, urls).
+    `container_title` est posé seulement en l'absence de revue.
     """
+    doc_type = get_doc_type(doc)
+    nnt = normalize_nnt(hal_text_field(doc.get("nntId_s")))
+    embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
+
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
 
-    external_ids = build_hal_external_ids(doc, hal_id, publication_meta.nnt)
+    external_ids = build_hal_external_ids(doc, hal_id, nnt)
 
     # Abstract
     abstract = hal_text_field(doc.get("abstract_s"))
@@ -235,11 +191,11 @@ def insert_hal_document(
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
-    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/journals créés via find_or_create_*.
+    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/serials créés via find_or_create_*.
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
-        **page_range(hal_text_field(doc.get("page_s")), publication_meta.doc_type)._asdict(),
+        **page_range(hal_text_field(doc.get("page_s")), doc_type)._asdict(),
         publisher=hal_text_field(doc.get("journalPublisher_s"))
         or hal_text_field(doc.get("publisher_s")),
         journal_title=hal_text_field(doc.get("journalTitle_s")),
@@ -251,31 +207,29 @@ def insert_hal_document(
     uri = hal_text_field(doc.get("uri_s"))
     urls = [uri] if uri else None
 
-    return record_store.upsert_source_record(
-        SourceRecordUpsert(
-            source="hal",
-            source_id=hal_id,
-            staging_id=staging_id,
-            doi=publication_meta.doi,
-            external_ids=external_ids,
-            title=publication_meta.title or "",
-            publication_year=publication_meta.publication_year,
-            raw_doc_type=publication_meta.doc_type,
-            journal_id=publication_meta.journal_id,
-            monograph_id=publication_meta.monograph_id,
-            container_title=publication_meta.container_title,
-            raw_language=publication_meta.language,
-            biblio=biblio_json,
-            source_extras=extract_hal_source_extras(doc),
-            abstract=abstract,
-            keywords=keywords,
-            topics=topics,
-            oa_status=publication_meta.oa_status,
-            license=normalize_license(hal_text_field(doc.get("licence_s"))),
-            urls=urls,
-            embargo_until=publication_meta.embargo_until,
-            hal_collections=collections_array,
-        ),
+    return SourceRecordUpsert(
+        source="hal",
+        source_id=hal_id,
+        staging_id=staging_id,
+        doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
+        external_ids=external_ids,
+        title=get_title(doc),
+        publication_year=as_int(doc.get("producedDateY_i")),
+        raw_doc_type=doc_type,
+        serial_id=containers.serial_id,
+        monograph_id=containers.monograph_id,
+        container_title=get_container_title(doc) if not containers.serial_id else None,
+        raw_language=hal_text_field(doc.get("language_s")),
+        biblio=biblio_json,
+        source_extras=extract_hal_source_extras(doc),
+        abstract=abstract,
+        keywords=keywords,
+        topics=topics,
+        oa_status=get_oa_status(doc, embargo_until),
+        license=normalize_license(hal_text_field(doc.get("licence_s"))),
+        urls=urls,
+        embargo_until=embargo_until,
+        hal_collections=collections_array,
     )
 
 
@@ -577,83 +531,33 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
     return records
 
 
-def process_contributions(
-    contribution_store: SourceContributionStore,
-    doc: Mapping[str, JsonValue],
-    source_record_id: int,
-) -> None:
-    """Synchronise les contributions sources HAL de l'enregistrement source depuis son bloc auteurs."""
-    sync_source_contributions(
-        contribution_store,
-        "hal",
-        source_record_id,
-        extract_hal_author_block(doc),
-        build_hal_author_records,
-    )
-
-
-# =============================================================
-# BOUCLE PRINCIPALE
-# =============================================================
-
-
-def process_work(
-    record_store: SourceRecordStore,
-    staging_row: StagingRow,
-    *,
-    container_stores: ContainerStores,
-    publisher_store: PublisherStore,
-    staging_store: StagingStore,
-    contribution_store: SourceContributionStore,
-) -> bool | None:
-    """Traite un work du staging HAL."""
-    staging_id = staging_row.id
-    hal_id = staging_row.source_id
-    doc = staging_row.raw_data
-
-    if not doc.get("authFullNameFormIDPersonIDIDHal_fs"):
-        return False
-
-    publisher_name = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
-        doc.get("publisher_s")
-    )
-    publisher_id = (
-        upsert_publisher(publisher_name, publisher_store=publisher_store)
-        if publisher_name
-        else None
-    )
-    containers = upsert_containers(doc, publisher_id, container_stores=container_stores)
-    publication_meta = extract_publication_metadata(
-        doc, containers.journal_id, containers.monograph_id
-    )
-
-    source_record_id = insert_hal_document(
-        record_store,
-        doc,
-        staging_id,
-        hal_id,
-        publication_meta,
-    )
-    process_contributions(contribution_store, doc, source_record_id)
-    staging_store.mark_done(staging_id)
-
-    return True
-
-
-class HalNormalizer(BibliographicNormalizer):
+class HalNormalizer(SourceNormalizer):
     SOURCE = "hal"
     DEFAULT_BATCH_SIZE = 500
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), as_int(row.raw_data.get("producedDateY_i"))
 
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        container_stores, publisher_store = self._container_stores, self._publisher_store
-        return process_work(
-            self._record_store,
-            row,
-            container_stores=container_stores,
-            publisher_store=publisher_store,
-            staging_store=self._staging,
-            contribution_store=self._contribution_store,
+    def parse(self, row: StagingRow) -> Document | None:
+        """Le dépôt, refusé sans champ auteurs."""
+        return row.raw_data if row.raw_data.get("authFullNameFormIDPersonIDIDHal_fs") else None
+
+    def publisher(self, doc: Document) -> PublisherFacts | None:
+        name = hal_text_field(doc.get("journalPublisher_s")) or hal_text_field(
+            doc.get("publisher_s")
         )
+        return PublisherFacts(name) if name else None
+
+    def container_facts(self, doc: Document) -> ContainerDescription:
+        return get_container_facts(doc)
+
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        return hal_source_record(doc, row.id, row.source_id, containers)
+
+    def author_block(self, doc: Document) -> AuthorBlock:
+        return extract_hal_author_block(doc)
+
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        return build_hal_author_records(block)

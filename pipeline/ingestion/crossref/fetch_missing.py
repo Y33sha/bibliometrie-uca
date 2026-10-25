@@ -9,19 +9,12 @@ Un 404 inscrit le DOI dans `failed_lookups`, et `fetch_missing_doi` le soumet à
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 import httpx2
-from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.registry import DOI_ORG
-from domain.sources.staging import StagingEntryMode
-from domain.types import JsonValue, as_str
-from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.doi_search import DoiBatchResult
-from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
-from pipeline.ingestion.common.staging import upsert_staging
+from domain.types import as_str
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.crossref.api import fetch_work
 
 
@@ -30,36 +23,20 @@ class CrossrefDoiSearch:
 
     source_key = "crossref"
     batch_size = 1
-    # Polite pool CrossRef : 10 req/s, 3 concurrentes max. Avec sem=3 et ~200 ms de latence par requête, request_delay=0.1 plafonne à 3 / (0.1 + 0.2) ≈ 10 req/s sustained, juste sous la limite.
+    # Polite pool Crossref : 3 requêtes simultanées au plus.
     max_concurrent = 3
-    request_delay_s = 0.1
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         doi = dois[0]
         message = await fetch_work(client, doi)
         if isinstance(message, NotFound):
             # 404 = DOI confirmé absent de Crossref.
-            return DoiBatchResult(not_found=[doi])
+            return LookupBatch(absent=[doi])
         if isinstance(message, Unavailable):
-            return DoiBatchResult()
+            return UNAVAILABLE
         if clean_doi(as_str(message.get("DOI"))) != doi:
             # DOI alias, que Crossref redirige vers son DOI principal : le document reçu a ce dernier pour DOI. L'alias est inscrit comme introuvable.
-            return DoiBatchResult(records=[message], not_found=[doi])
-        return DoiBatchResult(records=[message])
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        # DOI = identifiant CrossRef. On le passe par `clean_doi` (normalisation canonique partagée : lowercase, strip URL/ponctuation/suffixes) pour rester cohérent avec les autres sources et la colonne `doi`.
-        doi = clean_doi(as_str(record.get("DOI")))
-        if not doi:
-            return False
-        inserted, _ = upsert_staging(
-            conn,
-            source="crossref",
-            source_id=doi,
-            doi=doi,
-            raw_data=record,
-            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
-        )
-        forget_failed_doi_lookups(conn, "crossref", [doi])
-        forget_failed_doi_lookups(conn, DOI_ORG, [doi])
-        return inserted
+            return LookupBatch(records=[message], absent=[doi])
+        return LookupBatch(records=[message])

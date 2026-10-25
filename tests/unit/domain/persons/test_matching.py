@@ -5,18 +5,14 @@ from domain.persons.matching import (
     IdentifiedPerson,
     NameFormDecision,
     Namesake,
-    PersonMatchDecision,
     attested_full_first_names,
     compatible_namesakes,
     compatible_persons,
-    consensus_name,
-    decide_cross_source_match,
     decide_match_by_identifier,
     decide_name_form_outcome,
-    decide_person_match,
-    form_matches_person,
     full_namesakes,
     identifier_misplaced,
+    strict_majority,
     trusted_identifier,
 )
 
@@ -40,24 +36,30 @@ class TestTrustedIdentifier:
         assert trusted_identifier("hal_person_id", "hal")
 
 
-class TestConsensusName:
+class TestStrictMajority:
     def test_strict_majority(self):
-        assert consensus_name({"martin p": 2, "dupont j": 1}) == "martin p"
+        assert strict_majority({"martin p": 2, "dupont j": 1}) == "martin p"
 
     def test_relative_majority(self):
-        assert consensus_name({"a": 35, "b": 33, "c": 32}) == "a"
+        assert strict_majority({"a": 35, "b": 33, "c": 32}) == "a"
 
     def test_single_vote(self):
-        assert consensus_name({"martin p": 1}) == "martin p"
+        assert strict_majority({"martin p": 1}) == "martin p"
 
     def test_tie_at_the_top(self):
-        assert consensus_name({"aubert p": 1, "dupont j": 1}) is None
+        assert strict_majority({"aubert p": 1, "dupont j": 1}) is None
 
     def test_tie_below_the_top(self):
-        assert consensus_name({"a": 3, "b": 1, "c": 1}) == "a"
+        assert strict_majority({"a": 3, "b": 1, "c": 1}) == "a"
 
     def test_no_vote(self):
-        assert consensus_name({}) is None
+        assert strict_majority({}) is None
+
+    def test_keys_without_votes(self):
+        assert strict_majority({1: 0}) is None
+
+    def test_any_keys(self):
+        assert strict_majority({1: 0, 2: 1}) == 2
 
 
 class TestIdentifierMisplaced:
@@ -72,159 +74,6 @@ class TestIdentifierMisplaced:
 
     def test_no_consensus(self):
         assert not identifier_misplaced("t dado", None)
-
-
-class TestFormMatchesPerson:
-    def test_matches_canonical_name(self):
-        assert form_matches_person("helene chanal", "chanal", "helene")
-
-    def test_matches_via_confirmed_form(self):
-        # Le consensus colle à une forme confirmée, que le nom-prénom canonique ne recouvre pas.
-        assert form_matches_person(
-            "pierre michel llorca", "llorca", "pm", confirmed_forms=["pierre michel llorca"]
-        )
-
-    def test_homonym_does_not_match(self):
-        # Même patronyme, prénoms distincts : « hervé » ≠ « hélène ».
-        assert not form_matches_person("herve chanal", "chanal", "helene")
-
-    def test_unrelated_confirmed_form_does_not_match(self):
-        assert not form_matches_person(
-            "helene chanal", "chanal", "herve", confirmed_forms=["herve chanal"]
-        )
-
-    def test_family_name_alone_matches(self):
-        assert form_matches_person("martin", "martin", "jean")
-
-    def test_first_name_of_another_person_does_not_match(self):
-        """Le prénom commun ne suffit pas : le patronyme de la forme doit aussi correspondre."""
-        assert not form_matches_person("pierre durand", "martin", "pierre")
-
-    def test_confirmed_form_longer_than_the_form(self):
-        assert form_matches_person("dupont", "martin", "jean", confirmed_forms=["marie dupont"])
-
-    def test_form_longer_than_the_confirmed_form(self):
-        assert form_matches_person(
-            "marie jeanne dupont", "martin", "paul", confirmed_forms=["marie dupont"]
-        )
-
-
-class TestDecideCrossSourceMatch:
-    def test_no_candidates_returns_none(self):
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=[],
-            )
-            is None
-        )
-
-    def test_single_compatible_candidate(self):
-        candidates = [(42, "dupont", "jean", "hal")]
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-            )
-            == 42
-        )
-
-    def test_same_source_candidates_skipped(self):
-        """Les candidats portant la même source que la contribution sont
-        ignorés (ils ne portent aucun signal nouveau)."""
-        candidates = [(42, "dupont", "jean", "openalex")]
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-            )
-            is None
-        )
-
-    def test_incompatible_name_skipped(self):
-        candidates = [(42, "martin", "paul", "hal")]
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-            )
-            is None
-        )
-
-    def test_same_source_candidate_does_not_hide_the_next_one(self):
-        candidates = [(17, "dupont", "jean", "openalex"), (42, "dupont", "jean", "hal")]
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-            )
-            == 42
-        )
-
-    def test_same_first_name_other_last_name_skipped(self):
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=[(42, "martin", "jean", "hal")],
-            )
-            is None
-        )
-
-    def test_same_last_name_other_first_name_skipped(self):
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=[(42, "dupont", "pierre", "hal")],
-            )
-            is None
-        )
-
-    def test_multiple_compatible_same_pid_returns_pid(self):
-        """Plusieurs candidats compatibles qui pointent tous vers la même
-        person_id → match safe."""
-        candidates = [
-            (42, "dupont", "jean", "hal"),
-            (42, "dupont", "j", "wos"),
-        ]
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-            )
-            == 42
-        )
-
-    def test_multiple_compatible_different_pids_returns_none(self):
-        """Conflit : >1 person_id distincts compatibles → pas de match."""
-        candidates = [
-            (42, "dupont", "jean", "hal"),
-            (17, "dupont", "j", "wos"),
-        ]
-        assert (
-            decide_cross_source_match(
-                contribution_source="openalex",
-                last_norm="dupont",
-                first_norm="jean",
-                candidates=candidates,
-            )
-            is None
-        )
 
 
 class TestDecideNameFormOutcome:
@@ -501,196 +350,3 @@ class TestDecideMatchByIdentifier:
             "x", idref_map, _contribution("Dupont Jean"), ("dupont jean", "jean dupont"), status
         )
         assert result.person_id is None
-
-
-class TestDecidePersonMatch:
-    """Cascade unifiée : ordre orcid > hal_person_id > idref > cross_source > name_form."""
-
-    def _skip(self) -> NameFormDecision:
-        return NameFormDecision(action="skip", reason="ambiguous_name_form")
-
-    def test_orcid_wins_over_everything(self):
-        decision = decide_person_match(
-            orcid_match=99,
-            hal_match=88,
-            idref_match=17,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=99, reason="orcid")
-
-    def test_hal_wins_when_no_orcid(self):
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=88,
-            idref_match=17,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=88, reason="hal_person_id")
-
-    def test_idref_wins_when_no_orcid_no_hal(self):
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=17,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
-
-    def test_name_match_wins_over_cross_source(self):
-        # Le match par nom passe avant le cross-source (il maximise les ancres fermes).
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
-
-    def test_compatible_initials_win_over_cross_source(self):
-        """Les initiales compatibles font partie du match par nom, placé avant le cross-source."""
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(
-                action="match", person_id=7, reason="compatible_name"
-            ),
-        )
-        assert decision == PersonMatchDecision(
-            action="match", person_id=7, reason="compatible_name"
-        )
-
-    def test_compatible_initials_match_without_cross_source(self):
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=None,
-            name_form_outcome=NameFormDecision(
-                action="match", person_id=7, reason="compatible_name"
-            ),
-        )
-        assert decision == PersonMatchDecision(
-            action="match", person_id=7, reason="compatible_name"
-        )
-
-    def test_cross_source_wins_over_name_creation(self):
-        # Le cross-source passe avant la création : une contribution source à créer préfère rejoindre
-        # une ancre de même publication × position.
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="create"),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=42, reason="cross_source")
-
-    def test_name_form_match_when_no_other_signal(self):
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=None,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
-
-    def test_name_form_create_when_no_match(self):
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=None,
-            name_form_outcome=NameFormDecision(action="create"),
-        )
-        assert decision == PersonMatchDecision(action="create", reason="new")
-
-    def test_name_form_skip_ambiguous_propagates(self):
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=None,
-            name_form_outcome=self._skip(),
-        )
-        assert decision == PersonMatchDecision(action="skip", reason="ambiguous_name_form")
-
-    def test_name_form_skip_creation_not_allowed_propagates(self):
-        """Rôle non-auteur d'une thèse : pas de création, pas de match."""
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=None,
-            name_form_outcome=NameFormDecision(action="skip", reason="creation_not_allowed"),
-        )
-        assert decision == PersonMatchDecision(action="skip", reason="creation_not_allowed")
-
-    def test_identifier_match_short_circuits_name_form_skip(self):
-        """Un identifier match prend le pas sur un skip name_form
-        (ambiguïté ou create interdit) — l'identifier est plus fiable."""
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=17,
-            cross_source_match=None,
-            name_form_outcome=NameFormDecision(action="skip", reason="creation_not_allowed"),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
-
-    def test_cross_source_does_not_override_identifier(self):
-        """Cross-source recule derrière les identifiants : un idref match gagne
-        même si un cross-source est présent (inverse de l'ordre historique)."""
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=17,
-            cross_source_match=42,
-            name_form_outcome=self._skip(),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=17, reason="idref")
-
-    def test_rejected_orcid_match_falls_through_to_next_signal(self):
-        """Un match ORCID vers une personne rejetée pour la publi est annulé ;
-        la cascade retombe sur le hal_person_id."""
-        decision = decide_person_match(
-            orcid_match=99,
-            hal_match=88,
-            idref_match=17,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-            rejected_person_ids=frozenset({99}),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=88, reason="hal_person_id")
-
-    def test_all_id_matches_rejected_falls_through_to_name_form(self):
-        """Tous les matchs d'identifiant/cross-source rejetés → on retombe
-        sur le name form (qui, lui, doit déjà être gardé en amont)."""
-        decision = decide_person_match(
-            orcid_match=99,
-            hal_match=88,
-            idref_match=17,
-            cross_source_match=42,
-            name_form_outcome=NameFormDecision(action="match", person_id=7),
-            rejected_person_ids=frozenset({99, 88, 17, 42}),
-        )
-        assert decision == PersonMatchDecision(action="match", person_id=7, reason="single_name")
-
-    def test_rejected_cross_source_match_skips_to_name_form_outcome(self):
-        """Seul signal = cross-source, mais rejeté → on suit l'issue name form
-        (ici skip ambigu)."""
-        decision = decide_person_match(
-            orcid_match=None,
-            hal_match=None,
-            idref_match=None,
-            cross_source_match=42,
-            name_form_outcome=self._skip(),
-            rejected_person_ids=frozenset({42}),
-        )
-        assert decision == PersonMatchDecision(action="skip", reason="ambiguous_name_form")

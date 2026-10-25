@@ -9,19 +9,17 @@ import httpx2
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import API_BASE_URLS, THESES_DELAY, THESES_PER_PAGE
+from pipeline.ingestion.api_params import API_BASE_URLS, THESES_PER_PAGE
 
 # Marge au-dessus d'un hit unique : la recherche libre sur l'identifiant peut ramener quelques quasi-homonymes, filtrés ensuite par égalité stricte de l'`id`.
 _SEARCH_SIZE = 20
 
 
 class ThesesClient:
-    """Client de la recherche theses.fr, limité à un appel toutes les `THESES_DELAY` secondes."""
+    """Client de la recherche theses.fr."""
 
     def __init__(self, base_url: str) -> None:
         self._url = base_url
-        self._throttle = Throttle(THESES_DELAY)
 
     def fetch_page(self, query: str, *, start: int) -> Mapping[str, JsonValue]:
         """Une page de `THESES_PER_PAGE` thèses, à partir du rang `start`."""
@@ -30,12 +28,11 @@ class ThesesClient:
             "debut": start,
             "nombre": THESES_PER_PAGE,
         }
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry(
-                    "GET", self._url, params=params, timeout=30, label=f"theses debut={start}"
-                )
+        return as_mapping(
+            http_request_with_retry(
+                "GET", self._url, params=params, timeout=30, label=f"theses debut={start}"
             )
+        )
 
 
 async def fetch_thesis(

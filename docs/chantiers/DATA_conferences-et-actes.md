@@ -68,7 +68,6 @@ Par domaine HAL (une publication peut relever de plusieurs domaines ; 623 `confe
 
 ## Décisions
 
-- Le renommage de `journals` n'est pas prioritaire.
 - Les volumes d'actes vivent dans `monographs` ; `journals` porte les séries.
 - `conference_paper` désigne un texte publié dans des actes : volume ou série d'actes, `proceedings-article` Crossref, chapitre rattaché à un congrès.
 - Le type « conférence » désigne une communication sans texte publié, résumés compris (`meeting abstract`, `conference-abstract`, revues de résumés, numéros de supplément). Il appartient à la famille « Annexes et divers » des filtres.

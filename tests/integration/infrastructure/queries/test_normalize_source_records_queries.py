@@ -10,6 +10,7 @@ from pipeline.ingestion.common.source_records import (
     SourceRecordUpsert,
 )
 from tests.integration.helpers.queues import clear, queued
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.staging import insert_staging
 
 # Ligne de staging theses.fr « t-stg ».
@@ -182,3 +183,33 @@ class TestUpsertSourceRecord:
             "external_ids écarté (theses 2023ABC001) : hal_id = '10995/102143'",
             "external_ids écarté (theses 2023ABC001) : pmc = 'PMC9016621'",
         ]
+
+
+class TestPublisher:
+    """L'éditeur que nomme la source s'écrit, sauf pour une production hébergée sans être publiée."""
+
+    def _publisher_of(self, conn, **overrides) -> int | None:
+        publisher_id = insert_publisher(conn, "Éditeur")
+        staging_id = insert_staging(conn, source="datacite", source_id="dc-stg")
+        defaults = {"source": "datacite", "source_id": "10.9/x", "publisher_id": publisher_id}
+        source_record_id = SourceRecordStore(conn).upsert_source_record(
+            _row(staging_id, **{**defaults, **overrides})
+        )
+        return conn.execute(
+            text("SELECT publisher_id FROM source_records WHERE id = :id"),
+            {"id": source_record_id},
+        ).scalar_one()
+
+    def test_article_datacite_dans_une_revue(self, sa_sync_conn):
+        serial_id = insert_serial(sa_sync_conn, "Revue")
+        assert (
+            self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle", serial_id=serial_id)
+            is not None
+        )
+
+    def test_article_datacite_sans_conteneur_heberge_par_un_entrepot(self, sa_sync_conn):
+        assert self._publisher_of(sa_sync_conn, raw_doc_type="JournalArticle") is None
+
+    def test_jeu_de_donnees(self, sa_sync_conn):
+        serial_id = insert_serial(sa_sync_conn, "Revue")
+        assert self._publisher_of(sa_sync_conn, raw_doc_type="Dataset", serial_id=serial_id) is None

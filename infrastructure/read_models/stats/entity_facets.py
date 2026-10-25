@@ -27,7 +27,7 @@ def stats_entity_facet(
     filters_for_facet = replace(
         filters,
         publisher_ids=[] if kind == "publisher" else filters.publisher_ids,
-        journal_ids=[] if kind == "journal" else filters.journal_ids,
+        serial_ids=[] if kind == "serial" else filters.serial_ids,
     )
     where, binds = assemble_where(
         stats_filter_clauses(

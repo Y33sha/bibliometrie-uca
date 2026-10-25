@@ -2,7 +2,7 @@
 
 Le dump est importé seulement si sa version diffère de celle du dernier import. La version publiée se lit d'abord chez DataCite : Zenodo est interrogé seulement quand elle diffère, ou quand DataCite ne répond pas. Un dump inaccessible laisse le référentiel en l'état.
 
-Quand une organisation change de pays, l'import marque les contributions sources et les adresses qui la citent, pour la phase `countries`.
+Quand une organisation change de pays, l'import marque les contributions sources qui la citent sans adresse, pour la phase `countries`.
 """
 
 import logging
@@ -90,30 +90,19 @@ class RorStore:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Pour les organisations `ror_ids` : marque pour le recalcul des pays les contributions sources qui les citent sans adresse. Retire les candidats `ror` des adresses qui les citent et marque ces adresses pour la détection : la tâche `countries.ror` recrée leurs candidats."""
+        """Pour les organisations `ror_ids` : marque pour le recalcul des pays les contributions sources qui les citent sans adresse."""
         if not ror_ids:
             return
-        marked_contributions = enqueue_sql(
-            Queue.SOURCE_CONTRIBUTION_COUNTRIES,
-            "SELECT source_contribution_id FROM linked WHERE address_id IS NULL",
-        )
-        marked_addresses = enqueue_sql(
-            Queue.ADDRESS_CANDIDATES,
-            "SELECT address_id FROM linked WHERE address_id IS NOT NULL",
-        )
         self._conn.execute(
-            text(f"""
-                WITH linked AS (
-                    SELECT source_contribution_id, address_id
-                    FROM source_contribution_rors WHERE ror_id = ANY(:ids)
-                ),
-                marked_contributions AS ({marked_contributions}),
-                candidates AS (
-                    DELETE FROM address_country_candidates
-                    WHERE method = 'ror' AND address_id IN (SELECT address_id FROM linked)
+            text(
+                enqueue_sql(
+                    Queue.SOURCE_CONTRIBUTION_COUNTRIES,
+                    """
+                    SELECT source_contribution_id FROM source_contribution_rors
+                    WHERE ror_id = ANY(:ids) AND address_id IS NULL
+                    """,
                 )
-                {marked_addresses}
-            """),
+            ),
             {"ids": ror_ids},
         )
 

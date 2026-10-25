@@ -16,21 +16,18 @@ class SourceContributionRef(BaseModel):
 
 
 class AssignOrphanContribution(BaseModel):
-    """Attribution unitaire, seule à savoir créer la personne au passage.
+    """Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage."""
 
-    `source_contributions.id` est une clé primaire : l'id désigne la contribution source à lui seul.
-    """
-
-    source_contribution_id: int
+    contribution_id: int
     person_id: int | None = None
     create_person: CreatePersonName | None = None
     force: bool = False
 
 
 class BatchAssignOrphanContributions(BaseModel):
-    """Attribution en lot à une personne existante."""
+    """Attribution en lot de contributions orphelines, désignées par leurs groupes de contributions sources, à une personne existante."""
 
-    source_contribution_ids: list[int]
+    group_ids: list[int]
     person_id: int
     force: bool = False
 
@@ -39,14 +36,14 @@ class BatchAssignOrphanContributions(BaseModel):
 
 
 class OrphanAssignResponse(BaseModel):
-    """Acquittement de l'attribution d'une contribution source orpheline : la personne rattachée."""
+    """Acquittement de l'attribution d'une contribution orpheline : la personne rattachée."""
 
     ok: bool = True
     person_id: int
 
 
 class OrphanBatchAssignResponse(BaseModel):
-    """Acquittement de l'attribution en lot : le nombre de contributions sources rattachées."""
+    """Acquittement de l'attribution en lot : le nombre de contributions rattachées."""
 
     ok: bool = True
     assigned: int

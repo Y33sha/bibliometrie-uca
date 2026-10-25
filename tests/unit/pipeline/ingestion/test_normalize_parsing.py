@@ -3,6 +3,7 @@
 
 # ── OpenAlex ─────────────────────────────────────────────────────
 
+from domain.source_records.source_record import SourceRecord
 from pipeline.ingestion.openalex.normalize import extract_locations_data
 
 
@@ -267,8 +268,7 @@ class TestFirstDocTypeArbitration:
     nomenclatures sources brutes."""
 
     @staticmethod
-    def _src(source: str, doc_type: str | None) -> "SourceRecord":  # noqa: F821
-        from domain.source_records.source_record import SourceRecord
+    def _src(source: str, doc_type: str | None) -> SourceRecord:
 
         return SourceRecord(
             id=None,
@@ -278,7 +278,7 @@ class TestFirstDocTypeArbitration:
             publication_year=None,
             doc_type=doc_type,
             doi=None,
-            journal_id=None,
+            serial_id=None,
             monograph_id=None,
             container_title=None,
             language=None,
@@ -409,13 +409,19 @@ class TestNormalizeNnt:
 
 # ── theses.fr ────────────────────────────────────────────────────
 
+from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
     _build_source_extras,
-    extract_publication_metadata,
+    get_title as theses_get_title,
+    theses_source_record,
 )
 
 
-class TestThesesExtractPublicationMetadata:
+def _theses_record(thesis: dict) -> SourceRecordUpsert:
+    return theses_source_record(thesis, staging_id=1, theses_id="2023UCFA0069")
+
+
+class TestThesesSourceRecordMetadata:
     def test_soutenue(self):
         thesis = {
             "titrePrincipal": "Titre de la thèse",
@@ -423,41 +429,38 @@ class TestThesesExtractPublicationMetadata:
             "doi": "10.1234/test",
             "nnt": "2023ucfa0069",
         }
-        meta = extract_publication_metadata(thesis)
-        assert meta.title == "Titre de la thèse"
-        assert meta.doc_type == "thesis"
-        assert meta.publication_year == 2023
-        assert meta.doi == "10.1234/test"
-        assert meta.nnt == "2023UCFA0069"
-        assert meta.oa_status == "closed"
-        assert meta.journal_id is None
+        record = _theses_record(thesis)
+        assert record.title == "Titre de la thèse"
+        assert record.raw_doc_type == "thesis"
+        assert record.publication_year == 2023
+        assert record.doi == "10.1234/test"
+        assert record.external_ids == {"nnt": "2023UCFA0069"}
+        assert record.oa_status == "closed"
+        assert record.serial_id is None
 
     def test_en_cours_falls_back_to_inscription(self):
         thesis = {
             "titrePrincipal": "Thèse en cours",
             "datePremiereInscriptionDoctorat": "01/09/2022",
         }
-        meta = extract_publication_metadata(thesis)
-        assert meta.doc_type == "ongoing_thesis"
-        assert meta.publication_year == 2022
-        assert meta.doi is None
-        assert meta.nnt is None
+        record = _theses_record(thesis)
+        assert record.raw_doc_type == "ongoing_thesis"
+        assert record.publication_year == 2022
+        assert record.doi is None
+        assert record.external_ids is None
 
     def test_no_dates(self):
-        meta = extract_publication_metadata({"titrePrincipal": "X"})
-        assert meta.doc_type == "ongoing_thesis"
-        assert meta.publication_year is None
+        record = _theses_record({"titrePrincipal": "X"})
+        assert record.raw_doc_type == "ongoing_thesis"
+        assert record.publication_year is None
 
     def test_malformed_date(self):
         """Date non parseable → publication_year reste None."""
-        meta = extract_publication_metadata(
-            {"titrePrincipal": "X", "dateSoutenance": "date-invalide"}
-        )
-        assert meta.publication_year is None
+        record = _theses_record({"titrePrincipal": "X", "dateSoutenance": "date-invalide"})
+        assert record.publication_year is None
 
     def test_no_title(self):
-        meta = extract_publication_metadata({})
-        assert meta.title is None
+        assert theses_get_title({}) is None
 
 
 class TestThesesBuildSourceMeta:

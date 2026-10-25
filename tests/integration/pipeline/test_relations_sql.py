@@ -455,6 +455,7 @@ class TestPhaseRelations:
                 options=RunOptions(),
                 maintain=lambda operation: None,
                 credentials_missing=lambda _source: None,
+                request_budget=lambda _source: None,
             )
         )
 

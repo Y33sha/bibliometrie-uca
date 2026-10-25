@@ -3,7 +3,7 @@
 import httpx2
 import pytest
 
-from domain.journals.issns import IssnSupport
+from domain.serials.issns import IssnSupport
 from pipeline.ingestion.complements import sudoc as client
 
 _BASE = "https://www.sudoc.fr"

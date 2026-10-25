@@ -5,7 +5,6 @@
   import Pagination from "$lib/components/Pagination.svelte";
   import PublicationTitle from "$lib/components/PublicationTitle.svelte";
   import SourceTag from "$lib/components/SourceTag.svelte";
-  import { sourceExternalUrl } from "$lib/sources";
   import type { components } from "$lib/api/schema";
 
   type Suspect = components["schemas"]["SuspectMergeOut"];
@@ -69,7 +68,7 @@
         <div class="source-records">
           {#each item.source_records as n (n.source + n.source_id)}
             <span class="source-record">
-              <SourceTag source={n.source} id={n.source_id} href={sourceExternalUrl(n.source, n.source_id) ?? undefined} />
+              <SourceTag source={n.source} id={n.source_id} href={n.record_url} />
               {n.matched_source_contributions} / {n.source_contributions}
             </span>
           {/each}

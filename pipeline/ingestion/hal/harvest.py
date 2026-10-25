@@ -7,7 +7,7 @@ Le routage new/updated/unchanged vient de l'écriture dans `staging`, pilotée p
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
@@ -21,8 +21,6 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.hal.api import HalClient
-from pipeline.ingestion.hal.fields import extract_doi, extract_id
-from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
 
@@ -63,12 +61,10 @@ def harvest_union(
     client: HalClient,
     config: HalHarvestConfig,
     conn: Connection,
-    logger: ScopedOrPlainLogger,
     progress: Progress,
     *,
     years: list[int] | None = None,
     since: str | None = None,
-    breaker_tripped: Callable[[], bool] = lambda: False,
 ) -> PhaseMetrics:
     """Moissonne l'union des collections pour un périmètre temporel, page après page jusqu'à stabilisation du marqueur.
 
@@ -80,21 +76,11 @@ def harvest_union(
     metrics = PhaseMetrics()
     cursor = "*"
     while True:
-        if breaker_tripped():
-            logger.warning(
-                "à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
-            )
-            break
         data = client.fetch_page_cursor(query, fq, cursor)
         docs = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
 
         for doc in docs:
-            hal_id = extract_id(doc)
-            if not hal_id:
-                continue
-            stage_document(
-                conn, metrics, source="hal", source_id=hal_id, doi=extract_doi(doc), raw_data=doc
-            )
+            stage_document(conn, metrics, source="hal", record=doc)
         conn.commit()
 
         progress.advance(len(docs))
@@ -138,11 +124,9 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
                     client,
                     config,
                     self.conn,
-                    scoped_logger(self.logger, self.SOURCE),
                     progress,
                     years=years,
                     since=window.since,
-                    breaker_tripped=self._breaker_tripped,
                 ),
             )
 
@@ -154,10 +138,8 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
                 client,
                 config,
                 self.conn,
-                scoped_logger(self.logger, self.SOURCE, str(year)),
                 progress,
                 years=[year],
-                breaker_tripped=self._breaker_tripped,
             )
 
         return self._harvest_by_year(years, count_year, harvest_step)

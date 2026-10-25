@@ -1,11 +1,10 @@
 """Moissonnage theses.fr : tâche `harvest.theses`.
 
-Interroge en une seule requête l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. Sans année demandée, ramène tout l'historique theses.fr de ces établissements : la plage d'années de la configuration ne s'applique pas.
+Interroge en une seule requête l'ensemble des PPN d'établissement du périmètre, avec une pagination par `debut`. La requête ramène tout l'historique theses.fr de ces établissements. Le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours.
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
@@ -19,8 +18,7 @@ from pipeline.ingestion.common.harvester import (
     stage_document,
 )
 from pipeline.ingestion.theses.api import ThesesClient
-from pipeline.ingestion.theses.fields import extract_doi, extract_id, is_ongoing
-from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger, scoped_logger
+from pipeline.ingestion.theses.fields import extract_id, is_ongoing
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress, track_progress
 
@@ -42,27 +40,21 @@ def harvest_theses(
     client: ThesesClient,
     conn: Connection,
     ppns: list[str],
-    logger: ScopedOrPlainLogger,
     progress: Progress,
     *,
-    year: int | None = None,
-    breaker_tripped: Callable[[], bool] = lambda: False,
+    years: list[int],
 ) -> PhaseMetrics:
     """Moissonne les thèses des établissements, page après page.
 
-    Si `year` est fourni, retient les thèses soutenues cette année-là (NNT commençant par l'année) et toutes les thèses en cours. `progress` compte les thèses parcourues, et retient celles que le filtre garde. Le total des métriques porte sur toutes les thèses parcourues.
+    Retient les thèses soutenues l'une des années `years` (NNT commençant par l'année), et toutes les thèses en cours. `progress` compte les thèses parcourues, et retient celles que le filtre garde. Le total des métriques porte sur toutes les thèses parcourues.
     """
+    prefixes = tuple(str(year) for year in years)
     query = build_query(ppns)
     metrics = PhaseMetrics()
     total: int | None = None
     start = 0
 
     while total is None or start < total:
-        if breaker_tripped():
-            logger.warning(
-                "à bout (429/5xx répétés) — pagination interrompue (retry au prochain run)"
-            )
-            break
         data = client.fetch_page(query, start=start)
         if total is None:
             total = as_int(data.get("totalHits")) or 0
@@ -76,16 +68,9 @@ def harvest_theses(
             theses_id = extract_id(thesis)
             if not theses_id:
                 continue
-            if year is not None and not is_ongoing(thesis) and not theses_id.startswith(str(year)):
+            if not is_ongoing(thesis) and not theses_id.startswith(prefixes):
                 continue
-            stage_document(
-                conn,
-                metrics,
-                source="theses",
-                source_id=theses_id,
-                doi=extract_doi(thesis),
-                raw_data=thesis,
-            )
+            stage_document(conn, metrics, source="theses", record=thesis)
             progress.keep()
 
         conn.commit()
@@ -111,23 +96,10 @@ class ThesesHarvester(SourceHarvester[ThesesHarvestConfig, ThesesClient]):
         return ThesesHarvestConfig(ppns=ppns)
 
     def harvest_all(self, window: HarvestWindow, config: ThesesHarvestConfig) -> PhaseMetrics:
-        # La colonne du périmètre reste vide sans `--year` : la barre s'aligne sur celles des autres sources.
-        scope = str(window.year) if window.year is not None else ""
-        with track_progress(
-            None, self._label(scope), self.logger, count_kept=window.year is not None
-        ) as progress:
-            metrics = harvest_theses(
-                self._client,
-                self.conn,
-                config.ppns,
-                scoped_logger(self.logger, self.SOURCE),
-                progress,
-                year=window.year,
-                breaker_tripped=self._breaker_tripped,
-            )
-        if window.year is None:
-            self._write_summary(metrics)
-        else:
-            # Le filtre par année retient une partie des thèses parcourues ; le bilan porte sur celles-là.
-            self._write_summary(metrics, found=metrics.new + metrics.updated + metrics.unchanged)
+        years = self._years(window)
+        scope = f"{years[0]}-{years[-1]}" if len(years) > 1 else str(years[0])
+        with track_progress(None, self._label(scope), self.logger, count_kept=True) as progress:
+            metrics = harvest_theses(self._client, self.conn, config.ppns, progress, years=years)
+        # Le filtre par année retient une partie des thèses parcourues ; le bilan porte sur celles-là.
+        self._write_summary(metrics, found=metrics.new + metrics.updated + metrics.unchanged)
         return metrics

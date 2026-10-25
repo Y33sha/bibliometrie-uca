@@ -4,36 +4,33 @@
 
 ### En cours
 
-- [Résolution des personnes par groupe](DATA_resolution-personnes.md)
+- [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
+- [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
 
 ### En pause
 
-- [Cycle de vie des publications et des référentiels](CODE_cycle-de-vie-des-publications.md)
 - [Gestion et dédoublonnage assistés de la base personnes](DATA_personnes-dedoublonnage-assiste.md)
-- [Normalisation par lots de documents](CODE_batch-normalize.md)
 
 ### Non commencé
 
-- [Accès réseau des sources](CODE_acces-reseau-des-sources.md)
-- [Alignement des auteurs d'une publication](DATA_alignement-auteurs.md)
 - [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Conférences et actes](DATA_conferences-et-actes.md)
-- [Contrat des métriques de phase](CODE_contrat-des-metriques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Indicateurs d'impact dans les rapports par laboratoire](METIER_rapports-impact.md)
-- [Modèle des conteneurs](DATA_modele-des-conteneurs.md)
 - [Monographies](DATA_monographies.md)
-- [Pagination par curseur](CODE_pagination-par-curseur.md)
+- [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
 - [Rapports annuels par laboratoire](METIER_rapports-par-labo.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Revues divergentes selon les sources](DATA_revues-divergentes-entre-sources.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
-- [Une source, un adaptateur](CODE_adaptateur-par-source.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
 ## Chantiers archivés
 
+- 2026-10-24 — [Résolution des personnes par groupe](archived/2026-10-24_DATA_resolution-personnes.md)
+- 2026-10-24 — [Alignement des auteurs d'une publication](archived/2026-10-24_DATA_alignement-auteurs.md)
+- 2026-10-23 — [Cycle de vie des publications et des référentiels](archived/2026-10-23_CODE_cycle-de-vie-des-publications.md)
+- 2026-10-23 — [Une source, un adaptateur](archived/2026-10-23_CODE_adaptateur-par-source.md)
 - 2026-10-23 — [Conception du pipeline](archived/2026-10-23_CODE_conception-du-pipeline.md)
 - 2026-10-23 — [Files d'attente de recalcul](archived/2026-10-23_CODE_files-d-attente-de-recalcul.md)
 - 2026-10-21 — [Règles du domaine complètes et uniques](archived/2026-10-21_CODE_profondeur-du-domaine.md)

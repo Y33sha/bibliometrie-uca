@@ -9,10 +9,11 @@ from infrastructure.read_models.publications.detail import (
     get_publication_external_identifiers,
     get_publication_subjects,
 )
-from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.journals import insert_doi_prefix, insert_monograph, insert_publisher
+from tests.integration.helpers.contributions import group_id_of, insert_contribution
+from tests.integration.helpers.groups import add_group_member, insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
@@ -22,16 +23,16 @@ class TestGetPublicationDetail:
     def test_returns_none_for_missing(self, sa_sync_conn):
         assert get_publication_detail(sa_sync_conn, 999_999) is None
 
-    def test_monographie_et_son_editeur(self, sa_sync_conn):
-        """Une publication sans revue prend l'éditeur de sa monographie."""
+    def test_monographie_et_l_editeur_de_la_publication(self, sa_sync_conn):
+        """Le détail donne la monographie et l'éditeur de la publication."""
         publisher = insert_publisher(sa_sync_conn, "Dykinson")
         monograph = insert_monograph(
             sa_sync_conn, "Diplomacy", proceedings=True, publisher_id=publisher
         )
         publication = insert_publication(sa_sync_conn, doc_type="conference_paper")
         sa_sync_conn.execute(
-            text("UPDATE publications SET monograph_id = :m WHERE id = :id"),
-            {"m": monograph, "id": publication},
+            text("UPDATE publications SET monograph_id = :m, publisher_id = :p WHERE id = :id"),
+            {"m": monograph, "p": publisher, "id": publication},
         )
         detail = get_publication_detail(sa_sync_conn, publication)
         assert detail is not None
@@ -46,7 +47,13 @@ class TestGetPublicationDetail:
             sa_sync_conn, publication, source="hal", source_id="hal-1"
         )
         insert_contribution(sa_sync_conn, publication, person_id=pid)
-        insert_source_contribution(sa_sync_conn, source_record, person_id=pid)
+        source_contribution = insert_source_contribution(sa_sync_conn, source_record)
+        add_group_member(
+            sa_sync_conn,
+            group_id_of(sa_sync_conn, publication, pid),
+            source_contribution,
+            source_record,
+        )
 
         detail = get_publication_detail(sa_sync_conn, publication)
         assert detail is not None
@@ -55,6 +62,45 @@ class TestGetPublicationDetail:
         assert any(s.source == "hal" for s in detail.sources)
         assert len(detail.contributions) == 1
         assert detail.contributions[0].source_hal is True
+        assert detail.contributions[0].source_openalex is False
+
+    def test_contributions_are_groups_with_person(self, sa_sync_conn):
+        """Les auteurs consolidés sont les groupes rattachés à une personne, dans l'ordre de `reference_position`. Les sources sont celles des enregistrements sources des membres du groupe."""
+        first = insert_person(sa_sync_conn, "Premier", first_name="A")
+        second = insert_person(sa_sync_conn, "Second", first_name="B")
+        publication = insert_publication(sa_sync_conn)
+        hal_record = insert_source_record(
+            sa_sync_conn, publication, source="hal", source_id="hal-g"
+        )
+        openalex_record = insert_source_record(
+            sa_sync_conn, publication, source="openalex", source_id="W-g"
+        )
+        insert_contribution(sa_sync_conn, publication, person_id=second, author_position=2)
+        insert_contribution(sa_sync_conn, publication, person_id=first, author_position=1)
+        # Contribution source HAL de la personne, hors de son groupe : sans effet sur les sources.
+        insert_source_contribution(sa_sync_conn, hal_record)
+        openalex_contribution = insert_source_contribution(
+            sa_sync_conn, openalex_record, source="openalex"
+        )
+        add_group_member(
+            sa_sync_conn,
+            group_id_of(sa_sync_conn, publication, first),
+            openalex_contribution,
+            openalex_record,
+        )
+        orphan = insert_source_contribution(sa_sync_conn, hal_record, author_position=3)
+        insert_group(sa_sync_conn, publication, [(orphan, hal_record)])
+
+        detail = get_publication_detail(sa_sync_conn, publication)
+        assert detail is not None
+        assert [(c.person_id, c.author_position) for c in detail.contributions] == [
+            (first, 1),
+            (second, 2),
+        ]
+        assert (detail.contributions[0].source_hal, detail.contributions[0].source_openalex) == (
+            False,
+            True,
+        )
 
     def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
         # `is_secondary` marque les formes convergées (pièce, version, variante), pas les

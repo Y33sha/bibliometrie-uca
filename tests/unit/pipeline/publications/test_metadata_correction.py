@@ -12,19 +12,19 @@ from pipeline.transformation.publications.correction.correct_by_cluster import (
     ClusterCorrectionStats,
 )
 from pipeline.transformation.publications.correction.correct_unary import UnaryCorrectionStats
-from pipeline.transformation.publications.correction.journal_by_doi import JournalByDoiStats
+from pipeline.transformation.publications.correction.serial_by_doi import SerialByDoiStats
 
 
-def _run(contexte, *, journal=None, unary=None, cluster=None):
+def _run(contexte, *, serial=None, unary=None, cluster=None):
     ordre: list[str] = []
-    journal = journal or JournalByDoiStats(examined=0, attached=0)
+    serial = serial or SerialByDoiStats(examined=0, attached=0)
     unary = unary or UnaryCorrectionStats(examined=0, corrected=0, rule_counts={})
     cluster = cluster or ClusterCorrectionStats(examined=0, corrected=0, case_counts={})
     with (
         patch.object(
             phase,
-            "run_journal_by_doi",
-            side_effect=lambda conn, q, log: ordre.append("journal_by_doi") or journal,
+            "run_serial_by_doi",
+            side_effect=lambda conn, q, log: ordre.append("serial_by_doi") or serial,
         ),
         patch.object(
             phase, "run_unary", side_effect=lambda conn, q, log: ordre.append("unaire") or unary
@@ -43,7 +43,7 @@ def test_rattachement_de_revue_avant_la_reclassification(contexte):
     """La revue posée par la première passe est ce sur quoi la deuxième s'appuie."""
     _, ordre = _run(contexte)
 
-    assert ordre == ["journal_by_doi", "unaire", "cluster"]
+    assert ordre == ["serial_by_doi", "unaire", "cluster"]
 
 
 def test_chaque_passe_dans_sa_transaction(open_tx, contexte):
@@ -55,7 +55,7 @@ def test_chaque_passe_dans_sa_transaction(open_tx, contexte):
 def test_bilan_assemble_des_trois_passes(contexte):
     metrics, _ = _run(
         contexte,
-        journal=JournalByDoiStats(examined=10, attached=4),
+        serial=SerialByDoiStats(examined=10, attached=4),
         unary=UnaryCorrectionStats(examined=20, corrected=6, rule_counts={}),
         cluster=ClusterCorrectionStats(examined=30, corrected=1, case_counts={}),
     )
@@ -63,8 +63,8 @@ def test_bilan_assemble_des_trois_passes(contexte):
     assert metrics.total == 60
     assert metrics.updated == 11
     assert metrics.details["summary"] == {
-        "journal_by_doi_examined": 10,
-        "journal_by_doi_corrected": 4,
+        "serial_by_doi_examined": 10,
+        "serial_by_doi_corrected": 4,
         "unary_examined": 20,
         "unary_corrected": 6,
         "cluster_examined": 30,

@@ -9,7 +9,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, computed_field
 
 from application.ports.read_models._common import (
     EntityFacetResponse,
@@ -20,6 +20,7 @@ from application.ports.read_models._common import (
 )
 from application.ports.read_models.subjects_queries import SubjectOut
 from domain.publications.licenses import License
+from domain.sources.registry import Source, source_record_url
 
 # Vocabulaire de tri des listes de publications, thèses comprises : le champ, puis le sens.
 PublicationSort = Literal[
@@ -44,7 +45,7 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "type",
         "year",
         "title",
-        "journal",
+        "serial",
         "publisher",
         "labs",
         "corr",
@@ -79,7 +80,7 @@ class PublicationFilters:
     lab_none: bool = False
     years: list[int] = field(default_factory=list)
     publisher_id: int | None = None
-    journal_id: int | None = None
+    serial_id: int | None = None
     monograph_id: int | None = None
     access: list[str] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
@@ -130,8 +131,8 @@ class PublicationListItem(BaseModel):
     doc_type: str
     oa_status: str
     license: str | None  # licence de la version éditeur
-    journal: str | None
-    journal_id: int | None
+    serial: str | None
+    serial_id: int | None
     publisher: str | None
     publisher_id: int | None
     hal_id: str | None
@@ -139,6 +140,24 @@ class PublicationListItem(BaseModel):
     scanr_id: str | None
     wos_id: str | None
     theses_id: str | None
+
+    @computed_field
+    @property
+    def record_urls(self) -> dict[str, str]:
+        """Lien vers le portail de chaque source où la publication est présente."""
+        ids = {
+            Source.HAL: self.hal_id,
+            Source.OPENALEX: self.openalex_id,
+            Source.SCANR: self.scanr_id,
+            Source.WOS: self.wos_id,
+            Source.THESES: self.theses_id,
+        }
+        return {
+            source: source_record_url(source, source_id, self.oa_status)
+            for source, source_id in ids.items()
+            if source_id
+        }
+
     date_soutenance: str | None
     date_inscription: str | None
     thesis_author_name: str | None
@@ -201,9 +220,9 @@ class PublicationDetailCore(BaseModel):
     language: str | None
     container_title: str | None
     abstract: str | None
-    journal_id: int | None
+    serial_id: int | None
     journal_title: str | None
-    journal_issns: list[str]
+    serial_issns: list[str]
     """ISSN actifs de la revue."""
     apc_amount: float | None
     apc_currency: str | None
@@ -219,12 +238,19 @@ class PublicationDetailCore(BaseModel):
 class SourceRecordOut(BaseModel):
     source: str
     source_id: str
+    oa_status: str | None
     doi: str | None
     hal_collections: list[str] | None
     countries: list[str] | None
     # Forme secondaire convergée (pièce, version ou variante dont le DOI a été substitué par
     # celui de l'œuvre canonique). La fiche replie ces sources sous un groupe dépliable.
     is_secondary: bool
+
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers l'enregistrement sur le portail de sa source."""
+        return source_record_url(self.source, self.source_id, self.oa_status)
 
 
 class ExternalIdentifierOut(BaseModel):
@@ -328,7 +354,7 @@ class PublicationDetailResponse(BaseModel):
 class SourceRecordMetadataOut(BaseModel):
     """Métadonnées d'un enregistrement source, après normalisation.
 
-    `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+    `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
     """
 
     id: int
@@ -344,7 +370,7 @@ class SourceRecordMetadataOut(BaseModel):
     language_name: str | None
     language_raw: str | None
     oa_status: str | None
-    journal_id: int | None
+    serial_id: int | None
     journal_title: str | None
     journal_raw_title: str | None
     journal_raw_issn: str | None
@@ -358,11 +384,17 @@ class SourceRecordMetadataOut(BaseModel):
     pages: str | None
     article_number: str | None
 
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers l'enregistrement sur le portail de sa source."""
+        return source_record_url(self.source, self.source_id, self.oa_status)
+
 
 class SourceContributionOut(BaseModel):
     """Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
 
-    `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `group_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
+    `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `person_id` : personne du groupe. `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
     """
 
     id: int
@@ -376,7 +408,7 @@ class SourceContributionOut(BaseModel):
     structure_ids: list[int] | None
     raw_affiliation: str | None
     countries: list[str] | None
-    group_id: int | None
+    contribution_id: int | None
     group_position: int | None
     method: str | None
     score: float | None
@@ -399,6 +431,12 @@ class SuspectMergeSourceRecordOut(BaseModel):
     source_id: str
     source_contributions: int
     matched_source_contributions: int
+
+    @computed_field
+    @property
+    def record_url(self) -> str:
+        """Lien vers l'enregistrement sur le portail de sa source."""
+        return source_record_url(self.source, self.source_id)
 
 
 class SuspectMergeOut(BaseModel):

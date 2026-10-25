@@ -106,7 +106,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
       },
     ],
   },
-  publishers_journals: {
+  publishing: {
     summary: [{ key: "doaj_matched", label: "DOAJ — journaux taggés" }],
     tables: [
       {
@@ -159,7 +159,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         { key: "corrected", label: "corrigées" },
       ],
       rows: [
-        { key: "journal_by_doi", label: "Rattachement journal (par DOI)" },
+        { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },
         { key: "unary", label: "Corrections à l'unité" },
         { key: "cluster", label: "Corrections par grappe" },
       ],
@@ -196,13 +196,25 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
   },
   persons: {
     summary: [
+      { key: "groups", label: "Contributions sans personne examinées" },
+      { key: "written", label: "Contributions sans personne rattachées" },
+      { key: "pinned", label: "Contributions rattachées par épinglage" },
       { key: "created", label: "Personnes créées" },
+      { key: "create", label: "Contributions sans personne (nom inconnu, invalide)" },
+      { key: "skip:ambiguous_name_form", label: "Contributions sans personne (nom ambigu)" },
+      { key: "skip:all_candidates_rejected", label: "Contributions sans personne (candidats rejetés)" },
+      { key: "skip:name_conflict", label: "Contributions sans personne (noms en conflit)" },
+      { key: "skip:identifier_conflict", label: "Contributions sans personne (identifiants en conflit)" },
+      { key: "skip:pin_conflict", label: "Contributions sans personne (épinglages en conflit)" },
+      { key: "skip:person_in_other_group", label: "Contributions sans personne (personne déjà présente dans la publication)" },
+      { key: "skip:creation_not_allowed", label: "Contributions sans personne (rôles de jury seuls)" },
+      { key: "skip:out_of_perimeter", label: "Contributions sans personne (hors périmètre)" },
       { key: "first_names_completed", label: "Prénoms complétés" },
-      { key: "skipped_ambiguous", label: "Ignorées (nom ambigu)" },
-      { key: "skipped_all_rejected", label: "Ignorées (candidats rejetés)" },
-      { key: "corroboration_rejected", label: "Rejets par corroboration de nom" },
-      { key: "corroboration_rejected_distinct", label: "dont identifiants distincts" },
-      { key: "cross_source_detached", label: "Cross-source détachés (sans appui)" },
+      { key: "identifiers_neutralized", label: "Identifiants portés sous le nom d'une autre personne, neutralisés" },
+      { key: "identifiers_transferred", label: "Identifiants transférés" },
+      { key: "ambiguous_marked", label: "Contributions à redécider (nom devenu ambigu)" },
+      { key: "deleted_attributions", label: "Attributions d'identifiant supprimées" },
+      { key: "deleted_persons", label: "Personnes supprimées" },
       { key: "name_forms_inserted", label: "Formes de nom ajoutées" },
       { key: "name_forms_updated", label: "Formes de nom modifiées" },
       { key: "name_forms_deleted", label: "Formes de nom supprimées" },
@@ -210,26 +222,25 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     tables: [
       {
         source: "table",
-        firstColumnLabel: "Méthode de rattachement",
+        firstColumnLabel: "Mode de rattachement",
         rowLabels: {
+          manual: "Épinglage",
           orcid: "ORCID",
           hal_person_id: "Compte HAL",
           idref: "IdRef",
-          cross_source: "Cross-source",
-          single_name: "Forme de nom",
+          name: "Nom sans homonymie",
           compatible_name: "Initiales compatibles",
+          created: "Personne créée",
         },
-        columns: [{ key: "count", label: "Rattachées", pct: true }],
+        columns: [{ key: "count", label: "Contributions rattachées", pct: true }],
         total: true,
       },
     ],
   },
-  contributions: {
+  finalize: {
     summary: [
-      { key: "created", label: "Contributions créées" },
-      { key: "pruned", label: "Contributions orphelines supprimées" },
       { key: "publications_purged", label: "Publications orphelines supprimées" },
-      { key: "total_in_perimeter", label: "Total dans le périmètre" },
+      { key: "total_in_perimeter", label: "Contributions du périmètre" },
     ],
   },
   countries: {

@@ -1,9 +1,9 @@
 # STATUS: oneshot (2026-09-21)
-"""Instantané (lecture seule) des conteneurs de chaque enregistrement : entrée de `journals` et monographie.
+"""Instantané (lecture seule) des conteneurs de chaque enregistrement : entrée de `serials` et monographie.
 
-Sert à quantifier, par type de changement, l'effet d'une renormalisation du stock. L'entrée de `journals` retenue est celle que donne la normalisation, avant correction par espace de noms DOI.
+Sert à quantifier, par type de changement, l'effet d'une renormalisation du stock. L'entrée de `serials` retenue est celle que donne la normalisation, avant correction par espace de noms DOI.
 
-L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : pour chaque enregistrement présent dans les deux, le changement de son entrée de `journals` et celui de sa monographie, par source et type de document.
+L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : pour chaque enregistrement présent dans les deux, le changement de son entrée de `serials` et celui de sa monographie, par source et type de document.
 
 Usage :
     python -m interfaces.cli.oneshot.snapshot_record_containers
@@ -33,21 +33,21 @@ _EXAMPLES = 5
 
 _RECORDS = text(f"""
     SELECT sr.source::text AS source, sr.source_id, sr.doc_type,
-           normalized.id AS journal_id, j.title AS journal_title,
-           coalesce({has_active_issn("j.id")}, false) AS journal_has_issn,
+           normalized.id AS serial_id, j.title AS journal_title,
+           coalesce({has_active_issn("j.id")}, false) AS serial_has_issn,
            sr.monograph_id, m.title AS monograph_title
     FROM source_records sr
     CROSS JOIN LATERAL (
-        SELECT CASE WHEN sr.corrections ? 'journal_id'
-                    THEN (sr.corrections->'journal_id'->>'raw')::int
-                    ELSE sr.journal_id END AS id
+        SELECT CASE WHEN sr.corrections ? 'serial_id'
+                    THEN (sr.corrections->'serial_id'->>'raw')::int
+                    ELSE sr.serial_id END AS id
     ) normalized
-    LEFT JOIN journals j ON j.id = normalized.id
+    LEFT JOIN serials j ON j.id = normalized.id
     LEFT JOIN monographs m ON m.id = sr.monograph_id
 """)
 
 Record = list[object]
-"""`[doc_type, journal_id, journal_title, journal_has_issn, monograph_id, monograph_title]`"""
+"""`[doc_type, serial_id, journal_title, serial_has_issn, monograph_id, monograph_title]`"""
 
 
 def snapshot() -> dict[str, Record]:
@@ -56,9 +56,9 @@ def snapshot() -> dict[str, Record]:
     return {
         f"{r.source}:{r.source_id}": [
             r.doc_type,
-            r.journal_id,
+            r.serial_id,
             r.journal_title,
-            r.journal_has_issn,
+            r.serial_has_issn,
             r.monograph_id,
             r.monograph_title,
         ]
@@ -66,16 +66,16 @@ def snapshot() -> dict[str, Record]:
     }
 
 
-def _journal_kind(record: Record) -> str:
+def _serial_kind(record: Record) -> str:
     if record[1] is None:
         return "aucune"
     return "à ISSN" if record[3] else "sans ISSN"
 
 
-def _journal_change(before: Record, after: Record) -> str:
+def _serial_change(before: Record, after: Record) -> str:
     if before[1] == after[1]:
         return "revue inchangée"
-    return f"revue {_journal_kind(before)} → {_journal_kind(after)}"
+    return f"revue {_serial_kind(before)} → {_serial_kind(after)}"
 
 
 def _monograph_change(before: Record, after: Record) -> str:
@@ -105,7 +105,7 @@ def _compare(before: dict[str, Record], after: dict[str, Record]) -> None:
     examples: defaultdict[tuple[str, str], list[str]] = defaultdict(list)
     for key in sorted(common):
         b, a = before[key], after[key]
-        change = (_journal_change(b, a), _monograph_change(b, a))
+        change = (_serial_change(b, a), _monograph_change(b, a))
         if change == ("revue inchangée", "monographie inchangée"):
             continue
         tally[change] += 1
@@ -116,8 +116,8 @@ def _compare(before: dict[str, Record], after: dict[str, Record]) -> None:
     log.info("─── Changements ───")
     for change, n in tally.most_common():
         log.info("%s, %s : %d", *change, n)
-        for (journal, monograph, kind), m in by_type.most_common():
-            if (journal, monograph) == change:
+        for (serial, monograph, kind), m in by_type.most_common():
+            if (serial, monograph) == change:
                 log.info("    %-40s %6d", kind, m)
         for line in examples[change]:
             log.info("    · %s", line)

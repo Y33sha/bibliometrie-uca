@@ -183,7 +183,7 @@ class PgAddressesQueries(AddressesQueries):
                 JOIN source_contributions sc ON sc.id = sca.source_contribution_id
                 JOIN source_records sr ON sr.id = sc.source_record_id
                 JOIN publications p ON p.id = sr.publication_id
-                LEFT JOIN journals j ON j.id = p.journal_id
+                LEFT JOIN serials j ON j.id = p.serial_id
                 WHERE sca.address_id = :id AND sr.publication_id IS NOT NULL
                 ORDER BY p.id, p.publication_year DESC
                 LIMIT :lim

@@ -21,8 +21,10 @@ from sqlalchemy import Connection
 
 from domain.sources.registry import SOURCE_PRIORITY, source_label
 from infrastructure.raw_store import NullRawStore, get_raw_store
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.adapter import SourceAdapter
+from pipeline.ingestion.common.locations import LocationStore
 from pipeline.ingestion.common.normalizer import (
-    BibliographicNormalizer,
     NormalizeStats,
     SourceNormalizer,
 )
@@ -37,13 +39,6 @@ from pipeline.ingestion.common.source_records import (
     delete_disappeared_source_records,
 )
 from pipeline.ingestion.common.staging import StagingStore
-from pipeline.ingestion.crossref.normalize import CrossrefNormalizer
-from pipeline.ingestion.datacite.normalize import DataciteNormalizer
-from pipeline.ingestion.hal.normalize import HalNormalizer
-from pipeline.ingestion.openalex.normalize import OpenalexNormalizer
-from pipeline.ingestion.scanr.normalize import ScanrNormalizer
-from pipeline.ingestion.theses.normalize import ThesesNormalizer
-from pipeline.ingestion.wos.normalize import WosNormalizer
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -115,7 +110,7 @@ class NormalizePhase:
     def _normalize_task(self, source: str) -> TaskRun:
         """Tâche `normalize.<source>` : normalise la source et garde sa ligne de la table d'observabilité."""
 
-        def run(ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+        def run(ctx: PhaseContext) -> PhaseMetrics:
             stats = self.normalize_one(ctx, source)
             metrics = PhaseMetrics()
             metrics.details["row"] = {
@@ -128,7 +123,7 @@ class NormalizePhase:
 
         return run
 
-    def _prune(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _prune(self, ctx: PhaseContext) -> PhaseMetrics:
         """Supprime les documents disparus de leur source, et ferme la section de normalisation."""
         disappeared = self.prune_disappeared(ctx)
         if disappeared:
@@ -141,14 +136,14 @@ class NormalizePhase:
             ctx.logger.info("%saucun document disparu de sa source", LAST_BRANCH)
         return PhaseMetrics(extras={"disappeared": disappeared})
 
-    def _cleanup(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _cleanup(self, ctx: PhaseContext) -> PhaseMetrics:
         deleted = self.cleanup_orphan_contributor_information(ctx)
         metrics = PhaseMetrics()
         if deleted:
             metrics.report = f"{quantity(deleted, 'ligne supprimée', 'lignes supprimées')}"
         return metrics
 
-    def _cleanup_addresses(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _cleanup_addresses(self, ctx: PhaseContext) -> PhaseMetrics:
         deleted = self.cleanup_orphan_addresses(ctx)
         metrics = PhaseMetrics()
         if deleted:
@@ -210,36 +205,26 @@ def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
 
 
 def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
-    """Constructeur du normaliseur de chaque source. Les sources bibliographiques partagent le câblage `_biblio` ; `theses` a le sien, sans repository de revue ni d'éditeur."""
+    """Constructeur du normaliseur de chaque source, sur les stores de la phase."""
 
     raw_store = get_raw_store() if archive else NullRawStore()
 
-    def _biblio(cls: type[BibliographicNormalizer]) -> NormalizerFactory:
-        return lambda conn, logger: cls(
-            conn,
-            logger,
-            StagingStore(conn, raw_store),
-            SourceRecordStore(conn),
-            container_stores=ContainerStores.of(conn),
-            publisher_store=PublisherStore(conn),
-            contribution_store=SourceContributionStore(conn),
-        )
+    def builder(adapter: SourceAdapter) -> NormalizerFactory:
+        def build(conn: Connection, logger: logging.Logger) -> SourceNormalizer:
+            return adapter.normalizer()(
+                conn,
+                logger,
+                StagingStore(conn, raw_store),
+                SourceRecordStore(conn),
+                container_stores=ContainerStores.of(conn),
+                publisher_store=PublisherStore(conn),
+                contribution_store=SourceContributionStore(conn),
+                location_store=LocationStore(conn),
+            )
 
-    return {
-        "theses": lambda conn, logger: ThesesNormalizer(
-            conn,
-            logger,
-            StagingStore(conn, raw_store),
-            SourceRecordStore(conn),
-            contribution_store=SourceContributionStore(conn),
-        ),
-        "crossref": _biblio(CrossrefNormalizer),
-        "datacite": _biblio(DataciteNormalizer),
-        "scanr": _biblio(ScanrNormalizer),
-        "hal": _biblio(HalNormalizer),
-        "openalex": _biblio(OpenalexNormalizer),
-        "wos": _biblio(WosNormalizer),
-    }
+        return build
+
+    return {source.value: builder(adapter) for source, adapter in ADAPTERS.items()}
 
 
 def _run_normalize(ctx: PhaseContext, build: NormalizerFactory) -> NormalizeStats:

@@ -21,7 +21,7 @@ def add_identifiers_from_contributions(
 ) -> None:
     """Attribue en `pending` à la personne les identifiants observés dans ses contributions sources, donnés par `{id_type: valeur}`.
 
-    Une valeur mal formée est journalisée et écartée. Une valeur déjà attribuée à une autre personne en `pending` ou `confirmed` est laissée : l'arbitrage par consensus du run suivant la tranche.
+    Une valeur mal formée est journalisée et écartée. Une valeur déjà attribuée à une autre personne en `pending` ou `confirmed` est laissée : l'arbitrage des conflits d'attribution du run suivant la tranche.
     """
     seen: set[tuple[str, str]] = set()
     for a in contributions:

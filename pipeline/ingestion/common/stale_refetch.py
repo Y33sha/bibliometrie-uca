@@ -1,53 +1,36 @@
 """Nouvelle lecture des documents d'une source par leur identifiant natif (`staging.source_id`).
 
-Chaque source implémente `StaleRefetch` (`pipeline/ingestion/<source>/fetch_stale.py`) : seule la requête par identifiant natif lui est propre. `refresh` fait la boucle commune.
+Chaque source implémente `StaleRefetch` (`pipeline/ingestion/<source>/fetch_stale.py`) : seule la requête par identifiant natif lui est propre. `refresh` sélectionne les documents et les relit par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
-from dataclasses import dataclass
 
 import httpx2
 from sqlalchemy import Connection, text
 
+from domain.publications.doc_types import DocType
 from domain.sources.registry import ALL_SOURCES_SET as VALID_SOURCES
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.http.fetch_pool import run_fetch_pool
-from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE, LookupOutcome
-from pipeline.ingestion.common.staging import upsert_staging
-from pipeline.runtime.observability.log_format import source_branch
-from pipeline.runtime.observability.logging_scope import scoped_logger
+from pipeline.http.lookup import LookupOutcome
+from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
 from pipeline.runtime.observability.metrics import PhaseMetrics
-from pipeline.runtime.observability.progress import track_progress
 
-COMMIT_EVERY = 50
-
-
-@dataclass(frozen=True, slots=True)
-class FetchedRecord:
-    """Document relu dans la source : payload brut et DOI."""
-
-    doi: str | None
-    raw_data: Mapping[str, JsonValue]
-
-
-type FetchOutcome = LookupOutcome[FetchedRecord]
+type FetchOutcome = LookupOutcome[Mapping[str, JsonValue]]
+"""Document relu dans la source, ou son absence, ou l'indisponibilité de la source."""
 
 
 class StaleRefetch(ABC):
     """Nouvelle lecture d'un document d'une source par son identifiant natif.
 
-    Les sous-classes fixent `source_key`, `max_concurrent`, `request_delay_s` et implémentent `fetch_by_native_id`.
+    Les sous-classes fixent `source_key` et `max_concurrent`, et implémentent `fetch_by_native_id`. Le débit suit le budget de la source (`api_params.MAX_PER_SECOND`).
     """
 
     source_key: str
     max_concurrent: int  # plafond de requêtes simultanées, sous le rate-limit de l'API
-    request_delay_s: float = 0.0  # pause par worker après chaque requête
 
     @abstractmethod
     async def fetch_by_native_id(
@@ -82,14 +65,18 @@ def get_stale_source_ids(
 ) -> list[str]:
     """Identifiants natifs des documents de `source` dont `last_seen_at` date de plus de `after_days` jours, hors documents disparus.
 
-    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_records.publication_year` : un run sur une période glissante relit seulement les documents de ses propres années. `None` = aucune borne.
+    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_records.publication_year` : un run sur une période glissante relit seulement les documents de ses propres années, et les thèses en cours. `None` = aucune borne.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
-        year_clause = "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years))"
+        # Une thèse en cours n'a pas d'année de soutenance : elle est relue quelle que soit la fenêtre.
+        year_clause = (
+            "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years)"
+            f" OR sr.doc_type = '{DocType.ONGOING_THESIS}')"
+        )
         params["years"] = list(years)
     sql = text(_STALE_ROWS_SQL_TEMPLATE.format(year_clause=year_clause))
     return list(conn.execute(sql, params).scalars())
@@ -107,73 +94,25 @@ async def refresh(
     *,
     after_days: int,
     years: list[int] | None = None,
-    breaker: SourceCircuitBreaker | None = None,
 ) -> PhaseMetrics:
     """Relit par identifiant natif les documents de la source de `refetch` non revus depuis `after_days` jours.
 
-    `years` borne la sélection à la fenêtre d'années du run (via `source_records.publication_year`) ; `None` = tous les documents anciens de la source.
+    `years` borne la sélection à la fenêtre d'années du run (via `source_records.publication_year`) ; `None` = tous les documents anciens de la source. Un document confirmé absent est marqué `disappeared_at`.
 
-    `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées marquées `disappeared_at`.
+    Compteurs de `look_up` : `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées.
     """
     source = refetch.source_key
-    slog = scoped_logger(log, source)
-    stale = get_stale_source_ids(conn, source, years, after_days=after_days)
-    total = len(stale)
-
-    metrics = PhaseMetrics(seen=total)
-    if total == 0:
-        return metrics
-
-    processed = 0
-
-    async def _fetch(client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        try:
-            outcome = await refetch.fetch_by_native_id(client, source_id)
-        except Exception as e:
-            # Breaker déclenché pendant la requête : abandon silencieux, le journal le signale une fois après le pool.
-            if not (breaker is not None and breaker.tripped):
-                slog.error("erreur sur %s : %s", source_id, e)
-            outcome = UNAVAILABLE
-        if refetch.request_delay_s:
-            await asyncio.sleep(refetch.request_delay_s)
-        return outcome
-
-    with track_progress(total, source_branch(source), slog, count_kept=True) as progress:
-
-        def _write(conn: Connection, source_id: str, outcome: FetchOutcome) -> None:
-            nonlocal processed
-            if outcome is UNAVAILABLE:
-                metrics.add(errors=1)
-            elif outcome is NOT_FOUND:
-                set_disappeared(conn, source, source_id)
-                metrics.add(disappeared=1)
-            else:
-                assert isinstance(outcome, FetchedRecord)
-                _, changed = upsert_staging(
-                    conn,
-                    source=source,
-                    source_id=source_id,
-                    doi=outcome.doi,
-                    raw_data=outcome.raw_data,
-                )
-                metrics.add(updated=1) if changed else metrics.add(unchanged=1)
-                progress.keep()
-            processed += 1
-            progress.advance()
-
-        await run_fetch_pool(
-            stale,
-            conn,
+    return await look_up(
+        conn,
+        log,
+        LookupChannel(
+            source=source,
+            fetch=one_at_a_time(refetch.fetch_by_native_id),
+            on_absent=lambda conn, source_id: set_disappeared(conn, source, source_id),
+            # La lecture par identifiant natif rend le document entier : aucun plafond d'auteurs.
+            stage=lambda staging, record: staging.stage(source, record, listed=False),
+            absent_metric="disappeared",
             max_concurrent=refetch.max_concurrent,
-            commit_every=COMMIT_EVERY,
-            fetch=_fetch,
-            write=_write,
-        )
-
-    if breaker is not None and breaker.tripped:
-        slog.warning(
-            "indisponible (429/5xx répétés) — abandon, %d/%d documents traités, reste au prochain run",
-            processed,
-            total,
-        )
-    return metrics
+        ),
+        get_stale_source_ids(conn, source, years, after_days=after_days),
+    )

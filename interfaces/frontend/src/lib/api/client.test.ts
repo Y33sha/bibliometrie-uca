@@ -244,12 +244,12 @@ describe('apiDetail', () => {
 		vi.stubGlobal('window', {
 			location: { pathname: '/journals/7', search: '?tab=dashboard', hash: '', replace }
 		});
-		const promesse = apiDetail('/api/journals/7');
+		const promesse = apiDetail('/api/serials/7');
 		await toursDeBoucle();
 		const reponse = reponseJson({ id: 12 });
 		Object.defineProperties(reponse, {
 			redirected: { value: true },
-			url: { value: 'http://localhost/api/journals/12' }
+			url: { value: 'http://localhost/api/serials/12' }
 		});
 		enVol[0].resoudre(reponse);
 
@@ -258,7 +258,7 @@ describe('apiDetail', () => {
 	});
 
 	it('rend le corps JSON sans redirection', async () => {
-		const promesse = apiDetail<{ id: number }>('/api/journals/7');
+		const promesse = apiDetail<{ id: number }>('/api/serials/7');
 		await toursDeBoucle();
 		enVol[0].resoudre(reponseJson({ id: 7 }));
 		expect(await promesse).toEqual({ id: 7 });

@@ -324,7 +324,7 @@ class TestAddressesCountries:
         sa_sync_conn.execute(
             text(
                 "INSERT INTO address_country_candidates (address_id, country_code, method)"
-                " VALUES (:a, 'fr', 'country_name'), (:a, 'fr', 'ror'), (:a, 'it', 'city')"
+                " VALUES (:a, 'fr', 'country_name'), (:a, 'fr', 'source_openalex'), (:a, 'it', 'city')"
             ),
             {"a": addr},
         )
@@ -335,6 +335,6 @@ class TestAddressesCountries:
 
         assert [a.id for a in res.addresses] == [addr]
         assert [(f.country_code, f.methods) for f in res.addresses[0].found_countries] == [
-            ("fr", [CountryDetectionMethod.COUNTRY_NAME, CountryDetectionMethod.ROR]),
+            ("fr", [CountryDetectionMethod.COUNTRY_NAME, CountryDetectionMethod.SOURCE_OPENALEX]),
             ("it", [CountryDetectionMethod.CITY]),
         ]

@@ -1,0 +1,355 @@
+<script lang="ts">
+	import { autofocus } from '$lib/actions/focus';
+	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
+	import { base } from '$app/paths';
+	import type { Snippet } from 'svelte';
+
+	import EntityFilter from '$lib/components/EntityFilter.svelte';
+	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
+	import Pagination from '$lib/components/Pagination.svelte';
+	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
+	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
+	import { useFacets } from '$lib/composables/useFacets.svelte';
+	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	import type { components } from '$lib/api/schema';
+
+	type Serial = components['schemas']['SerialListItem'];
+
+	// Composant de liste de revues réutilisable. Utilisé par :
+	// - `/journals` (mode autonome avec sync URL)
+	// - `/admin/serials` (snippet `actionCell` pour Modifier/Fusionner)
+	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe)
+	interface ExternalFilters {
+		publisherId?: number;
+	}
+
+	let {
+		apiKey = 'journals-list',
+		externalFilters,
+		urlSync = false,
+		basePath = '/journals',
+		perPage = 50,
+		withPubs = false,
+		actionCell,
+		actionColumnHeader = '',
+		nouns = ['revue', 'revues'],
+	}: {
+		apiKey?: string;
+		externalFilters?: ExternalFilters;
+		urlSync?: boolean;
+		basePath?: string;
+		perPage?: number;
+		/** Si true, n'expose que les revues avec ≥ 1 publication rattachée (mode page publique, masque les orphelines). Défaut false = admin. */
+		withPubs?: boolean;
+		/** Snippet rendu dans la colonne actions (1 row → 1 cell). Si fourni, une colonne Actions est ajoutée à droite du tableau. */
+		actionCell?: Snippet<[Serial]>;
+		/** En-tête de la colonne actions (vide par défaut, comme admin). */
+		actionColumnHeader?: string;
+		/** Nom des lignes au singulier et au pluriel : « revue » sur les pages publiques, le nom exact en administration. */
+		nouns?: [string, string];
+	} = $props();
+
+	// Éditeur imposé par le contexte : la facette et la colonne Éditeur portent alors la même valeur sur toutes les lignes, et sont masquées.
+	const publisherFixed = $derived(externalFilters?.publisherId != null);
+
+	// --- Filter state ---
+	let search = $state('');
+	let currentSort = $state('publications_desc');
+	let selectedPublisher: string[] = $state([]); // 0 ou 1 identifiant d'éditeur
+	let selectedSerialTypes: string[] = $state([]);
+	let selectedOaModels: string[] = $state([]);
+	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
+
+	// --- Params builder partagé entre la liste et ses facettes ---
+	// Le terme de recherche en fait partie : les décomptes des facettes suivent ainsi le champ de recherche, comme la liste.
+	function buildFilterParams(): URLSearchParams {
+		const params = new URLSearchParams();
+		const publisherId = externalFilters?.publisherId != null
+			? String(externalFilters.publisherId)
+			: selectedPublisher[0];
+		if (publisherId) params.set('publisher_id', publisherId);
+		if (selectedSerialTypes.length) params.set('serial_type', selectedSerialTypes.join(','));
+		if (selectedOaModels.length) params.set('oa_model', selectedOaModels.join(','));
+		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
+		if (selectedDoaj.length === 1) params.set('is_in_doaj', selectedDoaj[0]);
+		if (withPubs) params.set('with_publications', 'true');
+		const q = search.trim();
+		if (q) params.set('search', q);
+		return params;
+	}
+
+	const serials = usePaginatedFetch<Serial>({
+		endpoint: '/api/serials',
+		itemsKey: 'serials',
+		// svelte-ignore state_referenced_locally
+		perPage,
+		apiKey: () => apiKey,
+		buildParams() {
+			const params = buildFilterParams();
+			params.set('sort', currentSort);
+			return params;
+		},
+	});
+
+	const facets = useFacets({
+		endpoint: '/api/serials/facets',
+		apiKey: () => `${apiKey}-facets`,
+		buildParams: buildFilterParams,
+		facets: {
+			serialTypes: { type: 'labeled', apiKey: 'serial_types' },
+			oaModels: { type: 'labeled', apiKey: 'oa_models' },
+			doaj: { type: 'labeled', apiKey: 'doaj' },
+		},
+	});
+
+	const url = useUrlFilters({
+		basePath: () => basePath,
+		filters: {
+			selectedPublisher: { type: 'string_array', urlKey: 'publisher_id' },
+			selectedSerialTypes: { type: 'string_array', urlKey: 'serial_type' },
+			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },
+			selectedDoaj: { type: 'string_array', urlKey: 'is_in_doaj' },
+			search: { type: 'single', urlKey: 'search' },
+			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
+			currentPage: { type: 'page', urlKey: 'page' },
+		},
+	});
+
+	// --- Handlers ---
+	function syncUrl() {
+		if (!urlSync) return;
+		url.syncUrl(() => ({
+			selectedPublisher,
+			selectedSerialTypes,
+			selectedOaModels,
+			selectedDoaj,
+			search,
+			currentSort,
+			currentPage: serials.page,
+		}));
+	}
+
+	function onFilterChange() {
+		serials.page = 1;
+		syncUrl();
+		serials.load();
+		facets.load();
+	}
+
+	const onSearchInput = url.debouncedSearch(() => {
+		serials.page = 1;
+		syncUrl();
+		serials.load();
+		facets.load();
+	});
+
+	function setSort(s: string) {
+		currentSort = currentSort === s ? oppositeSort(s) : s;
+		serials.page = 1;
+		syncUrl();
+		serials.load();
+	}
+
+	function oppositeSort(s: string): string {
+		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
+	}
+
+	function sortArrow(col: 'title' | 'publisher' | 'publications'): string {
+		if (currentSort === col) return '▲';
+		if (currentSort === '-' + col) return '▼';
+		return '';
+	}
+
+	function formatIssns(j: Serial): string {
+		return j.issns.join(' / ');
+	}
+
+	function serialTypeLabel(value: string | null): string {
+		if (!value) return '';
+		const opt = facets.options.serialTypes.find((o) => o.value === value);
+		return opt ? opt.text : value;
+	}
+
+	onMount(async () => {
+		if (urlSync) {
+			const restored = url.restoreFromUrl($page.url.searchParams);
+			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
+			if (restored.selectedSerialTypes) selectedSerialTypes = restored.selectedSerialTypes as string[];
+			if (restored.selectedOaModels) selectedOaModels = restored.selectedOaModels as string[];
+			if (restored.selectedDoaj) selectedDoaj = restored.selectedDoaj as string[];
+			if (restored.search) search = restored.search as string;
+			if (restored.currentSort) currentSort = restored.currentSort as string;
+			if (restored.currentPage) serials.page = restored.currentPage as number;
+		}
+		await facets.load();
+		serials.load();
+	});
+</script>
+
+<div class="toolbar toolbar-card toolbar-sticky">
+	<input
+		type="search"
+		placeholder="Rechercher par titre ou ISSN"
+		bind:value={search}
+		use:autofocus
+		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
+		oninput={onSearchInput}
+	/>
+	{#if !publisherFixed}
+		<EntityFilter
+			label="Éditeur"
+			endpoint="/api/serials/facets"
+			kind="publisher"
+			buildParams={buildFilterParams}
+			selected={selectedPublisher}
+			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+		/>
+	{/if}
+	<FacetDropdown
+		label="Types"
+		options={facets.options.serialTypes}
+		bind:selected={selectedSerialTypes}
+		onchange={onFilterChange}
+	/>
+	<FacetDropdown
+		label="DOAJ"
+		options={facets.options.doaj}
+		bind:selected={selectedDoaj}
+		onchange={onFilterChange}
+	/>
+	<FacetDropdown
+		label="Modèle OA"
+		options={facets.options.oaModels}
+		bind:selected={selectedOaModels}
+		onchange={onFilterChange}
+	/>
+	<span class="count">{serials.total.toLocaleString('fr-FR')} {serials.total > 1 ? nouns[1] : nouns[0]}</span>
+</div>
+
+<div class="table-scroll">
+<table class="journals-table">
+	<thead>
+		<tr>
+			<th class="sortable" onclick={() => setSort('title')}>
+				Titre {sortArrow('title')}
+			</th>
+			<th>ISSN</th>
+			{#if !publisherFixed}
+				<th class="sortable" onclick={() => setSort('publisher')}>
+					Éditeur {sortArrow('publisher')}
+				</th>
+			{/if}
+			<th>Type</th>
+			<th class="num sortable" onclick={() => setSort('publications')}>
+				Publis {sortArrow('publications')}
+			</th>
+			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
+		</tr>
+	</thead>
+	<tbody>
+		{#each serials.items as j (j.id)}
+			<tr>
+				<td>
+					<a href="{base}/journals/{j.id}" class="journal-link">{j.title}</a>
+					{#if j.is_in_doaj}
+						{#if j.doaj_url}
+							<a class="badge-doaj" href={j.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
+						{:else}
+							<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
+						{/if}
+					{/if}				</td>
+				<td class="issn-cell">{formatIssns(j)}</td>
+				{#if !publisherFixed}
+					<td class="muted">
+						{#if j.publisher_name}
+							{#if j.publisher_id}
+								<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.publisher_name}</a>
+							{:else}
+								{j.publisher_name}
+							{/if}
+						{/if}
+					</td>
+				{/if}
+				<td class="muted">{serialTypeLabel(j.serial_type)}</td>
+				<td class="num">{j.publication_count.toLocaleString('fr-FR')}</td>
+				{#if actionCell}<td class="actions">{@render actionCell(j)}</td>{/if}
+			</tr>
+		{/each}
+		{#if serials.items.length === 0}
+			<TableStatusRow loading={serials.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune {nouns[0]} ne correspond aux filtres." />
+		{/if}
+	</tbody>
+</table>
+</div>
+
+<Pagination
+	page={serials.page}
+	pages={serials.pages}
+	onchange={(p) => {
+		serials.page = p;
+		syncUrl();
+		serials.load();
+	}}
+/>
+
+<style>
+	/* Assez large pour que le texte indicatif du champ tienne en entier. */
+	.toolbar input[type='search'] {
+		width: 280px;
+	}
+
+	.journals-table {
+		width: 100%;
+		min-width: 660px;
+		border-collapse: collapse;
+		background: var(--card);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+	}
+	.journals-table thead th {
+		background: var(--surface);
+		padding: 8px 10px;
+		text-align: left;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--muted);
+		border-bottom: 2px solid var(--border);
+		white-space: nowrap;
+	}
+	.journals-table thead th.num { text-align: right; }
+	.journals-table thead th.sortable { cursor: pointer; user-select: none; }
+	.journals-table thead th.sortable:hover { color: var(--accent); }
+	.journals-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
+	.journals-table tbody tr:last-child { border-bottom: none; }
+	.journals-table tbody tr:hover { background: var(--surface-hover); }
+	.journals-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
+	.journals-table td.num {
+		text-align: right;
+		font-variant-numeric: tabular-nums;
+		color: var(--muted);
+	}
+	.issn-cell {
+		color: var(--muted);
+		font-size: 0.85rem;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.muted { color: var(--muted); }
+
+	.journal-link { font-weight: 500; }
+
+	.badge-doaj {
+		font-size: 0.7rem;
+		padding: 1px 5px;
+		background: var(--success);
+		color: white;
+		border-radius: 8px;
+		margin-left: 6px;
+		vertical-align: middle;
+		font-weight: 600;
+		text-decoration: none;
+	}
+	:global(a.badge-doaj:hover) { background: #256528; }
+	.actions { white-space: nowrap; position: relative; }
+</style>

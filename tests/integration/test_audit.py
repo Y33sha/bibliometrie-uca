@@ -311,6 +311,8 @@ class TestEndToEndServiceIntegration:
             reject_pair(
                 publication_id,
                 person_id,
+                conn=sa_sync_conn,
+                perimeter_recompute=PublicationPerimeterRecompute(),
                 repo=contribution_repository(sa_sync_conn),
                 audit_repo=audit_repository(sa_sync_conn),
             )

@@ -19,13 +19,12 @@ def source_contribution_structure_ids(source_contribution: str = "sc") -> str:
     )
 
 
-def contribution_has_source(source: str, contribution: str = "a") -> str:
-    """Condition vraie quand la contribution aliasée `contribution` est attestée par une contribution source de `source` : même publication par son enregistrement source, même personne."""
+def contribution_has_source(source: str, group: str = "a") -> str:
+    """Condition vraie quand le groupe aliasé `group` a un membre dont l'enregistrement source est de `source`."""
     return (
-        "EXISTS (SELECT 1 FROM source_contributions sc_src"
-        " JOIN source_records sr_src ON sr_src.id = sc_src.source_record_id"
-        f" WHERE sr_src.publication_id = {contribution}.publication_id"
-        f" AND sc_src.person_id = {contribution}.person_id AND sc_src.source = '{source}')"
+        "EXISTS (SELECT 1 FROM aligned_source_contributions m_src"
+        " JOIN source_records sr_src ON sr_src.id = m_src.source_record_id"
+        f" WHERE m_src.contribution_id = {group}.id AND sr_src.source = '{source}')"
     )
 
 

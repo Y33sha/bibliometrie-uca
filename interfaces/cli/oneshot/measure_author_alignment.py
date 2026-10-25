@@ -322,7 +322,7 @@ def measure(
             length_gaps[f"{label}|{'0' if gap == 0 else '1-2' if gap <= 2 else '3+'}"] += 1
             dependent = _dependent(ka, kb)
             pair = "–".join(sorted((ka[1], kb[1]))) + (" (recopie de HAL)" if dependent else "")
-            context = {
+            context: dict[str, object] = {
                 "publication_id": publication_id,
                 "sources": f"{ka[1]}→{kb[1]}",
                 "tranche": label,

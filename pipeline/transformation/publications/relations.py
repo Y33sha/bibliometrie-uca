@@ -44,7 +44,13 @@ from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.sql_fragments import has_source_extra, raw_column
 from pipeline.runtime.context import Phase, PhaseContext
-from pipeline.runtime.observability.log_format import LAST_BRANCH, inflect, quantity, step
+from pipeline.runtime.observability.log_format import (
+    LAST_BRANCH,
+    breakdown,
+    inflect,
+    quantity,
+    step,
+)
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
 
@@ -501,7 +507,7 @@ class RelationsPhase:
             "relations.rebuild"
         ]
 
-    def _rebuild(self, ctx: PhaseContext, _breaker: object) -> PhaseMetrics:
+    def _rebuild(self, ctx: PhaseContext) -> PhaseMetrics:
         """Reconstruit `publication_relations` depuis les trois signaux, en une transaction, et retourne les compteurs de la phase (répartition par type de relation dans `details`)."""
         with ctx.open_tx() as conn:
             sources = fetch_declared_relation_sources(conn)
@@ -549,22 +555,15 @@ def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
     """
     added = _count_by_pair_label(rebuild.added_by_type)
     total = sum(added.values())
+    step(logger, "Relations entre publications")
     if total:
-        step(
+        breakdown(
             logger,
-            "%s entre publications",
-            quantity(total, "nouvelle relation", "nouvelles relations"),
+            f"{quantity(total, 'nouvelle relation', 'nouvelles relations')}, dont",
+            ((count, label) for label, count in added.items()),
+            last=not rebuild.removed,
         )
-        logger.info("")
-        width = max(len(str(count)) for count in added.values())
-        for label, count in added.items():
-            logger.info("     %s %s", str(count).rjust(width), label)
-    else:
-        step(logger, "Relations entre publications")
-
     if rebuild.removed:
-        if total:
-            logger.info("")
         logger.info(
             "%s%s %s",
             LAST_BRANCH,

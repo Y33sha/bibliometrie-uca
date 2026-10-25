@@ -1109,7 +1109,7 @@ export interface paths {
         head?: never;
         /**
          * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte.
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
          *
          *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
@@ -1425,7 +1425,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable et détache les contributions sources sous cette forme : leur `person_id` est vidé dans `source_contributions`, et les contributions devenues orphelines sont supprimées. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     `rejected` pose un verrou durable. Les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne : le run suivant les redécide. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -1439,7 +1439,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Count
-         * @description Nombre de contributions sources du périmètre rattachées à aucune personne.
+         * @description Nombre de contributions orphelines.
          */
         get: operations["orphan_contributions_count_api_contributions_orphans_count_get"];
         put?: never;
@@ -1459,7 +1459,7 @@ export interface paths {
         };
         /**
          * List Orphan Contributions
-         * @description Liste les contributions sources du périmètre rattachées à aucune personne.
+         * @description Liste les contributions orphelines.
          */
         get: operations["list_orphan_contributions_api_contributions_orphans_get"];
         put?: never;
@@ -1479,7 +1479,7 @@ export interface paths {
         };
         /**
          * Orphan Contributions Facets
-         * @description Facette laboratoires des contributions sources orphelines.
+         * @description Facette laboratoires des contributions orphelines.
          */
         get: operations["orphan_contributions_facets_api_contributions_orphans_facets_get"];
         put?: never;
@@ -1501,9 +1501,9 @@ export interface paths {
         put?: never;
         /**
          * Assign Orphan Contribution
-         * @description Attribue une contribution source orpheline à une personne, que la requête désigne ou fait créer.
+         * @description Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou une contribution source introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, et sur une contribution source déjà rattachée à une personne (`ContributionAlreadyAssignedError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1523,9 +1523,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Assign Orphan Contributions
-         * @description Attribue plusieurs contributions sources orphelines à une personne existante.
+         * @description Attribue plusieurs contributions orphelines à une personne existante.
          *
-         *     Les contributions sources absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions sources rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les groupes absents ou déjà rattachés sont écartés du lot et journalisés ; le décompte rendu compte les groupes rattachés. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
@@ -1551,7 +1551,7 @@ export interface paths {
          * Exclude Contribution
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     Enregistre la paire (publication, personne) dans `rejected_contributions`, détache les contributions sources et supprime la ligne consolidée. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
         patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
@@ -1831,7 +1831,7 @@ export interface paths {
          * Publishers Facets
          * @description Comptes par option des facettes de la liste des éditeurs.
          *
-         *     Convention partagée avec `/api/journals/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
+         *     Convention partagée avec `/api/serials/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
          */
         get: operations["publishers_facets_api_publishers_facets_get"];
         put?: never;
@@ -1853,7 +1853,7 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
-         *     `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -1903,7 +1903,7 @@ export interface paths {
          * Get Publisher Dashboard
          * @description Agrégats de l'onglet tableau de bord de la page d'un éditeur.
          *
-         *     Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` des publications que ses revues portent. Renvoie 404 sur un éditeur inconnu.
+         *     Distribution des `serial_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
          */
         get: operations["get_publisher_dashboard_api_publishers__publisher_id__dashboard_get"];
         put?: never;
@@ -1949,7 +1949,7 @@ export interface paths {
          * Merge
          * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
          *
-         *         Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `journal_type` de la cible (`merge_journals`).
+         *         Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
          *
          *     Deux éditeurs qui portent des membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
          *
@@ -1962,7 +1962,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/oa-models": {
+    "/api/serials/oa-models": {
         parameters: {
             query?: never;
             header?: never;
@@ -1973,9 +1973,9 @@ export interface paths {
          * List Oa Models
          * @description Valeurs possibles de `oa_model` avec leur libellé français.
          *
-         *     La source de vérité côté Python est `domain.journals.journal.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la modale d'édition admin.
+         *     La source de vérité côté Python est `domain.serials.journal.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la modale d'édition admin.
          */
-        get: operations["list_oa_models_api_journals_oa_models_get"];
+        get: operations["list_oa_models_api_serials_oa_models_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1984,7 +1984,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/types": {
+    "/api/serials/types": {
         parameters: {
             query?: never;
             header?: never;
@@ -1992,12 +1992,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Journal Types
-         * @description Valeurs possibles de l'enum `journal_type` avec leur libellé français.
+         * List Serial Types
+         * @description Valeurs possibles de l'enum `serial_type` avec leur libellé français.
          *
-         *     La source de vérité côté Python est `domain.journals.journal.JOURNAL_TYPES` et `JOURNAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
+         *     La source de vérité côté Python est `domain.serials.journal.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
          */
-        get: operations["list_journal_types_api_journals_types_get"];
+        get: operations["list_serial_types_api_serials_types_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2006,7 +2006,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/facets": {
+    "/api/serials/facets": {
         parameters: {
             query?: never;
             header?: never;
@@ -2014,12 +2014,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journals Facets
+         * Serials Facets
          * @description Comptes par option des facettes de la liste des revues.
          *
          *     Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
          */
-        get: operations["journals_facets_api_journals_facets_get"];
+        get: operations["serials_facets_api_serials_facets_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2028,7 +2028,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/facets/entities": {
+    "/api/serials/facets/entities": {
         parameters: {
             query?: never;
             header?: never;
@@ -2036,14 +2036,14 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journals Entity Facet
+         * Serials Entity Facet
          * @description Facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
          *
          *     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre et leurs ISSN.
          *
          *     `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
          */
-        get: operations["journals_entity_facet_api_journals_facets_entities_get"];
+        get: operations["serials_entity_facet_api_serials_facets_entities_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2052,7 +2052,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals": {
+    "/api/serials": {
         parameters: {
             query?: never;
             header?: never;
@@ -2060,12 +2060,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * List Journals
+         * List Serials
          * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
          *     `with_publications` restreint aux revues qui ont au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
-        get: operations["list_journals_api_journals_get"];
+        get: operations["list_serials_api_serials_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2074,7 +2074,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/same-titles/count": {
+    "/api/serials/same-titles/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -2082,10 +2082,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journals With Same Title Count
+         * Serials With Same Title Count
          * @description Compteur de l'onglet « Titres identiques » (badge).
          */
-        get: operations["journals_with_same_title_count_api_journals_same_titles_count_get"];
+        get: operations["serials_with_same_title_count_api_serials_same_titles_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2094,7 +2094,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/same-titles": {
+    "/api/serials/same-titles": {
         parameters: {
             query?: never;
             header?: never;
@@ -2102,12 +2102,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journals With Same Title
+         * Serials With Same Title
          * @description Groupes de revues de même titre normalisé, à fusionner à la main.
          *
          *     Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées.
          */
-        get: operations["journals_with_same_title_api_journals_same_titles_get"];
+        get: operations["serials_with_same_title_api_serials_same_titles_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2116,7 +2116,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/shared-issns/count": {
+    "/api/serials/shared-issns/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -2124,10 +2124,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journals Sharing Issn Count
+         * Serials Sharing Issn Count
          * @description Compteur de l'onglet « ISSN partagés » (badge).
          */
-        get: operations["journals_sharing_issn_count_api_journals_shared_issns_count_get"];
+        get: operations["serials_sharing_issn_count_api_serials_shared_issns_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2136,7 +2136,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/shared-issns": {
+    "/api/serials/shared-issns": {
         parameters: {
             query?: never;
             header?: never;
@@ -2144,10 +2144,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Journals Sharing Issn
+         * Serials Sharing Issn
          * @description Groupes de revues où le même ISSN est actif, à fusionner à la main.
          */
-        get: operations["journals_sharing_issn_api_journals_shared_issns_get"];
+        get: operations["serials_sharing_issn_api_serials_shared_issns_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2156,7 +2156,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/likely-proceedings/count": {
+    "/api/serials/likely-proceedings/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -2167,7 +2167,7 @@ export interface paths {
          * Likely Proceedings Count
          * @description Compteur de l'onglet « Recueils d'actes probables » (badge).
          */
-        get: operations["likely_proceedings_count_api_journals_likely_proceedings_count_get"];
+        get: operations["likely_proceedings_count_api_serials_likely_proceedings_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2176,7 +2176,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/likely-proceedings": {
+    "/api/serials/likely-proceedings": {
         parameters: {
             query?: never;
             header?: never;
@@ -2187,7 +2187,7 @@ export interface paths {
          * Likely Proceedings
          * @description Revues typées `journal` dont la majorité des documents sont des articles de congrès, à typer à la main.
          */
-        get: operations["likely_proceedings_api_journals_likely_proceedings_get"];
+        get: operations["likely_proceedings_api_serials_likely_proceedings_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2196,7 +2196,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/doi-namespace-conflicts/count": {
+    "/api/serials/doi-namespace-conflicts/count": {
         parameters: {
             query?: never;
             header?: never;
@@ -2207,7 +2207,7 @@ export interface paths {
          * Doi Namespace Conflicts Count
          * @description Compteur de l'onglet « Contredites par le DOI » (badge).
          */
-        get: operations["doi_namespace_conflicts_count_api_journals_doi_namespace_conflicts_count_get"];
+        get: operations["doi_namespace_conflicts_count_api_serials_doi_namespace_conflicts_count_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2216,7 +2216,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/doi-namespace-conflicts": {
+    "/api/serials/doi-namespace-conflicts": {
         parameters: {
             query?: never;
             header?: never;
@@ -2227,7 +2227,7 @@ export interface paths {
          * Doi Namespace Conflicts
          * @description Paires de revues dont l'une porte des enregistrements dont le DOI tombe dans l'espace de noms de l'autre.
          */
-        get: operations["doi_namespace_conflicts_api_journals_doi_namespace_conflicts_get"];
+        get: operations["doi_namespace_conflicts_api_serials_doi_namespace_conflicts_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2236,7 +2236,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/{journal_id}": {
+    "/api/serials/{serial_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -2244,21 +2244,21 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Journal
+         * Get Serial
          * @description Profil complet d'une revue, pour sa page publique.
          *
          *     Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
          */
-        get: operations["get_journal_api_journals__journal_id__get"];
+        get: operations["get_serial_api_serials__serial_id__get"];
         /**
-         * Update Journal
+         * Update Serial
          * @description Met à jour une revue, champ par champ.
          *
          *     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur une revue inconnue.
          *
-         *     Un `journal_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_journal`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
+         *     Un `serial_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_serial`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
          */
-        put: operations["update_journal_api_journals__journal_id__put"];
+        put: operations["update_serial_api_serials__serial_id__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2266,7 +2266,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/{journal_id}/dashboard": {
+    "/api/serials/{serial_id}/dashboard": {
         parameters: {
             query?: never;
             header?: never;
@@ -2274,12 +2274,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Journal Dashboard
+         * Get Serial Dashboard
          * @description Agrégats des publications de la revue : distributions de `doc_type` et de `oa_status`.
          *
          *     Sert l'onglet tableau de bord de la page d'une revue, où ces distributions donnent à voir les incohérences — un `article` dans une revue de type `proceedings`, par exemple. Renvoie 404 sur une revue inconnue.
          */
-        get: operations["get_journal_dashboard_api_journals__journal_id__dashboard_get"];
+        get: operations["get_serial_dashboard_api_serials__serial_id__dashboard_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2288,7 +2288,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/{journal_id}/subjects": {
+    "/api/serials/{serial_id}/subjects": {
         parameters: {
             query?: never;
             header?: never;
@@ -2296,12 +2296,12 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Journal Subjects
+         * Get Serial Subjects
          * @description Sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
          *
          *     Les sujets trop génériques sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
          */
-        get: operations["get_journal_subjects_api_journals__journal_id__subjects_get"];
+        get: operations["get_serial_subjects_api_serials__serial_id__subjects_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2310,7 +2310,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/journals/{journal_id}/type-change-impact": {
+    "/api/serials/{serial_id}/type-change-impact": {
         parameters: {
             query?: never;
             header?: never;
@@ -2321,20 +2321,20 @@ export interface paths {
         put?: never;
         /**
          * Get Type Change Impact
-         * @description Compte les publications de la revue dont le `doc_type` changerait si son `journal_type` passait à la valeur demandée.
+         * @description Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à la valeur demandée.
          *
          *     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
          *
          *     La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
          */
-        post: operations["get_type_change_impact_api_journals__journal_id__type_change_impact_post"];
+        post: operations["get_type_change_impact_api_serials__serial_id__type_change_impact_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/journals/{journal_id}/merge": {
+    "/api/serials/{serial_id}/merge": {
         parameters: {
             query?: never;
             header?: never;
@@ -2345,11 +2345,11 @@ export interface paths {
         put?: never;
         /**
          * Merge
-         * @description Fusionne la revue `source_id` dans la revue `journal_id`.
+         * @description Fusionne la revue `source_id` dans la revue `serial_id`.
          *
-         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `journal_type` de la cible (`merge_journals`). Renvoie 422 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
+         *     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `serial_type` de la cible (`merge_serials`). Renvoie 422 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
          */
-        post: operations["merge_api_journals__journal_id__merge_post"];
+        post: operations["merge_api_serials__serial_id__merge_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2530,6 +2530,26 @@ export interface paths {
          * @description Détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord.
          */
         get: operations["get_subject_api_subjects__subject_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sources
+         * @description Sources et leur libellé, dans l'ordre d'affichage.
+         */
+        get: operations["list_sources_api_sources_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2764,13 +2784,11 @@ export interface components {
         };
         /**
          * AssignOrphanContribution
-         * @description Attribution unitaire, seule à savoir créer la personne au passage.
-         *
-         *     `source_contributions.id` est une clé primaire : l'id désigne la contribution source à lui seul.
+         * @description Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage.
          */
         AssignOrphanContribution: {
-            /** Source Contribution Id */
-            source_contribution_id: number;
+            /** Contribution Id */
+            contribution_id: number;
             /** Person Id */
             person_id?: number | null;
             create_person?: components["schemas"]["CreatePersonName"] | null;
@@ -2802,11 +2820,11 @@ export interface components {
         };
         /**
          * BatchAssignOrphanContributions
-         * @description Attribution en lot à une personne existante.
+         * @description Attribution en lot de contributions orphelines, désignées par leurs groupes de contributions sources, à une personne existante.
          */
         BatchAssignOrphanContributions: {
-            /** Source Contribution Ids */
-            source_contribution_ids: number[];
+            /** Group Ids */
+            group_ids: number[];
             /** Person Id */
             person_id: number;
             /**
@@ -2860,16 +2878,16 @@ export interface components {
             updated: number;
         };
         /**
-         * BlockingJournalItem
+         * BlockingSerialItem
          * @description Paire de revues qui empêche la fusion de deux éditeurs.
          */
-        BlockingJournalItem: {
-            /** Target Journal Id */
-            target_journal_id: number;
+        BlockingSerialItem: {
+            /** Target Serial Id */
+            target_serial_id: number;
             /** Target Title */
             target_title: string;
-            /** Source Journal Id */
-            source_journal_id: number;
+            /** Source Serial Id */
+            source_serial_id: number;
             /** Source Title */
             source_title: string;
             /** Reason */
@@ -2954,7 +2972,7 @@ export interface components {
          * @description Moyen qui propose un pays pour une adresse.
          * @enum {string}
          */
-        CountryDetectionMethod: "manual" | "country_name" | "ror" | "source_openalex" | "institution" | "city" | "source_scanr";
+        CountryDetectionMethod: "manual" | "country_name" | "source_openalex" | "institution" | "city" | "source_scanr";
         /**
          * CountryOut
          * @description Pays du référentiel : code ISO à deux lettres et libellé.
@@ -2996,8 +3014,8 @@ export interface components {
             last_name: string;
             /** Has Rh */
             has_rh: boolean;
-            /** Source Contribution Count */
-            source_contribution_count: number;
+            /** Contribution Count */
+            contribution_count: number;
             /** Labs */
             labs: string[];
         };
@@ -3032,21 +3050,19 @@ export interface components {
         };
         /**
          * DetachContributionsResponse
-         * @description Décompte d'un détachement de contributions sources : contributions sources détachées, contributions supprimées, formes de nom nettoyées.
+         * @description Décompte d'un détachement de contributions : groupes de contributions sources détachés de la personne, formes de nom nettoyées.
          */
         DetachContributionsResponse: {
             /** Detached */
             detached: number;
-            /** Deleted Contributions */
-            deleted_contributions: number;
             /** Cleaned Forms */
             cleaned_forms: number;
         };
         /**
          * DoiNamespaceConflict
-         * @description Enregistrements de `record_journal` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_journal`.
+         * @description Enregistrements de `record_serial` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_serial`.
          *
-         *     `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part des DOI qui désigne `namespace_journal`, un DOI partagé entre plusieurs revues au prorata de ses enregistrements. `records` compte les enregistrements de `record_journal`, `sources` les répartit par source.
+         *     `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part des DOI qui désigne `namespace_serial`, un DOI partagé entre plusieurs revues au prorata de ses enregistrements. `records` compte les enregistrements de `record_serial`, `sources` les répartit par source.
          */
         DoiNamespaceConflict: {
             /** Namespace */
@@ -3057,8 +3073,8 @@ export interface components {
             documents: number;
             /** Share */
             share: number;
-            namespace_journal: components["schemas"]["JournalListItem"];
-            record_journal: components["schemas"]["JournalListItem"];
+            namespace_serial: components["schemas"]["SerialListItem"];
+            record_serial: components["schemas"]["SerialListItem"];
             /** Records */
             records: number;
             /** Sources */
@@ -3131,7 +3147,7 @@ export interface components {
          * EnumOption
          * @description Une valeur d'enum exposée à l'interface : `{value, label_fr}`.
          *
-         *     Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, journal_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+         *     Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, serial_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
          */
         EnumOption: {
             /** Value */
@@ -3267,10 +3283,13 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Halids */
-            halids: string[] | null;
             /** Laboratories */
             laboratories: components["schemas"]["StructureRef"][];
+            /**
+             * Hal Links
+             * @description Dépôts HAL de la publication, avec leur lien.
+             */
+            readonly hal_links: components["schemas"]["SourceLink"][];
         };
         /** HalAffiliationConflictsResponse */
         HalAffiliationConflictsResponse: {
@@ -3316,6 +3335,11 @@ export interface components {
             hal_title: string | null;
             /** Author Count */
             author_count: number;
+            /**
+             * Record Url
+             * @description Lien vers le dépôt sur HAL.
+             */
+            readonly record_url: string;
         };
         /** HalDoiDuplicatePair */
         HalDoiDuplicatePair: {
@@ -3394,10 +3418,13 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Halids */
-            halids: string[] | null;
             /** Outside Perimeter Collections */
             outside_perimeter_collections: boolean;
+            /**
+             * Hal Links
+             * @description Dépôts HAL de la publication, avec leur lien.
+             */
+            readonly hal_links: components["schemas"]["SourceLink"][];
         };
         /** HalMissingCollectionsResponse */
         HalMissingCollectionsResponse: {
@@ -3501,228 +3528,11 @@ export interface components {
          */
         IssnSupport: "print" | "electronic" | "other";
         /**
-         * JournalDashboardResponse
-         * @description GET /api/journals/{id}/dashboard : distributions des publications d'une revue.
-         *
-         *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
-         *
-         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `journal_type` et le `oa_model` de la revue (`domain.journals.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue ne porte pas la valeur correspondante, ou que celle-ci n'est pas mappée.
-         */
-        JournalDashboardResponse: {
-            /** Total Publications */
-            total_publications: number;
-            /** Doc Types */
-            doc_types: components["schemas"]["application__ports__read_models__journals_queries__DocTypeCount"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__read_models__journals_queries__OaStatusCount"][];
-            /** Expected Doc Types */
-            expected_doc_types: string[];
-            /** Expected Oa Statuses */
-            expected_oa_statuses: string[];
-        };
-        /**
-         * JournalDetailResponse
-         * @description GET /api/journals/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
-         *
-         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
-         */
-        JournalDetailResponse: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Issns */
-            issns: string[];
-            /** Publisher Id */
-            publisher_id: number | null;
-            /** Publisher Name */
-            publisher_name: string | null;
-            /** Is In Doaj */
-            is_in_doaj: boolean;
-            journal_type: components["schemas"]["JournalType"] | null;
-            /** Publication Count */
-            publication_count: number;
-            /** Doaj Url */
-            doaj_url: string | null;
-            /** Issn Details */
-            issn_details: components["schemas"]["JournalIssnDetail"][];
-            /** Openalex Id */
-            openalex_id: string | null;
-            /** Apc Amount */
-            apc_amount: number | null;
-            /** Apc Currency */
-            apc_currency: string | null;
-            oa_model: components["schemas"]["OaModel"] | null;
-            /** Is Academic */
-            is_academic: boolean | null;
-            /** Doaj Payload */
-            doaj_payload: {
-                [key: string]: string;
-            } | null;
-            /** Doaj Imported At */
-            doaj_imported_at: string | null;
-        };
-        /**
-         * JournalDuplicateGroup
-         * @description Revues en double potentiel : la valeur qu'elles partagent, puis les revues, la plus riche en publications en tête.
-         */
-        JournalDuplicateGroup: {
-            /** Value */
-            value: string;
-            /** Journals */
-            journals: components["schemas"]["JournalListItem"][];
-        };
-        /**
-         * JournalDuplicatesResponse
-         * @description File de groupes de revues en double potentiel, les plus riches en publications en tête.
-         */
-        JournalDuplicatesResponse: {
-            /** Groups */
-            groups: components["schemas"]["JournalDuplicateGroup"][];
-        };
-        /**
-         * JournalIssnDetail
-         * @description Un ISSN d'une revue : support, ISSN-L, statut, ISSN successeur et date de vérification au Sudoc.
-         */
-        JournalIssnDetail: {
-            /** Issn */
-            issn: string;
-            support: components["schemas"]["IssnSupport"] | null;
-            /** Linking */
-            linking: boolean;
-            status: components["schemas"]["IssnStatus"];
-            /** Replaced By */
-            replaced_by: string | null;
-            /** Sudoc Checked At */
-            sudoc_checked_at: string | null;
-        };
-        /**
-         * JournalIssnInput
-         * @description Un ISSN d'une revue, saisi à l'administration.
-         */
-        JournalIssnInput: {
-            /** Issn */
-            issn: string;
-            support?: components["schemas"]["IssnSupport"] | null;
-            /**
-             * Linking
-             * @default false
-             */
-            linking: boolean;
-            /** @default active */
-            status: components["schemas"]["IssnStatus"];
-            /** Replaced By */
-            replaced_by?: string | null;
-        };
-        /**
-         * JournalListItem
-         * @description Ligne de la liste paginée `/api/journals` — un résumé ; le profil complet est `JournalDetailResponse`.
-         *
-         *     `publisher_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `journals`.
-         */
-        JournalListItem: {
-            /** Id */
-            id: number;
-            /** Title */
-            title: string;
-            /** Issns */
-            issns: string[];
-            /** Publisher Id */
-            publisher_id: number | null;
-            /** Publisher Name */
-            publisher_name: string | null;
-            /** Is In Doaj */
-            is_in_doaj: boolean;
-            journal_type: components["schemas"]["JournalType"] | null;
-            /** Publication Count */
-            publication_count: number;
-            /** Doaj Url */
-            doaj_url: string | null;
-        };
-        /** JournalListResponse */
-        JournalListResponse: {
-            /** Total */
-            total: number;
-            /** Page */
-            page: number;
-            /** Per Page */
-            per_page: number;
-            /** Journals */
-            journals: components["schemas"]["JournalListItem"][];
-            /** Pages */
-            readonly pages: number;
-        };
-        /**
-         * JournalType
-         * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `journal_type`.
-         * @enum {string}
-         */
-        JournalType: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
-        /**
-         * JournalTypeChange
-         * @description Valeur de `journal_type` dont la modale admin demande l'impact avant de confirmer l'édition.
-         */
-        JournalTypeChange: {
-            journal_type: components["schemas"]["JournalType"];
-        };
-        /**
-         * JournalTypeChangeImpact
-         * @description Compte des publications dont le `doc_type` canonique changerait si le `journal_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
-         */
-        JournalTypeChangeImpact: {
-            /** Count */
-            count: number;
-        };
-        /**
-         * JournalTypeCount
-         * @description Compteur de revues par `journal_type` pour un éditeur.
-         */
-        JournalTypeCount: {
-            /** Journal Type */
-            journal_type: string | null;
-            /** Count */
-            count: number;
-        };
-        /**
-         * JournalUpdate
-         * @description Champs éditables d'une revue, en modification sélective.
-         *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
-         *
-         *     `journal_type` et `oa_model` ont les types du domaine, que les enums SQL des mêmes noms reprennent. Leurs valeurs se vérifient ici.
-         */
-        JournalUpdate: {
-            /** Title */
-            title?: string | null;
-            /** Issns */
-            issns?: components["schemas"]["JournalIssnInput"][] | null;
-            oa_model?: components["schemas"]["OaModel"] | null;
-            journal_type?: components["schemas"]["JournalType"] | null;
-            /** Is Academic */
-            is_academic?: boolean | null;
-            /** Apc Amount */
-            apc_amount?: number | null;
-        };
-        /**
-         * JournalsFacetsResponse
-         * @description Facettes de `/api/journals` sur trois dimensions.
-         *
-         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `JOURNAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
-         */
-        JournalsFacetsResponse: {
-            /** Journal Types */
-            journal_types: components["schemas"]["FacetOption"][];
-            /** Oa Models */
-            oa_models: components["schemas"]["FacetOption"][];
-            /** Doaj */
-            doaj: components["schemas"]["FacetOption"][];
-        };
-        /**
          * LikelyProceedingsItem
          * @description Revue typée `journal` qui contient surtout des articles de congrès : `conference_papers` sur `records` documents, d'après le type donné par chaque source.
          */
         LikelyProceedingsItem: {
-            journal: components["schemas"]["JournalListItem"];
+            serial: components["schemas"]["SerialListItem"];
             /** Conference Papers */
             conference_papers: number;
             /** Records */
@@ -3733,8 +3543,8 @@ export interface components {
          * @description File des recueils d'actes probables : les revues sans ISSN en tête, puis les plus riches en documents.
          */
         LikelyProceedingsResponse: {
-            /** Journals */
-            journals: components["schemas"]["LikelyProceedingsItem"][];
+            /** Serials */
+            serials: components["schemas"]["LikelyProceedingsItem"][];
         };
         /** LoginRequest */
         LoginRequest: {
@@ -3791,8 +3601,8 @@ export interface components {
             publisher_id: number | null;
             /** Publisher Name */
             publisher_name: string | null;
-            /** Journal Id */
-            journal_id: number | null;
+            /** Serial Id */
+            serial_id: number | null;
             /** Journal Title */
             journal_title: string | null;
             /** Publication Count */
@@ -3967,7 +3777,7 @@ export interface components {
         };
         /**
          * OrphanAssignResponse
-         * @description Acquittement de l'attribution d'une contribution source orpheline : la personne rattachée.
+         * @description Acquittement de l'attribution d'une contribution orpheline : la personne rattachée.
          */
         OrphanAssignResponse: {
             /**
@@ -3980,7 +3790,7 @@ export interface components {
         };
         /**
          * OrphanBatchAssignResponse
-         * @description Acquittement de l'attribution en lot : le nombre de contributions sources rattachées.
+         * @description Acquittement de l'attribution en lot : le nombre de contributions rattachées.
          */
         OrphanBatchAssignResponse: {
             /**
@@ -3991,12 +3801,15 @@ export interface components {
             /** Assigned */
             assigned: number;
         };
-        /** OrphanContributionOut */
+        /**
+         * OrphanContributionOut
+         * @description Contribution orpheline : groupe de contributions sources du périmètre, sous un rôle d'auteur, rattaché à aucune personne.
+         */
         OrphanContributionOut: {
-            /** Source */
-            source: string;
-            /** Source Contribution Id */
-            source_contribution_id: number;
+            /** Contribution Id */
+            contribution_id: number;
+            /** Sources */
+            sources: string[];
             /** Full Name */
             full_name: string;
             /** Last Name */
@@ -4014,7 +3827,7 @@ export interface components {
         };
         /**
          * OrphanContributionsFacetsResponse
-         * @description Facette laboratoires de la file des contributions sources orphelines : décompte par laboratoire détecté dans la contribution source, et nombre de contributions sources sans laboratoire.
+         * @description Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les membres du groupe, et nombre de groupes sans laboratoire.
          */
         OrphanContributionsFacetsResponse: {
             /** Labs */
@@ -4064,8 +3877,8 @@ export interface components {
             shared_publications: number;
             /** Labs */
             labs: number;
-            /** Journals */
-            journals: number;
+            /** Serials */
+            serials: number;
         };
         /**
          * PartenaireThese
@@ -4232,10 +4045,10 @@ export interface components {
             /** Has Rh */
             has_rh: boolean;
             exclusion: components["schemas"]["PersonExclusion"] | null;
-            /** Source Contribution Count */
-            source_contribution_count: number;
-            /** In Perimeter Source Contribution Count */
-            in_perimeter_source_contribution_count: number;
+            /** Contribution Count */
+            contribution_count: number;
+            /** In Perimeter Contribution Count */
+            in_perimeter_contribution_count: number;
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][];
         };
@@ -4510,12 +4323,12 @@ export interface components {
             container_title: string | null;
             /** Abstract */
             abstract: string | null;
-            /** Journal Id */
-            journal_id: number | null;
+            /** Serial Id */
+            serial_id: number | null;
             /** Journal Title */
             journal_title: string | null;
-            /** Journal Issns */
-            journal_issns: string[];
+            /** Serial Issns */
+            serial_issns: string[];
             /** Apc Amount */
             apc_amount: number | null;
             /** Apc Currency */
@@ -4583,10 +4396,10 @@ export interface components {
             oa_status: string;
             /** License */
             license: string | null;
-            /** Journal */
-            journal: string | null;
-            /** Journal Id */
-            journal_id: number | null;
+            /** Serial */
+            serial: string | null;
+            /** Serial Id */
+            serial_id: number | null;
             /** Publisher */
             publisher: string | null;
             /** Publisher Id */
@@ -4619,6 +4432,13 @@ export interface components {
             contribution_id: number | null;
             /** Hal Collections */
             hal_collections: string[] | null;
+            /**
+             * Record Urls
+             * @description Lien vers le portail de chaque source où la publication est présente.
+             */
+            readonly record_urls: {
+                [key: string]: string;
+            };
         };
         /** PublicationListResponse */
         PublicationListResponse: {
@@ -4709,8 +4529,8 @@ export interface components {
             country: string | null;
             /** Publisher Type */
             publisher_type: string;
-            /** Journal Count */
-            journal_count: number;
+            /** Serial Count */
+            serial_count: number;
             /** Publication Count */
             publication_count: number;
             /** Doi Prefixes */
@@ -4720,13 +4540,13 @@ export interface components {
          * PublisherDashboardResponse
          * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
          *
-         *     `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publis rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
+         *     `serial_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
          */
         PublisherDashboardResponse: {
             /** Total Publications */
             total_publications: number;
-            /** Journal Types */
-            journal_types: components["schemas"]["JournalTypeCount"][];
+            /** Serial Types */
+            serial_types: components["schemas"]["SerialTypeCount"][];
             /** Doc Types */
             doc_types: components["schemas"]["application__ports__read_models__publishers_queries__DocTypeCount"][];
             /** Oa Statuses */
@@ -4749,8 +4569,8 @@ export interface components {
             country: string | null;
             /** Publisher Type */
             publisher_type: string;
-            /** Journal Count */
-            journal_count: number;
+            /** Serial Count */
+            serial_count: number;
             /** Publication Count */
             publication_count: number;
             /** Doi Prefixes */
@@ -4771,13 +4591,13 @@ export interface components {
         };
         /**
          * PublisherMergeBlockedResponse
-         * @description 409 de `POST /api/publishers/{id}/merge` : la fusion est refusée en bloc, `blocking_journals` énumère les paires à traiter.
+         * @description 409 de `POST /api/publishers/{id}/merge` : la fusion est refusée en bloc, `blocking_serials` énumère les paires à traiter.
          */
         PublisherMergeBlockedResponse: {
             /** Detail */
             detail: string;
-            /** Blocking Journals */
-            blocking_journals: components["schemas"]["BlockingJournalItem"][];
+            /** Blocking Serials */
+            blocking_serials: components["schemas"]["BlockingSerialItem"][];
         };
         /**
          * PublisherType
@@ -4943,6 +4763,223 @@ export interface components {
             /** Phases */
             phases: components["schemas"]["PhaseBrief"][];
         };
+        /**
+         * SerialDashboardResponse
+         * @description GET /api/serials/{id}/dashboard : distributions des publications d'une revue.
+         *
+         *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
+         *
+         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue ne porte pas la valeur correspondante, ou que celle-ci n'est pas mappée.
+         */
+        SerialDashboardResponse: {
+            /** Total Publications */
+            total_publications: number;
+            /** Doc Types */
+            doc_types: components["schemas"]["application__ports__read_models__serials_queries__DocTypeCount"][];
+            /** Oa Statuses */
+            oa_statuses: components["schemas"]["application__ports__read_models__serials_queries__OaStatusCount"][];
+            /** Expected Doc Types */
+            expected_doc_types: string[];
+            /** Expected Oa Statuses */
+            expected_oa_statuses: string[];
+        };
+        /**
+         * SerialDetailResponse
+         * @description GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
+         *
+         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+         */
+        SerialDetailResponse: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Issns */
+            issns: string[];
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Publisher Name */
+            publisher_name: string | null;
+            /** Is In Doaj */
+            is_in_doaj: boolean;
+            serial_type: components["schemas"]["SerialType"] | null;
+            /** Publication Count */
+            publication_count: number;
+            /** Doaj Url */
+            doaj_url: string | null;
+            /** Issn Details */
+            issn_details: components["schemas"]["SerialIssnDetail"][];
+            /** Openalex Id */
+            openalex_id: string | null;
+            /** Apc Amount */
+            apc_amount: number | null;
+            /** Apc Currency */
+            apc_currency: string | null;
+            oa_model: components["schemas"]["OaModel"] | null;
+            /** Is Academic */
+            is_academic: boolean | null;
+            /** Doaj Payload */
+            doaj_payload: {
+                [key: string]: string;
+            } | null;
+            /** Doaj Imported At */
+            doaj_imported_at: string | null;
+        };
+        /**
+         * SerialDuplicateGroup
+         * @description Revues en double potentiel : la valeur qu'elles partagent, puis les revues, la plus riche en publications en tête.
+         */
+        SerialDuplicateGroup: {
+            /** Value */
+            value: string;
+            /** Serials */
+            serials: components["schemas"]["SerialListItem"][];
+        };
+        /**
+         * SerialDuplicatesResponse
+         * @description File de groupes de revues en double potentiel, les plus riches en publications en tête.
+         */
+        SerialDuplicatesResponse: {
+            /** Groups */
+            groups: components["schemas"]["SerialDuplicateGroup"][];
+        };
+        /**
+         * SerialIssnDetail
+         * @description Un ISSN d'une revue : support, ISSN-L, statut, ISSN successeur et date de vérification au Sudoc.
+         */
+        SerialIssnDetail: {
+            /** Issn */
+            issn: string;
+            support: components["schemas"]["IssnSupport"] | null;
+            /** Linking */
+            linking: boolean;
+            status: components["schemas"]["IssnStatus"];
+            /** Replaced By */
+            replaced_by: string | null;
+            /** Sudoc Checked At */
+            sudoc_checked_at: string | null;
+        };
+        /**
+         * SerialIssnInput
+         * @description Un ISSN d'une revue, saisi à l'administration.
+         */
+        SerialIssnInput: {
+            /** Issn */
+            issn: string;
+            support?: components["schemas"]["IssnSupport"] | null;
+            /**
+             * Linking
+             * @default false
+             */
+            linking: boolean;
+            /** @default active */
+            status: components["schemas"]["IssnStatus"];
+            /** Replaced By */
+            replaced_by?: string | null;
+        };
+        /**
+         * SerialListItem
+         * @description Ligne de la liste paginée `/api/serials` — un résumé ; le profil complet est `SerialDetailResponse`.
+         *
+         *     `publisher_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `serials`.
+         */
+        SerialListItem: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Issns */
+            issns: string[];
+            /** Publisher Id */
+            publisher_id: number | null;
+            /** Publisher Name */
+            publisher_name: string | null;
+            /** Is In Doaj */
+            is_in_doaj: boolean;
+            serial_type: components["schemas"]["SerialType"] | null;
+            /** Publication Count */
+            publication_count: number;
+            /** Doaj Url */
+            doaj_url: string | null;
+        };
+        /** SerialListResponse */
+        SerialListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Serials */
+            serials: components["schemas"]["SerialListItem"][];
+            /** Pages */
+            readonly pages: number;
+        };
+        /**
+         * SerialType
+         * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`.
+         * @enum {string}
+         */
+        SerialType: "journal" | "proceedings" | "repository" | "book_series" | "ebook_platform" | "preprint_server" | "media" | "unknown";
+        /**
+         * SerialTypeChange
+         * @description Valeur de `serial_type` dont la modale admin demande l'impact avant de confirmer l'édition.
+         */
+        SerialTypeChange: {
+            serial_type: components["schemas"]["SerialType"];
+        };
+        /**
+         * SerialTypeChangeImpact
+         * @description Compte des publications dont le `doc_type` canonique changerait si le `serial_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
+         */
+        SerialTypeChangeImpact: {
+            /** Count */
+            count: number;
+        };
+        /**
+         * SerialTypeCount
+         * @description Compteur de revues par `serial_type` pour un éditeur.
+         */
+        SerialTypeCount: {
+            /** Serial Type */
+            serial_type: string | null;
+            /** Count */
+            count: number;
+        };
+        /**
+         * SerialUpdate
+         * @description Champs éditables d'une revue, en modification sélective.
+         *
+         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
+         *
+         *     `serial_type` et `oa_model` ont les types du domaine, que les enums SQL des mêmes noms reprennent. Leurs valeurs se vérifient ici.
+         */
+        SerialUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Issns */
+            issns?: components["schemas"]["SerialIssnInput"][] | null;
+            oa_model?: components["schemas"]["OaModel"] | null;
+            serial_type?: components["schemas"]["SerialType"] | null;
+            /** Is Academic */
+            is_academic?: boolean | null;
+            /** Apc Amount */
+            apc_amount?: number | null;
+        };
+        /**
+         * SerialsFacetsResponse
+         * @description Facettes de `/api/serials` sur trois dimensions.
+         *
+         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
+         */
+        SerialsFacetsResponse: {
+            /** Serial Types */
+            serial_types: components["schemas"]["FacetOption"][];
+            /** Oa Models */
+            oa_models: components["schemas"]["FacetOption"][];
+            /** Doaj */
+            doaj: components["schemas"]["FacetOption"][];
+        };
         /** SetCountry */
         SetCountry: {
             /** Countries */
@@ -4989,7 +5026,7 @@ export interface components {
          * SourceContributionOut
          * @description Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
          *
-         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `group_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
+         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `person_id` : personne du groupe. `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
          */
         SourceContributionOut: {
             /** Id */
@@ -5014,8 +5051,8 @@ export interface components {
             raw_affiliation: string | null;
             /** Countries */
             countries: string[] | null;
-            /** Group Id */
-            group_id: number | null;
+            /** Contribution Id */
+            contribution_id: number | null;
             /** Group Position */
             group_position: number | null;
             /** Method */
@@ -5033,10 +5070,20 @@ export interface components {
             source_contribution_id: number;
         };
         /**
+         * SourceLink
+         * @description Identifiant d'un enregistrement source et son lien vers le portail de la source.
+         */
+        SourceLink: {
+            /** Source Id */
+            source_id: string;
+            /** Record Url */
+            record_url: string;
+        };
+        /**
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `journal_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur de cette revue. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
          */
         SourceRecordMetadataOut: {
             /** Id */
@@ -5067,8 +5114,8 @@ export interface components {
             language_raw: string | null;
             /** Oa Status */
             oa_status: string | null;
-            /** Journal Id */
-            journal_id: number | null;
+            /** Serial Id */
+            serial_id: number | null;
             /** Journal Title */
             journal_title: string | null;
             /** Journal Raw Title */
@@ -5093,6 +5140,11 @@ export interface components {
             pages: string | null;
             /** Article Number */
             article_number: string | null;
+            /**
+             * Record Url
+             * @description Lien vers l'enregistrement sur le portail de sa source.
+             */
+            readonly record_url: string;
         };
         /** SourceRecordOut */
         SourceRecordOut: {
@@ -5100,6 +5152,8 @@ export interface components {
             source: string;
             /** Source Id */
             source_id: string;
+            /** Oa Status */
+            oa_status: string | null;
             /** Doi */
             doi: string | null;
             /** Hal Collections */
@@ -5108,6 +5162,11 @@ export interface components {
             countries: string[] | null;
             /** Is Secondary */
             is_secondary: boolean;
+            /**
+             * Record Url
+             * @description Lien vers l'enregistrement sur le portail de sa source.
+             */
+            readonly record_url: string;
         };
         /** StatsFacetsResponse */
         StatsFacetsResponse: {
@@ -5445,6 +5504,11 @@ export interface components {
             source_contributions: number;
             /** Matched Source Contributions */
             matched_source_contributions: number;
+            /**
+             * Record Url
+             * @description Lien vers l'enregistrement sur le portail de sa source.
+             */
+            readonly record_url: string;
         };
         /** SuspectMergesResponse */
         SuspectMergesResponse: {
@@ -5552,34 +5616,6 @@ export interface components {
         };
         /**
          * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `journal_type` de la revue (`domain.journals.expected`), ce qui laisse le frontend signaler les autres.
-         */
-        application__ports__read_models__journals_queries__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
-         *
-         *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.journals.expected`).
-         */
-        application__ports__read_models__journals_queries__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
-        };
-        /**
-         * DocTypeCount
          * @description Compteur de publications par `doc_type` pour un éditeur.
          */
         application__ports__read_models__publishers_queries__DocTypeCount: {
@@ -5597,6 +5633,34 @@ export interface components {
             oa_status: string | null;
             /** Count */
             count: number;
+        };
+        /**
+         * DocTypeCount
+         * @description Compteur de publications par `doc_type` pour une revue.
+         *
+         *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `serial_type` de la revue (`domain.serials.expected`), ce qui laisse le frontend signaler les autres.
+         */
+        application__ports__read_models__serials_queries__DocTypeCount: {
+            /** Doc Type */
+            doc_type: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
+        };
+        /**
+         * OaStatusCount
+         * @description Compteur de publications par `oa_status` pour une revue.
+         *
+         *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.serials.expected`).
+         */
+        application__ports__read_models__serials_queries__OaStatusCount: {
+            /** Oa Status */
+            oa_status: string | null;
+            /** Count */
+            count: number;
+            /** Expected */
+            expected: boolean;
         };
     };
     responses: never;
@@ -5697,7 +5761,7 @@ export interface operations {
                 lab_id?: string;
                 year?: string;
                 publisher_id?: string;
-                journal_id?: string;
+                serial_id?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5732,12 +5796,12 @@ export interface operations {
     stats_entity_facet_api_stats_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal" | "person" | "subject";
+                kind: "publisher" | "serial" | "person" | "subject";
                 entity_search?: string;
                 lab_id?: string;
                 year?: string;
                 publisher_id?: string;
-                journal_id?: string;
+                serial_id?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5775,7 +5839,7 @@ export interface operations {
                 lab_id?: string;
                 year?: string;
                 publisher_id?: string;
-                journal_id?: string;
+                serial_id?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5836,7 +5900,7 @@ export interface operations {
                 lab_id?: string;
                 year?: string;
                 publisher_id?: string;
-                journal_id?: string;
+                serial_id?: string;
                 oa_status?: string;
                 license?: string;
                 has_apc?: string;
@@ -5895,7 +5959,7 @@ export interface operations {
                 lab_id?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
@@ -5942,13 +6006,13 @@ export interface operations {
     publications_entity_facet_api_publications_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal" | "person" | "subject";
+                kind: "publisher" | "serial" | "person" | "subject";
                 entity_search?: string;
                 search?: string;
                 lab_id?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
@@ -6001,7 +6065,7 @@ export interface operations {
                 lab_id?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
@@ -6206,7 +6270,7 @@ export interface operations {
                 lab_id?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
                 monograph_id?: number | null;
                 person_id?: number | null;
                 author_id?: number | null;
@@ -6253,7 +6317,7 @@ export interface operations {
     resolve_entity_label_api_entity_labels_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal" | "person" | "subject";
+                kind: "publisher" | "serial" | "person" | "subject";
                 entity_id: number;
             };
             header?: never;
@@ -7196,7 +7260,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "source_contributions_asc" | "source_contributions_desc" | "in_perimeter_source_contributions_asc" | "in_perimeter_source_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
                 search?: string;
                 department?: string;
                 role?: string;
@@ -8633,7 +8697,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "name_asc" | "name_desc" | "journals_asc" | "journals_desc" | "publications_asc" | "publications_desc";
+                sort?: "name_asc" | "name_desc" | "serials_asc" | "serials_desc" | "publications_asc" | "publications_desc";
                 search?: string;
                 publisher_type?: string;
                 country?: string;
@@ -8839,7 +8903,7 @@ export interface operations {
             };
         };
     };
-    list_oa_models_api_journals_oa_models_get: {
+    list_oa_models_api_serials_oa_models_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8859,7 +8923,7 @@ export interface operations {
             };
         };
     };
-    list_journal_types_api_journals_types_get: {
+    list_serial_types_api_serials_types_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -8879,12 +8943,12 @@ export interface operations {
             };
         };
     };
-    journals_facets_api_journals_facets_get: {
+    serials_facets_api_serials_facets_get: {
         parameters: {
             query?: {
                 search?: string;
                 publisher_id?: number | null;
-                journal_type?: string;
+                serial_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
                 with_publications?: boolean;
@@ -8901,7 +8965,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalsFacetsResponse"];
+                    "application/json": components["schemas"]["SerialsFacetsResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8915,14 +8979,14 @@ export interface operations {
             };
         };
     };
-    journals_entity_facet_api_journals_facets_entities_get: {
+    serials_entity_facet_api_serials_facets_entities_get: {
         parameters: {
             query: {
                 kind: "publisher";
                 entity_search?: string;
                 search?: string;
                 publisher_id?: number | null;
-                journal_type?: string;
+                serial_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
                 with_publications?: boolean;
@@ -8953,7 +9017,7 @@ export interface operations {
             };
         };
     };
-    list_journals_api_journals_get: {
+    list_serials_api_serials_get: {
         parameters: {
             query?: {
                 page?: number;
@@ -8961,7 +9025,7 @@ export interface operations {
                 sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "publications_asc" | "publications_desc";
                 search?: string;
                 publisher_id?: number | null;
-                journal_type?: string;
+                serial_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
                 with_publications?: boolean;
@@ -8978,7 +9042,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalListResponse"];
+                    "application/json": components["schemas"]["SerialListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8992,7 +9056,7 @@ export interface operations {
             };
         };
     };
-    journals_with_same_title_count_api_journals_same_titles_count_get: {
+    serials_with_same_title_count_api_serials_same_titles_count_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9012,7 +9076,7 @@ export interface operations {
             };
         };
     };
-    journals_with_same_title_api_journals_same_titles_get: {
+    serials_with_same_title_api_serials_same_titles_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9027,52 +9091,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalDuplicatesResponse"];
+                    "application/json": components["schemas"]["SerialDuplicatesResponse"];
                 };
             };
         };
     };
-    journals_sharing_issn_count_api_journals_shared_issns_count_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TotalCountResponse"];
-                };
-            };
-        };
-    };
-    journals_sharing_issn_api_journals_shared_issns_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JournalDuplicatesResponse"];
-                };
-            };
-        };
-    };
-    likely_proceedings_count_api_journals_likely_proceedings_count_get: {
+    serials_sharing_issn_count_api_serials_shared_issns_count_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9092,7 +9116,47 @@ export interface operations {
             };
         };
     };
-    likely_proceedings_api_journals_likely_proceedings_get: {
+    serials_sharing_issn_api_serials_shared_issns_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SerialDuplicatesResponse"];
+                };
+            };
+        };
+    };
+    likely_proceedings_count_api_serials_likely_proceedings_count_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TotalCountResponse"];
+                };
+            };
+        };
+    };
+    likely_proceedings_api_serials_likely_proceedings_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9112,7 +9176,7 @@ export interface operations {
             };
         };
     };
-    doi_namespace_conflicts_count_api_journals_doi_namespace_conflicts_count_get: {
+    doi_namespace_conflicts_count_api_serials_doi_namespace_conflicts_count_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9132,7 +9196,7 @@ export interface operations {
             };
         };
     };
-    doi_namespace_conflicts_api_journals_doi_namespace_conflicts_get: {
+    doi_namespace_conflicts_api_serials_doi_namespace_conflicts_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -9152,12 +9216,12 @@ export interface operations {
             };
         };
     };
-    get_journal_api_journals__journal_id__get: {
+    get_serial_api_serials__serial_id__get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                journal_id: number;
+                serial_id: number;
             };
             cookie?: never;
         };
@@ -9169,7 +9233,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalDetailResponse"];
+                    "application/json": components["schemas"]["SerialDetailResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9183,18 +9247,18 @@ export interface operations {
             };
         };
     };
-    update_journal_api_journals__journal_id__put: {
+    update_serial_api_serials__serial_id__put: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                journal_id: number;
+                serial_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["JournalUpdate"];
+                "application/json": components["schemas"]["SerialUpdate"];
             };
         };
         responses: {
@@ -9218,12 +9282,12 @@ export interface operations {
             };
         };
     };
-    get_journal_dashboard_api_journals__journal_id__dashboard_get: {
+    get_serial_dashboard_api_serials__serial_id__dashboard_get: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                journal_id: number;
+                serial_id: number;
             };
             cookie?: never;
         };
@@ -9235,7 +9299,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalDashboardResponse"];
+                    "application/json": components["schemas"]["SerialDashboardResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9249,14 +9313,14 @@ export interface operations {
             };
         };
     };
-    get_journal_subjects_api_journals__journal_id__subjects_get: {
+    get_serial_subjects_api_serials__serial_id__subjects_get: {
         parameters: {
             query?: {
                 limit?: number;
             };
             header?: never;
             path: {
-                journal_id: number;
+                serial_id: number;
             };
             cookie?: never;
         };
@@ -9282,18 +9346,18 @@ export interface operations {
             };
         };
     };
-    get_type_change_impact_api_journals__journal_id__type_change_impact_post: {
+    get_type_change_impact_api_serials__serial_id__type_change_impact_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                journal_id: number;
+                serial_id: number;
             };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["JournalTypeChange"];
+                "application/json": components["schemas"]["SerialTypeChange"];
             };
         };
         responses: {
@@ -9303,7 +9367,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["JournalTypeChangeImpact"];
+                    "application/json": components["schemas"]["SerialTypeChangeImpact"];
                 };
             };
             /** @description Validation Error */
@@ -9317,12 +9381,12 @@ export interface operations {
             };
         };
     };
-    merge_api_journals__journal_id__merge_post: {
+    merge_api_serials__serial_id__merge_post: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                journal_id: number;
+                serial_id: number;
             };
             cookie?: never;
         };
@@ -9362,7 +9426,7 @@ export interface operations {
                 type?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -9397,7 +9461,7 @@ export interface operations {
                 type?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -9428,13 +9492,13 @@ export interface operations {
     monographs_entity_facet_api_monographs_facets_entities_get: {
         parameters: {
             query: {
-                kind: "publisher" | "journal";
+                kind: "publisher" | "serial";
                 entity_search?: string;
                 search?: string;
                 type?: string;
                 year?: string;
                 publisher_id?: number | null;
-                journal_id?: number | null;
+                serial_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -9642,6 +9706,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EnumOption"][];
                 };
             };
         };

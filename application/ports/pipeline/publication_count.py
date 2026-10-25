@@ -12,5 +12,5 @@ class PublicationCountRecompute(Protocol):
     """Recalcul ciblé du `publication_count` d'un éditeur."""
 
     def refresh_publisher_publication_count(self, conn: Connection, publisher_id: int) -> None:
-        """Recalcule le `publication_count` de l'éditeur, somme de celui de ses revues."""
+        """Recalcule le `publication_count` de l'éditeur."""
         ...

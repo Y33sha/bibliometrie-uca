@@ -15,20 +15,20 @@ from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.repositories.serial_repository import SerialRepository
 from application.ports.repositories.structure_repository import StructureRepository
 
 from .address_repository import PgAddressRepository
 from .audit_repository import PgAuditRepository
 from .config_repository import PgConfigRepository
 from .contribution_repository import PgContributionRepository
-from .journal_repository import PgJournalRepository
 from .perimeter_repository import PgPerimeterRepository
 from .person_repository import PgPersonRepository
 from .publisher_repository import PgPublisherRepository
+from .serial_repository import PgSerialRepository
 from .structure_repository import PgStructureRepository
 
 
@@ -48,8 +48,8 @@ def config_repository(conn: Connection) -> ConfigRepository:
     return PgConfigRepository(conn)
 
 
-def journal_repository(conn: Connection) -> JournalRepository:
-    return PgJournalRepository(conn)
+def serial_repository(conn: Connection) -> SerialRepository:
+    return PgSerialRepository(conn)
 
 
 def perimeter_repository(conn: Connection) -> PerimeterRepository:

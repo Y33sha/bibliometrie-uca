@@ -13,11 +13,6 @@ def moissonneur[E](cls: Callable[..., E], client: MagicMock) -> E:
     return cls(MagicMock(), logging.getLogger("test"), client)
 
 
-def source_a_bout() -> MagicMock:
-    """Circuit-breaker déclenché."""
-    return MagicMock(tripped=True)
-
-
 def arguments_du_run(**surcharges: Any) -> HarvestWindow:
     """Fenêtre du moissonnage : année, année de début, date de modification minimale, `None` par défaut."""
     return HarvestWindow(**surcharges)

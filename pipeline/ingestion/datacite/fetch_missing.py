@@ -14,16 +14,11 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 import httpx2
-from sqlalchemy import Connection
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.registry import DOI_ORG
-from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
-from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.doi_search import DoiBatchResult
-from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
+from pipeline.ingestion.common.lookup import LookupBatch
 from pipeline.ingestion.datacite.api import search_dois
 from pipeline.ingestion.datacite.fields import record_doi
 
@@ -33,38 +28,20 @@ class DataciteDoiSearch:
 
     source_key = "datacite"
     batch_size = 10
-    # Débit DataCite (tier « identifié », User-Agent avec mailto) : 1000 req / 5 min ≈ 3,3 req/s.
-    # `max_concurrent=3` × `request_delay_s=0,9` ≈ 3,3 req/s ; chaque requête rapatrie 10 DOI (~33 DOI/s utile).
     max_concurrent = 3
-    request_delay_s = 0.9
 
-    async def fetch_async(self, client: httpx2.AsyncClient, dois: list[str]) -> DoiBatchResult:
+    async def fetch_async(
+        self, client: httpx2.AsyncClient, dois: list[str]
+    ) -> LookupBatch | Unavailable:
         records = await search_dois(client, dois)
         if isinstance(records, NotFound | Unavailable):
-            return DoiBatchResult()
+            return UNAVAILABLE
         # Les nœuds reçus se rapportent aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume. DOI demandés non retournés = confirmés absents de DataCite.
         found: dict[str, Mapping[str, JsonValue]] = {}
         for record in records:
             if doi := record_doi(record):
                 found[doi] = record
-        return DoiBatchResult(
+        return LookupBatch(
             records=list(found.values()),
-            not_found=[d for d in dois if clean_doi(d) not in found],
+            absent=[d for d in dois if clean_doi(d) not in found],
         )
-
-    def insert(self, conn: Connection, record: Mapping[str, JsonValue]) -> bool:
-        # `record` est le nœud JSON:API `data` : son `id` est le DOI, dupliqué dans `attributes.doi`, normalisé en lowercase comme les autres sources.
-        doi = record_doi(record)
-        if not doi:
-            return False
-        inserted, _ = upsert_staging(
-            conn,
-            source="datacite",
-            source_id=doi,
-            doi=doi,
-            raw_data=record,
-            entry_mode=StagingEntryMode.FETCH_MISSING_DOI,
-        )
-        forget_failed_doi_lookups(conn, "datacite", [doi])
-        forget_failed_doi_lookups(conn, DOI_ORG, [doi])
-        return inserted

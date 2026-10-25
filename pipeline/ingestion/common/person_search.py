@@ -13,18 +13,17 @@ from typing import ClassVar
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import PERSON_IDENTIFIER_LABELS, PersonIdentifierType
-from domain.sources.person_search import PERSON_SEARCH_IDENTIFIERS, SEARCHED_IDENTIFIER_STATUSES
-from domain.sources.registry import Source
+from domain.sources.registry import PROFILES, SEARCHED_IDENTIFIER_STATUSES, Source
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import SourceUnavailableError, trip_source
+from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,
     SourceHarvester,
     stage_document,
 )
-from pipeline.runtime.observability.log_format import inflect, quantity
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.observability.progress import Progress
@@ -91,7 +90,7 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
     @property
     def id_types(self) -> frozenset[PersonIdentifierType]:
         """Types d'identifiant que la source accepte."""
-        return PERSON_SEARCH_IDENTIFIERS[Source(self.SOURCE)]
+        return PROFILES[Source(self.SOURCE)].person_identifiers
 
     @abstractmethod
     def fetch_page(
@@ -102,14 +101,6 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         label: str,
     ) -> PersonSearchPage:
         """Une page des documents d'un des `identifiers`, parus entre les deux années de `years` : la première quand `next_token` est `None`."""
-
-    @abstractmethod
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        """Identifiant de la ligne de `staging` et DOI normalisé d'un document, ou `None` pour un document sans identifiant."""
-
-    def authors_truncated(self, record: Mapping[str, JsonValue]) -> bool:  # noqa: ARG002
-        """Vrai si la source a tronqué la liste d'auteurs du document."""
-        return False
 
     def load_config(self, conn: Connection) -> PersonSearchConfig:
         persons = searched_persons(conn, self.id_types)
@@ -129,15 +120,11 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         def harvest_step(progress: Progress) -> PhaseMetrics:
             metrics = PhaseMetrics()
             for i, batch in enumerate(batches):
-                remaining = len(persons) - i * self.BATCH_SIZE
-                skipped = f"{quantity(remaining, 'personne')} {inflect(remaining, 'sautée')}"
-                if self._stop_on_tripped(skipped):
-                    break
                 label = f"lot {i + 1}"
                 try:
                     self._extract_batch(merge_identifiers(batch), years, label, seen, metrics)
                 except SourceUnavailableError:
-                    self._warn_stopped(skipped)
+                    trip_source()
                     break
                 except Exception as e:
                     scoped_logger(self.logger, self.SOURCE, label).error(
@@ -164,21 +151,17 @@ class PersonSearchHarvester[ClientT](SourceHarvester[PersonSearchConfig, ClientT
         while True:
             page = self.fetch_page(identifiers, years, next_token, label)
             for record in page.records:
-                key = self.record_key(record)
-                if key and key[0] not in seen:
-                    source_id, doi = key
-                    seen.add(source_id)
+                identity = ADAPTERS[Source(self.SOURCE)].identify(record)
+                if identity and identity.source_id not in seen:
+                    seen.add(identity.source_id)
                     stage_document(
                         self.conn,
                         metrics,
                         source=self.SOURCE,
-                        source_id=source_id,
-                        doi=doi,
-                        raw_data=record,
-                        authors_truncated=self.authors_truncated(record),
+                        record=record,
                         entry_mode=StagingEntryMode.PERSON_IDENTIFIER,
                     )
             self.conn.commit()
             next_token = page.next_token
-            if next_token is None or self._breaker_tripped():
+            if next_token is None:
                 return

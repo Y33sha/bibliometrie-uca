@@ -14,20 +14,20 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import time
 from collections import Counter
 from collections.abc import Callable
 from typing import NamedTuple, NotRequired, TypedDict, cast
 
+import httpx2
 from sqlalchemy import Connection, text
 
 from domain.types import as_mapping
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.savepoint import rollback_unless_invalidated
 from infrastructure.observability.log import setup_logger
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
+from pipeline.http.circuit_breaker import SourceUnavailableError, source_tripped
 from pipeline.http.http_retry import http_request_with_retry
-from pipeline.ingestion.api_params import API_BASE_URLS, OPENALEX_DELAY
+from pipeline.ingestion.api_params import API_BASE_URLS, request_budget
 from pipeline.ingestion.credentials import source_credentials_missing
 from pipeline.ingestion.openalex.api import credential_params
 from pipeline.ingestion.openalex.payload import full_openalex_id, short_openalex_id
@@ -77,7 +77,7 @@ def fetch_publishers_batch(
 ) -> dict[str, str | None]:
     """Interroge OpenAlex Publishers pour un lot d'identifiants (filtre à `|`, 50 au plus).
 
-    Rend `{}` en cas d'échec : `http_request_with_retry` a déjà compté l'échec au circuit-breaker, que la boucle consulte.
+    Rend `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les retries ; la boucle consulte l'état du circuit-breaker.
     """
     params: dict[str, str] = {
         "filter": f"ids.openalex:{'|'.join(full_openalex_id(oid) for oid in openalex_ids)}",
@@ -91,7 +91,7 @@ def fetch_publishers_batch(
                 "GET", openalex_publishers_api, params=params, timeout=30, label="publishers batch"
             )
         )
-    except Exception as exc:
+    except (httpx2.HTTPStatusError, SourceUnavailableError) as exc:
         log.warning("OpenAlex publishers batch : %r", exc)
         return {}
     results = cast("list[_OpenAlexPublisher]", data.get("results", []))
@@ -138,10 +138,8 @@ def run_enrich_publishers_from_openalex(
     logger: logging.Logger,
     *,
     fetch_batch: FetchPublishersBatch,
-    breaker: SourceCircuitBreaker,
     limit: int = 0,
     dry_run: bool = False,
-    rate_delay: float = 0.1,
 ) -> None:
     """Pose le pays OpenAlex des éditeurs qui n'en ont pas, par lots de `BATCH_SIZE`, avec un commit par lot."""
     try:
@@ -154,7 +152,7 @@ def run_enrich_publishers_from_openalex(
         updated = no_response = processed = 0
         country_counter: Counter[str] = Counter()
         for i in range(0, total, BATCH_SIZE):
-            if breaker.tripped:
+            if source_tripped():
                 if not dry_run:
                     conn.commit()
                 logger.warning(
@@ -166,7 +164,6 @@ def run_enrich_publishers_from_openalex(
                 return
             id_map = {oa_id: publisher_id for publisher_id, oa_id in publishers[i : i + BATCH_SIZE]}
             countries_by_id = fetch_batch(list(id_map))
-            time.sleep(rate_delay)
             outcome = _enrich_batch(conn, id_map, countries_by_id, dry_run=dry_run)
             updated += outcome.updated
             no_response += outcome.no_response
@@ -208,17 +205,15 @@ def main() -> int:
     conn = get_sync_engine().connect()
     publishers_api = API_BASE_URLS["openalex_publishers"]
 
-    def enrich(breaker: SourceCircuitBreaker) -> PhaseMetrics:
+    def enrich() -> PhaseMetrics:
         run_enrich_publishers_from_openalex(
             conn,
             log,
             fetch_batch=lambda oa_ids: fetch_publishers_batch(
                 oa_ids, openalex_publishers_api=publishers_api
             ),
-            breaker=breaker,
             limit=args.limit,
             dry_run=args.dry_run,
-            rate_delay=OPENALEX_DELAY,
         )
         return PhaseMetrics()
 
@@ -231,6 +226,7 @@ def main() -> int:
             phase="enrich_publishers",
             logger=log,
             credentials_missing=source_credentials_missing,
+            request_budget=request_budget,
             threshold=3,
         )
     finally:

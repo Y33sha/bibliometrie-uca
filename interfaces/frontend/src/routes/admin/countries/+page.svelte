@@ -19,7 +19,6 @@
 	const METHOD_LABELS: Record<Method, string> = {
 		manual: 'saisie',
 		country_name: 'nom de pays',
-		ror: 'ROR',
 		source_openalex: 'OpenAlex',
 		institution: 'institution',
 		city: 'ville',

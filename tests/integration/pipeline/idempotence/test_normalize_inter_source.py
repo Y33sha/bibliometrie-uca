@@ -161,7 +161,7 @@ class TestNormalizeInterSourceIdempotence:
             f"Relancer HAL ne devrait rien créer. Avant={publications_after_oa}, après={publications_after_hal2}"
         )
 
-    def test_shared_doi_same_journal(self, sa_sync_conn):
+    def test_shared_doi_same_serial(self, sa_sync_conn):
         """L'article partagé pointe vers le même journal, pas un doublon."""
         from sqlalchemy import text
 
@@ -173,7 +173,7 @@ class TestNormalizeInterSourceIdempotence:
 
         cnt = sa_sync_conn.execute(
             text("""
-                SELECT COUNT(*) AS cnt FROM journals
+                SELECT COUNT(*) AS cnt FROM serials
                 WHERE title_normalized LIKE '%geochemistry international%'
             """)
         ).scalar_one()

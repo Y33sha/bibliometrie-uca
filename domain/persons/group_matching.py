@@ -10,10 +10,11 @@ Un groupe réunit les contributions sources d'un même auteur dans une publicati
 Deux personnes désignées au même niveau laissent le groupe sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à un seul groupe (`settle_publication`).
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, MutableMapping, Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
+from domain.normalize import normalize_text
 from domain.persons.contributor_name import ContributorName
 from domain.persons.creation import allow_person_creation
 from domain.persons.identifiers import PersonIdentifierType
@@ -26,7 +27,9 @@ from domain.persons.matching import (
     decide_name_form_outcome,
     trusted_identifier,
 )
-from domain.persons.name_forms import contributor_name_forms
+from domain.persons.name_forms import compute_person_name_forms, contributor_name_forms
+from domain.persons.name_matching import first_name_initials
+from domain.sources.registry import Source
 
 IDENTIFIER_ORDER: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,
@@ -59,7 +62,7 @@ class GroupSkipReason(StrEnum):
 
 
 class GroupMatchReason(StrEnum):
-    """Signal qui rattache un groupe à une personne. Reflet du type PostgreSQL `group_resolution_mode`."""
+    """Signal qui rattache un groupe à une personne. Reflet du type PostgreSQL `resolution_mode`."""
 
     MANUAL = "manual"
     ORCID = "orcid"
@@ -68,6 +71,9 @@ class GroupMatchReason(StrEnum):
     NAME = "name"
     COMPATIBLE_NAME = "compatible_name"
 
+
+# Signaux qui rattachent un groupe à une personne par le nom.
+NAME_MATCH_REASONS = (GroupMatchReason.NAME, GroupMatchReason.COMPATIBLE_NAME)
 
 _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, GroupMatchReason] = {
     PersonIdentifierType.ORCID: GroupMatchReason.ORCID,
@@ -95,6 +101,15 @@ class GroupMember:
         last_name, first_name = self.name.normalized()
         return contributor_name_forms(last_name, first_name)
 
+    @property
+    def trusted_identifiers(self) -> dict[str, str]:
+        """Identifiants qui servent de signal de rattachement (`trusted_identifier`)."""
+        return {
+            id_type: value
+            for id_type, value in self.identifiers.items()
+            if trusted_identifier(id_type, self.source)
+        }
+
 
 @dataclass(frozen=True)
 class PersonIndex:
@@ -104,12 +119,31 @@ class PersonIndex:
     - `name_forms` : personnes de chaque forme de nom active.
     - `name_form_status` : verdict d'un couple (forme de nom, personne), qui corrobore ou refuse un identifiant.
     - `namesakes` : personnes par nom de famille normalisé, pour le rattachement par initiales compatibles.
+
+    `register` y ajoute une personne créée pendant la décision.
     """
 
-    identifiers: Mapping[str, Mapping[str, IdentifiedPerson]]
-    name_forms: Mapping[str, Sequence[int]]
+    identifiers: Mapping[str, MutableMapping[str, IdentifiedPerson]]
+    name_forms: MutableMapping[str, list[int]]
     name_form_status: Mapping[tuple[str, int], str]
-    namesakes: Mapping[str, Sequence[Namesake]]
+    namesakes: MutableMapping[str, list[Namesake]]
+
+    def register(
+        self, person_id: int, last_name: str, first_name: str, identifiers: Mapping[str, str]
+    ) -> None:
+        """Ajoute la personne `person_id` : homonyme de son nom de famille, formes de son nom, identifiants encore libres. Une forme déjà portée par une autre personne devient ambiguë."""
+        last_key = normalize_text(last_name)
+        self.namesakes[last_key] = [
+            *self.namesakes.get(last_key, ()),
+            Namesake(person_id, last_name, first_name),
+        ]
+        for form in compute_person_name_forms(last_name, first_name):
+            self.name_forms[form] = [*self.name_forms.get(form, ()), person_id]
+        identified = IdentifiedPerson(person_id, last_key, normalize_text(first_name))
+        for id_type, value in identifiers.items():
+            by_value = self.identifiers.get(id_type)
+            if by_value is not None and value not in by_value:
+                by_value[value] = identified
 
 
 @dataclass(frozen=True)
@@ -147,8 +181,8 @@ def decide_group(
     for id_type in IDENTIFIER_ORDER:
         identifier_map = index.identifiers.get(id_type, {})
         for m in members:
-            value = m.identifiers.get(id_type)
-            if not value or not trusted_identifier(id_type, m.source):
+            value = m.trusted_identifiers.get(id_type)
+            if not value:
                 continue
             match = decide_match_by_identifier(
                 value, identifier_map, m.name, m.name_forms, index.name_form_status
@@ -258,24 +292,68 @@ def settle_publication(
     `decisions` : décision et nombre de membres de chaque groupe, par identifiant de groupe. `taken` : personnes déjà rattachées à un autre groupe de la publication ; un groupe qui en désigne une reste sans personne. Quand plusieurs groupes désignent la même personne, elle revient au groupe le mieux appuyé (épinglage, puis identifiant, puis nom), à égalité au groupe qui a le plus de membres, puis au plus petit identifiant. Les autres groupes restent sans personne.
     """
 
-    def rank(group_id: int) -> tuple[int, int, int]:
-        decision, member_count = decisions[group_id]
+    def rank(contribution_id: int) -> tuple[int, int, int]:
+        decision, member_count = decisions[contribution_id]
         assert isinstance(decision.reason, GroupMatchReason)
-        return (_STRENGTH[decision.reason], -member_count, group_id)
+        return (_STRENGTH[decision.reason], -member_count, contribution_id)
 
     by_person: dict[int, list[int]] = {}
-    for group_id, (decision, _) in decisions.items():
+    for contribution_id, (decision, _) in decisions.items():
         if decision.outcome == GroupOutcome.MATCH and decision.person_id is not None:
-            by_person.setdefault(decision.person_id, []).append(group_id)
-    settled = {group_id: decision for group_id, (decision, _) in decisions.items()}
+            by_person.setdefault(decision.person_id, []).append(contribution_id)
+    settled = {contribution_id: decision for contribution_id, (decision, _) in decisions.items()}
     for person_id, group_ids in by_person.items():
         kept = set() if person_id in taken else {min(group_ids, key=rank)}
-        for group_id in set(group_ids) - kept:
-            decision = settled[group_id]
-            settled[group_id] = GroupDecision(
+        for contribution_id in set(group_ids) - kept:
+            decision = settled[contribution_id]
+            settled[contribution_id] = GroupDecision(
                 GroupOutcome.SKIP,
                 reason=GroupSkipReason.PERSON_IN_OTHER_GROUP,
                 evidence=decision.evidence,
                 refused=decision.refused,
             )
     return settled
+
+
+# Préséance des sources pour le nom d'une personne créée. HAL vient après les autres agrégateurs : un compte HAL attribué à tort donne le nom d'une autre personne. WoS ferme la marche, pour ses erreurs de reconnaissance de caractères.
+NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
+    Source.THESES,
+    Source.CROSSREF,
+    Source.DATACITE,
+    Source.OPENALEX,
+    Source.SCANR,
+    Source.HAL,
+    Source.WOS,
+)
+_NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(NAME_SOURCE_PRIORITY)}
+
+
+def founding_name(members: Sequence[GroupMember]) -> tuple[str, str]:
+    """(nom de famille, prénom) de la personne que fonde un groupe : ceux d'un membre d'une source qui sépare nom et prénom, de préférence au prénom complet, puis selon la préséance des sources (`NAME_SOURCE_PRIORITY`)."""
+
+    def rank(member: GroupMember) -> tuple[bool, bool, int, tuple[str, str]]:
+        last_name, first_name = member.name.split()
+        reduced = not first_name or first_name_initials(first_name) is not None
+        return (
+            not member.name.split_by_source,
+            reduced,
+            _NAME_SOURCE_RANK.get(member.source, len(NAME_SOURCE_PRIORITY)),
+            (last_name, first_name),
+        )
+
+    return min(members, key=rank).name.split()
+
+
+def identifiers_to_attribute(
+    members: Sequence[GroupMember], decision: GroupDecision
+) -> list[dict[str, str]]:
+    """Identifiants fiables des membres d'un groupe rattaché, à attribuer à sa personne. Les valeurs dont la corroboration a été refusée (`decision.refused`) en sont écartées."""
+    refused = {(id_type, value) for id_type, value, _ in decision.refused}
+    return [
+        {
+            id_type: value
+            for id_type, value in m.trusted_identifiers.items()
+            if (id_type, value) not in refused
+        }
+        for m in members
+    ]

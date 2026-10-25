@@ -36,7 +36,7 @@ class TestValeursAdmises:
             ("/api/publications", {"in_perimeter": "yes"}),
             ("/api/publications", {"has_apc": "yes,no"}),
             ("/api/publications", {"license": "cc-by,none"}),
-            ("/api/publications/export.csv", {"columns": "title,year,journal"}),
+            ("/api/publications/export.csv", {"columns": "title,year,serial"}),
             ("/api/stats/facets", {"has_apc": "no"}),
         ],
     )

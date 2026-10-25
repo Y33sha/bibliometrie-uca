@@ -1,6 +1,6 @@
 """Client api.datacite.org/prefixes : provider + client (repository) d'un préfixe DOI.
 
-`GET /prefixes/<prefix>?include=clients,providers` (réponse JSON:API) renvoie le provider DataCite (organisation-mère, occupe le slot `publisher_*`) et le client (repository : Zenodo, NAKALA, INRAE, …). Interrogé par le volet publisher de `publishers_journals` quand la RA du préfixe est `'DataCite'`.
+`GET /prefixes/<prefix>?include=clients,providers` (réponse JSON:API) renvoie le provider DataCite (organisation-mère, occupe le slot `publisher_*`) et le client (repository : Zenodo, NAKALA, INRAE, …). Interrogé par le volet publisher de `publishing` quand la RA du préfixe est `'DataCite'`.
 
 Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client. Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
 """

@@ -5,11 +5,7 @@ Interroge `GET /works` avec le filtre `orcid`, une fois par ORCID du lot : Cross
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 from domain.persons.identifiers import PersonIdentifierType
-from domain.publications.identifiers import clean_doi
-from domain.types import JsonValue, as_str
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
@@ -43,7 +39,3 @@ class CrossrefPersonHarvester(PersonSearchHarvester[CrossrefClient]):
     ) -> PersonSearchPage:
         orcids = identifiers[PersonIdentifierType.ORCID]
         return self._client.fetch_page(build_orcid_filter(orcids, *years), next_token, label)
-
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        doi = clean_doi(as_str(record.get("DOI")))
-        return (doi, doi) if doi else None

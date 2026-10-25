@@ -6,21 +6,21 @@ Les erreurs à corps trivial (`{detail}`) n'ont pas de modèle : leur forme est 
 from pydantic import BaseModel
 
 
-class BlockingJournalItem(BaseModel):
+class BlockingSerialItem(BaseModel):
     """Paire de revues qui empêche la fusion de deux éditeurs."""
 
-    target_journal_id: int
+    target_serial_id: int
     target_title: str
-    source_journal_id: int
+    source_serial_id: int
     source_title: str
     reason: str
 
 
 class PublisherMergeBlockedResponse(BaseModel):
-    """409 de `POST /api/publishers/{id}/merge` : la fusion est refusée en bloc, `blocking_journals` énumère les paires à traiter."""
+    """409 de `POST /api/publishers/{id}/merge` : la fusion est refusée en bloc, `blocking_serials` énumère les paires à traiter."""
 
     detail: str
-    blocking_journals: list[BlockingJournalItem]
+    blocking_serials: list[BlockingSerialItem]
 
 
 class RejectedPairItem(BaseModel):

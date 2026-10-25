@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { loadSources } from '$lib/sources.svelte';
 import {
 	authorRows,
 	comparisonRows,
@@ -15,6 +16,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		id: 1,
 		source: 'hal',
 		source_id: 'hal-1',
+		record_url: 'https://hal.science/hal-1',
 		doi: null,
 		identifiers: {},
 		title: 'Titre',
@@ -25,7 +27,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		language_name: 'Anglais',
 		language_raw: null,
 		oa_status: 'green',
-		journal_id: null,
+		serial_id: null,
 		journal_title: null,
 		journal_raw_title: null,
 		journal_raw_issn: null,
@@ -48,7 +50,15 @@ function row(rows: ComparisonRow[], key: string): ComparisonRow {
 	return found;
 }
 
+// Ordre d'affichage des sources, tel que `/api/sources` le sert.
+vi.mock('$lib/api', () => ({
+	api: async () =>
+		['hal', 'openalex', 'wos'].map((value) => ({ value, label_fr: value }))
+}));
+
 describe('orderRecords', () => {
+	beforeAll(() => loadSources());
+
 	it("suit l'ordre d'affichage des sources, puis l'identifiant dans la source", () => {
 		const ordered = orderRecords([
 			record({ id: 1, source: 'wos', source_id: 'w1' }),
@@ -93,27 +103,27 @@ describe('comparisonRows', () => {
 		const keys = comparisonRows([
 			record({ journal_raw_title: 'Revue', journal_raw_issn: '1234-5678' }),
 		]).map((r) => r.key);
-		const journal = keys.indexOf('journal');
-		expect(keys.slice(journal, journal + 2)).toEqual(['journal', 'issn']);
+		const serial = keys.indexOf('serial');
+		expect(keys.slice(serial, serial + 2)).toEqual(['serial', 'issn']);
 		expect(keys).not.toContain('eissn');
 		expect(keys).not.toContain('volume');
 	});
 
 	it('met en note le nom de revue donné par la source quand il diffère du référentiel', () => {
 		const rows = comparisonRows([
-			record({ journal_id: 7, journal_title: 'Nature', journal_raw_title: 'Nature (London)' }),
+			record({ serial_id: 7, journal_title: 'Nature', journal_raw_title: 'Nature (London)' }),
 		]);
-		expect(row(rows, 'journal').cells).toEqual([
-			{ text: 'Nature', link: { kind: 'journals', id: 7 }, note: 'Nature (London)' },
+		expect(row(rows, 'serial').cells).toEqual([
+			{ text: 'Nature', link: { kind: 'serials', id: 7 }, note: 'Nature (London)' },
 		]);
 	});
 
 	it('signale une revue rattachée à deux entrées différentes du référentiel', () => {
 		const rows = comparisonRows([
-			record({ journal_id: 7, journal_title: 'Nature' }),
-			record({ id: 2, journal_id: 8, journal_title: 'Nature' }),
+			record({ serial_id: 7, journal_title: 'Nature' }),
+			record({ id: 2, serial_id: 8, journal_title: 'Nature' }),
 		]);
-		expect(row(rows, 'journal').divergent).toBe(true);
+		expect(row(rows, 'serial').divergent).toBe(true);
 	});
 
 	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {
@@ -135,7 +145,7 @@ function contribution(overrides: Partial<SourceContribution>): SourceContributio
 		structure_ids: null,
 		raw_affiliation: null,
 		countries: null,
-		group_id: null,
+		contribution_id: null,
 		group_position: null,
 		method: null,
 		score: null,
@@ -149,9 +159,9 @@ describe('authorRows', () => {
 
 	it("réunit les contributions sources d'un groupe sur une ligne, dans l'ordre de la liste de référence", () => {
 		const rows = authorRows(records, [
-			contribution({ id: 11, source_record_id: 1, position: 1, group_id: 7, group_position: 1 }),
-			contribution({ id: 21, source_record_id: 2, position: 0, group_id: 7, group_position: 1 }),
-			contribution({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
+			contribution({ id: 11, source_record_id: 1, position: 1, contribution_id: 7, group_position: 1 }),
+			contribution({ id: 21, source_record_id: 2, position: 0, contribution_id: 7, group_position: 1 }),
+			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, group_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells.map((c) => c?.id ?? null))).toEqual([
 			[10, null],
@@ -164,7 +174,7 @@ describe('authorRows', () => {
 		const rows = authorRows(records, [
 			contribution({ id: 30, source_record_id: 1, position: null, roles: ['jury_member'] }),
 			contribution({ id: 12, source_record_id: 1, position: 2, collective: true }),
-			contribution({ id: 10, source_record_id: 1, position: 0, group_id: 6, group_position: 0 }),
+			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, group_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells[0]?.id)).toEqual([10, 12, 30]);
 	});

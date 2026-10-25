@@ -15,8 +15,8 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 PublisherSort = Literal[
     "name_asc",
     "name_desc",
-    "journals_asc",
-    "journals_desc",
+    "serials_asc",
+    "serials_desc",
     "publications_asc",
     "publications_desc",
 ]
@@ -54,7 +54,7 @@ class PublisherListItem(BaseModel):
     openalex_id: str | None
     country: str | None
     publisher_type: str
-    journal_count: int
+    serial_count: int
     publication_count: int
     doi_prefixes: list[DoiPrefixInfo]
 
@@ -67,10 +67,10 @@ class PublisherListResponse(PaginatedResponse):
     publishers: list[PublisherListItem]
 
 
-class JournalTypeCount(BaseModel):
-    """Compteur de revues par `journal_type` pour un éditeur."""
+class SerialTypeCount(BaseModel):
+    """Compteur de revues par `serial_type` pour un éditeur."""
 
-    journal_type: str | None
+    serial_type: str | None
     count: int
 
 
@@ -101,11 +101,11 @@ class PublishersFacetsResponse(BaseModel):
 class PublisherDashboardResponse(BaseModel):
     """GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
 
-    `journal_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publis rattachées via ses revues, utiles pour le repérage d'incohérences à venir.
+    `serial_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
     """
 
     total_publications: int
-    journal_types: list[JournalTypeCount]
+    serial_types: list[SerialTypeCount]
     doc_types: list[DocTypeCount]
     oa_statuses: list[OaStatusCount]
 

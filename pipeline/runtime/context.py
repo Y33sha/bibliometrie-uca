@@ -23,6 +23,9 @@ OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 # Contrôle des identifiants d'accès : motif d'absence des identifiants d'une source, ou `None` s'ils sont utilisables.
 CredentialsMissing = Callable[[str], str | None]
 
+# Débit consenti à une source, en requêtes par seconde, ou `None` sans plafond.
+RequestBudget = Callable[[str], float | None]
+
 
 @dataclass(frozen=True, slots=True)
 class RunOptions:
@@ -50,13 +53,14 @@ class RunOptions:
 
 @dataclass(frozen=True, slots=True)
 class PhaseContext:
-    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, et le contrôle des identifiants d'accès aux sources."""
+    """Ce que le run remet à chaque phase : ses transactions, son journal, ses options, l'exécution de la maintenance des tables (`VACUUM`, `ANALYZE`) hors transaction, le contrôle des identifiants d'accès aux sources et leur débit."""
 
     open_tx: OpenTransaction
     logger: logging.Logger
     options: RunOptions
     maintain: Callable[[str], None]
     credentials_missing: CredentialsMissing
+    request_budget: RequestBudget
 
 
 class Phase(Protocol):

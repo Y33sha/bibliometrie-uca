@@ -4,22 +4,15 @@ Périmètre : les publications qui portent un ISBN, celles de type `book` ou `bo
 
 ## Contexte
 
-Un livre n'a pas d'entité dans la base. Le conteneur d'un livre ou d'un chapitre est le livre lui-même, et le titre du livre va dans la colonne `container_title`. Deux cas font exception :
-
-- l'enregistrement source porte un ISSN, celui de la collection : cette collection devient la revue du document ;
-- le titre du conteneur est déjà celui d'un recueil d'actes en base : le document y est rattaché, sans création.
-
-Un volume d'actes, lui, a une entrée dans `journals`. La table range donc au même niveau les revues, les recueils d'actes et les collections dont ils font partie.
-
-Les chapitres d'un même livre ne partagent qu'une chaîne de caractères, qui varie d'une source à l'autre. Rien ne réunit un livre et ses chapitres.
+Le conteneur d'un livre ou d'un chapitre est le livre lui-même. Le livre et le volume d'actes ont une entité, la monographie, que partagent leurs chapitres et leurs communications. La monographie est rattachée à sa collection dans `journals`.
 
 ### ISBN
 
-L'ISBN identifie un livre. Seul ceux issus de Crossref sont lus (`external_ids.isbn`) ; pourtant HAL (TEI `idno type="isbn"`) et WoS (`isbn`, `eisbn`) le fournissent aussi, DataCite dans un `relatedIdentifiers` de type ISBN ou dans l'identifiant de son conteneur.
+L'ISBN identifie un livre. Crossref le fournit, WoS dans `isbn` et `eisbn`, HAL dans la zone TEI `idno type="isbn"`, DataCite dans un `relatedIdentifiers` de type ISBN ou dans l'identifiant de son conteneur.
 
-Un livre porte souvent deux ISBN, un par support. Crossref et WoS disent lequel est électronique ; HAL et DataCite le taisent. Le numéro lui-même n'en dit rien : l'éditeur attribue un numéro par format. Un ISBN-13 est un EAN-13, à préfixe 978 ou 979.
+Un livre a souvent deux ISBN, un par support. Crossref et WoS disent lequel est électronique. L'éditeur attribue un numéro par format, sans marque du support. Un ISBN-13 est un EAN-13, à préfixe 978 ou 979.
 
-Le DOI porte souvent l'ISBN. Sa forme annonce alors la nature du document :
+Le DOI contient souvent l'ISBN. Sa forme annonce alors la nature du document :
 
 - ISBN seul en fin de DOI (`10.1007/978-3-030-20131-9`) : le DOI est celui du livre ou du volume d'actes ;
 - ISBN suivi d'un suffixe (`10.1007/978-3-030-58080-3_309`, `10.48611/isbn.978-2-406-17883-5.p.0071`) : le DOI est celui d'un chapitre ou d'une communication.
@@ -79,7 +72,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 - [x] Rattachement des enregistrements : `source_records.monograph_id`, agrégé dans `publications.monograph_id`.
 - [x] Trouve-ou-crée d'une monographie (`application/services/monographs/core.py`).
 - [x] Normalisation, sans rien retirer : l'enregistrement garde son `journal_id` selon la règle en place, et reçoit en outre sa monographie, dont le `journal_id` désigne la même entrée de `journals`. Chaque source décrit le conteneur du document (`ContainerFacts`). Crossref : `container-title` porte `[collection, livre]` pour un chapitre, le volume d'actes en tête pour un article de congrès. HAL : `bookTitle_s` ; le congrès (`conferenceTitle_s`) ne désigne pas un volume, une communication le nomme avec ou sans actes publiés. OpenAlex : source `conference` pour le volume, `book series` ou `journal` pour la collection. WoS : titre de la source, hors ISSN. ScanR : congrès d'une communication. DataCite : conteneur sans ISSN.
-- [x] Sous-étape `delete_empty_monographs` de `publishers_journals`. Un éditeur qui porte une monographie n'est pas vide ; la fusion d'éditeurs transfère les monographies.
+- [x] Sous-étape `delete_empty_monographs` de `publishing`. Un éditeur qui porte une monographie n'est pas vide ; la fusion d'éditeurs transfère les monographies.
 - [x] Audit de 2026 : 161 monographies, correspondance un pour un avec `journals` (6 entrées). 15 titres en double, presque tous parce que HAL ne donne pas l'éditeur.
 - [x] Rapprochement par titre dans le domaine (`choose_monograph`) : un éditeur absent ne sépare pas deux monographies ; la monographie du même éditeur passe avant celle sans éditeur.
 - [x] Sous-étape `merge_duplicate_monographs` : une monographie rejoint la seule monographie compatible de son titre (`duplicate_monographs`). Simulation : 12 fusions sur 24 titres en double. Les autres opposent des éditeurs en double (Quæ et Quae, Peter Lang et Peter Lang Verlag, Garnier et Classiques Garnier, Springer et ses filiales) ou des volumes de même titre à ISBN distincts.
@@ -128,7 +121,7 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
     - série sans ISSN créée pour un volume : « Proceedings of the Thirty-First International Joint Conference on Artificial Intelligence » (ordinal en toutes lettres) ;
     - revue recréée sous un nouvel id : « Aristotle's Generation of Animals ».
 - [x] Instantané des articles de congrès après la phase `publications`, comparé à celui d'avant : volumes dans `journals` 65 → 23, en monographie 1 133 → 1 261 ; 9 892 articles sans série ni volume. Les 23 restants : enregistrements Crossref absents du raw store, jamais renormalisés ; articles OpenAlex dont le type brut gardé dans `raw_metadata` est périmé (10 891 enregistrements OpenAlex sur 23 890 dont le type est corrigé).
-- [x] Oneshot sur les 2 424 enregistrements absents du raw store (`move_volumes_to_monographs`), puis `publishers_journals` et `publications`. 24 enregistrements changent de conteneurs. Un second run laisse tout en l'état.
+- [x] Oneshot sur les 2 424 enregistrements absents du raw store (`move_volumes_to_monographs`), puis `publishing` et `publications`. 24 enregistrements changent de conteneurs. Un second run laisse tout en l'état.
 - [x] Suppression des entrées de `journals` qui décrivent un volume, une fois vidées (`delete_empty_journals`).
 - [x] Mesure finale, comparée au premier instantané : 12 802 articles, 632 séries (545 à ISSN, 87 sans), volumes en monographie 1 133 → 1 268, dans `journals` 65 → 11 ; 9 830 articles sans série ni volume. Les 11 restants : 6 conteneurs OpenAlex sans année (« Winter Simulation Conference », « Symposium on Discrete Algorithms »), qui relèvent de la question « Niveau d'un conteneur sans ISSN » ; 5 revues HAL sans ISSN (« Questio »).
 
@@ -150,13 +143,10 @@ La phase `metadata_correction` prive de leur DOI les chapitres qui le partagent 
 
 ### 11. Documentation
 
-- [ ] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishers-journals.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
+- [ ] Mise à jour de la documentation : `docs/pipeline/03-normalize.md` (conteneurs et monographies), `docs/pipeline/05-publishing.md` (suppression des monographies vides), `docs/agregats/journals.md`, fiche des revues (règle des conteneurs).
 
 ## Questions ouvertes
 
-- **Identification sans ISBN.** L'ISBN réunit deux enregistrements quand il est là. Sinon, quel signal les réunit : le titre normalisé du conteneur, l'éditeur, le préfixe du DOI ? Les titres divergent d'une source à l'autre.
-- **Volumes multiples.** Un titre paru en plusieurs volumes n'est pas traité. Chaque volume est-il une monographie, et qu'est-ce qui les relie ?
-- **Double série.** Un volume LIPIcs appartient à la collection LIPIcs, qui porte un ISSN, et à la série de son congrès (STACS, SoCG, ICALP). `monographs.journal_id` n'en désigne qu'une : laquelle ?
 - **Niveau d'un conteneur sans ISSN.** Le conteneur sans ISSN d'un livre, d'un chapitre ou d'un article de congrès désigne tantôt le volume (« Silicon Photonics XIII », « Proceedings of the Thirty-Second International Joint Conference on Artificial Intelligence »), tantôt la série (« SPIE Proceedings »). Pistes :
     - Années différentes. Le conteneur est une monographie par défaut, promue en série quand ses enregistrements couvrent plusieurs années. Mesure sur les années des enregistrements. Deux années consécutives mêlent livres parus en ligne puis imprimés, ouvrages de référence enrichis au fil de l'eau, écarts entre sources, volumes parus l'année suivant le congrès (PoS(ICHEP2022)) et quelques séries (GECCO, IEOM). Des années non consécutives ou au moins trois années désignent presque toujours une série : AIP Conference Proceedings, AAAI, AAMAS, Winter Simulation Conference, sessions du congrès ERS. Un faux positif sur 19 : « Handbook of Labor, Human Resources and Population Economics ».
     - Chiffres romains (« Silicon Photonics XIII ») comme marque de volume dans `container_level`. Risque de confusion avec d'autres emplois.

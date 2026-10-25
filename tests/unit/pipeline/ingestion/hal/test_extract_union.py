@@ -1,18 +1,16 @@
 """Moissonnage HAL d'un périmètre temporel (`harvest_union`).
 
-Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée (fixture `ecritures`). On vérifie la pagination (jusqu'à stabilisation du marqueur), la ventilation new/updated/unchanged et l'arrêt sur disjoncteur.
+Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée (fixture `ecritures`). On vérifie la pagination (jusqu'à stabilisation du marqueur) et la ventilation new/updated/unchanged.
 """
 
 from __future__ import annotations
 
-import logging
 from unittest.mock import MagicMock
 
 from pipeline.ingestion.common.staging import UpsertOutcome
 from pipeline.ingestion.hal.harvest import HalHarvestConfig, harvest_union
 from pipeline.runtime.observability.progress import Progress
 
-_LOGGER = logging.getLogger("test")
 _CONFIG = HalHarvestConfig(all_collections={"C": "Coll"})
 
 
@@ -36,7 +34,6 @@ def _extrait(client: MagicMock, **options):
         client,
         _CONFIG,
         MagicMock(),
-        _LOGGER,
         Progress(None, "HAL", None),
         years=[2025],
         **options,
@@ -106,12 +103,3 @@ class TestRouting:
 
         assert metrics.total == 1
         assert [e.source_id for e in ecritures] == ["hal-ok"]
-
-
-def test_breaker_interrupts_pagination(ecritures):
-    client = _client([_page([_doc("hal-1")], next_cursor="c1")])
-
-    metrics = _extrait(client, breaker_tripped=lambda: True)
-
-    assert metrics.total == 0
-    client.fetch_page_cursor.assert_not_called()

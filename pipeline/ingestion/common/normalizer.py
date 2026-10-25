@@ -1,21 +1,30 @@
 """Normalisation d'une source, du staging vers `source_records`, `source_contributions` et `addresses`.
 
-Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`). Le patron fait la boucle : chargement des lignes à traiter, un SAVEPOINT par enregistrement source (une erreur isolée garde le lot en cours), commit périodique, progression et bilan. Les requêtes sur `staging`, `source_records` et les contributions sources sont injectées à la construction.
+Chaque source hérite de `SourceNormalizer` (`pipeline/ingestion/<source>/normalize.py`) et fournit l'analyse d'une ligne de `staging`, sans I/O : document lu, éditeur, conteneurs, enregistrement source, bloc auteurs et contributions sources. Le patron fait les écritures et la boucle : chargement des lignes à traiter, un SAVEPOINT par enregistrement source (une erreur isolée garde le lot en cours), commit périodique, progression et bilan. Les stores sont injectés à la construction.
 """
 
 from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
+from dataclasses import replace
 from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
 from domain.publications.metadata import has_minimal_publication_metadata
+from domain.serials.containers import ContainerDescription
+from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
-from pipeline.ingestion.common.source_records import SourceRecordStore
+from pipeline.ingestion.common.source_contributions import (
+    AuthorBlock,
+    AuthorRecord,
+    sync_source_contributions,
+)
+from pipeline.ingestion.common.source_records import SourceRecordStore, SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow, StagingStore
 from pipeline.runtime.observability.log_format import (
     BRANCH_CONTINUATION,
@@ -25,7 +34,22 @@ from pipeline.runtime.observability.log_format import (
 from pipeline.runtime.observability.logging_scope import scoped_logger
 from pipeline.runtime.observability.progress import track_progress
 from pipeline.transformation.publishing.containers import ContainerStores
+from pipeline.transformation.publishing.find_or_create import (
+    Containers,
+    find_or_create_containers,
+    find_or_create_publisher,
+)
 from pipeline.transformation.publishing.publishers.store import PublisherStore
+
+type Document = Mapping[str, JsonValue]
+"""Document que la source décrit, lu dans une ligne de `staging`."""
+
+
+class PublisherFacts(NamedTuple):
+    """Éditeur d'un document, tel que la source le nomme, et son identifiant OpenAlex s'il est connu."""
+
+    name: str
+    openalex_id: str | None = None
 
 
 class NormalizeStats(NamedTuple):
@@ -37,14 +61,17 @@ class NormalizeStats(NamedTuple):
 
 
 class SourceNormalizer(ABC):
-    """Template method pour la normalisation source → tables structurées.
+    """Normalisation d'une source : la source analyse une ligne de `staging`, le patron écrit.
 
     Points d'override :
     - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
     - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
     - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
     - `minimal_metadata(row)` : abstrait, titre et année de l'enregistrement source
-    - `normalize_record(row) -> bool | None` : abstrait, logique métier d'un enregistrement source complet
+    - `parse(row)` : document lu dans la ligne, ou `None` pour un enregistrement refusé (défaut : le payload)
+    - `publisher(doc)`, `container_facts(doc)`, `locations(doc)` : éditeur, conteneurs et localisations du document (défaut : aucun)
+    - `source_record(row, doc, containers)` : abstrait, enregistrement source à écrire
+    - `author_block(doc)`, `author_records(block)` : abstraits, bloc auteurs et contributions sources qu'il donne
     - `preload_caches()` : pré-chargement optionnel
     - `cleanup()` : libération des caches après commit final
     """
@@ -55,21 +82,100 @@ class SourceNormalizer(ABC):
     FETCH_SUB_BATCH: ClassVar[int] = 50
 
     def __init__(
-        self, conn: Connection, logger: logging.Logger, staging_store: StagingStore
+        self,
+        conn: Connection,
+        logger: logging.Logger,
+        staging_store: StagingStore,
+        record_store: SourceRecordStore,
+        container_stores: ContainerStores,
+        publisher_store: PublisherStore,
+        contribution_store: SourceContributionStore,
+        location_store: LocationStore,
     ) -> None:
         self.conn = conn
         self.logger = logger
         self._staging = staging_store
+        self._record_store = record_store
+        self._container_stores = container_stores
+        self._publisher_store = publisher_store
+        self._contribution_store = contribution_store
+        self._location_store = location_store
 
-    # ── Hooks métier ────────────────────────────────────────────
+    # ── Analyse d'une ligne, propre à la source ─────────────────
 
     @abstractmethod
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         """Titre et année de l'enregistrement source, lus dans son payload."""
 
+    def parse(self, row: StagingRow) -> Document | None:
+        """Document que décrit la ligne, ou `None` pour un enregistrement refusé, sans rien écrire."""
+        return row.raw_data
+
+    def publisher(self, doc: Document) -> PublisherFacts | None:  # noqa: ARG002
+        """Éditeur du document, ou `None` sans éditeur."""
+        return None
+
+    def container_facts(self, doc: Document) -> ContainerDescription | None:  # noqa: ARG002
+        """Revue, ou monographie et collection, qui contiennent le document. `None` : sans conteneur."""
+        return None
+
+    def locations(self, doc: Document) -> list[LocationFacts]:  # noqa: ARG002
+        """Localisations du document."""
+        return []
+
     @abstractmethod
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Retourne True (ok), None (skip) ou False (enregistrement refusé, sans rien écrire)."""
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        """Enregistrement source du document, rattaché à ses conteneurs."""
+
+    @abstractmethod
+    def author_block(self, doc: Document) -> AuthorBlock:
+        """Partie du document qui porte ses auteurs : son empreinte décide de la synchronisation des contributions sources."""
+
+    @abstractmethod
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        """Contributions sources que donne le bloc auteurs."""
+
+    # ── Écritures ───────────────────────────────────────────────
+
+    def normalize_record(self, row: StagingRow) -> bool:
+        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Rend True, ou False pour un enregistrement refusé, sans rien écrire.
+
+        Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations et ses contributions sources.
+        """
+        doc = self.parse(row)
+        if doc is None:
+            return False
+        publisher = self.publisher(doc)
+        publisher_id = (
+            find_or_create_publisher(
+                publisher.name, openalex_id=publisher.openalex_id, repo=self._publisher_store
+            )
+            if publisher
+            else None
+        )
+        facts = self.container_facts(doc)
+        containers = (
+            find_or_create_containers(
+                facts, publisher_id=publisher_id, stores=self._container_stores
+            )
+            if facts is not None
+            else Containers(None, None)
+        )
+        source_record_id = self._record_store.upsert_source_record(
+            replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
+        )
+        self._location_store.replace_locations(source_record_id, self.locations(doc))
+        sync_source_contributions(
+            self._contribution_store,
+            self.SOURCE,
+            source_record_id,
+            self.author_block(doc),
+            self.author_records,
+        )
+        self._staging.mark_done(row.id)
+        return True
 
     def process_work(self, row: StagingRow) -> bool | None:
         """Traite une ligne staging. Retourne True (ok), None (skip), False (enregistrement refusé).
@@ -191,23 +297,3 @@ class SourceNormalizer(ABC):
             rollback_unless_invalidated(self.conn)
             slog.error(f"Erreur fatale : {e}")
             raise
-
-
-class BibliographicNormalizer(SourceNormalizer):
-    """Normaliseur d'une source bibliographique : `SourceNormalizer` doté des repositories conteneur (revue et monographie) / éditeur."""
-
-    def __init__(
-        self,
-        conn: Connection,
-        logger: logging.Logger,
-        staging_store: StagingStore,
-        record_store: SourceRecordStore,
-        container_stores: ContainerStores,
-        publisher_store: PublisherStore,
-        contribution_store: SourceContributionStore,
-    ) -> None:
-        super().__init__(conn, logger, staging_store)
-        self._record_store = record_store
-        self._container_stores = container_stores
-        self._publisher_store = publisher_store
-        self._contribution_store = contribution_store

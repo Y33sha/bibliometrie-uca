@@ -4,7 +4,7 @@ from domain.structures.identifiers import RorId
 from domain.structures.ror import RorOrganization, RorStatus, RorType
 from infrastructure.db.queues import Queue
 from pipeline.transformation.structures.ror import RorStore
-from tests.integration.helpers.addresses import ensure_country, insert_address
+from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -49,9 +49,10 @@ def test_reimport_d_une_version_deja_importee(sa_sync_conn):
     assert store.last_imported_version() == "v2.14"
 
 
-def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_qui_citent_l_organisation(
+def test_un_changement_de_pays_marque_les_contributions_sources_qui_citent_l_organisation_sans_adresse(
     sa_sync_conn,
 ):
+    """Le ROR d'une affiliation ne donne pas de pays à son adresse : seule la contribution source qui cite l'organisation sans adresse est à recalculer."""
     store = RorStore(sa_sync_conn)
     store.replace_all([_org(UNIV), _org(LABO)], [], version="v2.13")
     record = insert_source_record(sa_sync_conn, source="openalex", source_id="W1")
@@ -63,7 +64,6 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
         sa_sync_conn, record, source="openalex", author_position=2
     )
     address = insert_address(sa_sync_conn, "Institut, Paris")
-    ensure_country(sa_sync_conn, "fr")
     sa_sync_conn.execute(
         text(
             "INSERT INTO source_contribution_rors (source_contribution_id, ror_id, address_id)"
@@ -78,26 +78,10 @@ def test_un_changement_de_pays_marque_les_contributions_sources_et_les_adresses_
             "addr": address,
         },
     )
-    sa_sync_conn.execute(
-        text(
-            "INSERT INTO address_country_candidates (address_id, country_code, method)"
-            " VALUES (:addr, 'fr', 'ror'), (:addr, 'fr', 'city')"
-        ),
-        {"addr": address},
-    )
     clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES)
     clear(sa_sync_conn, Queue.ADDRESS_CANDIDATES)
 
     store.replace_all([_org(UNIV, "it"), _org(LABO)], [], version="v2.14")
 
     assert queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_COUNTRIES) == {without_address}
-    methods = (
-        sa_sync_conn.execute(
-            text("SELECT method::text FROM address_country_candidates WHERE address_id = :a"),
-            {"a": address},
-        )
-        .scalars()
-        .all()
-    )
-    assert methods == ["city"]
-    assert queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES) == {address}
+    assert queued(sa_sync_conn, Queue.ADDRESS_CANDIDATES) == set()

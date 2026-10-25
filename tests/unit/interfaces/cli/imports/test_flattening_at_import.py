@@ -10,7 +10,7 @@ import pytest
 from interfaces.cli.imports.import_apc import clean
 from interfaces.cli.imports.import_persons import read_csv_tsv
 from interfaces.cli.maintenance.import_authenticated_orcids import _load_rows
-from pipeline.transformation.publishing.journals.enrich_journals_from_doaj import (
+from pipeline.transformation.publishing.serials.enrich_serials_from_doaj import (
     clean_doaj_row,
 )
 

@@ -10,31 +10,29 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
-from domain.journals.containers import ContainerDescription, ContainerRole, container_role
-from domain.journals.series import split_collection_and_volume
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import crossref_license
+from domain.serials.containers import ContainerDescription, ContainerRole, container_role
+from domain.serials.series import split_collection_and_volume
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs, as_text
-from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
+from pipeline.ingestion.common.locations import LocationFacts
+from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
     contributor_identifiers,
-    sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.crossref.payload import (
     crossref_issns,
     crossref_raw_doc_type,
@@ -44,13 +42,9 @@ from pipeline.ingestion.crossref.payload import (
     parse_crossref_issns,
     strip_jats_tags,
 )
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # EXTRACTEURS DE CHAMPS
@@ -158,7 +152,7 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Volume, issue, pages, article-number + publisher/journal bruts.
 
-    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/journals créés via `find_or_create_*`.
+    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/serials créés via `find_or_create_*`.
     """
     issn_val, eissn_val = get_issns(msg)
     article_number = as_text(msg.get("article-number"))
@@ -177,15 +171,6 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
 # =============================================================
 # PUBLISHER + JOURNAL
 # =============================================================
-
-
-def upsert_publisher(
-    msg: Mapping[str, JsonValue], *, publisher_store: PublisherStore
-) -> int | None:
-    name = get_publisher_name(msg)
-    if not name:
-        return None
-    return find_or_create_publisher(name, repo=publisher_store)
 
 
 def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
@@ -228,18 +213,6 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
         isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
         eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
         year=get_publication_year(msg),
-    )
-
-
-def upsert_containers(
-    msg: Mapping[str, JsonValue],
-    publisher_id: int | None,
-    *,
-    container_stores: ContainerStores,
-) -> Containers:
-    """Trouve ou crée la revue, ou la monographie et sa collection, qui contiennent le document."""
-    return find_or_create_containers(
-        get_container_facts(msg), publisher_id=publisher_id, stores=container_stores
     )
 
 
@@ -323,96 +296,72 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
     return {"author": msg.get("author")}
 
 
-def process_contributions(
-    contribution_store: SourceContributionStore,
-    msg: Mapping[str, JsonValue],
-    source_record_id: int,
-) -> None:
-    """Synchronise les contributions sources Crossref de l'enregistrement source depuis son bloc auteurs."""
-    sync_source_contributions(
-        contribution_store,
-        "crossref",
-        source_record_id,
-        extract_crossref_author_block(msg),
-        build_crossref_author_records,
-    )
+def get_locations(msg: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """Page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte, pas à des copies consultables."""
+    url = as_str(as_mapping(as_mapping(msg.get("resource")).get("primary")).get("URL"))
+    return [LocationFacts(url=url, license=crossref_license(msg.get("license")))] if url else []
 
 
-# =============================================================
-# BOUCLE PRINCIPALE
-# =============================================================
-
-
-def process_work(
-    record_store: SourceRecordStore,
-    staging_row: StagingRow,
-    *,
-    container_stores: ContainerStores,
-    publisher_store: PublisherStore,
-    staging_store: StagingStore,
-    contribution_store: SourceContributionStore,
-) -> bool | None:
-    staging_id = staging_row.id
-    raw = staging_row.raw_data
-    msg = raw  # CrossRef stocke directement le 'message'
+def crossref_source_record(
+    msg: Mapping[str, JsonValue], staging_id: int, containers: Containers
+) -> SourceRecordUpsert:
+    """Enregistrement source Crossref d'une œuvre, identifiée par son DOI."""
     doi = get_doi(msg)
-    if not doi:
-        return False
-
     title = get_title(msg)
     publication_year = get_publication_year(msg)
-    # Garanti par `SourceNormalizer.process_work`, qui filtre les enregistrements sources sans titre ou sans année.
-    assert isinstance(title, str) and isinstance(publication_year, int)
-
-    publisher_id = upsert_publisher(msg, publisher_store=publisher_store)
-    containers = upsert_containers(msg, publisher_id, container_stores=container_stores)
-
-    external_ids = get_external_ids(msg)
-    biblio = get_biblio(msg)
-    source_extras = extract_crossref_source_extras(msg)
-
-    source_record_id = record_store.upsert_source_record(
-        SourceRecordUpsert(
-            source="crossref",
-            source_id=doi,
-            staging_id=staging_id,
-            doi=doi,
-            external_ids=external_ids,
-            title=title,
-            publication_year=publication_year,
-            raw_doc_type=crossref_raw_doc_type(msg),
-            journal_id=containers.journal_id,
-            monograph_id=containers.monograph_id,
-            container_title=get_container_title(msg) if not containers.journal_id else None,
-            raw_language=get_language(msg),
-            biblio=biblio,
-            abstract=get_abstract(msg),
-            keywords=get_keywords(msg),
-            oa_status=None,
-            license=crossref_license(msg.get("license")),
-            impact=Impact(cited_by_count=get_cited_by_count(msg)).to_json(),
-            source_extras=source_extras,
-        ),
+    # Garanti par `SourceNormalizer` : l'œuvre a un DOI, un titre et une année.
+    assert doi and isinstance(title, str) and isinstance(publication_year, int)
+    return SourceRecordUpsert(
+        source="crossref",
+        source_id=doi,
+        staging_id=staging_id,
+        doi=doi,
+        external_ids=get_external_ids(msg),
+        title=title,
+        publication_year=publication_year,
+        raw_doc_type=crossref_raw_doc_type(msg),
+        serial_id=containers.serial_id,
+        monograph_id=containers.monograph_id,
+        container_title=get_container_title(msg) if not containers.serial_id else None,
+        raw_language=get_language(msg),
+        biblio=get_biblio(msg),
+        abstract=get_abstract(msg),
+        keywords=get_keywords(msg),
+        oa_status=None,
+        license=crossref_license(msg.get("license")),
+        impact=Impact(cited_by_count=get_cited_by_count(msg)).to_json(),
+        source_extras=extract_crossref_source_extras(msg),
     )
-    process_contributions(contribution_store, msg, source_record_id)
-    staging_store.mark_done(staging_id)
-    return True
 
 
-class CrossrefNormalizer(BibliographicNormalizer):
+class CrossrefNormalizer(SourceNormalizer):
     SOURCE = "crossref"
     DEFAULT_BATCH_SIZE = 100
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return get_title(row.raw_data), get_publication_year(row.raw_data)
 
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        container_stores, publisher_store = self._container_stores, self._publisher_store
-        return process_work(
-            self._record_store,
-            row,
-            container_stores=container_stores,
-            publisher_store=publisher_store,
-            staging_store=self._staging,
-            contribution_store=self._contribution_store,
-        )
+    def parse(self, row: StagingRow) -> Document | None:
+        """Le `message` de l'œuvre, refusé sans DOI."""
+        return row.raw_data if get_doi(row.raw_data) else None
+
+    def publisher(self, doc: Document) -> PublisherFacts | None:
+        name = get_publisher_name(doc)
+        return PublisherFacts(name) if name else None
+
+    def container_facts(self, doc: Document) -> ContainerDescription:
+        return get_container_facts(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return get_locations(doc)
+
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        return crossref_source_record(doc, row.id, containers)
+
+    def author_block(self, doc: Document) -> AuthorBlock:
+        return extract_crossref_author_block(doc)
+
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        return build_crossref_author_records(block)

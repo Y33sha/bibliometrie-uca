@@ -15,8 +15,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
-from pipeline.ingestion.common import stale_refetch
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, StaleRefetch, refresh
+from pipeline.ingestion.common import lookup, stale_refetch
+from pipeline.ingestion.common.staging import StagingStore
+from pipeline.ingestion.common.stale_refetch import StaleRefetch, refresh
 
 
 class _Lecture(StaleRefetch):
@@ -47,7 +48,7 @@ def lancer(monkeypatch):
     def _lancer(outcomes: dict):
         base = _Base()
 
-        def _upsert(conn, *, source, source_id, doi, raw_data):
+        def _upsert(_store, *, source, source_id, doi, raw_data, authors_truncated, entry_mode):
             base.ecrits.append(source_id)
             return False, bool(raw_data["changed"])
 
@@ -56,7 +57,7 @@ def lancer(monkeypatch):
             "get_stale_source_ids",
             lambda conn, source, years, *, after_days: list(outcomes),
         )
-        monkeypatch.setattr(stale_refetch, "upsert_staging", _upsert)
+        monkeypatch.setattr(StagingStore, "upsert", _upsert)
         monkeypatch.setattr(
             stale_refetch,
             "set_disappeared",
@@ -71,8 +72,8 @@ def lancer(monkeypatch):
 
 
 _QUATRE_ISSUES = {
-    "A": FetchedRecord(doi="10.1/a", raw_data={"changed": True}),
-    "B": FetchedRecord(doi="10.1/b", raw_data={"changed": False}),
+    "A": {"id": "https://openalex.org/A", "changed": True},
+    "B": {"id": "https://openalex.org/B", "changed": False},
     "C": NOT_FOUND,
     "D": UNAVAILABLE,
 }
@@ -120,7 +121,7 @@ def test_progress_counter_counts_documents_found_at_the_source(monkeypatch, lanc
         options.update(kwargs)
         yield spy
 
-    monkeypatch.setattr(stale_refetch, "track_progress", _track_progress)
+    monkeypatch.setattr(lookup, "track_progress", _track_progress)
     lancer(_QUATRE_ISSUES)
 
     assert options.get("count_kept") is True

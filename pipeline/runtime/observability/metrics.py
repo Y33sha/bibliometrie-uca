@@ -23,10 +23,10 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     ),
     "issn_from_documents": ("ISSN repris d'un enregistrement", "ISSN repris d'enregistrements"),
     "issn_set_aside": ("ISSN mis de côté", "ISSN mis de côté"),
-    "journal_doi_namespaces": ("espace de noms DOI de revue", "espaces de noms DOI de revues"),
-    "journals_deleted": ("revue vide supprimée", "revues vides supprimées"),
-    "journals_merged": ("revue fusionnée", "revues fusionnées"),
-    "journals_typed_proceedings": (
+    "serial_doi_namespaces": ("espace de noms DOI de revue", "espaces de noms DOI de revues"),
+    "serials_deleted": ("revue vide supprimée", "revues vides supprimées"),
+    "serials_merged": ("revue fusionnée", "revues fusionnées"),
+    "serials_typed_proceedings": (
         "revue typée recueil d'actes",
         "revues typées recueils d'actes",
     ),
@@ -86,7 +86,7 @@ class PhaseMetrics:
 
     `details` porte les indicateurs sur-mesure d'observabilité (conventions
     `summary`, `table`, lues par l'interface) et `signals` le motif d'un statut
-    dégradé (source coupée après une série de 429/5xx…), qui fait passer le point de
+    dégradé (source coupée après une série de requêtes en échec…), qui fait passer le point de
     la phase en ambre et s'affiche au drill-down : tous deux remontés à
     l'orchestrateur pour la capture par phase, sans rôle dans les compteurs.
     """

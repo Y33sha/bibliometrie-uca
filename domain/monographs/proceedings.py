@@ -3,9 +3,9 @@
 from collections.abc import Iterable
 from typing import NamedTuple
 
-from domain.journals.containers import is_conference
-from domain.journals.journal import JournalType
-from domain.journals.titles import names_proceedings
+from domain.serials.containers import is_conference
+from domain.serials.serial import SerialType
+from domain.serials.titles import names_proceedings
 
 
 class MonographRecord(NamedTuple):
@@ -28,6 +28,6 @@ def is_proceedings_volume(
             is_conference(r.raw_doc_type, r.source, declares_conference=r.declares_conference)
             for r in records
         )
-        or collection_type == JournalType.PROCEEDINGS
+        or collection_type == SerialType.PROCEEDINGS
         or names_proceedings(title)
     )

@@ -17,6 +17,7 @@ from sqlalchemy import Connection, text
 
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
+from infrastructure.sql_fragments import DETACHED_GROUP
 
 log = setup_logger("delete_initials_last_name_persons", os.path.dirname(__file__))
 
@@ -43,6 +44,11 @@ def delete_persons(conn: Connection, *, apply: bool) -> list[int]:
         log.info("%d : %s / %s", r.id, r.last_name, r.first_name)
     ids = [r.id for r in rows]
     if apply and ids:
+        # Les groupes de la personne perdent personne et mode avant sa suppression : la clé étrangère vide seulement `person_id`.
+        conn.execute(
+            text(f"UPDATE contributions SET {DETACHED_GROUP} WHERE person_id = ANY(:ids)"),
+            {"ids": ids},
+        )
         conn.execute(text("DELETE FROM persons WHERE id = ANY(:ids)"), {"ids": ids})
     return ids
 

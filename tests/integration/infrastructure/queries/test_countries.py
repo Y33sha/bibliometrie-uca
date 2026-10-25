@@ -145,27 +145,6 @@ class TestCandidatesAndResolution:
 
         assert _field(sa_sync_conn, addr, "countries") is None
 
-    def test_les_ror_de_l_affiliation_donnent_un_candidat(self, sa_sync_conn):
-        ensure_country(sa_sync_conn, "fr")
-        publication = insert_publication(sa_sync_conn)
-        sa = insert_source_contribution(
-            sa_sync_conn, insert_source_record(sa_sync_conn, publication)
-        )
-        addr = insert_address(sa_sync_conn, "Institut Pascal")
-        sa_sync_conn.execute(
-            text(
-                "INSERT INTO ror_organizations (ror_id, name, country_code, types, status)"
-                " VALUES ('01a8ajp46', 'UCA', 'fr', '{education}', 'active')"
-            )
-        )
-        sa_sync_conn.execute(
-            text("INSERT INTO source_contribution_rors VALUES (:sa, '01a8ajp46', :a)"),
-            {"sa": sa, "a": addr},
-        )
-
-        assert CountryCandidatesStore(sa_sync_conn).add_ror() == 1
-        assert _candidates(sa_sync_conn, addr) == {("fr", "ror")}
-
 
 class TestRefreshAddressSourceCountries:
     def test_propagates_country_from_address(self, sa_sync_conn):

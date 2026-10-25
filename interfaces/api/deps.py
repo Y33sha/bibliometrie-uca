@@ -12,7 +12,6 @@ from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
-from application.ports.pipeline.journal_recompute import JournalRecompute as JournalRecomputePort
 from application.ports.pipeline.perimeter_structures import (
     PerimeterStructures as PerimeterStructuresPort,
 )
@@ -22,6 +21,7 @@ from application.ports.pipeline.publication_count import (
 from application.ports.pipeline.publication_perimeter import (
     PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
 )
+from application.ports.pipeline.serial_recompute import SerialRecompute as SerialRecomputePort
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.contributions_queries import ContributionsQueries
@@ -29,13 +29,13 @@ from application.ports.read_models.countries_queries import CountriesQueries
 from application.ports.read_models.entity_labels_queries import EntityLabelQueries
 from application.ports.read_models.feedback_queries import FeedbackQueries
 from application.ports.read_models.hal_problems_queries import HalProblemsQueries
-from application.ports.read_models.journals_queries import JournalQueries
 from application.ports.read_models.monographs_queries import MonographQueries
 from application.ports.read_models.perimeters_queries import PerimetersQueries
 from application.ports.read_models.persons_queries import PersonsQueries
 from application.ports.read_models.pipeline_runs_queries import PipelineRunsQueries
 from application.ports.read_models.publications_queries import PublicationsQueries
 from application.ports.read_models.publishers_queries import PublisherQueries
+from application.ports.read_models.serials_queries import SerialQueries
 from application.ports.read_models.stats_queries import StatsQueries
 from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
@@ -43,10 +43,10 @@ from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
+from application.ports.repositories.serial_repository import SerialRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.addresses import countries as countries_service
 from application.services.contributions.core import propagate_in_perimeter_for_addresses
@@ -60,7 +60,6 @@ from infrastructure.read_models.countries import PgCountriesQueries
 from infrastructure.read_models.entity_labels import PgEntityLabelQueries
 from infrastructure.read_models.feedback import PgFeedbackQueries
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
-from infrastructure.read_models.journals import PgJournalQueries
 from infrastructure.read_models.merge_redirects import PgMergeRedirectQueries
 from infrastructure.read_models.monographs import PgMonographQueries
 from infrastructure.read_models.perimeters import PgPerimetersQueries
@@ -68,6 +67,7 @@ from infrastructure.read_models.persons import PgPersonsQueries
 from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
 from infrastructure.read_models.publications import PgPublicationsQueries
 from infrastructure.read_models.publishers import PgPublisherQueries
+from infrastructure.read_models.serials import PgSerialQueries
 from infrastructure.read_models.stats import PgStatsQueries
 from infrastructure.read_models.structures import PgStructuresQueries
 from infrastructure.read_models.subjects import PgSubjectsQueries
@@ -75,10 +75,10 @@ from infrastructure.repositories import (
     address_repository,
     audit_repository,
     contribution_repository,
-    journal_repository,
     perimeter_repository,
     person_repository,
     publisher_repository,
+    serial_repository,
     structure_repository,
 )
 from infrastructure.repositories.config_repository import PgConfigRepository
@@ -87,10 +87,10 @@ from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.session import read_session
 from pipeline.public import (
     CountryRecompute,
-    JournalRecompute,
     PerimeterStructures,
     PublicationCountRecompute,
     PublicationPerimeterRecompute,
+    SerialRecompute,
     SourceContributionPerimeterRecompute,
 )
 
@@ -214,12 +214,12 @@ def person_repo(conn: Connection = Depends(db_conn)) -> PersonRepository:
     return person_repository(conn)
 
 
-def journal_queries(conn: Connection = Depends(db_conn)) -> JournalQueries:
-    return PgJournalQueries(conn)
+def serial_queries(conn: Connection = Depends(db_conn)) -> SerialQueries:
+    return PgSerialQueries(conn)
 
 
-def journal_repo(conn: Connection = Depends(db_conn)) -> JournalRepository:
-    return journal_repository(conn)
+def serial_repo(conn: Connection = Depends(db_conn)) -> SerialRepository:
+    return serial_repository(conn)
 
 
 def monograph_queries(conn: Connection = Depends(db_conn)) -> MonographQueries:
@@ -310,13 +310,13 @@ def get_perimeter_structures() -> PerimeterStructuresPort:
     return _perimeter_structures_singleton
 
 
-# `JournalRecompute` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_journal_recompute_singleton: JournalRecomputePort = JournalRecompute()
+# `SerialRecompute` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
+_serial_recompute_singleton: SerialRecomputePort = SerialRecompute()
 
 
-def journal_recompute() -> JournalRecomputePort:
+def serial_recompute() -> SerialRecomputePort:
     """Requalification des publications d'une revue après son édition ou sa fusion."""
-    return _journal_recompute_singleton
+    return _serial_recompute_singleton
 
 
 # Recalculs sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
@@ -327,7 +327,7 @@ _publication_count_recompute_singleton: PublicationCountRecomputePort = Publicat
 
 
 def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
-    """Appartenance au périmètre des publications d'une personne, après son exclusion."""
+    """Appartenance au périmètre des publications, après une décision sur une personne ou sur ses contributions."""
     return _publication_perimeter_recompute_singleton
 
 

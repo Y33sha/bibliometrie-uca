@@ -22,6 +22,7 @@ from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.serials import insert_doi_prefix, insert_publisher
 from tests.integration.helpers.sources import insert_source_record
 
 # Enregistrement source de 2024, de titre « Test ».
@@ -72,6 +73,41 @@ class TestRefreshFromSources:
 
         lang = _scalar(sa_sync_conn, "SELECT language FROM publications WHERE id = :id", id=id1)
         assert lang == "en"
+
+    def test_editeur_titulaire_du_prefixe_crossref(self, sa_sync_conn):
+        """Le titulaire du préfixe l'emporte sur l'éditeur actuel que nomme Crossref."""
+        origin = insert_publisher(sa_sync_conn, "Cambridge")
+        current = insert_publisher(sa_sync_conn, "Elsevier")
+        insert_doi_prefix(sa_sync_conn, "10.1017", ra="Crossref", publisher_id=origin)
+        id1 = _insert_publication(sa_sync_conn, doi="10.1017/abc")
+        _source_record(
+            sa_sync_conn,
+            id1,
+            source="crossref",
+            source_id="10.1017/abc",
+            doi="10.1017/abc",
+            doc_type="article",
+            publisher_id=current,
+        )
+        refresh_from_sources(sa_sync_conn, id1)
+
+        assert (
+            _scalar(sa_sync_conn, "SELECT publisher_id FROM publications WHERE id = :id", id=id1)
+            == origin
+        )
+
+    def test_editeur_des_sources_sans_prefixe_crossref(self, sa_sync_conn):
+        publisher = insert_publisher(sa_sync_conn, "Armand Colin")
+        id1 = _insert_publication(sa_sync_conn)
+        _source_record(
+            sa_sync_conn, id1, source_id=f"hal-{id1}", doc_type="article", publisher_id=publisher
+        )
+        refresh_from_sources(sa_sync_conn, id1)
+
+        assert (
+            _scalar(sa_sync_conn, "SELECT publisher_id FROM publications WHERE id = :id", id=id1)
+            == publisher
+        )
 
     def test_oa_status_upgrade(self, sa_sync_conn):
         """Le statut OA le plus ouvert gagne (closed + green → green)."""
@@ -259,8 +295,7 @@ class TestRefreshFromSources:
         assert source_record_publication is None
 
     def test_out_of_scope_deletion_cascades_contributions(self, sa_sync_conn):
-        """La suppression d'un type non admissible emporte les contributions canoniques (FK ON
-        DELETE CASCADE) ; la personne, elle, survit."""
+        """La suppression d'un type non admissible emporte les groupes de contributions sources (FK ON DELETE CASCADE) ; la personne, elle, survit."""
         conn = sa_sync_conn
         pid = _insert_publication(conn, doc_type="article", publication_year=2024)
         _source_record(
@@ -272,7 +307,11 @@ class TestRefreshFromSources:
 
         assert _scalar(conn, "SELECT count(*) FROM publications WHERE id = :id", id=pid) == 0
         assert (
-            _scalar(conn, "SELECT count(*) FROM contributions WHERE publication_id = :id", id=pid)
+            _scalar(
+                conn,
+                "SELECT count(*) FROM contributions WHERE publication_id = :id",
+                id=pid,
+            )
             == 0
         )
         assert _scalar(conn, "SELECT count(*) FROM persons WHERE id = :id", id=person_id) == 1

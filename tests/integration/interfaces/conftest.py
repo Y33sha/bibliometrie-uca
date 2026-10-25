@@ -3,6 +3,7 @@
 Fournit :
 - `client` : TestClient FastAPI pointant sur bibliometrie_test (module-scoped).
 - `auth_client` : TestClient avec cookie session admin valide.
+- une remise à zéro de la base après chaque module : les tests d'API valident leurs écritures.
 
 Le sync Engine SQLAlchemy du lifespan FastAPI est redirigé vers
 bibliometrie_test par monkey-patch de `build_sync_engine` avant l'import
@@ -63,10 +64,27 @@ _app_module.build_sync_engine = _build_test_sync_engine
 from collections.abc import Iterator
 
 from infrastructure.settings import settings as _settings  # noqa: E402
+from tests.integration.helpers.db import ConfigRow, config_rows, reset_database  # noqa: E402
 
 # Les tests s'exécutent sur http://testserver : un cookie de session marqué Secure ne serait
 # pas renvoyé par le client, ce qui casserait le parcours d'authentification par login.
 _settings.cookie_secure = False
+
+
+@pytest.fixture(scope="session")
+def _config_defaults() -> list[ConfigRow]:
+    """Réglages de `ops.config` posés par les migrations, lus avant le premier module de tests d'API."""
+    return config_rows()
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _reset_database_after_module(_config_defaults: list[ConfigRow]) -> Iterator[None]:
+    """Remet la base dans son état d'après les migrations à la fin de chaque module.
+
+    Les tests d'API valident leurs écritures dans la base : sans remise à zéro, elles pèseraient sur les modules suivants.
+    """
+    yield
+    reset_database(_config_defaults)
 
 
 @pytest.fixture(autouse=True)

@@ -13,10 +13,17 @@ def extract_id(doc: Mapping[str, JsonValue]) -> str:
     return as_str(doc.get("id")) or ""
 
 
+def extract_dois(doc: Mapping[str, JsonValue]) -> list[str]:
+    """DOI nettoyés des `externalIds` d'un document ScanR, dans leur ordre."""
+    return [
+        doi
+        for entry in as_sequence(doc.get("externalIds"))
+        if as_str((ext := as_mapping(entry)).get("type")) == "doi"
+        and (doi := clean_doi(as_str(ext.get("id"))))
+    ]
+
+
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     """Premier DOI nettoyé des `externalIds` d'un document ScanR."""
-    for entry in as_sequence(doc.get("externalIds")):
-        ext = as_mapping(entry)
-        if as_str(ext.get("type")) == "doi":
-            return clean_doi(as_str(ext.get("id")))
-    return None
+    dois = extract_dois(doc)
+    return dois[0] if dois else None

@@ -9,9 +9,8 @@ import httpx2
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.http.throttle import Throttle
 from pipeline.http.tls import tls_context
-from pipeline.ingestion.api_params import API_BASE_URLS, WOS_DELAY, WOS_PER_PAGE
+from pipeline.ingestion.api_params import API_BASE_URLS, WOS_PER_PAGE
 from pipeline.ingestion.credentials import get_wos_api_key
 
 type QueryParams = Mapping[str, str | int | float | bool | None]
@@ -71,7 +70,7 @@ def headers(api_key: str) -> dict[str, str]:
 
 
 class WosClient:
-    """Client de l'API WoS Expanded, limité à un appel toutes les `WOS_DELAY` secondes.
+    """Client de l'API WoS Expanded.
 
     Le backoff est plus long qu'aux autres sources (`initial_backoff=2.0`) : WoS renvoie plus volontiers des 429.
     """
@@ -79,22 +78,20 @@ class WosClient:
     def __init__(self, base_url: str, api_key: str) -> None:
         self._url = base_url
         self._headers = headers(api_key)
-        self._throttle = Throttle(WOS_DELAY)
 
     def _get(self, params: QueryParams, label: str) -> Mapping[str, JsonValue]:
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry(
-                    "GET",
-                    self._url,
-                    params=params,
-                    headers=self._headers,
-                    timeout=60,
-                    retry_on_empty_body=True,
-                    initial_backoff=2.0,
-                    label=label,
-                )
+        return as_mapping(
+            http_request_with_retry(
+                "GET",
+                self._url,
+                params=params,
+                headers=self._headers,
+                timeout=60,
+                retry_on_empty_body=True,
+                initial_backoff=2.0,
+                label=label,
             )
+        )
 
     def fetch_page(
         self, year: int, first_record: int, affiliations: list[str]

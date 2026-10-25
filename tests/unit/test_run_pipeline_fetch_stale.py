@@ -8,12 +8,9 @@
 """
 
 from contextlib import ExitStack
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from pipeline.http.circuit_breaker import (
-    SourceCircuitBreaker,
-    get_current_breaker,
-)
+from pipeline.http.circuit_breaker import get_current_breaker
 from pipeline.ingestion.common import fetch_stale
 from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
@@ -21,7 +18,11 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def _run_phase(options: RunOptions) -> PhaseMetrics:
-    return fetch_stale.build().run(phase_context(options, credentials_missing=lambda _source: None))
+    return fetch_stale.build().run(
+        phase_context(
+            options, credentials_missing=lambda _source: None, request_budget=lambda _source: None
+        )
+    )
 
 
 def _called_targets(stack) -> MagicMock:
@@ -29,12 +30,15 @@ def _called_targets(stack) -> MagicMock:
     run_one = stack.enter_context(
         patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
     )
-    # Fenêtre d'années : évite tout accès base (get_years lit la config).
+    # Fenêtre d'années : évite tout accès base (window_years lit la config).
     stack.enter_context(
         patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
     )
     stack.enter_context(
-        patch("pipeline.ingestion.common.fetch_stale.get_years", return_value=[2024])
+        patch(
+            "pipeline.ingestion.common.fetch_stale.window_years",
+            side_effect=lambda conn, *, start_year, year: [year] if year else [2024],
+        )
     )
     return run_one
 
@@ -65,13 +69,12 @@ def test_fetch_stale_covers_theses():
     assert "theses" in [c.args[1] for c in run_one.call_args_list]
 
 
-def test_fetch_stale_couples_years_per_source():
-    # theses ramène tout l'historique (borne None) ; les autres suivent la fenêtre du run.
+def test_fetch_stale_toutes_les_sources_suivent_la_fenetre():
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions())
     by_target = {c.args[1]: c.args[2] for c in run_one.call_args_list}
-    assert by_target["theses"] is None
+    assert by_target["theses"] == [2024]
     assert by_target["hal"] == [2024]
 
 
@@ -93,25 +96,27 @@ def test_fetch_stale_respects_sources_filter():
 
 
 def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
-    """L'exécuteur pose le circuit-breaker de la source, le transmet à la relecture, puis le retire."""
+    """L'exécuteur pose le circuit-breaker de la source pendant la relecture, puis le retire."""
+    sources = []
+
+    async def refresh(*_args, **_kwargs):
+        breaker = get_current_breaker()
+        sources.append(breaker and breaker.source)
+        return PhaseMetrics()
+
     with ExitStack() as stack:
-        refresh = stack.enter_context(
-            patch(
-                "pipeline.ingestion.common.fetch_stale.refresh",
-                new=AsyncMock(return_value=PhaseMetrics()),
-            )
-        )
+        stack.enter_context(patch("pipeline.ingestion.common.fetch_stale.refresh", new=refresh))
         stack.enter_context(
             patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
         )
         stack.enter_context(
-            patch("pipeline.ingestion.common.fetch_stale.get_years", return_value=[2024])
+            patch(
+                "pipeline.ingestion.common.fetch_stale.window_years",
+                side_effect=lambda conn, *, start_year, year: [year] if year else [2024],
+            )
         )
-        stack.enter_context(patch.object(fetch_stale, "_make_refetch", return_value=MagicMock()))
         _run_phase(RunOptions(sources={"hal"}))
 
-    breaker = refresh.call_args.kwargs["breaker"]
-    assert isinstance(breaker, SourceCircuitBreaker)
-    assert breaker.source == "hal"
+    assert sources == ["hal"]
     # La ContextVar est restaurée en sortie (pas de fuite de breaker).
     assert get_current_breaker() is None

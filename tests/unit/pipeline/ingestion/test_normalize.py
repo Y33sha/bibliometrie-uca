@@ -1,6 +1,6 @@
-"""Tests unitaires de `pipeline.ingestion.common.normalizer.SourceNormalizer.run`.
+"""Tests unitaires de `pipeline.ingestion.common.normalizer.SourceNormalizer`.
 
-Couvre la template method `run()` et ses chemins :
+Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur les métadonnées minimales, et la template method `run()` et ses chemins :
 - `total == 0` (rien à faire)
 - happy path (success / skip / error mélangés, batch commit, summary)
 - exception dans `process_work` (log de l'échec + rollback au SAVEPOINT)
@@ -12,13 +12,24 @@ Couvre la template method `run()` et ses chemins :
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 
-from pipeline.ingestion.common.normalizer import NormalizeStats, SourceNormalizer
+from domain.serials.containers import ContainerDescription
+from pipeline.ingestion.common import normalizer as normalizer_module
+from pipeline.ingestion.common.normalizer import (
+    Document,
+    NormalizeStats,
+    PublisherFacts,
+    SourceNormalizer,
+)
+from pipeline.ingestion.common.source_contributions import AuthorBlock, AuthorRecord
+from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
+from pipeline.transformation.publishing.find_or_create import Containers
 
 
 def _row(label: str) -> StagingRow:
@@ -55,7 +66,41 @@ class _FakeStaging:
         return [r for r in self.pending_rows if r.id in ids_set]
 
 
-class _Norm(SourceNormalizer):
+def _stores(staging) -> dict[str, Any]:
+    """Arguments du constructeur commun, `staging` compris, les autres stores étant des MagicMock."""
+    return {
+        "conn": MagicMock(invalidated=False),
+        "logger": logging.getLogger("test"),
+        "staging_store": staging,
+        "record_store": MagicMock(),
+        "container_stores": MagicMock(),
+        "publisher_store": MagicMock(),
+        "contribution_store": MagicMock(),
+        "location_store": MagicMock(),
+    }
+
+
+class _StubNorm(SourceNormalizer):
+    """Normalizer dont l'analyse d'une ligne est sans objet pour le test."""
+
+    SOURCE = "test"
+
+    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
+        return "Titre", 2024
+
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        raise NotImplementedError
+
+    def author_block(self, doc: Document) -> AuthorBlock:
+        return {}
+
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        return []
+
+
+class _Norm(_StubNorm):
     """Normalizer instrumenté pour pinguer `run()`."""
 
     SOURCE = "test"
@@ -68,22 +113,12 @@ class _Norm(SourceNormalizer):
         results: list[Any] | None = None,
         raises_on: set[str] | None = None,
     ) -> None:
-        super().__init__(
-            conn=MagicMock(invalidated=False),
-            logger=logging.getLogger("test"),
-            staging_store=staging,
-        )
+        super().__init__(**_stores(staging))
         self.results = results or []
         self.raises_on = raises_on or set()
         self.processed_rows: list[StagingRow] = []
         self.preload_called = False
         self.cleanup_called = False
-
-    def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
-        return "Titre", 2024
-
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        return True
 
     def process_work(self, row: StagingRow) -> bool | None:
         self.processed_rows.append(row)
@@ -275,23 +310,17 @@ class TestIterRowsSubBatch:
 # ── process_work : métadonnées minimales ─────────────────────────
 
 
-class _MinimalNorm(SourceNormalizer):
+class _MinimalNorm(_StubNorm):
     """Normalizer qui lit titre et année dans le payload, pour la méthode de gabarit `process_work`."""
 
-    SOURCE = "test"
-
     def __init__(self, staging: MagicMock) -> None:
-        super().__init__(
-            conn=MagicMock(invalidated=False),
-            logger=logging.getLogger("test"),
-            staging_store=staging,
-        )
+        super().__init__(**_stores(staging))
         self.normalized: list[StagingRow] = []
 
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
         return row.raw_data.get("title"), row.raw_data.get("year")  # type: ignore[return-value]
 
-    def normalize_record(self, row: StagingRow) -> bool | None:
+    def normalize_record(self, row: StagingRow) -> bool:
         self.normalized.append(row)
         return True
 
@@ -316,7 +345,7 @@ class TestProcessWorkMinimalMetadata:
         assert norm.normalized == []
 
     def test_enregistrement_source_refuse_par_la_source(self):
-        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplète."""
+        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplet."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         norm.normalize_record = lambda row: False  # type: ignore[method-assign]
@@ -332,3 +361,129 @@ class TestProcessWorkMinimalMetadata:
         assert norm.process_work(row) is True
         assert norm.normalized == [row]
         staging.discard_source_record.assert_not_called()
+
+
+# ── normalize_record : séquence d'écriture ───────────────────────
+
+
+_RECORD = SourceRecordUpsert(
+    source="test",
+    source_id="a",
+    staging_id=1,
+    doi=None,
+    external_ids=None,
+    title="T",
+    publication_year=2020,
+    raw_doc_type=None,
+    serial_id=None,
+    monograph_id=None,
+    container_title=None,
+    raw_language=None,
+    biblio=None,
+    abstract=None,
+    keywords=None,
+    oa_status=None,
+    license=None,
+    impact=None,
+    source_extras=None,
+)
+
+
+class _WritingNorm(_StubNorm):
+    """Normalizer dont l'analyse est réglable : document lu, éditeur, conteneurs."""
+
+    def __init__(
+        self,
+        *,
+        doc: Document | None,
+        publisher: PublisherFacts | None = None,
+        facts: ContainerDescription | None = None,
+    ) -> None:
+        super().__init__(**_stores(MagicMock()))
+        self._doc = doc
+        self._publisher = publisher
+        self._facts = facts
+        self.containers_seen: list[Containers] = []
+
+    def parse(self, row: StagingRow) -> Document | None:
+        return self._doc
+
+    def publisher(self, doc: Document) -> PublisherFacts | None:
+        return self._publisher
+
+    def container_facts(self, doc: Document) -> ContainerDescription | None:
+        return self._facts
+
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        self.containers_seen.append(containers)
+        return _RECORD
+
+
+@pytest.fixture
+def writes(monkeypatch) -> list[tuple]:
+    """Écritures de la séquence, dans l'ordre : éditeur, conteneurs, contributions sources."""
+    calls: list[tuple] = []
+
+    def publisher(name, *, openalex_id, repo):
+        calls.append(("publisher", name, openalex_id))
+        return 5
+
+    def containers(facts, *, publisher_id, stores):
+        calls.append(("containers", publisher_id))
+        return Containers(7, None)
+
+    def sync(store, source, source_record_id, block, build):
+        calls.append(("contributions", source, source_record_id))
+
+    monkeypatch.setattr(normalizer_module, "find_or_create_publisher", publisher)
+    monkeypatch.setattr(normalizer_module, "find_or_create_containers", containers)
+    monkeypatch.setattr(normalizer_module, "sync_source_contributions", sync)
+    return calls
+
+
+class TestNormalizeRecord:
+    ROW = StagingRow(id=1, source_id="a", doi=None, raw_data={"title": "T"})
+
+    def test_enregistrement_refuse_sans_ecriture(self, writes):
+        norm = _WritingNorm(doc=None)
+        assert norm.normalize_record(self.ROW) is False
+        assert writes == []
+        norm._record_store.upsert_source_record.assert_not_called()
+        norm._staging.mark_done.assert_not_called()
+
+    def test_editeur_puis_conteneurs_puis_enregistrement_et_contributions(self, writes):
+        norm = _WritingNorm(
+            doc={"title": "T"},
+            publisher=PublisherFacts("Elsevier", "P1"),
+            facts=ContainerDescription(source="test", raw_doc_type=None, journal_title="Revue"),
+        )
+        norm._record_store.upsert_source_record.return_value = 42
+        assert norm.normalize_record(self.ROW) is True
+        assert writes == [
+            ("publisher", "Elsevier", "P1"),
+            ("containers", 5),
+            ("contributions", "test", 42),
+        ]
+        assert norm.containers_seen == [Containers(7, None)]
+        norm._record_store.upsert_source_record.assert_called_once_with(
+            replace(_RECORD, publisher_id=5)
+        )
+        norm._location_store.replace_locations.assert_called_once_with(42, [])
+        norm._staging.mark_done.assert_called_once_with(1)
+
+    def test_sans_editeur_ni_conteneur(self, writes):
+        norm = _WritingNorm(doc={"title": "T"})
+        norm._record_store.upsert_source_record.return_value = 42
+        assert norm.normalize_record(self.ROW) is True
+        assert writes == [("contributions", "test", 42)]
+        assert norm.containers_seen == [Containers(None, None)]
+
+    def test_conteneurs_sans_editeur(self, writes):
+        norm = _WritingNorm(
+            doc={"title": "T"},
+            facts=ContainerDescription(source="test", raw_doc_type=None, journal_title="Revue"),
+        )
+        norm.normalize_record(self.ROW)
+        assert writes[0] == ("containers", None)

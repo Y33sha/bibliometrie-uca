@@ -17,6 +17,8 @@ from sqlalchemy import Connection, Row, text
 
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
+from domain.platforms.platform import PlatformType
+from domain.platforms.registry import known_platform_of_source, preprint_servers_of_prefix
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
@@ -27,7 +29,7 @@ from infrastructure.sql_fragments import diamond_journal_sql
 
 EVOLUTION_YEARS = 5
 THESIS_YEARS = 10
-TOP_JOURNAL_MIN_ARTICLES = 2
+TOP_SERIAL_MIN_ARTICLES = 2
 TOP_COUNTRIES = 6
 
 type SqlRow = Row[tuple[object, ...]]
@@ -35,7 +37,7 @@ type SqlRow = Row[tuple[object, ...]]
 # Types comptés dans le taux d'open access.
 OA_RATE_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.CONFERENCE_PAPER)
 # Types parus dans une revue, pour les modèles de revues et les APC.
-JOURNAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
+SERIAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORIAL)
 CONFERENCE_TYPES = (DocType.CONFERENCE, DocType.CONFERENCE_PAPER, DocType.POSTER)
 OPEN_STATUSES = (OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN)
 
@@ -65,23 +67,6 @@ DOC_TYPE_LABELS = {
     DocType.ERRATUM: "Erratum",
     DocType.OTHER: "Autre",
 }
-
-# Préfixe DOI propre à un serveur de preprints. bioRxiv et medRxiv partagent les leurs.
-PREPRINT_SERVERS = {
-    "10.48550": "arXiv",
-    "10.1101": "bioRxiv",
-    "10.64898": "bioRxiv",
-    "10.2139": "SSRN",
-    "10.21203": "Research Square",
-    "10.20944": "Preprints.org",
-    "10.22541": "Authorea",
-    "10.31234": "PsyArXiv",
-    "10.31235": "SocArXiv",
-    "10.31219": "OSF Preprints",
-    "10.26434": "ChemRxiv",
-    "10.31223": "EarthArXiv",
-}
-PREPRINT_SERVER_NAMES = frozenset(PREPRINT_SERVERS.values()) | {"medRxiv"}
 
 MODEL_LABELS = {"full_oa": "Open access", "diamond": "Open access", "subscription": "Abonnement"}
 
@@ -215,10 +200,10 @@ class OpenScienceReport:
         )
         return text_, current
 
-    def journal_models(self) -> str:
+    def serial_models(self) -> str:
         r = self._one(
             f"""
-            SELECT COUNT(*) AS total, COUNT(DISTINCT p.journal_id) AS journals,
+            SELECT COUNT(*) AS total, COUNT(DISTINCT p.serial_id) AS serials,
                    COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS}) AS full_oa,
                    COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS} AND p.oa_status = ANY(:open)) AS full_oa_open,
                    COUNT(*) FILTER (WHERE j.oa_model IN {OPEN_ACCESS_MODELS} AND {DIAMOND_JOURNAL}) AS diamond,
@@ -228,10 +213,10 @@ class OpenScienceReport:
                    COUNT(*) FILTER (WHERE j.oa_model = 'subscription' AND p.oa_status = 'green') AS green,
                    COUNT(*) FILTER (WHERE j.oa_model IS NULL OR j.oa_model NOT IN ('full_oa', 'diamond', 'subscription')) AS unknown
             FROM ({LAB_PUBLICATIONS}) p
-            LEFT JOIN publishing.journals j ON j.id = p.journal_id
+            LEFT JOIN publishing.serials j ON j.id = p.serial_id
             WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             """,
-            types=_values(JOURNAL_TYPES),
+            types=_values(SERIAL_TYPES),
             open=_values(OPEN_STATUSES),
         )
         sub_open = r.hybrid + r.bronze + r.green
@@ -250,7 +235,7 @@ class OpenScienceReport:
         if r.unknown:
             rows.append(("Modèle inconnu ou hors revue", r.unknown, "—"))
         return (
-            f"## Modèles de revues et APC\n\nPérimètre : {r.total} articles, revues de littérature, lettres et éditoriaux de {self.year}, parus dans {r.journals} revues.\n\n"
+            f"## Modèles de revues et APC\n\nPérimètre : {r.total} articles, revues de littérature, lettres et éditoriaux de {self.year}, parus dans {r.serials} revues.\n\n"
             + _table(["Modèle de la revue", "Articles", "Dont ouverts"], rows)
             + "\n\nRevue diamant : revue marquée diamant, ou revue du DOAJ sans APC ni autres frais."
         )
@@ -276,10 +261,10 @@ class OpenScienceReport:
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    ) AS lab_corresponding
             FROM ({LAB_PUBLICATIONS}) p
-            JOIN publishing.journals j ON j.id = p.journal_id
+            JOIN publishing.serials j ON j.id = p.serial_id
             WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types) AND p.oa_status IN ('gold', 'hybrid')
             """,
-            types=_values(JOURNAL_TYPES),
+            types=_values(SERIAL_TYPES),
         )
         known = [r for r in catalogue if r.apc_amount is not None and r.apc_currency in EUR_RATES]
         total = sum(float(r.apc_amount) * EUR_RATES[r.apc_currency] for r in known)
@@ -294,20 +279,20 @@ class OpenScienceReport:
             f"L'auteur correspondant appartient au laboratoire pour {corresponding} de ces {len(catalogue)} articles."
         )
 
-    def journals(self) -> str:
+    def serials(self) -> str:
         rows = self._rows(
             f"""
             SELECT j.title, pb.name AS publisher, j.oa_model, {DIAMOND_JOURNAL} AS diamond,
                    j.apc_amount, j.apc_currency, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
-            JOIN publishing.journals j ON j.id = p.journal_id
+            JOIN publishing.serials j ON j.id = p.serial_id
             LEFT JOIN publishing.publishers pb ON pb.id = j.publisher_id
             WHERE p.publication_year = :year AND p.doc_type::text = ANY(:types)
             GROUP BY j.id, pb.name ORDER BY n DESC, j.title
             """,
-            types=_values(JOURNAL_TYPES),
+            types=_values(SERIAL_TYPES),
         )
-        top = [r for r in rows if r.n >= TOP_JOURNAL_MIN_ARTICLES]
+        top = [r for r in rows if r.n >= TOP_SERIAL_MIN_ARTICLES]
         others = len(rows) - len(top)
 
         def model(r: SqlRow) -> str:
@@ -435,7 +420,9 @@ class OpenScienceReport:
             hal_accounts AS (
                 SELECT la.person_id, bool_or(k.identifiers ? 'orcid') AS has_orcid
                 FROM lab_authors la
-                JOIN source_contributions sc ON sc.person_id = la.person_id AND sc.source = 'hal'
+                JOIN contributions g ON g.person_id = la.person_id
+                JOIN aligned_source_contributions m ON m.contribution_id = g.id
+                JOIN source_contributions sc ON sc.id = m.source_contribution_id AND sc.source = 'hal'
                 JOIN contributor_information k ON k.id = sc.contributor_information_id
                 WHERE k.identifiers ? 'hal_person_id'
                 GROUP BY la.person_id
@@ -473,7 +460,7 @@ class OpenScienceReport:
             SELECT COALESCE(j.title, p.container_title, 'Entrepôt non renseigné') AS repository,
                    p.license::text AS license, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
-            LEFT JOIN publishing.journals j ON j.id = p.journal_id
+            LEFT JOIN publishing.serials j ON j.id = p.serial_id
             WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'dataset'
             GROUP BY 1, 2 ORDER BY 3 DESC, 1, 2
             """,
@@ -525,9 +512,11 @@ class OpenScienceReport:
                        WHERE sr.publication_id = p.id AND sr.doi IS NOT NULL
                    ) AS prefixes,
                    ARRAY(
-                       SELECT DISTINCT regexp_replace(sr.container_title, '\\s*\\(.*\\)$', '') FROM source_records sr
-                       WHERE sr.publication_id = p.id AND sr.source = 'openalex' AND sr.container_title IS NOT NULL
-                   ) AS openalex_sources
+                       SELECT DISTINCT pl.openalex_id FROM source_records sr
+                       JOIN source_record_locations l ON l.source_record_id = sr.id
+                       JOIN platforms pl ON pl.id = l.platform_id
+                       WHERE sr.publication_id = p.id AND pl.openalex_id IS NOT NULL
+                   ) AS platform_sources
             FROM ({LAB_PUBLICATIONS}) p
             WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'
             """,
@@ -538,7 +527,7 @@ class OpenScienceReport:
             return f"## Preprints\n\nAucun preprint sur {period}."
         by_year = Counter(r.year for r in rows)
         by_platform = Counter(
-            preprint_server(r.prefixes, r.openalex_sources) or "Autre plateforme ou archive"
+            preprint_server(r.prefixes, r.platform_sources) or "Autre plateforme ou archive"
             for r in rows
         )
         return (
@@ -621,8 +610,8 @@ class OpenScienceReport:
             self.synthesis(oa_current, orcid),
             self.typology(),
             oa_text,
-            self.journal_models() + "\n\n" + self.apc(),
-            self.journals(),
+            self.serial_models() + "\n\n" + self.apc(),
+            self.serials(),
             self.conferences(),
             self.books(),
             self.theses(),
@@ -643,12 +632,16 @@ def _with_identifier(id_type: str) -> str:
                 WHERE pi.id_type = '{id_type}' AND pi.status <> 'rejected')"""
 
 
-def preprint_server(prefixes: Sequence[str], openalex_sources: Sequence[str]) -> str | None:
-    """Serveur de preprints d'une publication, d'après les préfixes de ses DOI, à défaut d'après la source de son enregistrement source OpenAlex."""
+def preprint_server(prefixes: Sequence[str], platform_sources: Sequence[str]) -> str | None:
+    """Serveur de preprints d'une publication, d'après la source OpenAlex des plateformes de ses localisations, à défaut d'après les préfixes de ses DOI."""
+    for source in sorted(platform_sources):
+        known = known_platform_of_source(source)
+        if known and known.platform_type is PlatformType.PREPRINT_SERVER:
+            return known.name
     for prefix in sorted(prefixes):
-        if server := PREPRINT_SERVERS.get(prefix):
-            return "medRxiv" if server == "bioRxiv" and "medRxiv" in openalex_sources else server
-    return next((s for s in openalex_sources if s in PREPRINT_SERVER_NAMES), None)
+        if servers := preprint_servers_of_prefix(prefix):
+            return servers[0].name
+    return None
 
 
 def structure_id(conn: Connection, code: str) -> int | None:

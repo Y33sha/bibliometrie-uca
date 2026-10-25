@@ -219,7 +219,7 @@ def _refresh_source_contributions_in_batches(
 
 
 def refresh(conn: Connection, logger: logging.Logger) -> int:
-    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Retourne le nombre de publications mises à jour. Chaque étape a sa ligne de journal, avec son nombre de lignes et sa durée."""
+    """Recalcule les caches pays (source_contributions → source_records → publications) des contributions sources à recalculer, puis supprime les marquages traités. Retourne le nombre de publications mises à jour. Chaque recalcul a sa ligne de journal, avec son nombre de lignes et sa durée."""
     step(logger, "Rafraîchissement des pays associés aux publications")
     with waiting(f"{BRANCH}contributions sources à recalculer : en cours", logger) as line:
         total = create_dirty_scope(conn)
@@ -234,14 +234,16 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
         quantity(updated, "contribution source mise à jour", "contributions sources mises à jour"),
         time.perf_counter() - t0,
     )
-    for label, singular, plural, refresh_step in (
+    for branch, label, singular, plural, refresh_step in (
         (
+            BRANCH,
             "enregistrements sources",
             "enregistrement source mis à jour",
             "enregistrements sources mis à jour",
             refresh_source_record_countries,
         ),
         (
+            LAST_BRANCH,
             "publications",
             "publication mise à jour",
             "publications mises à jour",
@@ -249,17 +251,12 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
         ),
     ):
         t0 = time.perf_counter()
-        with waiting(f"{BRANCH}{label} : en cours", logger) as line:
+        with waiting(f"{branch}{label} : en cours", logger) as line:
             updated = refresh_step(conn)
             line.conclude(
-                f"{BRANCH}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
+                f"{branch}{quantity(updated, singular, plural)} en {time.perf_counter() - t0:.1f} s"
             )
-    t0 = time.perf_counter()
-    with waiting(f"{LAST_BRANCH}suppression des marquages traités : en cours", logger) as line:
-        delete_processed_marks(conn)
-        line.conclude(
-            f"{LAST_BRANCH}marquages traités supprimés en {time.perf_counter() - t0:.1f} s"
-        )
+    delete_processed_marks(conn)
     drop_dirty_scope(conn)
     return updated
 

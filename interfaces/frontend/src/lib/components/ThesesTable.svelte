@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { base } from '$app/paths';
-	import { halDocUrl, scanrPubUrl, titleCase } from '$lib/utils';
+	import { titleCase } from '$lib/utils';
 	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
 	import type { components, operations } from '$lib/api/schema';
@@ -16,6 +16,7 @@
 		| 'openalex_id'
 		| 'scanr_id'
 		| 'theses_id'
+		| 'record_urls'
 		| 'date_soutenance'
 		| 'date_inscription'
 		| 'thesis_author_name'
@@ -155,7 +156,7 @@
 				<td class="links-cell">
 					{#if t.hal_id}
 						<a
-							href={halDocUrl(t.hal_id, t.oa_status)}
+							href={t.record_urls.hal}
 							target="_blank"
 							rel="noopener"
 							class="source-tag source-hal"
@@ -168,7 +169,7 @@
 					{/if}
 					{#if t.openalex_id}
 						<a
-							href="https://openalex.org/{t.openalex_id}"
+							href={t.record_urls.openalex}
 							target="_blank"
 							rel="noopener"
 							class="source-tag source-openalex"
@@ -181,7 +182,7 @@
 					{/if}
 					{#if t.scanr_id}
 						<a
-							href={scanrPubUrl(t.scanr_id)}
+							href={t.record_urls.scanr}
 							target="_blank"
 							rel="noopener"
 							class="source-tag source-scanr"
@@ -194,7 +195,7 @@
 					{/if}
 					{#if t.theses_id}
 						<a
-							href="https://theses.fr/{t.theses_id}"
+							href={t.record_urls.theses}
 							target="_blank"
 							rel="noopener"
 							class="source-tag source-theses"

@@ -39,11 +39,13 @@ const HOTES_AFFICHABLES = new Set([
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
  * les valeurs internes désignent une route de l'application. */
 const COMPOSITION =
-	/^(halDocUrl|halPersonUrl|halUrl|halCollectionUrl|scanrPubUrl|rorFullUrl|sourceExternalUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
+	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl|accessUrl)$/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
-/* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. */
-const VERIFIE_COTE_SERVEUR = /^[a-z]+\.doaj_url$/;
+/* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. Lien vers le portail d'une
+ * source, composé par l'API : l'hôte y est écrit dans le code et l'identifiant encodé
+ * (`domain/sources/registry.py`, `source_record_url`). */
+const VERIFIE_COTE_SERVEUR = /^[a-z]+\.(doaj_url|record_url|record_urls\.[a-z]+)$/;
 
 const URL_LITTERALE = /https?:\/\/([A-Za-z0-9._-]+)/g;
 const LIAISON_HREF = /href=\{([^}]*)\}/g;

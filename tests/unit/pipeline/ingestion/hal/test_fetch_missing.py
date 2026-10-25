@@ -4,15 +4,14 @@ Deux pistes, même forme : sélectionner les identifiants absents, puis les cher
 """
 
 import logging
-from types import SimpleNamespace
 
 import pytest
 
-from pipeline.http.circuit_breaker import reset_current_breaker, set_current_breaker
+from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.hal import fetch_missing
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
-from pipeline.runtime.observability.log_format import LAST_BRANCH
 
 _LOG = logging.getLogger("test")
 
@@ -46,7 +45,7 @@ class _HalSimule:
                 return UNAVAILABLE
             return self.docs.get(identifiant, NOT_FOUND)
 
-        def upsert_staging(conn, *, source, source_id, doi, raw_data, entry_mode):
+        def upsert(_store, *, source, source_id, doi, raw_data, authors_truncated, entry_mode):
             self.ecrits.append(source_id)
             return source_id not in self.deja_en_staging, False
 
@@ -60,9 +59,8 @@ class _HalSimule:
             fetch_missing, "get_missing_nnts", lambda conn, *, retry_after_days: list(ids)
         )
         monkeypatch.setattr(fetch_missing, "search_one", search_one)
-        monkeypatch.setattr(fetch_missing, "upsert_staging", upsert_staging)
+        monkeypatch.setattr(StagingStore, "upsert", upsert)
         monkeypatch.setattr(fetch_missing, "record_failed_lookup", record_failed_lookup)
-        monkeypatch.setattr(fetch_missing, "HAL_DELAY", 0)
 
 
 class TestParHalId:
@@ -104,7 +102,6 @@ class TestParHalId:
         """La recherche s'arrête à l'identifiant qui fait couper le circuit-breaker."""
         hal_ids = [f"hal-{i}" for i in range(20)]
         hal = _HalSimule(monkeypatch, ids=hal_ids)
-        breaker = SimpleNamespace(tripped=False)
         recherche = fetch_missing.search_one
 
         async def search_one_puis_coupure(client, query, *, label):
@@ -112,16 +109,13 @@ class TestParHalId:
             return await recherche(client, query, label=label)
 
         monkeypatch.setattr(fetch_missing, "search_one", search_one_puis_coupure)
-        token = set_current_breaker(breaker)
-        try:
+        with source_circuit_breaker("hal") as breaker:
             await fetch_missing_hal_by_id(_FakeConnection(), _LOG, retry_after_days=30)
-        finally:
-            reset_current_breaker(token)
 
         assert hal.cherches == ["hal-0"]
 
-    async def test_rien_a_faire(self, monkeypatch, caplog):
-        """Le titre de la sous-étape est écrit avant l'appel : sans ligne de conclusion, il reste seul."""
+    async def test_sans_hal_id_a_chercher_rien_n_est_ecrit(self, monkeypatch, caplog):
+        """L'exécuteur des tâches ferme la section quand aucune recherche n'a rien cherché."""
         hal = _HalSimule(monkeypatch)
 
         with caplog.at_level(logging.INFO):
@@ -129,7 +123,7 @@ class TestParHalId:
 
         assert metrics.seen == 0
         assert hal.cherches == []
-        assert f"{LAST_BRANCH}Rien à faire" in caplog.text
+        assert caplog.text == ""
 
 
 class TestParNnt:

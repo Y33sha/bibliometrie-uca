@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from domain.sources.registry import SOURCE_LABELS, source_label
 from pipeline.runtime.observability.logging_scope import ScopedOrPlainLogger
 
@@ -37,6 +39,24 @@ def source_branch(source: str, scope: str | None = None) -> str:
     return f"{label} {scope:<{_SCOPE_WIDTH}}"
 
 
+def breakdown(
+    logger: ScopedOrPlainLogger,
+    header: str,
+    rows: Iterable[tuple[int, str]],
+    *,
+    last: bool = True,
+) -> None:
+    """Ligne de branche `header`, puis une ligne par `(nombre, libellé)`, nombres alignés à droite. Sous une branche suivie d'autres lignes (`last` faux), le trait vertical longe le détail, et une ligne vide le sépare de la branche suivante."""
+    rows = list(rows)
+    margin = " " * len(LAST_BRANCH) if last else BRANCH_CONTINUATION
+    logger.info("%s%s", LAST_BRANCH if last else BRANCH, header)
+    width = max((len(str(count)) for count, _ in rows), default=0)
+    for count, label in rows:
+        logger.info("%s%s %s", margin, str(count).rjust(width), label)
+    if not last:
+        logger.info("%s", margin.rstrip())
+
+
 def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
     """Ouvre une sous-étape : une ligne vide la détache de ce qui précède, puis son titre.
 
@@ -47,9 +67,9 @@ def step(logger: ScopedOrPlainLogger, title: str, *args: object) -> None:
     logger.info(line, *args)
 
 
-def nothing_to_do(logger: ScopedOrPlainLogger) -> None:
-    """Ferme une sous-étape qui n'a rien à traiter."""
-    logger.info("%sRien à faire", LAST_BRANCH)
+def nothing_to_do(logger: ScopedOrPlainLogger, subject: str | None = None) -> None:
+    """Ferme une sous-étape qui n'a rien à traiter. `subject` nomme la sous-étape quand l'étape en compte plusieurs."""
+    logger.info("%s%s", LAST_BRANCH, f"{subject} : rien à faire" if subject else "Rien à faire")
 
 
 def inflect(n: int, singular: str, plural: str | None = None) -> str:

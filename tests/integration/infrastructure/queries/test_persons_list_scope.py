@@ -1,6 +1,6 @@
 """Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
 
-Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contribution source de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
+Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contribution de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
 """
 
 from sqlalchemy import text
@@ -58,8 +58,8 @@ class TestListLabScope:
         ids = {p.id for p in res.persons}
         assert {p_in, p_out} <= ids
 
-    def test_source_contribution_counts_scoped_to_lab(self, sa_sync_conn):
-        """Sous scope labo, les dénombrements ne comptent que les contributions sources du labo."""
+    def test_contribution_counts_scoped_to_lab(self, sa_sync_conn):
+        """Sous scope labo, les dénombrements comptent seulement les contributions du labo."""
         lab = insert_structure(sa_sync_conn, "LAB-CNT")
         person = insert_person(sa_sync_conn, "Counted")
         _contribution_in_lab(sa_sync_conn, person, lab_id=lab)
@@ -72,11 +72,11 @@ class TestListLabScope:
         unscoped = q.list_persons(
             filters=PersonFilters(search="counted"), page=1, per_page=50, sort="name_asc"
         )
-        assert next(p for p in scoped.persons if p.id == person).source_contribution_count == 1
-        assert next(p for p in unscoped.persons if p.id == person).source_contribution_count == 2
+        assert next(p for p in scoped.persons if p.id == person).contribution_count == 1
+        assert next(p for p in unscoped.persons if p.id == person).contribution_count == 2
 
-    def test_source_contribution_counts_author_role_only(self, sa_sync_conn):
-        """Les dénombrements comptent seulement les contributions sources en tant qu'auteur, dans la liste comme dans la fiche d'édition."""
+    def test_contribution_counts_author_role_only(self, sa_sync_conn):
+        """Les dénombrements comptent seulement les contributions en tant qu'auteur, dans la liste comme dans la fiche d'édition."""
         person = insert_person(sa_sync_conn, "Juror")
         _contribution_in_lab(sa_sync_conn, person, in_perimeter=True)
         _contribution_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)
@@ -92,8 +92,8 @@ class TestListLabScope:
         curated = q.person_curation(person)
         assert curated is not None
         for p in (listed, curated):
-            assert p.source_contribution_count == 1
-            assert p.in_perimeter_source_contribution_count == 1
+            assert p.contribution_count == 1
+            assert p.in_perimeter_contribution_count == 1
 
     def test_facets_restricted_to_lab(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-FAC")

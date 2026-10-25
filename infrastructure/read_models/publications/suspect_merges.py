@@ -15,9 +15,9 @@ _SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"
 _SOURCE_RECORDS_SQL = text(f"""
     WITH members AS (
         SELECT g.publication_id, gs.source_record_id,
-               count(*) OVER (PARTITION BY gs.group_id) AS group_size
-        FROM source_contribution_groups g
-        JOIN source_contribution_group_members gs ON gs.group_id = g.id
+               count(*) OVER (PARTITION BY gs.contribution_id) AS group_size
+        FROM contributions g
+        JOIN aligned_source_contributions gs ON gs.contribution_id = g.id
         JOIN source_contributions sc ON sc.id = gs.source_contribution_id
         WHERE g.publication_id = ANY(:publications)
           AND (sc.roles IS NULL OR '{ContributionRole.AUTHOR.value}' = ANY(sc.roles))

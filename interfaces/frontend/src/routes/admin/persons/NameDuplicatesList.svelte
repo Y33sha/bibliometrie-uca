@@ -37,7 +37,7 @@
     ["coauthors", "co-auteurs"],
     ["shared_publications", "publis communes"],
     ["labs", "labos"],
-    ["journals", "revues"],
+    ["serials", "publications en série"],
   ];
 
   async function merge(targetId: number, sourceId: number) {
@@ -142,7 +142,7 @@
       {titleCase(p.first_name)}
     </button>
     {#if p.has_rh}<span class="rh-check" title="Base RH">&#x2713;</span>{/if}
-    <div class="meta">{p.source_contribution_count} publication{p.source_contribution_count !== 1 ? "s" : ""}</div>
+    <div class="meta">{p.contribution_count} publication{p.contribution_count !== 1 ? "s" : ""}</div>
     {#if p.labs.length}
       <div class="labs">
         {#each p.labs as lab (lab)}<span class="lab-badge">{lab}</span>{/each}

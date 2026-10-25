@@ -16,6 +16,7 @@ from infrastructure.read_models.persons.admin import (
 )
 from infrastructure.read_models.persons.list import person_name_forms
 from tests.integration.helpers.contributions import insert_contribution
+from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -23,6 +24,7 @@ from tests.integration.helpers.persons import (
 )
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 
 # Forme de nom de source HAL.
 _hal_name_form = partial(insert_person_name_form, sources=["hal"])
@@ -31,13 +33,24 @@ _hal_name_form = partial(insert_person_name_form, sources=["hal"])
 _author = partial(insert_contribution, roles=["author"])
 
 
+def _person_source_contribution(conn, source_record, *, person_id, **source_contribution):
+    """Contribution source décrite par `source_contribution`, seul membre d'un groupe rattaché à la personne `person_id`. Rend l'`id` de la contribution source."""
+    source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
+    publication = conn.execute(
+        text("SELECT publication_id FROM source_records WHERE id = :s"), {"s": source_record}
+    ).scalar_one()
+    group = insert_group(conn, publication, [(source_contribution_id, source_record)])
+    set_perimeter_author_group(conn, group, person_id=person_id, mode="name")
+    return source_contribution_id
+
+
 class TestNameFormContributions:
     def test_returns_contributions_and_other_persons(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn, "Dupond")
         other = insert_person(sa_sync_conn, "Martin")
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(sa_sync_conn, publication)
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn,
             source_record,
             person_id=pid,
@@ -86,6 +99,34 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
     assert [p.person_id for p in panneau] == [porteur]
 
 
+def test_une_forme_compte_les_publications_des_groupes_de_la_personne(sa_sync_conn):
+    """Seuls comptent les membres des groupes de la personne : une contribution source rattachée à la personne hors de ses groupes ne compte pas."""
+    pid = insert_person(sa_sync_conn, "Dupond")
+    _hal_name_form(sa_sync_conn, pid, name_form="dupond j")
+    for rank in range(2):
+        _person_source_contribution(
+            sa_sync_conn,
+            insert_source_record(
+                sa_sync_conn, insert_publication(sa_sync_conn), source_id=f"h-forme-{rank}"
+            ),
+            person_id=pid,
+            author_name_normalized="dupond j",
+        )
+    insert_source_contribution(
+        sa_sync_conn,
+        insert_source_record(
+            sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-forme-hors-groupe"
+        ),
+        author_name_normalized="dupond j",
+    )
+
+    (forme,) = [f for f in person_name_forms(sa_sync_conn, pid) if f.name_form == "dupond j"]
+    contributions = name_form_contributions(sa_sync_conn, pid, "dupond j").contributions
+
+    assert forme.publication_count == 2
+    assert len(contributions) == 2
+
+
 # Tests pour `hal_duplicate_accounts` déplacés vers
 # `tests/integration/infrastructure/queries/test_hal_problems.py` —
 # la query est maintenant exposée par PgHalProblemsQueries.
@@ -99,19 +140,17 @@ def _attribute(conn, person_id, id_type, id_value, status):
 
 
 class TestIdentifierConflicts:
-    """La détection projette `(person_id, id_type, id_value)` à la volée depuis
-    `source_contributions` ⋈ `contributor_information` : rien à rafraîchir, la lecture voit
-    directement le seed de la transaction rollbackée du fixture."""
+    """La détection projette `(person_id, id_type, id_value)` à la volée depuis les membres des groupes des personnes ⋈ `contributor_information` : rien à rafraîchir, la lecture voit directement le seed de la transaction rollbackée du fixture."""
 
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
         p2 = insert_person(sa_sync_conn, "Smith", first_name="J")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0001-2345-6789", "pending")
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn, source_record, identifiers={"orcid": "0000-0001-2345-6789"}, person_id=p1
         )
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn,
             source_record,
             author_position=1,
@@ -135,7 +174,7 @@ class TestIdentifierConflicts:
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0009-9999-9999", "pending")
         for position, person in ((0, p1), (1, p2)):
-            insert_source_contribution(
+            _person_source_contribution(
                 sa_sync_conn,
                 source_record,
                 author_position=position,
@@ -153,10 +192,10 @@ class TestIdentifierConflicts:
         p2 = insert_person(sa_sync_conn, "Pinard", first_name="Celeste")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0003-2202-7362", status)
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn, source_record, identifiers={"orcid": "0000-0003-2202-7362"}, person_id=p1
         )
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn,
             source_record,
             author_position=1,
@@ -170,10 +209,10 @@ class TestIdentifierConflicts:
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn, source_record, identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
         )
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn,
             source_record,
             author_position=1,
@@ -188,10 +227,10 @@ class TestIdentifierConflicts:
         p2 = insert_person(sa_sync_conn, "Lee", first_name="A", exclusion="out_of_perimeter")
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         _attribute(sa_sync_conn, p1, "orcid", "0000-0002-1111-2222", "pending")
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn, source_record, identifiers={"orcid": "0000-0002-1111-2222"}, person_id=p1
         )
-        insert_source_contribution(
+        _person_source_contribution(
             sa_sync_conn,
             source_record,
             author_position=1,
@@ -222,6 +261,21 @@ class TestNameDuplicates:
         pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
         assert pair.overlaps.coauthors == 1
 
+    def test_shared_lab_counts_and_lists_the_lab(self, sa_sync_conn):
+        """Un laboratoire atteint par les membres des groupes des deux personnes compte comme recouvrement et figure dans leur fiche allégée."""
+        lab = insert_structure(sa_sync_conn, "LAB-DUP", acronym="LABDUP")
+        a = insert_person(sa_sync_conn, "Lacombe", first_name="R")
+        b = insert_person(sa_sync_conn, "Lacombe", first_name="Rémi")
+        for person in (a, b):
+            contribution = _author(sa_sync_conn, insert_publication(sa_sync_conn), person_id=person)
+            add_contribution_structure(sa_sync_conn, contribution, lab)
+
+        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        assert pair.overlaps.labs == 1
+        for curated in (pair.person_a, pair.person_b):
+            assert curated.labs == ["LABDUP"]
+            assert curated.contribution_count == 1
+
     def test_disjoint_pair_has_no_overlap(self, sa_sync_conn):
         a = insert_person(sa_sync_conn, "Bernard", first_name="M")
         b = insert_person(sa_sync_conn, "Bernard", first_name="Marie")
@@ -231,7 +285,7 @@ class TestNameDuplicates:
             pair.overlaps.coauthors,
             pair.overlaps.shared_publications,
             pair.overlaps.labs,
-            pair.overlaps.journals,
+            pair.overlaps.serials,
         ) == (0, 0, 0, 0)
 
     def test_compound_first_name_pairs_with_its_first_word(self, sa_sync_conn):

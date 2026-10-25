@@ -21,7 +21,7 @@ class MergedEntity(StrEnum):
     """Entité fusionnable dont l'identifiant absorbé redirige vers l'identifiant conservé."""
 
     PERSON = "person"
-    JOURNAL = "journal"
+    SERIAL = "serial"
     PUBLISHER = "publisher"
     MONOGRAPH = "monograph"
     PUBLICATION = "publication"

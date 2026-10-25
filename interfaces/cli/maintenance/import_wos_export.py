@@ -25,7 +25,7 @@ from pathlib import Path
 from domain.sources.staging import StagingEntryMode
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.wos.fields import extract_doi
 
 log = setup_logger("import_wos_export", os.path.dirname(__file__))
@@ -65,6 +65,7 @@ def main() -> None:
     inserted = changed = unchanged = duplicates = 0
     engine = get_sync_engine()
     with engine.connect() as conn:
+        staging = StagingStore(conn)
         for path in files:
             for n, record in enumerate(read_export(path), start=1):
                 ut = record["UT"]
@@ -74,8 +75,7 @@ def main() -> None:
                 seen.add(ut)
                 if args.dry_run:
                     continue
-                was_inserted, was_changed = upsert_staging(
-                    conn,
+                was_inserted, was_changed = staging.upsert(
                     source="wos",
                     source_id=ut,
                     doi=extract_doi(record),

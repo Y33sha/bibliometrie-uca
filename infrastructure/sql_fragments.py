@@ -4,15 +4,14 @@ Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause
 """
 
 from application.ports.repositories.address_repository import AddressCountryFilter
-from domain.journals.journal import OaModel
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.publications.contribution_roles import ContributionRole
+from domain.serials.serial import OaModel
 from domain.source_records.corrections import CORRECTED_BY, RAW
 from domain.source_records.source_extras import CROSSREF_PREPRINT_OF, SourceExtra
-from domain.sources.person_search import SEARCHED_IDENTIFIER_STATUSES
-from domain.sources.registry import SOURCE_PRIORITY
+from domain.sources.registry import SEARCHED_IDENTIFIER_STATUSES
 from domain.structures.perimeter_evidence import PerimeterEvidence
 
 
@@ -28,11 +27,20 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
 
 
 def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à un groupe (`source_contribution_group_members`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors groupe."""
+    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à un groupe (`aligned_source_contributions`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors groupe."""
     return (
-        "EXISTS (SELECT 1 FROM source_contribution_group_members gm"
+        "EXISTS (SELECT 1 FROM aligned_source_contributions gm"
         f" WHERE gm.source_contribution_id = {source_contribution}.id)"
     )
+
+
+GROUP_MEMBERS = """
+    contributions g
+    JOIN aligned_source_contributions gm ON gm.contribution_id = g.id
+    JOIN source_contributions sc ON sc.id = gm.source_contribution_id
+    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+"""
+"""Clause `FROM` des groupes `g` et de leurs membres : contributions sources `sc`, avec leurs informations du contributeur `ci`."""
 
 
 def pinned(source_contribution_id: str) -> str:
@@ -48,21 +56,21 @@ def active_name_form(form: str) -> str:
     )
 
 
-DETACHED_SOURCE_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE source_contributions` qui détache une contribution source de sa personne."""
+DETACHED_GROUP = "person_id = NULL, resolution_mode = NULL"
+"""Affectations d'un `UPDATE contributions` qui retire sa personne à un groupe."""
 
 
-def diamond_journal_sql(journal: str = "j") -> str:
+def diamond_journal_sql(serial: str = "j") -> str:
     """Condition vraie quand la revue aliasée `journal` est diamant : marquée `diamond`, ou présente dans le DOAJ sans APC ni autres frais. NULL quand la revue est absente d'une jointure externe."""
     return (
-        f"({journal}.oa_model = '{OaModel.DIAMOND.value}' OR ({journal}.is_in_doaj"
-        f" AND {journal}.doaj_payload->>'APC' = 'No'"
-        f" AND {journal}.doaj_payload->>'Has other fees' = 'No'))"
+        f"({serial}.oa_model = '{OaModel.DIAMOND.value}' OR ({serial}.is_in_doaj"
+        f" AND {serial}.doaj_payload->>'APC' = 'No'"
+        f" AND {serial}.doaj_payload->>'Has other fees' = 'No'))"
     )
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
+    """Condition vraie quand la contribution source ou le groupe aliasé `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
@@ -253,135 +261,87 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
-# Restrictions de `insert_missing_contributions_sql` et `propagate_contribution_attributes_sql`, sur la contribution source `sc` et son enregistrement source `sr`.
-PERSON_PUBLICATIONS_SCOPE = (
-    "AND sc.person_id = :person_id AND sr.publication_id = ANY(:publication_ids)"
-)
-"""Paires (publication, personne) de la personne `:person_id` sur les publications `:publication_ids`."""
-
-SOURCE_CONTRIBUTIONS_SCOPE = """AND (sr.publication_id, sc.person_id) IN (
-    SELECT s_sr.publication_id, s.person_id
-    FROM source_contributions s JOIN source_records s_sr ON s_sr.id = s.source_record_id
-    WHERE s.id = ANY(:source_contribution_ids)
-)"""
-"""Paires (publication, personne) des contributions sources `:source_contribution_ids`."""
-
-
-def insert_missing_contributions_sql(*, scope: str = "") -> str:
-    """Insère une contribution par paire (publication, personne) que lient des contributions sources, et absente de la table.
-
-    Une paire rejetée est écartée, sauf si une contribution source confirmée la relie : la confirmation vise la contribution source elle-même, le rejet la publication. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
-    """
-    return f"""
-        WITH all_pairs AS (
-            SELECT sr.publication_id, sc.person_id,
-                   bool_or(ca.source_contribution_id IS NOT NULL) AS confirmed
-            FROM source_contributions sc
-            JOIN source_records sr ON sr.id = sc.source_record_id
-            JOIN publications pub ON pub.id = sr.publication_id
-            LEFT JOIN confirmed_source_contributions ca
-              ON ca.source_contribution_id = sc.id AND ca.person_id = sc.person_id
-            WHERE sc.person_id IS NOT NULL {scope}
-            GROUP BY sr.publication_id, sc.person_id
-        )
-        INSERT INTO contributions (publication_id, person_id)
-        SELECT ap.publication_id, ap.person_id
-        FROM all_pairs ap
-        WHERE NOT EXISTS (
-            SELECT 1 FROM contributions a
-            WHERE a.publication_id = ap.publication_id
-              AND a.person_id = ap.person_id
-        )
-          AND (ap.confirmed
-               OR NOT {publication_rejected_for("ap.publication_id", "ap.person_id")})
-    """
-
-
-def propagate_contribution_attributes_sql(*, scope: str = "") -> str:
-    """Recompose les attributs de chaque contribution depuis ses contributions sources.
-
-    La position vient de la source la plus prioritaire qui en donne une. L'auteur est correspondant si une contribution source le dit. Les indices de périmètre et les rôles sont l'union de ceux des contributions sources. `scope` restreint les paires (`PERSON_PUBLICATIONS_SCOPE`, `SOURCE_CONTRIBUTIONS_SCOPE`).
-    """
-    return f"""
-        WITH linked AS (
-            SELECT a.id AS aid, sc.source, sc.author_position, sc.is_corresponding,
-                   sc.perimeter_evidence, sc.roles
-            FROM source_contributions sc
-            JOIN source_records sr ON sr.id = sc.source_record_id
-            JOIN contributions a ON a.publication_id = sr.publication_id
-                              AND a.person_id = sc.person_id
-            WHERE TRUE {scope}
-        ),
-        scal AS (
-            SELECT l.aid,
-                   (array_agg(l.author_position ORDER BY
-                       {case_priority(SOURCE_PRIORITY, "l.source")})
-                       FILTER (WHERE l.author_position IS NOT NULL))[1] AS pos,
-                   bool_or(l.is_corresponding) AS is_corr
-            FROM linked l
-            GROUP BY l.aid
-        ),
-        ev AS (
-            SELECT l.aid, array_agg(DISTINCT e ORDER BY e) AS evidence
-            FROM linked l, LATERAL unnest(l.perimeter_evidence) AS e
-            GROUP BY l.aid
-        ),
-        rol AS (
-            SELECT l.aid, array_agg(DISTINCT r ORDER BY r) AS roles
-            FROM linked l, LATERAL unnest(l.roles) AS r
-            GROUP BY l.aid
-        )
-        UPDATE contributions a
-        SET author_position = scal.pos,
-            is_corresponding = scal.is_corr,
-            perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
-            roles            = rol.roles
-        FROM scal LEFT JOIN rol ON rol.aid = scal.aid LEFT JOIN ev ON ev.aid = scal.aid
-        WHERE a.id = scal.aid
-          AND (a.author_position, a.is_corresponding, a.perimeter_evidence, a.roles)
-              IS DISTINCT FROM (scal.pos, scal.is_corr,
-                                coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
-    """
-
-
 def propagate_group_attributes_sql(group_ids: str) -> str:
     """Recompose les attributs des groupes de contributions sources de la requête `group_ids` depuis leurs membres : correspondant si un membre le dit, union des rôles et des indices de périmètre. Seuls les groupes dont un attribut change sont écrits."""
     return f"""
         WITH members AS (
-            SELECT gm.group_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
-            FROM source_contribution_group_members gm
+            SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
+            FROM aligned_source_contributions gm
             JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-            WHERE gm.group_id IN ({group_ids})
+            WHERE gm.contribution_id IN ({group_ids})
         ),
         scal AS (
-            SELECT group_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY group_id
+            SELECT contribution_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY contribution_id
         ),
         ev AS (
-            SELECT m.group_id, array_agg(DISTINCT e ORDER BY e) AS evidence
+            SELECT m.contribution_id, array_agg(DISTINCT e ORDER BY e) AS evidence
             FROM members m, LATERAL unnest(m.perimeter_evidence) AS e
-            GROUP BY m.group_id
+            GROUP BY m.contribution_id
         ),
         rol AS (
-            SELECT m.group_id, array_agg(DISTINCT r ORDER BY r) AS roles
+            SELECT m.contribution_id, array_agg(DISTINCT r ORDER BY r) AS roles
             FROM members m, LATERAL unnest(m.roles) AS r
-            GROUP BY m.group_id
+            GROUP BY m.contribution_id
         )
-        UPDATE source_contribution_groups g
+        UPDATE contributions g
         SET is_corresponding = scal.is_corr,
             perimeter_evidence = coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}),
             roles = rol.roles
-        FROM scal LEFT JOIN rol ON rol.group_id = scal.group_id LEFT JOIN ev ON ev.group_id = scal.group_id
-        WHERE g.id = scal.group_id
+        FROM scal LEFT JOIN rol ON rol.contribution_id = scal.contribution_id LEFT JOIN ev ON ev.contribution_id = scal.contribution_id
+        WHERE g.id = scal.contribution_id
           AND (g.is_corresponding, g.perimeter_evidence, g.roles)
               IS DISTINCT FROM (scal.is_corr, coalesce(ev.evidence, {NO_PERIMETER_EVIDENCE}), rol.roles)
     """
 
 
-def active_issns(journal: str) -> str:
+def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
+    """Deux requêtes, à jouer dans l'ordre, qui rattachent à la personne épinglée les groupes de la requête `group_ids` dont un membre est épinglé.
+
+    Un groupe dont les membres sont épinglés à plusieurs personnes reste en l'état. Dans une publication, un groupe par personne au plus : un groupe épinglé cède devant un autre groupe manuel de la même personne, et prend sa personne à un autre groupe non manuel. La première requête libère ces autres groupes, la seconde rattache les groupes épinglés en mode `manual`.
+    """
+    target = f"""
+        WITH pinned AS (
+            SELECT gm.contribution_id, min(c.person_id) AS person_id
+            FROM confirmed_source_contributions c
+            JOIN aligned_source_contributions gm
+                ON gm.source_contribution_id = c.source_contribution_id
+            WHERE gm.contribution_id IN ({group_ids})
+            GROUP BY gm.contribution_id
+            HAVING count(DISTINCT c.person_id) = 1
+        ),
+        target AS (
+            SELECT DISTINCT ON (g.publication_id, p.person_id) g.id, g.publication_id, p.person_id
+            FROM pinned p
+            JOIN contributions g ON g.id = p.contribution_id
+            WHERE NOT EXISTS (
+                SELECT 1 FROM contributions o
+                WHERE o.publication_id = g.publication_id AND o.person_id = p.person_id
+                  AND o.id <> g.id AND o.resolution_mode = 'manual'
+            )
+            ORDER BY g.publication_id, p.person_id, g.id
+        )
+    """
+    release = f"""{target}
+        UPDATE contributions o
+        SET {DETACHED_GROUP}
+        FROM target t
+        WHERE o.publication_id = t.publication_id AND o.person_id = t.person_id AND o.id <> t.id
+    """
+    attach = f"""{target}
+        UPDATE contributions g
+        SET person_id = t.person_id, resolution_mode = 'manual'
+        FROM target t
+        WHERE g.id = t.id
+          AND (g.person_id, g.resolution_mode) IS DISTINCT FROM (t.person_id, 'manual'::resolution_mode)
+    """
+    return release, attach
+
+
+def active_issns(serial: str) -> str:
     """Tableau des ISSN actifs de la revue `journal` (expression SQL), dans l'ordre d'enregistrement ; tableau vide sans ISSN."""
     return f"""coalesce((
-        SELECT array_agg(i.issn ORDER BY i.id) FROM journal_issns i
-        WHERE i.journal_id = {journal} AND i.status = 'active'
+        SELECT array_agg(i.issn ORDER BY i.id) FROM serial_issns i
+        WHERE i.serial_id = {serial} AND i.status = 'active'
     ), ARRAY[]::text[])"""
 
 
@@ -404,6 +364,6 @@ def address_country_conditions(
     return conditions, params
 
 
-def has_active_issn(journal: str) -> str:
+def has_active_issn(serial: str) -> str:
     """Condition vraie quand la revue `journal` a un ISSN actif."""
-    return f"EXISTS (SELECT 1 FROM journal_issns i WHERE i.journal_id = {journal} AND i.status = 'active')"
+    return f"EXISTS (SELECT 1 FROM serial_issns i WHERE i.serial_id = {serial} AND i.status = 'active')"

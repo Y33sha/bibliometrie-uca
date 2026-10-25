@@ -4,6 +4,7 @@ from sqlalchemy import text
 
 from pipeline.transformation.publications.oa_status import OaSignal, OaStatusStore
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_doi_prefix
 from tests.integration.helpers.sources import insert_source_record
 
 STALENESS = 30  # seuil de péremption arbitraire pour ces tests
@@ -49,6 +50,18 @@ class TestDoisToCheck:
         ]
 
         assert dois == ["10.1/b", "10.1/a"]
+
+    def test_doi_datacite_ecartes(self, sa_sync_conn):
+        """Un préfixe DataCite écarte le DOI ; un préfixe d'une autre agence ou pas encore résolu le garde."""
+        insert_doi_prefix(sa_sync_conn, "10.9001", ra="DataCite")
+        insert_doi_prefix(sa_sync_conn, "10.9002", ra="mEDRA")
+        for doi in ("10.9001/x", "10.9002/y", "10.9003/z"):
+            insert_publication(sa_sync_conn, doi=doi)
+
+        dois = set(OaStatusStore(sa_sync_conn).fetch_dois_to_check(staleness_days=STALENESS))
+
+        assert {"10.9002/y", "10.9003/z"} <= dois
+        assert "10.9001/x" not in dois
 
     def test_respecte_le_plafond(self, sa_sync_conn):
         for i in range(3):

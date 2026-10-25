@@ -30,13 +30,13 @@
 
 	// Colonnes numériques triables, placées après les colonnes descriptives.
 	const countColumns = $derived([
-		{ label: 'Publications', sortKey: 'source_contributions', value: (p: PersonRow) => p.source_contribution_count },
+		{ label: 'Publications', sortKey: 'contributions', value: (p: PersonRow) => p.contribution_count },
 		...(perimeterCount
 			? [
 					{
 						label: institution.name,
-						sortKey: 'in_perimeter_source_contributions',
-						value: (p: PersonRow) => p.in_perimeter_source_contribution_count
+						sortKey: 'in_perimeter_contributions',
+						value: (p: PersonRow) => p.in_perimeter_contribution_count
 					}
 				]
 			: [])

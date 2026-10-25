@@ -12,7 +12,11 @@ import pytest
 
 from interfaces.cli.maintenance import enrich_publishers as module
 from interfaces.cli.maintenance.enrich_publishers import main
-from pipeline.http.circuit_breaker import SourceUnavailableError
+from pipeline.http.circuit_breaker import (
+    SourceUnavailableError,
+    get_current_breaker,
+    source_circuit_breaker,
+)
 from pipeline.ingestion.openalex import api
 
 
@@ -49,7 +53,6 @@ def test_enrichissement_lance_avec_ses_dependances(lancer):
     assert resultat.code == 0
     assert resultat.recus["limit"] == 0
     assert resultat.recus["dry_run"] is False
-    assert resultat.recus["breaker"] is not None
     assert resultat.fermetures == [True]
 
 
@@ -66,48 +69,41 @@ def test_quota_de_la_source_epuise(lancer, caplog):
         resultat = lancer(issue=SourceUnavailableError("openalex"))
 
     assert resultat.code == 0
-    assert "openalex indisponible" in caplog.text
+    assert "source openalex coupée" in caplog.text
     assert resultat.fermetures == [True]
 
 
 class TestArretSurCoupeCircuit:
-    @pytest.fixture(autouse=True)
-    def _no_sleep(self, monkeypatch):
-        monkeypatch.setattr(module.time, "sleep", lambda *_: None)
-
-    def _run(self, monkeypatch, fetch_batch, breaker, n_batches):
+    def _run(self, monkeypatch, fetch_batch, n_batches):
         conn = MagicMock()
         rows = [(i, f"P{i}") for i in range(n_batches * module.BATCH_SIZE)]
         monkeypatch.setattr(module, "find_countryless", lambda c, limit=None: rows)
-        module.run_enrich_publishers_from_openalex(
-            conn, MagicMock(), fetch_batch=fetch_batch, breaker=breaker
-        )
+        with source_circuit_breaker("openalex"):
+            module.run_enrich_publishers_from_openalex(conn, MagicMock(), fetch_batch=fetch_batch)
         return conn
 
     def test_s_arrete_quand_le_coupe_circuit_se_declenche(self, monkeypatch):
         """La boucle s'arrête au tour où le breaker est déclenché, sans parcourir tout le stock."""
-        breaker = SimpleNamespace(tripped=False)
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):
             calls["n"] += 1
-            if calls["n"] >= 3:
+            if calls["n"] >= 3 and (breaker := get_current_breaker()) is not None:
                 breaker.tripped = True  # le 3e lot épuise le budget
             return {}
 
-        conn = self._run(monkeypatch, fetch_batch, breaker, n_batches=20)
+        conn = self._run(monkeypatch, fetch_batch, n_batches=20)
         assert calls["n"] == 3
         conn.commit.assert_called()  # le déjà-fait est committé avant de couper
 
     def test_parcourt_tous_les_lots_quand_la_source_tient(self, monkeypatch):
-        breaker = SimpleNamespace(tripped=False)
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):
             calls["n"] += 1
             return {}
 
-        self._run(monkeypatch, fetch_batch, breaker, n_batches=4)
+        self._run(monkeypatch, fetch_batch, n_batches=4)
         assert calls["n"] == 4
 
 
@@ -146,7 +142,7 @@ class TestFetchPublishersBatch:
         """L'échec est déjà compté au circuit-breaker par le helper HTTP : le lot rendu est vide."""
 
         def boom(*_a, **_k):
-            raise RuntimeError("network down")
+            raise SourceUnavailableError("openalex")
 
         monkeypatch.setattr(module, "http_request_with_retry", boom)
         assert module.fetch_publishers_batch(["P1"], openalex_publishers_api="x") == {}

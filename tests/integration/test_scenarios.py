@@ -13,13 +13,13 @@ from infrastructure.db.tables import metadata
 from infrastructure.repositories import person_repository
 from pipeline.transformation.publications.consolidation import refresh_from_sources
 from pipeline.transformation.publications.store import PublicationStore
-from tests.integration.helpers.journals import insert_journal
 from tests.integration.helpers.persons import (
     insert_hr_record,
     insert_person,
     insert_person_name_form,
 )
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.serials import insert_serial
 from tests.integration.helpers.sources import insert_source_record
 
 # Fiche RH du département « Test » par défaut.
@@ -92,7 +92,7 @@ def _seed_publication(
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
         """refresh_from_sources enrichit les métadonnées depuis les source_records."""
-        journal_id = insert_journal(sa_sync_conn, "Science")
+        serial_id = insert_serial(sa_sync_conn, "Science")
         publication_id = _seed_publication(publication_repo, "Pub", doi="10.5555/enrich-test")
         insert_source_record(
             sa_sync_conn,
@@ -101,15 +101,15 @@ class TestRefreshFromSources:
             source_id="W999enrich",
             title="Pub",
             publication_year=2024,
-            journal_id=journal_id,
+            serial_id=serial_id,
             oa_status="gold",
         )
         refresh_from_sources(sa_sync_conn, publication_id)
         row = sa_sync_conn.execute(
-            text("SELECT oa_status, journal_id FROM publications WHERE id = :id"),
+            text("SELECT oa_status, serial_id FROM publications WHERE id = :id"),
             {"id": publication_id},
         ).one()
-        assert row.journal_id == journal_id
+        assert row.serial_id == serial_id
         assert row.oa_status == "gold"
 
 
@@ -188,9 +188,7 @@ class TestMergePersons:
             is None
         )
 
-    def test_merge_transfers_source_contribution_groups_one_per_publication(
-        self, sa_sync_conn, person_repo
-    ):
+    def test_merge_transfers_contributions_one_per_publication(self, sa_sync_conn, person_repo):
         """Régression : les groupes de contributions sources référencent la personne. Dans une publication où la conservée a déjà un groupe, le groupe de l'absorbée perd sa personne et garde ses contributions sources."""
         conn = sa_sync_conn
         target = _person(conn, "Dupont", first_name="Jean")
@@ -204,7 +202,7 @@ class TestMergePersons:
         ):
             groups[key] = conn.execute(
                 text(
-                    "INSERT INTO source_contribution_groups (publication_id, person_id, resolution_mode)"
+                    "INSERT INTO contributions (publication_id, person_id, resolution_mode)"
                     " VALUES (:p, :person, 'name') RETURNING id"
                 ),
                 {"p": publication, "person": person},
@@ -212,9 +210,7 @@ class TestMergePersons:
 
         merge_person(target, source, repo=person_repo)
 
-        persons = dict(
-            conn.execute(text("SELECT id, person_id FROM source_contribution_groups")).all()
-        )
+        persons = dict(conn.execute(text("SELECT id, person_id FROM contributions")).all())
         assert persons[groups["target"]] == target
         assert persons[groups["source_shared"]] is None
         assert persons[groups["source_alone"]] == target

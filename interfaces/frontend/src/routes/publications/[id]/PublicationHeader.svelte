@@ -40,11 +40,11 @@
       <!-- Le livre ou le volume d'actes, puis sa collection ; sans monographie, la revue ou le titre brut du conteneur. -->
       {#if pub.monograph_id}
         <a href="{base}/monographs/{pub.monograph_id}" class="journal-name"><PublicationTitle titre={pub.monograph_title} /></a>
-        {#if pub.journal_id}
-          <a href="{base}/journals/{pub.journal_id}" class="collection-name">{pub.journal_title}</a>
+        {#if pub.serial_id}
+          <a href="{base}/journals/{pub.serial_id}" class="collection-name">{pub.journal_title}</a>
         {/if}
-      {:else if pub.journal_id}
-        <a href="{base}/journals/{pub.journal_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
+      {:else if pub.serial_id}
+        <a href="{base}/journals/{pub.serial_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
       {:else}
         <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
       {/if}

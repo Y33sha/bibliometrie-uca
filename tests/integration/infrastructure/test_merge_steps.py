@@ -10,13 +10,13 @@ from domain.merge import MergedEntity
 from infrastructure.repositories import publisher_merge
 from infrastructure.repositories.merge_steps import record_redirect
 from infrastructure.repositories.person_repository import _merge as person_merge
-from pipeline.transformation.publishing.journals import journal_merge
 from pipeline.transformation.publishing.monographs import monograph_merge
+from pipeline.transformation.publishing.serials import serial_merge
 from tests.integration.helpers.redirects import redirect_of
 
 _ENTITIES = [
     pytest.param("persons", person_merge.MERGE_STEPS, id="persons"),
-    pytest.param("journals", journal_merge.MERGE_STEPS, id="journals"),
+    pytest.param("serials", serial_merge.MERGE_STEPS, id="serials"),
     pytest.param("publishers", publisher_merge.MERGE_STEPS, id="publishers"),
     pytest.param("monographs", monograph_merge.MERGE_STEPS, id="monographs"),
 ]
@@ -52,10 +52,10 @@ def test_steps_cover_schema(sa_sync_conn, table, steps):
 def test_chained_redirect_leads_to_last_kept(sa_sync_conn):
     """A absorbé par B, puis B par C : A et B mènent à C. Le même identifiant d'une autre entité garde sa redirection."""
     a, b, c = 900001, 900002, 900003
-    record_redirect(sa_sync_conn, MergedEntity.JOURNAL, b, a)
+    record_redirect(sa_sync_conn, MergedEntity.SERIAL, b, a)
     record_redirect(sa_sync_conn, MergedEntity.PUBLISHER, b, a)
-    record_redirect(sa_sync_conn, MergedEntity.JOURNAL, c, b)
+    record_redirect(sa_sync_conn, MergedEntity.SERIAL, c, b)
 
-    assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, a) == c
-    assert redirect_of(sa_sync_conn, MergedEntity.JOURNAL, b) == c
+    assert redirect_of(sa_sync_conn, MergedEntity.SERIAL, a) == c
+    assert redirect_of(sa_sync_conn, MergedEntity.SERIAL, b) == c
     assert redirect_of(sa_sync_conn, MergedEntity.PUBLISHER, a) == b

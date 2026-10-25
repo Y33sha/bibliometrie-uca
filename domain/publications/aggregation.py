@@ -3,7 +3,7 @@
 Encapsule les règles d'agrégation : à partir des `source_records` attachées à une publication canonique (lues via `SourceRecord`), calcule l'état canonique de l'aggregate `Publication` et le mute en place. C'est l'inverse logique de la lecture multi-sources → `Publication` (vue canonique).
 
 Règles d'agrégation par type de champ :
-- **Scalaires nullable** (`title`, `doi`, `doc_type`, `publication_year`, `journal_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `journal_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
+- **Scalaires nullable** (`title`, `doi`, `doc_type`, `publication_year`, `serial_id`, `monograph_id`, `container_title`, `language`, `abstract`) : premier non-null dans l'ordre de `source_priority`. Sans `serial_id` d'aucune source, la publication prend celui de sa monographie, sa collection.
 - **`oa_status`** : le statut le plus ouvert des sources, ou le verdict d'Unpaywall sur le DOI de la publication (`publication_oa_status` dans `metadata`).
 - **`license`** : licence de la version éditeur, première non nulle dans l'ordre de `publisher_license_sources` (Crossref, OpenAlex, scanR, DataCite ; DataCite en tête pour un jeu de données ou un logiciel). **`deposit_license`** : licence du fichier déposé dans HAL.
 - **`is_retracted`** : OR logique (True si au moins une source le déclare).
@@ -11,6 +11,7 @@ Règles d'agrégation par type de champ :
 - **JSONB `biblio`, `source_extras`** : fusion shallow par clé ; en cas de conflit, la source la plus prioritaire l'emporte.
 - **JSONB `topics`** : composite par source — chaque source garde sa forme native sous sa propre clé (`{"openalex": [...], "scanr": ..., "theses": {...}}`).
 - **`doc_type`** : premier non-null, un sous-type d'article d'une source moins prioritaire l'emportant sur `article` (cf. `arbitrate_doc_type_with_article_subtype`), puis arbitrage entre communication et texte d'actes (`arbitrate_conference`).
+- **`publisher_id`** : posé par `assign_publisher`, une fois le type de document corrigé (`domain.publishers.attribution`).
 
 Priorité d'ordre : les enregistrements canoniques passent avant les formes secondaires convergées (`secondary_ids` — pièce, version ou variante dont le DOI a été substitué par celui de l'œuvre canonique), afin que les scalaires descriptifs (titre en tête) viennent de l'enregistrement qui porte nativement le DOI, pas d'une pièce. La priorité de source départage à l'intérieur de chaque groupe.
 
@@ -21,12 +22,14 @@ from collections.abc import Mapping
 from typing import cast
 
 from domain.normalize import normalize_text
+from domain.platforms.registry import is_publisher_platform_prefix
 from domain.publications.conference import arbitrate_conference
 from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
 from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_license_sources
 from domain.publications.metadata import publication_oa_status
 from domain.publications.publication import Publication
+from domain.publishers.attribution import publication_publisher
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
@@ -38,7 +41,7 @@ def refresh_from_sources(
     *,
     source_priority: tuple[str, ...],
     secondary_ids: frozenset[int] = frozenset(),
-    monograph_journals: Mapping[int, int | None] | None = None,
+    monograph_serials: Mapping[int, int | None] | None = None,
     unpaywall: Mapping[str, str] | None = None,
 ) -> None:
     """Recalcule l'état de `publication` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `publication` en place ; persistance via `repo.save(publication)` côté caller.
@@ -47,7 +50,7 @@ def refresh_from_sources(
 
     `secondary_ids` liste les `source_records` qui décrivent une **forme secondaire** de l'œuvre : une pièce, une version ou une variante dont la correction de convergence a remplacé le DOI par celui de l'œuvre. Elles passent en fin de priorité : les scalaires descriptifs (titre en tête) viennent de l'enregistrement dont c'est le DOI d'origine. Les listes restent unionnées toutes sources confondues : une pièce peut contenir un mot-clé légitime.
 
-    `monograph_journals` donne l'entrée de `journals` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `journal_id` prend celle de sa monographie.
+    `monograph_serials` donne l'entrée de `serials` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `serial_id` prend celle de sa monographie.
 
     `unpaywall` donne le verdict d'Unpaywall des DOI des sources que connaît Unpaywall.
 
@@ -58,8 +61,7 @@ def refresh_from_sources(
             "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
         )
 
-    rank = {s: i for i, s in enumerate(source_priority)}
-    sorted_sources = sorted(sources, key=lambda s: (s.id in secondary_ids, rank.get(s.source, 99)))
+    sorted_sources = prioritized(sources, source_priority, secondary_ids)
 
     new_title = as_str(first_non_null(sorted_sources, "title"))
     publication.title = new_title if new_title is not None else publication.title
@@ -74,14 +76,10 @@ def refresh_from_sources(
     new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
     publication.doi = DOI(new_doi_str) if new_doi_str else None
 
-    publication.journal_id = as_int(first_non_null(sorted_sources, "journal_id"))
+    publication.serial_id = as_int(first_non_null(sorted_sources, "serial_id"))
     publication.monograph_id = as_int(first_non_null(sorted_sources, "monograph_id"))
-    if (
-        publication.journal_id is None
-        and publication.monograph_id is not None
-        and monograph_journals
-    ):
-        publication.journal_id = monograph_journals.get(publication.monograph_id)
+    if publication.serial_id is None and publication.monograph_id is not None and monograph_serials:
+        publication.serial_id = monograph_serials.get(publication.monograph_id)
     publication.oa_status = publication_oa_status(
         sorted_sources,
         unpaywall.get(publication.doi.value) if publication.doi and unpaywall else None,
@@ -101,7 +99,36 @@ def refresh_from_sources(
     publication.is_retracted = any(s.is_retracted for s in sorted_sources if s.is_retracted)
 
 
+def assign_publisher(
+    publication: Publication,
+    sources: list[SourceRecord],
+    *,
+    source_priority: tuple[str, ...],
+    secondary_ids: frozenset[int] = frozenset(),
+    prefix_publishers: Mapping[str, int] | None = None,
+) -> None:
+    """Pose l'éditeur de `publication` d'après son type de document, son DOI et ses `sources`.
+
+    `prefix_publishers` donne le titulaire de chaque préfixe DOI Crossref. Un préfixe de plateforme d'éditeurs se lit dans la liste des plateformes connues (`domain.platforms.registry`).
+    """
+    prefix = publication.doi.prefix.value if publication.doi else None
+    publication.publisher_id = publication_publisher(
+        publication.doc_type,
+        (prefix_publishers or {}).get(prefix) if prefix else None,
+        (s.publisher_id for s in prioritized(sources, source_priority, secondary_ids)),
+        platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
+    )
+
+
 # ── Helpers publics ────────────────────────────────────────────────
+
+
+def prioritized(
+    sources: list[SourceRecord], source_priority: tuple[str, ...], secondary_ids: frozenset[int]
+) -> list[SourceRecord]:
+    """`sources` dans l'ordre de l'agrégation : formes canoniques avant formes secondaires, puis ordre de `source_priority`."""
+    rank = {s: i for i, s in enumerate(source_priority)}
+    return sorted(sources, key=lambda s: (s.id in secondary_ids, rank.get(s.source, 99)))
 
 
 def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:

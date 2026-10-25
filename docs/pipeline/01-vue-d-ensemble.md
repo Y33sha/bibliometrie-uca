@@ -21,7 +21,7 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Normalisation
 
-- [Normalisation](03-normalize.md) : transforme les données brutes (*staging*) en tables structurées (`source_records`, `source_contributions`). Extrait les signatures institutionnelles et les centralise dans la table `addresses`. Peuple les tables `publishers` et `journals`.
+- [Normalisation](03-normalize.md) : transforme les données brutes (*staging*) en tables structurées (`source_records`, `source_contributions`). Extrait les signatures institutionnelles et les centralise dans la table `addresses`. Peuple les tables `publishers` et `serials`.
 
 ## Résolution des structures
 
@@ -29,22 +29,23 @@ Ce fichier présente la logique du pipeline de traitement. Pour les modalités d
 
 ## Résolution des publications
 
-- [Identification des agences d'enregistrement des DOI](05-publishers-journals.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
-- [Publishers & journals](05-publishers-journals.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), catégories de revues (sources: OpenAlex Sources, DOAJ).
+- [Identification des agences d'enregistrement des DOI](05-publishing.md#agences-denregistrement-doi-resolve_ra) : résout l'agence d'enregistrement ([Crossref](../glossaire.md#crossref) ou [DataCite](../glossaire.md#datacite)) des préfixes [DOI](../glossaire.md#doi).
+- [Référentiels de l'édition](05-publishing.md) : enrichit les référentiels de revues et d'éditeurs à partir de sources externes — préfixes DOI (sources: Crossref + DataCite), catégories de revues (sources: OpenAlex Sources, DOAJ).
 - [Corrections de métadonnées](06-metadata-correction.md) : prépare les `source_records` avant leur rattachement, en posant sur leurs colonnes les valeurs corrigées sur lesquelles s'appuiera la résolution. Les métadonnées brutes sont conservées, avec l'identifiant de la règle qui les a corrigées.
 - [Publications](07-publications.md) : peuple et maintient le référentiel `publications` à partir des `source_records`. Regroupe celles qui désignent le même document, crée une publication pour chaque document du périmètre, et fusionne ou scinde les publications existantes selon ce regroupement.
 
 ## Résolution des personnes
 
-- [Personnes](08-persons.md) : rattache chaque contribution source à une personne, et peuple la table `persons` avec ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef).
+- [Alignement des auteurs](08-author-grouping.md) : réunit en une contribution les contributions sources d'un même auteur dans une publication.
+- [Personnes](09-persons.md) : rattache chaque contribution à une personne, et peuple la table `persons` avec ses tables satellites `person_name_forms` et `person_identifiers` (ORCID, idHAL, IdRef).
 
-## Consolidation des relations publications-personnes-structures
+## Données dérivées des contributions
 
-- [Contributions](09-contributions.md) : peuple la table `contributions` (table de liaison entre les référentiels `publications` et `persons`) à partir des contributions sources.
+- [Finalisation](10-finalize.md) : met à jour, après la résolution des personnes, le périmètre des publications, les vues des structures, la purge des publications et des référentiels vides, et les compteurs de publications.
 
 ## Enrichissements
 
-- [Relations entre publications](10-enrichissements.md#relations-entre-publications-relations) : peuple `publication_relations`, qui relie des publications apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…).
-- [Sujets](10-enrichissements.md#sujets-subjects) : ingestion des sujets des `source_records` vers les référentiels `subjects` et `publication_subjects`, puis recalcul de `subjects.usage_count` et de la table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
-- [Pays](10-enrichissements.md#pays-des-adresses-countries) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
-- [Statut open access](10-enrichissements.md#statut-open-access-oa_status) : interroge Unpaywall pour obtenir le statut OA à jour des publications.
+- [Relations entre publications](11-enrichissements.md#relations-entre-publications-relations) : peuple `publication_relations`, qui relie des publications apparentées (preprint ↔ version publiée, supplément ↔ article, chapitre ↔ ouvrage, erratum ↔ article corrigé…).
+- [Sujets](11-enrichissements.md#sujets-subjects) : ingestion des sujets des `source_records` vers les référentiels `subjects` et `publication_subjects`, puis recalcul de `subjects.usage_count` et de la table `subject_cooccurrences` (paires de sujets co-présents sur une même publication).
+- [Pays](11-enrichissements.md#pays-des-adresses-countries) : détection automatisée des pays des adresses. Sert à interroger les collaborations internationales.
+- [Statut open access](11-enrichissements.md#statut-open-access-oa_status) : interroge Unpaywall pour obtenir le statut OA à jour des publications.

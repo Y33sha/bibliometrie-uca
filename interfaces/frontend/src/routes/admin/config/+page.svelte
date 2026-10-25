@@ -33,7 +33,8 @@
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);
   let editingKey: string | null = $state(null);
-  let editValue = $state("");
+  // Un champ numérique lié par `bind:value` rend un nombre, ou `null` vide.
+  let editValue: string | number | null = $state("");
   let saving = $state(false);
 
   // Perimeter CRUD
@@ -220,14 +221,15 @@
   async function save(key: string) {
     saving = true;
     try {
+      const text = String(editValue ?? "");
       let parsed;
-      if (CAP_KEYS.has(key) && editValue.trim() === "") {
+      if (CAP_KEYS.has(key) && text.trim() === "") {
         parsed = 0;
       } else {
         try {
-          parsed = JSON.parse(editValue);
+          parsed = JSON.parse(text);
         } catch {
-          parsed = editValue;
+          parsed = text;
         }
       }
       await configApi.setValue(key, parsed);

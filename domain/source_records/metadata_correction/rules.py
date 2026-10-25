@@ -14,10 +14,10 @@ from dataclasses import dataclass, fields
 from enum import StrEnum
 from typing import NamedTuple, TypedDict
 
-from domain.journals.journal import JournalType, OaModel
 from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
 from domain.publishers.publisher import PublisherType
+from domain.serials.serial import OaModel, SerialType
 from domain.source_records.external_ids import ExternalIdType
 from domain.types import JsonValue
 
@@ -34,8 +34,8 @@ class MetadataForCorrection:
     title: str
     doc_type: str | None
     doi: str | None
-    journal_id: int | None
-    journal_type: str | None = None
+    serial_id: int | None
+    serial_type: str | None = None
     oa_status: str | None = None
     oa_model: str | None = None
     urls: list[str] | None = None
@@ -64,16 +64,16 @@ class MetadataForCorrection:
         title: str,
         doc_type: str | None,
         doi: str | None,
-        journal_id: int | None,
-        journal_type: str | None,
+        serial_id: int | None,
+        serial_type: str | None,
     ) -> "MetadataForCorrection":
         """Faits d'une publication : les champs que l'agrégation arbitre, et le type de sa revue."""
         return cls(
             title=title,
             doc_type=doc_type,
             doi=doi,
-            journal_id=journal_id,
-            journal_type=journal_type,
+            serial_id=serial_id,
+            serial_type=serial_type,
         )
 
 
@@ -85,9 +85,9 @@ class MetadataCorrectionRule(StrEnum):
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
     DUMAS_URL_TO_MEMOIR = "DUMAS_URL_TO_MEMOIR"
-    THESIS_WITH_JOURNAL_TO_ARTICLE = "THESIS_WITH_JOURNAL_TO_ARTICLE"
-    JOURNAL_TYPE_MEDIA_TO_MEDIA = "JOURNAL_TYPE_MEDIA_TO_MEDIA"
-    JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
+    THESIS_WITH_SERIAL_TO_ARTICLE = "THESIS_WITH_SERIAL_TO_ARTICLE"
+    SERIAL_TYPE_MEDIA_TO_MEDIA = "SERIAL_TYPE_MEDIA_TO_MEDIA"
+    SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER = "SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER"
     CONFERENCE_DECLARED_TO_CONFERENCE_PAPER = "CONFERENCE_DECLARED_TO_CONFERENCE_PAPER"
     PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER = "PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER"
     PRESENTATION_ORAL_TO_CONFERENCE = "PRESENTATION_ORAL_TO_CONFERENCE"
@@ -97,7 +97,7 @@ class MetadataCorrectionRule(StrEnum):
         "CROSSREF_AUTHORLESS_VOLUME_TITLE_TO_PROCEEDINGS"
     )
     CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS = "CROSSREF_VOLUME_TITLE_PREFIX_TO_PROCEEDINGS"
-    JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
+    SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT = "SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT"
     PREPRINT_RELATION_TO_PREPRINT = "PREPRINT_RELATION_TO_PREPRINT"
     TITLE_MEDIA_PREFIX_TO_MEDIA = "TITLE_MEDIA_PREFIX_TO_MEDIA"
     TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET = "TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET"
@@ -218,19 +218,19 @@ class _AppliesTo(TypedDict, total=False):
     - `doi_contains` : sous-chaîne du DOI.
     - `title_prefix_normalized` : préfixes de `normalize_text(title)`.
     - `title_regex` : motif cherché dans le titre.
-    - `journal_id_present` : présence d'un `journal_id`.
+    - `serial_id_present` : présence d'un `serial_id`.
     - `doi_prefix_not_in` : le DOI existe et son préfixe est hors du tuple.
     - `author_count_max` : `author_count` connu et au plus égal à la valeur.
     """
 
     doc_type: str | frozenset[str]
-    journal_type: str
+    serial_type: str
     oa_model: str
     url_contains: str
     doi_contains: str
     title_prefix_normalized: tuple[str, ...]
     title_regex: re.Pattern[str]
-    journal_id_present: bool
+    serial_id_present: bool
     doi_prefix_not_in: tuple[str, ...]
     oa_status: str
     embargo_expired: bool
@@ -261,39 +261,39 @@ _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 
 
 # ── Table des règles ────────────────────────────────────────────────────
-# Ordre = priorité de la cascade (signaux forts d'abord : URL > journal_type > titre). Les whitelists `doc_type` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
+# Ordre = priorité de la cascade (signaux forts d'abord : URL > serial_type > titre). Les whitelists `doc_type` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
 
 _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
-    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `journal_id_present: False` : un enregistrement source theses.fr AVEC un journal_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_JOURNAL_TO_ARTICLE`), pas l'URL theses.fr. La règle corrige donc en `thesis` les seuls enregistrements sources theses.fr **sans** journal.
+    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `serial_id_present: False` : un enregistrement source theses.fr AVEC un serial_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_SERIAL_TO_ARTICLE`), pas l'URL theses.fr. La règle corrige donc en `thesis` les seuls enregistrements sources theses.fr **sans** journal.
     MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: {
-        "applies_to": {"url_contains": "theses.fr/", "journal_id_present": False},
+        "applies_to": {"url_contains": "theses.fr/", "serial_id_present": False},
         "applies_correction": {"doc_type": DocType.THESIS},
     },
-    # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `journal_id_present: False` que theses.fr (un enregistrement source DUMAS avec journal_id = article publié → prime sur le mémoire).
+    # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `serial_id_present: False` que theses.fr (un enregistrement source DUMAS avec serial_id = article publié → prime sur le mémoire).
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
-        "applies_to": {"url_contains": "dumas.ccsd", "journal_id_present": False},
+        "applies_to": {"url_contains": "dumas.ccsd", "serial_id_present": False},
         "applies_correction": {"doc_type": DocType.MEMOIR},
     },
-    # Famille thèse + `journal_id` présent ⇒ `article`, SAUF si le DOI est celui d'un registre de
+    # Famille thèse + `serial_id` présent ⇒ `article`, SAUF si le DOI est celui d'un registre de
     # thèses (`doi_prefix_not_in`). Une vraie thèse a un DOI ABES (ou pas de DOI) ; un DOI d'éditeur
-    # signe au contraire la version publiée. Le `doc_type=thesis` + `journal_id` + DOI éditeur est
+    # signe au contraire la version publiée. Le `doc_type=thesis` + `serial_id` + DOI éditeur est
     # donc un article publié (mistype d'OpenAlex/ScanR, ou conflation thèse↔version publiée mergées
-    # par titre) → `article`. Avec un DOI ABES ou aucun DOI, le `journal_id` est parasite (la version
-    # publiée d'une conflation) : le type reste thèse, le nettoyage du journal_id relève des relations.
+    # par titre) → `article`. Avec un DOI ABES ou aucun DOI, le `serial_id` est parasite (la version
+    # publiée d'une conflation) : le type reste thèse, le nettoyage du serial_id relève des relations.
     # Placée APRÈS les règles URL : un enregistrement source theses.fr/DUMAS reste thèse/mémoire (l'URL est le signal
     # fort). Le nullage des clés-thèse (NNT, hal_id `tel-`/`dumas-`) de la conflation est traité à
     # part (mutation `external_ids`, hors DSL colonne).
-    MetadataCorrectionRule.THESIS_WITH_JOURNAL_TO_ARTICLE: {
+    MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE: {
         "applies_to": {
             "doc_type": frozenset({DocType.THESIS, DocType.ONGOING_THESIS, DocType.MEMOIR}),
-            "journal_id_present": True,
+            "serial_id_present": True,
             "doi_prefix_not_in": _THESIS_REGISTRY_DOI_PREFIXES,
         },
         "applies_correction": {"doc_type": DocType.ARTICLE},
     },
     # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type`.
-    MetadataCorrectionRule.JOURNAL_TYPE_MEDIA_TO_MEDIA: {
-        "applies_to": {"journal_type": JournalType.MEDIA},
+    MetadataCorrectionRule.SERIAL_TYPE_MEDIA_TO_MEDIA: {
+        "applies_to": {"serial_type": SerialType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
     # DOI déposé par un éditeur de presse ⇒ `media`, quel que soit le `doc_type`. The Conversation dépose ses articles sans titre de revue.
@@ -321,14 +321,14 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_correction": {"doc_type": DocType.PROCEEDINGS},
     },
     # Journal d'actes + doc_type plausible ⇒ `conference_paper`. `book` exclu : un volume entier d'actes peut légitimement rester `book`.
-    MetadataCorrectionRule.JOURNAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
+    MetadataCorrectionRule.SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
         "applies_to": {
-            "journal_type": JournalType.PROCEEDINGS,
+            "serial_type": SerialType.PROCEEDINGS,
             "doc_type": frozenset({DocType.ARTICLE, DocType.BOOK_CHAPTER}),
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
-    # Article ou chapitre d'un volume d'actes (sa monographie) ⇒ `conference_paper`. Le volume d'actes remplace le recueil de `journals` comme conteneur des articles de congrès.
+    # Article ou chapitre d'un volume d'actes (sa monographie) ⇒ `conference_paper`. Le volume d'actes remplace le recueil de `serials` comme conteneur des articles de congrès.
     MetadataCorrectionRule.PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER: {
         "applies_to": {
             "in_proceedings_volume": True,
@@ -355,9 +355,9 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
     # Serveur de preprints (arXiv, bioRxiv, ChemRxiv, EGUsphere, SSRN, …) + doc_type ∈ {article, other} ⇒ `preprint`.
-    MetadataCorrectionRule.JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
+    MetadataCorrectionRule.SERIAL_TYPE_PREPRINT_SERVER_TO_PREPRINT: {
         "applies_to": {
-            "journal_type": JournalType.PREPRINT_SERVER,
+            "serial_type": SerialType.PREPRINT_SERVER,
             "doc_type": _ARTICLE_OR_OTHER,
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},
@@ -543,9 +543,9 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
     if key == "title_regex":
         assert isinstance(value, re.Pattern)
         return bool(source_record.title and value.search(source_record.title))
-    if key == "journal_id_present":
+    if key == "serial_id_present":
         assert isinstance(value, bool)
-        return (source_record.journal_id is not None) == value
+        return (source_record.serial_id is not None) == value
     if key == "doi_prefix_not_in":
         assert isinstance(value, tuple)
         if not source_record.doi:
@@ -576,7 +576,7 @@ def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
 
     Fonction pure : aucune I/O, aucun effet de bord. Les données journal consommées par les règles arrivent par le contrat (champs joints à la lecture), pas via des entités passées en paramètre — ce qui permet à la fonction de servir aussi bien la dédup (sur la `source_record` entrante) que le refresh (sur la publication canonique).
 
-    `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `journal_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
+    `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `serial_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
     """
     return CorrectedFields(
         doc_type=_correct_field(source_record, "doc_type"),
@@ -592,7 +592,7 @@ _DISSERTATION_HALID_PREFIXES = ("tel-", "dumas-")
 def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, JsonValue]:
     """Retire d'un `external_ids` les clés propres aux **dissertations**, erronées sur une `source_record` article (conflation thèse↔article publié : OpenAlex/ScanR fusionnent une thèse et son article dans un seul enregistrement, en gardant le `nnt` / les hal_id `tel-`/`dumas-` de la thèse).
 
-    Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui pointent l'article). Pur. Le caller n'appelle cette fonction que sur les `source_records` corrigées thèse→article (`THESIS_WITH_JOURNAL_TO_ARTICLE`).
+    Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui pointent l'article). Pur. Le caller n'appelle cette fonction que sur les `source_records` corrigées thèse→article (`THESIS_WITH_SERIAL_TO_ARTICLE`).
     """
     result = {k: v for k, v in external_ids.items() if k != ExternalIdType.NNT}
     hal_ids = result.get(ExternalIdType.HAL_ID)

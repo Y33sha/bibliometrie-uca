@@ -29,21 +29,17 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Iterator, Mapping
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.sources.registry import ALL_SOURCES_SET
+from domain.sources.registry import ALL_SOURCES_SET, Source
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.observability.log import setup_logger
 from infrastructure.raw_store import UnreadablePayloadError, get_raw_store
+from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.change_detection import change_detection_hash
-from pipeline.ingestion.hal.fields import extract_doi as hal_extract_doi
-from pipeline.ingestion.openalex.fields import extract_doi as openalex_extract_doi
-from pipeline.ingestion.scanr.fields import extract_doi as scanr_extract_doi
-from pipeline.ingestion.theses.fields import extract_doi as theses_extract_doi
-from pipeline.ingestion.wos.fields import extract_doi as wos_extract_doi
 
 log = setup_logger("rehydrate_staging_from_raw_store", os.path.dirname(__file__))
 
@@ -118,27 +114,14 @@ def rehydrate_or_create_staging_row(
     )
 
 
-# DOI ré-extrait du payload par la logique propre à chaque source (réutilise les
-# fonctions de lecture des phases de moissonnage, sans réimplémentation). crossref et
-# datacite sont absents : ce sont des sources DOI-natives dont le `source_id`
-# (clé du store) est déjà le DOI — cf. `_doi_for`.
-_DOI_EXTRACTORS: dict[str, Callable[[Mapping[str, JsonValue]], str | None]] = {
-    "hal": hal_extract_doi,
-    "openalex": openalex_extract_doi,
-    "wos": wos_extract_doi,
-    "scanr": scanr_extract_doi,
-    "theses": theses_extract_doi,
-}
+def _doi_for(source: str, raw_data: Mapping[str, JsonValue]) -> str | None:
+    """DOI à poser en staging pour un payload réhydraté, lu par l'adaptateur de la source."""
+    identity = ADAPTERS[Source(source)].identify(raw_data)
+    return identity.doi if identity else None
 
 
+# Sources dont l'identifiant natif est le DOI : leur clé d'archive porte un préfixe de DOI.
 _DOI_NATIVE_SOURCES = frozenset({"crossref", "datacite"})
-
-
-def _doi_for(source: str, source_id: str, raw_data: Mapping[str, JsonValue]) -> str | None:
-    """DOI à poser en staging pour un payload réhydraté."""
-    if source in _DOI_NATIVE_SOURCES:
-        return source_id  # sources DOI-natives : source_id == doi
-    return _DOI_EXTRACTORS[source](raw_data)
 
 
 def _parse_sources(raw: str) -> list[str]:
@@ -217,7 +200,7 @@ def main() -> None:
                     )
                     continue
                 if args.full:
-                    doi = _doi_for(source, source_id, raw_data)
+                    doi = _doi_for(source, raw_data)
                     if rehydrate_or_create_staging_row(conn, source, source_id, doi, raw_data):
                         inserted += 1
                     else:

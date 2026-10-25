@@ -2,17 +2,13 @@
 
 from functools import partial
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
-    seed_journal,
     seed_monograph,
     seed_publication,
     seed_publisher,
+    seed_serial,
     uniq,
-)
-
-_cleanup_after_module = truncate_after_module(
-    "monographs", "journals", "publishers", "publications"
 )
 
 # Publication sans titre normalisé.
@@ -48,22 +44,20 @@ class TestListMonographs:
         assert _ids(client, search=title, type="proceedings") == [volume]
         assert sorted(_ids(client, search=title, type="book,proceedings")) == sorted([book, volume])
 
-    def test_publisher_and_journal_filters(self, client):
+    def test_publisher_and_serial_filters(self, client):
         title = uniq("Rattachement")
         publisher = seed_publisher(title, name_normalized=title.lower())
-        journal = seed_journal(title, title_normalized=title.lower())
+        serial = seed_serial(title, title_normalized=title.lower())
         in_publisher = seed_monograph(title)
-        in_journal = seed_monograph(title)
+        in_serial = seed_monograph(title)
         seed_monograph(title)
         with owner_pool() as cur:
             cur.execute(
                 "UPDATE monographs SET publisher_id = %s WHERE id = %s", (publisher, in_publisher)
             )
-            cur.execute(
-                "UPDATE monographs SET journal_id = %s WHERE id = %s", (journal, in_journal)
-            )
+            cur.execute("UPDATE monographs SET serial_id = %s WHERE id = %s", (serial, in_serial))
         assert _ids(client, search=title, publisher_id=publisher) == [in_publisher]
-        assert _ids(client, search=title, journal_id=journal) == [in_journal]
+        assert _ids(client, search=title, serial_id=serial) == [in_serial]
 
     def test_unknown_kind_rejected(self, client):
         assert client.get("/api/monographs", params={"type": "journal"}).status_code == 422
@@ -109,14 +103,14 @@ class TestMonographsFacets:
     def test_facette_des_editeurs_et_des_collections(self, client):
         title = uniq("Entite")
         publisher = seed_publisher(title, name_normalized=title.lower())
-        journal = seed_journal(title, title_normalized=title.lower())
+        serial = seed_serial(title, title_normalized=title.lower())
         mid = seed_monograph(title)
         with owner_pool() as cur:
             cur.execute(
-                "UPDATE monographs SET publisher_id = %s, journal_id = %s WHERE id = %s",
-                (publisher, journal, mid),
+                "UPDATE monographs SET publisher_id = %s, serial_id = %s WHERE id = %s",
+                (publisher, serial, mid),
             )
-        for kind, entity in (("publisher", publisher), ("journal", journal)):
+        for kind, entity in (("publisher", publisher), ("serial", serial)):
             r = client.get(
                 "/api/monographs/facets/entities",
                 params={"kind": kind, "entity_search": title, "search": title},

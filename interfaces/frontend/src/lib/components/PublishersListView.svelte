@@ -11,7 +11,7 @@
 	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
 	import { useFacets } from '$lib/composables/useFacets.svelte';
 	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { crossrefMemberIds, crossrefMemberUrl } from '$lib/sources';
+	import { crossrefMemberIds, crossrefMemberUrl } from '$lib/sources.svelte';
 	import type { components } from '$lib/api/schema';
 
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -27,6 +27,7 @@
 		withPubs = false,
 		actionCell,
 		actionColumnHeader = '',
+		serialsHeader = 'Revues',
 	}: {
 		apiKey?: string;
 		urlSync?: boolean;
@@ -37,6 +38,8 @@
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). */
 		actionCell?: Snippet<[Publisher]>;
 		actionColumnHeader?: string;
+		/** En-tête de la colonne des publications en série : « Revues » sur la page publique, le nom exact en administration. */
+		serialsHeader?: string;
 	} = $props();
 
 	// --- Filter state ---
@@ -131,7 +134,7 @@
 		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
-	function sortArrow(col: 'name' | 'journals' | 'publications'): string {
+	function sortArrow(col: 'name' | 'serials' | 'publications'): string {
 		if (currentSort === `${col}_asc`) return '▲';
 		if (currentSort === `${col}_desc`) return '▼';
 		return '';
@@ -192,8 +195,8 @@
 			<th>Type</th>
 			<th>Pays</th>
 			<th>Préfixes DOI</th>
-			<th class="num sortable" onclick={() => setSort('journals')}>
-				Revues {sortArrow('journals')}
+			<th class="num sortable" onclick={() => setSort('serials')}>
+				{serialsHeader} {sortArrow('serials')}
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
 				Publis {sortArrow('publications')}
@@ -225,7 +228,7 @@
 						<span class="prefix-chip" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
 					{/each}
 				</td>
-				<td class="num">{p.journal_count.toLocaleString('fr-FR')}</td>
+				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
 				{#if actionCell}<td class="actions">{@render actionCell(p)}</td>{/if}
 			</tr>

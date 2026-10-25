@@ -12,10 +12,8 @@ from infrastructure.read_models.filters import (
     year_clause,
 )
 
-# Périmètre commun aux agrégats stats : corpus in-perimeter, hors revues-dépôts. Le type de document n'est PAS figé ici — c'est un filtre comme un autre (cf. `doc_type_clause`). Suppose `publications p` avec `LEFT JOIN journals j`.
-STATS_BASE = " AND ".join(
-    [PUBLICATION_IS_IN_PERIMETER, "(j.oa_model IS DISTINCT FROM 'repository')"]
-)
+# Périmètre commun aux agrégats stats : les publications du périmètre. Le type de document est un filtre comme un autre (`doc_type_clause`).
+STATS_BASE = PUBLICATION_IS_IN_PERIMETER
 
 
 def stats_filter_clauses(
@@ -44,14 +42,14 @@ def stats_filter_clauses(
     if filters.publisher_ids:
         out.append(
             WhereClause(
-                "j.publisher_id = ANY(:flt_publisher_ids)",
+                "p.publisher_id = ANY(:flt_publisher_ids)",
                 {"flt_publisher_ids": filters.publisher_ids},
             )
         )
-    if filters.journal_ids:
+    if filters.serial_ids:
         out.append(
             WhereClause(
-                "p.journal_id = ANY(:flt_journal_ids)", {"flt_journal_ids": filters.journal_ids}
+                "p.serial_id = ANY(:flt_serial_ids)", {"flt_serial_ids": filters.serial_ids}
             )
         )
     return out

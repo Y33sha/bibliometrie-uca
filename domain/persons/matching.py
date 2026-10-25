@@ -25,14 +25,6 @@ class IdentifiedPerson(NamedTuple):
     first_name: str
 
 
-class PersonNameForms(NamedTuple):
-    """Nom normalisé d'une personne et ses formes de nom confirmées, pour l'arbitrage des transferts d'identifiant."""
-
-    last_name: str
-    first_name: str
-    confirmed_forms: list[str]
-
-
 # TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
 # (`decide_match_by_identifier(idref, idref_map)`), alors que l'IdRef ScanR provient
 # du même bloc `denormalized` que son ORCID exclu. Asymétrie possiblement défendable
@@ -63,37 +55,12 @@ def trusted_identifier(id_type: str, source: str) -> bool:
 
 
 class MatchReason(StrEnum):
-    """Motif d'une décision de la cascade de rattachement (`decide_person_match`, `decide_name_form_outcome`)."""
+    """Motif d'une décision par forme de nom (`decide_name_form_outcome`)."""
 
-    ORCID = "orcid"
-    HAL_PERSON_ID = "hal_person_id"
-    IDREF = "idref"
-    CROSS_SOURCE = "cross_source"
-    SINGLE_NAME = "single_name"
     COMPATIBLE_NAME = "compatible_name"
-    NEW = "new"
     AMBIGUOUS_NAME_FORM = "ambiguous_name_form"
     ALL_CANDIDATES_REJECTED = "all_candidates_rejected"
     CREATION_NOT_ALLOWED = "creation_not_allowed"
-    OUT_OF_PERIMETER = "out_of_perimeter"
-
-
-class ResolutionMode(StrEnum):
-    """Canal de résolution par lequel la cascade a posé le `person_id` d'une contribution source, indexé par le `reason` de `decide_person_match`. Enregistré dans `source_contributions.resolution_mode`, il guide les réinitialisations ordre-indépendantes de la phase : re-null ciblé des `identifier` transférés, re-orphelinage des `name` à forme devenue ambiguë, recompute en bloc des `cross_source`. La création par nom vaut `name` (elle ancre une personne sur sa forme). Mappe l'enum PostgreSQL `resolution_mode`."""
-
-    IDENTIFIER = "identifier"
-    NAME = "name"
-    CROSS_SOURCE = "cross_source"
-
-
-RESOLUTION_MODE_BY_REASON: dict[MatchReason, ResolutionMode] = {
-    MatchReason.ORCID: ResolutionMode.IDENTIFIER,
-    MatchReason.HAL_PERSON_ID: ResolutionMode.IDENTIFIER,
-    MatchReason.IDREF: ResolutionMode.IDENTIFIER,
-    MatchReason.CROSS_SOURCE: ResolutionMode.CROSS_SOURCE,
-    MatchReason.SINGLE_NAME: ResolutionMode.NAME,
-    MatchReason.COMPATIBLE_NAME: ResolutionMode.NAME,
-}
 
 
 class Namesake(NamedTuple):
@@ -179,45 +146,6 @@ def attested_full_first_names(
     }
 
 
-def decide_cross_source_match(
-    contribution_source: str,
-    last_norm: str,
-    first_norm: str,
-    candidates: list[tuple[int, str, str, str]],
-) -> int | None:
-    """Décide si une contribution peut être rattachée à la `person` d'une autre contribution source de son groupe (contributions sources du même auteur dans la publication, `source_contribution_group_members`).
-
-    Quand HAL a déjà rattaché un auteur à la personne 42, la contribution source OpenAlex du même groupe reçoit la même personne, à condition que son nom soit compatible.
-
-    Paramètres :
-
-    - `contribution_source` : source de la contribution qu'on cherche à rattacher. Sert à exclure les candidats de la même source (qui ne porteraient aucun signal supplémentaire).
-    - `last_norm`, `first_norm` : nom normalisé de la contribution.
-    - `candidates` : liste de tuples `(person_id, last_norm, first_norm, source)` — les contributions déjà rattachées du même groupe.
-
-    Cascade :
-
-    - Aucun candidat compatible → `None`.
-    - Candidats compatibles convergent tous vers la même `person_id` → cette `person_id`.
-    - Candidats compatibles divergent (≥ 2 `person_id` distincts) → `None` (conflit, pas de match safe).
-    """
-    matched_pid: int | None = None
-    for pid, ln, fn, src in candidates:
-        if src == contribution_source:
-            continue
-        if names_compatible(last_norm, first_norm, ln, fn):
-            if matched_pid is not None and matched_pid != pid:
-                return None
-            matched_pid = pid
-    return matched_pid
-
-
-# Motifs d'un `skip` par forme de nom connue : la contribution source ne peut ni se rattacher par son nom, ni créer de personne.
-UNDECIDABLE_NAME_FORM_REASONS = frozenset(
-    {MatchReason.AMBIGUOUS_NAME_FORM, MatchReason.ALL_CANDIDATES_REJECTED}
-)
-
-
 @dataclass(frozen=True)
 class NameFormDecision:
     """Décision résultant du lookup d'une contribution dans `person_name_forms`.
@@ -238,7 +166,7 @@ def decide_name_form_outcome(
 ) -> NameFormDecision:
     """Arbitre la décision de matching après lookup dans `person_name_forms`.
 
-    `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution traitée (store `rejected_contributions`). Elles sont **éliminées** de la liste des candidats avant arbitrage : une paire `(publication, personne)` rejetée est tenue hors du matching. L'élimination peut désambiguïser — si 2 personnes partagent la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate et l'`ambiguous_name_form` devient un `match` univoque.
+    `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution source traitée (store `rejected_contributions`). Elles sont **éliminées** de la liste des candidats avant arbitrage : une paire `(publication, personne)` rejetée est tenue hors du matching. L'élimination peut désambiguïser — si 2 personnes partagent la forme de nom mais qu'une est rejetée, il ne reste qu'une candidate et l'`ambiguous_name_form` devient un `match` univoque.
 
     `compatible_person_ids` : personnes de même nom de famille que la contribution source désigne par ses initiales (`compatible_namesakes`). Consultées seulement quand la forme exacte est inconnue.
 
@@ -327,32 +255,12 @@ def decide_match_by_identifier(
     return IdentifierMatch(rejection=(person_id, f"{target.first_name} {target.last_name}".strip()))
 
 
-def form_matches_person(
-    form: str,
-    last_name: str,
-    first_name: str,
-    confirmed_forms: Iterable[str] = (),
-) -> bool:
-    """La forme de nom `form` désigne-t-elle la personne ?
-
-    Vrai si `form` est compatible (`names_compatible`, comparaison par tokens) avec le nom-prénom de la personne, ou avec l'une de ses formes de nom **confirmées** (un nom validé par un humain que le nom-prénom canonique ne recouvre pas, changement de nom inclus).
-
-    Sert à arbitrer un conflit d'attribution d'identifiant : la forme majoritaire des contributions sources qui contiennent une valeur (le *consensus*, agrégat ordre-indépendant fourni par le caller) est confrontée au propriétaire actuel et au candidat en conflit — l'identifiant se transfère vers le candidat si, et seulement si, le consensus le désigne, lui et pas le propriétaire.
-    """
-    if names_compatible(form, "", last_name, first_name):
-        return True
-    return any(names_compatible(form, "", cf, "") for cf in confirmed_forms)
-
-
-def consensus_name(votes: Mapping[str, int]) -> str | None:
-    """Consensus d'une valeur d'identifiant : le nom qui porte strictement plus de voix que chacun des autres.
-
-    `votes` compte les contributions sources qui contiennent la valeur sous chaque nom normalisé. `None` en cas d'égalité en tête ou sans aucune voix.
-    """
+def strict_majority[K](votes: Mapping[K, int]) -> K | None:
+    """Clé qui porte strictement plus de voix que chacune des autres. `None` en cas d'égalité en tête ou sans aucune voix."""
     if not votes:
         return None
     best, *others = sorted(votes.values(), reverse=True)
-    if others and others[0] == best:
+    if best <= 0 or (others and others[0] == best):
         return None
     return max(votes, key=votes.__getitem__)
 
@@ -360,55 +268,3 @@ def consensus_name(votes: Mapping[str, int]) -> str | None:
 def identifier_misplaced(contributor_name_form: str, consensus: str | None) -> bool:
     """Vrai quand le consensus d'une valeur d'identifiant désigne une autre personne que le nom de la contribution source qui la contient. Sans consensus, aucun identifiant n'est mal placé."""
     return consensus is not None and not names_compatible(contributor_name_form, "", consensus, "")
-
-
-@dataclass(frozen=True)
-class PersonMatchDecision:
-    """Décision de la cascade de matching unifiée. `reason` identifie le signal qui a tranché."""
-
-    action: Literal["match", "create", "skip"]
-    person_id: int | None = None
-    reason: MatchReason | None = None
-
-
-def decide_person_match(
-    *,
-    orcid_match: int | None,
-    hal_match: int | None,
-    idref_match: int | None,
-    cross_source_match: int | None,
-    name_form_outcome: NameFormDecision,
-    rejected_person_ids: frozenset[int] = frozenset(),
-) -> PersonMatchDecision:
-    """Cascade unifiée de matching personne, du signal le plus fiable au moins fiable.
-
-    Hiérarchie par fiabilité de provenance :
-
-    1. **ORCID déposé par l'auteur** (`orcid_match`) — ORCID issu d'une source à dépôt auteur (`ORCID_MATCH_SOURCES`), borné côté caller.
-    2. **`hal_person_id`** (`hal_match`) — compte HAL de l'auteur, attaché à la contribution source dans le TEI HAL.
-    3. **IdRef** (`idref_match`).
-    4. **Match par `person_name_forms`** (`name_form_outcome` d'action `match`) — nom normalisé désignant une seule personne, ou, à forme inconnue, seule personne aux initiales compatibles (`reason="compatible_name"`). Placé avant le cross-source pour maximiser les ancres fermes que ce dernier exploite.
-    5. **Cross-source** (`cross_source_match`) — match par le groupe de contributions sources, avec une contribution d'une autre source et nom compatible. Inopérant au bootstrap (suppose des matchings préexistants).
-    6. **Création par `person_name_forms`** (`name_form_outcome` d'action `create`) — nom inconnu, en dernier recours. La création est différée en fin de cascade côté orchestrateur : une contribution source à créer peut encore rejoindre une ancre cross-source posée par une contribution source traitée plus loin.
-
-    `rejected_person_ids` : personnes déjà rejetées pour la publication de la contribution (store `rejected_contributions`). Un match d'identifiant ou cross-source pointant vers une personne rejetée est **annulé** — la cascade retombe au signal suivant, et faute de mieux laisse la contribution orpheline, sans recréer le lien rejeté. Le tiroir name form est déjà gardé en amont : `name_form_outcome` doit être calculé avec le même `rejected_person_ids` (cf. `decide_name_form_outcome`).
-
-    Pure, testable sans BDD : les paramètres sont précalculés par le caller via prefetch.
-    """
-    if orcid_match is not None and orcid_match not in rejected_person_ids:
-        return PersonMatchDecision("match", orcid_match, MatchReason.ORCID)
-    if hal_match is not None and hal_match not in rejected_person_ids:
-        return PersonMatchDecision("match", hal_match, MatchReason.HAL_PERSON_ID)
-    if idref_match is not None and idref_match not in rejected_person_ids:
-        return PersonMatchDecision("match", idref_match, MatchReason.IDREF)
-    if name_form_outcome.action == "match":
-        return PersonMatchDecision(
-            "match",
-            name_form_outcome.person_id,
-            name_form_outcome.reason or MatchReason.SINGLE_NAME,
-        )
-    if cross_source_match is not None and cross_source_match not in rejected_person_ids:
-        return PersonMatchDecision("match", cross_source_match, MatchReason.CROSS_SOURCE)
-    if name_form_outcome.action == "create":
-        return PersonMatchDecision("create", reason=MatchReason.NEW)
-    return PersonMatchDecision("skip", reason=name_form_outcome.reason)

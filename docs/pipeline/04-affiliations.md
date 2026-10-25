@@ -17,7 +17,7 @@ flowchart LR
 
 La phase `affiliations` rattache les contributions sources aux structures du périmètre, et marque leur entrée dans le périmètre.
 
-1. **`refresh_ror`** — importe la dernière version du dump ROR, publié sur Zenodo, si elle n'est pas déjà importée. Une organisation qui change de pays marque pour la phase [`countries`](10-enrichissements.md#pays-des-adresses-countries) les contributions sources et les adresses qui la citent.
+1. **`refresh_ror`** — importe la dernière version du dump ROR, publié sur Zenodo, si elle n'est pas déjà importée. Une organisation qui change de pays marque pour la phase [`countries`](11-enrichissements.md#pays-des-adresses-countries) les contributions sources et les adresses qui la citent.
 
 2. **`refresh_hal_structures`** — charge depuis l'API HAL les structures citées par les contributions sources et absentes du référentiel `ref.hal_structures`, puis leurs parents. Une structure qui change de pays marque pour la phase `countries` les contributions sources qui la citent.
 

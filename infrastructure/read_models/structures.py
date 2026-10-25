@@ -27,7 +27,7 @@ from infrastructure.sql_fragments import has_author_role
 
 _NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
-# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à elle par une structure de contribution, et qui tient le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
+# Contribution de la structure `:structure_id` : dans le périmètre, rattachée à elle par `contribution_structures`, et qui tient le rôle d'auteur. S'applique à un alias `a` sur `contributions`.
 AUTHOR_SOURCE_CONTRIBUTION = f"""
     a.in_perimeter = TRUE
     AND {has_author_role("a")}

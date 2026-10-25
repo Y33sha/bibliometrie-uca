@@ -13,33 +13,30 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from domain.dates import today
-from domain.journals.containers import ContainerDescription
-from domain.journals.issns import source_issns
 from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import normalize_orcid
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi
 from domain.publications.licenses import datacite_license
+from domain.serials.containers import ContainerDescription
+from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_text
 from domain.urls import is_host
-from pipeline.ingestion.common.normalizer import BibliographicNormalizer
-from pipeline.ingestion.common.source_contribution_store import SourceContributionStore
+from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
     AuthorBlock,
     AuthorRecord,
     contributor_identifiers,
-    sync_source_contributions,
 )
 from pipeline.ingestion.common.source_records import (
-    SourceRecordStore,
     SourceRecordUpsert,
 )
-from pipeline.ingestion.common.staging import StagingRow, StagingStore
+from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.datacite.payload import (
     container_names_a_journal,
     extract_datacite_doc_type_token,
@@ -56,26 +53,13 @@ from pipeline.ingestion.datacite.payload import (
     get_publisher_name,
     get_title,
 )
-from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
-    find_or_create_containers,
-    find_or_create_publisher,
 )
-from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 # =============================================================
 # PUBLISHER + JOURNAL
 # =============================================================
-
-
-def upsert_publisher(
-    attributes: Mapping[str, JsonValue], *, publisher_store: PublisherStore
-) -> int | None:
-    name = get_publisher_name(attributes)
-    if not name:
-        return None
-    return find_or_create_publisher(name, repo=publisher_store)
 
 
 def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -100,22 +84,10 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
     )
 
 
-def upsert_containers(
-    attributes: Mapping[str, JsonValue],
-    publisher_id: int | None,
-    *,
-    container_stores: ContainerStores,
-) -> Containers:
-    """Trouve ou crée l'entrée de `journals` et la monographie qui contiennent le document."""
-    return find_or_create_containers(
-        get_container_facts(attributes), publisher_id=publisher_id, stores=container_stores
-    )
-
-
 def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     """Volume / issue / pages depuis `container` + publisher/journal bruts.
 
-    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/journals créés via `find_or_create_*`.
+    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/serials créés via `find_or_create_*`.
     """
     container = as_mapping(attributes.get("container"))
     title, issn = get_container(attributes)
@@ -223,54 +195,19 @@ def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> Author
     return {"creators": attributes.get("creators")}
 
 
-def process_contributions(
-    contribution_store: SourceContributionStore,
-    attributes: Mapping[str, JsonValue],
-    source_record_id: int,
-) -> None:
-    """Synchronise les contributions sources DataCite de l'enregistrement source depuis son bloc auteurs."""
-    sync_source_contributions(
-        contribution_store,
-        "datacite",
-        source_record_id,
-        extract_datacite_author_block(attributes),
-        build_datacite_author_records,
-    )
+def datacite_doi(attributes: Mapping[str, JsonValue], staging_doi: str | None) -> str | None:
+    """DOI du nœud : `attributes.doi`, à défaut celui de sa ligne de `staging`."""
+    return clean_doi(as_str(attributes.get("doi"))) or staging_doi
 
 
-# =============================================================
-# BOUCLE PRINCIPALE
-# =============================================================
-
-
-def process_work(
-    record_store: SourceRecordStore,
-    staging_row: StagingRow,
-    *,
-    container_stores: ContainerStores,
-    publisher_store: PublisherStore,
-    staging_store: StagingStore,
-    contribution_store: SourceContributionStore,
-) -> bool | None:
-    staging_id = staging_row.id
-    raw = staging_row.raw_data
-    # Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `attributes`.
-    attributes = raw.get("attributes")
-    # Garanti par `SourceNormalizer.process_work` : `minimal_metadata` rend (None, None) sinon.
-    assert isinstance(attributes, dict)
-
-    doi = clean_doi(as_str(attributes.get("doi"))) or staging_row.doi
-    if not doi:
-        return False
-
+def datacite_source_record(
+    attributes: Mapping[str, JsonValue], staging_id: int, doi: str, containers: Containers
+) -> SourceRecordUpsert:
+    """Enregistrement source DataCite d'un nœud, identifié par son DOI."""
     title = get_title(attributes)
     publication_year = extract_datacite_publication_year(attributes, max_year=today().year + 1)
-    # Garanti par `SourceNormalizer.process_work`, qui filtre les enregistrements sources sans titre ou sans année.
+    # Garanti par `SourceNormalizer`, qui filtre les enregistrements sources sans titre ou sans année.
     assert isinstance(title, str) and isinstance(publication_year, int)
-
-    publisher_id = upsert_publisher(attributes, publisher_store=publisher_store)
-    containers = upsert_containers(attributes, publisher_id, container_stores=container_stores)
-
     container_title, _ = get_container(attributes)
     related_dois = extract_related_dois(attributes, doi)
     external_ids: dict[str, JsonValue] = {}
@@ -278,36 +215,30 @@ def process_work(
         external_ids[ExternalIdType.RELATED_DOIS] = related_dois
     if isbns := get_isbns(attributes):
         external_ids[ExternalIdType.ISBN] = isbns
-
-    source_record_id = record_store.upsert_source_record(
-        SourceRecordUpsert(
-            source="datacite",
-            source_id=doi,
-            staging_id=staging_id,
-            doi=doi,
-            external_ids=external_ids or None,
-            title=title,
-            publication_year=publication_year,
-            raw_doc_type=extract_datacite_doc_type_token(attributes),
-            journal_id=containers.journal_id,
-            monograph_id=containers.monograph_id,
-            container_title=container_title if not containers.journal_id else None,
-            raw_language=get_language(attributes),
-            biblio=get_biblio(attributes),
-            abstract=get_abstract(attributes),
-            keywords=get_keywords(attributes),
-            oa_status=None,
-            license=datacite_license(attributes.get("rightsList")),
-            impact=Impact(cited_by_count=get_cited_by_count(attributes)).to_json(),
-            source_extras=extract_datacite_source_extras(attributes),
-        ),
+    return SourceRecordUpsert(
+        source="datacite",
+        source_id=doi,
+        staging_id=staging_id,
+        doi=doi,
+        external_ids=external_ids or None,
+        title=title,
+        publication_year=publication_year,
+        raw_doc_type=extract_datacite_doc_type_token(attributes),
+        serial_id=containers.serial_id,
+        monograph_id=containers.monograph_id,
+        container_title=container_title if not containers.serial_id else None,
+        raw_language=get_language(attributes),
+        biblio=get_biblio(attributes),
+        abstract=get_abstract(attributes),
+        keywords=get_keywords(attributes),
+        oa_status=None,
+        license=datacite_license(attributes.get("rightsList")),
+        impact=Impact(cited_by_count=get_cited_by_count(attributes)).to_json(),
+        source_extras=extract_datacite_source_extras(attributes),
     )
-    process_contributions(contribution_store, attributes, source_record_id)
-    staging_store.mark_done(staging_id)
-    return True
 
 
-class DataciteNormalizer(BibliographicNormalizer):
+class DataciteNormalizer(SourceNormalizer):
     SOURCE = "datacite"
     DEFAULT_BATCH_SIZE = 100
 
@@ -319,13 +250,29 @@ class DataciteNormalizer(BibliographicNormalizer):
             attributes, max_year=today().year + 1
         )
 
-    def normalize_record(self, row: StagingRow) -> bool | None:
-        container_stores, publisher_store = self._container_stores, self._publisher_store
-        return process_work(
-            self._record_store,
-            row,
-            container_stores=container_stores,
-            publisher_store=publisher_store,
-            staging_store=self._staging,
-            contribution_store=self._contribution_store,
-        )
+    def parse(self, row: StagingRow) -> Document | None:
+        """Les `attributes` du nœud JSON:API, refusés sans DOI."""
+        attributes = row.raw_data.get("attributes")
+        # Garanti par `SourceNormalizer` : `minimal_metadata` rend (None, None) sinon.
+        assert isinstance(attributes, dict)
+        return attributes if datacite_doi(attributes, row.doi) else None
+
+    def publisher(self, doc: Document) -> PublisherFacts | None:
+        name = get_publisher_name(doc)
+        return PublisherFacts(name) if name else None
+
+    def container_facts(self, doc: Document) -> ContainerDescription:
+        return get_container_facts(doc)
+
+    def source_record(
+        self, row: StagingRow, doc: Document, containers: Containers
+    ) -> SourceRecordUpsert:
+        doi = datacite_doi(doc, row.doi)
+        assert doi, "garanti par `parse`"
+        return datacite_source_record(doc, row.id, doi, containers)
+
+    def author_block(self, doc: Document) -> AuthorBlock:
+        return extract_datacite_author_block(doc)
+
+    def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
+        return build_datacite_author_records(block)

@@ -18,20 +18,10 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from domain.config import ConfigKey
-from domain.sources.registry import ALL_SOURCES, source_label
-from pipeline.http.circuit_breaker import SourceCircuitBreaker
-from pipeline.ingestion.common.stale_refetch import (
-    StaleRefetch,
-    refresh,
-)
-from pipeline.ingestion.crossref.fetch_stale import CrossrefStaleRefetch
-from pipeline.ingestion.datacite.fetch_stale import DataciteStaleRefetch
-from pipeline.ingestion.hal.fetch_stale import HalStaleRefetch
-from pipeline.ingestion.openalex.fetch_stale import OpenalexStaleRefetch
-from pipeline.ingestion.scanr.fetch_stale import ScanrStaleRefetch
-from pipeline.ingestion.theses.fetch_stale import ThesesStaleRefetch
-from pipeline.ingestion.wos.fetch_stale import WosStaleRefetch
-from pipeline.runtime.config import delay, get_years
+from domain.sources.registry import ALL_SOURCES, Source, source_label
+from pipeline.ingestion.adapters import ADAPTERS
+from pipeline.ingestion.common.stale_refetch import refresh
+from pipeline.runtime.config import delay, window_years
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -39,10 +29,10 @@ from pipeline.runtime.observability.signals import select_targets, skipped
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 # Dépendances techniques du phasage, injectées par le composition-root.
-RefreshOne = Callable[[PhaseContext, str, "list[int] | None", SourceCircuitBreaker], PhaseMetrics]
-"""Nouvelle lecture des documents d'une source, bornée à `years`, sous le circuit-breaker de la source."""
-GetYearsForWindow = Callable[[PhaseContext, "int | None"], "list[int] | None"]
-"""`(ctx, start_year) -> années de la fenêtre du run | None (tout l'historique)`."""
+RefreshOne = Callable[[PhaseContext, str, "list[int] | None"], PhaseMetrics]
+"""Nouvelle lecture des documents d'une source, bornée à `years`."""
+GetYearsForWindow = Callable[[PhaseContext, "int | None", "int | None"], "list[int] | None"]
+"""`(ctx, start_year, year) -> années de la fenêtre du run | None (tout l'historique)`."""
 
 
 @dataclass(frozen=True)
@@ -53,7 +43,7 @@ class FetchStalePhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         """Relit les documents anciens de chaque source, dans la fenêtre d'années du run.
 
-        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]` ; `theses` ignore la borne large (tout l'historique des PPN), mais suit `--year`.
+        La phase est sautée dans un mode dont la policy exclut `fetch_stale`. WoS est opt-in (`--include-wos`). Fenêtre d'années : `--year` cible une seule année, sinon `[start_year … courante]`. Une thèse en cours est relue quelle que soit la fenêtre.
         """
         options, logger = ctx.options, ctx.logger
         metrics = PhaseMetrics()
@@ -62,17 +52,10 @@ class FetchStalePhase:
             return metrics
         targets = set(select_targets(ALL_SOURCES, options.sources, include_wos=options.include_wos))
 
-        year = options.year
-        years_default = [int(year)] if year else self.get_years_for_window(ctx, options.start_year)
-        years_theses = [int(year)] if year else None
+        years = self.get_years_for_window(ctx, options.start_year, options.year)
 
         def task(source: str) -> TaskRun:
-            def run(ctx: PhaseContext, breaker: SourceCircuitBreaker | None) -> PhaseMetrics:
-                assert breaker is not None, "tâche à source : l'exécuteur pose le circuit-breaker"
-                row_years = years_theses if source == "theses" else years_default
-                return self.refresh_one(ctx, source, row_years, breaker)
-
-            return run
+            return lambda ctx: self.refresh_one(ctx, source, years)
 
         def selected(source: str) -> Callable[[PhaseContext], bool]:
             return lambda _ctx: source in targets
@@ -122,37 +105,20 @@ def build() -> Phase:
     )
 
 
-def _get_years_for_window(ctx: PhaseContext, start_year: int | None) -> list[int] | None:
-    """Années de la fenêtre du run, de `start_year` à l'année courante."""
+def _get_years_for_window(
+    ctx: PhaseContext, start_year: int | None, year: int | None
+) -> list[int] | None:
+    """Années de la fenêtre du run (`window_years`)."""
     with ctx.open_tx() as conn:
-        return get_years(conn, start_year)
+        return window_years(conn, start_year=start_year, year=year)
 
 
-def _make_refetch(source: str) -> StaleRefetch:
-    """Construit la nouvelle lecture par identifiant natif d'une source."""
-
-    refetches: dict[str, type[StaleRefetch]] = {
-        "hal": HalStaleRefetch,
-        "openalex": OpenalexStaleRefetch,
-        "wos": WosStaleRefetch,
-        "scanr": ScanrStaleRefetch,
-        "theses": ThesesStaleRefetch,
-        "crossref": CrossrefStaleRefetch,
-        "datacite": DataciteStaleRefetch,
-    }
-    return refetches[source]()
-
-
-def _run_fetch_stale(
-    ctx: PhaseContext, target: str, years: list[int] | None, breaker: SourceCircuitBreaker
-) -> PhaseMetrics:
+def _run_fetch_stale(ctx: PhaseContext, target: str, years: list[int] | None) -> PhaseMetrics:
     """Refetch par id natif des rows stale d'une source : trouvé → bump, absence → disappeared.
 
     `years` borne le refresh à la fenêtre d'années du run (None = tout le stale).
     """
-    refetch = _make_refetch(target)
+    refetch = ADAPTERS[Source(target)].stale_refetch()
     with ctx.open_tx() as conn:
         after_days = delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS)
-        return asyncio.run(
-            refresh(conn, refetch, ctx.logger, after_days=after_days, years=years, breaker=breaker)
-        )
+        return asyncio.run(refresh(conn, refetch, ctx.logger, after_days=after_days, years=years))

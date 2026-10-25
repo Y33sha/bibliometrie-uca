@@ -2,11 +2,14 @@
 
 from functools import partial
 
+from sqlalchemy import text
+
 from application.ports.read_models.hal_problems_queries import NoMissingCollections
 from infrastructure.read_models.hal_problems import PgHalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import insert_contribution
+from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -40,17 +43,23 @@ def _create_lab(conn, code="LAB", hal_collection=None):
 def _create_hal_source_contribution_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
-    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur."""
+    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur, membre d'un groupe rattaché à `person_id`."""
     publication = insert_publication(
         conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}"
     )
     source_record = _source_record(conn, publication, source_id=source_id)
-    insert_source_contribution(
+    source_contribution = insert_source_contribution(
         conn,
         source_record,
-        person_id=person_id,
         raw_author_name=raw_author_name,
         identifiers={"hal_person_id": hal_person_id},
+    )
+    group = insert_group(conn, publication, [(source_contribution, source_record)])
+    conn.execute(
+        text(
+            "UPDATE contributions SET person_id = :person, resolution_mode = 'manual' WHERE id = :g"
+        ),
+        {"person": person_id, "g": group},
     )
 
 
@@ -198,10 +207,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="Conflict OA")
         lab = _create_lab(sa_sync_conn, code="LAB-OA")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-oa-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-1"
         )
@@ -217,10 +224,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="Conflict WoS")
         lab = _create_lab(sa_sync_conn, code="LAB-WOS")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-wos-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         wos_source_record = _source_record(
             sa_sync_conn, publication, source="wos", source_id="WOS:1"
         )
@@ -239,10 +244,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="OA no address")
         lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-noaddr-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-noaddr"
         )
@@ -257,10 +260,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="Position independent")
         lab = _create_lab(sa_sync_conn, code="LAB-POS")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-pos-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-pos"
         )
@@ -278,10 +279,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="ScanR only")
         lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-scanr-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         scanr_source_record = _source_record(
             sa_sync_conn, publication, source="scanr", source_id="sr-1"
         )
@@ -298,10 +297,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="OA confirms")
         lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-confirm-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-confirm"
         )
@@ -319,10 +316,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="Mixed conf")
         lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-mixed-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
         oa_source_record = _source_record(
             sa_sync_conn, publication, source="openalex", source_id="oa-mixed"
         )
@@ -346,10 +341,8 @@ class TestHalAffiliationConflicts:
         publication = insert_publication(sa_sync_conn, title="HAL only")
         lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-only-1")
-        uca_person = _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
-        insert_source_contribution(
-            sa_sync_conn, hal_source_record, person_id=uca_person, in_perimeter=True
-        )
+        _create_contribution_uca(sa_sync_conn, publication, lab, position=0)
+        insert_source_contribution(sa_sync_conn, hal_source_record, in_perimeter=True)
 
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
         assert publication not in [p.id for p in res.publications]

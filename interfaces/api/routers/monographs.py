@@ -30,11 +30,11 @@ def monograph_filters(
     monograph_type: str = Query("", alias="type"),
     year: str = "",
     publisher_id: int | None = None,
-    journal_id: int | None = None,
+    serial_id: int | None = None,
 ) -> MonographFilters:
     """Filtres partagés par la liste et ses facettes.
 
-    `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `type` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes). `year` liste les années retenues. `publisher_id` et `journal_id` restreignent à un éditeur et à une collection.
+    `search` porte sur le titre, ou sur l'ISBN quand le terme commence par 978 ou 979. `type` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes). `year` liste les années retenues. `publisher_id` et `serial_id` restreignent à un éditeur et à une collection.
     """
     kinds = parse_vocabulary_csv(monograph_type, allowed=MONOGRAPH_KINDS, param="type")
     return MonographFilters(
@@ -42,7 +42,7 @@ def monograph_filters(
         kinds=tuple(kinds),
         years=tuple(parse_int_csv(year, param="year")),
         publisher_id=publisher_id,
-        journal_id=journal_id,
+        serial_id=serial_id,
     )
 
 

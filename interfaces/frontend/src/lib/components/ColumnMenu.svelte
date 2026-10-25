@@ -44,10 +44,11 @@
 		letter-spacing: 2px;
 	}
 	.column-menu-btn:hover { background: var(--hover); color: var(--fg); }
-	.column-menu-backdrop { position: fixed; inset: 0; z-index: 9; }
+	/* Au niveau des autres menus de la page (100), au-dessus de la barre de facettes collante (50). */
+	.column-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
 	.column-menu {
 		background: var(--card); border: 1px solid var(--border); border-radius: 6px;
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0; z-index: 11;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0; z-index: 100;
 		min-width: 150px;
 	}
 	.column-menu label {

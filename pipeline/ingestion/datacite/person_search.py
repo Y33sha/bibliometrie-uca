@@ -5,17 +5,13 @@ Interroge `GET /dois` sur les ORCID des créateurs (`creators.nameIdentifiers.na
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
 from domain.persons.identifiers import PersonIdentifierType, orcid_uri
-from domain.types import JsonValue
 from pipeline.ingestion.common.person_search import (
     Identifiers,
     PersonSearchHarvester,
     PersonSearchPage,
 )
 from pipeline.ingestion.datacite.api import DataciteClient
-from pipeline.ingestion.datacite.fields import record_doi
 
 # Documents par page. Un enregistrement de grande collaboration compte un millier de créateurs (environ 200 Kio).
 _PAGE_SIZE = 25
@@ -49,7 +45,3 @@ class DatacitePersonHarvester(PersonSearchHarvester[DataciteClient]):
             page_size=_PAGE_SIZE,
         )
         return PersonSearchPage(records=page.records, next_token=page.next_url)
-
-    def record_key(self, record: Mapping[str, JsonValue]) -> tuple[str, str | None] | None:
-        doi = record_doi(record)
-        return (doi, doi) if doi else None

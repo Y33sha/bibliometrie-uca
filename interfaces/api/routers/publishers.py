@@ -6,8 +6,8 @@ Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Connection
 
-from application.ports.pipeline.journal_recompute import JournalRecompute
 from application.ports.pipeline.publication_count import PublicationCountRecompute
+from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.read_models.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
@@ -19,11 +19,11 @@ from application.ports.read_models.publishers_queries import (
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.journal_repository import JournalRepository
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
 )
+from application.ports.repositories.serial_repository import SerialRepository
 from application.services.publishers import commands as publisher_commands
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
@@ -31,11 +31,11 @@ from interfaces.api.deps import (
     audit_repo,
     db_conn,
     entity_detail,
-    journal_recompute,
-    journal_repo,
     publication_count_recompute,
     publisher_queries,
     publisher_repo,
+    serial_recompute,
+    serial_repo,
 )
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
@@ -87,7 +87,7 @@ def publishers_facets(
 ) -> PublishersFacetsResponse:
     """Comptes par option des facettes de la liste des éditeurs.
 
-    Convention partagée avec `/api/journals/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
+    Convention partagée avec `/api/serials/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
     """
     return queries.publishers_facets(filters=filters)
 
@@ -102,7 +102,7 @@ def list_publishers(
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `journals` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 
@@ -127,7 +127,7 @@ def get_publisher_dashboard(
 ) -> PublisherDashboardResponse:
     """Agrégats de l'onglet tableau de bord de la page d'un éditeur.
 
-    Distribution des `journal_type` de son catalogue, et distributions des `doc_type` et `oa_status` des publications que ses revues portent. Renvoie 404 sur un éditeur inconnu.
+    Distribution des `serial_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
     """
     result = queries.get_publisher_dashboard(publisher_id)
     if result is None:
@@ -176,14 +176,14 @@ def merge(
     body: MergeRequest,
     conn: Connection = Depends(db_conn),
     publishers: PublisherRepository = Depends(publisher_repo),
-    journals: JournalRepository = Depends(journal_repo),
+    serials: SerialRepository = Depends(serial_repo),
     audit: AuditRepository = Depends(audit_repo),
-    recompute: JournalRecompute = Depends(journal_recompute),
+    recompute: SerialRecompute = Depends(serial_recompute),
     publication_count_recompute: PublicationCountRecompute = Depends(publication_count_recompute),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
-        Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `journal_type` de la cible (`merge_journals`).
+        Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
 
     Deux éditeurs qui portent des membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
 
@@ -196,7 +196,7 @@ def merge(
         recompute=recompute,
         publication_count_recompute=publication_count_recompute,
         publisher_repo=publishers,
-        journal_repo=journals,
+        serial_repo=serials,
         audit_repo=audit,
     )
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

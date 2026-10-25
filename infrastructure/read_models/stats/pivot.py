@@ -150,18 +150,18 @@ DIMENSIONS: dict[str, Dimension] = {
             comparable=True,
             filterable=True,
             group_sql="pub.name",
-            join_sql="JOIN publishers pub ON pub.id = j.publisher_id",
+            join_sql="JOIN publishers pub ON pub.id = p.publisher_id",
         ),
         # Forte cardinalité : comparaison et facette (filtre par revue, recherche serveur). Jointure interne : exclut les publications sans revue.
         Dimension(
-            "journal",
+            "serial",
             "Revue",
             "high",
             ordinal=False,
             comparable=True,
             filterable=True,
             group_sql="jt.title",
-            join_sql="JOIN journals jt ON jt.id = p.journal_id",
+            join_sql="JOIN serials jt ON jt.id = p.serial_id",
         ),
         Dimension("apc", "APC", "low", ordinal=False, comparable=False, filterable=True),
         # Licence de la version éditeur.
@@ -253,7 +253,7 @@ def run_pivot(
     )
     inner = (
         f"SELECT DISTINCT {inner_select} FROM publications p "
-        f"LEFT JOIN journals j ON j.id = p.journal_id {joins} "
+        f"LEFT JOIN serials j ON j.id = p.serial_id {joins} "
         f"WHERE {STATS_BASE} AND {where}"
     )
     keys = [d.key for d in dims]

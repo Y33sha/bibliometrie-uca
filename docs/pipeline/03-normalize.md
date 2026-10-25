@@ -15,7 +15,7 @@ flowchart LR
     class C,D,F,journals,publishers new;
 ```
 
-Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers` et `journals`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
+Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers` et `serials`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
 
 Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de revue. Seul un recueil d'actes existant de même titre le rattache. Les plateformes d'ebooks d'OpenAlex ne créent pas de revue.
 
@@ -36,9 +36,6 @@ Conservés en base, les payloads bruts la font grossir hors de proportion avec l
 Chaque contribution source entrante est rapprochée d'une contribution source en base aux mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
 
 Un enregistrement source dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses contributions sources en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
-
-Les contributions sources des thèses sont supprimées puis recréées à chaque normalisation.
-
 ## Archivage du payload brut
 
 Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le [raw store](../../infrastructure/raw_store/) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option [`--raw-store`](../exploitation/03-pipeline.md#divers) déclenche cet archivage : sans elle, le payload est perdu à la vidange. Cette option est inopérante en production, où la racine du conteneur est en lecture seule.

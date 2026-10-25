@@ -78,7 +78,7 @@ D'autres modules réunissent des connaissances sans rapport :
 - L'outillage HTTP quitte `ingestion/` pour un paquet neutre `pipeline/http/`. `parallel.py` et `access_source.py` rejoignent `runtime/`. Des contrats import-linter fixent le sens des dépendances : le noyau (`runtime`, `graph`, `node_runner`) n'importe ni `ingestion` ni `transformation`.
 - Le contexte de phase est le seul canal des transactions et du journal.
 - Chaque phase par paquet applique les conventions SQL, de nommage et de langue aux modules qu'elle touche. Un module se modifie une seule fois.
-- Les constats couverts par [Une source, un adaptateur](../CODE_adaptateur-par-source.md), [Accès réseau des sources](../CODE_acces-reseau-des-sources.md), [Contrat des métriques de phase](../CODE_contrat-des-metriques.md) et [Cycle de vie des publications](../CODE_cycle-de-vie-des-publications.md) restent dans ces fiches.
+- Les constats couverts par [Une source, un adaptateur](2026-10-23_CODE_adaptateur-par-source.md), « Contrat des métriques de phase » (classé sans suite) et [Cycle de vie des publications](2026-10-23_CODE_cycle-de-vie-des-publications.md) restent dans ces fiches.
 
 ## Phasage
 

@@ -43,12 +43,12 @@ class CannotAttributeConflict(ConflictError):
         super().__init__(message)
 
 
-class BlockingJournal(TypedDict):
+class BlockingSerial(TypedDict):
     """Description structurée d'une paire de journaux qui bloque la fusion de deux éditeurs (cf. `PublisherMergeBlockedError`)."""
 
-    target_journal_id: int
+    target_serial_id: int
     target_title: str
-    source_journal_id: int
+    source_serial_id: int
     source_title: str
     reason: str  # explication lisible (ex: "ISSN différents : 0028-0836 vs 9999-9999")
 
@@ -56,27 +56,39 @@ class BlockingJournal(TypedDict):
 class PublisherMergeBlockedError(ConflictError):
     """Fusion d'éditeurs refusée : des paires de revues ne peuvent pas être fusionnées automatiquement (ex: ISSN divergents pour des revues partageant le même titre). L'utilisatrice doit traiter les paires bloquantes côté admin Revues d'abord, puis relancer la fusion.
 
-    `blocking_journals` énumère les paires problématiques pour que l'UI puisse les afficher et permettre l'action manuelle."""
+    `blocking_serials` énumère les paires problématiques pour que l'UI puisse les afficher et permettre l'action manuelle."""
 
-    def __init__(self, blocking_journals: list[BlockingJournal]) -> None:
-        self.blocking_journals = blocking_journals
-        n = len(blocking_journals)
+    def __init__(self, blocking_serials: list[BlockingSerial]) -> None:
+        self.blocking_serials = blocking_serials
+        n = len(blocking_serials)
         super().__init__(
             f"Fusion bloquée par {n} paire{'s' if n > 1 else ''} de revues à traiter manuellement"
         )
 
 
 class ContributionAlreadyAssignedError(ConflictError):
-    """Attribution refusée : la contribution source visée est déjà rattachée à une personne.
+    """Attribution refusée : la contribution visée, groupe de contributions sources, est déjà rattachée à une personne.
 
-    Seule une contribution source orpheline s'attribue ; reprendre une contribution source rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
+    Seule une contribution orpheline s'attribue ; reprendre une contribution rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
 
     def __init__(self, contribution_id: int, owner_person_id: int) -> None:
         self.contribution_id = contribution_id
         self.owner_person_id = owner_person_id
         super().__init__(
-            f"La contribution source #{contribution_id} est déjà attribuée à la personne "
-            f"#{owner_person_id} ; seule une contribution source orpheline peut être attribuée."
+            f"La contribution #{contribution_id} est déjà attribuée à la personne "
+            f"#{owner_person_id} ; seule une contribution orpheline peut être attribuée."
+        )
+
+
+class PersonAlreadyInPublicationError(ConflictError):
+    """Attribution refusée : la personne a déjà, dans la publication, une contribution rattachée par une décision humaine. Une personne a au plus une contribution par publication ; la contribution visée resterait sans elle."""
+
+    def __init__(self, publication_id: int, contribution_id: int) -> None:
+        self.publication_id = publication_id
+        self.contribution_id = contribution_id
+        super().__init__(
+            f"La personne a déjà la contribution #{contribution_id} dans la publication "
+            f"#{publication_id}, rattachée par une décision humaine."
         )
 
 

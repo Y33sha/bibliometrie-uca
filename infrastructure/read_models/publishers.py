@@ -6,7 +6,6 @@ from application.ports.read_models._common import FacetOption
 from application.ports.read_models.publishers_queries import (
     DocTypeCount,
     DoiPrefixInfo,
-    JournalTypeCount,
     OaStatusCount,
     Publisher,
     PublisherDashboardResponse,
@@ -16,6 +15,7 @@ from application.ports.read_models.publishers_queries import (
     PublisherQueries,
     PublishersFacetsResponse,
     PublisherSort,
+    SerialTypeCount,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from domain.normalize import normalize_text
@@ -31,7 +31,7 @@ def _build_publisher_where(
 ) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
 
-    Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes journals/publications.
+    Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes serials/publications.
     """
     binds: dict[str, object] = {}
     parts: list[str] = []
@@ -55,8 +55,8 @@ def _build_publisher_where(
 _SORT_MAP = {
     "name_asc": "p.name ASC",
     "name_desc": "p.name DESC",
-    "journals_asc": "journal_count ASC, p.name ASC",
-    "journals_desc": "journal_count DESC, p.name ASC",
+    "serials_asc": "serial_count ASC, p.name ASC",
+    "serials_desc": "serial_count DESC, p.name ASC",
     "publications_asc": "publication_count ASC, p.name ASC",
     "publications_desc": "publication_count DESC, p.name ASC",
 }
@@ -82,7 +82,7 @@ def _doi_prefixes_sql() -> str:
 _PUBLISHER_COLUMNS = f"""
     p.id, p.name, p.openalex_id, p.country,
     p.publisher_type,
-    (SELECT COUNT(*) FROM journals j WHERE j.publisher_id = p.id) AS journal_count,
+    (SELECT COUNT(*) FROM serials j WHERE j.publisher_id = p.id) AS serial_count,
     p.publication_count,
     {_doi_prefixes_sql()} AS doi_prefixes
 """.strip()
@@ -99,7 +99,7 @@ def _row_to_publisher(row: Row[tuple[object, ...]]) -> Publisher:
         openalex_id=row.openalex_id,
         country=row.country,
         publisher_type=row.publisher_type,
-        journal_count=row.journal_count,
+        serial_count=row.serial_count,
         publication_count=row.publication_count,
         doi_prefixes=[DoiPrefixInfo(**p) for p in row.doi_prefixes],
     )
@@ -204,13 +204,13 @@ class PgPublisherQueries(PublisherQueries):
         if exists is None:
             return None
 
-        journal_type_rows = self._conn.execute(
+        serial_type_rows = self._conn.execute(
             text("""
-                SELECT journal_type, COUNT(*) AS n
-                FROM journals
+                SELECT serial_type, COUNT(*) AS n
+                FROM serials
                 WHERE publisher_id = :id
-                GROUP BY journal_type
-                ORDER BY n DESC, journal_type NULLS LAST
+                GROUP BY serial_type
+                ORDER BY n DESC, serial_type NULLS LAST
             """),
             {"id": publisher_id},
         ).all()
@@ -218,8 +218,7 @@ class PgPublisherQueries(PublisherQueries):
             text(f"""
                 SELECT p.doc_type, COUNT(*) AS n
                 FROM publications p
-                JOIN journals j ON j.id = p.journal_id
-                WHERE j.publisher_id = :id
+                WHERE p.publisher_id = :id
                   AND {publication_in_perimeter("p")}
                 GROUP BY p.doc_type
                 ORDER BY n DESC, p.doc_type NULLS LAST
@@ -230,8 +229,7 @@ class PgPublisherQueries(PublisherQueries):
             text(f"""
                 SELECT p.oa_status, COUNT(*) AS n
                 FROM publications p
-                JOIN journals j ON j.id = p.journal_id
-                WHERE j.publisher_id = :id
+                WHERE p.publisher_id = :id
                   AND {publication_in_perimeter("p")}
                 GROUP BY p.oa_status
                 ORDER BY n DESC, p.oa_status NULLS LAST
@@ -242,25 +240,20 @@ class PgPublisherQueries(PublisherQueries):
 
         return PublisherDashboardResponse(
             total_publications=total,
-            journal_types=[
-                JournalTypeCount(journal_type=r.journal_type, count=r.n) for r in journal_type_rows
+            serial_types=[
+                SerialTypeCount(serial_type=r.serial_type, count=r.n) for r in serial_type_rows
             ],
             doc_types=[DocTypeCount(doc_type=r.doc_type, count=r.n) for r in doc_type_rows],
             oa_statuses=[OaStatusCount(oa_status=r.oa_status, count=r.n) for r in oa_rows],
         )
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Sujets des publications de l'éditeur, les plus fréquents d'abord, atteintes par ses revues.
+        """Sujets des publications de l'éditeur, les plus fréquents d'abord.
 
         Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
-            text(
-                entity_subjects_sql(
-                    "EXISTS (SELECT 1 FROM journals j "
-                    "WHERE j.id = p.journal_id AND j.publisher_id = :id)"
-                )
-            ),
+            text(entity_subjects_sql("p.publisher_id = :id")),
             {"id": publisher_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]

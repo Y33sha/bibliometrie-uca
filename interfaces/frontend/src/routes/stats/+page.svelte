@@ -41,7 +41,7 @@
 	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
 	// Facettes à forte cardinalité (recherche serveur) : une entité sélectionnée (id + libellé).
 	// Facettes éditeur / revue : seul l'id (état canonique) ; le libellé de la pastille est résolu par EntityFilter.
-	let selectedJournalId = $state<string | null>(null);
+	let selectedSerialId = $state<string | null>(null);
 	let selectedPublisherId = $state<string | null>(null);
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
@@ -198,7 +198,7 @@
 		if (dim === 'license' && selectedLicenses.length > 0) { selectedLicenses = []; cleared = true; }
 		if (dim === 'lab' && selectedLabs.length > 0) { selectedLabs = []; cleared = true; }
 		if (dim === 'publisher' && selectedPublisherId) { selectedPublisherId = null; cleared = true; }
-		if (dim === 'journal' && selectedJournalId) { selectedJournalId = null; cleared = true; }
+		if (dim === 'serial' && selectedSerialId) { selectedSerialId = null; cleared = true; }
 		syncUrl();
 		if (cleared) refresh();
 		else loadChart();
@@ -214,7 +214,7 @@
 		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
 		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
-		if (selectedJournalId) p.set('journal_id', selectedJournalId);
+		if (selectedSerialId) p.set('serial_id', selectedSerialId);
 		return p;
 	}
 
@@ -244,7 +244,7 @@
 			selectedLicenses: { type: 'string_array', urlKey: 'license' },
 			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
-			journalId: { type: 'single', urlKey: 'journal_id' },
+			serialId: { type: 'single', urlKey: 'serial_id' },
 			measure: { type: 'single', urlKey: 'measure', defaultValue: 'publication_count' },
 			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
@@ -264,7 +264,7 @@
 			selectedLicenses,
 			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
 			publisherId: selectedPublisherId ?? '',
-			journalId: selectedJournalId ?? '',
+			serialId: selectedSerialId ?? '',
 			measure,
 			primaryBy,
 			groupBy,
@@ -286,7 +286,7 @@
 		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
 		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
-		if (selectedJournalId) p.set('journal_id', selectedJournalId);
+		if (selectedSerialId) p.set('serial_id', selectedSerialId);
 		return base + '/publications?' + paramsToQuery(p);
 	});
 
@@ -521,8 +521,8 @@
 		selectedPublisherId = id;
 		onFilterChange();
 	}
-	function onJournalFilter(id: string | null) {
-		selectedJournalId = id;
+	function onSerialFilter(id: string | null) {
+		selectedSerialId = id;
 		onFilterChange();
 	}
 
@@ -538,7 +538,7 @@
 		if (restored.selectedDocTypes != null)
 			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
-		if (restored.journalId) selectedJournalId = restored.journalId as string;
+		if (restored.serialId) selectedSerialId = restored.serialId as string;
 		if (restored.measure !== undefined) measure = restored.measure as string;
 		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
@@ -650,8 +650,8 @@
 	{#if facetKeys.has('doc_type')}
 		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	{/if}
-	{#if facetKeys.has('journal')}
-		<EntityFilter label="Revue" endpoint="/api/stats/facets" kind="journal" buildParams={chartParams} selected={selectedJournalId ? [selectedJournalId] : []} onchange={(ids) => onJournalFilter(ids[0] ?? null)} />
+	{#if facetKeys.has('serial')}
+		<EntityFilter label="Revue" endpoint="/api/stats/facets" kind="serial" buildParams={chartParams} selected={selectedSerialId ? [selectedSerialId] : []} onchange={(ids) => onSerialFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('publisher')}
 		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />

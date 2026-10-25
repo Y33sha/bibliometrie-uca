@@ -1,6 +1,6 @@
 """Service Personnes — écritures sur l'agrégat Person, transaction-agnostiques.
 
-Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions sources (`source_contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
+Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`contributions`). Les appelants sont les command handlers de l'API et l'import RH ; chacun tient sa propre frontière transactionnelle et commite lui-même. Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
 import logging
@@ -44,10 +44,9 @@ class ContributionRef(TypedDict):
 
 
 class DetachResult(TypedDict):
-    """Résultat de `detach_contributions` : compteurs de l'opération."""
+    """Résultat de `detach_contributions` : groupes détachés et formes de nom supprimées."""
 
     detached: int
-    deleted_contributions: int
     cleaned_forms: int
 
 
@@ -162,7 +161,7 @@ def add_identifier(
       n'attribue à la main ;
     - l'existence de la personne est vérifiée, l'identifiant venant d'un formulaire. La
       promotion depuis les contributions sources (`IdentifierOrigin.AUTO`) en fait l'économie : elle boucle sur
-      une personne que la cascade vient de créer ou de rapprocher.
+      une personne que la phase `persons` vient de rapprocher.
     """
     if source == IdentifierOrigin.MANUAL:
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
@@ -204,7 +203,7 @@ def update_identifier_status(
 ) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Lève NotFoundError si l'identifiant n'existe pas.
+    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les groupes de contributions sources que ses identifiants rejetés lui rattachent (`mark_groups_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
     propagated = (
@@ -212,6 +211,8 @@ def update_identifier_status(
         if status in _PROPAGATED_STATUSES
         else 0
     )
+    if status == AttributionStatus.REJECTED.value:
+        repo.mark_groups_of_rejected_identifiers(row["person_id"])
     emit_event(
         audit_repo,
         "person_identifier.status_changed",
@@ -259,15 +260,13 @@ def update_name_form_status(
 ) -> NameFormStatusRow:
     """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-    `confirmed` valide le lien. `rejected` est le verrou de non-retour ET déclenche le **détachement** des contributions sources sous cette forme : leur `person_id` passe à NULL et les `contributions` devenues sans source sont supprimées. Les contributions sources que l'admin a épinglées sur la personne restent rattachées, épinglage compris.
+    `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il marque aussi pour la redécision de leur personne les groupes de la personne rattachés par le nom dont un membre contient la forme (`mark_groups_for_name_form`) : le run suivant les redécide. Les groupes épinglés ne sont pas marqués.
 
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
     if status == "rejected":
-        detached = contribution_repo.null_person_id_for_name_form(person_id, name_form)
-        if detached:
-            contribution_repo.delete_orphan_contributions_for_person(person_id)
+        contribution_repo.mark_groups_for_name_form(person_id, name_form)
     emit_event(
         audit_repo,
         "person_name_form.status_changed",
@@ -282,15 +281,17 @@ def detach_contributions(
     person_id: int,
     contributions: list[ContributionRef],
     *,
+    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
 ) -> DetachResult:
     """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
 
-    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement de toutes les sources de la paire, suppression de la ligne consolidée). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
+    Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement du groupe de la personne). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
 
-    Retourne {"detached": N, "deleted_contributions": M, "cleaned_forms": K}.
+    Retourne {"detached": N, "cleaned_forms": K}, N groupes détachés.
     """
     publication_ids: set[int] = set()
     for a in contributions:
@@ -302,19 +303,21 @@ def detach_contributions(
             publication_ids.add(publication_id)
 
     detached = 0
-    deleted = 0
     for publication_id in publication_ids:
         result = reject_pair(
-            publication_id, person_id, repo=contribution_repo, audit_repo=audit_repo
+            publication_id,
+            person_id,
+            conn=conn,
+            repo=contribution_repo,
+            perimeter_recompute=perimeter_recompute,
+            audit_repo=audit_repo,
         )
         detached += result["detached"]
-        deleted += result["deleted_contributions"]
 
     cleaned_forms = repo.delete_orphan_name_forms_for_person(person_id)
 
     return {
         "detached": detached,
-        "deleted_contributions": deleted,
         "cleaned_forms": cleaned_forms,
     }
 

@@ -138,6 +138,7 @@ def _run(
             options=RunOptions(),
             maintain=lambda op: None,
             credentials_missing=lambda _source: None,
+            request_budget=lambda _source: None,
         )
     )
 
@@ -300,6 +301,7 @@ def test_skips_without_unpaywall_configuration(logger):
             options=RunOptions(),
             maintain=lambda op: None,
             credentials_missing=lambda _source: "adresse polite pool absente",
+            request_budget=lambda _source: None,
         )
     )
 

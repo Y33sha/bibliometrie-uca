@@ -68,15 +68,11 @@ def _addresses(conn, source_contribution_id: int) -> list[str]:
 
 def _pin(conn, source_contribution_id: int) -> int:
     person = insert_person(conn, "Xu", first_name="Zhilu", normalizer="lower")
-    conn.execute(
-        text("UPDATE source_contributions SET person_id = :p WHERE id = :i"),
-        {"p": person, "i": source_contribution_id},
-    )
     insert_confirmed_source_contribution(conn, source_contribution_id, person_id=person)
     return person
 
 
-def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
+def test_auteur_ajoute_en_tete_conserve_l_epinglage(sa_sync_conn):
     conn = sa_sync_conn
     source_record = _source_record(conn)
     _write(conn, source_record, [_rec(0, "Dupont, Jean"), _rec(1, "Xu, Z.")])
@@ -94,12 +90,6 @@ def test_auteur_ajoute_en_tete_conserve_personne_et_epinglage(sa_sync_conn):
     )
 
     assert _source_contributions(conn, source_record)[2][0] == xu_id
-    assert (
-        conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": xu_id}
-        ).scalar_one()
-        == person
-    )
     assert (
         conn.execute(
             text(
@@ -303,7 +293,7 @@ def test_marque_collective_ecrite_et_reecrite(sa_sync_conn):
     assert [tuple(r) for r in rows] == [(0, True), (1, True)]
 
 
-def test_contribution_source_devenue_collective_reinseree_sans_personne(sa_sync_conn):
+def test_contribution_source_devenue_collective_reinseree_sans_epinglage(sa_sync_conn):
     conn = sa_sync_conn
     source_record = _source_record(conn)
     _write(conn, source_record, [_rec(0, "Big Lab")])
@@ -316,8 +306,11 @@ def test_contribution_source_devenue_collective_reinseree_sans_personne(sa_sync_
     assert new_id != old_id
     assert (
         conn.execute(
-            text("SELECT person_id FROM source_contributions WHERE id = :i"), {"i": new_id}
-        ).scalar_one()
+            text(
+                "SELECT person_id FROM confirmed_source_contributions WHERE source_contribution_id = :i"
+            ),
+            {"i": new_id},
+        ).scalar_one_or_none()
         is None
     )
 

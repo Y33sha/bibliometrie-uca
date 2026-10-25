@@ -34,7 +34,7 @@ class CorrectionKey(StrEnum):
     DOI = "doi"
     REMOVED_EXTERNAL_IDS = "removed_external_ids"
     """Identifiants externes partagés avec une autre œuvre, retirés (`removal_entry`)."""
-    JOURNAL_ID = "journal_id"
+    SERIAL_ID = "serial_id"
 
 
 # Clés que pose chaque sous-étape de `metadata_correction`. Chaque sous-étape réécrit les siennes et garde les autres (`other_entries`).
@@ -42,12 +42,12 @@ UNARY_KEYS = frozenset(
     {CorrectionKey.DOC_TYPE, CorrectionKey.OA_STATUS, CorrectionKey.EXTERNAL_IDS}
 )
 CLUSTER_KEYS = frozenset({CorrectionKey.DOI, CorrectionKey.REMOVED_EXTERNAL_IDS})
-JOURNAL_BY_DOI_KEYS = frozenset({CorrectionKey.JOURNAL_ID})
-assert UNARY_KEYS | CLUSTER_KEYS | JOURNAL_BY_DOI_KEYS == set(CorrectionKey)
+SERIAL_BY_DOI_KEYS = frozenset({CorrectionKey.SERIAL_ID})
+assert UNARY_KEYS | CLUSTER_KEYS | SERIAL_BY_DOI_KEYS == set(CorrectionKey)
 assert not (
     UNARY_KEYS & CLUSTER_KEYS
-    or UNARY_KEYS & JOURNAL_BY_DOI_KEYS
-    or CLUSTER_KEYS & JOURNAL_BY_DOI_KEYS
+    or UNARY_KEYS & SERIAL_BY_DOI_KEYS
+    or CLUSTER_KEYS & SERIAL_BY_DOI_KEYS
 )
 
 

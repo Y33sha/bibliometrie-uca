@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `publishers_journals` — fusionne les monographies en double.
+"""Sous-étape de la phase `publishing` — fusionne les monographies en double.
 
 Deux monographies de même titre naissent quand l'éditeur ou l'ISBN manque à l'une des sources, puis arrive par une autre. `duplicate_monographs` (`domain/monographs/matching.py`) désigne les fusions : une monographie rejoint la seule monographie compatible de son titre, quand celle-ci en dit davantage. Le journal garde le titre et les identifiants de chaque fusion.
 """

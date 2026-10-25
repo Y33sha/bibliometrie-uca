@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import urllib.parse
 from collections.abc import Iterator, Sequence
@@ -27,7 +26,7 @@ def fetch_registration_agencies(
 ) -> Iterator[tuple[str, str | None]]:
     """Agence d'enregistrement de chaque préfixe DOI, par lots de `DOI_ORG_RA_BATCH` préfixes.
 
-    Rend `(préfixe, agence)`, avec l'agence `None` quand doi.org ne connaît pas le préfixe. Les préfixes d'un lot dont la requête échoue sont absents du résultat. L'indisponibilité de doi.org sous circuit-breaker lève `SourceUnavailableError`.
+    Rend `(préfixe, agence)`, avec l'agence `None` quand doi.org ne connaît pas le préfixe. Les préfixes d'un lot refusé par doi.org (4xx) sont absents du résultat. L'indisponibilité de doi.org lève `SourceUnavailableError`.
     """
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     for i in range(0, len(prefixes), DOI_ORG_RA_BATCH):
@@ -37,7 +36,7 @@ def fetch_registration_agencies(
             data = http_request_with_retry(
                 "GET", url, headers=headers, timeout=15, label=f"lot de {len(batch)} préfixes"
             )
-        except (httpx2.HTTPStatusError, json.JSONDecodeError) as exc:
+        except httpx2.HTTPStatusError as exc:
             logger.warning("doi.org/ra, lot de %d préfixes : %r", len(batch), exc)
             continue
         asked = set(batch)

@@ -1,13 +1,13 @@
-"""Intégration : back-fill du `doi` sur conflit, via `upsert_staging`.
+"""Intégration : back-fill du `doi` sur conflit, via `StagingStore.upsert`.
 
-Régression : sur conflit `(source, source_id)`, le `DO UPDATE` doit renseigner `doi` quand la ligne existait sans (doc moissonné avant que la source ne porte le DOI). Sinon le DOI trouvé par la phase `fetch_missing` n'atterrit jamais et le même lot est re-cherché à chaque run. Comportement mutualisé dans `upsert_staging`, commun à toutes les voies d'entrée du staging.
+Régression : sur conflit `(source, source_id)`, le `DO UPDATE` doit renseigner `doi` quand la ligne existait sans (doc moissonné avant que la source ne porte le DOI). Sinon le DOI trouvé par la phase `fetch_missing` n'atterrit jamais et le même lot est re-cherché à chaque run. Comportement mutualisé dans `StagingStore.upsert`, commun à toutes les voies d'entrée du staging.
 
-Appelle `upsert_staging` directement (ne committe pas, l'isolation du fixture est préservée).
+Appelle `StagingStore.upsert` directement (ne committe pas, l'isolation du fixture est préservée).
 """
 
 from sqlalchemy import text
 
-from pipeline.ingestion.common.staging import upsert_staging
+from pipeline.ingestion.common.staging import StagingStore
 from tests.integration.helpers.staging import insert_staging
 
 
@@ -23,8 +23,7 @@ def _staging_doi(conn, source_id):
 
 
 def _upsert(conn, source_id, doi):
-    upsert_staging(
-        conn,
+    StagingStore(conn).upsert(
         source="hal",
         source_id=source_id,
         doi=doi,

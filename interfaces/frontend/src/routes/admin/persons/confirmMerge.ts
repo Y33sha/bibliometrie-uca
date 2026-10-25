@@ -6,11 +6,11 @@ import { titleCase } from "$lib/utils";
  * Confirmation avant fusion de deux personnes. Signale le nombre de publications en tant qu'auteur réattribuées (celles de la personne absorbée, `sourceId`) et le caractère irréversible de l'action. Récupère le compte à jour depuis l'API pour rester exact quel que soit le point d'appel.
  */
 export async function confirmMerge(sourceId: number): Promise<boolean> {
-  const p = await api<{ last_name: string; first_name: string; source_contribution_count: number }>(
+  const p = await api<{ last_name: string; first_name: string; contribution_count: number }>(
     `/api/persons/${sourceId}/curation`,
   );
   const name = `${titleCase(p.last_name)} ${titleCase(p.first_name)}`.trim();
-  const n = p.source_contribution_count ?? 0;
+  const n = p.contribution_count ?? 0;
   const reassigned =
     n === 1
       ? "1 publication en tant qu'auteur sera réattribuée"

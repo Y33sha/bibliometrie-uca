@@ -12,7 +12,7 @@ export { api, apiDetail, cancel, latestRequest, post, put, patch, del, ApiError 
 export * as auth from './auth';
 export * as persons from './persons';
 export * as contributions from './contributions';
-export * as journals from './journals';
+export * as serials from './serials';
 export * as publishers from './publishers';
 export * as structures from './structures';
 export * as perimeters from './perimeters';

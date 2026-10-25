@@ -72,7 +72,7 @@ class TestTransferTo:
         assert ident.status is AttributionStatus.CONFIRMED
 
     def test_raises_on_rejected(self):
-        # Le rejeté relève de reattribute_to, pas du transfert par consensus.
+        # Le rejeté relève de reattribute_to, pas du transfert automatique.
         ident = _make(status=AttributionStatus.REJECTED)
         with pytest.raises(CannotAttributeConflict):
             ident.transfer_to(99, source="auto")

@@ -10,9 +10,9 @@ from domain.errors import (
 
 def _paire_de_revues() -> dict:
     return {
-        "target_journal_id": 1,
+        "target_serial_id": 1,
         "target_title": "Nature",
-        "source_journal_id": 2,
+        "source_serial_id": 2,
         "source_title": "Nature",
         "reason": "ISSN différents : 0028-0836 vs 9999-9999",
     }
@@ -40,7 +40,7 @@ class TestPublisherMergeBlockedError:
     def test_une_paire(self):
         paires = [_paire_de_revues()]
         exc = PublisherMergeBlockedError(paires)
-        assert exc.blocking_journals == paires
+        assert exc.blocking_serials == paires
         assert str(exc) == "Fusion bloquée par 1 paire de revues à traiter manuellement"
 
     def test_plusieurs_paires(self):
@@ -49,12 +49,12 @@ class TestPublisherMergeBlockedError:
 
 
 class TestContributionAlreadyAssignedError:
-    def test_nomme_la_contribution_source_et_sa_detentrice(self):
+    def test_nomme_la_contribution_et_sa_detentrice(self):
         exc = ContributionAlreadyAssignedError(7, 42)
         assert (exc.contribution_id, exc.owner_person_id) == (7, 42)
         assert str(exc) == (
-            "La contribution source #7 est déjà attribuée à la personne #42 ; "
-            "seule une contribution source orpheline peut être attribuée."
+            "La contribution #7 est déjà attribuée à la personne #42 ; "
+            "seule une contribution orpheline peut être attribuée."
         )
 
 

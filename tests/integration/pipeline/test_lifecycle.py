@@ -1,4 +1,4 @@
-"""Cycle de vie d'une publication : recalcul avec suppression, dissolution, suppression des publications sans source."""
+"""Cycle de vie d'une publication : recalcul avec suppression, dissolution, purge."""
 
 from functools import partial
 
@@ -8,13 +8,16 @@ from sqlalchemy import text
 from domain.merge import MergedEntity
 from pipeline.transformation.publications.consolidation import RefreshVerdict
 from pipeline.transformation.publications.lifecycle import (
-    delete_publications_without_sources,
     dissolve,
+    purge_publications,
     refresh,
 )
+from tests.integration.helpers.contributions import insert_contribution
+from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 _source_record = partial(
     insert_source_record, source="openalex", title="T", publication_year=2024, doc_type="article"
@@ -74,12 +77,60 @@ class TestDissolve:
         assert _publication_exists(conn, dissoute)
 
 
-def test_seules_les_publications_sans_source_sont_supprimees(sa_sync_conn):
-    conn = sa_sync_conn
-    vide = insert_publication(conn)
-    garnie = insert_publication(conn)
-    _source_record(conn, garnie, source_id="garnie", marked=False)
+class TestPurge:
+    @staticmethod
+    def _publication(conn, *, source: bool, contribution: bool) -> int:
+        pid = insert_publication(conn)
+        if source:
+            _source_record(conn, pid, source_id=f"w{pid}", marked=False)
+        if contribution:
+            insert_contribution(conn, pid, person_id=insert_person(conn, "Doe", first_name="Jane"))
+        return pid
 
-    assert delete_publications_without_sources(conn) == 1
-    assert not _publication_exists(conn, vide)
-    assert _publication_exists(conn, garnie)
+    def test_publication_sans_source_ou_sans_contribution_supprimee(self, sa_sync_conn):
+        conn = sa_sync_conn
+        sans_source = self._publication(conn, source=False, contribution=True)
+        sans_contribution = self._publication(conn, source=True, contribution=False)
+        complete = self._publication(conn, source=True, contribution=True)
+
+        purge_publications(conn)
+
+        assert not _publication_exists(conn, sans_source)
+        assert not _publication_exists(conn, sans_contribution)
+        assert _publication_exists(conn, complete)
+
+    def test_groupe_sans_personne_ne_retient_pas_la_publication(self, sa_sync_conn):
+        conn = sa_sync_conn
+        pid = self._publication(conn, source=True, contribution=False)
+        conn.execute(text("INSERT INTO contributions (publication_id) VALUES (:p)"), {"p": pid})
+
+        purge_publications(conn)
+
+        assert not _publication_exists(conn, pid)
+
+    def test_limit_borne_le_lot(self, sa_sync_conn):
+        conn = sa_sync_conn
+        # Purge préalable pour un compte déterministe, annulée par le rollback du test.
+        purge_publications(conn)
+        for _ in range(3):
+            insert_publication(conn)
+
+        assert purge_publications(conn, limit=2) == 2
+        assert purge_publications(conn, limit=2) == 1
+        assert purge_publications(conn, limit=2) == 0
+
+    def test_sujets_supprimes_en_cascade(self, sa_sync_conn):
+        """`publication_subjects` reste limitée aux publications du périmètre sans filtre propre."""
+        conn = sa_sync_conn
+        pid = insert_publication(conn)
+        insert_publication_subject(conn, pid, subject_id=insert_subject(conn, "vaches laitieres"))
+
+        purge_publications(conn)
+
+        assert (
+            conn.execute(
+                text("SELECT count(*) FROM publication_subjects WHERE publication_id = :p"),
+                {"p": pid},
+            ).scalar_one()
+            == 0
+        )

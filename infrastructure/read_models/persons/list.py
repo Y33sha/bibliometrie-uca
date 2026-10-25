@@ -27,10 +27,10 @@ from infrastructure.read_models.filters import (
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.sql_fragments import other_name_form_holders
-from infrastructure.sql_fragments import has_author_role
+from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role
 
-# Sous scope `lab_id`, chaque dénombrement se limite aux contributions sources de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
-_LAB_SCOPED_SOURCE_CONTRIBUTIONS = (
+# Sous scope `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
+_LAB_SCOPED_CONTRIBUTIONS = (
     " AND EXISTS (SELECT 1 FROM contribution_structures aus "
     "WHERE aus.contribution_id = a.id AND aus.structure_id = :flt_person_lab_id)"
 )
@@ -71,15 +71,15 @@ def search_persons(conn: Connection, *, search: str, limit: int) -> list[PersonS
 # ── Liste admin ──────────────────────────────────────────────────
 
 
-def _source_contribution_counts_sql(*, lab_scoped: bool) -> str:
-    """Les deux dénombrements de contributions sources en tant qu'auteur, sous la même condition de scope."""
-    scope = _LAB_SCOPED_SOURCE_CONTRIBUTIONS if lab_scoped else ""
+def _contribution_counts_sql(*, lab_scoped: bool) -> str:
+    """Les deux dénombrements de contributions en tant qu'auteur, sous la même condition de scope."""
+    scope = _LAB_SCOPED_CONTRIBUTIONS if lab_scoped else ""
     return f"""
         (SELECT COUNT(*) FROM contributions a
-         WHERE a.person_id = p.id AND {has_author_role("a")}{scope}) AS source_contribution_count,
+         WHERE a.person_id = p.id AND {has_author_role("a")}{scope}) AS contribution_count,
         (SELECT COUNT(*) FROM contributions a
          WHERE a.person_id = p.id AND {has_author_role("a")} AND a.in_perimeter = TRUE{scope}
-        ) AS in_perimeter_source_contribution_count
+        ) AS in_perimeter_contribution_count
     """
 
 
@@ -123,7 +123,7 @@ def list_persons(
             SELECT p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.exclusion,
-                {_source_contribution_counts_sql(lab_scoped=filters.lab_id is not None)}
+                {_contribution_counts_sql(lab_scoped=filters.lab_id is not None)}
             FROM persons p
             LEFT JOIN hr_records prh ON prh.person_id = p.id
             WHERE {where_sql}
@@ -151,8 +151,8 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
         end_date=row.end_date,
         has_rh=row.has_rh,
         exclusion=row.exclusion,
-        source_contribution_count=row.source_contribution_count,
-        in_perimeter_source_contribution_count=row.in_perimeter_source_contribution_count,
+        contribution_count=row.contribution_count,
+        in_perimeter_contribution_count=row.in_perimeter_contribution_count,
         identifiers=identifiers,
     )
 
@@ -160,7 +160,7 @@ def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifier
 def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryOut]:
     """Formes de nom d'une personne, avec leur état d'arbitrage.
 
-    Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui portent la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes que la forme signe.
+    Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui portent la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes où un membre d'un groupe de la personne porte la forme.
     """
     rows = conn.execute(
         text(f"""
@@ -170,11 +170,9 @@ def person_name_forms(conn: Connection, person_id: int) -> list[NameFormSummaryO
                    (SELECT COUNT(*)
                     FROM ({other_name_form_holders("pnf.name_form", "pnf.person_id")}) holders
                    ) AS shared_count,
-                   (SELECT COUNT(DISTINCT sr.publication_id)
-                    FROM source_contributions sc
-                    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-                    JOIN source_records sr ON sr.id = sc.source_record_id
-                    WHERE sc.person_id = pnf.person_id
+                   (SELECT COUNT(DISTINCT g.publication_id)
+                    FROM {GROUP_MEMBERS}
+                    WHERE g.person_id = pnf.person_id
                       AND ci.author_name_normalized = pnf.name_form
                    ) AS publication_count
             FROM person_name_forms pnf
@@ -202,7 +200,7 @@ def person_curation(conn: Connection, person_id: int) -> PersonOut | None:
             SELECT p.id, p.last_name, p.first_name,
                 prh.role_title, prh.department_name, prh.start_date, prh.end_date,
                 (prh.id IS NOT NULL) AS has_rh, p.exclusion,
-                {_source_contribution_counts_sql(lab_scoped=False)}
+                {_contribution_counts_sql(lab_scoped=False)}
             FROM persons p
             LEFT JOIN hr_records prh ON prh.person_id = p.id
             WHERE p.id = :id

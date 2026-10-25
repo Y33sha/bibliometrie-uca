@@ -107,8 +107,8 @@ def get_publication_detail(
                    p.oa_status::text AS oa_status,
                    p.license::text AS license, p.deposit_license::text AS deposit_license,
                    p.language, p.container_title, d.abstract, d.keywords,
-                   j.id AS journal_id, j.title AS journal_title,
-                   CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS journal_issns,
+                   j.id AS serial_id, j.title AS journal_title,
+                   CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
                    j.apc_amount, j.apc_currency,
                    j.oa_model,
                    m.id AS monograph_id, m.title AS monograph_title,
@@ -116,9 +116,9 @@ def get_publication_detail(
                    dp.ra AS doi_ra
             FROM publications p
             LEFT JOIN publications_detail d ON d.publication_id = p.id
-            LEFT JOIN journals j ON j.id = p.journal_id
+            LEFT JOIN serials j ON j.id = p.serial_id
             LEFT JOIN monographs m ON m.id = p.monograph_id
-            LEFT JOIN publishers pub ON pub.id = COALESCE(j.publisher_id, m.publisher_id)
+            LEFT JOIN publishers pub ON pub.id = p.publisher_id
             LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
             WHERE p.id = :pid
         """),
@@ -131,7 +131,7 @@ def get_publication_detail(
 
     sources_rows = conn.execute(
         text(f"""
-            SELECT sr.source, sr.source_id, sr.doi, sr.hal_collections, sr.countries,
+            SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries,
                    COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
                        AS is_secondary
             FROM source_records sr
@@ -144,6 +144,7 @@ def get_publication_detail(
         SourceRecordOut(
             source=r.source,
             source_id=r.source_id,
+            oa_status=r.oa_status,
             doi=r.doi,
             hal_collections=r.hal_collections,
             countries=r.countries,
@@ -154,7 +155,7 @@ def get_publication_detail(
 
     auth_rows = conn.execute(
         text(f"""
-            SELECT a.author_position, a.in_perimeter, a.is_corresponding,
+            SELECT a.reference_position AS author_position, a.in_perimeter, a.is_corresponding,
                    (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
                     FROM contribution_structures aus
                     WHERE aus.contribution_id = a.id) AS structure_ids,
@@ -167,7 +168,7 @@ def get_publication_detail(
             FROM contributions a
             JOIN persons pe ON pe.id = a.person_id
             WHERE a.publication_id = :pid
-            ORDER BY a.author_position
+            ORDER BY a.reference_position
         """),
         {"pid": publication_id},
     ).all()
@@ -191,9 +192,11 @@ def get_publication_detail(
 
     theses_rows = conn.execute(
         text(f"""
-            SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, sc.person_id,
+            SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, g.person_id,
                    sc.roles, sc.in_perimeter
             FROM source_contributions sc
+            LEFT JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc.id
+            LEFT JOIN contributions g ON g.id = gm.contribution_id
             WHERE sc.source_record_id = (
                 SELECT id FROM source_records
                 WHERE source = '{Source.THESES.value}' AND publication_id = :pid
@@ -264,9 +267,9 @@ def get_publication_detail(
             language=publication_row.language,
             container_title=publication_row.container_title,
             abstract=publication_row.abstract,
-            journal_id=publication_row.journal_id,
+            serial_id=publication_row.serial_id,
             journal_title=publication_row.journal_title,
-            journal_issns=list(publication_row.journal_issns or []),
+            serial_issns=list(publication_row.serial_issns or []),
             apc_amount=publication_row.apc_amount,
             apc_currency=publication_row.apc_currency,
             oa_model=publication_row.oa_model,

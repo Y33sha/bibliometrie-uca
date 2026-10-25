@@ -22,7 +22,7 @@ Source d'enrichissement consultée par DOI pour le statut open access des public
 
 ### Données récupérées
 
-Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`oa_status`](../pipeline/10-enrichissements.md#statut-open-access-oa_status) l'écrit par DOI dans `sources.unpaywall`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
+Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l'enum du référentiel : `gold`, `hybrid`, `bronze`, `green`, `closed`. La phase [`oa_status`](../pipeline/11-enrichissements.md#statut-open-access-oa_status) l'écrit par DOI dans `sources.unpaywall`, avec la date de l'interrogation. Un DOI absent d'Unpaywall y reçoit un statut nul.
 
 ### Particularités
 
@@ -34,14 +34,14 @@ Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l
 
 https://www.sudoc.fr/ — catalogue collectif des bibliothèques de l'enseignement supérieur (ABES)
 
-Source de référence des ISSN des revues. Consommée par `check_journals_in_sudoc`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md).
+Source de référence des ISSN des revues. Consommée par `check_serials_in_sudoc`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Services utilisés
 
 - `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN d'une revue, en une requête. Le format de réponse se donne dans le chemin. Une requête dont aucun ISSN n'a de notice répond 404.
 - `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML, lue avec `defusedxml`.
 
-Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 revues à la fois (`SUDOC_MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`). Licence ouverte Etalab.
+Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 revues à la fois (`MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
 
 ### Données récupérées
 
@@ -49,13 +49,13 @@ Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en lig
 
 Le Sudoc code « électronique » (`182$c = c`) aussi bien une ressource en ligne qu'un CD-ROM : seul `183$a` les distingue. Une notice dont le titre nomme le CD-ROM est lue comme un autre support, quel que soit son codage. L'arrêt du papier au profit de l'en ligne est souvent codé comme un changement de titre (`430`, `440`), sous le même titre. L'ISSN-L des notices papier et en ligne d'une même revue diffère parfois ; la notice porte alors l'ISSN-L d'un titre précédent.
 
-La notice elle-même n'est pas conservée. Ses informations sont écrites dans `journal_issns` : support, ISSN-L, statut et date de vérification de chaque ISSN.
+La notice elle-même n'est pas conservée. Ses informations sont écrites dans `serial_issns` : support, ISSN-L, statut et date de vérification de chaque ISSN.
 
 ## DOAJ
 
 https://doaj.org/ — Directory of Open Access Journals
 
-Source d'enrichissement des revues : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par `enrich_journals_from_doaj`, dans la phase [`publishers_journals`](../pipeline/05-publishers-journals.md).
+Source d'enrichissement des revues : « cette revue est-elle un journal open access certifié DOAJ, et à quelles conditions ? ». Consommée par `enrich_serials_from_doaj`, dans la phase [`publishing`](../pipeline/05-publishing.md).
 
 ### Dump utilisé
 
@@ -65,7 +65,7 @@ L'import indexe les revues par leurs ISSN valides, remet `is_in_doaj` à FALSE p
 
 ### Données récupérées
 
-Stockage : `journals.doaj_payload` (JSONB), `journals.doaj_imported_at` (timestamptz), `journals.is_in_doaj` (bool).
+Stockage : `serials.doaj_payload` (JSONB), `serials.doaj_imported_at` (timestamptz), `serials.is_in_doaj` (bool).
 
 Le payload garde les colonnes du CSV pour clés. Le frontend les lit telles quelles dans `READABLE_DOAJ_FIELDS` (`"Journal title"`, `"APC amount"`…), et l'audit des frais de publication interroge `doaj_payload->>'APC amount'`.
 

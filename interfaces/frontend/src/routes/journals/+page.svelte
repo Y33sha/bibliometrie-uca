@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { institution, pageTitle } from '$lib/institution.svelte';
-	import JournalsListView from '$lib/components/JournalsListView.svelte';
+	import SerialsListView from '$lib/components/SerialsListView.svelte';
 </script>
 
 <svelte:head>
@@ -14,7 +14,7 @@
 	et ses données DOAJ.
 </p>
 
-<JournalsListView apiKey="journals-list" urlSync withPubs />
+<SerialsListView apiKey="journals-list" urlSync withPubs />
 
 <style>
 	h1 { margin: 0 0 8px; font-size: 1.5rem; }

@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 33BuihB9OPczMIEY6dguVoaE0AfTfZOYur4QLk9q4jm2ySgCQkOfzHevglJDZa2
+\restrict q1uz21cMYjzb4F802UJtnbcgEmnPi9gdfMbZf3CRzHn1S91v64dELbn95KdENPD
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -62,6 +62,13 @@ CREATE SCHEMA ref;
 
 
 --
+-- Name: snapshot_20261024_gel; Type: SCHEMA; Schema: -; Owner: -
+--
+
+CREATE SCHEMA snapshot_20261024_gel;
+
+
+--
 -- Name: sources; Type: SCHEMA; Schema: -; Owner: -
 --
 
@@ -110,7 +117,6 @@ COMMENT ON EXTENSION unaccent IS 'text search dictionary that removes accents';
 CREATE TYPE public.country_detection_method AS ENUM (
     'manual',
     'country_name',
-    'ror',
     'source_openalex',
     'institution',
     'city',
@@ -149,20 +155,6 @@ CREATE TYPE public.doc_type AS ENUM (
     'data_paper',
     'proceedings',
     'media'
-);
-
-
---
--- Name: group_resolution_mode; Type: TYPE; Schema: public; Owner: -
---
-
-CREATE TYPE public.group_resolution_mode AS ENUM (
-    'manual',
-    'orcid',
-    'hal_person_id',
-    'idref',
-    'name',
-    'compatible_name'
 );
 
 
@@ -401,9 +393,12 @@ CREATE TYPE public.relation_type AS ENUM (
 --
 
 CREATE TYPE public.resolution_mode AS ENUM (
-    'identifier',
+    'manual',
+    'orcid',
+    'hal_person_id',
+    'idref',
     'name',
-    'cross_source'
+    'compatible_name'
 );
 
 
@@ -901,20 +896,51 @@ CREATE SEQUENCE public.pipeline_run_id_seq
 
 
 --
+-- Name: aligned_source_contributions; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.aligned_source_contributions (
+    source_contribution_id integer NOT NULL,
+    contribution_id integer NOT NULL,
+    source_record_id integer NOT NULL,
+    method public.grouping_method NOT NULL,
+    score real,
+    margin real,
+    CONSTRAINT aligned_source_contributions_score_check CHECK (((method = 'model'::public.grouping_method) OR ((score IS NULL) AND (margin IS NULL))))
+);
+
+
+--
+-- Name: TABLE aligned_source_contributions; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.aligned_source_contributions IS 'Appartenance d''une contribution source à son groupe. method : origine du lien. score et margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité de l''affectation.';
+
+
+--
 -- Name: contributions; Type: TABLE; Schema: publications; Owner: -
 --
 
 CREATE TABLE publications.contributions (
     id integer NOT NULL,
     publication_id integer NOT NULL,
-    person_id integer NOT NULL,
-    author_position smallint,
-    created_at timestamp with time zone DEFAULT now(),
+    person_id integer,
+    resolution_mode public.resolution_mode,
+    reference_position smallint,
     is_corresponding boolean,
     roles text[],
     perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
-    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL
-);
+    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
+    CONSTRAINT contributions_resolution_mode_with_person CHECK (((person_id IS NULL) = (resolution_mode IS NULL)))
+)
+WITH (fillfactor='90');
+
+
+--
+-- Name: TABLE contributions; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.contributions IS 'Contributions sources d''un même auteur dans une publication, avec au maximum une contribution source par enregistrement source. reference_position : position dans la liste la plus longue. Une personne correspond au maximum à un groupe par publication.';
 
 
 --
@@ -1027,13 +1053,11 @@ CREATE TABLE sources.source_contributions (
     source public.source_type NOT NULL,
     source_record_id integer NOT NULL,
     author_position smallint,
-    person_id integer,
     is_corresponding boolean DEFAULT false,
     roles text[] DEFAULT ARRAY['author'::text],
     raw_author_name text,
     created_at timestamp with time zone DEFAULT now(),
     contributor_information_id integer NOT NULL,
-    resolution_mode public.resolution_mode,
     neutralized_identifiers jsonb,
     content_hash text,
     raw_last_name text,
@@ -1044,7 +1068,8 @@ CREATE TABLE sources.source_contributions (
     collective boolean DEFAULT false NOT NULL,
     duplicate_of integer,
     CONSTRAINT source_contributions_name_form CHECK (((num_nonnulls(raw_author_name, raw_last_name) = 1) AND ((raw_first_name IS NULL) OR (raw_last_name IS NOT NULL))))
-);
+)
+WITH (fillfactor='90');
 ALTER TABLE ONLY sources.source_contributions ALTER COLUMN source_record_id SET (n_distinct=-0.0134);
 
 
@@ -1360,15 +1385,13 @@ UNION
 --
 
 CREATE MATERIALIZED VIEW publications.contribution_structures AS
- SELECT DISTINCT a.id AS contribution_id,
-    sas.structure_id
-   FROM (((sources.source_contribution_structures sas
-     JOIN sources.source_contributions sa ON ((sa.id = sas.source_contribution_id)))
-     JOIN sources.source_records sp ON ((sp.id = sa.source_record_id)))
-     JOIN publications.contributions a ON (((a.publication_id = sp.publication_id) AND (a.person_id = sa.person_id))))
-  WHERE (NOT (EXISTS ( SELECT 1
-           FROM persons.persons pe
-          WHERE ((pe.id = a.person_id) AND (pe.exclusion IS NOT NULL)))))
+ SELECT DISTINCT m.contribution_id,
+    scs.structure_id
+   FROM (((sources.source_contribution_structures scs
+     JOIN publications.aligned_source_contributions m ON ((m.source_contribution_id = scs.source_contribution_id)))
+     JOIN publications.contributions g ON ((g.id = m.contribution_id)))
+     JOIN persons.persons pe ON ((pe.id = g.person_id)))
+  WHERE (pe.exclusion IS NULL)
   WITH NO DATA;
 
 
@@ -1393,64 +1416,17 @@ ALTER SEQUENCE publications.contributions_id_seq OWNED BY publications.contribut
 
 
 --
--- Name: source_contribution_group_members; Type: TABLE; Schema: publications; Owner: -
---
-
-CREATE TABLE publications.source_contribution_group_members (
-    source_contribution_id integer CONSTRAINT source_contribution_group_membe_source_contribution_id_not_null NOT NULL,
-    group_id integer NOT NULL,
-    source_record_id integer NOT NULL,
-    method public.grouping_method NOT NULL,
-    score real,
-    margin real,
-    CONSTRAINT source_contribution_group_members_score_check CHECK (((method = 'model'::public.grouping_method) OR ((score IS NULL) AND (margin IS NULL))))
-);
-
-
---
--- Name: TABLE source_contribution_group_members; Type: COMMENT; Schema: publications; Owner: -
---
-
-COMMENT ON TABLE publications.source_contribution_group_members IS 'Appartenance d''une contribution source à son groupe. method : origine du lien. score et margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité de l''affectation.';
-
-
---
--- Name: source_contribution_groups; Type: TABLE; Schema: publications; Owner: -
---
-
-CREATE TABLE publications.source_contribution_groups (
-    id integer NOT NULL,
-    publication_id integer NOT NULL,
-    person_id integer,
-    resolution_mode public.group_resolution_mode,
-    reference_position smallint,
-    is_corresponding boolean,
-    roles text[],
-    perimeter_evidence public.perimeter_evidence[] DEFAULT '{}'::public.perimeter_evidence[] NOT NULL,
-    in_perimeter boolean GENERATED ALWAYS AS ((cardinality(perimeter_evidence) > 0)) STORED NOT NULL,
-    CONSTRAINT source_contribution_groups_resolution_mode_with_person CHECK (((person_id IS NULL) = (resolution_mode IS NULL)))
-);
-
-
---
--- Name: TABLE source_contribution_groups; Type: COMMENT; Schema: publications; Owner: -
---
-
-COMMENT ON TABLE publications.source_contribution_groups IS 'Contributions sources d''un même auteur dans une publication, avec au maximum une contribution source par enregistrement source. reference_position : position dans la liste la plus longue. Une personne correspond au maximum à un groupe par publication.';
-
-
---
 -- Name: publication_author_alignment; Type: MATERIALIZED VIEW; Schema: publications; Owner: -
 --
 
 CREATE MATERIALIZED VIEW publications.publication_author_alignment AS
  WITH author_members AS (
          SELECT g.publication_id,
-            gs.group_id,
+            gs.contribution_id AS group_id,
             gs.source_record_id AS source_publication_id,
-            count(*) OVER (PARTITION BY gs.group_id) AS group_size
-           FROM ((publications.source_contribution_group_members gs
-             JOIN publications.source_contribution_groups g ON ((g.id = gs.group_id)))
+            count(*) OVER (PARTITION BY gs.contribution_id) AS group_size
+           FROM ((publications.aligned_source_contributions gs
+             JOIN publications.contributions g ON ((g.id = gs.contribution_id)))
              JOIN sources.source_contributions sa ON ((sa.id = gs.source_contribution_id)))
           WHERE ((sa.roles IS NULL) OR ('author'::text = ANY (sa.roles)))
         )
@@ -1505,11 +1481,11 @@ ALTER TABLE publications.publication_relations ALTER COLUMN id ADD GENERATED ALW
 --
 
 CREATE MATERIALIZED VIEW publications.publication_structures AS
- SELECT DISTINCT a.publication_id,
-    aus.structure_id
-   FROM (publications.contributions a
-     JOIN publications.contribution_structures aus ON ((aus.contribution_id = a.id)))
-  WHERE (a.roles && ARRAY['author'::text])
+ SELECT DISTINCT g.publication_id,
+    gs.structure_id
+   FROM (publications.contributions g
+     JOIN publications.contribution_structures gs ON ((gs.contribution_id = g.id)))
+  WHERE (g.roles && ARRAY['author'::text])
   WITH NO DATA;
 
 
@@ -1589,26 +1565,6 @@ CREATE SEQUENCE publications.publications_id_seq
 --
 
 ALTER SEQUENCE publications.publications_id_seq OWNED BY publications.publications.id;
-
-
---
--- Name: source_contribution_groups_id_seq; Type: SEQUENCE; Schema: publications; Owner: -
---
-
-CREATE SEQUENCE publications.source_contribution_groups_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: source_contribution_groups_id_seq; Type: SEQUENCE OWNED BY; Schema: publications; Owner: -
---
-
-ALTER SEQUENCE publications.source_contribution_groups_id_seq OWNED BY publications.source_contribution_groups.id;
 
 
 --
@@ -2094,6 +2050,54 @@ ALTER TABLE queues.address_countries_queue ALTER COLUMN seq ADD GENERATED ALWAYS
 
 
 --
+-- Name: contribution_attributes_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.contribution_attributes_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: contribution_attributes_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.contribution_attributes_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.contribution_attributes_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: contribution_resolution_queue; Type: TABLE; Schema: queues; Owner: -
+--
+
+CREATE TABLE queues.contribution_resolution_queue (
+    id integer NOT NULL,
+    seq bigint NOT NULL
+);
+
+
+--
+-- Name: contribution_resolution_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
+--
+
+ALTER TABLE queues.contribution_resolution_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME queues.contribution_resolution_queue_seq_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: publication_contributions_queue; Type: TABLE; Schema: queues; Owner: -
 --
 
@@ -2133,30 +2137,6 @@ CREATE TABLE queues.source_contribution_countries_queue (
 
 ALTER TABLE queues.source_contribution_countries_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME queues.source_contribution_countries_queue_seq_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1
-);
-
-
---
--- Name: source_contribution_group_attributes_queue; Type: TABLE; Schema: queues; Owner: -
---
-
-CREATE TABLE queues.source_contribution_group_attributes_queue (
-    id integer NOT NULL,
-    seq bigint NOT NULL
-);
-
-
---
--- Name: source_contribution_group_attributes_queue_seq_seq; Type: SEQUENCE; Schema: queues; Owner: -
---
-
-ALTER TABLE queues.source_contribution_group_attributes_queue ALTER COLUMN seq ADD GENERATED ALWAYS AS IDENTITY (
-    SEQUENCE NAME queues.source_contribution_group_attributes_queue_seq_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -2323,6 +2303,104 @@ COMMENT ON TABLE ref.ror_relations IS 'Relations parent/enfant entre organisatio
 
 
 --
+-- Name: contributions; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.contributions (
+    id integer,
+    publication_id integer,
+    person_id integer,
+    author_position smallint,
+    created_at timestamp with time zone,
+    is_corresponding boolean,
+    roles text[],
+    perimeter_evidence public.perimeter_evidence[],
+    in_perimeter boolean
+);
+
+
+--
+-- Name: group_members; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.group_members (
+    source_contribution_id integer,
+    group_id integer
+);
+
+
+--
+-- Name: groups; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.groups (
+    group_id integer,
+    publication_id integer,
+    person_id integer,
+    resolution_mode text,
+    in_perimeter boolean,
+    roles text[]
+);
+
+
+--
+-- Name: person_identifiers; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.person_identifiers (
+    id integer,
+    person_id integer,
+    id_type text,
+    id_value text,
+    source public.identifier_origin,
+    created_at timestamp with time zone,
+    status public.identifier_status
+);
+
+
+--
+-- Name: person_name_forms; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.person_name_forms (
+    name_form text,
+    person_id integer,
+    sources text[],
+    created_at timestamp with time zone,
+    status public.identifier_status
+);
+
+
+--
+-- Name: persons; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.persons (
+    id integer,
+    last_name text,
+    first_name text,
+    last_name_normalized text,
+    first_name_normalized text,
+    created_at timestamp with time zone,
+    exclusion public.person_exclusion
+);
+
+
+--
+-- Name: source_contribution_persons; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
+--
+
+CREATE TABLE snapshot_20261024_gel.source_contribution_persons (
+    source_contribution_id integer,
+    source_record_id integer,
+    publication_id integer,
+    person_id integer,
+    resolution_mode text,
+    in_perimeter boolean
+);
+
+
+--
 -- Name: known_dois; Type: VIEW; Schema: sources; Owner: -
 --
 
@@ -2366,7 +2444,8 @@ COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI des notices, DO
 
 CREATE VIEW sources.candidate_dois AS
  SELECT DISTINCT k.doi,
-    k.source
+    k.source,
+    k.publication_id
    FROM (sources.known_dois k
      JOIN publications.publications p ON ((p.id = k.publication_id)))
   WHERE p.in_perimeter;
@@ -2804,13 +2883,6 @@ ALTER TABLE ONLY publications.publications ALTER COLUMN id SET DEFAULT nextval('
 
 
 --
--- Name: source_contribution_groups id; Type: DEFAULT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_groups ALTER COLUMN id SET DEFAULT nextval('publications.source_contribution_groups_id_seq'::regclass);
-
-
---
 -- Name: subjects id; Type: DEFAULT; Schema: publications; Owner: -
 --
 
@@ -3071,6 +3143,22 @@ ALTER TABLE ONLY public.merge_redirects
 
 
 --
+-- Name: aligned_source_contributions aligned_source_contributions_contribution_record_uq; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.aligned_source_contributions
+    ADD CONSTRAINT aligned_source_contributions_contribution_record_uq UNIQUE (contribution_id, source_record_id);
+
+
+--
+-- Name: aligned_source_contributions aligned_source_contributions_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.aligned_source_contributions
+    ADD CONSTRAINT aligned_source_contributions_pkey PRIMARY KEY (source_contribution_id);
+
+
+--
 -- Name: contributions contributions_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -3124,38 +3212,6 @@ ALTER TABLE ONLY publications.publications_detail
 
 ALTER TABLE ONLY publications.publications
     ADD CONSTRAINT publications_pkey PRIMARY KEY (id);
-
-
---
--- Name: source_contribution_group_members source_contribution_group_members_group_record_uq; Type: CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_group_members
-    ADD CONSTRAINT source_contribution_group_members_group_record_uq UNIQUE (group_id, source_record_id);
-
-
---
--- Name: source_contribution_group_members source_contribution_group_members_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_group_members
-    ADD CONSTRAINT source_contribution_group_members_pkey PRIMARY KEY (source_contribution_id);
-
-
---
--- Name: source_contribution_groups source_contribution_groups_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_groups
-    ADD CONSTRAINT source_contribution_groups_pkey PRIMARY KEY (id);
-
-
---
--- Name: source_contribution_groups source_contribution_groups_publication_person_uq; Type: CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_groups
-    ADD CONSTRAINT source_contribution_groups_publication_person_uq UNIQUE (publication_id, person_id);
 
 
 --
@@ -3319,6 +3375,22 @@ ALTER TABLE ONLY queues.address_countries_queue
 
 
 --
+-- Name: contribution_attributes_queue contribution_attributes_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.contribution_attributes_queue
+    ADD CONSTRAINT contribution_attributes_queue_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: contribution_resolution_queue contribution_resolution_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.contribution_resolution_queue
+    ADD CONSTRAINT contribution_resolution_queue_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: publication_contributions_queue publication_contributions_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
 --
 
@@ -3332,14 +3404,6 @@ ALTER TABLE ONLY queues.publication_contributions_queue
 
 ALTER TABLE ONLY queues.source_contribution_countries_queue
     ADD CONSTRAINT source_contribution_countries_queue_pkey PRIMARY KEY (id);
-
-
---
--- Name: source_contribution_group_attributes_queue source_contribution_group_attributes_queue_pkey; Type: CONSTRAINT; Schema: queues; Owner: -
---
-
-ALTER TABLE ONLY queues.source_contribution_group_attributes_queue
-    ADD CONSTRAINT source_contribution_group_attributes_queue_pkey PRIMARY KEY (id);
 
 
 --
@@ -3783,45 +3847,24 @@ CREATE UNIQUE INDEX contribution_structures_pkey ON publications.contribution_st
 
 
 --
+-- Name: contributions_orphans_idx; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX contributions_orphans_idx ON publications.contributions USING btree (publication_id) WHERE ((person_id IS NULL) AND in_perimeter);
+
+
+--
+-- Name: contributions_person_id_idx; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX contributions_person_id_idx ON publications.contributions USING btree (person_id);
+
+
+--
 -- Name: idx_contribution_structures_structure_id; Type: INDEX; Schema: publications; Owner: -
 --
 
 CREATE INDEX idx_contribution_structures_structure_id ON publications.contribution_structures USING btree (structure_id);
-
-
---
--- Name: idx_contributions_corresponding_uca; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_contributions_corresponding_uca ON publications.contributions USING btree (publication_id) WHERE ((is_corresponding = true) AND (in_perimeter = true));
-
-
---
--- Name: idx_contributions_person; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_contributions_person ON publications.contributions USING btree (person_id) WHERE (person_id IS NOT NULL);
-
-
---
--- Name: idx_contributions_publication; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_contributions_publication ON publications.contributions USING btree (publication_id);
-
-
---
--- Name: idx_contributions_publication_uca; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_contributions_publication_uca ON publications.contributions USING btree (publication_id) WHERE (in_perimeter = true);
-
-
---
--- Name: idx_contributions_uca; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_contributions_uca ON publications.contributions USING btree (in_perimeter) WHERE (in_perimeter = true);
 
 
 --
@@ -3923,10 +3966,10 @@ CREATE INDEX idx_publications_year_type ON publications.publications USING btree
 
 
 --
--- Name: ix_source_contribution_group_members_source_record_id; Type: INDEX; Schema: publications; Owner: -
+-- Name: ix_aligned_source_contributions_source_record_id; Type: INDEX; Schema: publications; Owner: -
 --
 
-CREATE INDEX ix_source_contribution_group_members_source_record_id ON publications.source_contribution_group_members USING btree (source_record_id);
+CREATE INDEX ix_aligned_source_contributions_source_record_id ON publications.aligned_source_contributions USING btree (source_record_id);
 
 
 --
@@ -3955,13 +3998,6 @@ CREATE INDEX publication_subjects_subject_idx ON publications.publication_subjec
 --
 
 CREATE UNIQUE INDEX publications_doi_lower_key ON publications.publications USING btree (lower(doi)) WHERE (doi IS NOT NULL);
-
-
---
--- Name: source_contribution_groups_person_id_idx; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX source_contribution_groups_person_id_idx ON publications.source_contribution_groups USING btree (person_id);
 
 
 --
@@ -4252,27 +4288,6 @@ CREATE INDEX idx_source_contributions_in_perimeter ON sources.source_contributio
 
 
 --
--- Name: idx_source_contributions_orphan_in_perimeter; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_contributions_orphan_in_perimeter ON sources.source_contributions USING btree (id) WHERE ((person_id IS NULL) AND in_perimeter);
-
-
---
--- Name: idx_source_contributions_person; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_contributions_person ON sources.source_contributions USING btree (person_id, contributor_information_id) WHERE (person_id IS NOT NULL);
-
-
---
--- Name: idx_source_contributions_record_person; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_contributions_record_person ON sources.source_contributions USING btree (source_record_id, person_id) WHERE (person_id IS NOT NULL);
-
-
---
 -- Name: idx_source_records_countries; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4511,14 +4526,6 @@ CREATE INDEX ix_idref_structures_structure_id ON structures.idref_structures USI
 
 
 --
--- Name: source_authorships_orphan_perimeter; Type: STATISTICS; Schema: sources; Owner: -
---
-
-CREATE STATISTICS sources.source_authorships_orphan_perimeter (mcv) ON person_id, in_perimeter FROM sources.source_contributions;
-ALTER STATISTICS sources.source_authorships_orphan_perimeter SET STATISTICS 1000;
-
-
---
 -- Name: person_identifiers trg_protect_authenticated_identifier; Type: TRIGGER; Schema: persons; Owner: -
 --
 
@@ -4626,11 +4633,35 @@ ALTER TABLE ONLY persons.rejected_contributions
 
 
 --
+-- Name: aligned_source_contributions aligned_source_contributions_contribution_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.aligned_source_contributions
+    ADD CONSTRAINT aligned_source_contributions_contribution_id_fkey FOREIGN KEY (contribution_id) REFERENCES publications.contributions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: aligned_source_contributions aligned_source_contributions_source_contribution_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.aligned_source_contributions
+    ADD CONSTRAINT aligned_source_contributions_source_contribution_id_fkey FOREIGN KEY (source_contribution_id) REFERENCES sources.source_contributions(id) ON DELETE CASCADE;
+
+
+--
+-- Name: aligned_source_contributions aligned_source_contributions_source_record_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.aligned_source_contributions
+    ADD CONSTRAINT aligned_source_contributions_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
+
+
+--
 -- Name: contributions contributions_person_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
 ALTER TABLE ONLY publications.contributions
-    ADD CONSTRAINT contributions_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE CASCADE;
+    ADD CONSTRAINT contributions_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE SET NULL;
 
 
 --
@@ -4695,46 +4726,6 @@ ALTER TABLE ONLY publications.publications
 
 ALTER TABLE ONLY publications.publications
     ADD CONSTRAINT publications_monograph_id_fkey FOREIGN KEY (monograph_id) REFERENCES publishing.monographs(id);
-
-
---
--- Name: source_contribution_group_members source_contribution_group_members_group_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_group_members
-    ADD CONSTRAINT source_contribution_group_members_group_id_fkey FOREIGN KEY (group_id) REFERENCES publications.source_contribution_groups(id) ON DELETE CASCADE;
-
-
---
--- Name: source_contribution_group_members source_contribution_group_members_source_contribution_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_group_members
-    ADD CONSTRAINT source_contribution_group_members_source_contribution_id_fkey FOREIGN KEY (source_contribution_id) REFERENCES sources.source_contributions(id) ON DELETE CASCADE;
-
-
---
--- Name: source_contribution_group_members source_contribution_group_members_source_record_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_group_members
-    ADD CONSTRAINT source_contribution_group_members_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
-
-
---
--- Name: source_contribution_groups source_contribution_groups_person_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_groups
-    ADD CONSTRAINT source_contribution_groups_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE SET NULL;
-
-
---
--- Name: source_contribution_groups source_contribution_groups_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
---
-
-ALTER TABLE ONLY publications.source_contribution_groups
-    ADD CONSTRAINT source_contribution_groups_publication_id_fkey FOREIGN KEY (publication_id) REFERENCES publications.publications(id) ON DELETE CASCADE;
 
 
 --
@@ -4850,6 +4841,14 @@ ALTER TABLE ONLY publishing.publisher_name_forms
 
 
 --
+-- Name: contribution_resolution_queue contribution_resolution_queue_id_fkey; Type: FK CONSTRAINT; Schema: queues; Owner: -
+--
+
+ALTER TABLE ONLY queues.contribution_resolution_queue
+    ADD CONSTRAINT contribution_resolution_queue_id_fkey FOREIGN KEY (id) REFERENCES publications.contributions(id) ON DELETE CASCADE;
+
+
+--
 -- Name: hal_structure_aliases hal_structure_aliases_hal_structure_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -4959,14 +4958,6 @@ ALTER TABLE ONLY sources.source_contributions
 
 ALTER TABLE ONLY sources.source_contributions
     ADD CONSTRAINT source_contributions_duplicate_of_fkey FOREIGN KEY (duplicate_of) REFERENCES sources.source_contributions(id) ON DELETE SET NULL;
-
-
---
--- Name: source_contributions source_contributions_person_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
---
-
-ALTER TABLE ONLY sources.source_contributions
-    ADD CONSTRAINT source_contributions_person_id_fkey FOREIGN KEY (person_id) REFERENCES persons.persons(id) ON DELETE SET NULL;
 
 
 --
@@ -5109,5 +5100,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 33BuihB9OPczMIEY6dguVoaE0AfTfZOYur4QLk9q4jm2ySgCQkOfzHevglJDZa2
+\unrestrict q1uz21cMYjzb4F802UJtnbcgEmnPi9gdfMbZf3CRzHn1S91v64dELbn95KdENPD
 

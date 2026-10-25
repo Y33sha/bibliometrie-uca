@@ -7,7 +7,6 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
 )
 from pipeline.graph import PHASE_ORDER, TASKS, Task, dependencies, order_violations
-from pipeline.ingestion.common import harvest
 from pipeline.ingestion.common.normalize import _normalize_builders
 
 
@@ -27,7 +26,6 @@ def test_les_taches_d_une_phase_se_suivent():
 def test_une_tache_d_extraction_par_source_moissonnee():
     extract_tasks = [n.name for n in TASKS if n.phase == "harvest"]
     assert extract_tasks == [f"harvest.{s}" for s in HARVESTED_SOURCES]
-    assert set(harvest._harvesters()) == {s.value for s in HARVESTED_SOURCES}
 
 
 def test_une_tache_de_relecture_par_source():
@@ -76,8 +74,8 @@ def test_creation_de_lignes_change_toute_lecture_de_la_table():
 
 def test_la_fusion_des_revues_suit_le_typage_openalex():
     """La fusion lit le type, l'APC et le modèle open access des revues, que l'enrichissement OpenAlex écrit."""
-    deps = dependencies(TASKS)["publishers_journals.merge_duplicate_journals"]
-    assert "publishers_journals.enrich_journals_from_openalex" in deps
+    deps = dependencies(TASKS)["publishing.merge_duplicate_serials"]
+    assert "publishing.enrich_serials_from_openalex" in deps
 
 
 def test_le_nettoyage_des_informations_du_contributeur_suit_la_suppression_des_enregistrements_sources_disparus():
@@ -100,13 +98,13 @@ def test_la_resolution_des_adresses_suit_leur_nettoyage():
 def test_les_decomptes_de_sujets_ne_dependent_pas_des_publications():
     """Les décomptes lisent seulement `publication_subjects` : le périmètre des publications ne les concerne pas."""
     deps = dependencies(TASKS)["subjects.usage"]
-    assert "contributions.publications_in_perimeter" not in deps
+    assert "finalize.publications_in_perimeter" not in deps
 
 
 def test_la_normalisation_de_theses_ne_touche_pas_aux_referentiels_de_publication():
     theses = next(n for n in TASKS if n.name == "normalize.theses")
     assert not any(
-        item.startswith(("journals", "publishers", "monographs")) for item in theses.writes
+        item.startswith(("serials", "publishers", "monographs")) for item in theses.writes
     )
 
 
@@ -116,12 +114,6 @@ def test_chaque_canal_de_fetch_missing_declare_ses_propres_lectures():
     assert all("failed_lookups" in r for r in reads.values())
     lisent_l_agence = {name for name, r in reads.items() if "doi_prefixes.ra" in r}
     assert lisent_l_agence == {"fetch_missing.doi.crossref", "fetch_missing.doi.datacite"}
-
-
-def test_les_statistiques_des_contributions_sources_sont_rafraichies_apres_persons():
-    """`normalize` et `persons` réécrivent en masse `source_contributions.person_id`, que la construction des contributions filtre ensuite."""
-    purge = next(n for n in TASKS if n.name == "persons.purge")
-    assert "ANALYZE source_contributions" in purge.maintenance
 
 
 def test_un_lot_est_d_un_seul_tenant_et_sans_dependance_interne():

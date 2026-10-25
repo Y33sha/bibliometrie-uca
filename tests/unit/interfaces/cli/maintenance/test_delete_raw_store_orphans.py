@@ -18,7 +18,9 @@ from interfaces.cli.maintenance.delete_raw_store_orphans import main
 class _FakeStore:
     """Archive dont on connaît les clés par source, et qui retient les suppressions."""
 
-    def __init__(self, cles: dict[str, list[str]], deja_disparues: set[str] = frozenset()) -> None:
+    def __init__(
+        self, cles: dict[str, list[str]], deja_disparues: frozenset[str] = frozenset()
+    ) -> None:
         self._cles = cles
         self._deja_disparues = deja_disparues
         self.supprimees: list[tuple[str, str]] = []

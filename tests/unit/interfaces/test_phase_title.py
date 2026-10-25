@@ -73,7 +73,7 @@ def test_le_libelle_de_fetch_stale_donne_le_delai(delai_de_rafraichissement) -> 
 
 
 def test_un_libelle_long_tient_sur_deux_lignes(terminal) -> None:
-    lines = _titre("contributions")
+    lines = _titre("finalize")
     assert len(lines) == 5  # deux bords, le nom, et le libellé sur deux lignes
 
 

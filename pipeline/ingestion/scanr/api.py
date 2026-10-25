@@ -9,33 +9,30 @@ import httpx2
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, at_path
 from pipeline.http.http_retry import http_request_with_retry, lookup_json_async
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
-from pipeline.http.throttle import Throttle
-from pipeline.ingestion.api_params import API_BASE_URLS, SCANR_DELAY
+from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.credentials import get_scanr_credentials
 
 
 class ScanrClient:
-    """Client de l'index ScanR (`_search`, authentification basique), limité à un appel toutes les `SCANR_DELAY` secondes."""
+    """Client de l'index ScanR (`_search`, authentification basique)."""
 
     def __init__(self, base_url: str, credentials: tuple[str, str]) -> None:
         self._url = base_url
         self._auth = credentials
-        self._throttle = Throttle(SCANR_DELAY)
 
     def fetch_page(self, query: Mapping[str, JsonValue]) -> Mapping[str, JsonValue]:
         """Exécute une requête Elasticsearch."""
-        with self._throttle.request():
-            return as_mapping(
-                http_request_with_retry(
-                    "POST",
-                    self._url,
-                    json_body=query,
-                    auth=self._auth,
-                    # Une page de SCANR_PER_PAGE documents peut dépasser 30 s quand le cache du cluster est vide.
-                    timeout=60,
-                    label="ScanR search",
-                )
+        return as_mapping(
+            http_request_with_retry(
+                "POST",
+                self._url,
+                json_body=query,
+                auth=self._auth,
+                # Une page de SCANR_PER_PAGE documents peut dépasser 30 s quand le cache du cluster est vide.
+                timeout=60,
+                label="ScanR search",
             )
+        )
 
     def count(self, query: Mapping[str, JsonValue]) -> int:
         """Nombre de documents de `query`, lu sur un comptage exact sans document (`size=0`)."""

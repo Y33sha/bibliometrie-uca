@@ -37,19 +37,19 @@ from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
-from domain.journals.issns import ISSN_STATUSES, ISSN_SUPPORTS
-from domain.journals.journal import JOURNAL_TYPES, OA_MODELS
 from domain.merge import MergedEntity
 from domain.persons.group_matching import GroupMatchReason
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.matching import ResolutionMode
 from domain.persons.person import PersonExclusion
+from domain.platforms.platform import PLATFORM_TYPES
 from domain.publications.author_grouping import GroupingMethod
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import License
 from domain.publications.metadata import OA_RANK
 from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
+from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
+from domain.serials.serial import OA_MODELS, SERIAL_TYPES
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -223,7 +223,7 @@ person_exclusion_enum = PgEnum(
     create_type=False,
 )
 
-journal_type_enum = PgEnum(*JOURNAL_TYPES, name="journal_type", create_type=False)
+serial_type_enum = PgEnum(*SERIAL_TYPES, name="serial_type", create_type=False)
 
 oa_model_enum = PgEnum(*OA_MODELS, name="oa_model", create_type=False)
 issn_support_enum = PgEnum(*ISSN_SUPPORTS, name="issn_support", create_type=False)
@@ -378,8 +378,8 @@ ror_dump_imports = Table(
 )
 
 
-journals = Table(
-    "journals",
+serials = Table(
+    "serials",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("title", Text, nullable=False),
@@ -391,7 +391,7 @@ journals = Table(
     Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("journal_type", journal_type_enum, server_default="unknown"),
+    Column("serial_type", serial_type_enum, server_default="unknown"),
     Column("is_academic", Boolean, server_default="true"),
     Column("doaj_payload", Jsonb),
     Column("doaj_imported_at", DateTime(timezone=True)),
@@ -399,15 +399,15 @@ journals = Table(
     # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
     # publications pour le filtre `with_publications` / le tri / l'affichage.
     Column("publication_count", Integer, nullable=False, server_default="0"),
-    # Champs saisis à la main (`domain.journals.journal.ManualField`) : le pipeline ne les écrit pas.
+    # Champs saisis à la main (`domain.serials.journal.ManualField`) : le pipeline ne les écrit pas.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
-    UniqueConstraint("openalex_id", name="journals_openalex_id_key"),
+    UniqueConstraint("openalex_id", name="serials_openalex_id_key"),
     schema="publishing",
 )
 
 
-journal_issns = Table(
-    "journal_issns",
+serial_issns = Table(
+    "serial_issns",
     metadata,
     Column("id", Integer, primary_key=True),
     Column(
@@ -416,7 +416,7 @@ journal_issns = Table(
         nullable=False,
         comment="Forme normalisée si la valeur est valide, valeur reçue sinon (statut malformed).",
     ),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("support", issn_support_enum, comment="Support de l'ISSN. NULL : inconnu."),
     Column(
         "linking",
@@ -447,8 +447,8 @@ journal_issns = Table(
     ),
     UniqueConstraint(
         "issn",
-        "journal_id",
-        name="uq_journal_issns_issn_journal",
+        "serial_id",
+        name="uq_serial_issns_issn_serial",
         postgresql_nulls_not_distinct=True,
     ),
     comment=(
@@ -458,24 +458,24 @@ journal_issns = Table(
 )
 
 
-journal_name_forms = Table(
-    "journal_name_forms",
+serial_name_forms = Table(
+    "serial_name_forms",
     metadata,
     Column("id", Integer, primary_key=True),
-    Column("journal_id", Integer, nullable=False),
+    Column("serial_id", Integer, nullable=False),
     Column("form_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
-    UniqueConstraint("form_normalized", "publisher_id", name="uq_jnl_nf_form_publisher"),
+    UniqueConstraint("form_normalized", "publisher_id", name="uq_serial_name_forms_form_publisher"),
     schema="publishing",
 )
 
 
-journal_doi_namespaces = Table(
-    "journal_doi_namespaces",
+serial_doi_namespaces = Table(
+    "serial_doi_namespaces",
     metadata,
     Column("namespace", Text, primary_key=True),
-    Column("journal_id", Integer, nullable=False),
+    Column("serial_id", Integer, nullable=False),
     Column("dois", Integer, nullable=False),
     Column("share", Float, nullable=False),
     schema="publishing",
@@ -504,7 +504,7 @@ monographs = Table(
     Column("eisbn", Text),
     Column("publisher_id", Integer),
     Column(
-        "journal_id",
+        "serial_id",
         Integer,
         comment="Collection dont la monographie fait partie, quand cette collection porte un ISSN.",
     ),
@@ -531,7 +531,7 @@ publishers = Table(
         server_default="unknown",
     ),
     # Compte matérialisé des publications in-perimeter de l'éditeur (= somme de ses
-    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `journals.publication_count`.
+    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `serials.publication_count`.
     Column("publication_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     schema="publishing",
@@ -595,13 +595,9 @@ oa_type_enum = PgEnum(*OA_RANK, name="oa_type", create_type=False)
 
 license_type_enum = PgEnum(*License, name="license_type", create_type=False)
 
-perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
+platform_type_enum = PgEnum(*PLATFORM_TYPES, name="platform_type", create_type=False)
 
-resolution_mode_enum = PgEnum(
-    *ResolutionMode,
-    name="resolution_mode",
-    create_type=False,
-)
+perimeter_evidence_enum = PgEnum(*PerimeterEvidence, name="perimeter_evidence", create_type=False)
 
 doc_type_enum = PgEnum(*DOC_TYPES, name="doc_type", create_type=False)
 
@@ -695,46 +691,17 @@ idref_structures = Table(
 )
 
 
-# ── Contributions (table consolidée + sources) ────────────────────────────────
+# ── Contributions (groupes et contributions sources) ──────────────────────────
 
 
-contributions = Table(
-    "contributions",
-    metadata,
-    Column("id", Integer, primary_key=True),
-    Column("publication_id", Integer, nullable=False),
-    Column("person_id", Integer, nullable=False),
-    Column("author_position", SmallInteger),
-    # Indices de l'entrée dans le périmètre ; `in_perimeter` en découle.
-    Column(
-        "perimeter_evidence",
-        ARRAY(perimeter_evidence_enum),
-        nullable=False,
-        server_default="{}",
-    ),
-    Column(
-        "in_perimeter",
-        Boolean,
-        Computed("cardinality(perimeter_evidence) > 0", persisted=True),
-        nullable=False,
-    ),
-    Column("created_at", DateTime(timezone=True), server_default=func.now()),
-    Column("is_corresponding", Boolean),
-    Column("roles", ARRAY(Text)),
-    UniqueConstraint("publication_id", "person_id", name="contributions_publication_person_uq"),
-    schema="publications",
-)
-
-
-# `contribution_structures` est une MATERIALIZED VIEW (DDL via migration
-# a2c6e4f8b1d7), pas une table : dérivée des `source_contribution_structures` des
-# `source_contributions` reliées à une contribution, hors contributions d'une personne
-# exclue. Pas modélisée dans le metadata
-# SQLAlchemy — tous les accès se font en SQL brut par nom (lectures) ou via
-# REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer en table.
+# `contribution_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
+# contributions sources rattaché à une personne non exclue aux structures de ses membres.
+# Pas modélisée dans le metadata SQLAlchemy — tous les accès se font en SQL brut par nom
+# (lectures) ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
+# en table.
 #
-# `publication_structures` (MATERIALIZED VIEW, migration d8b3f5a2c9e6) : lien
-# publication↔structure dédoublonné, dérivé d'`contributions` × `contribution_structures`.
+# `publication_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) : lien
+# publication↔structure dédoublonné, dérivé des groupes d'auteur × `contribution_structures`.
 # Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
 # + REFRESH dans le pipeline, après `contribution_structures`).
 
@@ -752,17 +719,15 @@ rejected_contributions = Table(
 
 grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_type=False)
 
-group_resolution_mode_enum = PgEnum(
-    *GroupMatchReason, name="group_resolution_mode", create_type=False
-)
+resolution_mode_enum = PgEnum(*GroupMatchReason, name="resolution_mode", create_type=False)
 
-source_contribution_groups = Table(
-    "source_contribution_groups",
+contributions = Table(
+    "contributions",
     metadata,
     Column("id", Integer, primary_key=True),
     Column("publication_id", Integer, nullable=False),
     Column("person_id", Integer),
-    Column("resolution_mode", group_resolution_mode_enum),
+    Column("resolution_mode", resolution_mode_enum),
     Column("reference_position", SmallInteger),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
@@ -779,12 +744,10 @@ source_contribution_groups = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    UniqueConstraint(
-        "publication_id", "person_id", name="source_contribution_groups_publication_person_uq"
-    ),
+    UniqueConstraint("publication_id", "person_id", name="contributions_publication_person_uq"),
     CheckConstraint(
         "(person_id IS NULL) = (resolution_mode IS NULL)",
-        name="source_contribution_groups_resolution_mode_with_person",
+        name="contributions_resolution_mode_with_person",
     ),
     comment=(
         "Contributions sources d'un même auteur dans une publication, avec au maximum une "
@@ -797,21 +760,23 @@ source_contribution_groups = Table(
 )
 
 
-source_contribution_group_members = Table(
-    "source_contribution_group_members",
+aligned_source_contributions = Table(
+    "aligned_source_contributions",
     metadata,
     Column("source_contribution_id", Integer, primary_key=True),
-    Column("group_id", Integer, nullable=False),
+    Column("contribution_id", Integer, nullable=False),
     Column("source_record_id", Integer, nullable=False),
     Column("method", grouping_method_enum, nullable=False),
     Column("score", REAL),
     Column("margin", REAL),
     UniqueConstraint(
-        "group_id", "source_record_id", name="source_contribution_group_members_group_record_uq"
+        "contribution_id",
+        "source_record_id",
+        name="aligned_source_contributions_contribution_record_uq",
     ),
     CheckConstraint(
         "method = 'model' OR (score IS NULL AND margin IS NULL)",
-        name="source_contribution_group_members_score_check",
+        name="aligned_source_contributions_score_check",
     ),
     comment=(
         "Appartenance d'une contribution source à son groupe. method : origine du lien. score et "
@@ -875,7 +840,7 @@ contributor_information = Table(
 
 
 # Arbitrages admin au grain de la contribution source : la paire (contribution source, personne) que la
-# cascade de la phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
+# phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
 confirmed_source_contributions = Table(
     "confirmed_source_contributions",
     metadata,
@@ -934,11 +899,6 @@ source_contributions = Table(
             "author_grouping."
         ),
     ),
-    Column("person_id", Integer),
-    # Canal ayant posé `person_id` (NULL si orpheline ou non résolue) : identifiant
-    # fort, forme de nom, ou ancrage cross-source. Partitionne la ré-évaluation des
-    # rattachements par la phase personnes.
-    Column("resolution_mode", resolution_mode_enum),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
     # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute
@@ -1130,12 +1090,23 @@ publications = Table(
     Column("doc_type", doc_type_enum, server_default="other"),
     Column("publication_year", SmallInteger, nullable=False),
     Column("doi", Text),
+    Column(
+        "doi_prefix",
+        Text,
+        Computed("split_part(doi, '/', 1)", persisted=True),
+        comment="Préfixe du DOI, pour les jointures sur doi_prefixes.",
+    ),
     Column("oa_status", oa_type_enum, server_default="unknown"),
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
     Column("license", license_type_enum),
     Column("deposit_license", license_type_enum),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("monograph_id", Integer),
+    Column(
+        "publisher_id",
+        Integer,
+        comment="Éditeur à la date de publication : titulaire du préfixe du DOI Crossref, à défaut éditeur des enregistrements sources.",
+    ),
     Column("container_title", Text),
     Column("language", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
@@ -1171,7 +1142,7 @@ publications = Table(
     # publication recalculée depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
     # Listes scopées au périmètre : tri par défaut (publication_year DESC) et sous-requêtes
-    # publication_count par éditeur/revue (jointure via journal_id), restreints au périmètre.
+    # publication_count par éditeur/revue (jointure via serial_id), restreints au périmètre.
     # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
     # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
     # composantes ne produit jamais deux publications au même DOI (assignation à
@@ -1236,8 +1207,13 @@ source_records = Table(
     ),
     Column("urls", ARRAY(Text)),
     Column("impact", Jsonb),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("monograph_id", Integer),
+    Column(
+        "publisher_id",
+        Integer,
+        comment="Éditeur que nomme la source. Nul pour une production hébergée sans être publiée.",
+    ),
     Column("oa_status", Text),
     # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
@@ -1306,6 +1282,45 @@ source_records = Table(
 )
 
 
+platforms = Table(
+    "platforms",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("name", Text, nullable=False),
+    Column("name_normalized", Text, nullable=False),
+    Column("platform_type", platform_type_enum, nullable=False, server_default="unknown"),
+    Column(
+        "openalex_id",
+        Text,
+        comment="Source OpenAlex de la plateforme, dont elle prend le nom.",
+    ),
+    Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    UniqueConstraint("openalex_id", name="platforms_openalex_id_key"),
+    schema="publishing",
+    comment="Lieux qui hébergent des publications : entrepôts, serveurs de preprints, plateformes d'éditeurs.",
+)
+
+
+source_record_locations = Table(
+    "source_record_locations",
+    metadata,
+    Column("source_record_id", Integer, primary_key=True),
+    Column("url", Text, primary_key=True),
+    Column("pdf_url", Text),
+    Column("oai_id", Text, comment="Identifiant OAI-PMH de la copie, que déclare l'entrepôt."),
+    Column(
+        "version",
+        Text,
+        comment="Version de la copie dans le vocabulaire de la source (submittedVersion, acceptedVersion, publishedVersion).",
+    ),
+    Column("license", license_type_enum),
+    Column("is_oa", Boolean),
+    Column("platform_id", Integer),
+    schema="sources",
+    comment="Localisations d'un enregistrement source, réécrites à chaque normalisation.",
+)
+
+
 distinct_persons = Table(
     "distinct_persons",
     metadata,
@@ -1326,7 +1341,7 @@ distinct_persons = Table(
 # Relevés de paiements de frais de publication (Article Processing Charges) :
 # une ligne par paiement, importés depuis des exports comptables (colonnes à
 # plat ; `source_file` trace le fichier d'origine). `publication_id`,
-# `journal_id`, `publisher_id` et `*_structure_id` sont rapprochés après import.
+# `serial_id`, `publisher_id` et `*_structure_id` sont rapprochés après import.
 apc_payments = Table(
     "apc_payments",
     metadata,
@@ -1345,7 +1360,7 @@ apc_payments = Table(
     Column("source_file", Text),
     Column("remarks", Text),
     Column("publication_id", Integer),
-    Column("journal_id", Integer),
+    Column("serial_id", Integer),
     Column("publisher_id", Integer),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("budget_structure_id", Integer),
@@ -1601,7 +1616,8 @@ address_countries_queue = _queue("address_countries_queue")
 address_candidates_queue = _queue("address_candidates_queue")
 publication_contributions_queue = _queue("publication_contributions_queue")
 source_record_keys_queue = _queue("source_record_keys_queue")
-source_contribution_group_attributes_queue = _queue("source_contribution_group_attributes_queue")
+contribution_attributes_queue = _queue("contribution_attributes_queue")
+contribution_resolution_queue = _queue("contribution_resolution_queue")
 
 
 # `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),

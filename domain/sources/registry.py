@@ -1,11 +1,14 @@
-"""Registre des sources bibliographiques : liste et ordres de priorité.
+"""Registre des sources bibliographiques : profil de chaque source et ordres de priorité.
 
-Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestPgEnumsMatchDb` vérifie la cohérence.
+Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestPgEnumsMatchDb` vérifie la cohérence. Le pipeline implémente le profil de chaque source dans son adaptateur.
 """
 
+from dataclasses import dataclass
 from enum import StrEnum
+from urllib.parse import quote
 
 from domain.errors import ValidationError
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 
 
 class Source(StrEnum):
@@ -20,22 +23,104 @@ class Source(StrEnum):
     DATACITE = "datacite"
 
 
-# Nom sous lequel une source se donne à lire, dans le journal comme à l'écran. L'interface en garde
-# une copie dans `interfaces/frontend/src/lib/sources.ts`, que TypeScript lit sans passer par ici.
-SOURCE_LABELS: dict[str, str] = {
-    Source.HAL: "HAL",
-    Source.OPENALEX: "OpenAlex",
-    Source.WOS: "WoS",
-    Source.SCANR: "ScanR",
-    Source.THESES: "theses.fr",
-    Source.CROSSREF: "Crossref",
-    Source.DATACITE: "DataCite",
+@dataclass(frozen=True, slots=True)
+class SourceProfile:
+    """Ce que le pipeline fait d'une source."""
+
+    # Nom sous lequel la source se donne à lire, dans le journal comme à l'écran (servi par `/api/sources`).
+    label: str
+    # Moissonnée par la phase `harvest`, sur les critères d'affiliation du périmètre.
+    harvested: bool = False
+    # Interrogée par DOI à la phase `fetch_missing`.
+    doi_searchable: bool = False
+    # Identifiants de personne que la phase `harvest_by_person` cherche dans la source. Vide : la phase ne l'interroge pas.
+    person_identifiers: frozenset[PersonIdentifierType] = frozenset()
+    # Agence d'enregistrement que la source représente, sous son nom dans `doi_prefixes.ra`. Seuls les DOI de cette agence y sont cherchés.
+    registration_agency: str | None = None
+    # Interrogée sur option (`--include-wos`) : son crédit d'API est limité.
+    opt_in: bool = False
+    # Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi.
+    incremental: bool = False
+
+
+PROFILES: dict[Source, SourceProfile] = {
+    Source.HAL: SourceProfile(
+        label="HAL",
+        harvested=True,
+        doi_searchable=True,
+        person_identifiers=frozenset(
+            {PersonIdentifierType.ORCID, PersonIdentifierType.IDHAL, PersonIdentifierType.IDREF}
+        ),
+        incremental=True,
+    ),
+    Source.OPENALEX: SourceProfile(
+        label="OpenAlex",
+        harvested=True,
+        doi_searchable=True,
+        person_identifiers=frozenset({PersonIdentifierType.ORCID}),
+    ),
+    Source.WOS: SourceProfile(label="WoS", harvested=True, doi_searchable=True, opt_in=True),
+    Source.SCANR: SourceProfile(
+        label="ScanR",
+        harvested=True,
+        doi_searchable=True,
+        person_identifiers=frozenset({PersonIdentifierType.ORCID, PersonIdentifierType.IDREF}),
+    ),
+    # Son API se requête par NNT, pas par DOI.
+    Source.THESES: SourceProfile(label="theses.fr", harvested=True),
+    # Interrogé par DOI et par personne, sans moissonnage.
+    Source.CROSSREF: SourceProfile(
+        label="Crossref",
+        doi_searchable=True,
+        person_identifiers=frozenset({PersonIdentifierType.ORCID}),
+        registration_agency="Crossref",
+    ),
+    Source.DATACITE: SourceProfile(
+        label="DataCite",
+        harvested=True,
+        doi_searchable=True,
+        person_identifiers=frozenset({PersonIdentifierType.ORCID}),
+        registration_agency="DataCite",
+    ),
 }
+
+SOURCE_LABELS: dict[str, str] = {source: profile.label for source, profile in PROFILES.items()}
+
+# Statuts d'un identifiant de personne RH qui la font interroger par la phase `harvest_by_person`.
+SEARCHED_IDENTIFIER_STATUSES: frozenset[AttributionStatus] = frozenset(
+    {AttributionStatus.CONFIRMED, AttributionStatus.AUTHENTICATED}
+)
 
 
 def source_label(source: str) -> str:
     """Nom lisible d'une source. Une clé inconnue se rend telle quelle."""
     return SOURCE_LABELS.get(source, source)
+
+
+def source_record_url(source: str, source_id: str, oa_status: str | None = None) -> str:
+    """Lien vers l'enregistrement source sur le portail de sa source. Lève `ValueError` pour une source inconnue.
+
+    L'hôte est écrit ici, et l'identifiant est encodé : il ne peut ni changer d'hôte ni ajouter de paramètre. Un dépôt HAL `dumas-` est servi par DUMAS. Une thèse HAL `tel-` est servie par theses.hal.science, sauf en accès fermé (`oa_status`).
+    """
+    path = quote(source_id, safe=":")
+    match Source(source):
+        case Source.HAL:
+            if source_id.startswith("dumas-"):
+                return f"https://dumas.ccsd.cnrs.fr/{path}"
+            if source_id.startswith("tel-") and oa_status != "closed":
+                return f"https://theses.hal.science/{path}"
+            return f"https://hal.science/{path}"
+        case Source.OPENALEX:
+            return f"https://openalex.org/{path}"
+        case Source.WOS:
+            return f"https://www.webofscience.com/wos/woscc/full-record/{path}"
+        case Source.SCANR:
+            # Un identifiant ScanR peut contenir des `/` (`doi/10.1234/…`) : ils sont encodés aussi.
+            return f"https://scanr.enseignementsup-recherche.gouv.fr/publications/{quote(source_id, safe='')}"
+        case Source.THESES:
+            return f"https://theses.fr/{path}"
+        case Source.CROSSREF | Source.DATACITE:
+            return f"https://doi.org/{quote(source_id, safe='/:')}"
 
 
 # Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
@@ -62,26 +147,12 @@ SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
     f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
 )
 
-# Sources moissonnées par la phase `harvest`, sur les critères d'affiliation du périmètre.
-# Crossref absent : il est seulement interrogé par DOI.
-HARVESTED_SOURCES: tuple[Source, ...] = (
-    Source.OPENALEX,
-    Source.HAL,
-    Source.WOS,
-    Source.SCANR,
-    Source.THESES,
-    Source.DATACITE,
+HARVESTED_SOURCES: tuple[Source, ...] = tuple(s for s, p in PROFILES.items() if p.harvested)
+DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = tuple(
+    s for s, p in PROFILES.items() if p.doi_searchable
 )
-
-# Sources interrogeables par DOI à la phase `fetch_missing`.
-# Theses absent car son API ne se requête pas par DOI mais par NNT.
-DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = (
-    Source.HAL,
-    Source.OPENALEX,
-    Source.WOS,
-    Source.SCANR,
-    Source.CROSSREF,
-    Source.DATACITE,
+PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
+    s for s, p in PROFILES.items() if p.person_identifiers
 )
 
 # Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.

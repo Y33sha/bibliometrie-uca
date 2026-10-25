@@ -7,7 +7,7 @@ Couvre :
 
 from __future__ import annotations
 
-from tests.integration.helpers.db import owner_pool, truncate_after_module
+from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_publication,
     seed_publication_subject,
@@ -29,16 +29,6 @@ def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None
             for s in (a, b):
                 seed_publication_subject(publication_id, subject_id=s)
         cur.execute("REFRESH MATERIALIZED VIEW subject_cooccurrences")
-
-
-# La cascade vide `publication_subjects` ; les publications « cooc-seed » de `_seed_cooccurrence` partent explicitement.
-_cleanup_after_module = truncate_after_module(
-    "subjects",
-    then=[
-        "DELETE FROM publications WHERE title = 'cooc-seed'",
-        "REFRESH MATERIALIZED VIEW subject_cooccurrences",
-    ],
-)
 
 
 class TestListSubjects:

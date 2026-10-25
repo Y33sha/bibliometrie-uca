@@ -8,19 +8,16 @@ from __future__ import annotations
 import httpx2
 
 from pipeline.http.lookup import NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.datacite.api import fetch_doi
-from pipeline.ingestion.datacite.fields import record_doi
 
 
 class DataciteStaleRefetch(StaleRefetch):
     source_key = "datacite"
-    # Tier identifié DataCite ~3,3 req/s (cf. `fetch_missing`).
     max_concurrent = 3
-    request_delay_s = 0.9
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
         node = await fetch_doi(client, source_id)
         if isinstance(node, NotFound | Unavailable):
             return node
-        return FetchedRecord(doi=record_doi(node), raw_data=node)
+        return node

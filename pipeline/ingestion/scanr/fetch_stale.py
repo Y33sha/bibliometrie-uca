@@ -9,9 +9,8 @@ import httpx2
 
 from domain.types import JsonValue
 from pipeline.http.lookup import NOT_FOUND, NotFound, Unavailable
-from pipeline.ingestion.common.stale_refetch import FetchedRecord, FetchOutcome, StaleRefetch
+from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.scanr.api import search
-from pipeline.ingestion.scanr.fields import extract_doi
 
 
 class ScanrStaleRefetch(StaleRefetch):
@@ -28,4 +27,4 @@ class ScanrStaleRefetch(StaleRefetch):
             return records
         if not records:
             return NOT_FOUND
-        return FetchedRecord(doi=extract_doi(records[0]), raw_data=records[0])
+        return records[0]
