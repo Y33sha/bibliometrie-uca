@@ -36,7 +36,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "hdr": "hdr",
         "preprint": "preprint",
         "prepublication": "preprint",
-        "undefined": "other",
+        "undefined": "preprint",
         "other": "other",
         "report": "report",
         "creport": "report",
