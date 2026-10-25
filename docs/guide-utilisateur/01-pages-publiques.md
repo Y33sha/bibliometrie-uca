@@ -51,7 +51,7 @@ Certaines colonnes+facettes sont masquées par défaut: un bouton permet de choi
 
 ### Détails `/publications/{id}`
 
-Vue détaillée : métadonnées, licences de la version éditeur et du dépôt HAL, auteurs, sources contributrices.
+Vue détaillée : métadonnées, licences de la version éditeur et du dépôt HAL, auteurs. Le bouton « Accéder » mène à la meilleure copie ouverte, à défaut au DOI. La section « Accès » donne la meilleure copie ouverte de chaque plateforme : la version éditeur passe avant la version acceptée, puis la version soumise. La section « Référencé par » donne les bases qui référencent la publication sans en donner de copie.
 
 Vue alignée des auteurs par source pour détecter d'éventuelles incohérences.<!--TODO: à supprimer de l'UI publique, à réserver à une future page admin.-->
 

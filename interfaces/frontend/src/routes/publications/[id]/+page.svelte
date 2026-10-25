@@ -115,7 +115,13 @@
       </div>
     </div>
 
-    <PublicationSidebar {pub} sources={data!.sources} externalIds={data!.external_identifiers} />
+    <PublicationSidebar
+      {pub}
+      bestCopyUrl={data!.access_url}
+      access={data!.access}
+      referencedBy={data!.referenced_by}
+      externalIds={data!.external_identifiers}
+    />
   </div>
 {/if}
 

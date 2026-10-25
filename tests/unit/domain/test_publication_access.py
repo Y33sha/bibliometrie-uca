@@ -57,3 +57,12 @@ def test_hal_decide_de_l_ouverture_de_ses_notices():
         _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),
     ]
     assert access(copies) == Access(None, [])
+
+
+def test_seule_une_adresse_web_compte():
+    copies = [
+        _copy("javascript:alert(1)"),
+        _copy("ftp://x.org/a"),
+        _copy("https://x.org/a", arrival=2),
+    ]
+    assert access(copies) == Access("https://x.org/a", [AccessLink("x.org", "https://x.org/a")])

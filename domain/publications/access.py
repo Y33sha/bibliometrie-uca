@@ -2,7 +2,7 @@
 
 Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL. Quand une plateforme décrit elle-même la publication (HAL pour HAL), sa description décide de l'ouverture de ses copies : les copies que les autres sources lui attribuent sont écartées.
 
-La meilleure copie est l'adresse d'accès. Une copie désignée par le DOI de la publication peut l'être, mais ne figure pas parmi les liens : le DOI est affiché à part.
+Seule une copie à adresse `http` ou `https` compte : l'adresse vient des sources, et alimente un lien. La meilleure copie est l'adresse d'accès. Une copie désignée par le DOI de la publication peut l'être, mais ne figure pas parmi les liens : le DOI est affiché à part.
 """
 
 from collections.abc import Iterable
@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
+_WEB_SCHEMES = frozenset({"http", "https"})
 _VERSION_RANK = {"publishedVersion": 0, "acceptedVersion": 1, "submittedVersion": 2}
 _UNKNOWN_VERSION_RANK = len(_VERSION_RANK)
 
@@ -62,7 +63,9 @@ def access(copies: Iterable[Copy]) -> Access:
     open_copies = [
         c
         for c in copies
-        if c.is_oa and (c.described_by_platform or c.platform not in self_described)
+        if c.is_oa
+        and urlsplit(c.url).scheme in _WEB_SCHEMES
+        and (c.described_by_platform or c.platform not in self_described)
     ]
     ranked = sorted(open_copies, key=_rank)
     best: dict[str, Copy] = {}
