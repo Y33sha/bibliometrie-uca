@@ -214,7 +214,7 @@
     font-size: 1rem;
     text-decoration: none;
   }
-  .access-btn:hover {
+  a.access-btn:hover {
     background: color-mix(in srgb, var(--accent), black 20%);
     text-decoration: none;
   }
@@ -244,10 +244,10 @@
     color: var(--open-text);
   }
   .access-unavailable {
-    background: var(--card);
+    background: var(--border);
     color: var(--text-secondary);
     font-weight: 600;
-    box-shadow: inset 0 0 0 1px var(--border);
+    cursor: default;
   }
   .access-via {
     color: var(--muted);
