@@ -1,10 +1,11 @@
 # Application — services
 
-*À jour le 2026-09-05.*
+*À jour le 2026-10-25.*
 
-La couche applicative détermine le déroulé des opérations : dans quel ordre appeler les règles du domaine et les adaptateurs, et où placer la frontière transactionnelle. Elle n'écrit elle-même ni SQL ni appel réseau.
+La couche applicative détermine le déroulé des opérations : dans quel ordre appeler les règles du domaine et les adaptateurs. Elle n'écrit elle-même ni SQL ni appel réseau.
 
-- **Services** (`application/services/`), un sous-package par agrégat. `commands.py` y contient les commandes de l'API — une commande, une transaction, un `commit` au succès (cf. [transactions](04-infrastructure.md#transactions)) ; `core.py` contient les opérations de l'agrégat. Le journal d'audit vit à part, dans `application/audit_log.py`.
+- **Services** (`application/services/`), un sous-package par agrégat. Ils appliquent la règle métier ; leur appelant commite la transaction (cf. [transactions](04-infrastructure.md#transactions)).
+- **Journal d'audit** (`application/audit_log.py`) : les services y déposent leurs événements, que la requête d'administration écrit avec son commit.
 - **Ports** (`application/ports/`) : les interfaces `Protocol` par lesquelles les services atteignent l'extérieur.
 
 ## Injection
