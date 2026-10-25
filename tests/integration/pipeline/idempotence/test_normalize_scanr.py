@@ -18,7 +18,7 @@ SCANR_STAGING_DOCS = [
             "source": {
                 "title": "Journal of Volcanology",
                 "publisher": "Elsevier BV",
-                "serialIssns": ["0012-3456", "0012-3457"],
+                "journalIssns": ["0012-3456", "0012-3457"],
                 "isOa": False,
                 "isInDoaj": False,
             },

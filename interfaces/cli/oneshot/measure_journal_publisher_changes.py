@@ -9,7 +9,7 @@ L'éditeur d'un préfixe DOI Crossref est celui de `doi_prefixes`. Une revue cha
 - les titres normalisés que portent plusieurs revues d'éditeurs distincts.
 
 Usage :
-    python -m interfaces.cli.oneshot.measure_serial_publisher_changes [--min 2]
+    python -m interfaces.cli.oneshot.measure_journal_publisher_changes [--min 2]
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ from sqlalchemy import Connection, text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
 
-log = setup_logger("measure_serial_publisher_changes", os.path.dirname(__file__))
+log = setup_logger("measure_journal_publisher_changes", os.path.dirname(__file__))
 
 _TABLES = (
     """

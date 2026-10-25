@@ -63,7 +63,7 @@ class TestScanrSourceRecordBiblio:
             {
                 "source": {
                     "title": "Journal of Physics",
-                    "serialIssns": ["0022-3727", "1361-6463"],
+                    "journalIssns": ["0022-3727", "1361-6463"],
                 }
             },
         )
@@ -81,7 +81,7 @@ class TestScanrSourceRecordBiblio:
                 "source": {
                     "publisher": "Elsevier",
                     "title": "Journal of Physics",
-                    "serialIssns": ["0022-3727"],
+                    "journalIssns": ["0022-3727"],
                 }
             },
         )
@@ -278,7 +278,7 @@ class TestEditeurEtConteneur:
     def test_revue_et_ses_deux_issn(self):
         """Les identifiants de revue arrivent en liste, sans support : ils restent de support inconnu."""
         facts = get_container_facts(
-            {"source": {"title": "J. Things", "serialIssns": ["1234-5679", "8765-4326"]}}
+            {"source": {"title": "J. Things", "journalIssns": ["1234-5679", "8765-4326"]}}
         )
         assert facts.journal_title == "J. Things"
         assert facts.issns == (SerialIssn(issn="1234-5679"), SerialIssn(issn="8765-4326"))

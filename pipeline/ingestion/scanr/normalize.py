@@ -63,11 +63,11 @@ def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
 
 
 def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Extrait (issn, eissn) depuis `source.serialIssns` (array ScanR).
+    """Extrait (issn, eissn) depuis `source.journalIssns` (array ScanR).
 
     Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles entrées supplémentaires (alias, ISSN-L, variantes historiques) sont ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
     """
-    issns = as_sequence(source.get("serialIssns"))
+    issns = as_sequence(source.get("journalIssns"))
     issn = as_str(issns[0]) if len(issns) >= 1 else None
     eissn = as_str(issns[1]) if len(issns) >= 2 else None
     return issn, eissn
@@ -86,7 +86,7 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
         collection_title=title,
         book_title=title if raw_type == "proceedings" else None,
         # ScanR ne donne pas le support de ses ISSN.
-        issns=source_issns(unknown=as_strs(source.get("serialIssns"))),
+        issns=source_issns(unknown=as_strs(source.get("journalIssns"))),
         year=as_int(doc.get("year")),
     )
 
