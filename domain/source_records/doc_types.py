@@ -21,6 +21,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "report_expertreport": "report",
         "report_fundreport": "report",
         "report_techreport": "report",
+        "report_resprot": "report",
         # Types simples
         "art": "article",
         "comm": "conference_paper",
@@ -178,6 +179,9 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "conference proceeding": "proceedings",
         "thesis": "thesis",
         "project deliverable": "report",
+        "technical note": "report",
+        "technical report": "report",
+        "presentation": "conference",
         "data paper": "data_paper",
         "book review": "book_review",
         "figure": "other",

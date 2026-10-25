@@ -387,10 +387,10 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.DATASET},
     },
-    # Titre suppléments / données complémentaires + doc_type ∈ {article, other} ⇒ `dataset`. DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme entités à part. `dataset` lui-même exclu (no-op naturel).
+    # Titre suppléments / données complémentaires + doc_type ∈ {article, other, conference} ⇒ `dataset`. DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme entités à part ; figshare type certains d'entre eux `Presentation`. `dataset` lui-même exclu (no-op naturel).
     MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: {
         "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER,
+            "doc_type": _ARTICLE_OR_OTHER | {DocType.CONFERENCE},
             "title_prefix_normalized": _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES,
         },
         "applies_correction": {"doc_type": DocType.DATASET},

@@ -258,6 +258,12 @@ class TestTitleSupplementaryContentRule:
         assert corrected.value == "dataset"
         assert corrected.rule == MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET
 
+    def test_additional_file_on_conference_corrects_to_dataset(self):
+        # figshare type `Presentation` certains fichiers complémentaires d'articles.
+        view = _view(doc_type="conference", title="Additional file 1 of COVID-19 associated X")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
     def test_supplementary_material_corrects_to_dataset(self):
         view = _view(doc_type="article", title="Supplementary material to seasonality of X")
         corrected = effective_metadata(view).doc_type

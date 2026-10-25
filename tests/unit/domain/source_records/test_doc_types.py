@@ -72,6 +72,16 @@ class TestMapDocType:
     def test_datacite_physicalobject_vers_physical_object(self):
         assert map_doc_type("PhysicalObject", source="datacite") == "physical_object"
 
+    def test_datacite_texte_libre_technique_vers_report(self):
+        assert map_doc_type("Technical note", source="datacite") == "report"
+        assert map_doc_type("Technical Report", source="datacite") == "report"
+
+    def test_datacite_presentation_vers_conference(self):
+        assert map_doc_type("Presentation", source="datacite") == "conference"
+
+    def test_hal_protocole_de_recherche_vers_report(self):
+        assert map_doc_type("REPORT_RESPROT", source="hal") == "report"
+
     def test_openalex_conference_paper_vers_conference_paper(self):
         assert map_doc_type("conference-paper", source="openalex") == "conference_paper"
 
