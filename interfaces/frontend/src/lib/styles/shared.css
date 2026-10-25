@@ -9,6 +9,7 @@
 	/* Texte */
 	--text: #2c2c2c;
 	--muted: #6b7280;
+	--text-faint: #bbb;        /* valeurs nulles ou absentes */
 
 	/* Surfaces et lignes */
 	--bg: #f8f7f4;             /* fond de page */
@@ -38,6 +39,12 @@
 	--danger-light: #fbeaea;
 	--warning: #d4a017;
 	--warning-light: #fef8e8;
+	--warning-text: #856404;    /* assombri, lisible en texte sur fond clair */
+	--attention: #e65100;       /* élément à traiter : orphelin, hors collection, exclusion */
+	--attention-light: #fff3e0;
+
+	/* Infobulles */
+	--tooltip-bg: #333;
 
 	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
 	--open: #57b82e;       /* ouvert, toutes voies confondues */
@@ -141,7 +148,7 @@
 	font-family: inherit;
 }
 .facet-btn:hover {
-	border-color: #ccc;
+	border-color: color-mix(in srgb, var(--border), black 15%);
 }
 .facet-btn.has-selection {
 	border-color: var(--accent);
@@ -198,7 +205,7 @@
 	cursor: pointer;
 }
 .facet-options label:hover {
-	background: #f5f5f2;
+	background: var(--hover);
 }
 .facet-options input[type='checkbox'],
 .facet-options input[type='radio'] {
@@ -217,7 +224,7 @@
 	margin-left: auto;
 	padding-left: 12px;
 	font-size: 0.8rem;
-	color: #888;
+	color: var(--muted);
 }
 
 /* Conteneur de tableau scrollable horizontalement (petit écran). */
@@ -334,7 +341,7 @@
 .sort-arrow {
 	font-size: 0.75rem;
 	margin-left: 3px;
-	color: #bbb;
+	color: var(--text-faint);
 }
 
 .sortable.active .sort-arrow,
@@ -445,7 +452,7 @@ th.sorted .sort-arrow {
 }
 
 .tab:hover {
-	background: #eae9e5;
+	background: var(--hover);
 	color: var(--text);
 }
 
@@ -481,7 +488,7 @@ th.sorted .sort-arrow {
 }
 
 .id-badge:hover {
-	background: #d4e4f3;
+	background: color-mix(in srgb, var(--accent) 20%, white);
 	color: var(--accent);
 	text-decoration: none;
 }
@@ -492,7 +499,7 @@ th.sorted .sort-arrow {
 }
 
 .id-badge.id-confirmed:hover {
-	background: #d0eadb;
+	background: color-mix(in srgb, var(--success) 20%, white);
 	color: var(--success);
 }
 
@@ -707,7 +714,7 @@ th.sorted .sort-arrow {
 }
 
 .lab-tag:hover {
-	background: #d0e4f4;
+	background: color-mix(in srgb, var(--accent) 20%, white);
 }
 
 /* ── Pastille de structure (lien vers la page de la structure) ── */
@@ -1013,8 +1020,8 @@ a.badge-doaj:hover {
 }
 
 .apc-other {
-	background: #f0f0f0;
-	color: #888;
+	background: var(--surface);
+	color: var(--muted);
 }
 
 .apc-cell {
@@ -1060,7 +1067,7 @@ a.badge-doaj:hover {
 }
 
 .btn:hover {
-	background: #f0f0f0;
+	background: var(--hover);
 }
 
 .btn:disabled {
@@ -1083,9 +1090,9 @@ a.badge-doaj:hover {
 }
 
 .btn-confirm:hover {
-	background: #1e5e3b;
+	background: color-mix(in srgb, var(--success), black 20%);
 	color: white;
-	border-color: #1e5e3b;
+	border-color: color-mix(in srgb, var(--success), black 20%);
 }
 
 .btn-danger {
@@ -1095,9 +1102,9 @@ a.badge-doaj:hover {
 }
 
 .btn-danger:hover {
-	background: #962018;
+	background: color-mix(in srgb, var(--danger), black 20%);
 	color: white;
-	border-color: #962018;
+	border-color: color-mix(in srgb, var(--danger), black 20%);
 }
 
 .btn-primary {
@@ -1107,14 +1114,14 @@ a.badge-doaj:hover {
 }
 
 .btn-primary:hover {
-	background: #2d5a87;
+	background: color-mix(in srgb, var(--accent), black 20%);
 	color: white;
-	border-color: #2d5a87;
+	border-color: color-mix(in srgb, var(--accent), black 20%);
 }
 
 /* Boutons outline (petits boutons icône ✕ ✓) */
 .btn-danger-outline {
-	background: white;
+	background: var(--card);
 	color: var(--danger);
 	border-color: var(--danger);
 }
@@ -1126,7 +1133,7 @@ a.badge-doaj:hover {
 }
 
 .btn-confirm-outline {
-	background: white;
+	background: var(--card);
 	color: var(--success);
 	border-color: var(--success);
 }
@@ -1191,7 +1198,7 @@ a.badge-doaj:hover {
 }
 
 .btn-skip:hover:not(:disabled) {
-	background: #f0f0f0;
+	background: var(--hover);
 }
 
 .btn-skip:disabled {
@@ -1246,7 +1253,7 @@ a.badge-doaj:hover {
 }
 
 .modal-content {
-	background: white;
+	background: var(--card);
 	border-radius: 8px;
 	padding: 24px;
 	max-width: 700px;
@@ -1321,8 +1328,8 @@ a.badge-doaj:hover {
 	display: inline-flex;
 	align-items: center;
 	gap: 3px;
-	border: 1px solid #d0d8e0;
-	background: #f0f4f8;
+	border: 1px solid var(--border);
+	background: var(--surface);
 	border-radius: 3px;
 	padding: 2px 7px;
 	font-size: 0.8rem;
@@ -1335,15 +1342,15 @@ a.badge-doaj:hover {
 }
 .status-chip.rejected {
 	background: var(--danger-light);
-	border-color: #e0a8a0;
-	color: #721c24;
+	border-color: color-mix(in srgb, var(--danger) 40%, white);
+	color: var(--danger);
 	opacity: 0.7;
 	text-decoration: line-through;
 }
 .status-chip.ambiguous {
-	background: #fff3e0;
-	border-color: #e0c080;
-	color: #8a6d3b;
+	background: var(--attention-light);
+	border-color: color-mix(in srgb, var(--warning) 40%, white);
+	color: var(--warning-text);
 }
 button.status-chip {
 	font: inherit;
@@ -1373,10 +1380,10 @@ button.status-chip:hover {
 	width: 22px;
 	height: 22px;
 	padding: 0;
-	border: 1px solid #ccc;
+	border: 1px solid var(--border);
 	border-radius: 3px;
-	background: #fff;
-	color: #999;
+	background: var(--card);
+	color: var(--muted);
 	cursor: pointer;
 	line-height: 1;
 	transition: all 0.12s;

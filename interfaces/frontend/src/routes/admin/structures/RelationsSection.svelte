@@ -108,7 +108,7 @@
     padding: 2px 8px;
     border-radius: 10px;
     margin: 2px;
-    background: #f0f0f0;
+    background: var(--surface);
   }
   .tag .tag-name {
     cursor: pointer;
@@ -151,7 +151,7 @@
     height: 20px;
     border-radius: 50%;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--card);
     color: var(--accent);
     font-size: 0.85rem;
     font-weight: bold;

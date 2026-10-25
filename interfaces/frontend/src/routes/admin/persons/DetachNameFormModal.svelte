@@ -119,7 +119,7 @@
     border-radius: 4px;
   }
   .detach-item:hover {
-    background: #f5f5f5;
+    background: var(--hover);
   }
   .detach-item input[type="checkbox"] {
     /* Annule le `.modal-content input { width: 100% }` global qui étirerait la case sur toute la largeur et écraserait le titre. Marges à 0 (sauf le top) pour aligner sur la case « tout cocher » (`.checkbox-row input { margin: 0 }`). */
@@ -128,7 +128,7 @@
     margin: 2px 0 0;
   }
   .detach-year {
-    color: #888;
+    color: var(--muted);
     font-size: 0.8rem;
     min-width: 30px;
     flex-shrink: 0;
@@ -152,12 +152,12 @@
   .other-persons-section {
     margin-bottom: 16px;
     padding-bottom: 12px;
-    border-bottom: 1px solid #e0e0e0;
+    border-bottom: 1px solid var(--border);
   }
   .other-persons-section h4 {
     margin: 0 0 8px;
     font-size: 0.9rem;
-    color: #666;
+    color: var(--muted);
   }
   .other-persons-list {
     display: flex;
@@ -173,24 +173,24 @@
     border-radius: 4px;
   }
   .other-person-row:hover {
-    background: #f5f5f5;
+    background: var(--hover);
   }
   .other-person-name {
     font-size: 0.9rem;
   }
   .other-person-dept {
-    color: #888;
+    color: var(--muted);
     font-size: 0.8rem;
   }
   .btn-merge-modal {
-    background: #1976d2;
+    background: var(--accent);
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
   }
   .btn-merge-modal:hover {
-    background: #1565c0;
+    background: color-mix(in srgb, var(--accent), black 20%);
   }
   .tag {
     display: inline-block;
@@ -201,8 +201,8 @@
     margin: 1px 2px;
   }
   .tag-source {
-    background: #eee;
-    color: #555;
+    background: var(--surface);
+    color: var(--muted);
     font-size: 0.7rem;
   }
 </style>

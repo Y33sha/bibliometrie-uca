@@ -60,7 +60,7 @@
 		font-family: inherit;
 	}
 	button:hover:not(:disabled):not(.active) {
-		background: #f0f0f0;
+		background: var(--hover);
 	}
 	button.active:hover {
 		background: color-mix(in srgb, var(--accent) 85%, black);

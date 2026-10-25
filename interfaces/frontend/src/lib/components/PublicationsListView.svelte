@@ -896,8 +896,8 @@
 	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
 	.exclude-btn {
 		background: none; border: none; cursor: pointer;
-		color: #ccc; font-size: 0.85rem; padding: 2px 4px;
+		color: var(--text-faint); font-size: 0.85rem; padding: 2px 4px;
 		border-radius: 3px; line-height: 1; transition: color 0.15s, background 0.15s;
 	}
-	.exclude-btn:hover { color: var(--danger); background: #fdeaea; }
+	.exclude-btn:hover { color: var(--danger); background: var(--danger-light); }
 </style>

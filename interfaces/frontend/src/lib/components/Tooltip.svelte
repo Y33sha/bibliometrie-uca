@@ -65,7 +65,7 @@
 	.tooltip-box {
 		position: fixed;
 		transform: translateY(calc(-100% - 8px));
-		background: #333;
+		background: var(--tooltip-bg);
 		color: #fff;
 		font-size: 0.78rem;
 		line-height: 1.4;
@@ -85,7 +85,7 @@
 		left: var(--arrow-left);
 		transform: translateX(-50%);
 		border: 5px solid transparent;
-		border-top-color: #333;
+		border-top-color: var(--tooltip-bg);
 	}
 	.tooltip-below {
 		transform: translateY(8px);
@@ -94,6 +94,6 @@
 		top: auto;
 		bottom: 100%;
 		border-top-color: transparent;
-		border-bottom-color: #333;
+		border-bottom-color: var(--tooltip-bg);
 	}
 </style>

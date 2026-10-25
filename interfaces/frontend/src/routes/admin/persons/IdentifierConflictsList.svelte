@@ -49,8 +49,8 @@
     align-items: center;
     gap: 5px;
     font-size: 0.8rem;
-    background: #eef4f5;
-    border: 1px solid #cfe0e3;
+    background: var(--section-heading-light);
+    border: 1px solid color-mix(in srgb, var(--section-heading) 25%, white);
     border-radius: 4px;
     padding: 1px 7px;
     font-family: var(--mono);
@@ -59,6 +59,6 @@
     text-transform: uppercase;
     font-size: 0.65rem;
     font-weight: 700;
-    color: #15616d;
+    color: var(--section-heading);
   }
 </style>

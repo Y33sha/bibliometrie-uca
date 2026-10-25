@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { cssColor } from "#lib/components/charts/cssColor.js";
   import { subjectColor } from "#lib/subjectColor.js";
   import { onDestroy, onMount } from "svelte";
   import { DataSet, Network } from "vis-network/standalone";
@@ -126,7 +127,7 @@
       },
       edges: {
         scaling: { min: 1, max: 8 },
-        color: { color: "#cbd5e1", highlight: "#64748b", hover: "#64748b" },
+        color: { color: cssColor("border"), highlight: cssColor("muted"), hover: cssColor("muted") },
         smooth: { enabled: true, type: "continuous", roundness: 0.3 },
       },
       physics: {
@@ -195,7 +196,7 @@
   .graph {
     width: 100%;
     height: 70vh;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
   }

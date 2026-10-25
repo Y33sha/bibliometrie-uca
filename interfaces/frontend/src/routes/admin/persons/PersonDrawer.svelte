@@ -308,7 +308,7 @@
     text-decoration: none;
   }
   .drawer-name-link:hover {
-    color: #2563eb;
+    color: var(--accent);
     text-decoration: underline;
   }
   .drawer-last {
@@ -332,7 +332,7 @@
   .edit-input {
     width: 128px;
     padding: 4px 6px;
-    border: 1px solid #ccc;
+    border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 0.9rem;
   }
@@ -341,19 +341,19 @@
     border: none;
     cursor: pointer;
     padding: 3px;
-    color: #888;
+    color: var(--muted);
     display: inline-flex;
     align-items: center;
     border-radius: 4px;
   }
   .icon-btn:hover {
     color: var(--accent);
-    background: #f0f0f0;
+    background: var(--hover);
   }
   .exclusion-select {
     font-size: 0.8rem;
     padding: 2px 4px;
-    color: #555;
+    color: var(--muted);
   }
   .exclusion-select.excluded {
     color: var(--danger);
@@ -362,7 +362,7 @@
     display: flex;
     gap: 14px;
     align-items: center;
-    color: #555;
+    color: var(--muted);
     font-size: 0.85rem;
     margin-bottom: 18px;
   }
@@ -377,7 +377,7 @@
     font-size: 0.85rem;
   }
   .rh-info dt {
-    color: #888;
+    color: var(--muted);
   }
   .rh-info dd {
     margin: 0;
@@ -386,7 +386,7 @@
     font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    color: #888;
+    color: var(--muted);
     margin: 0 0 8px;
   }
   .sharing-list {
@@ -410,12 +410,12 @@
     text-align: left;
   }
   .sharing-name:hover {
-    color: #2563eb;
+    color: var(--accent);
     text-decoration: underline;
   }
   .sharing-forms {
     font-size: 0.72rem;
-    color: #888;
+    color: var(--muted);
   }
   .tag {
     display: inline-block;
@@ -425,7 +425,7 @@
     font-weight: 500;
   }
   .tag-excluded {
-    background: #fdecea;
-    color: #b71c1c;
+    background: var(--danger-light);
+    color: var(--danger);
   }
 </style>

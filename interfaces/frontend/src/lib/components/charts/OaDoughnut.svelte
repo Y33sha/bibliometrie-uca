@@ -1,6 +1,6 @@
 <script lang="ts">
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/oaColors.js';
+	import { oaStatusColor } from '#lib/components/charts/cssColor.js';
 
 	// Répartition open access agrégée d'un dashboard, et part en open access sous l'anneau.
 	let {

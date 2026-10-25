@@ -217,7 +217,7 @@
 	.muted { color: var(--muted); }
 
 	.blocking-panel {
-		background: #fef3e0; border: 1px solid #e8a838;
+		background: var(--warning-light); border: 1px solid var(--warning);
 		border-radius: 6px; padding: 12px 16px; margin: 12px 0;
 	}
 	.blocking-header {
@@ -228,8 +228,8 @@
 	.blocking-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
 	.blocking-table th {
 		text-align: left; padding: 4px 8px; font-weight: 600; color: var(--muted);
-		border-bottom: 1px solid #e8a838;
+		border-bottom: 1px solid var(--warning);
 	}
-	.blocking-table td { padding: 6px 8px; border-bottom: 1px solid #f0d9b0; vertical-align: top; }
+	.blocking-table td { padding: 6px 8px; border-bottom: 1px solid color-mix(in srgb, var(--warning) 40%, white); vertical-align: top; }
 	.blocking-table tr:last-child td { border-bottom: none; }
 </style>

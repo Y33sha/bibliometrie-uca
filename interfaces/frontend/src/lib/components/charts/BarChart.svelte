@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { cssColor } from '#lib/components/charts/cssColor.js';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 
@@ -31,8 +32,7 @@
 			chart = null;
 		}
 		if (!canvas || values.length === 0) return;
-		const cs = getComputedStyle(document.documentElement);
-		const barColor = color ?? (cs.getPropertyValue('--accent')?.trim() || '#3b6b9e');
+		const barColor = color ?? cssColor('accent');
 		const valueScale = { beginAtZero: true, ticks: { precision: 0 } };
 		const categoryScale = { grid: { display: false } };
 

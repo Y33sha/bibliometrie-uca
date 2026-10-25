@@ -105,7 +105,7 @@
 		border-radius: 4px;
 		font-size: 1rem;
 		font-family: inherit;
-		background: white;
+		background: var(--card);
 	}
 	input:focus {
 		outline: none;
@@ -125,6 +125,6 @@
 		font-family: inherit;
 		margin-top: 4px;
 	}
-	button:hover { background: #2d5a85; }
+	button:hover { background: color-mix(in srgb, var(--accent), black 20%); }
 	button:disabled { opacity: 0.6; cursor: not-allowed; }
 </style>

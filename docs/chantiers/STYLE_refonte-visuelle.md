@@ -26,7 +26,7 @@ Le modèle visuel de départ est la page d'administration « Configuration du pi
 - **Toutes les variables dans un seul `:root`**, dans `shared.css`. Les noms existants sont conservés quand la notion existe déjà (`--accent`, `--muted`, `--text`, `--border`…).
 - **Les couleurs de rôle passent par les variables** : texte, surfaces, bordures, accent, états. Une palette de catégories (sources, types de structure, voies open access, niveaux de relation) est définie une seule fois, dans une classe de `shared.css` ou un module TypeScript commun. Les teintes de survol se calculent depuis la variable avec `color-mix()`.
 - **Un style dupliqué entre composants est factorisé** dans `shared.css`, ou dans un module TypeScript commun pour les palettes de graphiques.
-- **Les graphiques lisent leurs couleurs dans les variables CSS**, sur le modèle d'`oaStatusColor()`.
+- **Les graphiques lisent leurs couleurs dans les variables CSS**, par `cssColor()`.
 - **Palette open access agrégée** (ouvert, sous embargo, fermé, indéterminé) commune à toute l'application. Ouvert en vert, embargo en ambre, fermé en gris foncé, indéterminé en gris clair. Pas de rouge. Les voies (diamond, gold, hybrid, bronze, green) gardent leurs couleurs propres.
 - **Police Inter**, hébergée dans `static/fonts/` comme Ubuntu. Chiffres tabulaires (`font-variant-numeric: tabular-nums`) dans les tableaux et les chiffres clés.
 - **Un seul style de titre de section** : petites capitales par CSS (`text-transform: uppercase`), texte source en casse normale.
@@ -45,10 +45,10 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Déclarer en variables les teals de la barre de navigation (`--nav-public`, `--nav-admin` et leurs sous-menus) (719aad2d3)
 - [x] Supprimer les couleurs de repli des appels `var()` (719aad2d3)
 - [x] Factoriser les styles dupliqués : pastilles de type de structure, bandeau des fiches structure, encart d'information, lien HAL des pages Problèmes HAL, pastille DOAJ, pastille de structure, files de triage (composant `PersonPairsList` pour les paires de personnes), infobulle de `FacetDropdown` (composant `Tooltip`) (181901773)
-- [x] Factoriser les dashboards et leurs palettes : grille et cartes `.dash-*`, anneau open access des dashboards de structure et de personne (composant `OaDoughnut`, couleurs lues dans `--open`, `--embargoed`, `--closed`, `--unknown`), palette des sujets (`subjectColor`)
-- [ ] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; créer une variable pour un rôle qui n'en a pas
-- [ ] Teintes de survol calculées par `color-mix()`
-- [ ] Faire lire aux graphiques (`BarChart`, `DoughnutChart`, `SubjectsCloud`, dashboards) leurs couleurs dans les variables, valeurs actuelles inchangées
+- [x] Factoriser les dashboards et leurs palettes : grille et cartes `.dash-*`, anneau open access des dashboards de structure et de personne (composant `OaDoughnut`, couleurs lues dans `--open`, `--embargoed`, `--closed`, `--unknown`), palette des sujets (`subjectColor`) (ea2657f5c)
+- [x] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; variables ajoutées : `--text-faint`, `--warning-text`, `--attention`, `--attention-light`, `--tooltip-bg`
+- [x] Teintes de survol des couleurs de rôle calculées par `color-mix()`
+- [x] Faire lire aux graphiques et aux statuts du pipeline leurs couleurs de rôle dans les variables (`cssColor()`)
 
 ### Étape 1 — Fondations globales
 

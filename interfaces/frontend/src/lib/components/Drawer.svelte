@@ -64,7 +64,7 @@
     top: var(--header-height);
     right: 0;
     height: calc(100vh - var(--header-height));
-    background: #fff;
+    background: var(--card);
     box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
     z-index: 91;
     display: flex;
@@ -88,11 +88,11 @@
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
-    color: #888;
+    color: var(--muted);
     padding: 0 4px;
   }
   .drawer-close:hover {
-    color: #333;
+    color: var(--text);
   }
   .drawer-body {
     flex: 1;

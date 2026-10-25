@@ -41,13 +41,13 @@
     padding: 8px 14px;
     cursor: pointer;
     font: inherit;
-    color: #666;
+    color: var(--muted);
     display: inline-flex;
     align-items: center;
     gap: 6px;
   }
   .hub-tab:hover {
-    color: #222;
+    color: var(--text);
   }
   .hub-tab.active {
     color: var(--accent);

@@ -135,20 +135,20 @@
   }
   .publication-count {
     font-size: 0.72rem;
-    color: #666;
+    color: var(--muted);
     white-space: nowrap;
   }
   .publication-count.zero {
-    color: #bbb;
+    color: var(--text-faint);
   }
   .shared {
     font-size: 0.72rem;
-    color: #8a6d3b;
+    color: var(--warning-text);
     white-space: nowrap;
   }
   .empty {
     font-size: 0.8rem;
-    color: #8a6d10;
+    color: var(--warning-text);
     background: var(--warning-light);
     padding: 1px 7px;
     border-radius: 10px;
@@ -161,7 +161,7 @@
     list-style: none;
     cursor: pointer;
     font-size: 0.75rem;
-    color: #888;
+    color: var(--muted);
   }
   .rejected-forms summary::-webkit-details-marker {
     display: none;

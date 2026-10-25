@@ -5,6 +5,7 @@
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
+	import { cssColor, oaStatusColor } from '#lib/components/charts/cssColor.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
@@ -115,8 +116,8 @@
 	const OA_ACCESS_LABELS: Record<string, string> = {
 		ouvert: 'Ouvert', embargo: 'Sous embargo', ferme: 'Fermé', indetermine: 'Indéterminé',
 	};
-	const OA_ACCESS_VAR: Record<string, string> = {
-		ouvert: '--open', embargo: '--embargoed', ferme: '--closed', indetermine: '--unknown',
+	const OA_ACCESS_STATUS: Record<string, string> = {
+		ouvert: 'open', embargo: 'embargoed', ferme: 'closed', indetermine: 'unknown',
 	};
 	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
 
@@ -132,9 +133,9 @@
 		if (dim === 'license') return facets.options.licenses.find((o) => o.value === value)?.text ?? value;
 		return value;
 	}
-	function dimColor(dim: string, value: string, idx: number, cs: CSSStyleDeclaration): string {
-		if (dim === 'oa_voie') return cs.getPropertyValue('--' + value).trim() || PALETTE[idx % PALETTE.length];
-		if (dim === 'oa_access') return cs.getPropertyValue(OA_ACCESS_VAR[value] ?? '').trim() || PALETTE[idx % PALETTE.length];
+	function dimColor(dim: string, value: string, idx: number): string {
+		if (dim === 'oa_voie') return oaStatusColor(value) ?? PALETTE[idx % PALETTE.length];
+		if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? PALETTE[idx % PALETTE.length];
 		if (dim === 'doc_type_grouped') return docTypeGroupedColors[value] ?? PALETTE[idx % PALETTE.length];
 		if (dim === 'license') return licenseColors[value] ?? PALETTE[idx % PALETTE.length];
 		return PALETTE[idx % PALETTE.length];
@@ -329,7 +330,6 @@
 		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans comparaison, le groupement passe en abscisse, en barres simples.
 		const xDim = comparison || primaryBy;
 		const stackDim = comparison ? primaryBy : '';
-		const cs = getComputedStyle(document.documentElement);
 
 		const stackValues = stackDim ? orderedValues(stackDim, rows) : [];
 
@@ -364,7 +364,7 @@
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (measureDef?.label ?? 'Publications'),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? dimColor(stackDim, sv, i, cs) : cs.getPropertyValue('--accent').trim(),
+			backgroundColor: stackDim ? dimColor(stackDim, sv, i) : cssColor('accent'),
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
@@ -373,7 +373,7 @@
 		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
 		if (chartMode === 'part' && !stackDim) {
 			const values = datasets[0].data as number[];
-			const colors = cats.map((cv, i) => dimColor(xDim, cv, i, cs));
+			const colors = cats.map((cv, i) => dimColor(xDim, cv, i));
 			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i] }));
 			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
 				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);
@@ -741,7 +741,7 @@
 		padding: 5px 8px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		background: white;
+		background: var(--card);
 	}
 	/* Séparateur vertical léger entre les groupes de contrôles du pivot. */
 	.sep {
@@ -757,7 +757,7 @@
 		padding: 5px 9px;
 		border: 1px solid var(--border);
 		border-radius: 4px;
-		background: white;
+		background: var(--card);
 		color: var(--muted);
 		cursor: pointer;
 	}

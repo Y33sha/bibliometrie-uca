@@ -191,7 +191,7 @@
     border: 1px solid var(--border);
     border-radius: 4px;
     font-size: 0.95rem;
-    background: white;
+    background: var(--card);
     font-family: inherit;
   }
   .toolbar input {

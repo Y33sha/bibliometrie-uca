@@ -92,7 +92,7 @@
   .picker-container {
     position: relative;
     margin: 8px 0;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--accent);
     border-radius: 5px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
@@ -138,7 +138,7 @@
     z-index: 50;
     min-width: 350px;
     max-width: 600px;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);

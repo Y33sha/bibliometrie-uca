@@ -8,6 +8,7 @@
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
 	import OaDoughnut from '#lib/components/charts/OaDoughnut.svelte';
+	import { cssColor } from '#lib/components/charts/cssColor.js';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -62,8 +63,8 @@
 	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const collabSegments = $derived([
-		{ label: 'International', value: dashCollab.international, color: '#3b6b9e' },
-		{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' }
+		{ label: 'International', value: dashCollab.international, color: cssColor('accent') },
+		{ label: 'Domestique', value: dashCollab.domestic, color: cssColor('border') }
 	]);
 
 	const tutelles = $derived(parents);
@@ -250,7 +251,7 @@
 							labels={dashTopCountries.map((c) => c.name)}
 							values={dashTopCountries.map((c) => c.count)}
 							datasetLabel="Articles"
-							color="#e8a838"
+							color={cssColor('warning')}
 							horizontal
 						/>
 					</div>

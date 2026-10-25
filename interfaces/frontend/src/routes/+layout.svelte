@@ -146,7 +146,7 @@
     padding: 6px 10px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background: white;
+    background: var(--card);
     font-family: inherit;
     font-size: 0.95rem;
     color: inherit;

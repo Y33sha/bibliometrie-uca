@@ -104,6 +104,6 @@
 	.badge-issnl { font-size: 0.75rem; padding: 1px 6px; border: 1px solid var(--border); border-radius: 3px; }
 	.muted { color: var(--muted); }
 	.icon-btn { background: none; border: none; cursor: pointer; padding: 3px; color: var(--muted); border-radius: 3px; }
-	.icon-btn:hover:not(:disabled) { color: var(--accent); background: #f0f0f0; }
+	.icon-btn:hover:not(:disabled) { color: var(--accent); background: var(--hover); }
 	.icon-btn:disabled { opacity: 0.4; cursor: default; }
 </style>

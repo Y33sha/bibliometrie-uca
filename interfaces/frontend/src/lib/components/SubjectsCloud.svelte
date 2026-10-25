@@ -118,7 +118,7 @@
 <style>
   .cloud-container {
     width: 100%;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 4px;

@@ -458,12 +458,12 @@
     margin: 24px auto 8px;
     padding: 4px 10px;
     background: none;
-    color: #5b9ea0;
+    color: var(--section-heading);
     font-size: 0.8rem;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border-bottom: 2px solid #5b9ea0;
+    border-bottom: 2px solid var(--section-heading);
     max-width: 800px;
   }
   /* Bouton « Nouveau périmètre » sous la table, aligné à gauche de la colonne centrée. */
@@ -597,7 +597,7 @@
     font-size: 0.85rem;
     padding: 2px 8px;
     border-radius: 10px;
-    background: #f0f0f0;
+    background: var(--surface);
   }
 
   .remove {
@@ -615,7 +615,7 @@
     margin-top: 4px;
     max-height: 200px;
     overflow-y: auto;
-    background: white;
+    background: var(--card);
   }
   .picker-item {
     display: block;

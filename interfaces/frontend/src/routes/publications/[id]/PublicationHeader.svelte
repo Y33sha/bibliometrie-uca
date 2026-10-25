@@ -125,7 +125,7 @@
     font-weight: 600;
   }
   .doc-type-tag {
-    background: #15616d;
+    background: var(--section-heading);
     color: #fff;
     padding: 3px 9px;
     border-radius: 3px;

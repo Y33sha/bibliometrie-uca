@@ -292,7 +292,7 @@
 		color: var(--success);
 	}
 	.status-badge.en-cours {
-		background: #fff3e0;
-		color: #e65100;
+		background: var(--attention-light);
+		color: var(--attention);
 	}
 </style>

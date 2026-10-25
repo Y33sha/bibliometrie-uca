@@ -10,7 +10,7 @@
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/oaColors.js';
+	import { oaStatusColor } from '#lib/components/charts/cssColor.js';
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import type { components } from '#lib/api/schema.js';
 

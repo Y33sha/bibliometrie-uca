@@ -135,9 +135,9 @@
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 	.meta-badge { flex-shrink: 0; }
 	.badge-hors-uca {
-		display: inline-block; padding: 1px 8px; background: #fff3e0;
-		border: 1px solid #ffb74d; border-radius: 3px; font-size: 0.78rem;
-		color: #e65100; font-weight: 600; flex-shrink: 0;
+		display: inline-block; padding: 1px 8px; background: var(--attention-light);
+		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: 3px; font-size: 0.78rem;
+		color: var(--attention); font-weight: 600; flex-shrink: 0;
 	}
 	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
 	.publication-link:hover { text-decoration: underline; }

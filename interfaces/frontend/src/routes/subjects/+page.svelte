@@ -143,7 +143,7 @@
   table {
     width: 100%;
     border-collapse: collapse;
-    background: white;
+    background: var(--card);
     border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;

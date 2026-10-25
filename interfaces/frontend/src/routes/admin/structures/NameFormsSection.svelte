@@ -293,7 +293,7 @@
     text-align: right;
   }
   .forms-table .excluding {
-    background: #fff3e0;
+    background: var(--attention-light);
   }
   .form-text {
     font-family: var(--mono);
@@ -328,7 +328,7 @@
     padding: 1px 5px;
     border-radius: 6px;
     background: var(--warning-light);
-    color: #8a6d10;
+    color: var(--warning-text);
     display: inline-flex;
     align-items: center;
     gap: 3px;
@@ -381,7 +381,7 @@
     height: 16px;
     border-radius: 50%;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--card);
     color: var(--accent);
     font-size: 0.8rem;
     font-weight: bold;

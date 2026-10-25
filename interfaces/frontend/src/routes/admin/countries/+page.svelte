@@ -286,11 +286,11 @@
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
 	.proposal-tag {
 		display: inline-flex; align-items: center; gap: 4px;
-		padding: 2px 8px; background: #fff8e1; color: #856404;
-		border: 1px dashed #f5a623; border-radius: 3px; cursor: pointer;
+		padding: 2px 8px; background: var(--warning-light); color: var(--warning-text);
+		border: 1px dashed var(--warning); border-radius: 3px; cursor: pointer;
 		font-size: 0.78rem; font-weight: 500; white-space: nowrap;
 	}
-	.proposal-tag:hover { background: #ffecb3; }
+	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
 	.addr-table {
 		width: 100%; border-collapse: collapse; table-layout: fixed;
@@ -315,7 +315,7 @@
 	}
 	.tag-remove {
 		background: none; border: none; cursor: pointer;
-		color: #888; font-size: 0.8rem; padding: 0 1px; line-height: 1;
+		color: var(--muted); font-size: 0.8rem; padding: 0 1px; line-height: 1;
 	}
 	.tag-remove:hover { color: var(--danger); }
 	.add-country {

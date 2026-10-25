@@ -59,7 +59,7 @@
     color: var(--text);
   }
   .ov.zero {
-    color: var(--unknown);
+    color: var(--text-faint);
   }
   .ov-n {
     font-weight: 700;

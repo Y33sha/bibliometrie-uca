@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { cssColor } from '#lib/components/charts/cssColor.js';
 	import { Chart, registerables, type LegendItem } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
 
@@ -23,8 +24,6 @@
 		height?: number;
 	} = $props();
 
-	// Couleur d'alerte des valeurs inattendues (segment + libellé de légende).
-	const ANOMALY_COLOR = '#c0392b';
 	// Palette neutre tournante pour les distributions sans couleur sémantique (doc_types, serial_types). Stable par position.
 	const PALETTE = [
 		'#3b6b9e',
@@ -47,7 +46,7 @@
 	}
 
 	function colorFor(seg: DoughnutSegment, index: number): string {
-		if (isAnomaly(seg)) return ANOMALY_COLOR;
+		if (isAnomaly(seg)) return cssColor('danger');
 		return seg.color ?? PALETTE[index % PALETTE.length];
 	}
 
@@ -81,7 +80,7 @@
 									fillStyle: colors[i],
 									strokeStyle: colors[i],
 									lineWidth: 0,
-									fontColor: isAnomaly(s) ? ANOMALY_COLOR : undefined,
+									fontColor: isAnomaly(s) ? cssColor('danger') : undefined,
 									hidden: false,
 									index: i
 								}))

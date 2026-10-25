@@ -411,8 +411,8 @@
 	.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 	.header h1 { margin: 0; font-size: 1.2rem; }
 	.info-box {
-		background: #fff8e1; border: 1px solid #ffe082; border-radius: 6px;
-		padding: 10px 14px; font-size: 0.85rem; color: #6d4c00; margin-bottom: 14px;
+		background: var(--warning-light); border: 1px solid color-mix(in srgb, var(--warning) 40%, white); border-radius: 6px;
+		padding: 10px 14px; font-size: 0.85rem; color: var(--warning-text); margin-bottom: 14px;
 	}
 	.toolbar input { width: 300px; }
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
@@ -423,38 +423,38 @@
 	.publication-title { display: inline-block; max-width: 50ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.85rem; width: 200px; }
+	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.85rem; width: 200px; }
 	.assign-results {
 		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
-		background: white; border: 1px solid #ccc; border-radius: 4px;
+		background: var(--card); border: 1px solid var(--border); border-radius: 4px;
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 250px;
 	}
 	.result-btn {
 		display: block; width: 100%; text-align: left; padding: 4px 8px;
-		border: none; background: #f5f5f5; cursor: pointer; border-radius: 3px; font-size: 0.85rem;
+		border: none; background: var(--surface); cursor: pointer; border-radius: 3px; font-size: 0.85rem;
 	}
-	.result-btn:hover { background: #e0e0e0; }
-	.result-hint { font-size: 0.75rem; color: #888; margin-left: 4px; }
-	.loading-text { font-size: 0.8rem; color: #888; }
+	.result-btn:hover { background: var(--hover); }
+	.result-hint { font-size: 0.75rem; color: var(--muted); margin-left: 4px; }
+	.loading-text { font-size: 0.8rem; color: var(--muted); }
 	.batch-bar {
 		display: flex; align-items: center; gap: 10px;
 		padding: 10px 14px; margin-bottom: 10px;
-		background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px;
+		background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: 6px;
 		position: relative;
 	}
-	.batch-bar input { padding: 5px 10px; border: 1px solid #90caf9; border-radius: 4px; font-size: 0.85rem; width: 220px; }
+	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: 4px; font-size: 0.85rem; width: 220px; }
 	.batch-results {
 		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
-		background: white; border: 1px solid #ccc; border-radius: 4px;
+		background: var(--card); border: 1px solid var(--border); border-radius: 4px;
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 280px;
 		margin-top: 4px;
 	}
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
 	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
-	.create-form input { padding: 6px 8px; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9rem; }
+	.create-form input { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 0.9rem; }
 	.reject-detail { font-weight: 600; margin: 8px 0; }
-	.reject-muted { color: #888; font-size: 0.85rem; }
+	.reject-muted { color: var(--muted); font-size: 0.85rem; }
 	.reject-list { margin: 10px 0; padding-left: 18px; font-size: 0.85rem; }
 </style>
