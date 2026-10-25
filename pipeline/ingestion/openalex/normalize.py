@@ -9,6 +9,7 @@ from domain.journals.issns import source_issns
 from domain.journals.journal import OaModel
 from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.registry import known_platform_of_source
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.identifiers import clean_doi, extract_doi_from_url, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
@@ -126,13 +127,16 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
 
 
 def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
-    """Plateforme d'une source OpenAlex de type `repository`, nommée comme OpenAlex la nomme."""
+    """Plateforme d'une source OpenAlex de type `repository`, nommée comme OpenAlex la nomme. Son type est celui de la liste des plateformes connues, à défaut entrepôt."""
     if as_str(source.get("type")) != "repository":
         return None
     openalex_id = short_openalex_id(as_str(source.get("id")) or "")
     name = as_str(source.get("display_name"))
-    return (
-        PlatformFacts(openalex_id, name, PlatformType.REPOSITORY) if openalex_id and name else None
+    if not openalex_id or not name:
+        return None
+    known = known_platform_of_source(openalex_id)
+    return PlatformFacts(
+        openalex_id, name, known.platform_type if known else PlatformType.REPOSITORY
     )
 
 

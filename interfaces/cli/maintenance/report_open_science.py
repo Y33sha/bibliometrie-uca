@@ -17,6 +17,8 @@ from sqlalchemy import Connection, Row, text
 
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
+from domain.platforms.platform import PlatformType
+from domain.platforms.registry import known_platform_of_source, preprint_servers_of_prefix
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
@@ -65,23 +67,6 @@ DOC_TYPE_LABELS = {
     DocType.ERRATUM: "Erratum",
     DocType.OTHER: "Autre",
 }
-
-# Préfixe DOI propre à un serveur de preprints. bioRxiv et medRxiv partagent les leurs.
-PREPRINT_SERVERS = {
-    "10.48550": "arXiv",
-    "10.1101": "bioRxiv",
-    "10.64898": "bioRxiv",
-    "10.2139": "SSRN",
-    "10.21203": "Research Square",
-    "10.20944": "Preprints.org",
-    "10.22541": "Authorea",
-    "10.31234": "PsyArXiv",
-    "10.31235": "SocArXiv",
-    "10.31219": "OSF Preprints",
-    "10.26434": "ChemRxiv",
-    "10.31223": "EarthArXiv",
-}
-PREPRINT_SERVER_NAMES = frozenset(PREPRINT_SERVERS.values()) | {"medRxiv"}
 
 MODEL_LABELS = {"full_oa": "Open access", "diamond": "Open access", "subscription": "Abonnement"}
 
@@ -527,9 +512,11 @@ class OpenScienceReport:
                        WHERE sr.publication_id = p.id AND sr.doi IS NOT NULL
                    ) AS prefixes,
                    ARRAY(
-                       SELECT DISTINCT regexp_replace(sr.container_title, '\\s*\\(.*\\)$', '') FROM source_records sr
-                       WHERE sr.publication_id = p.id AND sr.source = 'openalex' AND sr.container_title IS NOT NULL
-                   ) AS openalex_sources
+                       SELECT DISTINCT pl.openalex_id FROM source_records sr
+                       JOIN source_record_locations l ON l.source_record_id = sr.id
+                       JOIN platforms pl ON pl.id = l.platform_id
+                       WHERE sr.publication_id = p.id AND pl.openalex_id IS NOT NULL
+                   ) AS platform_sources
             FROM ({LAB_PUBLICATIONS}) p
             WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'
             """,
@@ -540,7 +527,7 @@ class OpenScienceReport:
             return f"## Preprints\n\nAucun preprint sur {period}."
         by_year = Counter(r.year for r in rows)
         by_platform = Counter(
-            preprint_server(r.prefixes, r.openalex_sources) or "Autre plateforme ou archive"
+            preprint_server(r.prefixes, r.platform_sources) or "Autre plateforme ou archive"
             for r in rows
         )
         return (
@@ -645,12 +632,16 @@ def _with_identifier(id_type: str) -> str:
                 WHERE pi.id_type = '{id_type}' AND pi.status <> 'rejected')"""
 
 
-def preprint_server(prefixes: Sequence[str], openalex_sources: Sequence[str]) -> str | None:
-    """Serveur de preprints d'une publication, d'après les préfixes de ses DOI, à défaut d'après la source de son enregistrement source OpenAlex."""
+def preprint_server(prefixes: Sequence[str], platform_sources: Sequence[str]) -> str | None:
+    """Serveur de preprints d'une publication, d'après la source OpenAlex des plateformes de ses localisations, à défaut d'après les préfixes de ses DOI."""
+    for source in sorted(platform_sources):
+        known = known_platform_of_source(source)
+        if known and known.platform_type is PlatformType.PREPRINT_SERVER:
+            return known.name
     for prefix in sorted(prefixes):
-        if server := PREPRINT_SERVERS.get(prefix):
-            return "medRxiv" if server == "bioRxiv" and "medRxiv" in openalex_sources else server
-    return next((s for s in openalex_sources if s in PREPRINT_SERVER_NAMES), None)
+        if servers := preprint_servers_of_prefix(prefix):
+            return servers[0].name
+    return None
 
 
 def structure_id(conn: Connection, code: str) -> int | None:

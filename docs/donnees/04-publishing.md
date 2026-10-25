@@ -11,7 +11,7 @@ Revues, monographies, éditeurs et frais de publication.
 - **`journal_name_forms`** : formes de noms normalisées pour reconnaître une revue (parallèle à `person_name_forms` et `structure_name_forms`).
 - **`journal_doi_namespaces`** : espaces de noms DOI qui désignent une revue, recalculés par la phase `publishers_journals`.
 - **`monographs`** : livres et volumes d'actes de congrès.
-- **`platforms`** : lieux qui hébergent des publications (entrepôts, serveurs de preprints, plateformes d'éditeurs), nommés d'après leur source OpenAlex.
+- **`platforms`** : lieux qui hébergent des publications (entrepôts, serveurs de preprints, plateformes d'éditeurs), nommés d'après leur source OpenAlex. Le type vient de la liste fermée des plateformes connues (`domain/platforms/registry.py`), à défaut entrepôt.
 - **`publishers`** : référentiel des éditeurs.
 - **`publisher_name_forms`** : formes de noms normalisées pour reconnaître un éditeur.
 - **`doi_prefixes`** : cache préfixe DOI → agence d'enregistrement (Crossref / DataCite) et éditeur, alimenté par les phases `resolve_ra` et `publishers_journals`.

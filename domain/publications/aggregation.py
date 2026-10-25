@@ -22,6 +22,7 @@ from collections.abc import Mapping
 from typing import cast
 
 from domain.normalize import normalize_text
+from domain.platforms.registry import is_publisher_platform_prefix
 from domain.publications.conference import arbitrate_conference
 from domain.publications.doc_types import ARTICLE_SUBTYPES, DocType
 from domain.publications.identifiers import DOI
@@ -112,13 +113,14 @@ def assign_publisher(
 ) -> None:
     """Pose l'éditeur de `publication` d'après son type de document, son DOI et ses `sources`.
 
-    `prefix_publishers` donne le titulaire de chaque préfixe DOI Crossref.
+    `prefix_publishers` donne le titulaire de chaque préfixe DOI Crossref. Un préfixe de plateforme d'éditeurs se lit dans la liste des plateformes connues (`domain.platforms.registry`).
     """
     prefix = publication.doi.prefix.value if publication.doi else None
     publication.publisher_id = publication_publisher(
         publication.doc_type,
         (prefix_publishers or {}).get(prefix) if prefix else None,
         (s.publisher_id for s in prioritized(sources, source_priority, secondary_ids)),
+        platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
 
 

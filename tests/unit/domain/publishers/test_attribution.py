@@ -45,3 +45,9 @@ def test_editeur_d_une_publication():
     assert publication_publisher("article", None, [None, 7, 9]) == 7
     assert publication_publisher("article", None, []) is None
     assert publication_publisher("dataset", 3, [7]) is None
+
+
+def test_prefixe_de_plateforme_d_editeurs():
+    """Le titulaire du préfixe est la plateforme : ni lui ni un enregistrement source qui le nomme ne comptent."""
+    assert publication_publisher("article", 3, [3, None, 7], platform_prefix=True) == 7
+    assert publication_publisher("article", 3, [3], platform_prefix=True) is None

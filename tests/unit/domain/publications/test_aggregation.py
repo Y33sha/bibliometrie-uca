@@ -339,3 +339,15 @@ class TestAssignPublisher:
             publication, sources, source_priority=self._ORDRE, prefix_publishers={"10.1017": 3}
         )
         assert publication.publisher_id is None
+
+    def test_le_prefixe_d_une_plateforme_d_editeurs_cede_a_l_editeur_des_sources(self):
+        """Cairn (10.3917) est titulaire du préfixe et nommé par Crossref : l'éditeur vient de HAL."""
+        publication = self._publication("article", doi="10.3917/mult.086.0194")
+        sources = [
+            _source_record(id=1, source="crossref", publisher_id=3),
+            _source_record(id=2, source="hal", publisher_id=8),
+        ]
+        assign_publisher(
+            publication, sources, source_priority=self._ORDRE, prefix_publishers={"10.3917": 3}
+        )
+        assert publication.publisher_id == 8

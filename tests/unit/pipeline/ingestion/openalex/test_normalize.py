@@ -83,6 +83,23 @@ class TestExtractLocationsData:
 
 
 class TestGetLocations:
+    def test_un_serveur_de_preprints_de_la_liste_prend_son_type(self):
+        work = {
+            "locations": [
+                {
+                    "landing_page_url": "https://arxiv.org/abs/2103.11769",
+                    "source": {
+                        "id": "https://openalex.org/S4306400194",
+                        "type": "repository",
+                        "display_name": "arXiv (Cornell University)",
+                    },
+                }
+            ]
+        }
+        [location] = get_locations(work)
+        assert location.platform is not None
+        assert location.platform.platform_type is PlatformType.PREPRINT_SERVER
+
     def test_un_entrepot_donne_sa_plateforme_et_son_identifiant_oai(self):
         work = {
             "locations": [

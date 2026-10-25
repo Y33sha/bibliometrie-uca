@@ -43,16 +43,11 @@ def test_les_localisations_remplacent_les_precedentes(sa_sync_conn):
     ]
 
 
-def test_la_plateforme_suit_le_nom_openalex_et_garde_son_type(sa_sync_conn):
-    store = LocationStore(sa_sync_conn)
-    platform_id = store.platform_id(_HAL)
-    sa_sync_conn.execute(
-        text("UPDATE platforms SET platform_type = 'preprint_server' WHERE id = :id"),
-        {"id": platform_id},
-    )
+def test_la_plateforme_suit_le_nom_et_le_type_de_la_source(sa_sync_conn):
+    platform_id = LocationStore(sa_sync_conn).platform_id(_HAL)
 
     renamed = LocationStore(sa_sync_conn).platform_id(
-        PlatformFacts("S4306402512", "HAL Archive ouverte", PlatformType.REPOSITORY)
+        PlatformFacts("S4306402512", "HAL Archive ouverte", PlatformType.PREPRINT_SERVER)
     )
 
     row = sa_sync_conn.execute(

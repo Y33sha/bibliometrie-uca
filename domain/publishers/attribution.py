@@ -43,13 +43,16 @@ def publication_publisher(
     doc_type: str | None,
     prefix_publisher_id: int | None,
     record_publisher_ids: Iterable[int | None],
+    *,
+    platform_prefix: bool = False,
 ) -> int | None:
     """Éditeur d'une publication à la date de sa publication.
 
-    C'est le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur de `record_publisher_ids`, rangés dans l'ordre de priorité des sources.
+    C'est le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur de `record_publisher_ids`, rangés dans l'ordre de priorité des sources. Le titulaire d'un préfixe de plateforme d'éditeurs (`platform_prefix`) est la plateforme : il ne compte pas, ni un enregistrement source qui le nomme.
     """
     if not is_published(doc_type):
         return None
-    if prefix_publisher_id is not None:
+    if prefix_publisher_id is not None and not platform_prefix:
         return prefix_publisher_id
-    return next((p for p in record_publisher_ids if p is not None), None)
+    excluded = prefix_publisher_id if platform_prefix else None
+    return next((p for p in record_publisher_ids if p is not None and p != excluded), None)

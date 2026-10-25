@@ -1,6 +1,6 @@
 """Localisations d'un enregistrement source et plateformes qui les hébergent. L'écriture est commune aux normaliseurs.
 
-Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement lui-même : le dernier import fait autorité. Une plateforme se reconnaît par son identifiant OpenAlex et prend le nom que lui donne OpenAlex.
+Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement lui-même : le dernier import fait autorité. Une plateforme se reconnaît par son identifiant OpenAlex, et prend le nom que lui donne OpenAlex et le type que lui donne la liste des plateformes connues (`domain.platforms.registry`).
 """
 
 import json
@@ -35,12 +35,13 @@ class LocationFacts(NamedTuple):
     platform: PlatformFacts | None = None
 
 
-# Le nom suit OpenAlex ; le type, posé à la création, peut être affiné ensuite.
+# Le nom et le type suivent la source à chaque écriture.
 _UPSERT_PLATFORM = text("""
     INSERT INTO platforms (name, name_normalized, platform_type, openalex_id)
     VALUES (:name, :name_normalized, CAST(:platform_type AS platform_type), :openalex_id)
     ON CONFLICT (openalex_id) DO UPDATE SET
-        name = EXCLUDED.name, name_normalized = EXCLUDED.name_normalized
+        name = EXCLUDED.name, name_normalized = EXCLUDED.name_normalized,
+        platform_type = EXCLUDED.platform_type
     RETURNING id
 """)
 
