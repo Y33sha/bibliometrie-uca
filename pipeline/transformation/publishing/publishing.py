@@ -2,12 +2,13 @@
 
 Trois groupes de sous-étapes, dans l'ordre :
 
-- **Éditeurs** — `resolve_crossref_publishers`, puis `resolve_datacite_publishers` : éditeur Crossref, provider et repository DataCite de chaque préfixe DOI en attente.
+- **Éditeurs** — `resolve_crossref_publishers`, puis `resolve_datacite_publishers` : éditeur Crossref, provider et repository DataCite de chaque préfixe DOI en attente ; `merge_duplicate_publishers` : autres noms des titulaires de préfixe.
 - **Revues** — `enrich_serials_from_openalex` (type et frais de publication), `check_serials_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_serials`, `type_proceedings_serials`, `learn_serial_doi_namespaces`, `enrich_serials_from_doaj`.
 - **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
 
 Contraintes d'ordre :
 
+- La fusion des autres noms des éditeurs suit la résolution des préfixes, qui pose leurs titulaires.
 - OpenAlex type les revues `unknown` avant le typage en recueil d'actes, qui vise aussi les revues `unknown`.
 - La vérification Sudoc précède la fusion des revues, qui lit l'ISSN-L, et l'import DOAJ, qui apparie les revues par ISSN.
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
@@ -25,6 +26,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from domain.config import ConfigKey
+from infrastructure.repositories.publisher_merge import merge_publisher_into
 from pipeline.http.polite_pool import default_user_agent
 from pipeline.ingestion.api_params import (
     API_BASE_URLS,
@@ -54,7 +56,13 @@ from pipeline.transformation.publishing.monographs.merge_duplicate_monographs im
 from pipeline.transformation.publishing.monographs.type_proceedings_volumes import (
     run_type_proceedings_volumes,
 )
-from pipeline.transformation.publishing.publishers import resolve_publishers
+from pipeline.transformation.publishing.publishers import (
+    merge_duplicate_publishers,
+    resolve_publishers,
+)
+from pipeline.transformation.publishing.publishers.merge_duplicate_publishers import (
+    run_merge_duplicate_publishers,
+)
 from pipeline.transformation.publishing.publishers.resolve_publishers import (
     run_resolve_crossref_publishers,
     run_resolve_datacite_publishers,
@@ -197,6 +205,9 @@ def build() -> Phase:
                     "Éditeurs",
                     resolve_publishers.LABELS["DataCite"],
                 ),
+                "merge_duplicate_publishers": TaskStep(
+                    _run_merge_duplicate_publishers, "Éditeurs", merge_duplicate_publishers.LABEL
+                ),
                 # Trois lots consécutifs en 429 disent le quota OpenAlex du jour épuisé : le reste attend le run suivant.
                 "enrich_serials_from_openalex": TaskStep(
                     _run_enrich_serials_from_openalex,
@@ -274,6 +285,16 @@ def _run_resolve_datacite_publishers(
             publisher_store=PublisherStore(conn),
             fetch_prefix_fn=fetch_datacite_prefix,
         )
+
+
+def _run_merge_duplicate_publishers(ctx: PhaseContext) -> PhaseMetrics:
+    with ctx.open_tx() as conn:
+
+        def merge(target_id: int, source_id: int) -> None:
+            merge_publisher_into(conn, target_id, source_id)
+            conn.commit()
+
+        return run_merge_duplicate_publishers(conn, ctx.logger, merge=merge)
 
 
 def _run_enrich_serials_from_openalex(

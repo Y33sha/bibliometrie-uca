@@ -517,6 +517,32 @@ TASKS: tuple[Task, ...] = (
         network="datacite",
     ),
     _task(
+        "publishing.merge_duplicate_publishers",
+        "publishing",
+        reads=(
+            "source_records.publisher_id",
+            "source_records.publication_id",
+            "publications.doi_prefix",
+            "doi_prefixes.ra",
+            "doi_prefixes.publisher_id",
+            "publishers.id",
+            "publishers.name",
+        ),
+        writes=(
+            "publishers.id",
+            "source_records.publisher_id",
+            "publications.publisher_id",
+            "serials.publisher_id",
+            "monographs.publisher_id",
+            "apc_payments.publisher_id",
+            "publisher_name_forms",
+            "serial_name_forms",
+            "merge_redirects",
+        ),
+        # Un autre nom ne détient aucun préfixe DOI : la fusion laisse `doi_prefixes` en l'état.
+        previous_run=("source_records", "publications", "publishers"),
+    ),
+    _task(
         "publishing.enrich_serials_from_openalex",
         "publishing",
         reads=(

@@ -26,6 +26,8 @@ Les tables `serials`, `monographs`, `source_records`, `publications`, `serial_na
 
 **Éditeur des publications en série (`finalize`).** Chaque publication en série prend l'éditeur de ses publications les plus récentes (fiche [publications en série](serials.md)).
 
+**Autres noms (`publishing`).** Un éditeur que nomment les sources rejoint le titulaire Crossref des préfixes de ses enregistrements sources quand leurs noms sont compatibles (`domain/publishers/aliases.py`, [publishing](../pipeline/05-publishing.md)). Une marque ou un éditeur racheté reste distinct.
+
 **Enrichissement du pays, hors pipeline.** `interfaces/cli/maintenance/enrich_publishers.py` renseigne le pays depuis OpenAlex, et seulement là où il est absent : une valeur saisie à la main est conservée.
 
 ## Écriture par l'API — édition manuelle

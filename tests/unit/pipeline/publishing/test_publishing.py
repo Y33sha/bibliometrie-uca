@@ -50,10 +50,11 @@ def test_chaque_tache_ecrit_sa_ligne_sous_sa_section(contexte, caplog):
     with caplog.at_level(logging.INFO, logger="test"):
         _run(contexte, merge_duplicate_serials=fusion)
     lignes = [r.getMessage() for r in caplog.records if r.getMessage()]
-    assert lignes[:3] == [
+    assert lignes[:4] == [
         "▶ Éditeurs",
         "  ├─ Éditeurs des préfixes DOI Crossref : rien à faire",
-        "  └─ Éditeurs des préfixes DOI DataCite : rien à faire",
+        "  ├─ Éditeurs des préfixes DOI DataCite : rien à faire",
+        "  └─ Autres noms des éditeurs : rien à faire",
     ]
     assert "▶ Publications en série" in lignes and "▶ Monographies" in lignes
     assert "  ├─ Fusion des publications en série en double : 2 revues fusionnées" in lignes
