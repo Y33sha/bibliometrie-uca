@@ -1524,6 +1524,24 @@ button.status-chip:hover {
 	filter: brightness(0.97);
 }
 /* Bouton icône carré ; compose avec .btn + une variante outline (.btn-confirm-outline / .btn-danger-outline). */
+/* Bouton d'ajout discret (« + Ajouter ») : texte en couleur d'accent, fond au survol. */
+.btn-add {
+	height: 28px;
+	padding: 0 10px;
+	border: none;
+	border-radius: var(--radius-pill);
+	background: none;
+	font: inherit;
+	font-size: 0.85rem;
+	font-weight: 500;
+	color: var(--accent);
+	cursor: pointer;
+	white-space: nowrap;
+}
+.btn-add:hover {
+	background: var(--hover);
+}
+
 /* Bouton réduit à son icône (composant IconButton) : sans bordure, fond au survol, rouge au survol pour une suppression. */
 .icon-btn {
 	display: inline-flex;

@@ -8,6 +8,7 @@
     tutelles,
     tutellesDe,
     relationPickerOpen,
+    pickerDirection,
     relationPickerResults,
     relationPickerSearch = $bindable(),
     relationPickerEl = $bindable(),
@@ -21,6 +22,8 @@
     tutelles: RelatedStructure[];
     tutellesDe: RelatedStructure[];
     relationPickerOpen: boolean;
+    /** Ligne où le sélecteur est ouvert : `parent` (tutelles) ou `child` (est tutelle de). */
+    pickerDirection: string;
     relationPickerResults: Structure[];
     relationPickerSearch: string;
     relationPickerEl: HTMLDivElement | undefined;
@@ -57,26 +60,27 @@
         </span>
       {/each}
     {/if}
-    <button class="btn-add" onclick={() => onopenPicker(direction, structureId)}>+ Ajouter</button>
+    {#if relationPickerOpen && pickerDirection === direction}
+      <Picker
+        floating
+        results={relationPickerResults}
+        bind:search={relationPickerSearch}
+        bind:element={relationPickerEl}
+        onpick={(rs) => onpickStructure(rs.id)}
+        onclose={onclosePicker}
+        placeholder="Rechercher une structure…"
+      >
+        {#snippet item(rs)}
+          <span class="structure-type structure-type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>
+          {rs.acronym ? rs.acronym + " — " : ""}{rs.name}
+        {/snippet}
+      </Picker>
+    {:else}
+      <button class="btn-add" onclick={() => onopenPicker(direction, structureId)}>+ Ajouter</button>
+    {/if}
   </div>
 {/snippet}
 
-<!-- Relation picker -->
-{#if relationPickerOpen}
-  <Picker
-    results={relationPickerResults}
-    bind:search={relationPickerSearch}
-    bind:element={relationPickerEl}
-    onpick={(rs) => onpickStructure(rs.id)}
-    onclose={onclosePicker}
-    placeholder="Rechercher une structure…"
-  >
-    {#snippet item(rs)}
-      <span class="structure-type structure-type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>
-      {rs.acronym ? rs.acronym + " — " : ""}{rs.name}
-    {/snippet}
-  </Picker>
-{/if}
 
 <style>
   .relations {
@@ -135,20 +139,5 @@
   }
   .none-text {
     color: var(--muted);
-  }
-  .btn-add {
-    height: 28px;
-    padding: 0 10px;
-    border: none;
-    border-radius: var(--radius-pill);
-    background: none;
-    font: inherit;
-    font-size: 0.85rem;
-    font-weight: 500;
-    color: var(--accent);
-    cursor: pointer;
-  }
-  .btn-add:hover {
-    background: var(--hover);
   }
 </style>

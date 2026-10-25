@@ -13,6 +13,7 @@
     addFormExcluding = $bindable(),
     newFormCtx,
     ctxPickerOpen,
+    ctxPickerFormId,
     ctxPickerResults,
     ctxPickerSearch = $bindable(),
     ctxPickerEl = $bindable(),
@@ -36,6 +37,8 @@
     addFormExcluding: boolean;
     newFormCtx: (number | string)[];
     ctxPickerOpen: boolean;
+    /** Forme dont on édite le contexte ; `null` pour la forme en cours d'ajout. */
+    ctxPickerFormId: number | null;
     ctxPickerResults: Structure[];
     ctxPickerSearch: string;
     ctxPickerEl: HTMLDivElement | undefined;
@@ -123,13 +126,13 @@
               {#each f.requires_context_of as x}
                 <span class="ctx-tag">
                   {ctxLabel(x)}
-                  <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)}>x</button>
+                  <button class="ctx-remove" onclick={() => onremoveCtx(f.id, x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
                 </span>
               {/each}
-              <button class="btn-add-tiny" onclick={() => onopenCtxPicker(f.id)}> + </button>
+              {@render ctxAdd(f.id)}
             {:else}
               <span class="sufficient-label">suffisant</span>
-              <button class="btn-add-tiny" onclick={() => onopenCtxPicker(f.id)}> + </button>
+              {@render ctxAdd(f.id)}
             {/if}
           </td>
           <td class="row-actions" style="white-space:nowrap">
@@ -180,38 +183,43 @@
     {#each newFormCtx as x}
       <span class="ctx-tag">
         {ctxLabel(x)}
-        <button class="ctx-remove" onclick={() => onremoveNewCtx(x)}>x</button>
+        <button class="ctx-remove" onclick={() => onremoveNewCtx(x)} title="Retirer ce contexte" aria-label="Retirer ce contexte">×</button>
       </span>
     {/each}
-    <button class="btn-add-tiny" onclick={() => onopenCtxPicker(null)}>+</button>
+    {@render ctxAdd(null)}
     {#if newFormCtx.length === 0}
       <span class="ctx-hint">(suffisant)</span>
     {/if}
   </div>
 {/if}
 
-<!-- Context picker -->
-{#if ctxPickerOpen}
-  <Picker
-    results={ctxPickerResults}
-    bind:search={ctxPickerSearch}
-    bind:element={ctxPickerEl}
-    onpick={(cs) => onpickCtx(cs.id)}
-    onclose={oncloseCtxPicker}
-    placeholder="Rechercher une structure…"
-  >
-    {#snippet header()}
-      <div class="ctx-picker-shortcuts">
-        <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
-        <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; suffisant </button>
-      </div>
-    {/snippet}
-    {#snippet item(cs)}
-      <span class="structure-type structure-type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
-      {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
-    {/snippet}
-  </Picker>
-{/if}
+<!-- Ajout d'un contexte : le sélecteur s'ouvre à la place du bouton. -->
+{#snippet ctxAdd(formId: number | null)}
+  {#if ctxPickerOpen && ctxPickerFormId === formId}
+    <Picker
+      floating
+      results={ctxPickerResults}
+      bind:search={ctxPickerSearch}
+      bind:element={ctxPickerEl}
+      onpick={(cs) => onpickCtx(cs.id)}
+      onclose={oncloseCtxPicker}
+      placeholder="Rechercher une structure…"
+    >
+      {#snippet header()}
+        <div class="ctx-picker-shortcuts">
+          <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
+          <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; suffisant </button>
+        </div>
+      {/snippet}
+      {#snippet item(cs)}
+        <span class="structure-type structure-type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
+        {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
+      {/snippet}
+    </Picker>
+  {:else}
+    <button class="btn-add" onclick={() => onopenCtxPicker(formId)}>+ contexte</button>
+  {/if}
+{/snippet}
 
 <style>
   h3:not(.section-title) {
@@ -307,28 +315,6 @@
   .sufficient-label {
     color: var(--success);
     font-size: 0.8rem;
-  }
-  .btn-add-tiny {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 16px;
-    height: 16px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    background: var(--card);
-    color: var(--accent);
-    font-size: 0.8rem;
-    font-weight: bold;
-    cursor: pointer;
-    vertical-align: middle;
-    line-height: 1;
-    padding: 0;
-  }
-  .btn-add-tiny:hover {
-    background: var(--accent);
-    color: white;
-    border-color: var(--accent);
   }
   /* Formulaire d'ajout sous le tableau, sur un fond léger. */
   .add-row {

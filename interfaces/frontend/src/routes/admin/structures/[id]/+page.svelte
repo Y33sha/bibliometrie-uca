@@ -253,9 +253,6 @@
     ctxPickerSearch = "";
     ctxPickerOpen = true;
     relationPickerOpen = false;
-    requestAnimationFrame(() => {
-      ctxPickerEl?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
   }
 
   async function pickCtx(item: number | string) {
@@ -396,7 +393,7 @@
       ctxPickerOpen &&
       ctxPickerEl &&
       !ctxPickerEl.contains(target) &&
-      !target.classList.contains("btn-add-tiny")
+      !target.classList.contains("btn-add")
     ) {
       ctxPickerOpen = false;
     }
@@ -424,7 +421,7 @@
   <p class="loading">Chargement…</p>
 {:else}
   {@const s = detail.structure}
-  <div class="panel">
+  <div>
     <div class="detail-header">
       <span class="structure-type structure-type-{s.type}">{s.type}</span>
       <h2>
@@ -479,6 +476,7 @@
       {tutelles}
       {tutellesDe}
       {relationPickerOpen}
+      {pickerDirection}
       {relationPickerResults}
       bind:relationPickerSearch
       bind:relationPickerEl
@@ -498,6 +496,7 @@
       bind:addFormExcluding
       {newFormCtx}
       {ctxPickerOpen}
+      {ctxPickerFormId}
       {ctxPickerResults}
       bind:ctxPickerSearch
       bind:ctxPickerEl
@@ -546,15 +545,6 @@
   }
   .loading {
     color: var(--muted);
-  }
-
-  .panel {
-    max-width: 1100px;
-  }
-  .panel h2 {
-    margin: 0 0 10px;
-    font-size: 1.05rem;
-    font-weight: 600;
   }
 
   .details-inline {
