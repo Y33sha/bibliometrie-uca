@@ -97,6 +97,7 @@ class TestExcludeContribution:
             conn=sa_sync_conn,
             perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
             repo=repo,
+            person_repo=person_repository(sa_sync_conn),
         )
 
         assert _group_person(sa_sync_conn, contribution_id) == (None, None)
@@ -119,6 +120,7 @@ class TestExcludeContribution:
                 conn=sa_sync_conn,
                 perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
                 repo=repo,
+                person_repo=person_repository(sa_sync_conn),
             )
 
     def test_raises_not_found_for_group_without_person(self, sa_sync_conn, repo):
@@ -136,6 +138,7 @@ class TestExcludeContribution:
                 conn=sa_sync_conn,
                 perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
                 repo=repo,
+                person_repo=person_repository(sa_sync_conn),
             )
 
     def test_does_not_touch_other_contributions(self, sa_sync_conn, repo):
@@ -153,6 +156,7 @@ class TestExcludeContribution:
             conn=sa_sync_conn,
             perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
             repo=repo,
+            person_repo=person_repository(sa_sync_conn),
         )
 
         assert _group_person(sa_sync_conn, a2) == (p2, "manual")
@@ -180,7 +184,7 @@ class TestRejectPair:
             repo=repo,
         )
 
-        assert result == {"detached": 1}
+        assert result == 1
         # Store peuplé
         assert (
             sa_sync_conn.execute(

@@ -122,61 +122,39 @@ class AddIdentifierResult(NamedTuple):
     id_value: str
 
 
-def _identifiant_ajoute(
-    audit_repo: AuditRepository | None,
-    person_id: int,
-    id_type: str,
-    id_value: str,
-    outcome: AttributionOutcome,
-) -> AddIdentifierResult:
-    """Consigne l'attribution d'un identifiant, et rend l'issue à l'appelant."""
-    emit_event(
-        audit_repo,
-        "person_identifier.added",
-        "person",
-        person_id,
-        {"id_type": id_type, "id_value": id_value, "outcome": outcome.value},
-    )
-    return AddIdentifierResult(outcome, id_value)
-
-
 def add_identifier(
     person_id: int,
     id_type: str,
     id_value: str,
     *,
-    source: IdentifierOrigin = IdentifierOrigin.AUTO,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:
-    """Ajoute un identifiant (ORCID, idHAL, IdRef...) à une personne.
+    """Attribue à la main un identifiant (ORCID, idHAL, IdRef) à une personne.
 
-    L'attribution passe par `PersonRepository.attribute_identifier`, qui normalise la valeur et suit `attribution_outcome`. Lève `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`, `ValidationError` sur une valeur malformée.
+    L'attribution passe par `PersonRepository.attribute_identifier`, qui normalise la valeur et suit `attribution_outcome`. Le type se restreint à `PUBLIC_PERSON_IDENTIFIER_TYPES` : `hal_person_id` est la référence d'un compte HAL, que l'extraction observe dans le TEI.
 
-    `IdentifierOrigin.MANUAL` désigne l'attribution par une utilisatrice, et resserre deux gardes que
-    l'appel automatique n'a pas lieu de payer :
-
-    - les types se restreignent à `PUBLIC_PERSON_IDENTIFIER_TYPES` — `hal_person_id` est la
-      référence d'un compte HAL, que l'extraction observe dans le TEI, et que personne
-      n'attribue à la main ;
-    - l'existence de la personne est vérifiée, l'identifiant venant d'un formulaire. La
-      promotion depuis les contributions sources (`IdentifierOrigin.AUTO`) en fait l'économie : elle boucle sur
-      une personne que la phase `persons` vient de rapprocher.
+    Lève `ValidationError` sur un type hors de cette liste ou une valeur malformée, `NotFoundError` sur une personne absente, `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
     """
-    if source == IdentifierOrigin.MANUAL:
-        if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
-            raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
-        if repo.find_by_id(person_id) is None:
-            raise NotFoundError(f"Personne {person_id} introuvable")
+    if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
+        raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
+    if repo.find_by_id(person_id) is None:
+        raise NotFoundError(f"Personne {person_id} introuvable")
     outcome, id_value, existing = repo.attribute_identifier(
-        person_id, id_type, id_value, source=source
+        person_id, id_type, id_value, source=IdentifierOrigin.MANUAL
     )
     if existing is not None and outcome is AttributionOutcome.HELD_ELSEWHERE:
         raise held_elsewhere_conflict(existing, person_id)
-    if outcome is AttributionOutcome.ALREADY_EXISTS:
-        # Rien n'a changé : l'appel est idempotent, aucune décision n'a été prise.
-        return AddIdentifierResult(outcome, id_value)
-    return _identifiant_ajoute(audit_repo, person_id, id_type, id_value, outcome)
+    if outcome is not AttributionOutcome.ALREADY_EXISTS:
+        # Un appel répété ne change rien : seule une attribution effective est consignée.
+        emit_event(
+            audit_repo,
+            "person_identifier.added",
+            "person",
+            person_id,
+            {"id_type": id_type, "id_value": id_value, "outcome": outcome.value},
+        )
+    return AddIdentifierResult(outcome, id_value)
 
 
 class IdentifierStatusResult(NamedTuple):
@@ -224,29 +202,6 @@ def update_identifier_status(
 
 
 # ── Formes de noms ──
-
-
-def refresh_person_name_forms(
-    person_id: int,
-    last_name: str,
-    first_name: str,
-    *,
-    repo: PersonRepository,
-) -> None:
-    """Recalcule les formes de nom de source 'persons' d'une personne : calcul via le domaine, écriture par le repository."""
-    forms = compute_person_name_forms(last_name, first_name)
-    repo.refresh_name_forms(person_id, forms)
-
-
-def add_name_form(
-    person_id: int,
-    full_name: str,
-    source: str | None = None,
-    *,
-    repo: PersonRepository,
-) -> None:
-    """Ajoute une forme de nom à person_name_forms si elle n'existe pas déjà."""
-    repo.add_name_form(person_id, full_name, source=source)
 
 
 def update_name_form_status(
@@ -304,7 +259,7 @@ def detach_contributions(
 
     detached = 0
     for publication_id in publication_ids:
-        result = reject_pair(
+        detached += reject_pair(
             publication_id,
             person_id,
             conn=conn,
@@ -312,7 +267,6 @@ def detach_contributions(
             perimeter_recompute=perimeter_recompute,
             audit_repo=audit_repo,
         )
-        detached += result["detached"]
 
     cleaned_forms = repo.delete_orphan_name_forms_for_person(person_id)
 

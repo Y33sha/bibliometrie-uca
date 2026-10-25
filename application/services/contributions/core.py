@@ -17,7 +17,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import NotFoundError
-from domain.types import JsonValue
 
 
 def reject_pair(
@@ -28,7 +27,7 @@ def reject_pair(
     repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
     audit_repo: AuditRepository | None = None,
-) -> dict[str, int]:
+) -> int:
     """Rejette durablement une paire (publication, personne) : enregistre que cette personne n'est pas l'auteur de cette publication.
 
     Opération unique partagée par les deux façons de rejeter une contribution (depuis la fiche personne et depuis la fiche publication). Trois effets :
@@ -37,7 +36,7 @@ def reject_pair(
     2. Retire la personne à son groupe dans la publication, et retire les épinglages des contributions sources de la publication à elle (`detach_rejected_pair`).
     3. Recalcule l'appartenance au périmètre de la publication.
 
-    Retourne {"detached": N}, N groupes détachés.
+    Retourne le nombre de groupes détachés.
     """
     repo.reject_contribution(publication_id, person_id)
     detached = repo.detach_rejected_pair(publication_id, person_id)
@@ -50,7 +49,7 @@ def reject_pair(
         publication_id,
         {"person_id": person_id},
     )
-    return {"detached": detached}
+    return detached
 
 
 def exclude_contribution(
@@ -59,12 +58,12 @@ def exclude_contribution(
     conn: Connection,
     repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
-    person_repo: PersonRepository | None = None,
+    person_repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
-) -> dict[str, JsonValue]:
+) -> None:
     """Rejette une contribution désignée par son identifiant.
 
-    Retrouve la paire (publication, personne) à partir du groupe `contribution_id` puis applique `reject_pair`. Si `person_repo` est fourni, supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
+    Retrouve la paire (publication, personne) à partir du groupe `contribution_id` puis applique `reject_pair`. Supprime ensuite les formes de nom de la personne qu'aucune source restante n'atteste.
 
     Lève NotFoundError si le groupe n'existe pas ou n'a pas de personne.
     """
@@ -73,18 +72,15 @@ def exclude_contribution(
     if group is None or person_id is None:
         raise NotFoundError(f"Contribution {contribution_id} introuvable")
 
-    publication_id = group["publication_id"]
     reject_pair(
-        publication_id,
+        group["publication_id"],
         person_id,
         conn=conn,
         repo=repo,
         perimeter_recompute=perimeter_recompute,
         audit_repo=audit_repo,
     )
-    if person_repo is not None:
-        person_repo.delete_orphan_name_forms_for_person(person_id)
-    return {"id": contribution_id, "person_id": person_id, "publication_id": publication_id}
+    person_repo.delete_orphan_name_forms_for_person(person_id)
 
 
 def propagate_in_perimeter_for_addresses(

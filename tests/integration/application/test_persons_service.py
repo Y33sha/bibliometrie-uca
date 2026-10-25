@@ -151,22 +151,16 @@ def _scalar(conn, sql_text: str, **params):
 
 
 class TestAddIdentifier:
-    def test_manual_source_refuses_hal_person_id(self, sa_sync_conn, repo):
+    def test_refuses_hal_person_id(self, sa_sync_conn, repo):
         """`hal_person_id` est la référence d'un compte HAL, que l'extraction observe : personne ne l'attribue à la main."""
         person_id = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="id_type"):
-            add_identifier(person_id, "hal_person_id", "12345", source="manual", repo=repo)
+            add_identifier(person_id, "hal_person_id", "12345", repo=repo)
 
-    def test_auto_source_accepts_hal_person_id(self, sa_sync_conn, repo):
-        """La promotion depuis les contributions sources reste libre de le poser."""
-        person_id = _person(sa_sync_conn)
-        result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
-        assert result.outcome is AttributionOutcome.ADDED
-
-    def test_manual_source_raises_on_unknown_person(self, repo):
+    def test_raises_on_unknown_person(self, repo):
         """Sans cette garde, l'identifiant venu d'un formulaire heurterait la clé étrangère."""
         with pytest.raises(NotFoundError):
-            add_identifier(999999, "orcid", "0000-0001-2345-6789", source="manual", repo=repo)
+            add_identifier(999999, "orcid", "0000-0001-2345-6789", repo=repo)
 
     def test_inserts_new(self, sa_sync_conn, repo):
         person_id = _person(sa_sync_conn)

@@ -19,7 +19,6 @@ from application.services.persons.core import (
     DetachResult,
     IdentifierStatusResult,
 )
-from domain.persons.identifiers import IdentifierOrigin
 from domain.persons.person import PersonExclusion
 
 # ── Identifiants ──────────────────────────────────────────────────
@@ -31,13 +30,12 @@ def add_identifier(
     id_type: str,
     id_value: str,
     *,
-    source: IdentifierOrigin = IdentifierOrigin.MANUAL,
     repo: PersonRepository,
     audit_repo: AuditRepository | None = None,
 ) -> AddIdentifierResult:
     """Ajoute un identifiant (ORCID/idHAL) à une personne. Retourne l'issue de la cascade."""
     result = persons_service.add_identifier(
-        person_id, id_type, id_value, source=source, repo=repo, audit_repo=audit_repo
+        person_id, id_type, id_value, repo=repo, audit_repo=audit_repo
     )
     conn.commit()
     return result
