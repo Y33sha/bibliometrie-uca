@@ -108,7 +108,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
   | Rang parmi tous les libellés du niveau | 0,72 / 0,80 / 0,83 / 0,77 |
   | Écart au meilleur libellé de la publication au même niveau | 0,71 / 0,71 / 0,71 / 0,69 |
 
-  Meilleurs points de fonctionnement, tous niveaux : écart ≤ −0,03, précision 70 %, rappel 32 % ; rang dans la moitié basse du niveau, précision 59 %, rappel 35 %. À précision égale, le rappel dépasse celui du vote (20 %). Le libellé seul, quelques mots, décrit mal un sujet : les centroïdes devraient faire mieux
+  Meilleurs points de fonctionnement, tous niveaux : écart ≤ −0,03, précision 70 %, rappel 32 % ; rang dans la moitié basse du niveau, précision 59 %, rappel 35 %. À précision égale, le rappel dépasse celui du vote (20 %). Le modèle `BAAI/bge-m3`, deux fois plus gros, ne fait pas mieux (AUC du rang : 0,77 / 0,77 / 0,77 / 0,75). Le libellé seul, quelques mots, décrit mal un sujet : les centroïdes devraient faire mieux
 - [ ] Choix du modèle et de l'exécution (question ouverte « Specter2 »)
 - [ ] Embeddings des publications liées aux topics de l'échantillon ; centroïde par topic
 - [ ] Similarité cosinus des liens de l'échantillon ; précision et rappel selon le seuil
