@@ -150,7 +150,8 @@ Usages du type dans le code :
 - [x] Normalisation OpenAlex : localisations, plateforme trouvée ou créée pour une source de type `repository` (`8d0a6ca00`).
 - [x] Stock : réhydratation du staging OpenAlex et renormalisation. 303 477 localisations sur 105 496 des 111 022 enregistrements OpenAlex, 1 366 plateformes.
 - [ ] Serveurs de preprints, en attente de la question « Preprint : publication distincte ou version déposée ? ». La part de preprints par plateforme ne les sépare pas des entrepôts (bioRxiv 66 %, arXiv 24 %, OSF Preprints 22 %, Zenodo 9 %) ; l'attribution de DOI propres non plus (Zenodo, Figshare). Seule une liste fermée de serveurs tient.
-- [ ] Localisations de Crossref (`resource`, `link`).
+- [x] Localisation Crossref : la page de résolution du DOI (`resource.primary.URL`) ; les URL de `link`, points d'accès pour la fouille de texte, sont ignorées (`9ca9efccf`).
+- [ ] Stock : réhydratation du staging Crossref et renormalisation.
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
 - [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
 - [ ] Préfixe DOI d'une plateforme (Cairn `10.3917`, OpenEdition `10.4000`, Érudit, Université de Bordeaux `10.20870`) : son titulaire n'est pas l'éditeur, ni le nom que Crossref donne à ses DOI. L'éditeur vient des autres sources. Règle et oneshot de correction des publications (environ 4 650).
