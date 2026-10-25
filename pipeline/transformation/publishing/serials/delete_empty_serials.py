@@ -1,4 +1,4 @@
-"""Sous-étape de la phase `contributions` — supprime les revues vides.
+"""Sous-étape de la phase `finalize` — supprime les revues vides.
 
 Une revue vide n'a ni enregistrement, ni publication, ni monographie, ni paiement APC. Ses formes de nom partent avec elle : un enregistrement de ce titre chez cet éditeur crée de nouveau sa revue. Le journal garde le titre, l'éditeur et les ISSN de chaque revue supprimée.
 """
