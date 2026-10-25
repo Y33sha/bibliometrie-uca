@@ -24,7 +24,7 @@ from application.ports.read_models.serials_queries import (
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
-from application.services.serials import commands as serial_commands
+from application.services.serials import core as serials_service
 from domain.merge import MergedEntity
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,
@@ -267,10 +267,10 @@ def get_type_change_impact(
 
     La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
     """
-    count = serial_commands.preview_type_change_impact(
-        conn,
+    count = serials_service.preview_type_change_impact(
         serial_id,
         serial_type=body.serial_type,
+        conn=conn,
         repo=repo,
         recompute=recompute,
     )
@@ -292,10 +292,10 @@ def update_serial(
 
     Un `serial_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_serial`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
     """
-    serial_commands.update_serial(
-        conn,
+    serials_service.update_serial(
         serial_id,
         update=body,
+        conn=conn,
         repo=repo,
         audit_repo=audit,
         recompute=recompute,
@@ -316,10 +316,10 @@ def merge(
 
     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `serial_type` de la cible (`merge_serials`). Renvoie 422 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
     """
-    serial_commands.merge_serials(
-        conn,
+    serials_service.merge_serials(
         serial_id,
         body.source_id,
+        conn=conn,
         recompute=recompute,
         repo=repo,
         audit_repo=audit,

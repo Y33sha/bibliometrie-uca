@@ -3,7 +3,9 @@
 Ces opérations écrivent le lien et **retournent les adresses dont la contribution au calcul `in_perimeter` a changé**. La propagation (`propagate_in_perimeter_for_addresses`, potentiellement massive — jusqu'à des dizaines de milliers de source_contributions) est lancée en tâche de fond par l'appelant (`bg_propagate_in_perimeter`), jamais synchrone dans la requête.
 """
 
+from application.audit_log import emit_event
 from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.audit_repository import AuditRepository
 
 
 def review_structure_link(
@@ -12,6 +14,7 @@ def review_structure_link(
     is_confirmed: bool | None,
     *,
     repo: AddressRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> list[int]:
     """Insère ou met à jour le lien adresse ↔ structure (validation manuelle).
 
@@ -29,6 +32,13 @@ def review_structure_link(
         repo.upsert_structure_link(address_id, structure_id, is_confirmed)
 
     after = repo.which_contribute_to_perimeter([address_id], structure_id)
+    emit_event(
+        audit_repo,
+        "address.link_reviewed",
+        "address",
+        address_id,
+        {"structure_id": structure_id, "is_confirmed": is_confirmed},
+    )
     return list(before ^ after)
 
 
@@ -38,10 +48,13 @@ def batch_review_structure_link(
     is_confirmed: bool | None,
     *,
     repo: AddressRepository,
+    audit_repo: AuditRepository | None = None,
 ) -> tuple[int, list[int]]:
     """Comme `review_structure_link` mais sur un lot d'adresses.
 
     Retourne `(nombre d'adresses touchées, adresses dont la contribution au calcul in_perimeter a changé)`. Pour les reset, le nombre touché est le nombre de lignes mises à jour ; pour les upserts, la taille du lot. La propagation des adresses changées est lancée en tâche de fond par l'appelant.
+
+    Un lot est une décision unique : l'événement d'audit est unique lui aussi, sans identifiant d'agrégat, et porte les adresses visées et le nombre effectivement touché.
     """
     if not address_ids:
         return 0, []
@@ -55,4 +68,16 @@ def batch_review_structure_link(
         updated = len(address_ids)
 
     after = repo.which_contribute_to_perimeter(address_ids, structure_id)
+    emit_event(
+        audit_repo,
+        "address.batch_link_reviewed",
+        "address",
+        None,
+        {
+            "address_ids": address_ids,
+            "structure_id": structure_id,
+            "is_confirmed": is_confirmed,
+            "updated": updated,
+        },
+    )
     return updated, list(before ^ after)

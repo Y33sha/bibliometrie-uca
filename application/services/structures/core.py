@@ -1,12 +1,16 @@
-"""Service Structures — écritures sur l'agrégat Structure, transaction-agnostiques.
+"""Service Structures — écritures sur l'agrégat Structure.
 
 Couvre les tables `structures`, `structure_parents` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
 """
 
 from typing import cast
 
+from sqlalchemy import Connection
+
 from application.audit_log import emit_event
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.repositories.audit_repository import AuditRepository
+from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
     NameFormUpdate,
     StructureNameFormRow,
@@ -129,16 +133,21 @@ def _structure_edit(update: StructureUpdate) -> StructureEdit:
 def delete_structure(
     structure_id: int,
     *,
+    conn: Connection,
     repo: StructureRepository,
+    perimeter_repo: PerimeterRepository,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> None:
     """Supprime une structure. Lève NotFoundError si elle n'existe pas.
 
-    La base supprime en cascade ses formes de nom, ses tutelles et ses liens adresse-structure, confirmés compris (`ON DELETE CASCADE`). Le nettoyage du périmètre (retrait des racines de `perimeters.root_structure_ids`, rematérialisation de la clôture) relève du command handler.
+    La base supprime en cascade ses formes de nom, ses tutelles et ses liens adresse-structure, confirmés compris (`ON DELETE CASCADE`). La structure quitte les racines de tout périmètre, puis la clôture des périmètres est recalculée : la structure et ses tutelles en modifient la descente.
     """
     snapshot = repo.delete_structure(structure_id)
     if snapshot is None:
         raise NotFoundError(f"Structure {structure_id} introuvable")
+    perimeter_repo.remove_structure_from_all_perimeters(structure_id)
+    perimeter_structures.refresh(conn)
     # L'instantané garde ce que la cascade emporte : une suppression par erreur reste réparable à la main.
     emit_event(audit_repo, "structure.deleted", "structure", structure_id, snapshot)
 
@@ -150,10 +159,12 @@ def create_tutelle(
     *,
     parent_id: int,
     child_id: int,
+    conn: Connection,
     repo: StructureRepository,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> StructureTutelleRow | None:
-    """Crée une tutelle. Retourne la ligne insérée, ou None si elle existait déjà.
+    """Crée une tutelle, puis recalcule la clôture des périmètres, dont une tutelle modifie la descente. Retourne la ligne insérée, ou None si elle existait déjà.
 
     Lève `ValidationError` si la tutelle viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `repo.get_ancestor_ids` et la validation est déléguée au domaine.
     """
@@ -163,6 +174,7 @@ def create_tutelle(
         ancestors_of_parent=repo.get_ancestor_ids(parent_id),
     )
     row = repo.create_tutelle(parent_id=parent_id, child_id=child_id)
+    perimeter_structures.refresh(conn)
     if row is not None:
         # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le porte.
         emit_event(
@@ -178,13 +190,16 @@ def create_tutelle(
 def delete_tutelle(
     tutelle_id: int,
     *,
+    conn: Connection,
     repo: StructureRepository,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Supprime une tutelle. Lève NotFoundError si elle n'existe pas."""
+    """Supprime une tutelle, puis recalcule la clôture des périmètres. Lève NotFoundError si elle n'existe pas."""
     row = repo.delete_tutelle(tutelle_id)
     if not row:
         raise NotFoundError(f"Tutelle {tutelle_id} introuvable")
+    perimeter_structures.refresh(conn)
     emit_event(
         audit_repo,
         "structure_relation.deleted",

@@ -15,7 +15,7 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
-from application.services.publishers import commands as publisher_commands
+from application.services.publishers import core as publishers_service
 from domain.errors import ConflictError
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
@@ -111,10 +111,10 @@ def merge_aliases(conn: Connection, *, apply: bool) -> Counter[str]:
                 log.info("« %s » (%d) → « %s » (%d)", alias, source_id, target_name, targets[0])
                 continue
             try:
-                publisher_commands.merge_publishers(
-                    conn,
+                publishers_service.merge_publishers(
                     targets[0],
                     source_id,
+                    conn=conn,
                     publisher_repo=PgPublisherRepository(conn),
                     serial_repo=PgSerialRepository(conn),
                     recompute=SerialRecompute(),
@@ -125,6 +125,7 @@ def merge_aliases(conn: Connection, *, apply: bool) -> Counter[str]:
                 outcomes["refusées"] += 1
                 log.warning("« %s » → « %s » : %s", alias, target_name, e)
                 continue
+            conn.commit()
             outcomes["fusionnées"] += 1
     return outcomes
 

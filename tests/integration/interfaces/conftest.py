@@ -10,7 +10,6 @@ bibliometrie_test par monkey-patch de `build_sync_engine` avant l'import
 de l'app.
 """
 
-import logging
 import os
 
 import pytest
@@ -95,34 +94,6 @@ def _reset_rate_limiters():
     reset_rate_limiters()
     reset_export_slots()
     yield
-
-
-@pytest.fixture(autouse=True)
-def _fail_on_escaped_dml():
-    """Échoue si une écriture API échappe à un command handler.
-
-    `db_conn` émet un warning quand son commit de fin rattrape du DML non
-    committé (écriture qui ne passe pas par un command handler committant). On le
-    transforme en échec de test pour verrouiller l'invariant « toute écriture API
-    commit avant la réponse », y compris pour les futurs endpoints — c'est ce qui
-    rend sûre la lecture seule de `db_conn` (commit de fin retiré).
-    """
-    captured: list[str] = []
-
-    class _Capture(logging.Handler):
-        def emit(self, record: logging.LogRecord) -> None:
-            message = record.getMessage()
-            if "command handler" in message:
-                captured.append(message)
-
-    handler = _Capture()
-    deps_logger = logging.getLogger("interfaces.api.deps")
-    deps_logger.addHandler(handler)
-    try:
-        yield
-    finally:
-        deps_logger.removeHandler(handler)
-    assert not captured, "Écriture(s) hors command handler détectée(s) : " + " | ".join(captured)
 
 
 @pytest.fixture(scope="module")

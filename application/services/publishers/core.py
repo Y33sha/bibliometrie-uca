@@ -1,4 +1,4 @@
-"""Service Éditeurs — écritures sur l'agrégat Publisher, transaction-agnostiques.
+"""Service Éditeurs — écritures sur l'agrégat Publisher.
 
 Agrégat distinct de Serial, servi par son propre port (`PublisherRepository`). Un appelant qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) charge cette seule surface.
 

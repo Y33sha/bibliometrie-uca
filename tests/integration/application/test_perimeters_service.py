@@ -12,8 +12,11 @@ from application.services.perimeters.core import (
 from domain.errors import ConflictError, NotFoundError, ValidationError
 from infrastructure.read_models.config import PgConfigQueries
 from infrastructure.repositories import perimeter_repository
+from pipeline.transformation.structures.perimeter import PerimeterStructures
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.structures import insert_perimeter
+
+_PERIMETER_STRUCTURES = PerimeterStructures()
 
 
 @pytest.fixture
@@ -58,7 +61,12 @@ class TestPerimeterFindById:
 class TestCreatePerimeter:
     def test_creates(self, sa_sync_conn, repo):
         pid = create_perimeter(
-            code="new_perim", name="New Perimeter", root_structure_ids=[], repo=repo
+            code="new_perim",
+            name="New Perimeter",
+            root_structure_ids=[],
+            repo=repo,
+            conn=sa_sync_conn,
+            perimeter_structures=_PERIMETER_STRUCTURES,
         )
         assert pid is not None
         result = sa_sync_conn.execute(
@@ -71,13 +79,34 @@ class TestCreatePerimeter:
     def test_raises_on_code_conflict(self, sa_sync_conn, repo):
         insert_perimeter(sa_sync_conn, "existing", name="Test")
         with pytest.raises(ConflictError):
-            create_perimeter(code="existing", name="X", root_structure_ids=[], repo=repo)
+            create_perimeter(
+                code="existing",
+                name="X",
+                root_structure_ids=[],
+                repo=repo,
+                conn=sa_sync_conn,
+                perimeter_structures=_PERIMETER_STRUCTURES,
+            )
 
     def test_raises_on_empty_code_or_name(self, sa_sync_conn, repo):
         with pytest.raises(ValidationError):
-            create_perimeter(code="", name="X", root_structure_ids=[], repo=repo)
+            create_perimeter(
+                code="",
+                name="X",
+                root_structure_ids=[],
+                repo=repo,
+                conn=sa_sync_conn,
+                perimeter_structures=_PERIMETER_STRUCTURES,
+            )
         with pytest.raises(ValidationError):
-            create_perimeter(code="X", name="", root_structure_ids=[], repo=repo)
+            create_perimeter(
+                code="X",
+                name="",
+                root_structure_ids=[],
+                repo=repo,
+                conn=sa_sync_conn,
+                perimeter_structures=_PERIMETER_STRUCTURES,
+            )
 
 
 # ── update_perimeter ───────────────────────────────────────────────
@@ -86,22 +115,46 @@ class TestCreatePerimeter:
 class TestUpdatePerimeter:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_perimeter(999999, update=PerimeterUpdate(name="X"), repo=repo)
+            update_perimeter(
+                999999,
+                update=PerimeterUpdate(name="X"),
+                repo=repo,
+                conn=sa_sync_conn,
+                perimeter_structures=_PERIMETER_STRUCTURES,
+            )
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         p = insert_perimeter(sa_sync_conn, "test", name="Test")
         with pytest.raises(ValidationError):
-            update_perimeter(p, update=PerimeterUpdate(), repo=repo)
+            update_perimeter(
+                p,
+                update=PerimeterUpdate(),
+                repo=repo,
+                conn=sa_sync_conn,
+                perimeter_structures=_PERIMETER_STRUCTURES,
+            )
 
     def test_updates_name(self, sa_sync_conn, repo):
         p = insert_perimeter(sa_sync_conn, "test", name="Old")
-        update_perimeter(p, update=PerimeterUpdate(name="New"), repo=repo)
+        update_perimeter(
+            p,
+            update=PerimeterUpdate(name="New"),
+            repo=repo,
+            conn=sa_sync_conn,
+            perimeter_structures=_PERIMETER_STRUCTURES,
+        )
         result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
         assert result.scalar_one() == "New"
 
     def test_updates_structure_ids(self, sa_sync_conn, repo):
         p = insert_perimeter(sa_sync_conn, "test", root_structure_ids=[1], name="Test")
-        update_perimeter(p, update=PerimeterUpdate(root_structure_ids=[4, 5, 6]), repo=repo)
+        update_perimeter(
+            p,
+            update=PerimeterUpdate(root_structure_ids=[4, 5, 6]),
+            repo=repo,
+            conn=sa_sync_conn,
+            perimeter_structures=_PERIMETER_STRUCTURES,
+        )
         result = sa_sync_conn.execute(
             text("SELECT root_structure_ids FROM perimeters WHERE id = :p"), {"p": p}
         )

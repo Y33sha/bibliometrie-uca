@@ -13,7 +13,7 @@ from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
     PerimeterUpdate,
 )
-from application.services.perimeters import commands as perimeter_commands
+from application.services.perimeters import core as perimeters_service
 from interfaces.api.deps import (
     DbConn,
     audit_repo,
@@ -54,11 +54,11 @@ def create_perimeter(
 
     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et doit être un jeton unique, sans espace : un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
     """
-    pid = perimeter_commands.create_perimeter(
-        conn,
+    pid = perimeters_service.create_perimeter(
         code=body.code,
         name=body.name,
         root_structure_ids=body.root_structure_ids,
+        conn=conn,
         audit_repo=audit,
         repo=repo,
         perimeter_structures=perimeter_structures,
@@ -79,10 +79,10 @@ def update_perimeter(
 
     Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
     """
-    perimeter_commands.update_perimeter(
-        conn,
+    perimeters_service.update_perimeter(
         perimeter_id,
         update=body,
+        conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
         audit_repo=audit,
@@ -93,7 +93,6 @@ def update_perimeter(
 @router.delete("/{perimeter_id}", response_model=OkResponse)
 def delete_perimeter(
     perimeter_id: int,
-    conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     config: ConfigQueries = Depends(config_queries),
     audit: AuditRepository = Depends(audit_repo),
@@ -102,7 +101,5 @@ def delete_perimeter(
 
     Renvoie 409 si une clé de configuration le désigne encore — le pipeline s'y appuierait sans le trouver. Les lignes de la clôture matérialisée s'en vont avec lui, par cascade.
     """
-    perimeter_commands.delete_perimeter(
-        conn, perimeter_id, repo=repo, config=config, audit_repo=audit
-    )
+    perimeters_service.delete_perimeter(perimeter_id, repo=repo, config=config, audit_repo=audit)
     return OkResponse()

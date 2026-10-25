@@ -1,1 +1,1 @@
-"""Écritures API sur la table `config` (paramètres clé / valeur JSON)."""
+"""Écritures sur la table `config` (paramètres clé / valeur JSON)."""

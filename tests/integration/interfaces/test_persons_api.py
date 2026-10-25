@@ -385,10 +385,8 @@ class TestUpdatePersonName:
         assert r.json()["ok"] is True
 
     def test_visible_immediately(self, auth_client):
-        # Régression (chantier commit-avant-réponse) : le command handler commit
-        # avant l'envoi de la réponse, donc l'écriture est lisible depuis une
-        # connexion indépendante. Garde-fou du passage final du teardown de
-        # db_conn en rollback — un handler sans `commit()` ferait échouer ce test.
+        # La requête est committée avant l'envoi de la réponse : l'écriture est lisible depuis
+        # une connexion indépendante.
         pid = seed_person()
         marker = uniq("READBACK")
         r = auth_client.patch(

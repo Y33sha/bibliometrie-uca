@@ -1,9 +1,4 @@
-"""Command handlers des écritures API sur la table `config` : frontière transactionnelle.
-
-Écriture triviale, servie par le port `ConfigRepository` sans brique agnostique séparée.
-"""
-
-from sqlalchemy import Connection
+"""Écritures sur la table `config` (paramètres clé / valeur JSON)."""
 
 from application.audit_log import emit_event
 from application.ports.repositories.audit_repository import AuditRepository
@@ -14,7 +9,6 @@ from domain.types import JsonValue
 
 
 def update_config_value(
-    conn: Connection,
     key: str,
     value: JsonValue,
     *,
@@ -30,5 +24,4 @@ def update_config_value(
     if row is None:
         raise NotFoundError(f"Paramètre '{key}' introuvable")
     emit_event(audit_repo, "config.updated", "config", None, {"key": key, "value": normalisee})
-    conn.commit()
     return row

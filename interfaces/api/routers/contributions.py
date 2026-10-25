@@ -5,6 +5,8 @@ L'exclusion vise une contribution rattachée à une personne, par son `contribut
 Les routes sont groupées par sujet, et les chemins littéraux précèdent celui qui porte un identifiant — un chemin littéral déclaré après `/{contribution_id}` s'y ferait absorber.
 """
 
+from typing import cast
+
 from fastapi import APIRouter, Depends, Query
 
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
@@ -18,7 +20,7 @@ from application.ports.read_models.contributions_queries import (
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
-from application.services.contributions import commands as contribution_commands
+from application.services.contributions import assign_orphans, core as contributions_service
 from interfaces.api.deps import (
     DbConn,
     audit_repo,
@@ -93,23 +95,32 @@ def assign_orphan_contribution(
 ) -> OrphanAssignResponse:
     """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
     """
-    new_person: tuple[str, str] | None = None
-    if body.create_person:
-        new_person = (body.create_person.last_name, body.create_person.first_name)
-
-    person_id = contribution_commands.assign_orphan_contribution(
-        conn,
-        body.contribution_id,
-        person_id=body.person_id,
-        new_person=new_person,
-        repo=persons,
-        contribution_repo=contributions,
-        perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
-        force=body.force,
-    )
+    if body.create_person is not None:
+        person_id = assign_orphans.assign_orphan_contribution_to_new_person(
+            body.contribution_id,
+            body.create_person.last_name,
+            body.create_person.first_name,
+            conn=conn,
+            repo=persons,
+            contribution_repo=contributions,
+            perimeter_recompute=perimeter_recompute,
+            audit_repo=audit,
+            force=body.force,
+        )
+    else:
+        person_id = cast(int, body.person_id)
+        assign_orphans.assign_orphan_contribution(
+            person_id,
+            body.contribution_id,
+            conn=conn,
+            repo=persons,
+            contribution_repo=contributions,
+            perimeter_recompute=perimeter_recompute,
+            audit_repo=audit,
+            force=body.force,
+        )
     return OrphanAssignResponse(person_id=person_id)
 
 
@@ -133,10 +144,10 @@ def batch_assign_orphan_contributions(
     if not body.group_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
-    assigned = contribution_commands.batch_assign_orphan_contributions(
-        conn,
+    assigned = assign_orphans.batch_assign_orphan_contributions(
         body.person_id,
         body.group_ids,
+        conn=conn,
         repo=persons,
         contribution_repo=contributions,
         perimeter_recompute=perimeter_recompute,
@@ -162,9 +173,9 @@ def exclude_contribution(
 
     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
-    contribution_commands.exclude_contribution(
-        conn,
+    contributions_service.exclude_contribution(
         contribution_id,
+        conn=conn,
         repo=repo,
         person_repo=persons,
         perimeter_recompute=perimeter_recompute,

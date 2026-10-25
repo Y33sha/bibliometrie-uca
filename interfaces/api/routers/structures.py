@@ -27,7 +27,7 @@ from application.ports.repositories.structure_repository import (
     StructureRepository,
     StructureUpdate,
 )
-from application.services.structures import commands as structure_commands
+from application.services.structures import core as structures_service
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
 from interfaces.api.deps import (
@@ -74,14 +74,12 @@ def list_structures(
 @router.post("", response_model=StructureOut)
 def create_structure(
     data: StructureCreate,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureOut:
     """Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé."""
     return StructureOut.model_validate(
-        structure_commands.create_structure(
-            conn,
+        structures_service.create_structure(
             code=data.code,
             name=data.name,
             acronym=data.acronym,
@@ -111,10 +109,10 @@ def create_tutelle(
 
     Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 422 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
-    row = structure_commands.create_tutelle(
-        conn,
+    row = structures_service.create_tutelle(
         parent_id=data.parent_id,
         child_id=data.child_id,
+        conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
         audit_repo=audit,
@@ -133,8 +131,12 @@ def delete_tutelle(
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une tutelle. 404 si l'id n'existe pas."""
-    structure_commands.delete_tutelle(
-        conn, tutelle_id, repo=repo, perimeter_structures=perimeter_structures, audit_repo=audit
+    structures_service.delete_tutelle(
+        tutelle_id,
+        conn=conn,
+        repo=repo,
+        perimeter_structures=perimeter_structures,
+        audit_repo=audit,
     )
     return DeletedResponse()
 
@@ -147,7 +149,6 @@ def delete_tutelle(
 @router.post("/name-forms", response_model=NameFormOut)
 def create_name_form(
     data: NameFormCreate,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormOut:
@@ -156,8 +157,7 @@ def create_name_form(
     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
     """
     return NameFormOut.model_validate(
-        structure_commands.create_name_form(
-            conn,
+        structures_service.create_name_form(
             structure_id=data.structure_id,
             form_text=data.form_text,
             is_word_boundary=data.is_word_boundary,
@@ -185,25 +185,23 @@ def get_name_form(
 def update_name_form(
     form_id: int,
     data: NameFormUpdate,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> NameFormOut:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
     return NameFormOut.model_validate(
-        structure_commands.update_name_form(conn, form_id, update=data, repo=repo, audit_repo=audit)
+        structures_service.update_name_form(form_id, update=data, repo=repo, audit_repo=audit)
     )
 
 
 @router.delete("/name-forms/{form_id}", response_model=DeletedResponse)
 def delete_name_form(
     form_id: int,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une forme de nom. 404 si inconnue."""
-    structure_commands.delete_name_form(conn, form_id, repo=repo, audit_repo=audit)
+    structures_service.delete_name_form(form_id, repo=repo, audit_repo=audit)
     return DeletedResponse()
 
 
@@ -292,7 +290,6 @@ def get_structure_deletion_impact(
 def update_structure(
     structure_id: int,
     data: StructureUpdate,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> StructureOut:
@@ -301,9 +298,7 @@ def update_structure(
     Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
     """
     return StructureOut.model_validate(
-        structure_commands.update_structure(
-            conn, structure_id, update=data, repo=repo, audit_repo=audit
-        )
+        structures_service.update_structure(structure_id, update=data, repo=repo, audit_repo=audit)
     )
 
 
@@ -317,9 +312,9 @@ def delete_structure(
     audit: AuditRepository = Depends(audit_repo),
 ) -> DeletedResponse:
     """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue."""
-    structure_commands.delete_structure(
-        conn,
+    structures_service.delete_structure(
         structure_id,
+        conn=conn,
         repo=repo,
         perimeter_repo=perimeters,
         perimeter_structures=perimeter_structures,

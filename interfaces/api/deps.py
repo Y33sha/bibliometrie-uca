@@ -127,7 +127,7 @@ READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 def _open_connection(request: Request) -> Connection:
     """Connexion tirée de l'engine, avec les caractéristiques de la requête en cours.
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
 
     Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
     """
@@ -347,7 +347,7 @@ def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
 
     Une tâche de fond s'exécute pendant l'envoi de la réponse, en parallèle de la requête qui l'a enregistrée : la connexion de celle-ci appartient à un autre contexte, et la partager laisserait une transaction ouverte (idle in transaction). `engine.begin()` commite en sortie, annule sur exception, et ferme dans les deux cas.
 
-    L'exception est piégée et loguée : une tâche de fond n'a personne à qui la remonter, la réponse étant partie. `work` voit les écritures que le command handler de la requête a committées avant de retourner.
+    L'exception est piégée et loguée : une tâche de fond n'a personne à qui la remonter, la réponse étant partie. `work` voit les écritures de la requête, committées avant l'envoi de sa réponse.
     """
     try:
         with get_sync_engine().begin() as conn:

@@ -1,4 +1,4 @@
-"""Service Contributions — écritures sur l'agrégat Contribution, transaction-agnostiques.
+"""Service Contributions — écritures sur l'agrégat Contribution.
 
 Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`). Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
 

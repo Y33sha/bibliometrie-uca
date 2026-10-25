@@ -160,16 +160,30 @@ class TestSerialFindById:
 class TestUpdateSerial:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
-            update_serial(999999, update=SerialUpdate(title="X"), repo=repo)
+            update_serial(
+                999999,
+                update=SerialUpdate(title="X"),
+                repo=repo,
+                conn=sa_sync_conn,
+                recompute=SerialRecompute(),
+            )
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         j = _serial(sa_sync_conn)
         with pytest.raises(ValidationError):
-            update_serial(j, update=SerialUpdate(), repo=repo)
+            update_serial(
+                j, update=SerialUpdate(), repo=repo, conn=sa_sync_conn, recompute=SerialRecompute()
+            )
 
     def test_updates_title_and_normalizes(self, sa_sync_conn, repo):
         j = _serial(sa_sync_conn, title="Old Title")
-        update_serial(j, update=SerialUpdate(title="Nature Medicine"), repo=repo)
+        update_serial(
+            j,
+            update=SerialUpdate(title="Nature Medicine"),
+            repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
+        )
         row = _fetch_one(
             sa_sync_conn, "SELECT title, title_normalized FROM serials WHERE id = :id", id=j
         )
@@ -189,6 +203,8 @@ class TestUpdateSerial:
                 ]
             ),
             repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
         )
         assert (
             _fetch_one(
@@ -210,6 +226,8 @@ class TestUpdateSerial:
                 issns=[SerialIssnInput(issn="14764687", support=IssnSupport.ELECTRONIC)]
             ),
             repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
         )
         row = issn_columns(sa_sync_conn, j)
         assert row.eissn == "1476-4687"
@@ -217,7 +235,13 @@ class TestUpdateSerial:
     def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
         """Un type saisi devient un champ saisi à la main : le typage des recueils d'actes ne le voit plus, et les écritures du pipeline s'abstiennent."""
         j = _serial(sa_sync_conn, title="2024 IEEE SENSORS")
-        update_serial(j, update=SerialUpdate(serial_type=SerialType.JOURNAL), repo=repo)
+        update_serial(
+            j,
+            update=SerialUpdate(serial_type=SerialType.JOURNAL),
+            repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
+        )
 
         assert j not in {r.id for r in find_titles_of_non_proceedings_serials(sa_sync_conn)}
         gateway.set_serial_type(j, SerialType.PROCEEDINGS)
@@ -232,7 +256,11 @@ class TestUpdateSerial:
         """Le formulaire renvoie tous les champs : seul un champ modifié devient saisi à la main."""
         j = _serial(sa_sync_conn, title="Same", serial_type="journal")
         update_serial(
-            j, update=SerialUpdate(title="Same", serial_type=SerialType.JOURNAL), repo=repo
+            j,
+            update=SerialUpdate(title="Same", serial_type=SerialType.JOURNAL),
+            repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
         )
         assert (
             _fetch_one(
@@ -243,7 +271,13 @@ class TestUpdateSerial:
 
     def test_apc_saisi_en_euros_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
         j = _serial(sa_sync_conn, apc_amount=1000, apc_currency="USD")
-        update_serial(j, update=SerialUpdate(apc_amount=2499.99), repo=repo)
+        update_serial(
+            j,
+            update=SerialUpdate(apc_amount=2499.99),
+            repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
+        )
 
         update_serial_apc(sa_sync_conn, j, apc_amount=3000, apc_currency="GBP")
 
@@ -268,6 +302,8 @@ class TestUpdateSerial:
                 issns=[SerialIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC)],
             ),
             repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
         )
 
         assert j not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn, also=[j])}
@@ -283,7 +319,13 @@ class TestUpdateSerial:
 
     def test_modele_oa_vide_a_la_main_reste_vide(self, sa_sync_conn, repo, gateway):
         j = _serial(sa_sync_conn, oa_model="full_oa")
-        update_serial(j, update=SerialUpdate(oa_model=None), repo=repo)
+        update_serial(
+            j,
+            update=SerialUpdate(oa_model=None),
+            repo=repo,
+            conn=sa_sync_conn,
+            recompute=SerialRecompute(),
+        )
 
         gateway.enrich_serial(j, oa_model=OaModel.SUBSCRIPTION)
 
@@ -296,7 +338,11 @@ class TestUpdateSerial:
         j = _serial(sa_sync_conn, issn="0028-0836")
         with pytest.raises(ValidationError):
             update_serial(
-                j, update=SerialUpdate(issns=[SerialIssnInput(issn="1234-5678")]), repo=repo
+                j,
+                update=SerialUpdate(issns=[SerialIssnInput(issn="1234-5678")]),
+                repo=repo,
+                conn=sa_sync_conn,
+                recompute=SerialRecompute(),
             )
         row = issn_columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"

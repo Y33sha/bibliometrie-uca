@@ -1,4 +1,4 @@
-"""Service des publications en série — écritures sur l'agrégat Serial, transaction-agnostiques.
+"""Service des publications en série — écritures sur l'agrégat Serial.
 
 Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers/core.py` ; les deux agrégats restent liés par `serials.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
 
@@ -16,17 +16,19 @@ from application.ports.repositories.serial_repository import SerialRepository, S
 from application.services._merge import load_merge_pair
 from domain.errors import NotFoundError, ValidationError
 from domain.serials.issns import SerialIssn
-from domain.serials.serial import ManualField, SerialEdit
+from domain.serials.serial import ManualField, SerialEdit, SerialType
 
 
 def update_serial(
     serial_id: int,
     *,
     update: SerialUpdate,
+    conn: Connection,
     repo: SerialRepository,
+    recompute: SerialRecompute,
     audit_repo: AuditRepository | None = None,
-) -> bool:
-    """Charge la revue, applique les champs explicitement fournis (`Serial.edit`), persiste. Retourne `True` si le `serial_type` ou le `oa_model` a effectivement changé : le command handler rejoue alors les corrections des publications de la revue.
+) -> int:
+    """Charge la revue, applique les champs explicitement fournis (`Serial.edit`), persiste. Si le `serial_type` ou le `oa_model` change effectivement, rejoue les corrections des publications de la revue : leur `doc_type` suit le type de la revue, leur statut diamant son modèle OA. Retourne le nombre de publications dont le `doc_type` change.
 
     Un `null` sur un champ obligatoire (titre, type, caractère académique) vaut champ non fourni. L'événement d'audit contient seulement les champs soumis.
 
@@ -48,7 +50,36 @@ def update_serial(
         serial_id,
         update.model_dump(exclude_unset=True, mode="json"),
     )
-    return bool(changed & {ManualField.SERIAL_TYPE, ManualField.OA_MODEL})
+    if not changed & {ManualField.SERIAL_TYPE, ManualField.OA_MODEL}:
+        return 0
+    return requalify_publications_for_serial(
+        serial_id, conn=conn, recompute=recompute, audit_repo=audit_repo
+    )
+
+
+def preview_type_change_impact(
+    serial_id: int,
+    *,
+    serial_type: SerialType,
+    conn: Connection,
+    repo: SerialRepository,
+    recompute: SerialRecompute,
+) -> int:
+    """Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à `serial_type`.
+
+    Applique réellement l'édition (`update_serial`) dans un `SAVEPOINT` annulé : l'aperçu emprunte le chemin exact de l'édition, et aucune écriture ne survit. Lève `NotFoundError` sur une revue inconnue, comme l'édition simulée.
+    """
+    savepoint = conn.begin_nested()
+    try:
+        return update_serial(
+            serial_id,
+            update=SerialUpdate(serial_type=serial_type),
+            conn=conn,
+            repo=repo,
+            recompute=recompute,
+        )
+    finally:
+        savepoint.rollback()
 
 
 def _serial_edit(update: SerialUpdate) -> SerialEdit:

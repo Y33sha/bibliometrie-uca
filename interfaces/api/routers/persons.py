@@ -1,6 +1,6 @@
 """Router des personnes : annuaire, profil, files de triage et gestes de curation. Sert `/api/persons/*`.
 
-Les lectures passent par le port `PersonsQueries`, les écritures par les command handlers de `application.services.persons.commands`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
+Les lectures passent par le port `PersonsQueries`, les écritures par le service `application.services.persons.core`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
 
 L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
@@ -31,7 +31,7 @@ from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
-from application.services.persons import commands as person_commands
+from application.services.persons import core as persons_service
 from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
@@ -221,7 +221,6 @@ def name_duplicates(
 @router.post("/mark-distinct", response_model=OkResponse)
 def mark_persons_distinct(
     body: MarkDistinctPersons,
-    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
@@ -229,9 +228,7 @@ def mark_persons_distinct(
 
     Renvoie 422 sur deux identifiants égaux (`mark_distinct`).
     """
-    person_commands.mark_distinct(
-        conn, body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit
-    )
+    persons_service.mark_distinct(body.person_id_a, body.person_id_b, repo=repo, audit_repo=audit)
     return OkResponse()
 
 
@@ -242,7 +239,6 @@ def mark_persons_distinct(
 def update_identifier_status(
     ident_id: int,
     body: UpdateIdentifierStatus,
-    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> IdentifierStatusResponse:
@@ -250,8 +246,7 @@ def update_identifier_status(
 
     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
     """
-    result = person_commands.update_identifier_status(
-        conn,
+    result = persons_service.update_identifier_status(
         ident_id,
         body.status,
         repo=repo,
@@ -367,7 +362,6 @@ def name_form_contributions(
 def add_person_identifier(
     person_id: int,
     data: AddIdentifier,
-    conn: DbConn,
     queries: PersonsQueries = Depends(persons_queries),
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
@@ -376,8 +370,7 @@ def add_person_identifier(
 
     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`CannotAttributeConflict`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
     """
-    result = person_commands.add_identifier(
-        conn,
+    result = persons_service.add_identifier(
         person_id,
         data.id_type,
         data.id_value,
@@ -410,10 +403,10 @@ def set_person_exclusion(
 
     Renvoie 404 sur une personne introuvable (`set_exclusion`).
     """
-    person_commands.set_exclusion(
-        conn,
+    persons_service.set_exclusion(
         person_id,
         body.exclusion,
+        conn=conn,
         repo=repo,
         perimeter_recompute=perimeter_recompute,
         audit_repo=audit,
@@ -425,7 +418,6 @@ def set_person_exclusion(
 def update_person_name(
     person_id: int,
     body: UpdatePersonName,
-    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
@@ -433,8 +425,8 @@ def update_person_name(
 
     Renvoie 422 sans patronyme, 404 sur une personne introuvable (`update_name`).
     """
-    person_commands.update_name(
-        conn, person_id, body.last_name, body.first_name, repo=repo, audit_repo=audit
+    persons_service.update_name(
+        person_id, body.last_name, body.first_name, repo=repo, audit_repo=audit
     )
     return OkResponse()
 
@@ -443,7 +435,6 @@ def update_person_name(
 def merge_persons(
     person_id: int,
     body: MergeRequest,
-    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> MergeResponse:
@@ -451,8 +442,8 @@ def merge_persons(
 
     Si seule la source a une fiche RH, les rôles s'inversent : la réponse donne les rôles appliqués. Renvoie 422 sur deux identifiants égaux, 404 sur une personne introuvable, 409 si les deux ont une fiche RH (`merge_person`).
     """
-    target_id, source_id = person_commands.merge_person(
-        conn, person_id, body.source_id, repo=repo, audit_repo=audit
+    target_id, source_id = persons_service.merge_person(
+        person_id, body.source_id, repo=repo, audit_repo=audit
     )
     return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
 
@@ -469,13 +460,13 @@ def detach_contributions(
 ) -> DetachContributionsResponse:
     """Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet."""
     return DetachContributionsResponse.model_validate(
-        person_commands.detach_contributions(
-            conn,
+        persons_service.detach_contributions(
             person_id,
             [
                 {"source": a.source, "source_contribution_id": a.source_contribution_id}
                 for a in body.contributions
             ],
+            conn=conn,
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
@@ -488,7 +479,6 @@ def detach_contributions(
 def update_name_form_status(
     person_id: int,
     body: UpdateNameFormStatus,
-    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     audit: AuditRepository = Depends(audit_repo),
@@ -497,8 +487,7 @@ def update_name_form_status(
 
     `rejected` pose un verrou durable. Les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne : le run suivant les redécide. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
     """
-    row = person_commands.update_name_form_status(
-        conn,
+    row = persons_service.update_name_form_status(
         person_id,
         body.name_form,
         body.status,

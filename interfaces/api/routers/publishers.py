@@ -23,7 +23,7 @@ from application.ports.repositories.publisher_repository import (
     PublisherUpdate,
 )
 from application.ports.repositories.serial_repository import SerialRepository
-from application.services.publishers import commands as publisher_commands
+from application.services.publishers import core as publishers_service
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
@@ -151,7 +151,6 @@ def get_publisher_subjects(
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
-    conn: DbConn,
     repo: PublisherRepository = Depends(publisher_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> OkResponse:
@@ -159,9 +158,7 @@ def update_publisher(
 
     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
     """
-    publisher_commands.update_publisher(
-        conn, publisher_id, update=body, repo=repo, audit_repo=audit
-    )
+    publishers_service.update_publisher(publisher_id, update=body, repo=repo, audit_repo=audit)
     return OkResponse()
 
 
@@ -188,10 +185,10 @@ def merge(
 
         Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
-    publisher_commands.merge_publishers(
-        conn,
+    publishers_service.merge_publishers(
         publisher_id,
         body.source_id,
+        conn=conn,
         recompute=recompute,
         publication_count_recompute=publication_count_recompute,
         publisher_repo=publishers,

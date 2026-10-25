@@ -1,8 +1,8 @@
 """Attribuer à une personne des contributions orphelines : groupes de contributions sources du périmètre rattachés à aucune personne.
 
-Ces deux opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/contributions/orphans/...`) — actions utilisateur, hors pipeline. Elles épinglent les membres de chaque groupe à la personne, ce qui rattache le groupe.
+Ces opérations (unitaire et par lot) sont exposées par l'API admin (`POST /api/contributions/orphans/...`) — actions utilisateur, hors pipeline. Elles épinglent les membres de chaque groupe à la personne, ce qui rattache le groupe.
 
-Les deux opérations vérifient l'existence de la personne cible : elles écrivent des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
+Elles vérifient l'existence de la personne cible : elles écrivent des lignes qui la référencent, et sans cette garde une cible absente se traduirait en violation de clé étrangère.
 """
 
 import logging
@@ -159,6 +159,36 @@ def assign_orphan_contribution(
         person_id,
         {"contribution_id": contribution_id, "publication_id": group["publication_id"]},
     )
+
+
+def assign_orphan_contribution_to_new_person(
+    contribution_id: int,
+    last_name: str,
+    first_name: str,
+    *,
+    conn: Connection,
+    repo: PersonRepository,
+    contribution_repo: ContributionRepository,
+    perimeter_recompute: PublicationPerimeterRecompute,
+    audit_repo: AuditRepository | None = None,
+    force: bool = False,
+) -> int:
+    """Crée une personne (`PersonRepository.create`), puis lui attribue la contribution orpheline `contribution_id` (`assign_orphan_contribution`). Retourne l'id de la personne créée.
+
+    Lève `ValidationError` sans patronyme, et les erreurs d'`assign_orphan_contribution`.
+    """
+    person_id = repo.create(last_name, first_name)
+    assign_orphan_contribution(
+        person_id,
+        contribution_id,
+        conn=conn,
+        repo=repo,
+        contribution_repo=contribution_repo,
+        perimeter_recompute=perimeter_recompute,
+        audit_repo=audit_repo,
+        force=force,
+    )
+    return person_id
 
 
 def batch_assign_orphan_contributions(

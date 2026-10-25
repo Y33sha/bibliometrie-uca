@@ -1,6 +1,1 @@
-"""Services applicatifs autour de l'agrégat Serial.
-
-Sous-modules :
-- `core` : briques transaction-agnostiques (find_or_create, update, merge…), réutilisées par le pipeline, les CLI et l'API.
-- `commands` : command handlers de l'API (frontière transactionnelle, commit).
-"""
+"""Services applicatifs autour de l'agrégat Serial (`core` : mise à jour, fusion, requalification des publications)."""

@@ -1,11 +1,14 @@
-"""Service Périmètres — écritures sur l'agrégat Perimeter, transaction-agnostiques.
+"""Service Périmètres — écritures sur l'agrégat Perimeter.
 
-Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le gateway pipeline. Toute écriture qui touche aux racines laisse la clôture à recalculer : les command handlers déclenchent ce recompute.
+Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le gateway pipeline. La création et la mise à jour recalculent cette clôture, que les racines commandent.
 
 `delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
+from sqlalchemy import Connection
+
 from application.audit_log import emit_event
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import (
@@ -21,10 +24,12 @@ def create_perimeter(
     code: str,
     name: str,
     root_structure_ids: list[int],
+    conn: Connection,
     repo: PerimeterRepository,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> int:
-    """Crée un périmètre avec ses structures racines. Retourne l'id créé.
+    """Crée un périmètre avec ses structures racines, puis recalcule la clôture des périmètres. Retourne l'id créé.
 
     Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
     """
@@ -32,6 +37,7 @@ def create_perimeter(
     if repo.perimeter_code_exists(perimeter.code):
         raise ConflictError(f"Le code '{perimeter.code}' existe déjà")
     perimeter_id = repo.add(perimeter)
+    perimeter_structures.refresh(conn)
     emit_event(
         audit_repo,
         "perimeter.created",
@@ -50,10 +56,12 @@ def update_perimeter(
     perimeter_id: int,
     *,
     update: PerimeterUpdate,
+    conn: Connection,
     repo: PerimeterRepository,
+    perimeter_structures: PerimeterStructures,
     audit_repo: AuditRepository | None = None,
 ) -> None:
-    """Charge le périmètre, applique les champs explicitement fournis (validés), persiste.
+    """Charge le périmètre, applique les champs explicitement fournis (validés), persiste, puis recalcule la clôture des périmètres.
 
     L'événement d'audit ne porte que les champs soumis : y joindre les autres laisserait croire qu'ils ont été fournis.
 
@@ -71,6 +79,7 @@ def update_perimeter(
     if "root_structure_ids" in update.model_fields_set:
         perimeter.set_root_structure_ids(update.root_structure_ids)
     repo.save(perimeter)
+    perimeter_structures.refresh(conn)
     emit_event(
         audit_repo,
         "perimeter.updated",

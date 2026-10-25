@@ -7,12 +7,15 @@ import logging
 
 from sqlalchemy import Connection
 
+from application.audit_log import emit_event
 from application.ports.pipeline.countries import CountryRecompute
 from application.ports.repositories.address_repository import (
     AddressCountryFilter,
     AddressRepository,
 )
+from application.ports.repositories.audit_repository import AuditRepository
 from domain.errors import ValidationError
+from domain.types import JsonValue
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,7 @@ def set_country(
     *,
     repo: AddressRepository,
     country_recompute: CountryRecompute,
+    audit_repo: AuditRepository | None = None,
 ) -> list[int]:
     """Saisit à la main les pays d'une adresse, puis résout l'adresse. `countries=None` ou `[]` rend l'adresse aux moyens automatiques.
 
@@ -39,7 +43,61 @@ def set_country(
     _require_known_countries(countries or [], repo=repo)
     repo.set_manual_countries(address_id, countries)
     country_recompute.resolve_address_countries(conn, [address_id])
+    emit_event(
+        audit_repo, "address.country_set", "address", address_id, {"countries": countries or []}
+    )
     return [address_id]
+
+
+def batch_set_country(
+    conn: Connection,
+    country_code: str,
+    *,
+    address_ids: list[int] | None,
+    search: str,
+    has_country: bool | None,
+    country_code_filter: str,
+    repo: AddressRepository,
+    country_recompute: CountryRecompute,
+    audit_repo: AuditRepository | None = None,
+) -> list[int]:
+    """Ajoute un pays à des adresses, désignées par leurs identifiants ou, à défaut, par filtre (`batch_set_country_by_ids`, `batch_set_country_by_filter`).
+
+    Retourne les identifiants des adresses modifiées, à propager vers les publications en tâche de fond.
+    """
+    if address_ids:
+        modified_ids = batch_set_country_by_ids(
+            conn, country_code, address_ids, repo=repo, country_recompute=country_recompute
+        )
+    else:
+        modified_ids = batch_set_country_by_filter(
+            conn,
+            country_code,
+            search=search,
+            has_country=has_country,
+            country_code_filter=country_code_filter,
+            repo=repo,
+            country_recompute=country_recompute,
+        )
+    # Une sélection par filtre peut couvrir toute la table : c'est le critère qui porte la
+    # décision, non la liste qu'il rend. L'appel par identifiants, lui, les consigne.
+    decision: dict[str, JsonValue] = {"country_code": country_code}
+    if address_ids:
+        decision["address_ids"] = address_ids
+    else:
+        decision["filtre"] = {
+            "search": search,
+            "has_country": has_country,
+            "country_code_filter": country_code_filter,
+        }
+    emit_event(
+        audit_repo,
+        "address.batch_country_set",
+        "address",
+        None,
+        {**decision, "updated": len(modified_ids)},
+    )
+    return modified_ids
 
 
 def batch_set_country_by_ids(

@@ -1,6 +1,6 @@
 """Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
+Les lectures passent par le port `AddressesQueries`, les écritures par les modules `structure_links` et `countries` de `application.services.addresses`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
 
 Les routes sont groupées par sujet, et dans chaque groupe les chemins littéraux précèdent ceux qui portent un identifiant — un chemin littéral déclaré après `/{addr_id}` s'y ferait absorber.
 """
@@ -28,7 +28,10 @@ from application.ports.repositories.address_repository import (
     AddressRepository,
 )
 from application.ports.repositories.audit_repository import AuditRepository
-from application.services.addresses import commands as address_commands
+from application.services.addresses import (
+    countries as countries_service,
+    structure_links as structure_links_service,
+)
 from interfaces.api.deps import (
     DbConn,
     address_repo,
@@ -140,13 +143,11 @@ def address_stats(
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
-    conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     audit: AuditRepository = Depends(audit_repo),
 ) -> BatchUpdatedResponse:
     """Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure."""
-    updated, changed = address_commands.batch_review_structure_link(
-        conn,
+    updated, changed = structure_links_service.batch_review_structure_link(
         data.address_ids,
         data.structure_id,
         data.is_confirmed,
@@ -179,7 +180,6 @@ def review_address(
     addr_id: int,
     action: ReviewAction,
     bg: BackgroundTasks,
-    conn: DbConn,
     queries: AddressesQueries = Depends(addresses_queries),
     addr_repo: AddressRepository = Depends(address_repo),
     audit: AuditRepository = Depends(audit_repo),
@@ -190,8 +190,7 @@ def review_address(
     """
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Adresse introuvable")
-    changed = address_commands.review_structure_link(
-        conn,
+    changed = structure_links_service.review_structure_link(
         addr_id,
         action.structure_id,
         action.is_confirmed,
@@ -244,7 +243,7 @@ def batch_set_country(
 
     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
     """
-    modified_ids = address_commands.batch_set_country(
+    modified_ids = countries_service.batch_set_country(
         conn,
         body.country_code,
         address_ids=body.address_ids,
@@ -273,7 +272,7 @@ def set_address_country(
 
     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
-    affected = address_commands.set_country(
+    affected = countries_service.set_country(
         conn,
         addr_id,
         body.countries,
