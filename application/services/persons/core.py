@@ -29,8 +29,7 @@ from domain.persons.identifiers import (
     IdentifierOrigin,
 )
 from domain.persons.merge import merge_roles
-from domain.persons.name_forms import compute_person_name_forms
-from domain.persons.person import PersonExclusion, validated_name
+from domain.persons.person import PersonExclusion
 from domain.sources.registry import require_known_source
 
 logger = logging.getLogger(__name__)
@@ -50,18 +49,7 @@ class DetachResult(TypedDict):
     cleaned_forms: int
 
 
-# ── Création / mise à jour personne ──
-
-
-def create_person(last_name: str, first_name: str = "", *, repo: PersonRepository) -> int:
-    """Crée une personne et retourne son id.
-
-    Lève `ValidationError` sans patronyme : c'est de lui que `compute_person_name_forms` dérive les formes qui rendent la personne matchable, et une personne qui n'en a pas n'est atteignable par aucun nom.
-    """
-    last_name, first_name = validated_name(last_name, first_name)
-    person_id = repo.create(last_name, first_name)
-    repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
-    return person_id
+# ── Exclusion et renommage ──
 
 
 def set_exclusion(

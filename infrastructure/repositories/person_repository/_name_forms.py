@@ -11,12 +11,17 @@ from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import ConflictError, NotFoundError
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
-from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
 from infrastructure.sql_fragments import GROUP_MEMBERS
 
 
-def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> None:
-    """Pose `forms` comme formes du nom de la personne (`CANONICAL_NAME_FORM_SOURCE`). Les formes du nom précédent perdent cette source, et une forme sans autre source est supprimée."""
+def refresh_canonical_name_forms(
+    conn: Connection, person_id: int, last_name: str, first_name: str
+) -> None:
+    """Pose les formes du nom de la personne (`compute_person_name_forms`) sous la source `CANONICAL_NAME_FORM_SOURCE`. Les formes du nom précédent perdent cette source, et une forme sans autre source est supprimée.
+
+    Version unitaire de la synchronisation que la phase `persons` fait en masse (`populate_person_name_forms`), qui dérive les formes de la même fonction.
+    """
     params = {"pid": person_id, "src": CANONICAL_NAME_FORM_SOURCE}
     conn.execute(
         text("""
@@ -30,7 +35,7 @@ def refresh_name_forms(conn: Connection, person_id: int, forms: set[str]) -> Non
         text("DELETE FROM person_name_forms WHERE person_id = :pid AND sources = '{}'"),
         {"pid": person_id},
     )
-    for form in forms:
+    for form in compute_person_name_forms(last_name, first_name):
         add_person_source(
             conn, name_form=form, person_id=person_id, source=CANONICAL_NAME_FORM_SOURCE
         )

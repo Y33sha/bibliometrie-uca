@@ -25,7 +25,6 @@ from domain.persons.group_matching import (
 )
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
-from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import validated_name
 from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
@@ -292,7 +291,6 @@ def create_persons(
                 except ValidationError:
                     continue
                 person_id = repo.create(last_name, first_name)
-                repo.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
                 identifiers = identifiers_to_attribute(members, decision)
                 index.register(
                     person_id,

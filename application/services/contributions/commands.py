@@ -1,6 +1,6 @@
 """Command handlers des écritures API sur les contributions : frontière transactionnelle de l'agrégat.
 
-`assign_orphan_contribution` compose deux agrégats : il peut créer la personne cible (`persons.core.create_person`) avant de lui rattacher la contribution, dans une seule transaction.
+`assign_orphan_contribution` compose deux agrégats : il peut créer la personne cible (`PersonRepository.create`) avant de lui rattacher la contribution, dans une seule transaction.
 """
 
 from sqlalchemy import Connection
@@ -10,7 +10,6 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.contributions import assign_orphans, core as contributions_service
-from application.services.persons import core as persons_service
 from domain.errors import ValidationError
 
 
@@ -57,7 +56,7 @@ def assign_orphan_contribution(
     Retourne l'id de la personne finalement rattachée.
     """
     if new_person is not None:
-        person_id = persons_service.create_person(new_person[0], new_person[1], repo=repo)
+        person_id = repo.create(new_person[0], new_person[1])
     if person_id is None:
         raise ValidationError("person_id ou create_person requis")
     assign_orphans.assign_orphan_contribution(

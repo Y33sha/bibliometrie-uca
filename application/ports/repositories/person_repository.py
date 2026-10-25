@@ -33,11 +33,10 @@ class PersonRepository(Protocol):
         ...
 
     def create(self, last_name: str, first_name: str = "") -> int:
-        """Crée une personne (formes normalisées des noms dérivées) et retourne son `id`."""
-        ...
+        """Crée une personne avec ses formes de nom (`compute_person_name_forms`) et retourne son `id`.
 
-    def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
-        """Met à jour le nom d'une personne. Lève `NotFoundError` si elle est introuvable."""
+        Lève `ValidationError` sans patronyme : c'est de lui que dérivent les formes qui rendent la personne matchable.
+        """
         ...
 
     def rename(self, person_id: int, last_name: str, first_name: str) -> tuple[str, str]:
@@ -107,10 +106,6 @@ class PersonRepository(Protocol):
         ...
 
     # ── person_name_forms ──────────────────────────────────────────
-
-    def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
-        """Recalcule les formes de nom canoniques (source `'persons'`) d'une personne à partir de `forms`, l'ensemble des formes normalisées calculées par le domaine (`compute_person_name_forms`). Les formes attestées par d'autres sources sont préservées."""
-        ...
 
     def add_name_form(
         self,

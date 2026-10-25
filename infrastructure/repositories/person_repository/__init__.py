@@ -23,7 +23,6 @@ from domain.persons.identifiers import (
     IdentifierOrigin,
     normalized_identifier_value,
 )
-from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import validated_name
 from infrastructure.repositories.person_repository import (
     _core,
@@ -60,15 +59,15 @@ class PgPersonRepository(PersonRepository):
         return _core.find_by_id(self._conn, person_id)
 
     def create(self, last_name: str, first_name: str = "") -> int:
-        return _core.create(self._conn, last_name, first_name)
-
-    def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
-        _core.update_name(self._conn, person_id, last_name, first_name)
+        last_name, first_name = validated_name(last_name, first_name)
+        person_id = _core.create(self._conn, last_name, first_name)
+        _name_forms.refresh_canonical_name_forms(self._conn, person_id, last_name, first_name)
+        return person_id
 
     def rename(self, person_id: int, last_name: str, first_name: str) -> tuple[str, str]:
         last_name, first_name = validated_name(last_name, first_name)
-        self.update_name(person_id, last_name, first_name)
-        self.refresh_name_forms(person_id, compute_person_name_forms(last_name, first_name))
+        _core.update_name(self._conn, person_id, last_name, first_name)
+        _name_forms.refresh_canonical_name_forms(self._conn, person_id, last_name, first_name)
         return last_name, first_name
 
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
@@ -130,9 +129,6 @@ class PgPersonRepository(PersonRepository):
         return _identifiers.mark_groups_of_rejected_identifiers(self._conn, person_id)
 
     # ── person_name_forms ──────────────────────────────────────────
-
-    def refresh_name_forms(self, person_id: int, forms: set[str]) -> None:
-        _name_forms.refresh_name_forms(self._conn, person_id, forms)
 
     def add_name_form(self, person_id: int, full_name: str, source: str | None = None) -> None:
         _name_forms.add_name_form(self._conn, person_id, full_name, source)

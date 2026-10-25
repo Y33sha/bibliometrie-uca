@@ -5,7 +5,6 @@ from sqlalchemy import Connection, text
 from domain.merge import DataNature, MergedEntity
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import merged_exclusion
-from domain.persons.name_forms import compute_person_name_forms
 from domain.persons.person import PersonExclusion
 from infrastructure.repositories.contribution_repository import detach_rejected_groups
 from infrastructure.repositories.merge_steps import (
@@ -62,8 +61,9 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
         text("SELECT last_name, first_name FROM persons WHERE id = :id"),
         {"id": target_id},
     ).one()
-    forms = compute_person_name_forms(target.last_name, target.first_name or "")
-    _name_forms.refresh_name_forms(conn, target_id, forms)
+    _name_forms.refresh_canonical_name_forms(
+        conn, target_id, target.last_name, target.first_name or ""
+    )
 
 
 def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> None:

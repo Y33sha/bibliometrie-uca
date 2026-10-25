@@ -11,7 +11,6 @@ from application.services.contributions.assign_orphans import (
 )
 from application.services.persons.core import (
     add_identifier,
-    create_person,
     detach_contributions,
     mark_distinct,
     merge_person,
@@ -503,7 +502,7 @@ class TestUpdateName:
         assert row.sources == ["persons"]
 
         # L'ancienne forme 'dupont jean' n'avait que la source 'persons'
-        # pour ce pid : refresh_name_forms a dû supprimer la row entièrement.
+        # pour ce pid : le renommage a supprimé la ligne entière.
         row = sa_sync_conn.execute(
             text(
                 "SELECT 1 FROM person_name_forms "
@@ -538,12 +537,12 @@ class TestUpdateName:
             update_name(p, "   ", "Jean", repo=repo)
 
 
-# ── create_person ───────────────────────────────────────────────────
+# ── PersonRepository.create ───────────────────────────────────────────────────
 
 
 class TestCreatePerson:
     def test_creates_and_computes_name_forms(self, sa_sync_conn, repo):
-        p = create_person("Dupont", "Jean", repo=repo)
+        p = repo.create("Dupont", "Jean")
         forms = {
             r.name_form
             for r in sa_sync_conn.execute(
@@ -553,7 +552,7 @@ class TestCreatePerson:
         assert forms == {"jean dupont", "j dupont"}
 
     def test_strips_surrounding_space(self, sa_sync_conn, repo):
-        p = create_person("  Dupont  ", "  Jean  ", repo=repo)
+        p = repo.create("  Dupont  ", "  Jean  ")
         row = sa_sync_conn.execute(
             text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
         ).one()
@@ -563,7 +562,7 @@ class TestCreatePerson:
     def test_raises_without_last_name(self, sa_sync_conn, repo):
         """Sans patronyme, `compute_person_name_forms` ne rend aucune forme : la personne ne serait atteignable par aucun nom."""
         with pytest.raises(ValidationError, match="nom est requis"):
-            create_person("", "Jean", repo=repo)
+            repo.create("", "Jean")
 
 
 # ── merge_person ────────────────────────────────────────────────────
@@ -915,7 +914,7 @@ class TestDetachContributions:
     def test_preserves_computed_name_form(self, sa_sync_conn, repo, contribution_repo):
         """Les formes calculées depuis le nom de la personne (source `persons`)
         ne dépendent d'aucune source et survivent au détachement."""
-        person_id = create_person("Dupont", "Jean", repo=repo)
+        person_id = repo.create("Dupont", "Jean")
 
         result = detach_contributions(
             person_id,
@@ -1054,7 +1053,7 @@ class TestUpdateNameFormStatus:
 
     def test_derived_form_status_refused(self, sa_sync_conn, repo, contribution_repo):
         """Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse."""
-        person_id = create_person("Gamma", "Delta", repo=repo)
+        person_id = repo.create("Gamma", "Delta")
 
         with pytest.raises(ConflictError):
             update_name_form_status(
@@ -1066,7 +1065,7 @@ class TestUpdateNameFormStatus:
             )
 
     def test_unknown_form_raises(self, sa_sync_conn, repo, contribution_repo):
-        person_id = create_person("Gamma", "Delta", repo=repo)
+        person_id = repo.create("Gamma", "Delta")
 
         with pytest.raises(NotFoundError):
             update_name_form_status(
