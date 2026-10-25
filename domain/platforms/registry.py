@@ -1,4 +1,4 @@
-"""Liste fermée des plateformes connues : HAL, PubMed Central, serveurs de preprints et plateformes d'éditeurs. Une plateforme connue porte le nom de la liste.
+"""Liste fermée des plateformes connues : HAL, PubMed Central, Zenodo, serveurs de preprints et plateformes d'éditeurs. Une plateforme connue porte le nom de la liste.
 
 Une plateforme d'éditeurs enregistre sous son propre préfixe DOI les articles des revues qu'elle diffuse : le titulaire du préfixe et le nom que Crossref donne à ces DOI sont alors la plateforme, pas l'éditeur. Un serveur de preprints se reconnaît par la source OpenAlex de ses localisations.
 
@@ -37,12 +37,16 @@ PUBMED_CENTRAL = KnownPlatform(
 )
 """L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document."""
 
+ZENODO = KnownPlatform("Zenodo", PlatformType.REPOSITORY, openalex_ids=("S4306400562",))
+"""L'archive ouverte Zenodo, du CERN."""
+
 ARXIV = _preprint_server("arXiv", {"10.48550"}, ("S4306400194", "S4393918464"))
 """Le serveur de preprints arXiv, que désigne aussi l'identifiant arXiv d'un document."""
 
 KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     HAL,
     PUBMED_CENTRAL,
+    ZENODO,
     ARXIV,
     _preprint_server("bioRxiv", {"10.1101", "10.64898"}, ("S4306402567",)),
     _preprint_server("medRxiv", {"10.1101", "10.64898"}, ("S3005729997",)),

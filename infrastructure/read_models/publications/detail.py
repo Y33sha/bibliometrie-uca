@@ -252,7 +252,9 @@ def get_publication_detail(
     subjects = get_publication_subjects(conn, publication_id)
     relations = get_publication_relations(conn, publication_id)
     external_identifiers = get_publication_external_identifiers(conn, publication_id)
-    publication_access = access(get_publication_copies(conn, publication_id))
+    publication_access = access(
+        get_publication_copies(conn, publication_id), doi=publication_row.doi
+    )
 
     structures = structures_by_id(
         conn, {sid for a in contributions for sid in a.structure_ids or []}
@@ -317,7 +319,7 @@ def get_publication_copies(conn: Connection, publication_id: int) -> list[Copy]:
     """Localisations des enregistrements sources de la publication, hors formes secondaires. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text(f"""
-            SELECT l.url, l.version, l.is_oa, pl.name AS platform,
+            SELECT l.url, l.version, l.is_oa, pl.name AS platform, pl.openalex_id AS platform_openalex_id,
                    (sr.source = 'hal' AND pl.openalex_id = ANY(:hal_ids)) AS described_by_platform,
                    sr.id AS arrival
             FROM source_record_locations l
@@ -338,6 +340,7 @@ def get_publication_copies(conn: Connection, publication_id: int) -> list[Copy]:
             version=r.version,
             is_oa=r.is_oa,
             platform=r.platform,
+            platform_openalex_id=r.platform_openalex_id,
             described_by_platform=r.described_by_platform,
             arrival=r.arrival,
         )

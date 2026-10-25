@@ -34,7 +34,10 @@
     HAL: asset('icons/hal.ico'),
     arXiv: asset('icons/arxiv.png'),
     "PubMed Central": asset('icons/ncbi.png'),
+    Zenodo: asset('icons/zenodo.png'),
   };
+  // Pastilles colorées des icônes claires.
+  const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
 
   const orderedSources = $derived([
     ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
@@ -93,7 +96,7 @@
 
   {#snippet copyRow(copy: AccessLink)}
     <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
-      <span class="source-tag">
+      <span class="source-tag {PLATFORM_TAG_CLASSES[copy.label] ?? ''}">
         {#if PLATFORM_ICONS[copy.label]}
           <img src={PLATFORM_ICONS[copy.label]} alt={copy.label} />
         {/if}
@@ -254,6 +257,14 @@
   .source-row:hover {
     background: color-mix(in srgb, var(--accent-light) 60%, white);
     text-decoration: none;
+  }
+  /* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
+  .tag-zenodo {
+    background: #0047a8;
+  }
+  /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */
+  .source-row :global(.source-tag) {
+    flex-shrink: 0;
   }
   /* Le lien couvre toute la ligne : l'icône grossit au survol de la ligne entière, pas seulement de l'icône. */
   .source-row:hover :global(.source-tag) {
