@@ -37,10 +37,6 @@ Localisations OpenAlex du raw store local : 105 586 works, 322 036 localisations
 - Les localisations d'entrepôt sont presque toutes en `submittedVersion` (200 949 sur 258 875), y compris dans HAL pour des articles publiés, et dans Cairn, qui héberge des versions publiées. Leur version est donc peu fiable.
 - Sur 6 080 localisations arXiv en `submittedVersion` d'une publication autre qu'un preprint, 5 051 désignent un preprint qui n'a pas de publication propre.
 
-Publications qui partagent un identifiant arXiv sans être typées preprint : 189 paires. Dans 135 paires, l'une des deux a un DOI arXiv. Les autres réunissent une communication et un article (27), un erratum ou un addendum et son article (6), un jeu de données et son article (5), deux publications de même type (16). Parmi ces dernières, des copies d'entrepôt restent séparées de leur article (Apollo `10.17863`, DESY `10.3204`), et des identifiants arXiv sont attribués à tort.
-
-2 352 des 4 357 enregistrements DataCite arXiv sont typés `article`, d'après leur type brut. Aucun n'est rattaché à ArXiv.org, donc la correction `JOURNAL_TYPE_PREPRINT_SERVER_TO_PREPRINT` ne s'applique pas. 184 des 1 148 publications à DOI arXiv ont un autre type que `preprint`.
-
 Test de l'API Unpaywall sur 120 DOI du périmètre, tirés au hasard :
 
 - les 104 DOI Crossref ont une réponse, les 16 DOI DataCite aucune ;
@@ -139,37 +135,42 @@ Usages du type dans le code :
 - [x] Agrégation : la publication reçoit le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur non nul dans l'ordre de priorité des sources. Pas d'éditeur pour les mêmes types (`b123a7487`).
 - [x] Suppression des éditeurs vides et fusion d'éditeurs : prise en compte des éditeurs des enregistrements sources et des publications (`b123a7487`).
 - [x] Stock : oneshot `backfill_source_record_publishers` depuis `biblio.publisher`, puis phase `publications`. 46 139 publications ont un éditeur ; 9 242 diffèrent de celui de leur revue.
-- [ ] Base de production : fusion manuelle des éditeurs en double (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, De Gruyter et Walter de Gruyter, AIP et AIP Publishing, variantes de SIAM, de World Scientific et de John Libbey Eurotext). Marques d'un éditeur (BioMed Central, Birkhäuser, Lippincott) : fusion ou non à trancher.
-- [ ] Titulaires de préfixe « Éditions Techniques [1987-1994] » et « Éditions du Juris-classeur [2009] » sur des revues LexisNexis : à examiner.
-- [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
-- [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
 
 ### Phase 3 — Plateformes et localisations
 
 - [x] Migration : `platforms`, `source_record_locations` (`8d0a6ca00`).
 - [x] Normalisation OpenAlex : localisations, plateforme trouvée ou créée pour une source de type `repository` (`8d0a6ca00`).
 - [x] Stock : réhydratation du staging OpenAlex et renormalisation. 303 477 localisations sur 105 496 des 111 022 enregistrements OpenAlex, 1 366 plateformes.
-- [ ] Serveurs de preprints, en attente de la question « Preprint : publication distincte ou version déposée ? ». La part de preprints par plateforme ne les sépare pas des entrepôts (bioRxiv 66 %, arXiv 24 %, OSF Preprints 22 %, Zenodo 9 %) ; l'attribution de DOI propres non plus (Zenodo, Figshare). Seule une liste fermée de serveurs tient.
 - [x] Localisation Crossref : la page de résolution du DOI (`resource.primary.URL`) ; les URL de `link`, points d'accès pour la fouille de texte, sont ignorées (`9ca9efccf`).
 - [x] Stock : réhydratation du staging Crossref et renormalisation. 37 123 des 41 889 enregistrements Crossref ont leur localisation, 12 421 avec une licence.
-- [ ] Domaine → plateforme appris depuis les localisations OpenAlex.
-- [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
-- [ ] Préfixe DOI d'une plateforme (Cairn `10.3917`, OpenEdition `10.4000`, Érudit, Université de Bordeaux `10.20870`) : son titulaire n'est pas l'éditeur, ni le nom que Crossref donne à ses DOI. L'éditeur vient des autres sources, ou de la notice Sudoc de la revue. Règle et oneshot de correction des publications (environ 4 650), selon les questions « Préfixes DOI des plateformes » et « Éditeur d'une revue d'après le Sudoc ».
-- [ ] Type `preprint` d'après la plateforme du DOI, à la place du type de la revue : les enregistrements DataCite arXiv n'ont pas de revue.
-- [ ] Statistiques : exclusion des preprints ou non, en attente de la question « Preprint : publication distincte ou version déposée ? ».
 - [x] Vérification Unpaywall : DOI DataCite écartés (`e1d7daeb6`).
+- [ ] Liste fermée des préfixes DOI de plateformes, dans le domaine : serveurs de preprints (`PREPRINT_SERVERS` du bilan Science ouverte) et plateformes d'éditeurs. Type des plateformes. La part de preprints par plateforme ne sépare pas les serveurs des entrepôts (bioRxiv 66 %, arXiv 24 %, OSF Preprints 22 %, Zenodo 9 %), l'attribution de DOI propres non plus (Zenodo, Figshare).
+- [ ] Préfixe DOI d'une plateforme d'éditeurs (Cairn `10.3917`, OpenEdition `10.4000`, Érudit, Université de Bordeaux `10.20870`) : son titulaire n'est pas l'éditeur, ni le nom que Crossref donne à ses DOI. L'éditeur vient des autres sources, ou de la notice Sudoc de la revue. Règle et oneshot de correction des publications (environ 4 650). La règle « titulaire du préfixe » crée ce défaut : il se corrige avant que les lectures passent par l'éditeur de la publication.
+- [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
+- [ ] Domaine → plateforme appris depuis les localisations OpenAlex, quand un usage le demande.
 
-### Phase 4 — Séries
+### Phase 4 — Lectures de l'éditeur
+
+- [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
+- [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
+
+### Phase 5 — Séries
 
 - [ ] Renommage de `journals` en `serials`, et de `monographs.journal_id` en `serial_id`.
-- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `journals`.
-- [ ] Sources OpenAlex « … eBooks » : rattachement à l'éditeur qu'elles nomment.
+- [ ] Sources OpenAlex « … eBooks » (type `ebook_platform`, absent du modèle) : rattachement à l'éditeur qu'elles nomment.
 - [ ] Enrichissements limités à la nature qu'ils décrivent.
 - [ ] Endpoints, pages et filtres.
 
-### Phase 5 — Documentation
+### Phase 6 — Documentation
 
 - [ ] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`.
+
+### Phase 7 — Défauts antérieurs au chantier
+
+- [ ] Base de production : fusion manuelle des éditeurs en double (Taylor & Francis et Informa UK, OpenEdition Journals et OpenEdition, De Gruyter et Walter de Gruyter, AIP et AIP Publishing, variantes de SIAM, de World Scientific et de John Libbey Eurotext). Marques d'un éditeur (BioMed Central, Birkhäuser, Lippincott) : fusion ou non à trancher.
+- [ ] Titulaires de préfixe « Éditions Techniques [1987-1994] » et « Éditions du Juris-classeur [2009] » sur des revues LexisNexis : à examiner.
+- [ ] Thèses ScanR : l'université qui délivre la thèse quitte `journals`.
+- Type des preprints arXiv et exclusion des preprints des statistiques : chantier [Preprints et versions d'une publication](DATA_preprints-et-versions.md).
 
 ## Questions ouvertes
 
@@ -177,7 +178,6 @@ Usages du type dans le code :
 - Une publication peut-elle avoir à la fois une série, une monographie et une ou plusieurs localisations ?
 - Sort des entrées `unknown`.
 - Lien entre une localisation et le statut open access d'une publication (dépôt HAL, prépublication).
-- **Preprint : publication distincte ou version déposée ?** Un preprint forme aujourd'hui une publication distincte, reliée à l'article par `is_preprint_of` ; une version converge avec l'article seulement sous un même préfixe DOI. OpenAlex réunit au contraire preprint et article dans un même work, le preprint étant une localisation `submittedVersion`. Les localisations OpenAlex suivent donc ce second modèle : la copie arXiv figure parmi les localisations de l'article, alors que l'enregistrement DataCite arXiv forme sa propre publication. Adopter le modèle d'OpenAlex ferait converger les versions quel que soit le préfixe et remplacerait `is_preprint_of` par la version des localisations ; un preprint jamais publié resterait une publication de type preprint. Aujourd'hui, 1 468 preprints du périmètre ont leur article en base, et une statistique sans filtre de type compte les deux.
 - **Table des URL.** Les URL d'une publication viennent d'Unpaywall, de Crossref et d'OpenAlex, avec leur lieu et leur version. Le lieu se déduit du domaine, par une table domaine → lieu que les changements de plateforme font évoluer. Le lieu d'un domaine peut rester inconnu.
 - **Maintenance des référentiels.** Chaque table a son régime : recalcul à chaque run, mise à jour incrémentale par file d'attente, ou valeur posée une fois (typage OpenAlex, `doi_prefixes`). Comment rafraîchir une valeur posée une fois ? `doi_prefixes` attribue à Hindawi un préfixe dont Wiley détient les DOI.
 - **Responsabilité scientifique et éditeur commercial.** Faut-il distinguer les deux rôles ? Le membre Crossref et le domaine de résolution les séparent dans une partie des cas.
