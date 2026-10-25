@@ -163,8 +163,8 @@ Usages du type dans le code :
 - [x] Renommage de `journals` en `serials`, et de `monographs.journal_id` en `serial_id` (`f73c03b0e`, `947a58f45`). La migration réécrit les valeurs stockées : saisies manuelles, redirections, audit, corrections, métriques de l'historique des phases.
 - [x] Phase `publishers_journals` renommée `publishing`, du nom du schéma et du paquet qui portent ses référentiels (`e8655117a`).
 - [x] Plateformes d'ebooks. Un titre « … eBooks », nom qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur et que ScanR reprend comme revue, n'est le titre d'aucun conteneur. Une localisation principale OpenAlex sur une plateforme d'ebooks donne l'éditeur de son organisation hôte (`d153cf532`). Type `ebook_platform` retiré (`48fbf4cf0`).
-- [ ] Stock : oneshot `detach_ebook_platforms` (46 revues, 83 enregistrements sources détachés, 4 043 titres de conteneur retirés), puis phases `publications` et `finalize`. Un enregistrement OpenAlex reçoit l'éditeur de sa plateforme d'ebooks à sa prochaine normalisation, sans réhydratation dédiée : seules 12 des 1 743 publications concernées n'ont pas d'éditeur, les autres le tiennent de leur DOI ou des autres sources.
-- [x] Une entrée de type inconnu présente dans le DOAJ devient une revue : 52 entrées `unknown` y sont. Les autres enrichissements touchent seulement des revues, sauf une dizaine d'entrées.
+- [x] Stock : oneshot `detach_ebook_platforms` (46 revues, 83 enregistrements sources détachés, 4 043 titres de conteneur retirés), puis phases `publications` et `finalize`.
+- [x] Une entrée de type inconnu présente dans le DOAJ devient une revue : 52 entrées `unknown` y sont. Les autres enrichissements touchent seulement des revues, sauf une dizaine d'entrées (`865aeaf95`).
 - [ ] Endpoints, pages et filtres.
 
 ### Phase 6 — Documentation

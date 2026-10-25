@@ -26,7 +26,6 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "serial_doi_namespaces": ("espace de noms DOI de revue", "espaces de noms DOI de revues"),
     "serials_deleted": ("revue vide supprimée", "revues vides supprimées"),
     "serials_merged": ("revue fusionnée", "revues fusionnées"),
-    "serials_typed_journal": ("entrée du DOAJ typée revue", "entrées du DOAJ typées revues"),
     "serials_typed_proceedings": (
         "revue typée recueil d'actes",
         "revues typées recueils d'actes",

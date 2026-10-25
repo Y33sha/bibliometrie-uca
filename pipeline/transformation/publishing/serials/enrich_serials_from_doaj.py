@@ -202,8 +202,7 @@ def run_enrich_serials_from_doaj(
     metrics = _import_doaj(
         conn, logger, refresh_after_days=refresh_after_days, download_dump=download_dump
     )
-    if typed := type_doaj_serials_as_journals(conn):
-        metrics.add(serials_typed_journal=typed)
+    type_doaj_serials_as_journals(conn)
     return metrics
 
 

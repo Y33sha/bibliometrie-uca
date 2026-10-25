@@ -107,7 +107,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
     ],
   },
   publishing: {
-    summary: [{ key: "doaj_matched", label: "DOAJ — journaux taggés" }],
+    summary: [{ key: "doaj_matched", label: "Revues reconnues dans le DOAJ" }],
     tables: [
       {
         source: "table",

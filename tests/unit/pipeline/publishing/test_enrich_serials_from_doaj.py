@@ -13,10 +13,10 @@ from pipeline.transformation.publishing.serials import enrich_serials_from_doaj 
 
 
 class _FakeSerialRepo:
-    def __init__(self, last_import_at: datetime | None, typed: int = 0) -> None:
+    def __init__(self, last_import_at: datetime | None) -> None:
         self.last_import_at = last_import_at
-        self.typed = typed
         self.updated: list[int] = []
+        self.typings = 0
 
     def doaj_last_import_at(self) -> datetime | None:
         return self.last_import_at
@@ -31,7 +31,8 @@ class _FakeSerialRepo:
         self.updated.append(serial_id)
 
     def type_doaj_serials_as_journals(self) -> int:
-        return self.typed
+        self.typings += 1
+        return 0
 
 
 @contextlib.contextmanager
@@ -83,9 +84,10 @@ def test_recent_import_skips_download():
 
 def test_doaj_serials_typed_even_without_download():
     """Le typage suit le dernier import, téléchargé ou non à ce run."""
-    extras, downloads = _run(_FakeSerialRepo(datetime.now(UTC) - timedelta(days=10), typed=2))
-    assert extras == {"skipped": 1, "serials_typed_journal": 2}
+    repo = _FakeSerialRepo(datetime.now(UTC) - timedelta(days=10))
+    _, downloads = _run(repo)
     assert downloads == []
+    assert repo.typings == 1
 
 
 def test_stale_import_downloads_and_imports():
