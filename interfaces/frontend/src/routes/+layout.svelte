@@ -53,14 +53,14 @@
     </div>
     <nav class="site-nav" class:open={mobileNavOpen}>
       <div class="nav-dropdown" role="navigation" class:active={isPipeline}>
-        <button class="nav-link" class:active={isPipeline}>Pipeline &#x25BE;</button>
+        <button class="nav-link" class:active={isPipeline}>Pipeline <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
           <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isReferentiels}>
-        <button class="nav-link" class:active={isReferentiels}>Référentiels &#x25BE;</button>
+        <button class="nav-link" class:active={isReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
           <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
@@ -71,7 +71,7 @@
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isAddresses}>
-        <button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
+        <button class="nav-link" class:active={isAddresses}>Adresses <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
@@ -91,7 +91,7 @@
       <a href={resolve('laboratories')} class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
       <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
       <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
-        <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
+        <button class="nav-link" class:active={isPublicReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
           <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
@@ -101,7 +101,7 @@
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isHalProblems}>
-        <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
+        <button class="nav-link" class:active={isHalProblems}>Problèmes HAL <span class="chevron" aria-hidden="true"></span></button>
         <div class="nav-dropdown-menu">
           <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
           <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
@@ -269,6 +269,9 @@
   }
   .nav-dropdown:hover > .nav-dropdown-menu {
     display: block;
+  }
+  .nav-dropdown:hover > .nav-link .chevron {
+    transform: rotate(180deg);
   }
   .nav-dropdown-menu {
     display: none;

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -134,10 +135,10 @@
 		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
-	function sortArrow(col: 'name' | 'serials' | 'publications'): string {
-		if (currentSort === `${col}_asc`) return '▲';
-		if (currentSort === `${col}_desc`) return '▼';
-		return '';
+	function sortDirection(col: 'name' | 'serials' | 'publications'): 'asc' | 'desc' | null {
+		if (currentSort === `${col}_asc`) return 'asc';
+		if (currentSort === `${col}_desc`) return 'desc';
+		return null;
 	}
 
 	function publisherTypeLabel(value: string | null): string {
@@ -190,16 +191,16 @@
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('name')}>
-				Nom {sortArrow('name')}
+				Nom <SortChevron direction={sortDirection('name')} />
 			</th>
 			<th>Type</th>
 			<th>Pays</th>
 			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
-				{serialsHeader} {sortArrow('serials')}
+				{serialsHeader} <SortChevron direction={sortDirection('serials')} />
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis {sortArrow('publications')}
+				Publis <SortChevron direction={sortDirection('publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

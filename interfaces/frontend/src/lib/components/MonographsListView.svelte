@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -129,10 +130,10 @@
 		monographs.load();
 	}
 
-	function sortArrow(column: 'title' | 'year' | 'publications'): string {
-		if (currentSort === `${column}_asc`) return '▲';
-		if (currentSort === `${column}_desc`) return '▼';
-		return '';
+	function sortDirection(column: 'title' | 'year' | 'publications'): 'asc' | 'desc' | null {
+		if (currentSort === `${column}_asc`) return 'asc';
+		if (currentSort === `${column}_desc`) return 'desc';
+		return null;
 	}
 
 	onMount(() => {
@@ -190,13 +191,13 @@
 	<table class="data-table monographs-table">
 		<thead>
 			<tr>
-				<th class="sortable" onclick={() => setSort('title')}>Titre {sortArrow('title')}</th>
+				<th class="sortable" onclick={() => setSort('title')}>Titre <SortChevron direction={sortDirection('title')} /></th>
 				<th>Type</th>
-				<th class="num sortable" onclick={() => setSort('year')}>Année {sortArrow('year')}</th>
+				<th class="num sortable" onclick={() => setSort('year')}>Année <SortChevron direction={sortDirection('year')} /></th>
 				<th>ISBN</th>
 				{#if !publisherFixed}<th>Éditeur</th>{/if}
 				{#if !serialFixed}<th>Collection</th>{/if}
-				<th class="num sortable" onclick={() => setSort('publications')}>Publis {sortArrow('publications')}</th>
+				<th class="num sortable" onclick={() => setSort('publications')}>Publis <SortChevron direction={sortDirection('publications')} /></th>
 			</tr>
 		</thead>
 		<tbody>

@@ -109,7 +109,7 @@
 		{#if activeCount > 0}
 			<span class="facet-badge">{activeCount}</span>
 		{/if}
-		<span class="facet-arrow">&#9662;</span>
+		<span class="chevron" class:up={open} aria-hidden="true"></span>
 	</button>
 
 	{#if open}

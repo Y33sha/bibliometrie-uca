@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { autofocus } from '#lib/actions/focus.js';
@@ -400,9 +401,9 @@
 	});
 
 	// Sort display
-	const yearSortArrow = $derived(currentSort === 'year_asc' ? '▲' : currentSort === 'year_desc' ? '▼' : '');
-	const titleSortArrow = $derived(currentSort === 'title_asc' ? '▲' : currentSort === 'title_desc' ? '▼' : '');
-	const apcSortArrow = $derived(currentSort === 'apc_asc' ? '▲' : currentSort === 'apc_desc' ? '▼' : '');
+	const yearSort = $derived(currentSort === 'year_asc' ? 'asc' : currentSort === 'year_desc' ? 'desc' : null);
+	const titleSort = $derived(currentSort === 'title_asc' ? 'asc' : currentSort === 'title_desc' ? 'desc' : null);
+	const apcSort = $derived(currentSort === 'apc_asc' ? 'asc' : currentSort === 'apc_desc' ? 'desc' : null);
 	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
 	const titleSortActive = $derived(currentSort === 'title_asc' || currentSort === 'title_desc');
 	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');
@@ -594,7 +595,7 @@
 		<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
 			{showMoreFilters ? 'Cacher les filtres' : 'Plus de filtres'}
 			{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
-			<span class="more-filters-arrow">{showMoreFilters ? '▴' : '▾'}</span>
+			<span class="chevron" class:up={showMoreFilters} aria-hidden="true"></span>
 		</button>
 	</div>
 	{#if showMoreFilters}
@@ -629,17 +630,17 @@
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
-				An. <span class="sort-arrow">{yearSortArrow}</span>
+				An. <SortChevron direction={yearSort} />
 			</th>{/if}
 			<th class="sortable publication-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
-				Titre <span class="sort-arrow">{titleSortArrow}</span>
+				Titre <SortChevron direction={titleSort} />
 			</th>
 			{#if col('serial')}<th class="publication-col-journal">Revue</th>{/if}
 			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
-				APC <span class="sort-arrow">{apcSortArrow}</span>
+				APC <SortChevron direction={apcSort} />
 			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
@@ -816,7 +817,6 @@
 	}
 	.more-filters-btn:hover,
 	.more-filters-btn.open { background: var(--hover); }
-	.more-filters-arrow { font-size: 0.7rem; }
 	/* Facettes optionnelles sur une ligne, rubriques séparées par un filet vertical. */
 	.more-filters {
 		display: flex;

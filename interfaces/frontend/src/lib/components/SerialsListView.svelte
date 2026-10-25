@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -155,10 +156,10 @@
 		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
 	}
 
-	function sortArrow(col: 'title' | 'publisher' | 'publications'): string {
-		if (currentSort === col) return '▲';
-		if (currentSort === '-' + col) return '▼';
-		return '';
+	function sortDirection(col: 'title' | 'publisher' | 'publications'): 'asc' | 'desc' | null {
+		if (currentSort === col) return 'asc';
+		if (currentSort === '-' + col) return 'desc';
+		return null;
 	}
 
 	function formatIssns(j: Serial): string {
@@ -232,17 +233,17 @@
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('title')}>
-				Titre {sortArrow('title')}
+				Titre <SortChevron direction={sortDirection('title')} />
 			</th>
 			<th>ISSN</th>
 			{#if !publisherFixed}
 				<th class="sortable" onclick={() => setSort('publisher')}>
-					Éditeur {sortArrow('publisher')}
+					Éditeur <SortChevron direction={sortDirection('publisher')} />
 				</th>
 			{/if}
 			<th>Type</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis {sortArrow('publications')}
+				Publis <SortChevron direction={sortDirection('publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

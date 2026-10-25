@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import RhCheck from '#lib/components/RhCheck.svelte';
 	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
@@ -47,10 +48,10 @@
 		onSortChange(sort === `${col}_asc` ? `${col}_desc` : `${col}_asc`);
 	}
 
-	function sortIndicator(col: string): string {
-		if (sort === `${col}_asc`) return ' ▲';
-		if (sort === `${col}_desc`) return ' ▼';
-		return '';
+	function sortDirection(col: string): 'asc' | 'desc' | null {
+		if (sort === `${col}_asc`) return 'asc';
+		if (sort === `${col}_desc`) return 'desc';
+		return null;
 	}
 </script>
 
@@ -62,25 +63,25 @@
 			<th
 				class="sortable"
 				class:active={sort === 'name_asc' || sort === 'name_desc'}
-				onclick={() => toggleSort('name')}>Nom{sortIndicator('name')}</th
+				onclick={() => toggleSort('name')}>Nom<SortChevron direction={sortDirection('name')} /></th
 			>
 			<th>Identifiants</th>
 			<th
 				class="sortable"
 				class:active={sort === 'role_asc' || sort === 'role_desc'}
-				onclick={() => toggleSort('role')}>Fonction{sortIndicator('role')}</th
+				onclick={() => toggleSort('role')}>Fonction<SortChevron direction={sortDirection('role')} /></th
 			>
 			<th
 				class="sortable"
 				class:active={sort === 'dept_asc' || sort === 'dept_desc'}
-				onclick={() => toggleSort('dept')}>Département{sortIndicator('dept')}</th
+				onclick={() => toggleSort('dept')}>Département<SortChevron direction={sortDirection('dept')} /></th
 			>
 			{#each countColumns as col (col.sortKey)}
 				<th
 					class="sortable num"
 					style="width:80px"
 					class:active={sort === `${col.sortKey}_asc` || sort === `${col.sortKey}_desc`}
-					onclick={() => toggleSort(col.sortKey)}>{col.label}{sortIndicator(col.sortKey)}</th
+					onclick={() => toggleSort(col.sortKey)}>{col.label}<SortChevron direction={sortDirection(col.sortKey)} /></th
 				>
 			{/each}
 		</tr>

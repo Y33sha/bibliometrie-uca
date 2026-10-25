@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { asset, resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
@@ -54,18 +55,18 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	function sortArrow(asc: PublicationSort, desc: PublicationSort): string {
-		return sort === asc ? '▲' : sort === desc ? '▼' : '';
+	function sortDirection(asc: PublicationSort, desc: PublicationSort): 'asc' | 'desc' | null {
+		return sort === asc ? 'asc' : sort === desc ? 'desc' : null;
 	}
 	function sortActive(asc: PublicationSort, desc: PublicationSort): boolean {
 		return sort === asc || sort === desc;
 	}
 
-	const inscrArrow = $derived(sortArrow('inscription_asc', 'inscription_desc'));
+	const inscrSort = $derived(sortDirection('inscription_asc', 'inscription_desc'));
 	const inscrActive = $derived(sortActive('inscription_asc', 'inscription_desc'));
-	const soutArrow = $derived(sortArrow('soutenance_asc', 'soutenance_desc'));
+	const soutSort = $derived(sortDirection('soutenance_asc', 'soutenance_desc'));
 	const soutActive = $derived(sortActive('soutenance_asc', 'soutenance_desc'));
-	const titleArrow = $derived(sortArrow('title_asc', 'title_desc'));
+	const titleSort = $derived(sortDirection('title_asc', 'title_desc'));
 	const titleActive = $derived(sortActive('title_asc', 'title_desc'));
 </script>
 
@@ -77,18 +78,18 @@
 				class="col-date sortable"
 				class:active={inscrActive}
 				onclick={() => onToggleSort('inscription_asc', 'inscription_desc')}
-			>Inscription {inscrArrow}</th>
+			>Inscription <SortChevron direction={inscrSort} /></th>
 			<th
 				class="col-date sortable"
 				class:active={soutActive}
 				onclick={() => onToggleSort('soutenance_asc', 'soutenance_desc')}
-			>Soutenance {soutArrow}</th>
+			>Soutenance <SortChevron direction={soutSort} /></th>
 			<th class="col-author">Auteur</th>
 			<th
 				class="col-title sortable"
 				class:active={titleActive}
 				onclick={() => onToggleSort('title_asc', 'title_desc')}
-			>Titre {titleArrow}</th>
+			>Titre <SortChevron direction={titleSort} /></th>
 			<th class="col-status">Statut</th>
 			{#if showLabsColumn}
 				<th class="col-labs">Laboratoire(s)</th>

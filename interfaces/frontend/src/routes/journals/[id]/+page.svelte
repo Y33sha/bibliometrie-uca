@@ -228,7 +228,7 @@
 								{/each}
 							</dl>
 							<button class="toggle-raw" onclick={() => (showRawDoaj = !showRawDoaj)}>
-								{showRawDoaj ? '▾ Masquer' : '▸ Voir'} le payload DOAJ brut
+								{showRawDoaj ? 'Masquer' : 'Voir'} le payload DOAJ brut <span class="chevron" class:up={showRawDoaj} aria-hidden="true"></span>
 							</button>
 							{#if showRawDoaj}
 								<pre class="raw-payload">{JSON.stringify(journal.doaj_payload, null, 2)}</pre>

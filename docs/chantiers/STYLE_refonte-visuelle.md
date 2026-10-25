@@ -82,6 +82,8 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Menus déroulants natifs (page Statistiques) au style des boutons de filtre
 - [x] Pagination sans bordure, page active en couleur d'accent
 
+- [x] Chevrons dessinés à la place des triangles (menus, facettes, en-têtes triés), retournés quand le panneau est ouvert ou le tri croissant (`.chevron`, `SortChevron`)
+
 ### Étape 4 — Tableaux
 
 - [x] Factoriser : tableaux de liste sur `.data-table`, files de triage des revues sur `.triage-table`, colonnes triables et numériques dans `shared.css`, lien de titre `.publication-title` ; restent à part les tableaux de mise en page propre (run du pipeline, comparaison des sources, ISSN, blocages d'éditeurs)

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SortChevron from "#lib/components/SortChevron.svelte";
 	import { pageTitle } from "#lib/institution.svelte.js";
 	import { onMount } from "svelte";
 	import { autofocus } from "#lib/actions/focus.js";
@@ -116,9 +117,7 @@
 				onclick={() => toggleSort("acronym")}
 			>
 				Acronyme
-				<span class="sort-arrow"
-					>{sortCol === "acronym" ? (sortAsc ? "▲" : "▼") : ""}</span
-				>
+				<SortChevron direction={sortCol === "acronym" ? (sortAsc ? "asc" : "desc") : null} />
 			</th>
 			<th
 				class="sortable"
@@ -126,9 +125,7 @@
 				onclick={() => toggleSort("name")}
 			>
 				Nom
-				<span class="sort-arrow"
-					>{sortCol === "name" ? (sortAsc ? "▲" : "▼") : ""}</span
-				>
+				<SortChevron direction={sortCol === "name" ? (sortAsc ? "asc" : "desc") : null} />
 			</th>
 			<th
 				class="sortable tutelles-col"
@@ -136,13 +133,7 @@
 				onclick={() => toggleSort("tutelles")}
 			>
 				Tutelles
-				<span class="sort-arrow"
-					>{sortCol === "tutelles"
-						? sortAsc
-							? "▲"
-							: "▼"
-						: ""}</span
-				>
+				<SortChevron direction={sortCol === "tutelles" ? (sortAsc ? "asc" : "desc") : null} />
 			</th>
 			<th>ROR</th>
 			<th>Collection HAL</th>

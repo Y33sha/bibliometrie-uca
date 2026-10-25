@@ -111,7 +111,8 @@
 {#if rejectedForms.length}
   <details class="rejected-forms" bind:open={showRejected}>
     <summary>
-      {showRejected ? "masquer les formes rejetées ▲" : "afficher les formes rejetées ▼"}
+      {showRejected ? "masquer les formes rejetées" : "afficher les formes rejetées"}
+      <span class="chevron" class:up={showRejected} aria-hidden="true"></span>
     </summary>
     <div class="forms-list">
       {#each rejectedForms as nf}

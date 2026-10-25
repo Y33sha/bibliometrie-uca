@@ -125,7 +125,7 @@
 		{#if selected.length > 0}
 			<span class="facet-badge">{selected.length}</span>
 		{/if}
-		<span class="facet-arrow">&#9662;</span>
+		<span class="chevron" class:up={open} aria-hidden="true"></span>
 	</button>
 	</Tooltip>
 
