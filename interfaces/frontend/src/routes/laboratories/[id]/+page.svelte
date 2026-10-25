@@ -149,52 +149,46 @@
 {/if}
 
 {#if error}
-	<div class="lab-header">
-		<div class="no-results">Laboratoire introuvable</div>
-	</div>
+	<div class="no-results">Laboratoire introuvable</div>
 {:else if !lab}
-	<div class="lab-header">
-		<div class="loading">Chargement…</div>
-	</div>
+	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Header -->
-	<div class="lab-header">
-		<h1 class="lab-name">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{lab.name}
 			{#if lab.acronym}
-				<span class="lab-acronym">({lab.acronym})</span>
+				<span class="entity-acronym">{lab.acronym}</span>
 			{/if}
 		</h1>
-		<div class="lab-meta">
-			<div class="meta-row">
-				{#if lab.ror_id}
-					<span class="meta-label">ROR</span>
-					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
-						{rorShortId(lab.ror_id)}
-					</a>
-				{/if}
-				{#if lab.rnsr_id}
-					<span class="meta-label">RNSR</span>
-					<span class="id-badge">{lab.rnsr_id}</span>
-				{/if}
-				{#if lab.hal_collection}
-					<span class="meta-label">HAL</span>
-					<a
-						href="https://hal.science/{lab.hal_collection}"
-						target="_blank"
-						rel="noopener"
-						class="id-badge"
-					>
-						{lab.hal_collection}
-					</a>
-				{/if}
-				{#if tutelles.length}
-					<span class="meta-label">Tutelles</span>
-					{#each tutelles as t (t.id)}
-						<span class="tutelle-tag">{structureLabel(t)}</span>
-					{/each}
-				{/if}
-			</div>
+		<div class="entity-meta">
+			{#if lab.ror_id}
+				<span class="entity-meta-label">ROR</span>
+				<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
+					{rorShortId(lab.ror_id)}
+				</a>
+			{/if}
+			{#if lab.rnsr_id}
+				<span class="entity-meta-label">RNSR</span>
+				<span class="id-badge">{lab.rnsr_id}</span>
+			{/if}
+			{#if lab.hal_collection}
+				<span class="entity-meta-label">HAL</span>
+				<a
+					href="https://hal.science/{lab.hal_collection}"
+					target="_blank"
+					rel="noopener"
+					class="id-badge"
+				>
+					{lab.hal_collection}
+				</a>
+			{/if}
+			{#if tutelles.length}
+				<span class="entity-meta-label">Tutelles</span>
+				{#each tutelles as t (t.id)}
+					<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
+				{/each}
+			{/if}
 		</div>
 	</div>
 
@@ -338,27 +332,6 @@
 {/if}
 
 <style>
-	/* Header */
-	.lab-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 20px 24px;
-		margin-bottom: 0;
-	}
-	.lab-name { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
-	.lab-acronym { font-size: 1.05rem; color: var(--muted); font-weight: 400; }
-	.lab-meta { display: flex; flex-direction: column; gap: 6px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-	}
-	.tutelle-tag { background: var(--accent-light); color: var(--accent); }
-	.id-badge { margin-right: 8px; }
 
 	/* Shared table styles */
 	.tab-content table {

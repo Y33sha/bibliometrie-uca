@@ -66,8 +66,8 @@
   {:else if !data}
     <p class="loading">Chargement…</p>
   {:else}
-    <div class="header">
-      <h1>{data.subject.label}</h1>
+    <div class="entity-header">
+      <h1 class="entity-title">{data.subject.label}</h1>
     </div>
     <TabNav
       tabs={[
@@ -116,17 +116,6 @@
   }
   .back:hover {
     text-decoration: underline;
-  }
-  .header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-  h1 {
-    margin: 0;
-    font-size: 1.4rem;
   }
   .graph-wrapper {
     width: 100%;

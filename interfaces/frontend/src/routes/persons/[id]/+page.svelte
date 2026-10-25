@@ -150,23 +150,19 @@
 {/if}
 
 {#if error}
-	<div class="profile-header">
-		<div class="no-results">Personne introuvable</div>
-	</div>
+	<div class="no-results">Personne introuvable</div>
 {:else if !profile}
-	<div class="profile-header">
-		<div class="loading">Chargement…</div>
-	</div>
+	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Profile header -->
-	<div class="profile-header">
-		<h1 class="profile-name">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{titleCase(profile.first_name)}
-			<span class="profile-last">{titleCase(profile.last_name)}</span>
+			<span>{titleCase(profile.last_name)}</span>
 		</h1>
-		<div class="profile-meta">
+		<div class="entity-meta">
 			{#if profile.role_title}
-				<span class="role-badge">{profile.role_title}</span>
+				<span class="entity-tag">{profile.role_title}</span>
 			{/if}
 			{#if profile.department_name}
 				<span>{profile.department_name}</span>
@@ -320,31 +316,6 @@
 		color: var(--text);
 	}
 	.thesis-role-heading:first-child { margin-top: 0; }
-	.profile-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 20px 24px;
-		margin-bottom: 0;
-	}
-	.profile-name { font-size: 1.45rem; font-weight: 600; margin: 0 0 6px; }
-	.profile-last { font-weight: 600; }
-	.profile-meta {
-		display: flex;
-		gap: 16px;
-		align-items: center;
-		flex-wrap: wrap;
-		font-size: 0.95rem;
-		color: var(--muted);
-	}
-	.role-badge {
-		display: inline-block;
-		padding: 2px 8px;
-		background: var(--border-subtle);
-		border-radius: var(--radius);
-		font-size: 0.85rem;
-		color: var(--muted);
-	}
 	/* Shared table styles */
 	.tab-content table {
 		width: 100%;

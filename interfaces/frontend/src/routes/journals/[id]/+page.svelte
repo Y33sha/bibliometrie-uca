@@ -131,8 +131,8 @@
 	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Header -->
-	<div class="j-header">
-		<h1 class="j-title">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{journal.title}
 			{#if journal.is_in_doaj}
 				{#if journal.doaj_url}
@@ -142,37 +142,35 @@
 				{/if}
 			{/if}
 		</h1>
-		<div class="j-meta">
-			<div class="meta-row">
-				{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-					<span class="meta-label">{issnLabel(issn)}</span>
-					<span class="id-badge">{issn.issn}</span>
-				{/each}
-			</div>
-			<div class="meta-row">
-				{#if journal.publisher_name}
-					<span class="meta-label">Éditeur</span>
-					{#if journal.publisher_id}
-						<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
-					{:else}
-						<span class="publisher-link">{journal.publisher_name}</span>
-					{/if}
+		<div class="entity-meta">
+			{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
+				<span class="entity-meta-label">{issnLabel(issn)}</span>
+				<span class="id-badge">{issn.issn}</span>
+			{/each}
+		</div>
+		<div class="entity-meta">
+			{#if journal.publisher_name}
+				<span class="entity-meta-label">Éditeur</span>
+				{#if journal.publisher_id}
+					<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
+				{:else}
+					<span class="publisher-link">{journal.publisher_name}</span>
 				{/if}
-				{#if journal.serial_type}
-					<span class="meta-label">Type</span>
-					<span class="type-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
-				{/if}
-				{#if journal.oa_model}
-					<span class="meta-label">OA</span>
-					<span class="type-tag">{journal.oa_model}</span>
-				{/if}
-				{#if journal.apc_amount != null}
-					<span class="meta-label">APC</span>
-					<span class="type-tag">
-						{journal.apc_amount} {journal.apc_currency ?? ''}
-					</span>
-				{/if}
-			</div>
+			{/if}
+			{#if journal.serial_type}
+				<span class="entity-meta-label">Type</span>
+				<span class="entity-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
+			{/if}
+			{#if journal.oa_model}
+				<span class="entity-meta-label">OA</span>
+				<span class="entity-tag">{journal.oa_model}</span>
+			{/if}
+			{#if journal.apc_amount != null}
+				<span class="entity-meta-label">APC</span>
+				<span class="entity-tag">
+					{journal.apc_amount} {journal.apc_currency ?? ''}
+				</span>
+			{/if}
 		</div>
 	</div>
 
@@ -271,31 +269,7 @@
 {/if}
 
 <style>
-	.j-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 20px 24px;
-	}
-	.j-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
-	.j-meta { display: flex; flex-direction: column; gap: 6px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-	}
-	.id-badge { margin-right: 8px; }
-	.publisher-link { font-size: 0.95rem; }
-	span.publisher-link { color: var(--muted); }
-	.type-tag {
-		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.85rem;
-	}
 
-	.tab-content { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 
 	.muted { color: var(--muted); }

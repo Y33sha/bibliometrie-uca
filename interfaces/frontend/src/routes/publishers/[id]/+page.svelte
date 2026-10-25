@@ -113,34 +113,32 @@
 	<div class="loading">Chargement…</div>
 {:else}
 	<!-- Header -->
-	<div class="p-header">
-		<h1 class="p-title">
+	<div class="entity-header">
+		<h1 class="entity-title">
 			{publisher.name}
 		</h1>
-		<div class="p-meta">
-			<div class="meta-row">
-				<span class="meta-label">Type</span>
-				<span class="type-tag">
-					{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
-				</span>
-				{#if publisher.country}
-					<span class="meta-label">Pays</span>
-					<span class="type-tag">{publisher.country.toUpperCase()}</span>
-				{/if}
-				{#if publisher.openalex_id}
-					<span class="meta-label">OpenAlex</span>
-					<span class="id-badge">{publisher.openalex_id}</span>
-				{/if}
-			</div>
-			{#if publisher.doi_prefixes.length > 0}
-				<div class="meta-row">
-					<span class="meta-label">Préfixes DOI</span>
-					{#each publisher.doi_prefixes as p (p.prefix)}
-						<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
-					{/each}
-				</div>
+		<div class="entity-meta">
+			<span class="entity-meta-label">Type</span>
+			<span class="entity-tag">
+				{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
+			</span>
+			{#if publisher.country}
+				<span class="entity-meta-label">Pays</span>
+				<span class="entity-tag">{publisher.country.toUpperCase()}</span>
+			{/if}
+			{#if publisher.openalex_id}
+				<span class="entity-meta-label">OpenAlex</span>
+				<span class="id-badge">{publisher.openalex_id}</span>
 			{/if}
 		</div>
+		{#if publisher.doi_prefixes.length > 0}
+			<div class="entity-meta">
+				<span class="entity-meta-label">Préfixes DOI</span>
+				{#each publisher.doi_prefixes as p (p.prefix)}
+					<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
+				{/each}
+			</div>
+		{/if}
 	</div>
 
 	<!-- Tabs -->
@@ -225,30 +223,7 @@
 {/if}
 
 <style>
-	.p-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 20px 24px;
-	}
-	.p-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 10px; }
-	.p-meta { display: flex; flex-direction: column; gap: 6px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-	}
-	.id-badge { margin-right: 4px; }
-	.type-tag {
-		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.85rem;
-		margin-right: 8px;
-	}
 
-	.tab-content { margin-top: 16px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 
 	.muted { color: var(--muted); }

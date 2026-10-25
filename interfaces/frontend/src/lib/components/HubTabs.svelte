@@ -18,48 +18,11 @@
   } = $props();
 </script>
 
-<nav class="hub-tabs">
+<nav class="tabs">
   {#each tabs as t (t.key)}
-    <button class="hub-tab" class:active={active === t.key} onclick={() => onselect(t.key)}>
+    <button class="tab" class:active={active === t.key} onclick={() => onselect(t.key)}>
       {t.label}
-      {#if t.count}<span class="tab-badge">{t.count}</span>{/if}
+      {#if t.count}<span class="tab-count">{t.count.toLocaleString("fr-FR")}</span>{/if}
     </button>
   {/each}
 </nav>
-
-<style>
-  .hub-tabs {
-    display: flex;
-    gap: 4px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 14px;
-  }
-  .hub-tab {
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    padding: 8px 14px;
-    cursor: pointer;
-    font: inherit;
-    color: var(--muted);
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .hub-tab:hover {
-    color: var(--text);
-  }
-  .hub-tab.active {
-    color: var(--accent);
-    border-bottom-color: var(--accent);
-    font-weight: 600;
-  }
-  .tab-badge {
-    background: var(--accent);
-    color: white;
-    border-radius: var(--radius-pill);
-    font-size: 0.72rem;
-    padding: 0 7px;
-    font-weight: 600;
-  }
-</style>

@@ -43,30 +43,30 @@
 {:else if !monograph}
 	<div class="loading">Chargement…</div>
 {:else}
-	<div class="m-header">
-		<h1 class="m-title"><PublicationTitle titre={monograph.title} /></h1>
-		<div class="meta-row">
-			<span class="type-tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
+	<div class="entity-header">
+		<h1 class="entity-title"><PublicationTitle titre={monograph.title} /></h1>
+		<div class="entity-meta">
+			<span class="entity-tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
 			{#if monograph.year}
-				<span class="meta-label">Année</span>
+				<span class="entity-meta-label">Année</span>
 				<span>{monograph.year}</span>
 			{/if}
 			{#if monograph.isbn}
-				<span class="meta-label">ISBN</span>
+				<span class="entity-meta-label">ISBN</span>
 				<span class="id-badge">{monograph.isbn}</span>
 			{/if}
 			{#if monograph.eisbn}
-				<span class="meta-label">ISBN électronique</span>
+				<span class="entity-meta-label">ISBN électronique</span>
 				<span class="id-badge">{monograph.eisbn}</span>
 			{/if}
 		</div>
-		<div class="meta-row">
+		<div class="entity-meta">
 			{#if monograph.publisher_id}
-				<span class="meta-label">Éditeur</span>
+				<span class="entity-meta-label">Éditeur</span>
 				<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
 			{/if}
 			{#if monograph.serial_id}
-				<span class="meta-label">Collection</span>
+				<span class="entity-meta-label">Collection</span>
 				<a href={resolve(`journals/${monograph.serial_id}`)}>{monograph.journal_title}</a>
 			{/if}
 		</div>
@@ -84,30 +84,6 @@
 {/if}
 
 <style>
-	.m-header {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 20px 24px;
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-	}
-	.m-title { font-size: 1.3rem; font-weight: 600; margin: 0 0 4px; }
-	.meta-row {
-		display: flex; align-items: center; gap: 6px;
-		flex-wrap: wrap; font-size: 0.95rem;
-	}
-	.meta-label {
-		font-size: 0.8rem; font-weight: 600; color: var(--muted);
-		text-transform: uppercase; letter-spacing: 0.3px;
-		margin-left: 8px;
-	}
-	.meta-label:first-child { margin-left: 0; }
-	.type-tag {
-		background: var(--border-subtle); color: var(--muted);
-		padding: 2px 8px; border-radius: var(--radius-pill); font-size: 0.85rem;
-	}
-	.m-publications { margin-top: 16px; }
+	.m-publications { margin-top: 28px; }
 	.loading, .no-results { padding: 20px; color: var(--muted); }
 </style>
