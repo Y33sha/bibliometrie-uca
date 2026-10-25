@@ -9,6 +9,7 @@
 ### Non commencé
 
 - [Contenu des dashboards de structure et de personne](METIER_dashboards.md)
+- [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
