@@ -87,13 +87,13 @@ Lecture par source :
 - [x] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
 - [x] Facette « Organisation partenaire » dans la recherche de publications.
 - [x] Dimension « partenaire » dans le pivot des statistiques, filtrable.
-- [ ] Export du réseau (CSV, GEXF) pour Gephi ou VOSviewer.
 
 ### 5. Mise à jour de la documentation
 
-- [ ] `docs/` : référentiel ROR, table de liens, vue consolidée.
+- [x] `docs/` : référentiel ROR, table de liens, vue consolidée, organisations partenaires.
 
 ## Questions ouvertes
 
 - Faux positifs des sources hors périmètre : accord de deux sources ; vérification par un service externe (ISTEX…) dans un chantier distinct.
 - Carte des collaborations par ville. Le dump ROR donne la ville et les coordonnées de chaque organisation (`locations[].geonames_details`) ; `ror_organizations` garde seulement le pays.
+- Export du réseau des collaborations pour Gephi ou VOSviewer. Le corpus contient seulement les publications du périmètre : les liens entre partenaires se limitent à leurs copublications avec le périmètre. Une analyse de réseau complète passe par OpenAlex.

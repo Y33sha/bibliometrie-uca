@@ -8,7 +8,6 @@
 
 ### Non commencé
 
-- [Collaborations entre structures](DATA_collaborations-structures.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Qualité et cohérence des sujets](DATA_sujets-qualite.md)
@@ -18,6 +17,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-25 — [Collaborations entre structures](archived/2026-10-25_DATA_collaborations-structures.md)
 - 2026-10-25 — [Monographies](archived/2026-10-25_DATA_monographies.md)
 - 2026-10-25 — [Gestion et dédoublonnage assistés de la base personnes](archived/2026-10-25_DATA_personnes-dedoublonnage-assiste.md)
 - 2026-10-25 — [Conférences et actes](archived/2026-10-25_DATA_conferences-et-actes.md)

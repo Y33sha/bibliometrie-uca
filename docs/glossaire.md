@@ -91,6 +91,9 @@ Voir [détails](sources/03-openalex.md) sur l'API et les données récupérées.
 ## ORCID
 Identifiant unique d'un chercheur (ex: `0000-0001-2345-6789`). Créé par le chercheur.
 
+## Organisation partenaire
+Organisation [ROR](glossaire.md#ror) d'un auteur d'une publication, ou ancêtre ROR de cette organisation. Les organisations partenaires excluent les structures étudiées, leurs tutelles et leurs ancêtres ROR. Les structures étudiées sont le laboratoire de la page, les laboratoires sélectionnés, ou à défaut tout le périmètre.
+
 ## PID
 
 *Persistent identifier*. Identifiant unique pour une entité donnée.

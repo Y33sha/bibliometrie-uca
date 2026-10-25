@@ -6,7 +6,7 @@ Certaines données sont des **dérivés** recalculés à partir d'autres tables 
 
 ## Vues matérialisées
 
-Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupart en `REFRESH … CONCURRENTLY`, qui suppose un index unique). Aucune n'est écrite directement.
+Le pipeline les rafraîchit, la plupart en `REFRESH … CONCURRENTLY`, qui suppose un index unique. Aucune n'est écrite directement.
 
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
