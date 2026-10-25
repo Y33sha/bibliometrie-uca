@@ -23,6 +23,18 @@
   const isHalProblems = $derived(isActive("/hal-problems"));
   const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/monographs") || isActive("/subjects"));
 
+  // Essai de la barre publique : `?nav=clair` ou `?nav=teal` dans l'URL, mémorisé pour la session.
+  let navLight = $state(false);
+  $effect(() => {
+    const requested = page.url.searchParams.get("nav");
+    try {
+      if (requested) sessionStorage.setItem("nav", requested);
+      navLight = (requested ?? sessionStorage.getItem("nav")) === "clair";
+    } catch {
+      navLight = requested === "clair";
+    }
+  });
+
   let mobileNavOpen = $state(false);
   // Referme le menu mobile après chaque navigation.
   afterNavigate(() => {
@@ -43,7 +55,7 @@
   }
 </script>
 
-<div class="site-header" class:admin={isAdmin}>
+<div class="site-header" class:admin={isAdmin} class:light={navLight && !isAdmin}>
   {#if isAdmin}
     <div class="site-brand">
       <img src={asset('connectome.png')} alt="" class="site-icon" />
@@ -193,12 +205,12 @@
     display: none;
     background: none;
     border: none;
-    color: white;
+    color: inherit;
     font-size: 1.5rem;
     line-height: 1;
     cursor: pointer;
     padding: 0 6px;
-    height: 46px;
+    height: var(--header-height);
   }
   .site-title {
     font-family: "Ubuntu", sans-serif;
@@ -209,7 +221,7 @@
   .site-title-admin {
     font-size: 0.8rem;
     font-weight: 400;
-    color: rgba(255, 255, 255, 0.5);
+    color: rgba(255, 255, 255, 0.6);
     margin-left: 6px;
     text-transform: uppercase;
     letter-spacing: 1px;
@@ -217,53 +229,53 @@
   .site-nav {
     display: flex;
     align-items: center;
-    gap: 0;
+    gap: 2px;
     height: 100%;
   }
+  /* Rubrique : pastille arrondie, fond plus clair pour la rubrique active. */
   .nav-link {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
-    font-size: 0.95rem;
-    padding: 0 14px;
-    height: 46px;
+    font-size: 0.92rem;
+    font-weight: 500;
+    padding: 0 12px;
+    height: 34px;
     display: flex;
     align-items: center;
     border: none;
+    border-radius: var(--radius);
     background: none;
     cursor: pointer;
     font-family: inherit;
-    transition: color 0.15s;
+    transition: background 0.15s, color 0.15s;
   }
   .nav-link:hover {
     color: white;
+    background: rgba(255, 255, 255, 0.1);
   }
   .nav-icon {
     display: inline-flex;
     margin-right: 7px;
     font-size: 0.9em;
   }
-  .nav-link.active {
+  .nav-link.active,
+  .nav-dropdown.active > .nav-link {
     color: white;
-    box-shadow: inset 0 -2px 0 white;
+    background: rgba(255, 255, 255, 0.18);
   }
   .nav-switch-link {
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.6);
     font-size: 0.85rem;
     margin-left: 12px;
-    border-left: 1px solid rgba(255, 255, 255, 0.15);
   }
   .nav-switch-link:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: white;
   }
   .nav-dropdown {
     position: relative;
-    height: 46px;
+    height: 100%;
     display: flex;
     align-items: center;
-  }
-  .nav-dropdown.active > .nav-link {
-    color: white;
-    box-shadow: inset 0 -2px 0 white;
   }
   .nav-dropdown:hover > .nav-dropdown-menu {
     display: block;
@@ -271,20 +283,21 @@
   .nav-dropdown-menu {
     display: none;
     position: absolute;
-    top: 46px;
+    top: 100%;
     left: 0;
+    padding: 4px 0;
     background: var(--nav-public-menu);
     border-radius: 0 0 var(--radius) var(--radius);
-    min-width: 150px;
+    min-width: 170px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
     z-index: 100;
   }
   .nav-dropdown-menu a {
     display: block;
-    padding: 9px 16px;
-    color: rgba(255, 255, 255, 0.8);
+    padding: 8px 16px;
+    color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
-    font-size: 0.95rem;
+    font-size: 0.92rem;
   }
   .nav-dropdown-menu a:hover {
     background: rgba(255, 255, 255, 0.1);
@@ -293,6 +306,48 @@
   .nav-dropdown-menu a.active {
     color: white;
     font-weight: 600;
+  }
+
+  /* Variante claire de la barre publique : fond blanc, rubrique active soulignée en teal. */
+  .site-header.light {
+    background: var(--card);
+    color: var(--text);
+    border-bottom: 1px solid var(--border);
+  }
+  .site-header.light .site-title {
+    color: var(--accent);
+  }
+  .site-header.light .nav-link,
+  .site-header.light .nav-switch-link {
+    color: var(--text-secondary);
+  }
+  .site-header.light .nav-link:hover {
+    color: var(--text);
+    background: var(--hover);
+  }
+  .site-header.light .nav-link.active,
+  .site-header.light .nav-dropdown.active > .nav-link {
+    color: var(--accent);
+    font-weight: 600;
+    background: none;
+    border-radius: 0;
+    box-shadow: inset 0 -2px 0 var(--accent-mid);
+  }
+  .site-header.light .nav-dropdown-menu {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: none;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  }
+  .site-header.light .nav-dropdown-menu a {
+    color: var(--text);
+  }
+  .site-header.light .nav-dropdown-menu a:hover {
+    background: var(--hover);
+    color: var(--text);
+  }
+  .site-header.light .nav-dropdown-menu a.active {
+    color: var(--accent);
   }
   .container {
     max-width: 1400px;
@@ -309,7 +364,7 @@
     .site-nav {
       display: none;
       position: absolute;
-      top: 46px;
+      top: var(--header-height);
       left: 0;
       right: 0;
       flex-direction: column;
@@ -323,6 +378,10 @@
     .site-header.admin .site-nav {
       background: var(--nav-admin);
     }
+    .site-header.light .site-nav {
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+    }
     .site-nav.open {
       display: flex;
       /* Sur écran court, le menu déplié peut dépasser le bas du viewport : on borne sa hauteur et on le rend défilable pour atteindre le bas. */
@@ -333,6 +392,7 @@
       height: auto;
       width: 100%;
       padding: 11px 22px;
+      border-radius: 0;
     }
     .nav-dropdown {
       height: auto;
@@ -352,7 +412,6 @@
     }
     .nav-switch-link {
       margin-left: 0;
-      border-left: none;
       border-top: 1px solid rgba(255, 255, 255, 0.15);
     }
   }
