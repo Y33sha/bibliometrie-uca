@@ -1,15 +1,15 @@
 <script lang="ts">
-  import { institution, pageTitle } from "$lib/institution.svelte";
+  import { institution, pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { api, ApiError, orphanContributions, persons as personsApi } from "$lib/api";
-  import { toast } from "$lib/dialogs.svelte";
-  import { useDebouncedSearch } from "$lib/composables/useDebouncedSearch.svelte";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
-  import Pagination from "$lib/components/Pagination.svelte";
-  import PersonsTable from "$lib/components/PersonsTable.svelte";
+  import { api, ApiError, orphanContributions, persons as personsApi } from "#lib/api/index.js";
+  import { toast } from "#lib/dialogs.svelte.js";
+  import { useDebouncedSearch } from "#lib/composables/useDebouncedSearch.svelte.js";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import type { FacetOption } from "#lib/components/FacetDropdown.svelte";
+  import Pagination from "#lib/components/Pagination.svelte";
+  import PersonsTable from "#lib/components/PersonsTable.svelte";
   import type {
     DetachModalState,
     DetachPublication,
@@ -19,12 +19,12 @@
     PersonExclusion,
     PersonSearchResult,
   } from "./types";
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
   type NameFormContributionRef = components["schemas"]["NameFormContributionRef"];
   import PersonsToolbar from "./PersonsToolbar.svelte";
   import DetachNameFormModal from "./DetachNameFormModal.svelte";
   import PersonDrawer from "./PersonDrawer.svelte";
-  import HubTabs from "$lib/components/HubTabs.svelte";
+  import HubTabs from "#lib/components/HubTabs.svelte";
   import AmbiguousFormsList from "./AmbiguousFormsList.svelte";
   import IdentifierConflictsList from "./IdentifierConflictsList.svelte";
   import NameDuplicatesList from "./NameDuplicatesList.svelte";
@@ -555,7 +555,7 @@
 />
 
 {#if orphanCount > 0}
-  <a href="{base}/admin/orphan-contributions" class="orphan-link">
+  <a href={resolve('admin/orphan-contributions')} class="orphan-link">
     {orphanCount} contribution{orphanCount > 1 ? "s" : ""} {institution.name} orpheline{orphanCount > 1
       ? "s"
       : ""} (non reliée{orphanCount > 1 ? "s" : ""} à une personne)

@@ -1,6 +1,6 @@
 // Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
-import { api } from '$lib/api';
-import type { components } from '$lib/api/schema';
+import { api } from '#lib/api/index.js';
+import type { components } from '#lib/api/schema.js';
 
 type InstitutionOut = components['schemas']['InstitutionOut'];
 

@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { base } from '$app/paths';
-	import { api, ApiError } from '$lib/api';
-	import { confirmDialog, toast } from '$lib/dialogs.svelte';
-	import type { components } from '$lib/api/schema';
+	import { resolve } from '$app/paths';
+	import { api, ApiError } from '#lib/api/index.js';
+	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 	import { mergeSerial } from './mergeSerial';
 
 	type DuplicatesResponse = components['schemas']['SerialDuplicatesResponse'];
@@ -91,7 +91,7 @@
 				{/if}
 				{#each group.serials as j (j.id)}
 					<tr>
-						<td><a href="{base}/journals/{j.id}">{j.title}</a> <span class="muted">#{j.id}</span></td>
+						<td><a href={resolve(`journals/${j.id}`)}>{j.title}</a> <span class="muted">#{j.id}</span></td>
 						<td>{j.publisher_name ?? '—'}</td>
 						<td>{issns(j)}</td>
 						<td class="num">{j.publication_count}</td>

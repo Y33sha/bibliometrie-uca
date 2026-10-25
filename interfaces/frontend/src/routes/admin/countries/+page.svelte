@@ -1,15 +1,15 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { autofocus } from '$lib/actions/focus';
-	import { base } from '$app/paths';
+	import { autofocus } from '#lib/actions/focus.js';
+	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { addresses as addressesApi, api } from '$lib/api';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+	import { addresses as addressesApi, api } from '#lib/api/index.js';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type Address = components['schemas']['AddressForCountryAttribution'];
 	type Country = components['schemas']['CountryOut'];
 	type Method = components['schemas']['CountryDetectionMethod'];
@@ -97,7 +97,7 @@
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
 		const qs = p.toString();
-		replaceState(`${base}/admin/countries` + (qs ? '?' + qs : ''), {});
+		replaceState(resolve('admin/countries') + (qs ? '?' + qs : ''), {});
 	}
 
 	function onFilterChange() {

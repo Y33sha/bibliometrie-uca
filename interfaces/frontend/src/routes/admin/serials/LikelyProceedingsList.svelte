@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { base } from '$app/paths';
-	import { api, ApiError, serials as serialsApi } from '$lib/api';
-	import { confirmDialog, toast } from '$lib/dialogs.svelte';
-	import type { components } from '$lib/api/schema';
+	import { resolve } from '$app/paths';
+	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
+	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 
 	type Response = components['schemas']['LikelyProceedingsResponse'];
 	type Item = components['schemas']['LikelyProceedingsItem'];
@@ -88,7 +88,7 @@
 			{#each items as item (item.serial.id)}
 				<tr>
 					<td>
-						<a href="{base}/journals/{item.serial.id}">{item.serial.title}</a>
+						<a href={resolve(`journals/${item.serial.id}`)}>{item.serial.title}</a>
 						<span class="muted">#{item.serial.id}</span>
 					</td>
 					<td>{item.serial.publisher_name ?? '—'}</td>

@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { pageTitle } from "$lib/institution.svelte";
+	import { pageTitle } from "#lib/institution.svelte.js";
 	import { onMount } from "svelte";
-	import { autofocus } from "$lib/actions/focus";
-	import { base } from "$app/paths";
-	import { api } from "$lib/api";
-	import { rorShortId, rorFullUrl } from "$lib/utils";
-	import { structureLabel } from "$lib/structureLabels";
-	import FacetDropdown from "$lib/components/FacetDropdown.svelte";
+	import { autofocus } from "#lib/actions/focus.js";
+	import { resolve } from "$app/paths";
+	import { api } from "#lib/api/index.js";
+	import { rorShortId, rorFullUrl } from "#lib/utils.js";
+	import { structureLabel } from "#lib/structureLabels.js";
+	import FacetDropdown from "#lib/components/FacetDropdown.svelte";
 
-	import type { components } from "$lib/api/schema";
+	import type { components } from "#lib/api/schema.js";
 	type Lab = components["schemas"]["StructureListItem"];
 	type ConfigItem = components["schemas"]["ConfigItem"];
 
@@ -150,12 +150,12 @@
 		{#each filtered as lab (lab.id)}
 			<tr>
 				<td class="acronym-cell">
-					<a href="{base}/laboratories/{lab.id}" class="lab-link">
+					<a href={resolve(`laboratories/${lab.id}`)} class="lab-link">
 						<span class="lab-acronym">{lab.acronym}</span>
 					</a>
 				</td>
 				<td>
-					<a href="{base}/laboratories/{lab.id}" class="lab-link">
+					<a href={resolve(`laboratories/${lab.id}`)} class="lab-link">
 						<span class="lab-name">{lab.name}</span>
 					</a>
 				</td>

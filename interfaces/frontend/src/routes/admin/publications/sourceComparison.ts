@@ -1,6 +1,6 @@
-import type { components } from '$lib/api/schema';
-import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '$lib/labels';
-import { sourceOrder } from '$lib/sources.svelte';
+import type { components } from '#lib/api/schema.js';
+import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '#lib/labels.js';
+import { sourceOrder } from '#lib/sources.svelte.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
 export type SourceContribution = components['schemas']['SourceContributionOut'];

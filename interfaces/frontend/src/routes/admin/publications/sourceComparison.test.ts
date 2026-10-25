@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { loadSources } from '$lib/sources.svelte';
+import { loadSources } from '#lib/sources.svelte.js';
 import {
 	authorRows,
 	comparisonRows,
@@ -51,7 +51,7 @@ function row(rows: ComparisonRow[], key: string): ComparisonRow {
 }
 
 // Ordre d'affichage des sources, tel que `/api/sources` le sert.
-vi.mock('$lib/api', () => ({
+vi.mock('#lib/api/index.js', () => ({
 	api: async () =>
 		['hal', 'openalex', 'wos'].map((value) => ({ value, label_fr: value }))
 }));

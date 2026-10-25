@@ -1,10 +1,10 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { titleCase } from '$lib/utils';
-	import { institution } from '$lib/institution.svelte';
+	import { resolve } from '$app/paths';
+	import { titleCase } from '#lib/utils.js';
+	import { institution } from '#lib/institution.svelte.js';
 	import IdentifiersCell from './IdentifiersCell.svelte';
-	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import type { components } from '$lib/api/schema';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import type { components } from '#lib/api/schema.js';
 
 	export type PersonRow = components['schemas']['PersonOut'];
 
@@ -101,7 +101,7 @@
 								{titleCase(p.first_name)}
 							</button>
 						{:else}
-							<a href="{base}/persons/{p.id}" class="person-link">
+							<a href={resolve(`persons/${p.id}`)} class="person-link">
 								<span class="person-last">{titleCase(p.last_name)}</span>
 								{titleCase(p.first_name)}
 							</a>

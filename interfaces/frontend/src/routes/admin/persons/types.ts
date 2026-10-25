@@ -1,10 +1,10 @@
 /**
  * Types partagés par la page `admin/persons` et ses sous-composants.
  *
- * Les types de réponses API proviennent du schéma OpenAPI généré (`$lib/api/schema.ts`) ; seuls les états d'UI locaux restent définis ici.
+ * Les types de réponses API proviennent du schéma OpenAPI généré (`#lib/api/schema.ts`) ; seuls les états d'UI locaux restent définis ici.
  */
 
-import type { components } from "$lib/api/schema";
+import type { components } from "#lib/api/schema.js";
 
 // ── Types API (générés) ──
 export type PersonIdentifier = components["schemas"]["PersonIdentifierOut"];

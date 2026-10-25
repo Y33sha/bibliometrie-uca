@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
+	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount, tick } from 'svelte';
-	import { base } from '$app/paths';
-	import { api, latestRequest } from '$lib/api';
+	import { resolve } from '$app/paths';
+	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart, registerables } from 'chart.js';
 	import ChartDataLabels from 'chartjs-plugin-datalabels';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import EntityFilter from '$lib/components/EntityFilter.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import EntityFilter from '#lib/components/EntityFilter.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
 	import { defaultYears } from './defaultYears';
-	import { paramsToQuery } from '$lib/utils';
+	import { paramsToQuery } from '#lib/utils.js';
 	import {
 		oaLabelsMap,
 		docTypePlural,
@@ -21,9 +21,9 @@
 		publicationsDocTypes,
 		docTypeFilterToken,
 		docTypeFilterFromToken,
-	} from '$lib/labels';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	} from '#lib/labels.js';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 
 	Chart.register(...registerables, ChartDataLabels);
 
@@ -31,7 +31,7 @@
 	const pivotRequest = latestRequest();
 
 	// --- Types ---
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	// --- State ---
 	let selectedYears: string[] = $state([]);
 	let selectedLabs: string[] = $state([]);
@@ -287,7 +287,7 @@
 		// On ne transmet que l'id (état canonique) ; la liste résout elle-même le libellé de la pastille.
 		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
 		if (selectedSerialId) p.set('serial_id', selectedSerialId);
-		return base + '/publications?' + paramsToQuery(p);
+		return resolve('publications') + '?' + paramsToQuery(p);
 	});
 
 	// Filtres courants sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres que le graphe mais ignore l'axe, le mode et la pagination.

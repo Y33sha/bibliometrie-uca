@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { api } from "$lib/api";
-  import { titleCase } from "$lib/utils";
-  import { personExclusionLabels } from "$lib/labels";
-  import { autofocus } from "$lib/actions/focus";
-  import Drawer from "$lib/components/Drawer.svelte";
+  import { resolve } from "$app/paths";
+  import { api } from "#lib/api/index.js";
+  import { titleCase } from "#lib/utils.js";
+  import { personExclusionLabels } from "#lib/labels.js";
+  import { autofocus } from "#lib/actions/focus.js";
+  import Drawer from "#lib/components/Drawer.svelte";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
   import IdentifiersCell from "./IdentifiersCell.svelte";
-  import Picker from "$lib/components/Picker.svelte";
+  import Picker from "#lib/components/Picker.svelte";
   import NameFormsList from "./NameFormsList.svelte";
 
   type SharingPerson = components["schemas"]["SharingPersonOut"];
@@ -137,7 +137,7 @@
       <div class="drawer-title" class:excluded={!!person.exclusion}>
         <a
           class="drawer-name-link"
-          href="{base}/persons/{person.id}"
+          href={resolve(`persons/${person.id}`)}
           target="_blank"
           rel="noopener"
           title="Voir la fiche publique"

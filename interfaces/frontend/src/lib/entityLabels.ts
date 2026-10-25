@@ -1,9 +1,9 @@
 /**
  * Libellés des éditeurs, des revues, des personnes et des sujets, par identifiant. Un libellé connu par ailleurs (option choisie dans une facette) est retenu ; les autres sont lus sur `/api/entity-labels`, qui rend `null` pour une entité introuvable.
  */
-import { api } from '$lib/api';
-import type { components } from '$lib/api/schema';
-import { titleCase } from '$lib/utils';
+import { api } from '#lib/api/index.js';
+import type { components } from '#lib/api/schema.js';
+import { titleCase } from '#lib/utils.js';
 
 type EntityLabelResponse = components['schemas']['EntityLabelResponse'];
 

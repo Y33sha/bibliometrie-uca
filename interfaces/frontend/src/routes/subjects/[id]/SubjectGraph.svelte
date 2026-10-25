@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import { DataSet, Network } from "vis-network/standalone";
   import type { Node, Edge, Options } from "vis-network/standalone";
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
   type SubjectNeighbor = components["schemas"]["SubjectNeighborOut"];

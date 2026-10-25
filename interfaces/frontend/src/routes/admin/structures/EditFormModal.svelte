@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Modal from "$lib/components/Modal.svelte";
+  import Modal from "#lib/components/Modal.svelte";
   import type { EditFormState } from "./types";
   import { SHORT_FORM_MAX_LENGTH } from "./types";
 

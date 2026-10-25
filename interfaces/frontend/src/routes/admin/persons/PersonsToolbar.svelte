@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { autofocus } from "$lib/actions/focus";
-  import FacetDropdown from "$lib/components/FacetDropdown.svelte";
-  import type { FacetOption } from "$lib/components/FacetDropdown.svelte";
-  import PresenceFilterToggle from "$lib/components/PresenceFilterToggle.svelte";
-  import { IDENTIFIER_ITEMS, PENDING_ITEMS } from "$lib/filterItems";
-  import { personExclusionLabels } from "$lib/labels";
+  import { autofocus } from "#lib/actions/focus.js";
+  import FacetDropdown from "#lib/components/FacetDropdown.svelte";
+  import type { FacetOption } from "#lib/components/FacetDropdown.svelte";
+  import PresenceFilterToggle from "#lib/components/PresenceFilterToggle.svelte";
+  import { IDENTIFIER_ITEMS, PENDING_ITEMS } from "#lib/filterItems.js";
+  import { personExclusionLabels } from "#lib/labels.js";
 
   // `none` désigne les personnes retenues, comme dans le paramètre `exclusion` de l'API.
   const exclusionOptions: FacetOption[] = [

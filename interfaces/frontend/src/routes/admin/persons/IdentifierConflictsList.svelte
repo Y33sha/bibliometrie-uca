@@ -1,11 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { ApiError, persons as personsApi } from "$lib/api";
-  import { titleCase } from "$lib/utils";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import Pagination from "$lib/components/Pagination.svelte";
+  import { ApiError, persons as personsApi } from "#lib/api/index.js";
+  import { titleCase } from "#lib/utils.js";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import Pagination from "#lib/components/Pagination.svelte";
   import { confirmMerge } from "./confirmMerge";
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
 
   type Pair = components["schemas"]["IdentifierConflictPairOut"];
   type Person = components["schemas"]["CurationPersonOut"];

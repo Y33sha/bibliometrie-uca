@@ -1,13 +1,13 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { api, ApiError } from "$lib/api";
-  import type { components } from "$lib/api/schema";
-  import Drawer from "$lib/components/Drawer.svelte";
-  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
-  import SourceTag from "$lib/components/SourceTag.svelte";
-  import Tooltip from "$lib/components/Tooltip.svelte";
-  import { contributionRoleLabels } from "$lib/labels";
-  import { structsTooltip } from "$lib/structureLabels";
+  import { resolve } from "$app/paths";
+  import { api, ApiError } from "#lib/api/index.js";
+  import type { components } from "#lib/api/schema.js";
+  import Drawer from "#lib/components/Drawer.svelte";
+  import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import SourceTag from "#lib/components/SourceTag.svelte";
+  import Tooltip from "#lib/components/Tooltip.svelte";
+  import { contributionRoleLabels } from "#lib/labels.js";
+  import { structsTooltip } from "#lib/structureLabels.js";
   import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
@@ -45,7 +45,7 @@
     {#if data}
       <a
         class="drawer-title"
-        href="{base}/publications/{publicationId}"
+        href={resolve(`publications/${publicationId}`)}
         target="_blank"
         rel="noopener"
         title="Voir la fiche publique"
@@ -93,7 +93,7 @@
                 {:else if cell.link?.kind === "doi"}
                   <a href="https://doi.org/{cell.link.doi}" target="_blank" rel="noopener">{cell.text}</a>
                 {:else if cell.link}
-                  <a href="{base}/{cell.link.kind}/{cell.link.id}" target="_blank" rel="noopener">{cell.text}</a>
+                  <a href={resolve(cell.link.kind === "serials" ? `journals/${cell.link.id}` : `publishers/${cell.link.id}`)} target="_blank" rel="noopener">{cell.text}</a>
                 {:else if cell.title}
                   <PublicationTitle titre={cell.text} />
                 {:else}
@@ -126,7 +126,7 @@
                   <span class="author">
                     {#if s.person_id}
                       <a
-                        href="{base}/persons/{s.person_id}"
+                        href={resolve(`persons/${s.person_id}`)}
                         target="_blank"
                         rel="noopener"
                         class:in-perimeter={s.in_perimeter}>{s.full_name}</a

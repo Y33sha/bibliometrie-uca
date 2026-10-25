@@ -1,30 +1,30 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import { page } from '$app/stores';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
-	import { api, apiDetail } from '$lib/api';
-	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular } from '$lib/labels';
-	import TabNav from '$lib/components/TabNav.svelte';
-	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
-	import SerialsListView from '$lib/components/SerialsListView.svelte';
-	import MonographsListView from '$lib/components/MonographsListView.svelte';
-	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '$lib/components/charts/oaColors';
-	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
-	import type { components } from '$lib/api/schema';
+	import { api, apiDetail } from '#lib/api/index.js';
+	import { oaLabelsMap } from '#lib/labels.js';
+	import { docTypeSingular } from '#lib/labels.js';
+	import TabNav from '#lib/components/TabNav.svelte';
+	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import SerialsListView from '#lib/components/SerialsListView.svelte';
+	import MonographsListView from '#lib/components/MonographsListView.svelte';
+	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import { oaStatusColor } from '#lib/components/charts/oaColors.js';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import type { components } from '#lib/api/schema.js';
 
 	type PublisherDetail = components['schemas']['Publisher'];
 	type PublisherDashboard = components['schemas']['PublisherDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
-	const publisherId = $derived(Number($page.params.id));
+	const publisherId = $derived(Number(page.params.id));
 
 	const validTabs = ['dashboard', 'serials', 'monographs', 'publications'];
 	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab');
+			const t = page.url.searchParams.get('tab');
 			return t && validTabs.includes(t) ? t : 'dashboard';
 		})()
 	);

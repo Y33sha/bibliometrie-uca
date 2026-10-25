@@ -1,6 +1,7 @@
 import { goto } from '$app/navigation';
-import { base } from '$app/paths';
-import { paramsToQuery } from '$lib/utils';
+
+import { withBase } from '#lib/paths.js';
+import { paramsToQuery } from '#lib/utils.js';
 
 /**
  * Composable pour la synchronisation des filtres avec l'URL.
@@ -98,19 +99,19 @@ export function useUrlFilters(config: UrlFiltersConfig) {
 		}
 
 		const qs = paramsToQuery(p);
-		const targetPath =
-			base + (typeof config.basePath === 'function' ? config.basePath() : config.basePath);
+		const targetPath = withBase(
+			typeof config.basePath === 'function' ? config.basePath() : config.basePath
+		);
 		// Garde anti-navigation parasite : `syncUrl` est parfois appelé après un chargement async (cf. `onMount` des pages qui `await` puis `syncUrl()`). Si l'utilisateur a changé de route entre-temps, le `goto` ci-dessous — qui cible `basePath` en dur — le ramènerait sur cette page. On ne synchronise donc l'URL que si on est encore sur la page propriétaire.
 		if (typeof window !== 'undefined' && window.location.pathname !== targetPath) return;
-		// `goto({ replaceState: true })` plutôt que le `replaceState` bas niveau de `$app/navigation` : `replaceState` ne met pas correctement à jour l'entrée d'historique du navigateur, et au back, le navigateur ramène à l'URL d'origine (pré-modifications) tandis que le composant restauré depuis bfcache garde son `$state` JS d'avant la navigation — désynchro URL bar ↔ UI. `goto` synchronise history, store `$page` et bfcache. `noScroll` + `keepFocus` évitent les sauts quand on coche/décoche un filtre.
+		// `goto({ replaceState: true })` plutôt que le `replaceState` bas niveau de `$app/navigation` : `replaceState` ne met pas correctement à jour l'entrée d'historique du navigateur, et au back, le navigateur ramène à l'URL d'origine (pré-modifications) tandis que le composant restauré depuis bfcache garde son `$state` JS d'avant la navigation — désynchro URL bar ↔ UI. `goto` synchronise history, `page` et bfcache. `reset: false` garde défilement et focus quand on coche/décoche un filtre.
 		void goto(targetPath + (qs ? '?' + qs : ''), {
 			replaceState: true,
-			noScroll: true,
-			keepFocus: true,
+			reset: false,
 		});
 	}
 
-	function restoreFromUrl(urlParams: URLSearchParams): Record<string, unknown> {
+	function restoreFromUrl(urlParams: Pick<URLSearchParams, 'get'>): Record<string, unknown> {
 		const result: Record<string, unknown> = {};
 
 		for (const [key, def] of Object.entries(config.filters)) {

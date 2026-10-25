@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
   import PhaseRibbon from "./PhaseRibbon.svelte";
   import { CELL_COLOR, fmtDate, fmtDuration, STATUS_LABEL, type Status } from "./helpers";
   import { PHASE_VIEWS, type PhaseView, type TableColumn } from "./phase-views";

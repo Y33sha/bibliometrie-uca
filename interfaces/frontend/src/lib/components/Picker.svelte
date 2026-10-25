@@ -1,7 +1,7 @@
 <script lang="ts" generics="T">
   import type { Snippet } from "svelte";
-  import { autofocus } from "$lib/actions/focus";
-  import { anchored } from "$lib/actions/anchored";
+  import { autofocus } from "#lib/actions/focus.js";
+  import { anchored } from "#lib/actions/anchored.js";
 
   let {
     search = $bindable(),

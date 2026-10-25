@@ -1,26 +1,26 @@
 <script lang="ts">
-  import "$lib/styles/shared.css";
+  import "#lib/styles/shared.css";
   import "katex/dist/katex.min.css";
   import "@flaticon/flaticon-uicons/css/regular/rounded.css";
-  import { page } from "$app/stores";
+  import { page } from "$app/state";
   import { goto, afterNavigate } from "$app/navigation";
-  import { base } from "$app/paths";
+  import { asset, resolve } from "$app/paths";
   import type { Snippet } from "svelte";
-  import { auth } from "$lib/api";
-  import DialogHost from "$lib/components/DialogHost.svelte";
-  import { loadInstitution, siteTitle } from "$lib/institution.svelte";
-  import { loadSources } from "$lib/sources.svelte";
+  import { auth } from "#lib/api/index.js";
+  import DialogHost from "#lib/components/DialogHost.svelte";
+  import { loadInstitution, siteTitle } from "#lib/institution.svelte.js";
+  import { loadSources } from "#lib/sources.svelte.js";
 
   let { children }: { children: Snippet } = $props();
 
   loadInstitution();
   loadSources();
 
-  const isAdmin = $derived($page.url.pathname.startsWith(base + "/admin"));
-  const isPipeline = $derived($page.url.pathname === base + "/admin/pipeline" || $page.url.pathname === base + "/admin/config");
-  const isAddresses = $derived($page.url.pathname === base + "/admin/addresses" || $page.url.pathname === base + "/admin/feedback" || $page.url.pathname === base + "/admin/countries");
+  const isAdmin = $derived(isActive("/admin"));
+  const isPipeline = $derived(page.route.id === "/admin/pipeline" || page.route.id === "/admin/config");
+  const isAddresses = $derived(page.route.id === "/admin/addresses" || page.route.id === "/admin/feedback" || page.route.id === "/admin/countries");
   const isReferentiels = $derived(isActive("/admin/structures") || isActive("/admin/persons") || isActive("/admin/publications") || isActive("/admin/publishers") || isActive("/admin/serials") || isActive("/admin/monographs"));
-  const isHalProblems = $derived($page.url.pathname.startsWith(base + "/hal-problems"));
+  const isHalProblems = $derived(isActive("/hal-problems"));
   const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/monographs") || isActive("/subjects"));
 
   let mobileNavOpen = $state(false);
@@ -29,24 +29,24 @@
     mobileNavOpen = false;
   });
 
-  function isActive(path: string): boolean {
-    const current = $page.url.pathname;
-    const full = base + path;
-    if (current === full) return true;
-    if (path !== "/" && current.startsWith(full + "/")) return true;
+  // Compare l'identifiant de la route courante, sans le préfixe de déploiement.
+  function isActive(routeId: string): boolean {
+    const current = page.route.id ?? "";
+    if (current === routeId) return true;
+    if (routeId !== "/" && current.startsWith(routeId + "/")) return true;
     return false;
   }
 
   async function logout() {
     await auth.logout();
-    goto(base + "/login");
+    goto(resolve('login'));
   }
 </script>
 
 <div class="site-header" class:admin={isAdmin}>
   {#if isAdmin}
     <div class="site-brand">
-      <img src="{base}/connectome.png" alt="" class="site-icon" />
+      <img src={asset('connectome.png')} alt="" class="site-icon" />
       <h1 class="site-title">
         {siteTitle()} <span class="site-title-admin">Admin</span>
       </h1>
@@ -55,61 +55,61 @@
       <div class="nav-dropdown" role="navigation" class:active={isPipeline}>
         <button class="nav-link" class:active={isPipeline}>Pipeline &#x25BE;</button>
         <div class="nav-dropdown-menu">
-          <a href="{base}/admin/config" class:active={isActive("/admin/config")}>Config</a>
-          <a href="{base}/admin/pipeline" class:active={isActive("/admin/pipeline")}>Logs</a>
+          <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
+          <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isReferentiels}>
         <button class="nav-link" class:active={isReferentiels}>Référentiels &#x25BE;</button>
         <div class="nav-dropdown-menu">
-          <a href="{base}/admin/structures" class:active={isActive("/admin/structures")}>Structures</a>
-          <a href="{base}/admin/persons" class:active={isActive("/admin/persons")}>Personnes</a>
-          <a href="{base}/admin/publications" class:active={isActive("/admin/publications")}>Publications</a>
-          <a href="{base}/admin/publishers" class:active={isActive("/admin/publishers")}>Éditeurs</a>
-          <a href="{base}/admin/serials" class:active={isActive("/admin/serials")}>Publications en série</a>
-          <a href="{base}/admin/monographs" class:active={isActive("/admin/monographs")}>Monographies</a>
+          <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
+          <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
+          <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>
+          <a href={resolve('admin/publishers')} class:active={isActive("/admin/publishers")}>Éditeurs</a>
+          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>
+          <a href={resolve('admin/monographs')} class:active={isActive("/admin/monographs")}>Monographies</a>
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isAddresses}>
         <button class="nav-link" class:active={isAddresses}>Adresses &#x25BE;</button>
         <div class="nav-dropdown-menu">
-          <a href="{base}/admin/addresses" class:active={isActive("/admin/addresses")}>Affiliations</a>
-          <a href="{base}/admin/countries" class:active={isActive("/admin/countries")}>Pays</a>
+          <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
+          <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
         </div>
       </div>
-      <a href="{base}/stats" class="nav-link nav-switch-link">Public</a>
+      <a href={resolve('stats')} class="nav-link nav-switch-link">Public</a>
       <button class="nav-link nav-switch-link" onclick={logout}>Déconnexion</button>
     </nav>
   {:else}
     <div class="site-brand">
-      <img src="{base}/favicon.png" alt="" class="site-icon" />
+      <img src={asset('favicon.png')} alt="" class="site-icon" />
       <h1 class="site-title">{siteTitle()}</h1>
     </div>
     <nav class="site-nav" class:open={mobileNavOpen}>
-      <a href="{base}/stats" class="nav-link" class:active={isActive("/stats")}><i class="fi fi-rr-chart-histogram nav-icon" aria-hidden="true"></i>Stats</a>
-      <a href="{base}/publications" class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
-      <a href="{base}/laboratories" class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
-      <a href="{base}/persons" class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
+      <a href={resolve('stats')} class="nav-link" class:active={isActive("/stats")}><i class="fi fi-rr-chart-histogram nav-icon" aria-hidden="true"></i>Stats</a>
+      <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
+      <a href={resolve('laboratories')} class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
+      <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
       <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
         <button class="nav-link" class:active={isPublicReferentiels}>Référentiels &#x25BE;</button>
         <div class="nav-dropdown-menu">
-          <a href="{base}/theses" class:active={isActive("/theses")}>Thèses</a>
-          <a href="{base}/publishers" class:active={isActive("/publishers")}>Éditeurs</a>
-          <a href="{base}/journals" class:active={isActive("/journals")}>Revues</a>
-          <a href="{base}/monographs" class:active={isActive("/monographs")}>Monographies</a>
-          <a href="{base}/subjects" class:active={isActive("/subjects")}>Sujets</a>
+          <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
+          <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
+          <a href={resolve('journals')} class:active={isActive("/journals")}>Revues</a>
+          <a href={resolve('monographs')} class:active={isActive("/monographs")}>Monographies</a>
+          <a href={resolve('subjects')} class:active={isActive("/subjects")}>Sujets</a>
         </div>
       </div>
       <div class="nav-dropdown" role="navigation" class:active={isHalProblems}>
         <button class="nav-link" class:active={isHalProblems}>Problèmes HAL &#x25BE;</button>
         <div class="nav-dropdown-menu">
-          <a href="{base}/hal-problems/duplicate-accounts" class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
-          <a href="{base}/hal-problems/duplicate-publications" class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
-          <a href="{base}/hal-problems/missing-collections" class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
-          <a href="{base}/hal-problems/affiliation-conflicts" class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
+          <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
+          <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
+          <a href={resolve('hal-problems/missing-collections')} class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
+          <a href={resolve('hal-problems/affiliation-conflicts')} class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
         </div>
       </div>
-      <a href="{base}/admin/pipeline" class="nav-link nav-switch-link">Admin</a>
+      <a href={resolve('admin/pipeline')} class="nav-link nav-switch-link">Admin</a>
     </nav>
   {/if}
   <button class="nav-toggle" aria-label="Menu" aria-expanded={mobileNavOpen} onclick={() => (mobileNavOpen = !mobileNavOpen)}>&#9776;</button>
@@ -117,7 +117,7 @@
 
 <div class="container">
   <!-- Une page de détail se monte pour un identifiant : naviguer vers un autre identifiant de la même route la remonte, avec ses chargements au montage. -->
-  {#key $page.params.id}
+  {#key page.params.id}
     {@render children()}
   {/key}
 </div>

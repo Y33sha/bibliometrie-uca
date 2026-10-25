@@ -1,11 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { base } from "$app/paths";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import Pagination from "$lib/components/Pagination.svelte";
-  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
-  import SourceTag from "$lib/components/SourceTag.svelte";
-  import type { components } from "$lib/api/schema";
+  import { resolve } from "$app/paths";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import Pagination from "#lib/components/Pagination.svelte";
+  import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import SourceTag from "#lib/components/SourceTag.svelte";
+  import type { components } from "#lib/api/schema.js";
 
   type Suspect = components["schemas"]["SuspectMergeOut"];
 
@@ -54,7 +54,7 @@
           </button>
           <span class="meta">
             {item.doc_type}{#if item.publication_year} · {item.publication_year}{/if} ·
-            <a href="{base}/publications/{item.publication_id}" target="_blank" rel="noopener"
+            <a href={resolve(`publications/${item.publication_id}`)} target="_blank" rel="noopener"
               >listes d'auteurs</a
             >
           </span>

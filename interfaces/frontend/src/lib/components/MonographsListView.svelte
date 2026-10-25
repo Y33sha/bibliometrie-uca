@@ -1,17 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
-	import { autofocus } from '$lib/actions/focus';
-	import EntityFilter from '$lib/components/EntityFilter.svelte';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import type { components } from '$lib/api/schema';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
+	import { autofocus } from '#lib/actions/focus.js';
+	import EntityFilter from '#lib/components/EntityFilter.svelte';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 
 	type Monograph = components['schemas']['MonographListItem'];
 
@@ -137,7 +137,7 @@
 
 	onMount(() => {
 		if (urlSync) {
-			const restored = url.restoreFromUrl($page.url.searchParams);
+			const restored = url.restoreFromUrl(page.url.searchParams);
 			if (restored.selectedKinds) selectedKinds = restored.selectedKinds as string[];
 			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
@@ -202,18 +202,18 @@
 		<tbody>
 			{#each monographs.items as m (m.id)}
 				<tr>
-					<td><a href="{base}/monographs/{m.id}"><PublicationTitle titre={m.title} /></a></td>
+					<td><a href={resolve(`monographs/${m.id}`)}><PublicationTitle titre={m.title} /></a></td>
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
 					<td class="num">{m.year ?? ''}</td>
 					<td class="isbn">{[m.isbn, m.eisbn].filter(Boolean).join(' / ')}</td>
 					{#if !publisherFixed}
 						<td>
-							{#if m.publisher_id}<a href="{base}/publishers/{m.publisher_id}">{m.publisher_name}</a>{/if}
+							{#if m.publisher_id}<a href={resolve(`publishers/${m.publisher_id}`)}>{m.publisher_name}</a>{/if}
 						</td>
 					{/if}
 					{#if !serialFixed}
 						<td>
-							{#if m.serial_id}<a href="{base}/journals/{m.serial_id}">{m.journal_title}</a>{/if}
+							{#if m.serial_id}<a href={resolve(`journals/${m.serial_id}`)}>{m.journal_title}</a>{/if}
 						</td>
 					{/if}
 					<td class="num">{m.publication_count.toLocaleString('fr-FR')}</td>

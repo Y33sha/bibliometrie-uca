@@ -1,4 +1,4 @@
-import { base } from '$app/paths';
+import { withBase } from '#lib/paths.js';
 
 const controllers: Map<string, AbortController> = new Map();
 
@@ -45,7 +45,7 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 		const ctrl = new AbortController();
 		controllers.set(key, ctrl);
 		try {
-			const res = await fetch(base + url, { signal: ctrl.signal });
+			const res = await fetch(withBase(url), { signal: ctrl.signal });
 			if (!res.ok) throw new ApiError(res.status, await parseError(res));
 			return res.json();
 		} catch (e) {
@@ -57,7 +57,7 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
 			if (controllers.get(key) === ctrl) controllers.delete(key);
 		}
 	}
-	const res = await fetch(base + url);
+	const res = await fetch(withBase(url));
 	if (!res.ok) throw new ApiError(res.status, await parseError(res));
 	return res.json();
 }
@@ -68,7 +68,7 @@ export async function api<T>(url: string, opts?: { key?: string }): Promise<T> {
  * Usage : apiDetail('/api/serials/42'), depuis la page `/journals/42`.
  */
 export async function apiDetail<T>(url: string): Promise<T> {
-	const res = await fetch(base + url);
+	const res = await fetch(withBase(url));
 	if (!res.ok) throw new ApiError(res.status, await parseError(res));
 	if (res.redirected) {
 		const keptId = new URL(res.url).pathname.split('/').pop() ?? '';
@@ -107,7 +107,7 @@ async function mutate<T>(method: Method, url: string, body?: unknown): Promise<T
 		init.headers = { 'Content-Type': 'application/json' };
 		init.body = JSON.stringify(body);
 	}
-	const res = await fetch(base + url, init);
+	const res = await fetch(withBase(url), init);
 	if (!res.ok) throw new ApiError(res.status, await parseError(res));
 	if (res.status === 204 || res.headers.get('content-length') === '0') {
 		return null as T;

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import cloud from "d3-cloud";
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
 
   type SubjectFrequency = components["schemas"]["SubjectFrequency"];
 
@@ -98,7 +98,7 @@
     <svg {width} {height} viewBox="0 0 {width} {height}" preserveAspectRatio="xMidYMid meet">
       <g transform="translate({width / 2}, {height / 2})">
         {#each placedWords as w (w.id)}
-          <a href="{base}/subjects/{w.id}">
+          <a href={resolve(`subjects/${w.id}`)}>
             <text
               text-anchor="middle"
               font-family="system-ui, sans-serif"

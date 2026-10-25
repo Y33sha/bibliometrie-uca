@@ -1,5 +1,5 @@
-import { ApiError, serials as serialsApi } from '$lib/api';
-import { confirmDialog, toast } from '$lib/dialogs.svelte';
+import { ApiError, serials as serialsApi } from '#lib/api/index.js';
+import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 
 /**
  * Fusionne la revue `sourceId` dans `target` et rend `true` si la fusion a eu lieu.

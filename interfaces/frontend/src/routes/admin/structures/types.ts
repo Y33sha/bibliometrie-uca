@@ -1,10 +1,10 @@
 /**
  * Types et helpers partagés par la page `admin/structures` et ses sous-composants.
  *
- * Les types de réponses API proviennent du schéma OpenAPI généré (`$lib/api/schema.ts`) ; seuls les états d'UI locaux et helpers restent ici.
+ * Les types de réponses API proviennent du schéma OpenAPI généré (`#lib/api/schema.ts`) ; seuls les états d'UI locaux et helpers restent ici.
  */
 
-import type { components } from "$lib/api/schema";
+import type { components } from "#lib/api/schema.js";
 
 // ── Types API (générés) ──
 export type Structure = components["schemas"]["StructureOut"];

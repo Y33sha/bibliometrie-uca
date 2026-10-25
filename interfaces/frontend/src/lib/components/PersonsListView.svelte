@@ -1,16 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { autofocus } from '$lib/actions/focus';
-	import { page } from '$app/stores';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
-	import { IDENTIFIER_ITEMS } from '$lib/filterItems';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import PersonsTable from '$lib/components/PersonsTable.svelte';
-	import type { PersonRow } from '$lib/components/PersonsTable.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
+	import { autofocus } from '#lib/actions/focus.js';
+	import { page } from '$app/state';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
+	import { IDENTIFIER_ITEMS } from '#lib/filterItems.js';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import PersonsTable from '#lib/components/PersonsTable.svelte';
+	import type { PersonRow } from '#lib/components/PersonsTable.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 
 	type IdState = 'all' | 'yes' | 'no';
 
@@ -158,7 +158,7 @@
 
 	onMount(async () => {
 		if (urlSync) {
-			const restored = url.restoreFromUrl($page.url.searchParams);
+			const restored = url.restoreFromUrl(page.url.searchParams);
 			if (restored.selectedDepts) selectedDepts = restored.selectedDepts as string[];
 			if (restored.selectedRoles) selectedRoles = restored.selectedRoles as string[];
 			if (restored.idStates) idStates = restored.idStates as Record<string, IdState>;

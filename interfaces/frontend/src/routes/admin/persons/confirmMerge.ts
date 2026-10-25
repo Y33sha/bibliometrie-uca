@@ -1,6 +1,6 @@
-import { api } from "$lib/api";
-import { confirmDialog } from "$lib/dialogs.svelte";
-import { titleCase } from "$lib/utils";
+import { api } from "#lib/api/index.js";
+import { confirmDialog } from "#lib/dialogs.svelte.js";
+import { titleCase } from "#lib/utils.js";
 
 /**
  * Confirmation avant fusion de deux personnes. Signale le nombre de publications en tant qu'auteur réattribuées (celles de la personne absorbée, `sourceId`) et le caractère irréversible de l'action. Récupère le compte à jour depuis l'API pour rester exact quel que soit le point d'appel.

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Picker from "$lib/components/Picker.svelte";
+  import Picker from "#lib/components/Picker.svelte";
   import type { NameForm, Structure } from "./types";
   import { SHORT_FORM_MAX_LENGTH } from "./types";
 

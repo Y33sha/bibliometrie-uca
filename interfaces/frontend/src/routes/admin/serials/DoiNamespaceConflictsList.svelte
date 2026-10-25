@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { base } from '$app/paths';
-	import { api, ApiError } from '$lib/api';
-	import { confirmDialog, toast } from '$lib/dialogs.svelte';
-	import { sourceLabel } from '$lib/sources.svelte';
-	import type { components } from '$lib/api/schema';
+	import { resolve } from '$app/paths';
+	import { api, ApiError } from '#lib/api/index.js';
+	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+	import { sourceLabel } from '#lib/sources.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 	import { mergeSerial } from './mergeSerial';
 
 	type Response = components['schemas']['DoiNamespaceConflictsResponse'];
@@ -99,7 +99,7 @@
 				</tr>
 				{#each [[c.namespace_serial, c.record_serial], [c.record_serial, c.namespace_serial]] as [j, other] (j.id)}
 					<tr>
-						<td><a href="{base}/journals/{j.id}">{j.title}</a> <span class="muted">#{j.id}</span></td>
+						<td><a href={resolve(`journals/${j.id}`)}>{j.title}</a> <span class="muted">#{j.id}</span></td>
 						<td>{j.publisher_name ?? '—'}</td>
 						<td>{issns(j)}</td>
 						<td class="num">{j.publication_count}</td>

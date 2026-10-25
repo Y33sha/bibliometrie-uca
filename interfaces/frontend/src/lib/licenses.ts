@@ -1,5 +1,5 @@
-import { api } from '$lib/api';
-import type { components } from '$lib/api/schema';
+import { api } from '#lib/api/index.js';
+import type { components } from '#lib/api/schema.js';
 
 type EnumOption = components['schemas']['EnumOption'];
 

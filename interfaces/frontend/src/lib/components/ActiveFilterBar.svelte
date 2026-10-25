@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
-	import { entityLabel } from '$lib/entityLabels';
+	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
+	import { entityLabel } from '#lib/entityLabels.js';
 	import {
 		checkboxSummary,
 		isActive,
@@ -9,7 +9,7 @@
 		summarizeParts,
 		type FilterValues,
 		type ListFilter,
-	} from '$lib/filterRegistry';
+	} from '#lib/filterRegistry.js';
 
 	/** Barre des filtres actifs : une pastille par filtre, qui retire ce filtre, et un bouton qui les retire tous. Les valeurs fixées par la page n'y figurent pas. */
 	interface Props {

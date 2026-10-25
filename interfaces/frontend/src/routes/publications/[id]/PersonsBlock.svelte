@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
-  import { titleCase } from "$lib/utils";
+  import { titleCase } from "#lib/utils.js";
   import type { Contribution } from "./types";
 
   let { contributions }: { contributions: Contribution[] } = $props();
@@ -29,7 +29,7 @@
     <SectionLabel icon="person" text="Personnes liées" count={persons.length} />
     <div class="detail-tags">
       {#each persons as a (a.person_id)}
-        <a href="{base}/persons/{a.person_id}">
+        <a href={resolve(`persons/${a.person_id}`)}>
           {personName(a)}
           {#if a.has_rh}
             <svg

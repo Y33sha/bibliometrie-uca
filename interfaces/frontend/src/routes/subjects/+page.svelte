@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
+  import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
-  import { autofocus } from "$lib/actions/focus";
-  import { base } from "$app/paths";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import Pagination from "$lib/components/Pagination.svelte";
-  import type { components } from "$lib/api/schema";
+  import { autofocus } from "#lib/actions/focus.js";
+  import { resolve } from "$app/paths";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import Pagination from "#lib/components/Pagination.svelte";
+  import type { components } from "#lib/api/schema.js";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
 
@@ -90,7 +90,7 @@
           {#each list.items as s (s.id)}
             <tr>
               <td>
-                <a href="{base}/subjects/{s.id}">{s.label}</a>
+                <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
               </td>
               <td class="right">{s.usage_count.toLocaleString("fr-FR")}</td>
             </tr>

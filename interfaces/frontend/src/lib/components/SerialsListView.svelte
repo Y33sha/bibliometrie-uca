@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { autofocus } from '$lib/actions/focus';
+	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
 
-	import EntityFilter from '$lib/components/EntityFilter.svelte';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import type { components } from '$lib/api/schema';
+	import EntityFilter from '#lib/components/EntityFilter.svelte';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
 
@@ -173,7 +173,7 @@
 
 	onMount(async () => {
 		if (urlSync) {
-			const restored = url.restoreFromUrl($page.url.searchParams);
+			const restored = url.restoreFromUrl(page.url.searchParams);
 			if (restored.selectedPublisher) selectedPublisher = restored.selectedPublisher as string[];
 			if (restored.selectedSerialTypes) selectedSerialTypes = restored.selectedSerialTypes as string[];
 			if (restored.selectedOaModels) selectedOaModels = restored.selectedOaModels as string[];
@@ -251,7 +251,7 @@
 		{#each serials.items as j (j.id)}
 			<tr>
 				<td>
-					<a href="{base}/journals/{j.id}" class="journal-link">{j.title}</a>
+					<a href={resolve(`journals/${j.id}`)} class="journal-link">{j.title}</a>
 					{#if j.is_in_doaj}
 						{#if j.doaj_url}
 							<a class="badge-doaj" href={j.doaj_url} target="_blank" rel="noopener" title="Fiche DOAJ (nouvel onglet)">DOAJ</a>
@@ -264,7 +264,7 @@
 					<td class="muted">
 						{#if j.publisher_name}
 							{#if j.publisher_id}
-								<a href="{base}/publishers/{j.publisher_id}" class="publisher-link">{j.publisher_name}</a>
+								<a href={resolve(`publishers/${j.publisher_id}`)} class="publisher-link">{j.publisher_name}</a>
 							{:else}
 								{j.publisher_name}
 							{/if}

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import Modal from '$lib/components/Modal.svelte';
-	import { dialogs, resolveConfirm, dismissToast } from '$lib/dialogs.svelte';
+	import Modal from '#lib/components/Modal.svelte';
+	import { dialogs, resolveConfirm, dismissToast } from '#lib/dialogs.svelte.js';
 </script>
 
 {#if dialogs.confirmRequest}

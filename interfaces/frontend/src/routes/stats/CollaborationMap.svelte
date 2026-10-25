@@ -6,8 +6,8 @@
 	import world from 'world-atlas/countries-110m.json';
 	import iso from 'i18n-iso-countries';
 	import frLocale from 'i18n-iso-countries/langs/fr.json';
-	import { latestRequest } from '$lib/api';
-	import type { components } from '$lib/api/schema';
+	import { latestRequest } from '#lib/api/index.js';
+	import type { components } from '#lib/api/schema.js';
 
 	iso.registerLocale(frLocale);
 	Chart.register(ChoroplethController, GeoFeature, ColorScale, ProjectionScale);

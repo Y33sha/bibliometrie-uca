@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
+  import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
-  import { autofocus } from "$lib/actions/focus";
-  import { base } from "$app/paths";
+  import { autofocus } from "#lib/actions/focus.js";
+  import { resolve } from "$app/paths";
   import { goto } from "$app/navigation";
-  import { api, ApiError, latestRequest, structures as structuresApi } from "$lib/api";
-  import { toast } from "$lib/dialogs.svelte";
+  import { api, ApiError, latestRequest, structures as structuresApi } from "#lib/api/index.js";
+  import { toast } from "#lib/dialogs.svelte.js";
   import {
     API_SOURCES,
     ROR_FORMAT_ERROR,
@@ -14,8 +14,8 @@
     type StructureListItem,
     type Perimeter,
   } from "./types";
-  import { STRUCTURE_TYPES } from "$lib/structureTypes";
-  import { compareStructureLabels } from "$lib/structureLabels";
+  import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
+  import { compareStructureLabels } from "#lib/structureLabels.js";
   import StructureFormModal from "./StructureFormModal.svelte";
 
   let structures: StructureListItem[] = $state([]);
@@ -102,7 +102,7 @@
     try {
       const created = (await structuresApi.create(data)) as { id: number };
       createModalOpen = false;
-      goto(`${base}/admin/structures/${created.id}`);
+      goto(resolve(`admin/structures/${created.id}`));
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
       toast("Erreur: " + msg, "error");
@@ -148,7 +148,7 @@
       <a
         class="struct-item"
         class:orphan={s.perimeter_ids.length === 0}
-        href="{base}/admin/structures/{s.id}"
+        href={resolve(`admin/structures/${s.id}`)}
       >
         <span class="type-badge type-{s.type}">{s.type}</span>
         <span class="name">

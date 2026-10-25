@@ -1,9 +1,9 @@
 <script lang="ts">
-	import { base } from '$app/paths';
-	import { titleCase } from '$lib/utils';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import type { components, operations } from '$lib/api/schema';
+	import { asset, resolve } from '$app/paths';
+	import { titleCase } from '#lib/utils.js';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import type { components, operations } from '#lib/api/schema.js';
 
 	// Ligne servie par `/api/publications` (mode thèses) : le sous-ensemble de `PublicationListItem` que ce tableau consomme.
 	export type ThesisRow = Pick<
@@ -113,13 +113,13 @@
 				</td>
 				<td class="col-author">
 					{#if t.thesis_author_person_id}
-						<a href="{base}/persons/{t.thesis_author_person_id}">{titleCase(t.thesis_author_name)}</a>
+						<a href={resolve(`persons/${t.thesis_author_person_id}`)}>{titleCase(t.thesis_author_name)}</a>
 					{:else if t.thesis_author_name}
 						{titleCase(t.thesis_author_name)}
 					{/if}
 				</td>
 				<td class="col-title">
-					<a href="{base}/publications/{t.id}"><PublicationTitle titre={t.title} /></a>
+					<a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a>
 				</td>
 				<td class="col-status">
 					{#if t.doc_type === 'thesis'}
@@ -131,24 +131,24 @@
 				{#if showLabsColumn}
 					<td class="col-labs">
 						{#each t.lab_items || [] as lab}
-							<a href="{base}/laboratories/{lab.id}?tab=theses" class="lab-tag">{lab.label}</a>
+							<a href={resolve(`laboratories/${lab.id}?tab=theses`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>
 				{/if}
 				<td class="oa-lock-cell">
 					{#if t.doc_type === 'ongoing_thesis'}
 						<span class="oa-lock-badge oa-lock-ongoing">
-							<img src="{base}/hourglass.svg" alt="En cours" class="oa-lock" title="Thèse en cours" />
+							<img src={asset('hourglass.svg')} alt="En cours" class="oa-lock" title="Thèse en cours" />
 							<span class="oa-lock-label">en cours</span>
 						</span>
 					{:else if t.oa_status && !['unknown', 'closed'].includes(t.oa_status)}
 						<span class="oa-lock-badge oa-lock-open">
-							<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({t.oa_status})" />
+							<img src={asset('lock-open.svg')} alt="Open Access" class="oa-lock" title="Open Access ({t.oa_status})" />
 							<span class="oa-lock-label">ouvert</span>
 						</span>
 					{:else}
 						<span class="oa-lock-badge oa-lock-closed">
-							<img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
+							<img src={asset('lock-closed.svg')} alt="Closed" class="oa-lock" title="Accès fermé" />
 							<span class="oa-lock-label">fermé</span>
 						</span>
 					{/if}
@@ -162,7 +162,7 @@
 							class="source-tag source-hal"
 							title="HAL: {t.hal_id}"
 						>
-							<img src="{base}/icons/hal.ico" alt="HAL" />
+							<img src={asset('icons/hal.ico')} alt="HAL" />
 						</a>
 					{:else}
 						<span class="source-tag source-placeholder"></span>
@@ -175,7 +175,7 @@
 							class="source-tag source-openalex"
 							title="OpenAlex: {t.openalex_id}"
 						>
-							<img src="{base}/icons/openalex.png" alt="OA" />
+							<img src={asset('icons/openalex.png')} alt="OA" />
 						</a>
 					{:else}
 						<span class="source-tag source-placeholder"></span>
@@ -188,7 +188,7 @@
 							class="source-tag source-scanr"
 							title="ScanR: {t.scanr_id}"
 						>
-							<img src="{base}/scanr-icon.svg" alt="ScanR" />
+							<img src={asset('scanr-icon.svg')} alt="ScanR" />
 						</a>
 					{:else}
 						<span class="source-tag source-placeholder"></span>
@@ -201,7 +201,7 @@
 							class="source-tag source-theses"
 							title="theses.fr: {t.theses_id}"
 						>
-							<img src="{base}/icons/theses.ico" alt="theses.fr" />
+							<img src={asset('icons/theses.ico')} alt="theses.fr" />
 						</a>
 					{:else}
 						<span class="source-tag source-placeholder"></span>

@@ -12,7 +12,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import config from '../../svelte.config.js';
+import { csp } from '../../csp.js';
 
 /* Valeur attendue de chaque directive. Élargir l'une d'elles est un geste délibéré : cette
  * liste énonce ce que la page s'autorise.
@@ -32,7 +32,6 @@ const DIRECTIVES_ATTENDUES: Record<string, string[]> = {
 	'form-action': ['self']
 };
 
-const csp = config.kit?.csp;
 const directives = (csp?.directives ?? {}) as Record<string, string[]>;
 
 describe('politique de sécurité de contenu des pages', () => {

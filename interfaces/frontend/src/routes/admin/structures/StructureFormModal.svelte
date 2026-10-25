@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Modal from "$lib/components/Modal.svelte";
+  import Modal from "#lib/components/Modal.svelte";
   import { API_SOURCES, API_SOURCE_LABELS } from "./types";
-  import { STRUCTURE_TYPES } from "$lib/structureTypes";
+  import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
 
   let {
     editMode,

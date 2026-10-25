@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
+  import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
-  import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "$lib/api";
-  import { STRUCTURE_TYPES } from "$lib/structureTypes";
-  import { structureLabel } from "$lib/structureLabels";
-  import { confirmDialog, toast } from "$lib/dialogs.svelte";
-  import Modal from "$lib/components/Modal.svelte";
-  import Tooltip from "$lib/components/Tooltip.svelte";
-  import { autofocus } from "$lib/actions/focus";
-  import type { components } from "$lib/api/schema";
+  import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
+  import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
+  import { structureLabel } from "#lib/structureLabels.js";
+  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
+  import Modal from "#lib/components/Modal.svelte";
+  import Tooltip from "#lib/components/Tooltip.svelte";
+  import { autofocus } from "#lib/actions/focus.js";
+  import type { components } from "#lib/api/schema.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
 

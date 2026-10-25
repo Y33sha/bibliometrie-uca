@@ -1,24 +1,24 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { api, apiDetail, auth, contributions } from '$lib/api';
-	import { titleCase, formatDate } from '$lib/utils';
-	import { structureLabel } from '$lib/structureLabels';
-	import BarChart from '$lib/components/charts/BarChart.svelte';
-	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
-	import IdentifiersCell from '$lib/components/IdentifiersCell.svelte';
-	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
-	import TabNav from '$lib/components/TabNav.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import { confirmDialog } from '$lib/dialogs.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import type { components } from '$lib/api/schema';
+	import { api, apiDetail, auth, contributions } from '#lib/api/index.js';
+	import { titleCase, formatDate } from '#lib/utils.js';
+	import { structureLabel } from '#lib/structureLabels.js';
+	import BarChart from '#lib/components/charts/BarChart.svelte';
+	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import TabNav from '#lib/components/TabNav.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import { confirmDialog } from '#lib/dialogs.svelte.js';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 
-	const personId = $derived($page.params.id);
+	const personId = $derived(page.params.id);
 	let canGoBack = $state(false);
 
 	// --- Types ---
@@ -39,7 +39,7 @@
 
 	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab');
+			const t = page.url.searchParams.get('tab');
 			return t === 'publications' || t === 'theses' || t === 'addresses' ? t : 'dashboard';
 		})()
 	);
@@ -276,9 +276,9 @@
 						<tbody>
 							{#each section.theses as t (t.id)}
 								<tr>
-									<td>{#if t.author_person_id}<a href="{base}/persons/{t.author_person_id}">{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
-									<td><a href="{base}/publications/{t.id}"><PublicationTitle titre={t.title} /></a></td>
-									<td>{#each t.structure_ids as sid}<a href="{base}/laboratories/{sid}" class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
+									<td>{#if t.author_person_id}<a href={resolve(`persons/${t.author_person_id}`)}>{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
+									<td><a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a></td>
+									<td>{#each t.structure_ids as sid}<a href={resolve(`laboratories/${sid}`)} class="struct-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
 									<td>{t.publication_year ?? ''}</td>
 								</tr>
 							{/each}

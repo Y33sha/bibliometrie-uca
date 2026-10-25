@@ -1,5 +1,5 @@
 import { goto } from '$app/navigation';
-import { paramsToQuery } from '$lib/utils';
+import { paramsToQuery } from '#lib/utils.js';
 
 /** Page demandée au-delà de la dernière page : la liste a rétréci, par exemple après le traitement de sa dernière page. */
 export function isPageOutOfRange({ page, pages }: { page: number; pages: number }): boolean {
@@ -15,7 +15,6 @@ export function dropPageParam(key = 'page'): void {
 	const qs = paramsToQuery(params);
 	void goto(window.location.pathname + (qs ? '?' + qs : '') + window.location.hash, {
 		replaceState: true,
-		noScroll: true,
-		keepFocus: true,
+		reset: false,
 	});
 }

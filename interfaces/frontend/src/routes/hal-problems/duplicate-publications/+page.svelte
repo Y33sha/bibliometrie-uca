@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import { base } from '$app/paths';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { page as pageStore } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { docTypeSingular } from '$lib/labels';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { docTypeSingular } from '#lib/labels.js';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
 
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type DoiPair = components['schemas']['HalDoiDuplicatePair'];
 	type MetaPair = components['schemas']['HalMetaDuplicatePair'];
 
@@ -37,7 +37,7 @@
 		if (doi.page > 1) p.set('doi_page', String(doi.page));
 		if (meta.page > 1) p.set('meta_page', String(meta.page));
 		const qs = p.toString();
-		replaceState(`${base}/hal-problems/duplicate-publications` + (qs ? '?' + qs : ''), {});
+		replaceState(resolve('hal-problems/duplicate-publications') + (qs ? '?' + qs : ''), {});
 	}
 
 	function switchTab(tab: 'doi' | 'meta') {
@@ -49,7 +49,7 @@
 
 
 	onMount(() => {
-		const urlParams = new URLSearchParams($pageStore.url.search);
+		const urlParams = new URLSearchParams(page.url.search);
 		if (urlParams.get('tab')) activeTab = urlParams.get('tab') as 'doi' | 'meta';
 		if (urlParams.get('doi_page')) doi.page = parseInt(urlParams.get('doi_page')!) || 1;
 		if (urlParams.get('meta_page')) meta.page = parseInt(urlParams.get('meta_page')!) || 1;
@@ -93,7 +93,7 @@
 					<div class="publication-meta-line">
 						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
 						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
-						<a href="{base}/publications/{pair.publication.id}" class="publication-link"><PublicationTitle titre={pair.publication.title} /></a>
+						<a href={resolve(`publications/${pair.publication.id}`)} class="publication-link"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
@@ -130,7 +130,7 @@
 					<tr>
 						{#each [pair.publication_a, pair.publication_b] as pub}
 							<td>
-								<a href="{base}/publications/{pub.id}" class="publication-link"><PublicationTitle titre={pub.title} /></a>
+								<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
 								<div class="publication-meta-line">
 									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 									{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}

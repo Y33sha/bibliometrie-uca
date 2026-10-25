@@ -1,7 +1,7 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
-  import { docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "$lib/labels";
+  import { resolve } from "$app/paths";
+  import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import { docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
   import type { PubDetail, RelatedPublication } from "./types";
 
   const { pub, relations = [] }: { pub: PubDetail; relations?: RelatedPublication[] } = $props();
@@ -24,7 +24,7 @@
 
   // Lien vers l'œuvre liée : interne si elle est au corpus, sinon vers doi.org.
   function relHref(r: RelatedPublication): string {
-    return r.publication_id ? `${base}/publications/${r.publication_id}` : `https://doi.org/${r.doi}`;
+    return r.publication_id ? resolve(`publications/${r.publication_id}`) : `https://doi.org/${r.doi}`;
   }
 </script>
 
@@ -39,19 +39,19 @@
     <div class="publication-journal-line">
       <!-- Le livre ou le volume d'actes, puis sa collection ; sans monographie, la revue ou le titre brut du conteneur. -->
       {#if pub.monograph_id}
-        <a href="{base}/monographs/{pub.monograph_id}" class="journal-name"><PublicationTitle titre={pub.monograph_title} /></a>
+        <a href={resolve(`monographs/${pub.monograph_id}`)} class="journal-name"><PublicationTitle titre={pub.monograph_title} /></a>
         {#if pub.serial_id}
-          <a href="{base}/journals/{pub.serial_id}" class="collection-name">{pub.journal_title}</a>
+          <a href={resolve(`journals/${pub.serial_id}`)} class="collection-name">{pub.journal_title}</a>
         {/if}
       {:else if pub.serial_id}
-        <a href="{base}/journals/{pub.serial_id}" class="journal-name">{pub.journal_title || pub.container_title}</a>
+        <a href={resolve(`journals/${pub.serial_id}`)} class="journal-name">{pub.journal_title || pub.container_title}</a>
       {:else}
         <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
       {/if}
       {#if pub.publisher_name}
         <span class="publisher-sep">—</span>
         {#if pub.publisher_id}
-          <a href="{base}/publishers/{pub.publisher_id}" class="publisher-name">{pub.publisher_name}</a>
+          <a href={resolve(`publishers/${pub.publisher_id}`)} class="publisher-name">{pub.publisher_name}</a>
         {:else}
           <span class="publisher-name">{pub.publisher_name}</span>
         {/if}

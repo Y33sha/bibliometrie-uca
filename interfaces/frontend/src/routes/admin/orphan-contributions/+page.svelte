@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { institution } from '$lib/institution.svelte';
+	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { api, ApiError, orphanContributions } from '$lib/api';
-	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { titleCase } from '$lib/utils';
-	import { autofocus } from '$lib/actions/focus';
-	import { anchored } from '$lib/actions/anchored';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import Modal from '$lib/components/Modal.svelte';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
-	import type { components } from '$lib/api/schema';
+	import { api, ApiError, orphanContributions } from '#lib/api/index.js';
+	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { titleCase } from '#lib/utils.js';
+	import { autofocus } from '#lib/actions/focus.js';
+	import { anchored } from '#lib/actions/anchored.js';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import Modal from '#lib/components/Modal.svelte';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
+	import type { components } from '#lib/api/schema.js';
 
 	type PersonResult = components['schemas']['PersonSearchResult'];
 	type OrphanContribution = components['schemas']['OrphanContributionOut'];
@@ -213,7 +213,7 @@
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
 		const qs = p.toString();
-		replaceState(`${base}/admin/orphan-contributions` + (qs ? '?' + qs : ''), {});
+		replaceState(resolve('admin/orphan-contributions') + (qs ? '?' + qs : ''), {});
 	}
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
@@ -238,7 +238,7 @@
 
 <div class="header">
 	<h1>Contributions orphelines ({list.total})</h1>
-	<a href="{base}/admin/persons" class="btn">← Retour aux personnes</a>
+	<a href={resolve('admin/persons')} class="btn">← Retour aux personnes</a>
 </div>
 
 <div class="info-box">
@@ -310,13 +310,13 @@
 					</td>
 					<td>{o.full_name}</td>
 					<td>
-						<a href="{base}/publications/{o.publication_id}" class="publication-link">
+						<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
 							{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
 						</a>
 					</td>
 					<td>
 						{#each o.labs as lab (lab.id)}
-							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
+							<a href={resolve(`laboratories/${lab.id}`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>
 					<td>
@@ -393,7 +393,7 @@
 			<ul class="reject-list">
 				{#each rejectModal.pairs as p (p.publication_id)}
 					<li>
-						<a href="{base}/publications/{p.publication_id}" target="_blank" rel="noopener">
+						<a href={resolve(`publications/${p.publication_id}`)} target="_blank" rel="noopener">
 							Publication #{p.publication_id}
 						</a>
 						<span class="reject-muted">— rejetée le {new Date(p.rejected_at).toLocaleDateString('fr-FR')}</span>

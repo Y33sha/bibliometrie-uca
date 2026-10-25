@@ -1,21 +1,21 @@
 <script lang="ts">
-	import { institution, loadInstitution, pageTitle } from '$lib/institution.svelte';
+	import { institution, loadInstitution, pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
-	import { page } from '$app/stores';
+	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
-	import { addresses as addressesApi, api, ApiError, structures as structuresApi } from '$lib/api';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import { toast } from '$lib/dialogs.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { autofocus } from '$lib/actions/focus';
-	import { structureLabel } from '$lib/structureLabels';
-	import { groupStructuresByType, structureGroupLabel } from '$lib/structureTypes';
+	import { addresses as addressesApi, api, ApiError, structures as structuresApi } from '#lib/api/index.js';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import { toast } from '#lib/dialogs.svelte.js';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { autofocus } from '#lib/actions/focus.js';
+	import { structureLabel } from '#lib/structureLabels.js';
+	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
 
 	// ---- Type definitions ----
 
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type Stats = components['schemas']['AddressStatsResponse'];
 	type AddressStructure = components['schemas']['AddressStructureSummary'];
 	type Address = components['schemas']['AddressOut'];
@@ -67,7 +67,7 @@
 		p: number;
 		structureId: number | null;
 	} {
-		const sp = $page.url.searchParams;
+		const sp = page.url.searchParams;
 		return {
 			detected: sp.get('detected') || 'yes',
 			validation: sp.get('validation') || 'pending',
@@ -183,7 +183,7 @@
 
 	/** Résout la structure de scope : URL > localStorage (si valides) > défaut. Une seule assignation, pas de passage transitoire par le défaut. */
 	function resolveScopeStructure(): void {
-		const candidate = $page.url.searchParams.get('structure_id') ?? localStorage.getItem('admin_structure_id');
+		const candidate = page.url.searchParams.get('structure_id') ?? localStorage.getItem('admin_structure_id');
 		const id = candidate ? parseInt(candidate) : NaN;
 		const isScope = !isNaN(id) && scopeGroups.some(([, list]) => list.some((s) => s.id === id));
 		currentStructureId = isScope ? id : defaultStructureId();
@@ -433,7 +433,7 @@
 			<span class="stat-badge stat-rejected">Rejetées : {stats.rejected}</span>
 		</div>
 		{#if currentStructureId}
-			<a href="{base}/admin/feedback?structure_id={currentStructureId}" class="btn btn-sm feedback-btn">Qualité de la détection</a>
+			<a href={resolve(`admin/feedback?structure_id=${currentStructureId}`)} class="btn btn-sm feedback-btn">Qualité de la détection</a>
 		{/if}
 	</div>
 

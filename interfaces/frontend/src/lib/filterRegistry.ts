@@ -1,10 +1,10 @@
 /**
  * Registre des filtres d'une liste. Chaque filtre se déclare une fois ; le registre en dérive l'état initial, les paramètres de la requête, la synchronisation avec l'URL, la configuration des décomptes, les colonnes à afficher et la place du contrôle dans la page.
  */
-import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
-import type { FacetDef } from '$lib/composables/useFacets.svelte';
-import type { FilterDef as UrlFilterDef } from '$lib/composables/useUrlFilters.svelte';
-import type { EntityKind } from '$lib/entityLabels';
+import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
+import type { FacetDef } from '#lib/composables/useFacets.svelte.js';
+import type { FilterDef as UrlFilterDef } from '#lib/composables/useUrlFilters.svelte.js';
+import type { EntityKind } from '#lib/entityLabels.js';
 
 /** État d'un filtre de présence, par élément : `yes` retient les présents, `no` les absents. */
 export type PresenceStates = Record<string, 'all' | 'yes' | 'no'>;

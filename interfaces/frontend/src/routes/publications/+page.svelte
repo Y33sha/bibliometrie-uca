@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 </script>
 
 <svelte:head>

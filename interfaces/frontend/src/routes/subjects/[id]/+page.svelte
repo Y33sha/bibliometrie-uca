@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
-  import { page } from "$app/stores";
+  import { pageTitle } from "#lib/institution.svelte.js";
+  import { page } from "$app/state";
   import { goto } from "$app/navigation";
-  import { base } from "$app/paths";
-  import { latestRequest } from "$lib/api";
-  import type { components } from "$lib/api/schema";
+  import { resolve } from "$app/paths";
+  import { latestRequest } from "#lib/api/index.js";
+  import type { components } from "#lib/api/schema.js";
   import SubjectGraph from "./SubjectGraph.svelte";
-  import PublicationsListView from "$lib/components/PublicationsListView.svelte";
-  import TabNav from "$lib/components/TabNav.svelte";
+  import PublicationsListView from "#lib/components/PublicationsListView.svelte";
+  import TabNav from "#lib/components/TabNav.svelte";
 
   type SubjectDetailResponse = components["schemas"]["SubjectDetailResponse"];
 
-  const subjectId = $derived(Number($page.params.id));
+  const subjectId = $derived(Number(page.params.id));
 
   // Onglet actif synchronisé avec `?tab=...` (graphe par défaut). TabNav gère lui-même la lecture de l'URL et la navigation via goto.
   const activeTab = $derived(
-    $page.url.searchParams.get("tab") === "publications" ? "publications" : "graph",
+    page.url.searchParams.get("tab") === "publications" ? "publications" : "graph",
   );
 
   const NEIGHBORS_LIMIT = 20;
@@ -50,7 +50,7 @@
   });
 
   function onNeighborSelect(id: number) {
-    goto(`${base}/subjects/${id}`);
+    goto(resolve(`subjects/${id}`));
   }
 
 </script>
@@ -59,7 +59,7 @@
   <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
 </svelte:head>
 
-<a href="{base}/subjects" class="back">← Retour à la liste</a>
+<a href={resolve('subjects')} class="back">← Retour à la liste</a>
 
   {#if error}
     <div class="error">Sujet introuvable.</div>

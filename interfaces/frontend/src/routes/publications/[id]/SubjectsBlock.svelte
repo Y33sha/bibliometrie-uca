@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
   import type { Subject } from "./types";
 
@@ -16,7 +16,7 @@
     {#if subjects.length > 0}
       <div class="detail-tags">
         {#each subjects as s (s.id)}
-          <a href="{base}/subjects/{s.id}" title={tooltip(s)}>{s.label}</a>
+          <a href={resolve(`subjects/${s.id}`)} title={tooltip(s)}>{s.label}</a>
         {/each}
       </div>
     {/if}

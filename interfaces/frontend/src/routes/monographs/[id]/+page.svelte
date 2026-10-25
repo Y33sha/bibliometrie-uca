@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { apiDetail } from '$lib/api';
-	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import { titleText } from '$lib/utils';
-	import type { components } from '$lib/api/schema';
+	import { apiDetail } from '#lib/api/index.js';
+	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import { titleText } from '#lib/utils.js';
+	import type { components } from '#lib/api/schema.js';
 
 	type Monograph = components['schemas']['MonographListItem'];
 
-	const monographId = $derived(Number($page.params.id));
+	const monographId = $derived(Number(page.params.id));
 
 	let monograph = $state<Monograph | null>(null);
 	let error = $state(false);
@@ -63,11 +63,11 @@
 		<div class="meta-row">
 			{#if monograph.publisher_id}
 				<span class="meta-label">Éditeur</span>
-				<a href="{base}/publishers/{monograph.publisher_id}">{monograph.publisher_name}</a>
+				<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
 			{/if}
 			{#if monograph.serial_id}
 				<span class="meta-label">Collection</span>
-				<a href="{base}/journals/{monograph.serial_id}">{monograph.journal_title}</a>
+				<a href={resolve(`journals/${monograph.serial_id}`)}>{monograph.journal_title}</a>
 			{/if}
 		</div>
 	</div>
