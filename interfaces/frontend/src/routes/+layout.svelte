@@ -308,11 +308,11 @@
     font-weight: 600;
   }
 
-  /* Variante claire de la barre publique : fond blanc, rubrique active soulignée en teal. */
+  /* Variante claire de la barre publique : fond teal très clair, rubrique active soulignée en teal au bas de la barre. */
   .site-header.light {
-    background: var(--card);
+    background: var(--nav-light);
     color: var(--text);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, white);
   }
   .site-header.light .site-title {
     color: var(--accent);
@@ -321,20 +321,24 @@
   .site-header.light .nav-switch-link {
     color: var(--text-secondary);
   }
+  /* Rubriques sur toute la hauteur de la barre : le trait de la rubrique active touche son bord inférieur. */
+  .site-header.light .nav-link {
+    height: var(--header-height);
+    border-radius: 0;
+  }
   .site-header.light .nav-link:hover {
     color: var(--text);
-    background: var(--hover);
+    background: none;
   }
   .site-header.light .nav-link.active,
   .site-header.light .nav-dropdown.active > .nav-link {
     color: var(--accent);
     font-weight: 600;
     background: none;
-    border-radius: 0;
-    box-shadow: inset 0 -2px 0 var(--accent-mid);
+    box-shadow: inset 0 -3px 0 var(--accent-mid);
   }
   .site-header.light .nav-dropdown-menu {
-    background: var(--card);
+    background: var(--nav-light);
     border: 1px solid var(--border);
     border-top: none;
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
@@ -379,7 +383,7 @@
       background: var(--nav-admin);
     }
     .site-header.light .site-nav {
-      background: var(--card);
+      background: var(--nav-light);
       border-bottom: 1px solid var(--border);
     }
     .site-nav.open {
@@ -393,6 +397,9 @@
       width: 100%;
       padding: 11px 22px;
       border-radius: 0;
+    }
+    .site-header.light .nav-link {
+      height: auto;
     }
     .nav-dropdown {
       height: auto;
