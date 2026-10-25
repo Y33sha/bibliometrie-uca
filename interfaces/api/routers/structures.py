@@ -25,6 +25,7 @@ from application.ports.repositories.audit_repository import AuditRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.structures import commands as structure_commands
+from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
 from interfaces.api.deps import (
     audit_repo,
@@ -252,7 +253,7 @@ def get_structure_partners(
         structure_id,
         years=parse_int_csv(year, param="year"),
         countries=[c.lower() for c in parse_str_csv(country)],
-        types=parse_str_csv(type),
+        types=parse_vocabulary_csv(type, allowed=tuple(RorType), param="type"),
         page=page,
         per_page=per_page,
     )

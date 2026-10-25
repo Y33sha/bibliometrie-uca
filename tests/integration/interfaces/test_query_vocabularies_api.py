@@ -18,6 +18,11 @@ class TestValeurIntruse:
         r = client.get("/api/publications", params={"is_corresponding": "yes,peut-etre"})
         assert r.status_code == 422
 
+    def test_le_refus_vaut_pour_les_types_d_organisation_ror(self, client):
+        r = client.get("/api/structures/1/partners", params={"type": "laboratoire"})
+        assert r.status_code == 422
+        assert "laboratoire" in r.json()["detail"]
+
     def test_le_refus_vaut_pour_les_colonnes_d_export(self, client):
         assert (
             client.get(
