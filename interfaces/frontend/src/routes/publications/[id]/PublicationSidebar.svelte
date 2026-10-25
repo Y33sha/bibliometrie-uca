@@ -87,12 +87,27 @@
     </a>
   {/if}
 
-  {#if accessState}
+  {#if accessUrl && accessState}
     <div class="access-line">
-      <span class="access-state {accessState.cls}"><span class="access-dot"></span>{accessState.cls === "access-open" ? "Accès ouvert" : accessState.cls === "access-closed" ? "Accès fermé" : accessState.label}</span>
+      <span class="access-state" data-access={accessState.cls}><span class="access-dot"></span>Accès ouvert</span>
       {#if accessLicense}<span class="access-license">· {labels[accessLicense] ?? accessLicense}</span>{/if}
       {#if accessCopy || viaPublisher}
         <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
+      {/if}
+    </div>
+  {:else if !accessUrl && accessState}
+    <!-- Sans copie ouverte : un bloc du même format que le bouton, non cliquable. -->
+    <div class="access-btn access-unavailable">
+      {#if pub.oa_status === "embargoed"}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
+        </svg>
+        Sous embargo
+      {:else}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        Accès fermé
       {/if}
     </div>
   {/if}
@@ -225,9 +240,15 @@
     border-radius: var(--radius-pill);
     background: currentColor;
   }
-  .access-state.access-open { color: var(--open-text); }
-  .access-state.access-embargo { color: var(--warning-text); }
-  .access-state.access-closed { color: var(--closed); }
+  .access-state {
+    color: var(--open-text);
+  }
+  .access-unavailable {
+    background: var(--card);
+    color: var(--text-secondary);
+    font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--border);
+  }
   .access-via {
     color: var(--muted);
   }
