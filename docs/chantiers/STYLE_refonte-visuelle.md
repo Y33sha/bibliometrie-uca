@@ -28,7 +28,8 @@ Le modèle visuel de départ est la page d'administration « Configuration du pi
 - **Un style dupliqué entre composants est factorisé** dans `shared.css`, ou dans un module TypeScript commun pour les palettes de graphiques.
 - **Les graphiques lisent leurs couleurs dans les variables CSS**, par `cssColor()`.
 - **Palette open access agrégée** (ouvert, sous embargo, fermé, indéterminé) commune à toute l'application. Ouvert en vert, embargo en ambre, fermé en gris foncé, indéterminé en gris clair. Pas de rouge. Les voies (diamond, gold, hybrid, bronze, green) gardent leurs couleurs propres.
-- **Police Inter**, hébergée dans `static/fonts/` comme Ubuntu. Chiffres tabulaires (`font-variant-numeric: tabular-nums`) dans les tableaux et les chiffres clés.
+- **Police auto-hébergée** dans `static/fonts/` comme Ubuntu, désignée par `--font`. Chiffres tabulaires (`font-variant-numeric: tabular-nums`) sur toute la page.
+- **Filtres de liste sur deux niveaux** : le bouton de filtre porte le nombre de valeurs choisies, la barre « Filtres actifs » détaille ces valeurs avec une croix par filtre. On ajoute ou retire une valeur depuis le bouton sans supprimer le filtre.
 - **Un seul style de titre de section** : petites capitales par CSS (`text-transform: uppercase`), texte source en casse normale.
 - **Un seul rayon d'arrondi** (`--radius`), 999 px pour les pastilles.
 - **Un seul style d'onglets** pour `TabNav` et `HubTabs`.
@@ -52,7 +53,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ### Étape 1 — Fondations globales
 
-- [x] Héberger Inter dans `static/fonts/` et l'appliquer au `body` (`--font`)
+- [x] Héberger Inter et Source Sans 3 dans `static/fonts/` ; Source Sans 3 appliquée au `body` (`--font`)
 - [x] Chiffres tabulaires sur toute la page
 - [x] Passer `--accent` au teal foncé ; ajouter les nuances moyenne (`--accent-mid`) et claire ; fusionner `--section-heading` dans `--accent`
 - [x] Supprimer le bleu restant (boutons pleins, barres de graphiques, pagination active, liens)
@@ -76,7 +77,6 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Nombre de résultats en texte secondaire, sans encadré
 - [x] Action principale en bouton plein couleur d'accent, actions secondaires (« Export CSV », « Export PNG ») en boutons discrets
 - [x] Boutons de filtre sans bordure, fond au survol
-- [ ] Filtre actif en pastille couleur d'accent avec la valeur et une croix (« Années : 2020–2026 × », « Types : 6 sélectionnés × »), à la place des badges numérotés
 - [x] Menus déroulants natifs (page Statistiques) au style des boutons de filtre
 - [x] Pagination sans bordure, page active en couleur d'accent
 
@@ -100,7 +100,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [ ] Publications par année : barres teal, axe vertical à partir de 0, année en cours distinguée (barre claire et mention « en cours »)
 - [ ] Open access en barre empilée horizontale, pourcentage d'ouvert en grand
 - [ ] Graphiques sans carte ni bordure, sous un titre de section
-- [ ] Police Inter dans les graphiques (Chart.js, nuage de sujets)
+- [ ] Police `--font` dans les graphiques (Chart.js, nuage de sujets)
 
 ### Étape 6 — Page Statistiques
 
@@ -131,6 +131,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ## Questions ouvertes
 
+- Police : Source Sans 3 ou Inter, à trancher après essai sur d'autres écrans. La police écartée sera supprimée de `static/fonts/` et de `app.html`.
 - Compteurs dans les onglets d'entité (« Publications 1 849 »). Sans objet pour le dashboard, sans intérêt pour les adresses et les collaborations. Pour les autres onglets, reste à choisir entre le total de l'entité et le total filtré. `TabNav` accepte déjà un compteur.
 - Mode sombre, une fois toutes les couleurs en variables.
 
