@@ -148,13 +148,12 @@ Usages du type dans le code :
 - [x] Liste fermée des plateformes connues, dans le domaine (`domain/platforms/registry.py`) : serveurs de preprints et plateformes d'éditeurs. Une plateforme prend le type de la liste, à défaut entrepôt. Le bilan Science ouverte la lit (`b72bc40b1`).
 - [x] Préfixe DOI d'une plateforme d'éditeurs : ni son titulaire ni un enregistrement source qui le nomme ne donnent l'éditeur de la publication, qui vient des autres sources (`b72bc40b1`).
 - [x] Stock : oneshot `apply_known_platforms`, puis phase `publications`. 23 serveurs de preprints. Sur 4 834 publications à préfixe de plateforme d'éditeurs, 4 240 ont un éditeur, aucune la plateforme ; 584 articles de revue restent sans éditeur (OpenEdition 316, Cairn 238). « OpenEdition Journals » (109 publications) est une variante de nom d'OpenEdition, que la fusion de la phase 7 résout.
-- [ ] Éditeur d'une publication à préfixe de plateforme sans autre source : notice Sudoc de la revue, selon la question « Éditeur d'une revue d'après le Sudoc ».
 - [ ] Entrées de `journals` de type `repository` et `preprint_server` converties en plateformes.
 - [ ] Domaine → plateforme appris depuis les localisations OpenAlex, quand un usage le demande.
 
 ### Phase 4 — Lectures de l'éditeur
 
-- [ ] Éditeur d'une publication lu sur la publication : listes, détail, facettes, statistiques et compteurs `publication_count` des éditeurs passent par `journals.publisher_id` (36 occurrences dans 21 fichiers).
+- [x] Éditeur d'une publication lu sur la publication : listes, détail, facette, filtres, tableaux croisés, page d'un éditeur et `publishers.publication_count`. Les enregistrements sources montrent l'éditeur que nomme leur source (`137b396ae`).
 - [ ] Éditeur d'une revue calculé d'après ses publications les plus récentes ; suppression de `journals.publisher_id`.
 
 ### Phase 5 — Séries
