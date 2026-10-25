@@ -19,7 +19,6 @@ class SerialType(StrEnum):
     PROCEEDINGS = "proceedings"
     REPOSITORY = "repository"
     BOOK_SERIES = "book_series"
-    EBOOK_PLATFORM = "ebook_platform"
     PREPRINT_SERVER = "preprint_server"
     MEDIA = "media"
     UNKNOWN = "unknown"
@@ -34,7 +33,6 @@ SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.PROCEEDINGS: "Proceedings",
     SerialType.REPOSITORY: "Archive / dépôt",
     SerialType.BOOK_SERIES: "Série d'ouvrages",
-    SerialType.EBOOK_PLATFORM: "Plateforme eBooks",
     SerialType.PREPRINT_SERVER: "Serveur de preprints",
     SerialType.MEDIA: "Média",
     SerialType.UNKNOWN: "Inconnu",

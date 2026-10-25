@@ -648,7 +648,6 @@ class TestSerialTypes:
             "proceedings",
             "repository",
             "book_series",
-            "ebook_platform",
             "preprint_server",
             "media",
             "unknown",

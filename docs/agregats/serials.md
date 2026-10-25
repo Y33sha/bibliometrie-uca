@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-06.*
 
-Une publication en série (`serial`) est un support de publication : revue, collection d'ouvrages, plateforme de livres électroniques, recueil d'actes, serveur de preprints, dépôt, média. Près de deux revues sur cinq n'ont aucun ISSN, et autant portent plusieurs formes de leur titre selon la source qui les décrit ; `serial_name_forms` enregistre ces formes. `domain/serials/serial.py` définit sa structure ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
+Une publication en série (`serial`) est un support de publication : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, dépôt, média. Près de deux revues sur cinq n'ont aucun ISSN, et autant portent plusieurs formes de leur titre selon la source qui les décrit ; `serial_name_forms` enregistre ces formes. `domain/serials/serial.py` définit sa structure ; la résolution, la fusion et l'enrichissement vivent dans les services et leurs adaptateurs SQL.
 
 ## Tables
 

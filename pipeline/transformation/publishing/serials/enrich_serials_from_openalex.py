@@ -67,14 +67,13 @@ _OPENALEX_SOURCE_TYPE_MAP: dict[str, SerialType] = {
     "repository": SerialType.REPOSITORY,
     "conference": SerialType.PROCEEDINGS,
     "book series": SerialType.BOOK_SERIES,
-    "ebook platform": SerialType.EBOOK_PLATFORM,
 }
 
 
 def map_openalex_source_type(raw: str | None) -> SerialType | None:
     """Mappe le champ `type` d'une source OpenAlex vers l'enum `serial_type`, ou `None` pour les types sans signal exploitable (`metadata`, `other`) et les types inconnus.
 
-    `preprint_server` et `media` sont absents de la table (sans équivalent dans la taxonomie OpenAlex) et restent posés à la main.
+    `preprint_server` et `media` sont absents de la table (sans équivalent dans la taxonomie OpenAlex) et restent posés à la main. Une plateforme d'ebooks (`ebook platform`) n'est pas une série : son type est sans signal.
     """
     if not raw:
         return None
