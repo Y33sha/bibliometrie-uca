@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
+  import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
-  import { api } from "$lib/api";
-  import type { components } from "$lib/api/schema";
+  import { api } from "#lib/api/index.js";
+  import type { components } from "#lib/api/schema.js";
   import RunDetail from "./RunDetail.svelte";
   import RunList from "./RunList.svelte";
 

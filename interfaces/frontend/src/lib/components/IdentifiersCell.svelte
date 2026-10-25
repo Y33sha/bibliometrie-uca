@@ -1,6 +1,6 @@
 <script lang="ts">
 	import IdentifierLink from './IdentifierLink.svelte';
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 
 	type Identifier = components['schemas']['PersonIdentifierOut'];
 

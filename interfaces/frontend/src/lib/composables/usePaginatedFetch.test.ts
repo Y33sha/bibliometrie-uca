@@ -7,7 +7,7 @@ let apiResponse: Record<string, unknown> = {};
 // `(..._args: unknown[])` plutôt que `()` : permet à TS de typer `apiSpy.mock.calls[0][0]` lors des assertions.
 const apiSpy = vi.fn(async (..._args: unknown[]) => apiResponse);
 const cancelSpy = vi.fn((_key: string) => {});
-vi.mock('$lib/api', () => ({
+vi.mock('#lib/api/index.js', () => ({
 	api: (...args: unknown[]) => apiSpy(...args),
 	cancel: (key: string) => cancelSpy(key),
 }));

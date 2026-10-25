@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mocks SvelteKit : `goto` capture l'URL passée, base est un préfixe figé.
+// Mocks SvelteKit : `goto` capture l'URL passée, le préfixe de déploiement est figé.
 const gotoSpy = vi.fn();
 vi.mock('$app/navigation', () => ({
 	goto: (...args: unknown[]) => gotoSpy(...args),
 }));
-vi.mock('$app/paths', () => ({ base: '/bibliometrie' }));
+vi.mock('$app/paths', () => ({ resolve: (path: string) => '/bibliometrie/' + path }));
 
-// `syncUrl` appelle `goto(url, { replaceState, noScroll, keepFocus })`.
-const GOTO_OPTS = { replaceState: true, noScroll: true, keepFocus: true };
+// `syncUrl` appelle `goto(url, { replaceState, reset })`.
+const GOTO_OPTS = { replaceState: true, reset: false };
 
 // Import APRÈS les mocks pour qu'ils s'appliquent.
 const { useUrlFilters } = await import('./useUrlFilters.svelte');

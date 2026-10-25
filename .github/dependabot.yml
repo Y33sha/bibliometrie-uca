@@ -27,7 +27,12 @@ updates:
     open-pull-requests-limit: 10
     commit-message:
       prefix: "chore(deps)"
+    # Une dépendance va dans le premier groupe qui la désigne. SvelteKit et ses adaptateurs exigent
+    # chacun la version majeure de l'autre : proposées séparément, leurs majeures échouent toutes.
+    # Leur groupe précède donc celui des mineures et prend tous les types de montée.
     groups:
+      sveltekit:
+        patterns: ["@sveltejs/kit", "@sveltejs/adapter-*"]
       npm-mineures:
         patterns: ["*"]
         update-types: ["minor", "patch"]

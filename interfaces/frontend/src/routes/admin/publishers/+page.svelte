@@ -1,15 +1,15 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
+	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { base } from '$app/paths';
-	import { api, ApiError, publishers as publishersApi } from '$lib/api';
-	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
-	import PublishersListView from '$lib/components/PublishersListView.svelte';
-	import Modal from '$lib/components/Modal.svelte';
-	import Picker from '$lib/components/Picker.svelte';
-	import { toast } from '$lib/dialogs.svelte';
+	import { resolve } from '$app/paths';
+	import { api, ApiError, publishers as publishersApi } from '#lib/api/index.js';
+	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
+	import PublishersListView from '#lib/components/PublishersListView.svelte';
+	import Modal from '#lib/components/Modal.svelte';
+	import Picker from '#lib/components/Picker.svelte';
+	import { toast } from '#lib/dialogs.svelte.js';
 
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type Publisher = components['schemas']['PublisherListItem'];
 	type EnumOption = components['schemas']['EnumOption'];
 	type Country = components['schemas']['CountryOut'];
@@ -127,7 +127,7 @@
 		</div>
 		<p class="blocking-detail">{blockingDetail}</p>
 		<p class="muted">
-			Fusionner d'abord ces paires de publications en série dans l'<a href="{base}/admin/serials">administration des publications en série</a>,
+			Fusionner d'abord ces paires de publications en série dans l'<a href={resolve('admin/serials')}>administration des publications en série</a>,
 			puis relancer la fusion des éditeurs.
 		</p>
 		<table class="blocking-table">
@@ -142,13 +142,13 @@
 				{#each blockingSerials as bj (bj.target_serial_id + '_' + bj.source_serial_id)}
 					<tr>
 						<td>
-							<a href="{base}/journals/{bj.target_serial_id}" target="_blank" rel="noopener">
+							<a href={resolve(`journals/${bj.target_serial_id}`)} target="_blank" rel="noopener">
 								{bj.target_title}
 							</a>
 							<span class="muted">#{bj.target_serial_id}</span>
 						</td>
 						<td>
-							<a href="{base}/journals/{bj.source_serial_id}" target="_blank" rel="noopener">
+							<a href={resolve(`journals/${bj.source_serial_id}`)} target="_blank" rel="noopener">
 								{bj.source_title}
 							</a>
 							<span class="muted">#{bj.source_serial_id}</span>

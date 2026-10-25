@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
+  import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount, onDestroy } from "svelte";
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { goto } from "$app/navigation";
-  import { page } from "$app/stores";
-  import { api, ApiError, nameForms, structures as structuresApi } from "$lib/api";
-  import { rorFullUrl, rorShortId } from "$lib/utils";
-  import { confirmDialog, toast } from "$lib/dialogs.svelte";
+  import { page } from "$app/state";
+  import { api, ApiError, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { rorFullUrl, rorShortId } from "#lib/utils.js";
+  import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import {
     API_SOURCES,
     ROR_FORMAT_ERROR,
@@ -19,7 +19,7 @@
     type Structure,
     type StructureDetail,
   } from "../types";
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
   import RelationsSection from "../RelationsSection.svelte";
   import NameFormsSection from "../NameFormsSection.svelte";
   import EditFormModal from "../EditFormModal.svelte";
@@ -29,7 +29,7 @@
 
   /* ── State ── */
 
-  const id = $derived(parseInt($page.params.id ?? ""));
+  const id = $derived(parseInt(page.params.id ?? ""));
 
   let allStructuresCache: Structure[] = $state([]);
   let detail = $state<StructureDetail | null>(null);
@@ -176,7 +176,7 @@
   }
 
   function selectRelatedStructure(otherId: number) {
-    goto(`${base}/admin/structures/${otherId}`);
+    goto(resolve(`admin/structures/${otherId}`));
   }
 
   /* ── Forms ── */
@@ -325,7 +325,7 @@
     )
       return;
     await structuresApi.remove(id);
-    goto(`${base}/admin/structures`);
+    goto(resolve('admin/structures'));
   }
 
   /* ── Edit modal ── */
@@ -417,7 +417,7 @@
   <title>{pageTitle("Admin - Structure")}</title>
 </svelte:head>
 
-<p class="back-link"><a href="{base}/admin/structures">← Retour aux structures</a></p>
+<p class="back-link"><a href={resolve('admin/structures')}>← Retour aux structures</a></p>
 
 {#if !detail}
   <p class="loading">Chargement…</p>

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { anchored } from '$lib/actions/anchored';
+	import { anchored } from '#lib/actions/anchored.js';
 
 	type ToggleState = 'all' | 'yes' | 'no';
 

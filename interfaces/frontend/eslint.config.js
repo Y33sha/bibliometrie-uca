@@ -21,7 +21,7 @@ import tsParser from '@typescript-eslint/parser';
  */
 
 /* Fichiers où `{@html}` est admis, avec l'assainissement qui le justifie. Y ajouter un fichier
- * est un geste délibéré : la valeur insérée doit passer par `$lib/utils`. */
+ * est un geste délibéré : la valeur insérée doit passer par `#lib/utils.js`. */
 const RENDU_HTML_ASSAINI = [
 	// `sanitizeTitle` — titres de publication (formatage et MathML déposés par les sources).
 	'src/lib/components/PublicationTitle.svelte',

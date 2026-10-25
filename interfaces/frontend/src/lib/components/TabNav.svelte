@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { page } from '$app/stores';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 
 	export interface TabDef {
@@ -21,20 +21,20 @@
 
 	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab');
+			const t = page.url.searchParams.get('tab');
 			return t && tabs.some((tab) => tab.id === t) ? t : defaultTab;
 		})()
 	);
 
 	function switchTab(tab: string) {
 		if (tab === activeTab) return;
-		const url = new URL($page.url);
+		const url = new URL(page.url.href);
 		if (tab === defaultTab) {
 			url.searchParams.delete('tab');
 		} else {
 			url.searchParams.set('tab', tab);
 		}
-		const nav = goto(url.toString(), { replaceState: true, noScroll: true });
+		const nav = goto(url.toString(), { replaceState: true, reset: false });
 		if (afterNavigate) nav.then(afterNavigate);
 		onswitch?.(tab);
 	}

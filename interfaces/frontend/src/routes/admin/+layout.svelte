@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
-	import { auth } from '$lib/api';
+	import { auth } from '#lib/api/index.js';
 
 	let { children }: { children: Snippet } = $props();
 	let checked = $state(false);
@@ -12,11 +12,11 @@
 		try {
 			const data = await auth.check();
 			if (!data.authenticated) {
-				goto(base + '/login', { replaceState: true });
+				goto(resolve('login'), { replaceState: true });
 				return;
 			}
 		} catch {
-			goto(base + '/login', { replaceState: true });
+			goto(resolve('login'), { replaceState: true });
 			return;
 		}
 		checked = true;

@@ -10,7 +10,7 @@
 </script>
 
 <script lang="ts">
-	import { issnStatusLabels, issnSupportNames } from '$lib/labels';
+	import { issnStatusLabels, issnSupportNames } from '#lib/labels.js';
 
 	let { issns = $bindable() }: { issns: EditedIssn[] } = $props();
 

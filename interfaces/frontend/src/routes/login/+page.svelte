@@ -1,8 +1,8 @@
 <script lang="ts">
-	import { pageTitle, siteTitle } from '$lib/institution.svelte';
+	import { pageTitle, siteTitle } from '#lib/institution.svelte.js';
 	import { goto } from '$app/navigation';
-	import { base } from '$app/paths';
-	import { auth } from '$lib/api';
+	import { resolve } from '$app/paths';
+	import { auth } from '#lib/api/index.js';
 
 	let username = $state('');
 	let password = $state('');
@@ -15,7 +15,7 @@
 		loading = true;
 		try {
 			await auth.login(username, password);
-			goto(base + '/admin/addresses');
+			goto(resolve('admin/addresses'));
 		} catch (e) {
 			error = auth.loginErrorMessage(e);
 			loading = false;

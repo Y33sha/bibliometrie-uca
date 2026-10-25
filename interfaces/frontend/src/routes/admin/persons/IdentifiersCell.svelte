@@ -1,6 +1,6 @@
 <script lang="ts">
-  import IdentifierLink from "$lib/components/IdentifierLink.svelte";
-  import { autofocus } from "$lib/actions/focus";
+  import IdentifierLink from "#lib/components/IdentifierLink.svelte";
+  import { autofocus } from "#lib/actions/focus.js";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
 
   let {

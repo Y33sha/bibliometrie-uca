@@ -1,18 +1,18 @@
 <script lang="ts">
-	import { autofocus } from '$lib/actions/focus';
+	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { page } from '$app/state';
+	import { asset, resolve } from '$app/paths';
 	import type { Snippet } from 'svelte';
 
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { crossrefMemberIds, crossrefMemberUrl } from '$lib/sources.svelte';
-	import type { components } from '$lib/api/schema';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 
 	type Publisher = components['schemas']['PublisherListItem'];
 
@@ -148,7 +148,7 @@
 
 	onMount(async () => {
 		if (urlSync) {
-			const restored = url.restoreFromUrl($page.url.searchParams);
+			const restored = url.restoreFromUrl(page.url.searchParams);
 			if (restored.selectedPublisherTypes) selectedPublisherTypes = restored.selectedPublisherTypes as string[];
 			if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
 			if (restored.search) search = restored.search as string;
@@ -208,7 +208,7 @@
 		{#each publishers.items as p (p.id)}
 			<tr>
 				<td>
-					<a href="{base}/publishers/{p.id}" class="publisher-link">{p.name}</a>
+					<a href={resolve(`publishers/${p.id}`)} class="publisher-link">{p.name}</a>
 					{#each crossrefMemberIds(p.doi_prefixes) as member (member)}
 						<a
 							class="crossref-link"
@@ -217,7 +217,7 @@
 							rel="noopener"
 							title="Membre Crossref {member} (nouvel onglet)"
 						>
-							<img src="{base}/icons/crossref.ico" alt="Crossref" width="14" height="14" />
+							<img src={asset('icons/crossref.ico')} alt="Crossref" width="14" height="14" />
 						</a>
 					{/each}
 				</td>

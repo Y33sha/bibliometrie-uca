@@ -7,3 +7,11 @@ paths-ignore:
   - interfaces/frontend/.svelte-kit
   # Types engendrés depuis le schéma OpenAPI par `npm run types:gen`.
   - interfaces/frontend/src/lib/api/schema.ts
+
+query-filters:
+  # Les formatters de `infrastructure/observability/log.py` écrivent un record par ligne : le
+  # format JSON par sérialisation, le format texte en échappant les sauts de ligne du message.
+  # Une valeur journalisée ne peut donc pas forger une ligne de journal. L'analyse ne voit pas
+  # cette neutralisation, et signale chaque valeur venue d'une requête.
+  - exclude:
+      id: py/log-injection

@@ -1,5 +1,5 @@
-import { api, cancel } from '$lib/api';
-import { dropPageParam, isPageOutOfRange } from '$lib/pagination';
+import { api, cancel } from '#lib/api/index.js';
+import { dropPageParam, isPageOutOfRange } from '#lib/pagination.js';
 
 /**
  * Composable pour le chargement paginé de données.

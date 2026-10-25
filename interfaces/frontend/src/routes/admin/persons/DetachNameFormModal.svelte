@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import Modal from "$lib/components/Modal.svelte";
-  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
-  import { sourceLabel } from "$lib/sources.svelte";
+  import { resolve } from "$app/paths";
+  import Modal from "#lib/components/Modal.svelte";
+  import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import { sourceLabel } from "#lib/sources.svelte.js";
   import type { DetachModalState } from "./types";
 
   let {
@@ -75,7 +75,7 @@
               <span class="detach-year">{p.publication_year ?? "?"}</span>
               <a
                 class="detach-title"
-                href="{base}/publications/{p.publication_id}"
+                href={resolve(`publications/${p.publication_id}`)}
                 target="_blank"
                 rel="noopener"
               ><PublicationTitle titre={p.title} /></a>

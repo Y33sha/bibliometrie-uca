@@ -1,20 +1,20 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
+	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { replaceState } from '$app/navigation';
-	import { api, ApiError, serials as serialsApi } from '$lib/api';
-	import { useDebouncedSearch } from '$lib/composables/useDebouncedSearch.svelte';
-	import HubTabs from '$lib/components/HubTabs.svelte';
-	import SerialsListView from '$lib/components/SerialsListView.svelte';
+	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
+	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
+	import HubTabs from '#lib/components/HubTabs.svelte';
+	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import SerialDuplicatesList from './SerialDuplicatesList.svelte';
 	import LikelyProceedingsList from './LikelyProceedingsList.svelte';
 	import DoiNamespaceConflictsList from './DoiNamespaceConflictsList.svelte';
 	import { mergeSerial } from './mergeSerial';
-	import Modal from '$lib/components/Modal.svelte';
+	import Modal from '#lib/components/Modal.svelte';
 	import SerialIssnsEditor, { type EditedIssn } from './SerialIssnsEditor.svelte';
-	import Picker from '$lib/components/Picker.svelte';
-	import { confirmDialog, toast } from '$lib/dialogs.svelte';
-	import type { components } from '$lib/api/schema';
+	import Picker from '#lib/components/Picker.svelte';
+	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
 	type SerialDetail = components['schemas']['SerialDetailResponse'];

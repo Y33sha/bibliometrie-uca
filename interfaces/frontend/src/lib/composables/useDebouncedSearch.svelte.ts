@@ -22,7 +22,7 @@
  * `search` reçoit `request`, le flux de requêtes du composable (`latestRequest`) : chaque recherche annule la précédente encore en vol. Un compteur interne écarte en outre la réponse d'une recherche que `clear` ou une saisie trop courte a rendue caduque.
  */
 
-import { latestRequest } from '$lib/api';
+import { latestRequest } from '#lib/api/index.js';
 
 interface DebouncedSearchOptions<R> {
 	/** Fonction de recherche — retourne une promesse avec les résultats. Ses requêtes passent par `request` pour être annulées par la recherche suivante. */

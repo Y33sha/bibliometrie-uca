@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { CONTRIBUTION_ROLE_ORDER, contributionRoleLabels } from "$lib/labels";
+  import { resolve } from "$app/paths";
+  import { CONTRIBUTION_ROLE_ORDER, contributionRoleLabels } from "#lib/labels.js";
   import StructureTag from "./StructureTag.svelte";
   import { type StructInfo, type ThesisContribution, type ThesisMeta } from "./types";
 
@@ -28,7 +28,7 @@
         <dd>
           {#each people as p, i}
             {#if p.person_id}
-              <a href="{base}/persons/{p.person_id}">{p.full_name}</a>
+              <a href={resolve(`persons/${p.person_id}`)}>{p.full_name}</a>
             {:else}
               <span>{p.full_name}</span>
             {/if}

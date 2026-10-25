@@ -1,17 +1,17 @@
 <script lang="ts">
-	import { autofocus } from '$lib/actions/focus';
+	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import ThesesTable from '$lib/components/ThesesTable.svelte';
-	import type { PublicationSort, ThesisRow } from '$lib/components/ThesesTable.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { paramsToQuery } from '$lib/utils';
+	import { page } from '$app/state';
+	import { withBase } from '#lib/paths.js';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import ThesesTable from '#lib/components/ThesesTable.svelte';
+	import type { PublicationSort, ThesisRow } from '#lib/components/ThesesTable.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { paramsToQuery } from '#lib/utils.js';
 
 	// Vue-liste des thèses réutilisable. Utilisée par :
 	// - `/theses` (mode autonome avec sync URL)
@@ -153,12 +153,12 @@
 	}
 
 	function exportCsvUrl(): string {
-		return `${base}/api/publications/export-theses.csv?${paramsToQuery(buildFilterParams())}`;
+		return withBase(`/api/publications/export-theses.csv?${paramsToQuery(buildFilterParams())}`);
 	}
 
 	onMount(async () => {
 		if (urlSync) {
-			const restored = url.restoreFromUrl($page.url.searchParams);
+			const restored = url.restoreFromUrl(page.url.searchParams);
 			if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
 			if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
 			if (restored.selectedStatus) selectedStatus = restored.selectedStatus as string[];

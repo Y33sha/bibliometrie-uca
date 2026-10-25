@@ -1,27 +1,26 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { api } from '$lib/api';
-	import { rorShortId, rorFullUrl } from '$lib/utils';
-	import { structureLabel } from '$lib/structureLabels';
-	import BarChart from '$lib/components/charts/BarChart.svelte';
-	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
-	import PersonsListView from '$lib/components/PersonsListView.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import TabNav from '$lib/components/TabNav.svelte';
-	import ThesesListView from '$lib/components/ThesesListView.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
-	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
+	import { api } from '#lib/api/index.js';
+	import { rorShortId, rorFullUrl } from '#lib/utils.js';
+	import { structureLabel } from '#lib/structureLabels.js';
+	import BarChart from '#lib/components/charts/BarChart.svelte';
+	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import PersonsListView from '#lib/components/PersonsListView.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import TabNav from '#lib/components/TabNav.svelte';
+	import ThesesListView from '#lib/components/ThesesListView.svelte';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 
-	const labId = $derived($page.params.id);
+	const labId = $derived(page.params.id);
 	let canGoBack = $state(false);
 
 	// --- Types ---
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type Structure = components['schemas']['StructureOut'];
 	type RelatedStructure = components['schemas']['RelatedStructureOut'];
 	type LabProfile = components['schemas']['StructureDetailResponse'];
@@ -37,7 +36,7 @@
 	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'addresses'];
 	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab');
+			const t = page.url.searchParams.get('tab');
 			return t && validTabs.includes(t) ? t : 'dashboard';
 		})()
 	);
@@ -121,7 +120,7 @@
 		canGoBack = ((window as any).navigation?.canGoBack ?? document.referrer.startsWith(window.location.origin));
 
 		// Restore cross-tab state from URL (les filtres publications sont restaurés par PublicationsListView lui-même).
-		const restored = url.restoreFromUrl($page.url.searchParams);
+		const restored = url.restoreFromUrl(page.url.searchParams);
 		if (restored.addrPage) addresses.page = restored.addrPage as number;
 
 		try {

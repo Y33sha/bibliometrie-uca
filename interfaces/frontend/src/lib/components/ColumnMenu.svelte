@@ -1,6 +1,6 @@
 <script lang="ts">
-	import type { ColumnDef } from '$lib/composables/useColumnVisibility.svelte';
-	import { anchored } from '$lib/actions/anchored';
+	import type { ColumnDef } from '#lib/composables/useColumnVisibility.svelte.js';
+	import { anchored } from '#lib/actions/anchored.js';
 
 	interface Props {
 		columns: ColumnDef[];

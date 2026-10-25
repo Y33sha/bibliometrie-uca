@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
-  import { base } from "$app/paths";
+  import { pageTitle } from "#lib/institution.svelte.js";
+  import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { page as pageStore } from "$app/stores";
+  import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import { halPersonUrl, titleCase } from "$lib/utils";
-  import Pagination from "$lib/components/Pagination.svelte";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { halPersonUrl, titleCase } from "#lib/utils.js";
+  import Pagination from "#lib/components/Pagination.svelte";
 
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
   type PersonRow = components["schemas"]["HalDuplicateAccountPerson"];
 
   const list = usePaginatedFetch<PersonRow>({
@@ -22,11 +22,11 @@
     const p = new URLSearchParams();
     if (list.page > 1) p.set("page", String(list.page));
     const qs = p.toString();
-    replaceState(`${base}/hal-problems/duplicate-accounts` + (qs ? "?" + qs : ""), {});
+    replaceState(resolve('hal-problems/duplicate-accounts') + (qs ? "?" + qs : ""), {});
   }
 
   onMount(() => {
-    const urlParams = new URLSearchParams($pageStore.url.search);
+    const urlParams = new URLSearchParams(page.url.search);
     if (urlParams.get("page")) list.page = parseInt(urlParams.get("page")!) || 1;
     list.load();
   });
@@ -60,7 +60,7 @@
       {#each list.items as p}
         <tr>
           <td>
-            <a href="{base}/persons/{p.person_id}" class="person-link">
+            <a href={resolve(`persons/${p.person_id}`)} class="person-link">
               {titleCase(p.first_name)}
               {titleCase(p.last_name)}
             </a>

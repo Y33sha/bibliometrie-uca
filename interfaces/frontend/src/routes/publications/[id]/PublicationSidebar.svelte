@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import SourceTag from "$lib/components/SourceTag.svelte";
-  import { accessTag } from "$lib/labels";
-  import { licenseLabels } from "$lib/licenses";
-  import { sourceLabel, sourceOrder } from "$lib/sources.svelte";
+  import { asset } from "$app/paths";
+  import SourceTag from "#lib/components/SourceTag.svelte";
+  import { accessTag } from "#lib/labels.js";
+  import { licenseLabels } from "#lib/licenses.js";
+  import { sourceLabel, sourceOrder } from "#lib/sources.svelte.js";
   import type { ExternalId, PubDetail, Source } from "./types";
 
   const {
@@ -14,18 +14,18 @@
 
   // NCBI sert un favicon unique pour PubMed et PMC : on les distingue par la valeur, pas le logo.
   const EXT_META: Record<string, { label: string; icon: string; url: (v: string) => string }> = {
-    arxiv: { label: "arXiv", icon: `${base}/icons/arxiv.png`, url: (v) => `https://arxiv.org/abs/${v}` },
+    arxiv: { label: "arXiv", icon: asset('icons/arxiv.png'), url: (v) => `https://arxiv.org/abs/${v}` },
     pmid: {
       label: "PubMed",
-      icon: `${base}/icons/ncbi.png`,
+      icon: asset('icons/ncbi.png'),
       url: (v) => `https://pubmed.ncbi.nlm.nih.gov/${v}`,
     },
     pmcid: {
       label: "PMC",
-      icon: `${base}/icons/ncbi.png`,
+      icon: asset('icons/ncbi.png'),
       url: (v) => `https://www.ncbi.nlm.nih.gov/pmc/articles/${v}/`,
     },
-    nnt: { label: "Thèses.fr", icon: `${base}/icons/theses.ico`, url: (v) => `https://theses.fr/${v}` },
+    nnt: { label: "Thèses.fr", icon: asset('icons/theses.ico'), url: (v) => `https://theses.fr/${v}` },
   };
 
   const orderedSources = $derived([

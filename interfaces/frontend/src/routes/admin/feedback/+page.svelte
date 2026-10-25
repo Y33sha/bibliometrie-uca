@@ -1,21 +1,21 @@
 <script lang="ts">
-  import { pageTitle } from '$lib/institution.svelte';
+  import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
-  import { api, nameForms, structures as structuresApi } from "$lib/api";
-  import { deriveStructDetectionStatus } from "$lib/utils";
-  import { structureLabel } from "$lib/structureLabels";
-  import { groupStructuresByType, structureGroupLabel } from "$lib/structureTypes";
-  import { structDetectionClasses, structDetectionLabels } from "$lib/labels";
-  import Pagination from "$lib/components/Pagination.svelte";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import { autofocus } from "$lib/actions/focus";
-  import { confirmDialog, toast } from '$lib/dialogs.svelte';
+  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { deriveStructDetectionStatus } from "#lib/utils.js";
+  import { structureLabel } from "#lib/structureLabels.js";
+  import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
+  import { structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
+  import Pagination from "#lib/components/Pagination.svelte";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { autofocus } from "#lib/actions/focus.js";
+  import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 
   // ---------- Types ----------
 
-  import type { components } from "$lib/api/schema";
+  import type { components } from "#lib/api/schema.js";
   type FeedbackStats = components["schemas"]["FeedbackStats"];
   type AddressStructure = components["schemas"]["AddressStructureSummary"];
   type MatchedForm = components["schemas"]["FeedbackMatchedForm"];
@@ -252,7 +252,7 @@
 <svelte:window onclick={handleOutsideClick} />
 
 <div class="page-feedback">
-  <p class="back-link"><a href="{base}/admin/addresses{currentStructureId ? '?structure_id=' + currentStructureId : ''}">← Affiliations des adresses</a></p>
+  <p class="back-link"><a href={resolve(currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : 'admin/addresses')}>← Affiliations des adresses</a></p>
   <h2>Qualité de la détection</h2>
 
   <!-- Stats row -->

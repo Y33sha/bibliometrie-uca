@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { pageTitle } from "$lib/institution.svelte";
-  import { page } from "$app/stores";
+  import { pageTitle } from "#lib/institution.svelte.js";
+  import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { apiDetail } from "$lib/api";
-  import { titleText } from "$lib/utils";
-  import PublicationAbstract from "$lib/components/PublicationAbstract.svelte";
+  import { apiDetail } from "#lib/api/index.js";
+  import { titleText } from "#lib/utils.js";
+  import PublicationAbstract from "#lib/components/PublicationAbstract.svelte";
   import type { PubResponse } from "./types";
   import PublicationHeader from "./PublicationHeader.svelte";
   import PublicationSidebar from "./PublicationSidebar.svelte";
@@ -13,7 +13,7 @@
   import PersonsBlock from "./PersonsBlock.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
 
-  const publicationId = $derived($page.params.id);
+  const publicationId = $derived(page.params.id);
   let canGoBack = $state(false);
 
   let data = $state<PubResponse | null>(null);

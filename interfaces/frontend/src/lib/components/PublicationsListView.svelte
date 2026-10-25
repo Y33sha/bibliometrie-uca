@@ -1,15 +1,16 @@
 <script lang="ts">
-	import { institution } from '$lib/institution.svelte';
+	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { autofocus } from '$lib/actions/focus';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import FacetDropdown from '$lib/components/FacetDropdown.svelte';
-	import EntityFilter from '$lib/components/EntityFilter.svelte';
-	import PresenceFilterToggle from '$lib/components/PresenceFilterToggle.svelte';
-	import ActiveFilterBar from '$lib/components/ActiveFilterBar.svelte';
-	import { SOURCE_ITEMS } from '$lib/filterItems';
+	import { autofocus } from '#lib/actions/focus.js';
+	import { page } from '$app/state';
+	import { asset, resolve } from '$app/paths';
+	import { withBase } from '#lib/paths.js';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import EntityFilter from '#lib/components/EntityFilter.svelte';
+	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
+	import { SOURCE_ITEMS } from '#lib/filterItems.js';
 	import {
 		activeColumns,
 		appendFilterParams,
@@ -26,10 +27,10 @@
 		type CheckboxFilter,
 		type EntityChoiceFilter,
 		type ListFilter,
-	} from '$lib/filterRegistry';
-	import Pagination from '$lib/components/Pagination.svelte';
-	import { oaLabelsMap } from '$lib/labels';
-	import { licenseLabels } from '$lib/licenses';
+	} from '#lib/filterRegistry.js';
+	import Pagination from '#lib/components/Pagination.svelte';
+	import { oaLabelsMap } from '#lib/labels.js';
+	import { licenseLabels } from '#lib/licenses.js';
 	import {
 		docTypeSingular,
 		docTypePlural,
@@ -37,16 +38,16 @@
 		publicationsDocTypes,
 		docTypeFilterToken,
 		docTypeFilterFromToken,
-	} from '$lib/labels';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import TableStatusRow from '$lib/components/TableStatusRow.svelte';
-	import { useFacets } from '$lib/composables/useFacets.svelte';
-	import { useUrlFilters } from '$lib/composables/useUrlFilters.svelte';
-	import { useColumnVisibility } from '$lib/composables/useColumnVisibility.svelte';
-	import ColumnMenu from '$lib/components/ColumnMenu.svelte';
-	import { paramsToQuery } from '$lib/utils';
+	} from '#lib/labels.js';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
+	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
+	import { paramsToQuery } from '#lib/utils.js';
 
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type Publication = components['schemas']['PublicationListItem'] & {
 		// Champs présents quand l'API est appelée avec `person_id` (cf. routes /api/publications côté backend qui enrichit la réponse). Optionnels car non garantis hors contexte personne.
 		is_corresponding?: boolean | null;
@@ -386,7 +387,7 @@
 		if (publisherId) p.set('publisher_id', publisherId);
 		const serialId = fixedId(externalFilters?.serialId) ?? entity.serial.join(',');
 		if (serialId) p.set('serial_id', serialId);
-		return base + '/stats?' + paramsToQuery(p);
+		return resolve('stats') + '?' + paramsToQuery(p);
 	});
 
 	// Sort display
@@ -522,7 +523,7 @@
 		if (q) params.set('search', q);
 		// Colonnes visibles → le CSV reflète le tableau affiché.
 		params.set('columns', cv.visibleColumns.join(','));
-		return `${base}/api/publications/export.csv?${paramsToQuery(params)}`;
+		return withBase(`/api/publications/export.csv?${paramsToQuery(params)}`);
 	}
 
 	async function onExcludeClick(p: Publication) {
@@ -544,7 +545,7 @@
 			.then((labels) => (licenseNames = labels))
 			.catch(() => {});
 		if (urlSync) {
-			const restored = url.restoreFromUrl($page.url.searchParams);
+			const restored = url.restoreFromUrl(page.url.searchParams);
 			restoreValues(FILTERS, restored, values);
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
@@ -552,7 +553,7 @@
 		}
 
 		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous » l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
-		if (restrictToPublications && !(urlSync && $page.url.searchParams.has('doc_type'))) {
+		if (restrictToPublications && !(urlSync && page.url.searchParams.has('doc_type'))) {
 			values.checkbox.docTypes = [...publicationsDocTypes];
 		}
 
@@ -663,24 +664,24 @@
 						<span class="type-label">{docTypeSingular[p.doc_type || ''] || p.doc_type || ''}</span>
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
-					<td><a href="{base}/publications/{p.id}" class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
+					<td><a href={resolve(`publications/${p.id}`)} class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
 					{#if col('serial')}<td class="journal-cell publication-col-journal">
 						{#if p.serial_id}
-							<a href="{base}/journals/{p.serial_id}">{p.serial}</a>
+							<a href={resolve(`journals/${p.serial_id}`)}>{p.serial}</a>
 						{:else}
 							{p.serial || ''}
 						{/if}
 					</td>{/if}
 					{#if col('publisher')}<td class="journal-cell publication-col-journal">
 						{#if p.publisher_id}
-							<a href="{base}/publishers/{p.publisher_id}">{p.publisher}</a>
+							<a href={resolve(`publishers/${p.publisher_id}`)}>{p.publisher}</a>
 						{:else}
 							{p.publisher || ''}
 						{/if}
 					</td>{/if}
 					{#if !hasFixedLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
-							<a href="{base}/laboratories/{lab.id}" class="lab-tag">{lab.label}</a>
+							<a href={resolve(`laboratories/${lab.id}`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>{/if}
 					{#if showCorrespondingColumn && col('corr')}<td class="corr-cell">
@@ -705,17 +706,17 @@
 					{#if col('oa')}<td class="oa-lock-cell">
 						{#if p.oa_status === 'embargoed'}
 							<span class="oa-lock-badge oa-lock-embargo">
-								<img src="{base}/hourglass.svg" alt="Sous embargo" class="oa-lock" title="Sous embargo : dépôt existant, accès différé" />
+								<img src={asset('hourglass.svg')} alt="Sous embargo" class="oa-lock" title="Sous embargo : dépôt existant, accès différé" />
 								<span class="oa-lock-label">embargo</span>
 							</span>
 						{:else if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
 							<span class="oa-lock-badge oa-lock-open">
-								<img src="{base}/lock-open.svg" alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
+								<img src={asset('lock-open.svg')} alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
 								<span class="oa-lock-label">ouvert</span>
 							</span>
 						{:else}
 							<span class="oa-lock-badge oa-lock-closed">
-								<img src="{base}/lock-closed.svg" alt="Closed" class="oa-lock" title="Accès fermé" />
+								<img src={asset('lock-closed.svg')} alt="Closed" class="oa-lock" title="Accès fermé" />
 								<span class="oa-lock-label">fermé</span>
 							</span>
 						{/if}
@@ -734,28 +735,28 @@
 					<td class="links-cell">
 						{#if p.hal_id}
 							<a href={p.record_urls.hal} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
-								<img src="{base}/icons/hal.ico" alt="HAL" />
+								<img src={asset('icons/hal.ico')} alt="HAL" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.openalex_id}
 							<a href={p.record_urls.openalex} target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
-								<img src="{base}/icons/openalex.png" alt="OA" />
+								<img src={asset('icons/openalex.png')} alt="OA" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.scanr_id}
 							<a href={p.record_urls.scanr} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
-								<img src="{base}/scanr-icon.svg" alt="ScanR" />
+								<img src={asset('scanr-icon.svg')} alt="ScanR" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 						{#if p.wos_id}
 							<a href={p.record_urls.wos} target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
-								<img src="{base}/icons/wos.ico" alt="WoS" />
+								<img src={asset('icons/wos.ico')} alt="WoS" />
 							</a>
 						{:else}
 							<span class="source-tag source-placeholder"></span>

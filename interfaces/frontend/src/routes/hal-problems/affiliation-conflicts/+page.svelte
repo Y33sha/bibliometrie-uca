@@ -1,16 +1,16 @@
 <script lang="ts">
-	import { institution, pageTitle } from '$lib/institution.svelte';
-	import { base } from '$app/paths';
+	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
-	import { page as pageStore } from '$app/stores';
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
-	import { usePaginatedFetch } from '$lib/composables/usePaginatedFetch.svelte';
-	import { docTypeSingular } from '$lib/labels';
-	import { structureLabel } from '$lib/structureLabels';
-	import PublicationTitle from '$lib/components/PublicationTitle.svelte';
-	import Pagination from '$lib/components/Pagination.svelte';
+	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
+	import { docTypeSingular } from '#lib/labels.js';
+	import { structureLabel } from '#lib/structureLabels.js';
+	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import Pagination from '#lib/components/Pagination.svelte';
 
-	import type { components } from '$lib/api/schema';
+	import type { components } from '#lib/api/schema.js';
 	type Pub = components['schemas']['HalAffiliationConflictPublication'];
 
 	const list = usePaginatedFetch<Pub>({
@@ -24,12 +24,12 @@
 		const p = new URLSearchParams();
 		if (list.page > 1) p.set('page', String(list.page));
 		const qs = p.toString();
-		replaceState(`${base}/hal-problems/affiliation-conflicts` + (qs ? '?' + qs : ''), {});
+		replaceState(resolve('hal-problems/affiliation-conflicts') + (qs ? '?' + qs : ''), {});
 	}
 
 
 	onMount(() => {
-		const urlParams = new URLSearchParams($pageStore.url.search);
+		const urlParams = new URLSearchParams(page.url.search);
 		if (urlParams.get('page')) list.page = parseInt(urlParams.get('page')!) || 1;
 		list.load();
 	});
@@ -61,7 +61,7 @@
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{structureLabel(lab)}</span>{/each}
-					<a href="{base}/publications/{pub.id}" class="publication-link"><PublicationTitle titre={pub.title} /></a>
+					<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
 					{#if pub.hal_links.length}

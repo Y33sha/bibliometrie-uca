@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { base } from "$app/paths";
+  import { resolve } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
-  import { docTypeSingular, relationTypeLabel } from "$lib/labels";
-  import PublicationTitle from "$lib/components/PublicationTitle.svelte";
+  import { docTypeSingular, relationTypeLabel } from "#lib/labels.js";
+  import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import type { RelatedPublication } from "./types";
 
   let { relations }: { relations: RelatedPublication[] } = $props();
@@ -36,7 +36,7 @@
           {#each items as r (r.relation_type + (r.publication_id ?? r.doi))}
             <li>
               {#if r.publication_id}
-                <a href="{base}/publications/{r.publication_id}"><PublicationTitle titre={r.title ?? r.doi} /></a>
+                <a href={resolve(`publications/${r.publication_id}`)}><PublicationTitle titre={r.title ?? r.doi} /></a>
                 <span class="meta">
                   {#if r.publication_year}{r.publication_year}{/if}{#if r.publication_year && r.doc_type} · {/if}{docTypeLabel(r.doc_type)}
                 </span>

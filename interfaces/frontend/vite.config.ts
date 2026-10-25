@@ -1,16 +1,26 @@
+import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vitest/config';
+import { csp } from './csp.js';
 import { loadProjectEnv } from './project-env.js';
 
 // Fichiers d'environnement du projet (cf. project-env.js), lus sans polluer `process.env` :
-// ils font autorité sur les deux variables consommées ici, sans que leur valeur fuite vers
-// les processus enfants.
+// ils font autorité sur les variables consommées ici, sans que leur valeur fuite vers
+// les processus enfants. Ils priment aussi sur une valeur que l'environnement injecte déjà
+// (cas de l'extension Python `useEnvFile`, dont la valeur est par ailleurs corrompue par la
+// conversion de chemin POSIX→Windows de Git Bash).
 const fileEnv = loadProjectEnv();
 
-// `BASE_PATH` : préfixe de déploiement, les fichiers font autorité (cf. svelte.config.js).
-// Doit matcher `paths.base` dans svelte.config.js. Vide par défaut (app à la racine) ;
-// en dev, vite strip ce préfixe avant de proxyfier vers le backend.
-const basePath = fileEnv.BASE_PATH ?? process.env.BASE_PATH ?? '';
+// `BASE_PATH` : préfixe de déploiement (cf. ROOT_PATH côté backend), lu au build et en dev.
+// Vide par défaut → app servie à la racine (cas du dépôt cloné lancé via `docker compose`).
+// Un sous-chemin (ex. `/bibliometrie`) sert un déploiement derrière un reverse-proxy. En dev,
+// vite retire ce préfixe avant de transmettre les requêtes au backend.
+const basePathBrut = fileEnv.BASE_PATH ?? process.env.BASE_PATH ?? '';
+if (basePathBrut !== '' && !basePathBrut.startsWith('/')) {
+	throw new Error(`BASE_PATH est vide ou commence par « / » ; reçu : « ${basePathBrut} »`);
+}
+// Le contrôle ci-dessus établit la forme que le typage de SvelteKit exige du préfixe.
+const basePath = basePathBrut as '' | `/${string}`;
 
 // `API_TARGET` : cible du proxy, les fichiers font autorité comme pour `BASE_PATH`. Un
 // environnement peut en porter une valeur périmée — VSCode injecte le `.env` dans ses
@@ -29,7 +39,16 @@ const apiTarget = fileEnv.API_TARGET || process.env.API_TARGET || `http://127.0.
 const frontPort = Number(fileEnv.FRONT_PORT ?? process.env.FRONT_PORT ?? 5173);
 
 export default defineConfig({
-	plugins: [sveltekit()],
+	plugins: [
+		sveltekit({
+			// adapter-static : la SPA (ssr=false) est servie en fichiers statiques par
+			// FastAPI (cf. interfaces/api/spa.py). `fallback` : les routes non prérendues
+			// retombent sur index.html (routage client-side).
+			adapter: adapter({ fallback: 'index.html' }),
+			paths: { base: basePath },
+			csp
+		})
+	],
 	server: {
 		port: frontPort,
 		strictPort: true,

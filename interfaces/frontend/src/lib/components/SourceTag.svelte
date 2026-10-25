@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { sourceIcon, sourceLabel } from '$lib/sources.svelte';
+	import { sourceIcon, sourceLabel } from '#lib/sources.svelte.js';
 
 	let {
 		source,

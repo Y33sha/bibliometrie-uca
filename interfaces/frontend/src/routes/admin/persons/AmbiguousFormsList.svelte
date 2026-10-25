@@ -1,10 +1,10 @@
 <script lang="ts">
   import { untrack } from "svelte";
-  import { persons as personsApi } from "$lib/api";
-  import { titleCase } from "$lib/utils";
-  import { usePaginatedFetch } from "$lib/composables/usePaginatedFetch.svelte";
-  import Pagination from "$lib/components/Pagination.svelte";
-  import type { components } from "$lib/api/schema";
+  import { persons as personsApi } from "#lib/api/index.js";
+  import { titleCase } from "#lib/utils.js";
+  import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import Pagination from "#lib/components/Pagination.svelte";
+  import type { components } from "#lib/api/schema.js";
 
   type AmbiguousNameForm = components["schemas"]["AmbiguousNameFormOut"];
 

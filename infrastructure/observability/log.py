@@ -158,15 +158,25 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(data, default=str, ensure_ascii=False)
 
 
+class _FormatTexte(logging.Formatter):
+    """Formatter texte, un record par ligne.
+
+    Les retours chariot et sauts de ligne du message sont échappés : une valeur journalisée, venue d'une requête par exemple, ne peut pas forger une ligne de journal. La trace d'une exception, ajoutée après le message, garde ses lignes.
+    """
+
+    def formatMessage(self, record: logging.LogRecord) -> str:  # noqa: N802 — nom imposé par logging
+        return super().formatMessage(record).replace("\r", "\\r").replace("\n", "\\n")
+
+
 def _make_formatter() -> logging.Formatter:
     """Retourne le formatter selon LOG_FORMAT (json par défaut, text en fallback)."""
     fmt = os.environ.get("LOG_FORMAT", "json").lower()
     if fmt == "text":
-        return logging.Formatter("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+        return _FormatTexte("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
     return JsonFormatter()
 
 
-class _FormatConsole(logging.Formatter):
+class _FormatConsole(_FormatTexte):
     """Message seul, précédé du niveau à partir de l'avertissement.
 
     Le titre ouvrant chaque phase situe les lignes qui suivent, et le niveau de l'information vaut pour la quasi-totalité d'entre elles.

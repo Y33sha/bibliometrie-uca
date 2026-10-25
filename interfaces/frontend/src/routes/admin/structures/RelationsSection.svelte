@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Picker from "$lib/components/Picker.svelte";
-  import { structureLabel } from "$lib/structureLabels";
+  import Picker from "#lib/components/Picker.svelte";
+  import { structureLabel } from "#lib/structureLabels.js";
   import type { RelatedStructure, Structure } from "./types";
 
   let {

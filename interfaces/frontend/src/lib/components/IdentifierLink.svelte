@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { base } from "$app/paths";
-  import { halPersonUrl } from "$lib/utils";
+  import { asset } from "$app/paths";
+  import type { AssetPath } from "$app/types";
+  import { halPersonUrl } from "#lib/utils.js";
 
   let {
     id_type,
@@ -15,29 +16,29 @@
 
   const META: Record<
     string,
-    { url: (v: string) => string; icon: string; cls: string; label: string }
+    { url: (v: string) => string; icon: AssetPath; cls: string; label: string }
   > = {
     orcid: {
       url: (v) => `https://orcid.org/${v}`,
-      icon: "orcid.ico",
+      icon: "icons/orcid.ico",
       cls: "id-orcid",
       label: "ORCID",
     },
     idhal: {
       url: (v) => `https://hal.science/search/index/?q=%2A&authIdHal_s=${v}`,
-      icon: "hal.ico",
+      icon: "icons/hal.ico",
       cls: "id-hal",
       label: "idHAL",
     },
     idref: {
       url: (v) => `https://www.idref.fr/${v}`,
-      icon: "idref.png",
+      icon: "icons/idref.png",
       cls: "id-idref",
       label: "IdRef",
     },
     hal_person_id: {
       url: halPersonUrl,
-      icon: "hal.ico",
+      icon: "icons/hal.ico",
       cls: "id-hal",
       label: "Compte HAL",
     },
@@ -55,7 +56,7 @@
     rel="noopener"
     title="{meta.label} : {id_value}"
   >
-    <img src="{base}/icons/{meta.icon}" alt={meta.label} />
+    <img src={asset(meta.icon)} alt={meta.label} />
   </a>
 {:else}
   <span class="id-icon id-placeholder"></span>

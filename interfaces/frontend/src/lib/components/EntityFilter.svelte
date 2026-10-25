@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { anchored } from '$lib/actions/anchored';
-	import { api } from '$lib/api';
-	import type { components } from '$lib/api/schema';
-	import { displayEntityLabel, entityLabel, rememberEntityLabel, type EntityKind } from '$lib/entityLabels';
+	import { anchored } from '#lib/actions/anchored.js';
+	import { api } from '#lib/api/index.js';
+	import type { components } from '#lib/api/schema.js';
+	import { displayEntityLabel, entityLabel, rememberEntityLabel, type EntityKind } from '#lib/entityLabels.js';
 
 	type EntityFacetResponse = components['schemas']['EntityFacetResponse'];
 

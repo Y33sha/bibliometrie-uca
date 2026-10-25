@@ -1,19 +1,19 @@
 // Sources bibliographiques : libellés et ordre d'affichage servis par l'API, logos locaux.
-import { base } from '$app/paths';
-import { api } from '$lib/api';
-import type { components } from '$lib/api/schema';
+import { asset } from '$app/paths';
+import { api } from '#lib/api/index.js';
+import type { components } from '#lib/api/schema.js';
 
 type EnumOption = components['schemas']['EnumOption'];
 
 /** Logo local de chaque source : l'appli doit tourner hors ligne (pas de logo distant). */
 const ICONS: Record<string, string> = {
-	hal: `${base}/icons/hal.ico`,
-	openalex: `${base}/icons/openalex.png`,
-	scanr: `${base}/scanr-icon.svg`,
-	wos: `${base}/icons/wos.ico`,
-	theses: `${base}/icons/theses.ico`,
-	crossref: `${base}/icons/crossref.ico`,
-	datacite: `${base}/icons/datacite.ico`
+	hal: asset('icons/hal.ico'),
+	openalex: asset('icons/openalex.png'),
+	scanr: asset('scanr-icon.svg'),
+	wos: asset('icons/wos.ico'),
+	theses: asset('icons/theses.ico'),
+	crossref: asset('icons/crossref.ico'),
+	datacite: asset('icons/datacite.ico')
 };
 
 const sources = $state({ order: [] as string[], labels: {} as Record<string, string> });

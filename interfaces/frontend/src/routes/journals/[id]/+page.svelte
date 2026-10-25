@@ -1,28 +1,28 @@
 <script lang="ts">
-	import { pageTitle } from '$lib/institution.svelte';
-	import { page } from '$app/stores';
-	import { base } from '$app/paths';
+	import { pageTitle } from '#lib/institution.svelte.js';
+	import { page } from '$app/state';
+	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
-	import { api, apiDetail } from '$lib/api';
-	import { oaLabelsMap } from '$lib/labels';
-	import { docTypeSingular, issnLabel } from '$lib/labels';
-	import TabNav from '$lib/components/TabNav.svelte';
-	import PublicationsListView from '$lib/components/PublicationsListView.svelte';
-	import MonographsListView from '$lib/components/MonographsListView.svelte';
-	import DoughnutChart from '$lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '$lib/components/charts/oaColors';
-	import SubjectsCloud from '$lib/components/SubjectsCloud.svelte';
-	import type { components } from '$lib/api/schema';
+	import { api, apiDetail } from '#lib/api/index.js';
+	import { oaLabelsMap } from '#lib/labels.js';
+	import { docTypeSingular, issnLabel } from '#lib/labels.js';
+	import TabNav from '#lib/components/TabNav.svelte';
+	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import MonographsListView from '#lib/components/MonographsListView.svelte';
+	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import { oaStatusColor } from '#lib/components/charts/oaColors.js';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
+	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
 	type SerialDashboard = components['schemas']['SerialDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
-	const serialId = $derived(Number($page.params.id));
+	const serialId = $derived(Number(page.params.id));
 	const activeTab = $derived(
 		(() => {
-			const t = $page.url.searchParams.get('tab');
+			const t = page.url.searchParams.get('tab');
 			return t === 'publications' || t === 'monographs' ? t : 'dashboard';
 		})()
 	);
@@ -153,7 +153,7 @@
 				{#if journal.publisher_name}
 					<span class="meta-label">Éditeur</span>
 					{#if journal.publisher_id}
-						<a href="{base}/publishers/{journal.publisher_id}" class="publisher-link">{journal.publisher_name}</a>
+						<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
 					{:else}
 						<span class="publisher-link">{journal.publisher_name}</span>
 					{/if}

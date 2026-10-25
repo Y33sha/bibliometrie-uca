@@ -1,5 +1,5 @@
-import { api } from '$lib/api';
-import type { FacetOption } from '$lib/components/FacetDropdown.svelte';
+import { api } from '#lib/api/index.js';
+import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
 /**
  * Composable pour le chargement de facettes.
