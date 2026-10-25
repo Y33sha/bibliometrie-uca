@@ -97,6 +97,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `place_name_forms` | formes de noms pour la détection des pays | [ref](07-ref-et-ops.md) |
 | `platforms` | lieux qui hébergent des publications | [publishing](04-publishing.md) |
 | `publication_relations` | relations sémantiques entre publications | [publications](03-publications.md) |
+| `publication_rors` | *vue matérialisée* : ROR des auteurs d'une publication, ancêtres compris | [publications](03-publications.md) |
 | `publication_structures` | *vue matérialisée* : structures d'une publication | [publications](03-publications.md) |
 | `publication_subjects` | liaison publication ↔ sujet | [publications](03-publications.md) |
 | `publications` | référentiel consolidé des productions | [publications](03-publications.md) |

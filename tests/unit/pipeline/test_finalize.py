@@ -46,6 +46,7 @@ def _patch_sql(counts: _Counts) -> list:
             ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
             ("refresh_contribution_structures", "structures des groupes", None),
             ("refresh_publication_structures", "structures des publications", None),
+            ("refresh_publication_rors", "ROR des publications", None),
             ("refresh_serial_publishers", "éditeur des revues", 4),
             ("recompute_address_publication_count", "adresses", 7),
             ("refresh_serial_publication_counts", "revues", 3),

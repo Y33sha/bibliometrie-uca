@@ -1091,8 +1091,11 @@ TASKS: tuple[Task, ...] = (
             "contributions.roles",
             "aligned_source_contributions",
             "persons.exclusion",
+            "source_contribution_rors",
+            "ror_relations",
+            "structures.ror_id",
         ),
-        writes=("contribution_structures", "publication_structures"),
+        writes=("contribution_structures", "publication_structures", "publication_rors"),
     ),
     _task(
         "finalize.purge_publications",

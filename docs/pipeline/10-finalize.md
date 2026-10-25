@@ -15,7 +15,7 @@ flowchart LR
 Une contribution (`contributions`) réunit les contributions sources d'un même auteur d'une publication, une par enregistrement source au plus (`aligned_source_contributions`). La phase `author_grouping` les aligne, la phase `persons` et les décisions de l'administration leur donnent une personne. La phase `finalize` met à jour, après la résolution des personnes et avant les enrichissements, les données qui dérivent des contributions.
 
 1. **Report sur les publications** : `publications.in_perimeter` est matérialisé, pour que les filtres de liste lisent un drapeau au lieu de recalculer l'appartenance au périmètre à chaque requête.
-2. **Rafraîchissement des vues matérialisées** `contribution_structures` et `publication_structures`, qui rattachent contributions et publications à leurs structures.
+2. **Rafraîchissement des vues matérialisées** `contribution_structures` et `publication_structures`, qui rattachent contributions et publications à leurs structures, puis `publication_rors`, qui rattache chaque publication aux ROR de tous ses auteurs, ancêtres compris.
 
 ## Opérations finales
 

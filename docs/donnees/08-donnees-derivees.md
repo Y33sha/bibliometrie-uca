@@ -11,8 +11,9 @@ Toutes sont déclarées `WITH NO DATA` et rafraîchies par le pipeline (la plupa
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
 | `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
-| `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `contributions` |
-| `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `contributions` |
+| `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `finalize` |
+| `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `finalize` |
+| `publication_rors` | ROR des contributions sources alignées des auteurs (`source_contribution_rors`) et des structures de `publication_structures`, avec leurs ancêtres de `ror_relations` ; `cited` distingue les ROR cités | phase `finalize` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
 
 ## Tables dérivées
