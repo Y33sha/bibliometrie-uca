@@ -40,7 +40,7 @@ class DoiClusterCase(StrEnum):
     )
 
     # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
-    # `book_chapter` le porte à tort → le chapitre le perd.
+    # `book_chapter` d'un autre titre le porte à tort → le chapitre le perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
 
     # Plusieurs `book_chapter` partageant un DOI mais de titres réellement différents : le DOI
@@ -292,7 +292,7 @@ def resolve_cluster_doi_corrections(
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
     - **Même œuvre DataCite** (un membre porte un `canonical_doi`, cf. `_meme_oeuvre`) : tous les membres convergent sur l'œuvre principale (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
-    - **Ouvrage + chapitre** : les `book_chapter` perdent le DOI (`target_doi = None`, celui de l'ouvrage). Signal = le mix de `doc_type`, sans comparaison de titre.
+    - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI (`target_doi = None`, celui de l'ouvrage). Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
     - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + égalité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
     - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et dont le titre partage moins de 35 % de ses mots avec elle, perd le DOI. S'ajoute aux cas précédents.
@@ -325,8 +325,13 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
     chapters = [m for m in book_family if m.doc_type == DocType.BOOK_CHAPTER]
     has_book = any(m.doc_type == DocType.BOOK for m in book_family)
     if has_book and chapters:
+        book_titles = [
+            _clean_title(m.title_normalized) for m in book_family if m.doc_type == DocType.BOOK
+        ]
         return [
-            DoiClusterDecision(m.id, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE) for m in chapters
+            DoiClusterDecision(m.id, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
+            for m in chapters
+            if not any(_same_title(_clean_title(m.title_normalized), t) for t in book_titles if t)
         ]
     if (
         chapters
