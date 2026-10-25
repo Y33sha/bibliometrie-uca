@@ -221,13 +221,18 @@
 
 	.col-author {
 		width: 160px;
-		font-size: 0.9rem;
 	}
 	.col-date {
 		width: 85px;
 		text-align: center;
-		font-size: 0.85rem;
 		white-space: nowrap;
+	}
+	/* Taille propre aux cellules : l'en-tête garde la typographie commune des tableaux. */
+	td.col-author {
+		font-size: 0.9rem;
+	}
+	td.col-date {
+		font-size: 0.85rem;
 	}
 	.col-date .date-month {
 		font-size: 0.75rem;
