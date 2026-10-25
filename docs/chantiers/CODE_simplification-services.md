@@ -22,7 +22,7 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 ### Ports
 
 - Aucun port n'a de seconde implémentation, doublure de test comprise : les tests passent par la base.
-- Les 18 ports de lecture (`application/ports/read_models/`) sont lus chacun par un seul routeur. Seul `ConfigQueries` sert aussi à un service. Une lecture est déclarée trois fois : méthode du `Protocol`, le plus souvent sans docstring ; méthode de la classe `Pg…` ; fonction du module de l'adaptateur. 29 des 96 méthodes `Pg…` des lectures, et 17 des 65 des repositories, délèguent en une ligne à une fonction, à laquelle elles passent la connexion.
+- Les 18 ports de lecture (`application/ports/read_models/`) sont lus, pour 14 d'entre eux, par un seul routeur. Seul `ConfigQueries` sert aussi à un service. Une lecture est déclarée trois fois : méthode du `Protocol`, le plus souvent sans docstring ; méthode de la classe `Pg…` ; fonction du module de l'adaptateur. 29 des 96 méthodes `Pg…` des lectures, et 17 des 65 des repositories, délèguent en une ligne à une fonction, à laquelle elles passent la connexion.
 - Les modèles Pydantic des ports de lecture sont les réponses de l'API (`PersonProfileResponse`, `PersonOut`…), construites par l'infrastructure et rendues par les routeurs.
 - Les docstrings des ports de repositories décrivent l'implémentation (tables, `ILIKE`, `pinned_groups_sql`) et nomment des modèles de réponse de l'API (`StructureOut`, `NameFormStatusResponse`).
 - Docstrings fausses : `ports/repositories/__init__.py` cite des repositories `Publication` et `DoiPrefix`, absents des ports ; `PublisherRepository` annonce un enrichissement des pays, sous un intertitre vide.
@@ -69,7 +69,7 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 ## Questions ouvertes
 
 - Un objet de service par agrégat, construit dans `deps.py`, réduirait chaque route d'écriture à une dépendance. Le volume de câblage restant après la phase 1 décide de son intérêt.
-- Ports de lecture. Leur `Protocol` reproduit l'adaptateur méthode par méthode, pour un seul appelant et une seule implémentation ; il tient l'infrastructure hors des routeurs (contrat d'import). Deux réductions possibles, cumulables :
+- Ports de lecture. Leur `Protocol` reproduit l'adaptateur méthode par méthode, pour une seule implémentation et, le plus souvent, un seul routeur ; il tient l'infrastructure hors des routeurs (contrat d'import). Deux réductions possibles, cumulables :
   - dans l'infrastructure, une seule déclaration par lecture : la méthode de la classe `Pg…` contient la requête, ou la fonction de module suffit ;
   - sans `Protocol` de lecture, les routeurs reçoivent l'adaptateur concret. Les modèles de réponse restent dans `application/`, que l'infrastructure et les routeurs importent tous deux. Le contrat d'import s'assouplit pour les lectures.
 - Emplacement des structures d'une exécution de phase (`ports/pipeline/phase_executions.py`), hors des ports.
