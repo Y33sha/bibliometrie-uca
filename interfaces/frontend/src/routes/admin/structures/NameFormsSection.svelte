@@ -1,4 +1,5 @@
 <script lang="ts">
+  import HelpTip from "#lib/components/HelpTip.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import Picker from "#lib/components/Picker.svelte";
   import type { NameForm, Structure } from "./types";
@@ -96,7 +97,7 @@
 <table class="data-table forms-table">
   <thead>
     <tr
-      ><th class="col-badge"></th><th>Forme</th><th>Contexte requis</th><th></th></tr
+      ><th class="col-badge"></th><th>Forme</th><th>Contexte requis <HelpTip text="La forme de nom identifie la structure seulement si au moins une autre structure est reconnue dans l'adresse." /></th><th></th></tr
     >
   </thead>
   <tbody>
@@ -121,7 +122,7 @@
           <td class="form-text">{f.form_text}</td>
           <td>
             {#if f.is_excluding}
-              <span class="sufficient-label">—</span>
+              <span class="none-label">—</span>
             {:else if f.requires_context_of?.length}
               {#each f.requires_context_of as x}
                 <span class="ctx-tag">
@@ -131,7 +132,7 @@
               {/each}
               {@render ctxAdd(f.id)}
             {:else}
-              <span class="sufficient-label">suffisant</span>
+              <span class="none-label">—</span>
               {@render ctxAdd(f.id)}
             {/if}
           </td>
@@ -187,9 +188,6 @@
       </span>
     {/each}
     {@render ctxAdd(null)}
-    {#if newFormCtx.length === 0}
-      <span class="ctx-hint">(suffisant)</span>
-    {/if}
   </div>
 {/if}
 
@@ -208,7 +206,7 @@
       {#snippet header()}
         <div class="ctx-picker-shortcuts">
           <button class="btn btn-sm" onclick={onpickCtxShortcutTutelles}> tutelles </button>
-          <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; suffisant </button>
+          <button class="btn btn-sm" onclick={onpickCtxClear}> &#x2715; aucun contexte </button>
         </div>
       {/snippet}
       {#snippet item(cs)}
@@ -312,9 +310,8 @@
   .ctx-remove:hover {
     color: var(--danger);
   }
-  .sufficient-label {
-    color: var(--success);
-    font-size: 0.8rem;
+  .none-label {
+    color: var(--muted);
   }
   /* Formulaire d'ajout sous le tableau, sur un fond léger. */
   .add-row {
@@ -352,11 +349,6 @@
   }
   .ctx-label-text {
     color: var(--muted);
-  }
-  .ctx-hint {
-    color: var(--muted);
-    font-size: 0.8rem;
-    margin-left: 4px;
   }
   .ctx-picker-shortcuts {
     padding: 6px 10px;
