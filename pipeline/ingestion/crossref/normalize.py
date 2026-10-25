@@ -34,6 +34,7 @@ from pipeline.ingestion.common.source_records import (
 )
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.crossref.payload import (
+    clean_crossref_title,
     crossref_issns,
     crossref_raw_doc_type,
     extract_crossref_conference,
@@ -57,13 +58,11 @@ def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
 
 
 def get_title(msg: Mapping[str, JsonValue]) -> str | None:
+    """Premier titre du payload, nettoyé par `clean_crossref_title`."""
     titles = msg.get("title") or []
-    if isinstance(titles, list) and titles:
-        first = titles[0]
-        if isinstance(first, str) and first.strip():
-            return first.strip()
-    if isinstance(titles, str) and titles.strip():
-        return titles.strip()
+    first = titles[0] if isinstance(titles, list) and titles else titles
+    if isinstance(first, str) and (title := clean_crossref_title(first)):
+        return title
     return None
 
 

@@ -84,6 +84,47 @@ class TestGetTitle:
     def test_strips_whitespace(self):
         assert get_title({"title": ["  Spaced  "]}) == "Spaced"
 
+    def test_reduces_whitespace(self):
+        assert get_title({"title": ["Imprimitive\n   complex  reflection groups"]}) == (
+            "Imprimitive complex reflection groups"
+        )
+
+    def test_drops_mathml_symbols_after_formula(self):
+        # 10.1140/epjc/s10052-017-5151-8 : formule LaTeX, puis ses symboles MathML plus indentés.
+        title = (
+            "Study of charmonium production in \n                $${b} $$\n"
+            "                    b\n              -hadron decays and first evidence for the decay \n"
+            "                $${{{B}} ^0_{{s}}} \\!\\rightarrow \\phi \\phi \\phi $$\n"
+            "                          B\n                        s\n                        0\n"
+            "                      →\n                      ϕ"
+        )
+        assert get_title({"title": [title]}) == (
+            "Study of charmonium production in $${b} $$ -hadron decays and first evidence"
+            " for the decay $${{{B}} ^0_{{s}}} \\!\\rightarrow \\phi \\phi \\phi $$"
+        )
+
+    def test_drops_mathml_symbols_before_formula(self):
+        # 10.1007/jhep04(2017)162 : symboles MathML, puis la formule LaTeX.
+        title = (
+            "Evidence for the two-body charmless baryonic decay \n                      B\n"
+            "                      +\n                    →\n                    p\n"
+            "                $$ {B}^{+}\\to p\\overline{\\varLambda} $$"
+        )
+        assert get_title({"title": [title]}) == (
+            "Evidence for the two-body charmless baryonic decay $$ {B}^{+}\\to p\\overline{\\varLambda} $$"
+        )
+
+    def test_keeps_text_less_indented_than_formula_block(self):
+        # 10.1007/s40879-017-0185-x : formule en début de ligne ; la ligne suivante porte l'indentation du bloc.
+        title = (
+            "Powers of Jacobi triple product, Cohen’s numbers and the Ramanujan \n$${\\Delta }$$\n"
+            "                \n                    \n                        Δ\n"
+            "                    \n                \n            -function"
+        )
+        assert get_title({"title": [title]}) == (
+            "Powers of Jacobi triple product, Cohen’s numbers and the Ramanujan $${\\Delta }$$ -function"
+        )
+
     def test_none_when_empty_list(self):
         assert get_title({"title": []}) is None
 
