@@ -1,4 +1,6 @@
 python -m interfaces.cli.oneshot.backfill_source_record_publishers
+python -m interfaces.cli.oneshot.apply_known_platforms
+run_pipeline --only publications
 
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
