@@ -89,7 +89,7 @@
     <code>affiliations</code> : <code>python run_pipeline.py --from affiliations</code>
   </p>
 {/if}
-<table class="forms-table">
+<table class="data-table forms-table">
   <thead>
     <tr
       ><th class="col-badge"></th><th>Forme</th><th>Contexte requis</th><th></th></tr
@@ -270,22 +270,7 @@
   .btn-help-icon:hover {
     color: var(--accent);
   }
-  .forms-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.95rem;
-  }
-  .forms-table th {
-    text-align: left;
-    padding: 5px 8px;
-    font-size: 0.8rem;
-    color: var(--muted);
-    border-bottom: 2px solid var(--border);
-    font-weight: 600;
-  }
   .forms-table td {
-    padding: 5px 8px;
-    border-bottom: 1px solid var(--border-subtle);
     vertical-align: middle;
   }
   .forms-table td:last-child {

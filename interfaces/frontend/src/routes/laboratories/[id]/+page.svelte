@@ -300,7 +300,7 @@
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			<table>
+			<table class="data-table">
 				<thead>
 					<tr>
 						<th>Adresse</th>
@@ -333,29 +333,6 @@
 
 <style>
 
-	/* Shared table styles */
-	.tab-content table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé. Les coins arrondis restent visuellement corrects grâce à border-collapse. */
-	}
-	.tab-content thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.tab-content tbody tr:last-child { border-bottom: none; }
-	.tab-content tbody tr:hover { background: var(--surface-hover); }
-	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }

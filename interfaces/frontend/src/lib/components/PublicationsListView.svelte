@@ -623,7 +623,7 @@
 {/snippet}
 
 <div class="table-scroll">
-<table class="publication-table">
+<table class="data-table publication-table">
 	<thead>
 		<tr>
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
@@ -833,32 +833,7 @@
 		font-weight: 600;
 		color: var(--muted);
 	}
-	.publication-table {
-		width: 100%;
-		min-width: 760px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		/* pas d'overflow: hidden → le dropdown ColumnMenu peut déborder sous la dernière ligne sans être clippé (coins arrondis restent visuellement corrects grâce à border-collapse). */
-	}
-	.publication-table th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.publication-table td {
-		padding: 7px 10px;
-		border-bottom: 1px solid var(--border-subtle);
-		font-size: 0.95rem;
-		vertical-align: top;
-	}
-	.publication-table tr:hover td { background: var(--surface-hover); }
+	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
 

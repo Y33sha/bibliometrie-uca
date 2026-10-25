@@ -187,7 +187,7 @@
 </div>
 
 <div class="table-scroll">
-	<table class="monographs-table">
+	<table class="data-table monographs-table">
 		<thead>
 			<tr>
 				<th class="sortable" onclick={() => setSort('title')}>Titre {sortArrow('title')}</th>
@@ -238,31 +238,7 @@
 
 
 <style>
-	.monographs-table {
-		width: 100%;
-		min-width: 720px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.monographs-table thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.monographs-table thead th.num { text-align: right; }
-	.monographs-table thead th.sortable { cursor: pointer; user-select: none; }
-	.monographs-table thead th.sortable:hover { color: var(--accent); }
-	.monographs-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.monographs-table tbody tr:last-child { border-bottom: none; }
-	.monographs-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: top; }
-	.monographs-table td.num { text-align: right; white-space: nowrap; }
+	.monographs-table { min-width: 720px; }
 	.isbn { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
 	.muted { color: var(--muted); }
 	.search { width: 22rem; max-width: 100%; }

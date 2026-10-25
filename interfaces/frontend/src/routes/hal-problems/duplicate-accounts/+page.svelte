@@ -49,7 +49,7 @@
 {:else if list.items.length === 0}
   <div class="no-results">Aucun doublon détecté</div>
 {:else}
-  <table class="publication-table">
+  <table class="data-table">
     <thead>
       <tr>
         <th>Personne</th>
@@ -105,33 +105,8 @@
   .count {
     font-size: 0.9rem;
   }
-  .publication-table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  .publication-table thead th {
-    background: var(--surface);
-    padding: 8px 12px;
-    text-align: left;
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--muted);
-    border-bottom: 2px solid var(--border);
-  }
-  .publication-table tbody tr {
-    border-bottom: 1px solid var(--border-subtle);
-  }
-  .publication-table tbody tr:hover {
-    background: var(--surface-hover);
-  }
-  .publication-table td {
-    padding: 8px 12px;
+  .data-table td {
     font-size: 0.9rem;
-    vertical-align: top;
   }
   .person-link {
     font-weight: 500;

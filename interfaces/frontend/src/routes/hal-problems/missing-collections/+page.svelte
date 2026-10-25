@@ -95,7 +95,7 @@
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
+					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
 					{#if pub.hal_links.length}
@@ -139,8 +139,6 @@
 		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: var(--radius); font-size: 0.78rem;
 		color: var(--attention); font-weight: 600; flex-shrink: 0;
 	}
-	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
-	.publication-link:hover { text-decoration: underline; }
 	.hal-list {
 		display: flex; flex-wrap: wrap; gap: 6px;
 		align-items: center; margin-top: 6px; padding-left: 20px;

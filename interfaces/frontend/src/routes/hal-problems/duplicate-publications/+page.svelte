@@ -93,7 +93,7 @@
 					<div class="publication-meta-line">
 						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
 						{#if pair.publication.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
-						<a href={resolve(`publications/${pair.publication.id}`)} class="publication-link"><PublicationTitle titre={pair.publication.title} /></a>
+						<a href={resolve(`publications/${pair.publication.id}`)} class="publication-title"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
@@ -118,7 +118,7 @@
 	{:else if meta.items.length === 0}
 		<div class="no-results">Aucun doublon par métadonnées</div>
 	{:else}
-		<table class="publication-table meta-table">
+		<table class="data-table meta-table">
 			<thead>
 				<tr>
 					<th>Publication A</th>
@@ -130,7 +130,7 @@
 					<tr>
 						{#each [pair.publication_a, pair.publication_b] as pub}
 							<td>
-								<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
+								<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 								<div class="publication-meta-line">
 									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 									{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
@@ -160,40 +160,7 @@
 {/if}
 
 <style>
-	/* Override tabs for this page: underline variant */
-	.tabs {
-		background: none;
-		border-left: none;
-		border-right: none;
-		border-bottom: 2px solid var(--border);
-		border-radius: 0;
-	}
-	.tab {
-		flex: none;
-		padding: 8px 16px;
-		background: none;
-		border-right: none;
-		border-bottom: 2px solid transparent;
-		margin-bottom: -2px;
-	}
-	.tab.active { box-shadow: none; border-bottom-color: var(--accent); }
-
-	.publication-table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		overflow: hidden;
-	}
-	.publication-table thead th {
-		background: var(--surface); padding: 8px 12px; text-align: left;
-		font-size: 0.85rem; font-weight: 600; color: var(--muted);
-		border-bottom: 2px solid var(--border);
-	}
-	.publication-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.publication-table tbody tr:hover { background: var(--surface-hover); }
-	.publication-table td { padding: 8px 12px; font-size: 0.9rem; vertical-align: top; }
+	.data-table td { font-size: 0.9rem; }
 	.meta-table td { width: 50%; }
 
 	.doi-list { display: flex; flex-direction: column; gap: 8px; }
@@ -206,8 +173,6 @@
 	.hal-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-left: 20px; }
 	.hal-row { display: flex; gap: 6px; align-items: center; }
 	.doi-ref { font-size: 0.82rem; color: var(--muted); margin-left: 8px; }
-	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
-	.publication-link:hover { text-decoration: underline; }
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
 	.author-count { font-size: 0.8rem; color: var(--muted); }
 	.container-title { font-size: 0.82rem; color: var(--muted); margin-top: 2px; font-style: italic; }

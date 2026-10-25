@@ -73,7 +73,7 @@
 	<p class="muted">Aucun groupe.</p>
 {:else}
 	{#if intro}<p class="muted intro">{intro}</p>{/if}
-	<table>
+	<table class="data-table triage-table">
 		<colgroup>
 			<col class="col-title" />
 			<col class="col-publisher" />
@@ -109,17 +109,11 @@
 
 <style>
 	.intro { margin: 0 0 12px; }
-	table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.9rem; }
 	.col-title { width: 38%; }
 	.col-publisher { width: 24%; }
 	.col-issn { width: 16%; }
 	.col-publications { width: 9%; }
 	.col-action { width: 13%; }
-	th, td { text-align: left; padding: 4px 8px; overflow-wrap: anywhere; }
-	thead th { font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }
-	tbody.group { border-top: 2px solid var(--border); }
-	.group-head th { font-weight: 600; background: var(--accent-light); }
-	.num { text-align: right; }
-	.action { text-align: right; white-space: nowrap; }
+	.group-head th { font-weight: 600; }
 	.muted { color: var(--muted); }
 </style>

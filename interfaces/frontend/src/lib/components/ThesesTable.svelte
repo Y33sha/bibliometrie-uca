@@ -70,7 +70,7 @@
 </script>
 
 <div class="table-scroll">
-<table class="theses-table">
+<table class="data-table theses-table">
 	<thead>
 		<tr>
 			<th
@@ -215,31 +215,8 @@
 
 <style>
 	.theses-table {
-		width: 100%;
 		min-width: 720px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
 		font-size: 0.9rem;
-	}
-	.theses-table th {
-		text-align: left;
-		padding: 6px 8px;
-		border-bottom: 2px solid var(--border);
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		background: var(--surface);
-		white-space: nowrap;
-	}
-	.theses-table td {
-		padding: 5px 8px;
-		border-bottom: 1px solid var(--border);
-		vertical-align: top;
-	}
-	.theses-table tbody tr:hover {
-		background: var(--surface-hover);
 	}
 
 	.col-author {
@@ -272,14 +249,6 @@
 	.col-sources {
 		width: 120px;
 		text-align: center;
-	}
-
-	.sortable {
-		cursor: pointer;
-		user-select: none;
-	}
-	.sortable.active {
-		color: var(--accent);
 	}
 
 	.status-badge {

@@ -61,7 +61,7 @@
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
 					{#if pub.doc_type}<span class="meta-badge type-badge">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
 					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{structureLabel(lab)}</span>{/each}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-link"><PublicationTitle titre={pub.title} /></a>
+					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 				</div>
 				<div class="hal-list">
 					{#if pub.hal_links.length}
@@ -91,8 +91,6 @@
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 	.meta-badge { flex-shrink: 0; }
 	.lab-badge { background: var(--success-light); color: var(--success); font-weight: 500; }
-	.publication-link { color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.88rem; }
-	.publication-link:hover { text-decoration: underline; }
 	.hal-list {
 		display: flex; flex-wrap: wrap; gap: 6px;
 		align-items: center; margin-top: 6px; padding-left: 20px;

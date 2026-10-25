@@ -374,13 +374,44 @@
 	font-variant-numeric: tabular-nums;
 }
 
+.data-table th.num {
+	text-align: right;
+}
+
+.data-table td.num {
+	white-space: nowrap;
+}
+
+/* Tableau d'une file de triage : colonnes de largeur fixe, lignes regroupées par `tbody.group`. */
+.triage-table {
+	table-layout: fixed;
+	font-size: 0.9rem;
+}
+.triage-table th,
+.triage-table td {
+	overflow-wrap: anywhere;
+	white-space: normal;
+}
+.triage-table tbody.group {
+	border-top: 2px solid var(--border);
+}
+.triage-table .group-head th {
+	background: var(--accent-light);
+	color: var(--text);
+}
+.triage-table .action {
+	text-align: right;
+	white-space: nowrap;
+}
+
 /* ── Sortable columns ── */
 .sortable {
 	cursor: pointer;
 	user-select: none;
 }
 
-.sortable:hover {
+.sortable:hover,
+.sortable.active {
 	color: var(--accent);
 }
 
@@ -390,8 +421,7 @@
 	color: var(--text-faint);
 }
 
-.sortable.active .sort-arrow,
-th.sorted .sort-arrow {
+.sortable.active .sort-arrow {
 	color: var(--accent);
 	opacity: 1;
 }

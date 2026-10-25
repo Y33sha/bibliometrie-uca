@@ -227,7 +227,7 @@
 	{/if}
 </div>
 
-<table class="addr-table">
+<table class="data-table addr-table">
 	<thead>
 		<tr>
 			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
@@ -292,18 +292,8 @@
 	}
 	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
-	.addr-table {
-		width: 100%; border-collapse: collapse; table-layout: fixed;
-		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-	}
-	.addr-table thead th {
-		background: var(--surface); padding: 8px 10px; text-align: left;
-		font-size: 0.85rem; font-weight: 600; color: var(--muted);
-		border-bottom: 2px solid var(--border);
-	}
-	.addr-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.addr-table tbody tr:hover { background: var(--surface-hover); }
-	.addr-table td { padding: 6px 10px; font-size: 0.9rem; vertical-align: middle; }
+	.addr-table { table-layout: fixed; }
+	.addr-table td { font-size: 0.9rem; vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }

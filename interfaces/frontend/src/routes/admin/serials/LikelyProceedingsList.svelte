@@ -71,7 +71,7 @@
 	<p class="muted intro">
 		Publications en série typées « revue » dont la majorité des documents sont des articles de congrès, d'après le type donné par chaque source. Les publications en série sans ISSN viennent en tête.
 	</p>
-	<table>
+	<table class="data-table triage-table">
 		<colgroup>
 			<col class="col-title" />
 			<col class="col-publisher" />
@@ -107,16 +107,10 @@
 
 <style>
 	.intro { margin: 0 0 12px; }
-	table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 0.9rem; }
 	.col-title { width: 40%; }
 	.col-publisher { width: 22%; }
 	.col-issn { width: 14%; }
 	.col-share { width: 11%; }
 	.col-action { width: 13%; }
-	th, td { text-align: left; padding: 4px 8px; overflow-wrap: anywhere; }
-	thead th { font-weight: 600; color: var(--muted); border-bottom: 1px solid var(--border); }
-	tbody tr { border-top: 1px solid var(--border); }
-	.num { text-align: right; }
-	.action { text-align: right; white-space: nowrap; }
 	.muted { color: var(--muted); }
 </style>

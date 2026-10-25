@@ -79,11 +79,11 @@
     {#if list.items.length === 0}
       <p class="empty">Aucun sujet ne correspond à ces critères.</p>
     {:else}
-      <table>
+      <table class="data-table">
         <thead>
           <tr>
             <th>Libellé</th>
-            <th class="right">Occurrences</th>
+            <th class="num">Occurrences</th>
           </tr>
         </thead>
         <tbody>
@@ -92,7 +92,7 @@
               <td>
                 <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
               </td>
-              <td class="right">{s.usage_count.toLocaleString("fr-FR")}</td>
+              <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
             </tr>
           {/each}
         </tbody>
@@ -139,32 +139,6 @@
   .empty {
     color: var(--muted);
     font-style: italic;
-  }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
-  }
-  th,
-  td {
-    padding: 8px 12px;
-    text-align: left;
-    border-bottom: 1px solid var(--border);
-  }
-  tr:last-child td {
-    border-bottom: none;
-  }
-  th {
-    font-weight: 600;
-    background: var(--surface-hover);
-    font-size: 0.85rem;
-  }
-  td.right,
-  th.right {
-    text-align: right;
   }
   .loading {
     color: var(--muted);

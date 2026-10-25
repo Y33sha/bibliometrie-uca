@@ -319,7 +319,7 @@
 
 <h4 class="subsection-title">Définition des périmètres</h4>
 <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<table class="perimeters-table">
+<table class="data-table perimeters-table">
   <thead>
     <tr>
       <th>Code</th>
@@ -355,7 +355,7 @@
 </div>
 
 <h4 class="subsection-title">Rôle des périmètres</h4>
-<table class="perimeters-table">
+<table class="data-table perimeters-table">
   <thead>
     <tr>
       <th class="role-phase-col">Phase</th>
@@ -520,38 +520,14 @@
   }
 
   .perimeters-table {
-    width: 100%;
     max-width: 800px;
     margin: 0 auto 10px;
-    border-collapse: collapse;
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
   }
-  .perimeters-table th,
   .perimeters-table td {
-    padding: 7px 12px;
-    text-align: left;
     vertical-align: middle;
-    border-bottom: 1px solid var(--border-subtle);
   }
-  .perimeters-table thead th {
-    background: var(--surface);
-    font-size: 0.72rem;
-    font-weight: 600;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.03em;
-  }
-  .perimeters-table tbody tr:last-child td {
-    border-bottom: none;
-  }
-  .perimeters-table .num {
-    text-align: right;
-    font-variant-numeric: tabular-nums;
+  .perimeters-table td.num {
     color: var(--accent);
-    white-space: nowrap;
   }
   /* La colonne des structures racines absorbe la largeur disponible : les colonnes suivantes (Total, actions) se réduisent à leur contenu et se collent au bord droit. */
   .perimeters-table .perim-structs {

@@ -247,7 +247,7 @@
 			{:else}
 				{#each thesesSections as section (section.role)}
 					<h3 class="thesis-role-heading">{section.label}</h3>
-					<table class="publication-table">
+					<table class="data-table">
 						<thead>
 							<tr>
 								<th style="width:160px">Auteur</th>
@@ -280,7 +280,7 @@
 			{:else if addresses.items.length === 0}
 				<div class="no-results">Aucune adresse</div>
 			{:else}
-				<table>
+				<table class="data-table">
 					<thead>
 						<tr>
 							<th>Adresse</th>
@@ -316,33 +316,7 @@
 		color: var(--text);
 	}
 	.thesis-role-heading:first-child { margin-top: 0; }
-	/* Shared table styles */
-	.tab-content table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.tab-content thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.tab-content tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.tab-content tbody tr:last-child { border-bottom: none; }
-	.tab-content tbody tr:hover { background: var(--surface-hover); }
-	.tab-content td { padding: 7px 10px; font-size: 0.95rem; vertical-align: middle; }
-	.tab-content td a:not(.id-badge, .lab-tag, .structure-tag, .source-tag) { color: var(--accent); text-decoration: none; }
-	.tab-content td a:not(.id-badge, .lab-tag, .structure-tag, .source-tag):hover { text-decoration: underline; }
 
-	/* Theses tab utilise aussi .publication-table */
-	.publication-table td { vertical-align: top; }
 
 	/* Addresses tab */
 	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }

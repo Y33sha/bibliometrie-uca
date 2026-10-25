@@ -54,7 +54,7 @@
 </script>
 
 <div class="table-scroll">
-<table>
+<table class="data-table persons-table">
 	<thead>
 		<tr>
 			<th
@@ -75,7 +75,7 @@
 			>
 			{#each countColumns as col (col.sortKey)}
 				<th
-					class="sortable num-col"
+					class="sortable num"
 					style="width:80px"
 					class:active={sort === `${col.sortKey}_asc` || sort === `${col.sortKey}_desc`}
 					onclick={() => toggleSort(col.sortKey)}>{col.label}{sortIndicator(col.sortKey)}</th
@@ -118,7 +118,7 @@
 					</td>
 					<td class="muted-cell">{p.department_name || ''}</td>
 					{#each countColumns as col (col.sortKey)}
-						<td class="num-col">{col.value(p)}</td>
+						<td class="num">{col.value(p)}</td>
 					{/each}
 				</tr>
 			{/each}
@@ -128,32 +128,8 @@
 </div>
 
 <style>
-	table {
-		width: 100%;
-		min-width: 620px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		overflow: hidden;
-	}
-	thead th {
-		background: var(--surface);
-		padding: 9px 12px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 1px solid var(--border);
-		white-space: nowrap;
-	}
-	thead th.sortable { cursor: pointer; user-select: none; }
-	thead th.sortable:hover { color: var(--accent); }
-	thead th.sortable.active { color: var(--accent); }
-	tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	tbody tr:last-child { border-bottom: none; }
-	tbody tr:hover { background: var(--surface-hover); }
-	td { padding: 10px 12px; font-size: 0.95rem; vertical-align: middle; }
+	.persons-table { min-width: 620px; }
+	.persons-table td { vertical-align: middle; }
 	.person-link { color: var(--accent); text-decoration: none; font-weight: 500; }
 	.person-link:hover { text-decoration: underline; }
 	button.person-link { background: none; border: none; padding: 0; font: inherit; font-weight: 500; text-align: left; cursor: pointer; }
@@ -163,6 +139,4 @@
 	tr.excluded .person-link { text-decoration: line-through; }
 	.person-last { font-weight: 600; }
 	.muted-cell { font-size: 0.9rem; color: var(--muted); }
-	.num-col { text-align: right; }
-	thead th.num-col { padding-right: 16px; }
 </style>

@@ -107,11 +107,12 @@
 	>
 </div>
 
-<table>
+<table class="data-table">
 	<thead>
 		<tr>
 			<th
-				class:sorted={sortCol === "acronym"}
+				class="sortable"
+				class:active={sortCol === "acronym"}
 				onclick={() => toggleSort("acronym")}
 			>
 				Acronyme
@@ -120,7 +121,8 @@
 				>
 			</th>
 			<th
-				class:sorted={sortCol === "name"}
+				class="sortable"
+				class:active={sortCol === "name"}
 				onclick={() => toggleSort("name")}
 			>
 				Nom
@@ -129,8 +131,8 @@
 				>
 			</th>
 			<th
-				class="tutelles-col"
-				class:sorted={sortCol === "tutelles"}
+				class="sortable tutelles-col"
+				class:active={sortCol === "tutelles"}
 				onclick={() => toggleSort("tutelles")}
 			>
 				Tutelles
@@ -201,45 +203,8 @@
 	.toolbar input[type="search"] {
 		width: 260px;
 	}
-	table {
-		width: 100%;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		overflow: hidden;
-	}
-	thead th {
-		background: var(--surface);
-		padding: 9px 12px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 1px solid var(--border);
-		cursor: pointer;
-		user-select: none;
-		white-space: nowrap;
-	}
-	thead th:hover {
-		color: var(--text);
-	}
-	tbody tr {
-		border-bottom: 1px solid var(--border-subtle);
-	}
-	tbody tr:last-child {
-		border-bottom: none;
-	}
-	tbody tr:hover {
-		background: var(--surface-hover);
-	}
 	td {
-		padding: 10px 12px;
-		font-size: 0.95rem;
 		vertical-align: middle;
-	}
-	td a:not(.id-badge, .lab-tag, .source-tag):hover {
-		text-decoration: underline;
 	}
 	.lab-link {
 		text-decoration: none;

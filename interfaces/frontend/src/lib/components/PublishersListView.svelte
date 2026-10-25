@@ -186,7 +186,7 @@
 </div>
 
 <div class="table-scroll">
-<table class="publishers-table">
+<table class="data-table publishers-table">
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('name')}>
@@ -251,35 +251,8 @@
 />
 
 <style>
-	.publishers-table {
-		width: 100%;
-		min-width: 620px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.publishers-table thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.publishers-table thead th.num { text-align: right; }
-	.publishers-table thead th.sortable { cursor: pointer; user-select: none; }
-	.publishers-table thead th.sortable:hover { color: var(--accent); }
-	.publishers-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.publishers-table tbody tr:last-child { border-bottom: none; }
-	.publishers-table tbody tr:hover { background: var(--surface-hover); }	.publishers-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.publishers-table td.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-		color: var(--muted);
-	}
+	.publishers-table { min-width: 620px; }
+	.publishers-table td.num { color: var(--muted); }
 	.muted { color: var(--muted); }
 
 	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }

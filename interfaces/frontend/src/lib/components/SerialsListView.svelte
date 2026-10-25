@@ -228,7 +228,7 @@
 </div>
 
 <div class="table-scroll">
-<table class="journals-table">
+<table class="data-table journals-table">
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('title')}>
@@ -299,36 +299,8 @@
 		width: 280px;
 	}
 
-	.journals-table {
-		width: 100%;
-		min-width: 660px;
-		border-collapse: collapse;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-	}
-	.journals-table thead th {
-		background: var(--surface);
-		padding: 8px 10px;
-		text-align: left;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
-		border-bottom: 2px solid var(--border);
-		white-space: nowrap;
-	}
-	.journals-table thead th.num { text-align: right; }
-	.journals-table thead th.sortable { cursor: pointer; user-select: none; }
-	.journals-table thead th.sortable:hover { color: var(--accent); }
-	.journals-table tbody tr { border-bottom: 1px solid var(--border-subtle); }
-	.journals-table tbody tr:last-child { border-bottom: none; }
-	.journals-table tbody tr:hover { background: var(--surface-hover); }
-	.journals-table td { padding: 7px 10px; font-size: 0.95rem; vertical-align: top; }
-	.journals-table td.num {
-		text-align: right;
-		font-variant-numeric: tabular-nums;
-		color: var(--muted);
-	}
+	.journals-table { min-width: 660px; }
+	.journals-table td.num { color: var(--muted); }
 	.issn-cell {
 		color: var(--muted);
 		font-size: 0.85rem;
