@@ -2,7 +2,6 @@
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
-  import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
@@ -254,7 +253,7 @@
 
 <div class="page-feedback">
   <Breadcrumb
-    trail={[{ label: "Affiliations", href: resolve(currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses") }]}
+    trail={[{ label: "Affiliations", path: currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses" }]}
     current="Qualité de la détection"
   />
   <h2>Qualité de la détection</h2>

@@ -416,7 +416,7 @@
   <title>{pageTitle("Admin - Structure")}</title>
 </svelte:head>
 
-<Breadcrumb trail={[{ label: "Structures", href: resolve("admin/structures") }]} current={detail?.structure.acronym || detail?.structure.name} />
+<Breadcrumb trail={[{ label: "Structures", path: "admin/structures" }]} current={detail?.structure.acronym || detail?.structure.name} />
 
 {#if !detail}
   <p class="loading">Chargement…</p>

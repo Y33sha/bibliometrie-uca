@@ -29,7 +29,7 @@
 	<title>{pageTitle(titleText(monograph?.title) || 'Monographie')}</title>
 </svelte:head>
 
-	<Breadcrumb trail={[{ label: 'Monographies', href: resolve('monographs') }]} current={titleText(monograph?.title)} />
+	<Breadcrumb trail={[{ label: 'Monographies', path: 'monographs' }]} current={titleText(monograph?.title)} />
 
 {#if error}
 	<div class="no-results">Monographie introuvable</div>

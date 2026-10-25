@@ -116,7 +116,7 @@
 	<title>{pageTitle(journal?.title ?? 'Revue')}</title>
 </svelte:head>
 
-	<Breadcrumb trail={[{ label: 'Revues', href: resolve('journals') }]} current={journal?.title} />
+	<Breadcrumb trail={[{ label: 'Revues', path: 'journals' }]} current={journal?.title} />
 
 {#if error}
 	<div class="no-results">Revue introuvable</div>

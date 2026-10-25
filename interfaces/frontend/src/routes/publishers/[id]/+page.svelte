@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
-	import { resolve } from '$app/paths';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
@@ -99,7 +98,7 @@
 	<title>{pageTitle(publisher?.name ?? 'Éditeur')}</title>
 </svelte:head>
 
-	<Breadcrumb trail={[{ label: 'Éditeurs', href: resolve('publishers') }]} current={publisher?.name} />
+	<Breadcrumb trail={[{ label: 'Éditeurs', path: 'publishers' }]} current={publisher?.name} />
 
 {#if error}
 	<div class="no-results">Éditeur introuvable</div>

@@ -143,7 +143,7 @@
 	<title>{pageTitle(displayName || 'Personne')}</title>
 </svelte:head>
 
-<Breadcrumb trail={[{ label: 'Chercheurs', href: resolve('persons') }]} current={displayName} />
+<Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current={displayName} />
 
 {#if error}
 	<div class="no-results">Personne introuvable</div>

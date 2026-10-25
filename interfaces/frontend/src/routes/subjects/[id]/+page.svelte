@@ -60,7 +60,7 @@
   <title>{pageTitle(data?.subject.label ?? "Sujet")}</title>
 </svelte:head>
 
-<Breadcrumb trail={[{ label: "Sujets", href: resolve("subjects") }]} current={data?.subject.label} />
+<Breadcrumb trail={[{ label: "Sujets", path: "subjects" }]} current={data?.subject.label} />
 
   {#if error}
     <div class="error">Sujet introuvable.</div>

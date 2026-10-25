@@ -1,10 +1,14 @@
 <script lang="ts">
 	// Fil d'Ariane : position de la page dans l'arborescence du site. Les niveaux parents sont des liens, la page courante du texte.
+	import { resolve } from '$app/paths';
+	import type { PathnameWithSearchOrHash } from '$app/types';
+
 	let {
 		trail,
 		current
 	}: {
-		trail: { label: string; href: string }[];
+		/** Niveaux parents ; `path` est un chemin de l'application, relatif au préfixe de déploiement. `resolve` distribue son type d'argument sur chaque route et refuse donc une valeur typée par leur union : l'assertion du gabarit lève ce refus. */
+		trail: { label: string; path: PathnameWithSearchOrHash }[];
 		/** Libellé de la page courante ; absent tant que ses données chargent. */
 		current?: string | null;
 	} = $props();
@@ -12,8 +16,8 @@
 
 <nav class="breadcrumb" aria-label="Fil d'Ariane">
 	<ol>
-		{#each trail as step (step.href)}
-			<li><a href={step.href}>{step.label}</a></li>
+		{#each trail as step (step.path)}
+			<li><a href={resolve(...([step.path] as Parameters<typeof resolve>))}>{step.label}</a></li>
 		{/each}
 		{#if current}
 			<li><span aria-current="page">{current}</span></li>

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
-	import { resolve } from '$app/paths';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
@@ -143,7 +142,7 @@
 	<title>{pageTitle(lab ? structureLabel(lab) : 'Laboratoire')}</title>
 </svelte:head>
 
-<Breadcrumb trail={[{ label: 'Labos', href: resolve('laboratories') }]} current={lab?.acronym || lab?.name} />
+<Breadcrumb trail={[{ label: 'Labos', path: 'laboratories' }]} current={lab?.acronym || lab?.name} />
 
 {#if error}
 	<div class="no-results">Laboratoire introuvable</div>

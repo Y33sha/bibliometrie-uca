@@ -1,6 +1,5 @@
 <script lang="ts">
   import Breadcrumb from "#lib/components/Breadcrumb.svelte";
-  import { resolve } from "$app/paths";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
   import { apiDetail } from "#lib/api/index.js";
@@ -61,7 +60,7 @@
   <title>{pageTitle(titleText(pub?.title).slice(0, 80) || "Publication")}</title>
 </svelte:head>
 
-<Breadcrumb trail={[{ label: "Publications", href: resolve("publications") }]} current={titleText(pub?.title)} />
+<Breadcrumb trail={[{ label: "Publications", path: "publications" }]} current={titleText(pub?.title)} />
 
 {#if error}
   <div class="publication-header"><div class="no-results">Publication introuvable</div></div>
