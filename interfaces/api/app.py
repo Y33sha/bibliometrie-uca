@@ -92,11 +92,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# `root_path` : préfixe de déploiement (par exemple `/bibliometrie` en production).
-# Le serveur ASGI retire ce préfixe (uvicorn `--root-path` ou variable
-# d'environnement `UVICORN_ROOT_PATH`) avant que FastAPI route ; la valeur sert ici
-# à générer les URLs absolues d'OpenAPI et les redirections. Vide par défaut : en
-# développement local, ou derrière un reverse proxy qui le retire en amont.
+# `root_path` : préfixe de déploiement (par exemple `/bibliometrie` en production), vide à la
+# racine. Le routage l'ôte du chemin quand il y est, et laisse intact un chemin dont le reverse
+# proxy l'a retiré (cf. `route_path`).
 # Docs interactives coupées par défaut (`expose_api_docs`) : elles cartographient toute la
 # surface d'API, admin comprise. Activées en développement, absentes en production.
 _expose_docs = settings.expose_api_docs
