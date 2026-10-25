@@ -128,17 +128,16 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
 
 
 def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
-    """Plateforme d'une source OpenAlex de type `repository`, nommée comme OpenAlex la nomme. Son type est celui de la liste des plateformes connues, à défaut entrepôt."""
+    """Plateforme d'une source OpenAlex de type `repository`. Une plateforme de la liste des plateformes connues en prend le nom et le type ; une autre est un entrepôt, nommé comme OpenAlex le nomme."""
     if as_str(source.get("type")) != "repository":
         return None
     openalex_id = short_openalex_id(as_str(source.get("id")) or "")
     name = as_str(source.get("display_name"))
     if not openalex_id or not name:
         return None
-    known = known_platform_of_source(openalex_id)
-    return PlatformFacts(
-        openalex_id, name, known.platform_type if known else PlatformType.REPOSITORY
-    )
+    if known := known_platform_of_source(openalex_id):
+        return PlatformFacts(openalex_id, known.name, known.platform_type)
+    return PlatformFacts(openalex_id, name, PlatformType.REPOSITORY)
 
 
 def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str | None:

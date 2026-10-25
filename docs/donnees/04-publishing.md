@@ -24,5 +24,5 @@ Revues, monographies, éditeurs et frais de publication.
 | `serials`, `serial_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/serials/commands.py`) |
 | `publishers`, `publisher_name_forms` | mixte | créés et enrichis par le pipeline ; édités et fusionnés en admin (`application/services/publishers/commands.py`) |
 | `doi_prefixes` | pipeline | phases `resolve_ra` et `publishing` |
-| `platforms` | pipeline | phase `normalize`, d'après les localisations OpenAlex et HAL (`pipeline/ingestion/common/locations.py`) |
+| `platforms` | pipeline | phase `normalize`, d'après les localisations OpenAlex et HAL et les identifiants arXiv et PMCID (`pipeline/ingestion/common/locations.py`) ; une plateforme connue (`domain/platforms/registry.py`) en prend le nom et le type |
 | `apc_payments` | import CSV | `interfaces/cli/imports/import_apc.py` |

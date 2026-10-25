@@ -210,7 +210,7 @@ class TestGetLocations:
             "fileMain_s": "https://hal.science/hal-01/document",
             "licence_s": "http://creativecommons.org/licenses/by/",
         }
-        [location] = get_locations(doc)
+        [location] = get_locations(doc, None)
         assert (location.url, location.pdf_url, location.is_oa) == (
             "https://hal.science/hal-01",
             "https://hal.science/hal-01/document",
@@ -219,11 +219,19 @@ class TestGetLocations:
         assert location.platform.openalex_id == "S4306402512"
 
     def test_notice_sans_fichier_fermee(self):
-        [location] = get_locations({"uri_s": "https://hal.science/hal-02"})
+        [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)
         assert (location.pdf_url, location.is_oa) == (None, False)
 
+    def test_fichier_sous_embargo_ferme(self):
+        doc = {
+            "uri_s": "https://hal.science/hal-03",
+            "fileMain_s": "https://hal.science/hal-03/document",
+        }
+        [location] = get_locations(doc, date(2099, 1, 1))
+        assert location.is_oa is False
+
     def test_sans_notice(self):
-        assert get_locations({}) == []
+        assert get_locations({}, None) == []
 
 
 class TestParseTeiIsbns:

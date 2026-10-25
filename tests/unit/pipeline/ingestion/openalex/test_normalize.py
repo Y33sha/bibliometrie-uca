@@ -97,7 +97,10 @@ class TestGetLocations:
         }
         [location] = get_locations(work)
         assert location.platform is not None
-        assert location.platform.platform_type is PlatformType.PREPRINT_SERVER
+        assert (location.platform.name, location.platform.platform_type) == (
+            "arXiv",
+            PlatformType.PREPRINT_SERVER,
+        )
 
     def test_un_entrepot_donne_sa_plateforme_et_son_identifiant_oai(self):
         work = {
@@ -125,11 +128,7 @@ class TestGetLocations:
                 version="submittedVersion",
                 license=License.CC_BY,
                 is_oa=True,
-                platform=PlatformFacts(
-                    "S4306402512",
-                    "HAL (Le Centre pour la Communication Scientifique Directe)",
-                    PlatformType.REPOSITORY,
-                ),
+                platform=PlatformFacts("S4306402512", "HAL", PlatformType.REPOSITORY),
             )
         ]
 
