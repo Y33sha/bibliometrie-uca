@@ -99,7 +99,16 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ### Phase 4 — Embeddings
 
-- [ ] Décision de mener la phase, d'après les aberrations au grain topic restantes après les phases 2 et 3
+- [x] Décision de mener la phase : les pistes au grain domain ou field n'atteignent pas les topics aberrants sous un domain correct
+- [x] Prototype sans centroïdes, modèle multilingue `intfloat/multilingual-e5-base` : similarité entre la publication (titre et résumé) et le chemin complet de chaque libellé, règle descendante.
+
+  | Score | AUC domain / field / subfield / topic |
+  |---|---|
+  | Similarité cosinus | 0,67 / 0,71 / 0,72 / 0,71 |
+  | Rang parmi tous les libellés du niveau | 0,72 / 0,80 / 0,83 / 0,77 |
+  | Écart au meilleur libellé de la publication au même niveau | 0,71 / 0,71 / 0,71 / 0,69 |
+
+  Meilleurs points de fonctionnement, tous niveaux : écart ≤ −0,03, précision 70 %, rappel 32 % ; rang dans la moitié basse du niveau, précision 59 %, rappel 35 %. À précision égale, le rappel dépasse celui du vote (20 %). Le libellé seul, quelques mots, décrit mal un sujet : les centroïdes devraient faire mieux
 - [ ] Choix du modèle et de l'exécution (question ouverte « Specter2 »)
 - [ ] Embeddings des publications liées aux topics de l'échantillon ; centroïde par topic
 - [ ] Similarité cosinus des liens de l'échantillon ; précision et rappel selon le seuil
