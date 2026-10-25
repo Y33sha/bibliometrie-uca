@@ -204,7 +204,7 @@ def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
 
 
 class TestGetLocations:
-    def test_notice_avec_fichier_ouverte(self):
+    def test_depot_avec_fichier_ouvert(self):
         doc = {
             "uri_s": "https://hal.science/hal-01",
             "fileMain_s": "https://hal.science/hal-01/document",
@@ -218,7 +218,7 @@ class TestGetLocations:
         )
         assert location.platform.openalex_id == "S4306402512"
 
-    def test_notice_sans_fichier_fermee(self):
+    def test_depot_sans_fichier_ferme(self):
         [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)
         assert (location.pdf_url, location.is_oa) == (None, False)
 
@@ -230,7 +230,7 @@ class TestGetLocations:
         [location] = get_locations(doc, date(2099, 1, 1))
         assert location.is_oa is False
 
-    def test_sans_notice(self):
+    def test_sans_page_de_depot(self):
         assert get_locations({}, None) == []
 
 

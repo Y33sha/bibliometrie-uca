@@ -50,8 +50,8 @@ def test_les_copies_fermees_sont_ecartees():
     assert access([_copy("https://pubmed.ncbi.nlm.nih.gov/1", is_oa=False)]) == Access(None, [])
 
 
-def test_hal_decide_de_l_ouverture_de_ses_notices():
-    """OpenAlex dit ouverte une notice HAL sans fichier : la notice que donne HAL l'emporte."""
+def test_hal_decide_de_l_ouverture_de_ses_copies():
+    """OpenAlex dit ouverte une copie HAL sans fichier : la copie que donne HAL l'emporte."""
     copies = [
         _copy("https://hal.science/hal-1", platform="HAL", described=True, is_oa=False),
         _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),

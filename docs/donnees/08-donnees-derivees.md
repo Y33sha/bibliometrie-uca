@@ -1,6 +1,6 @@
 # Données dérivées
 
-*À jour le 2026-10-23.*
+*À jour le 2026-10-25.*
 
 Certaines données sont des **dérivés** recalculés à partir d'autres tables — vues matérialisées, tables satellites, colonnes dénormalisées. Ils existent pour accélérer la lecture (éviter à chaque requête des jointures ou des agrégations coûteuses) au prix d'une duplication qu'il faut tenir à jour. Cette page recense ces artefacts et la façon dont leur fraîcheur est maintenue.
 
@@ -27,10 +27,11 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | Colonne | Tables | Rafraîchie par |
 |---|---|---|
 | `perimeter_evidence`, d'où `in_perimeter` | `source_contributions` | phase `affiliations` |
-| `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `contributions` |
+| `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `finalize` |
 | `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
 | `is_corresponding`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
-| `publication_count` | `serials`, `publishers` | phase `contributions` |
+| `publication_count` | `serials`, `publishers` | phase `finalize` |
+| `publisher_id` | `serials` | phase `finalize`, d'après les publications |
 | `publication_count` | `addresses` | phase `publications` |
 | `usage_count` | `subjects` | phase `subjects` |
 

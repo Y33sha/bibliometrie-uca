@@ -1,6 +1,6 @@
 #  Normalisation
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-25.*
 
 ```mermaid
 flowchart LR
@@ -9,15 +9,18 @@ flowchart LR
         direction TB
         C[source_records]---D[source_contributions]
     end
-    C---journals---publishers
+    C---serials---publishers
+    C---L[source_record_locations]---platforms
     D---|source_contribution_addresses|F[addresses]
     classDef new  fill:#bbf
-    class C,D,F,journals,publishers new;
+    class C,D,F,L,serials,publishers,platforms new;
 ```
 
-Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers` et `serials`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
+Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers`, `serials` et `monographs`, écrit les localisations de chaque enregistrement source (`source_record_locations`) et leurs `platforms`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
 
-Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de revue. Seul un recueil d'actes existant de même titre le rattache. OpenAlex nomme la plateforme d'ebooks d'un éditeur « *éditeur* eBooks », et ScanR reprend ce nom comme revue. Ce titre n'est celui d'aucun conteneur : il ne crée pas de revue et ne reste pas dans `container_title`. Une localisation principale OpenAlex sur une telle plateforme donne l'éditeur de son organisation hôte.
+L'enregistrement source reçoit l'éditeur que nomme sa source, sauf une production hébergée sans être publiée : preprint, jeu de données, rapport, thèse, ou document DataCite sans publication en série ni monographie (`domain/publishers/attribution.py`). Les localisations et leurs plateformes sont décrites dans la fiche [plateformes](../agregats/platforms.md).
+
+Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de publication en série. Seul un recueil d'actes existant de même titre le rattache. OpenAlex nomme la plateforme d'ebooks d'un éditeur « *éditeur* eBooks », et ScanR reprend ce nom comme revue. Ce titre n'est celui d'aucun conteneur : il ne crée pas de publication en série et ne reste pas dans `container_title`. Une localisation principale OpenAlex sur une telle plateforme donne l'éditeur de son organisation hôte.
 
 Chaque normaliseur reporte dans `source_contributions` ce que sa source fournit pour chaque contribution source : identifiants de l'auteur (ORCID, IdRef…) et affiliations. Chaque identifiant prend sa forme canonique ; une valeur mal formée est écartée et journalisée.
 

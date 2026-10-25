@@ -1,6 +1,6 @@
 # Vue d'ensemble
 
-*À jour le 2026-10-12.*
+*À jour le 2026-10-25.*
 
 ## Entités principales et relations
 
@@ -68,7 +68,7 @@ Les tables se répartissent en un schéma par domaine. Le `search_path` de la ba
 
 - [`sources`](02-sources.md) — tables sources et staging
 - [`publications`](03-publications.md) — référentiel consolidé, contributions, sujets
-- [`publishing`](04-publishing.md) — revues, monographies, éditeurs, APC
+- [`publishing`](04-publishing.md) — publications en série, monographies, éditeurs, plateformes, APC
 - [`persons`](05-persons.md) — référentiel consolidé, identifiants, name forms, données RH, décisions humaines sur les contributions sources
 - [`structures`](06-structures.md) — référentiel institutionnel, périmètres, adresses
 - [`ref` et `ops`](07-ref-et-ops.md) — référentiels externes (pays, langues, ROR) et exploitation (configuration, journaux)

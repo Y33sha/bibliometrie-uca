@@ -1,6 +1,6 @@
 # Schéma `publications`
 
-*À jour le 2026-10-12.*
+*À jour le 2026-10-25.*
 
 Référentiel consolidé des productions de recherche et de leurs contributions. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de résolution d'entités.
 
@@ -13,8 +13,9 @@ flowchart LR
     apc_payments ---|DOI| publications
     source_records-->|match_or_create|publications
     publications---|publication_subjects|subjects
-    publications---journals
-    journals---publishers
+    publications---serials
+    serials---publishers
+    publications---publishers
 
 
     classDef manuel  fill:#8e5,stroke:#5a3
@@ -22,7 +23,7 @@ flowchart LR
     classDef csv fill:#fa5
     class apc_payments csv
     classDef auto fill:#adf,stroke:#58c
-    class source_records,publications,journals,publishers,contributions,persons,subjects auto
+    class source_records,publications,serials,publishers,contributions,persons,subjects auto
     classDef main stroke-width:4px,font-weight:bold
     class structures,publications,persons,contributions main
 ```

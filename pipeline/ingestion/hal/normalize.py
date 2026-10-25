@@ -126,7 +126,7 @@ def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> s
 
 
 def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
-    """La notice HAL (`uri_s`), avec le fichier déposé (`fileMain_s`) et sa licence. La notice est ouverte quand un fichier est déposé, hors embargo actif (`embargo_until`). Une notice sous embargo s'ouvre quand elle est renormalisée après la levée."""
+    """La page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`) et sa licence. La copie est ouverte quand un fichier est déposé, hors embargo actif (`embargo_until`). Une copie sous embargo s'ouvre quand elle est renormalisée après la levée."""
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
         return []

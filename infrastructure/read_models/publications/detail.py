@@ -309,7 +309,7 @@ _DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
 
 
 def get_publication_copies(conn: Connection, publication_id: int) -> tuple[list[Copy], set[str]]:
-    """Localisations des enregistrements sources de la publication, hors formes secondaires, et identifiants des enregistrements HAL dont la notice est ouverte. La notice qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
+    """Localisations des enregistrements sources de la publication, hors formes secondaires, et identifiants des enregistrements HAL dont la copie est ouverte. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text(f"""
             SELECT l.url, l.version, l.is_oa, pl.name AS platform,

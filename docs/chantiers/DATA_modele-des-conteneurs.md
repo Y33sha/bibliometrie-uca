@@ -165,13 +165,13 @@ Usages du type dans le code :
 - [x] Plateformes d'ebooks. Un titre « … eBooks », nom qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur et que ScanR reprend comme revue, n'est le titre d'aucun conteneur. Une localisation principale OpenAlex sur une plateforme d'ebooks donne l'éditeur de son organisation hôte (`d153cf532`). Type `ebook_platform` retiré (`48fbf4cf0`).
 - [x] Stock : oneshot `detach_ebook_platforms` (46 revues, 83 enregistrements sources détachés, 4 043 titres de conteneur retirés), puis phases `publications` et `finalize`.
 - [x] Une entrée de type inconnu présente dans le DOAJ devient une revue : 52 entrées `unknown` y sont. Les autres enrichissements touchent seulement des revues, sauf une dizaine d'entrées (`865aeaf95`).
-- [x] Localisations HAL : la notice et le fichier déposé, ouverte quand un fichier est déposé hors embargo (`5a6223609`). Localisations tirées des identifiants arXiv et PMCID, quelle que soit la source ; une plateforme connue prend le nom de la liste (`24f0d24f1`).
-- [x] Accès d'une publication d'après ses localisations : meilleure copie ouverte de chaque plateforme, par version puis par ordre d'arrivée ; sur HAL, la notice que donne HAL décide de l'ouverture. Le bouton « Accéder » mène à la meilleure copie, à défaut au DOI ; la liste omet la copie désignée par le DOI. « Référencé par » remplace la liste des sources : toutes sauf Crossref et DataCite, et HAL quand sa notice est ouverte. Les adresses des copies échappent à la règle des hôtes écrits dans le code ; le serveur en vérifie le schéma (`c23128941`, `7b06e34f7`, `bac85aabe`).
+- [x] Localisations HAL : la page du dépôt et le fichier déposé, ouverte quand un fichier est déposé hors embargo (`5a6223609`). Localisations tirées des identifiants arXiv et PMCID, quelle que soit la source ; une plateforme connue prend le nom de la liste (`24f0d24f1`).
+- [x] Accès d'une publication d'après ses localisations : meilleure copie ouverte de chaque plateforme, par version puis par ordre d'arrivée ; sur HAL, la copie que donne HAL décide de l'ouverture. Le bouton « Accéder » mène à la meilleure copie, à défaut au DOI ; la liste omet la copie désignée par le DOI. « Référencé par » remplace la liste des sources : toutes sauf Crossref et DataCite, et HAL quand sa copie est ouverte. Les adresses des copies échappent à la règle des hôtes écrits dans le code ; le serveur en vérifie le schéma (`c23128941`, `7b06e34f7`, `bac85aabe`).
 - [ ] Stock : oneshot `apply_known_platforms` (noms des plateformes connues), puis réhydratation et renormalisation de HAL et d'OpenAlex, seules sources qui portent des identifiants arXiv et PMCID.
 
 ### Phase 6 — Documentation
 
-- [ ] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`.
+- [x] Mise à jour de `docs/donnees`, `docs/pipeline` et `docs/agregats`, dont la fiche [plateformes et localisations](../agregats/platforms.md).
 
 ### Phase 7 — Défauts antérieurs au chantier
 

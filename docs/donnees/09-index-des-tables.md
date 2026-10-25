@@ -1,6 +1,6 @@
 # Index des tables
 
-*À jour le 2026-10-12.*
+*À jour le 2026-10-25.*
 
 ## Vue macro
 
@@ -13,8 +13,10 @@ flowchart TB
         source_contributions --> source_contribution_addresses --> addresses
     end
 
-    subgraph publishing["Revues & éditeurs"]
-        journals --> publishers
+    subgraph publishing["Édition"]
+        serials --> publishers
+        monographs --> serials
+        platforms
     end
 
     subgraph canon["Référentiel consolidé"]
@@ -78,10 +80,10 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |
 | `doi_prefixes` | cache préfixe DOI → agence + éditeur | [publishing](04-publishing.md) |
 | `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de l'échec | [sources](02-sources.md) |
-| `serial_doi_namespaces` | espaces de noms DOI qui désignent une revue | [publishing](04-publishing.md) |
-| `serial_issns` | ISSN des revues | [publishing](04-publishing.md) |
-| `serial_name_forms` | formes de noms pour reconnaître une revue | [publishing](04-publishing.md) |
-| `serials` | référentiel des revues | [publishing](04-publishing.md) |
+| `serial_doi_namespaces` | espaces de noms DOI qui désignent une publication en série | [publishing](04-publishing.md) |
+| `serial_issns` | ISSN des publications en série | [publishing](04-publishing.md) |
+| `serial_name_forms` | formes de noms pour reconnaître une publication en série | [publishing](04-publishing.md) |
+| `serials` | référentiel des publications en série | [publishing](04-publishing.md) |
 | `language_forms` | formes sous lesquelles les sources désignent une langue | [ref](07-ref-et-ops.md) |
 | `languages` | référentiel des langues | [ref](07-ref-et-ops.md) |
 | `monographs` | livres et volumes d'actes de congrès | [publishing](04-publishing.md) |
