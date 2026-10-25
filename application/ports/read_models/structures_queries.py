@@ -130,11 +130,12 @@ class PartnerFacetOption(BaseModel):
     count: int
 
 
-class StructurePartnersResponse(BaseModel):
+class StructurePartnersResponse(PaginatedResponse):
     """Organisations partenaires d'une structure, les plus fréquentes en tête, et les options de leurs filtres."""
 
-    total: int
     partners: list[StructurePartner]
+    years: list[PartnerFacetOption]
+    """Années des copublications, chacune avec son nombre de publications."""
     countries: list[PartnerFacetOption]
     types: list[PartnerFacetOption]
 

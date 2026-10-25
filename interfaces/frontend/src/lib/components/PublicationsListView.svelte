@@ -311,6 +311,14 @@
 			hideWhenEmpty: true,
 		},
 		{
+			key: 'partner',
+			control: 'entity',
+			label: 'Organisation partenaire',
+			param: 'partner_ror',
+			entity: 'partner',
+			group: 'Auteurs',
+		},
+		{
 			key: 'countries',
 			control: 'checkbox',
 			label: 'Pays',

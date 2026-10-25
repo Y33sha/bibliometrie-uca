@@ -84,8 +84,8 @@ Lecture par source :
 
 ### 4. Interface
 
-- [ ] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
-- [ ] Facette « Organisation partenaire » dans la recherche de publications.
+- [x] Onglet « Collaborations » de la page d'une structure : organisations partenaires classées par nombre de copublications, filtrables par période, pays et type d'organisation, avec le lien vers les copublications.
+- [x] Facette « Organisation partenaire » dans la recherche de publications.
 - [ ] Dimension « partenaire » dans le pivot des statistiques.
 - [ ] Export du réseau (CSV, GEXF) pour Gephi ou VOSviewer.
 

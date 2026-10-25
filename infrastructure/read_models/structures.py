@@ -45,13 +45,12 @@ _PARTNER_LINKS = """
         SELECT rr.parent_ror_id FROM ror_relations rr JOIN own_rors r ON rr.child_ror_id = r.ror_id
     ),
     links AS (
-        SELECT pr.publication_id, pr.ror_id
+        SELECT pr.publication_id, pr.ror_id, p.publication_year
         FROM publication_structures ps
         JOIN publications p ON p.id = ps.publication_id
         JOIN publication_rors pr ON pr.publication_id = ps.publication_id
         WHERE ps.structure_id = :structure_id
           AND pr.ror_id NOT IN (SELECT ror_id FROM own_rors)
-          AND (CAST(:years AS integer[]) = '{}' OR p.publication_year = ANY(:years))
     )
 """
 
@@ -63,6 +62,7 @@ def _ror_type_label(value: str) -> str:
         return value
 
 
+_PARTNER_YEAR = "(CAST(:years AS integer[]) = '{}' OR l.publication_year = ANY(:years))"
 _PARTNER_COUNTRY = "(CAST(:countries AS text[]) = '{}' OR ro.country_code = ANY(:countries))"
 _PARTNER_TYPE = (
     "(CAST(:types AS text[]) = '{}' OR CAST(ro.types AS text[]) && CAST(:types AS text[]))"
@@ -343,7 +343,7 @@ class PgStructuresQueries(StructuresQueries):
                 FROM links l
                 LEFT JOIN ror_organizations ro ON ro.ror_id = l.ror_id
                 LEFT JOIN countries c ON c.code = ro.country_code
-                WHERE {_PARTNER_COUNTRY} AND {_PARTNER_TYPE}
+                WHERE {_PARTNER_YEAR} AND {_PARTNER_COUNTRY} AND {_PARTNER_TYPE}
                 GROUP BY l.ror_id, ro.name, ro.country_code, c.name, ro.types
                 ORDER BY n DESC, ro.name NULLS LAST, l.ror_id
                 LIMIT :lim OFFSET :off
@@ -357,7 +357,7 @@ class PgStructuresQueries(StructuresQueries):
                 FROM links l
                 JOIN ror_organizations ro ON ro.ror_id = l.ror_id
                 LEFT JOIN countries c ON c.code = ro.country_code
-                WHERE ro.country_code IS NOT NULL AND {_PARTNER_TYPE}
+                WHERE ro.country_code IS NOT NULL AND {_PARTNER_YEAR} AND {_PARTNER_TYPE}
                 GROUP BY ro.country_code, c.name
                 ORDER BY n DESC, label
             """),  # noqa: S608
@@ -369,14 +369,28 @@ class PgStructuresQueries(StructuresQueries):
                 FROM links l
                 JOIN ror_organizations ro ON ro.ror_id = l.ror_id
                 CROSS JOIN LATERAL unnest(CAST(ro.types AS text[])) AS t
-                WHERE {_PARTNER_COUNTRY}
+                WHERE {_PARTNER_YEAR} AND {_PARTNER_COUNTRY}
                 GROUP BY t
                 ORDER BY n DESC, t
             """),  # noqa: S608
             binds,
         ).all()
+        years_rows = self._conn.execute(
+            text(f"""{_PARTNER_LINKS}
+                SELECT CAST(l.publication_year AS text) AS value,
+                       COUNT(DISTINCT l.publication_id) AS n
+                FROM links l
+                LEFT JOIN ror_organizations ro ON ro.ror_id = l.ror_id
+                WHERE l.publication_year IS NOT NULL AND {_PARTNER_COUNTRY} AND {_PARTNER_TYPE}
+                GROUP BY l.publication_year
+                ORDER BY l.publication_year DESC
+            """),  # noqa: S608
+            binds,
+        ).all()
         return StructurePartnersResponse(
             total=rows[0].total if rows else 0,
+            page=page,
+            per_page=per_page,
             partners=[
                 StructurePartner(
                     ror_id=r.ror_id,
@@ -388,6 +402,7 @@ class PgStructuresQueries(StructuresQueries):
                 )
                 for r in rows
             ],
+            years=[PartnerFacetOption(value=r.value, label=r.value, count=r.n) for r in years_rows],
             countries=[
                 PartnerFacetOption(value=r.value, label=r.label, count=r.n) for r in countries_rows
             ],

@@ -49,6 +49,9 @@ def test_filtre_par_pays_et_par_annee(sa_sync_conn):
     assert _partners(sa_sync_conn, structure, countries=["fr"]).total == 0
     assert _partners(sa_sync_conn, structure, years=[2023]).total == 0
     assert _partners(sa_sync_conn, structure, years=[2024]).total == 1
+    assert [(o.value, o.count) for o in _partners(sa_sync_conn, structure, years=[2023]).years] == [
+        ("2024", 1)
+    ]
 
 
 def test_les_publications_se_filtrent_par_organisation_partenaire(sa_sync_conn):

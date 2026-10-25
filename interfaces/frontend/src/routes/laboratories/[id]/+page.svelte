@@ -15,6 +15,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
+	import PartnersTab from './PartnersTab.svelte';
 
 	const labId = $derived(page.params.id);
 	let canGoBack = $state(false);
@@ -33,7 +34,7 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'addresses'];
+	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', 'addresses'];
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
@@ -208,6 +209,7 @@
 			{ id: 'publications', label: 'Publications' },
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
 			{ id: 'persons', label: 'Personnes' },
+			{ id: 'collaborations', label: 'Collaborations' },
 			{ id: 'addresses', label: 'Adresses' },
 		]}
 		onswitch={onTabSwitch}
@@ -301,6 +303,13 @@
 				urlSync={false}
 				apiKey={`lab-${lab.id}-persons`}
 			/>
+		</div>
+	{/if}
+
+	<!-- Tab: Collaborations -->
+	{#if activeTab === 'collaborations'}
+		<div class="tab-content">
+			<PartnersTab labId={lab.id} />
 		</div>
 	{/if}
 

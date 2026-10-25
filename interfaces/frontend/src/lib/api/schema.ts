@@ -5406,12 +5406,20 @@ export interface components {
         StructurePartnersResponse: {
             /** Total */
             total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
             /** Partners */
             partners: components["schemas"]["StructurePartner"][];
+            /** Years */
+            years: components["schemas"]["PartnerFacetOption"][];
             /** Countries */
             countries: components["schemas"]["PartnerFacetOption"][];
             /** Types */
             types: components["schemas"]["PartnerFacetOption"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * StructureRef
