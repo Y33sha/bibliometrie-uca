@@ -39,6 +39,19 @@
 
   const thesesSource = $derived(data?.sources.find((s) => s.source === "theses"));
 
+  // Résumé replié à quelques lignes ; « Lire la suite » n'apparaît que s'il dépasse.
+  let abstractEl = $state<HTMLDivElement | undefined>();
+  let abstractOpen = $state(false);
+  let abstractOverflows = $state(false);
+  $effect(() => {
+    void pub?.abstract;
+    abstractOpen = false;
+  });
+  $effect(() => {
+    if (!abstractEl || abstractOpen) return;
+    abstractOverflows = abstractEl.scrollHeight > abstractEl.clientHeight + 2;
+  });
+
   async function loadData(id: string) {
     data = await apiDetail<PubResponse>(`/api/publications/${id}`);
   }
@@ -63,9 +76,9 @@
 <Breadcrumb trail={[{ label: "Publications", path: "publications" }]} current={titleText(pub?.title)} />
 
 {#if error}
-  <div class="publication-header"><div class="no-results">Publication introuvable</div></div>
+  <div class="no-results">Publication introuvable</div>
 {:else if !pub}
-  <div class="publication-header"><div class="loading">Chargement…</div></div>
+  <div class="loading">Chargement…</div>
 {:else}
   <PublicationHeader {pub} relations={data!.relations} />
 
@@ -81,6 +94,20 @@
       {/if}
 
       <div class="detail-body">
+        {#if pub.abstract}
+          <div class="detail-section">
+            <div class="detail-label">Résumé</div>
+            <div class="abstract-text" class:clamped={!abstractOpen} class:overflows={abstractOverflows} bind:this={abstractEl}>
+              <PublicationAbstract resume={pub.abstract} />
+            </div>
+            {#if abstractOverflows || abstractOpen}
+              <button type="button" class="read-more" onclick={() => (abstractOpen = !abstractOpen)}>
+                {abstractOpen ? "Réduire" : "Lire la suite"}
+              </button>
+            {/if}
+          </div>
+        {/if}
+
         {#if hasTruthTable && pub.doc_type !== "thesis" && pub.doc_type !== "ongoing_thesis"}
           <PersonsBlock contributions={data!.contributions} />
         {/if}
@@ -88,13 +115,6 @@
         <StructuresBlock {structureIds} structures={data!.structures} />
 
         <SubjectsBlock subjects={data!.subjects} keywords={data!.keywords} />
-
-        {#if pub.abstract}
-          <div class="detail-section">
-            <div class="detail-label">Résumé</div>
-            <div class="abstract-text"><PublicationAbstract resume={pub.abstract} /></div>
-          </div>
-        {/if}
       </div>
     </div>
 
@@ -109,18 +129,11 @@
 {/if}
 
 <style>
-  .publication-header {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 24px;
-    margin-bottom: 16px;
-  }
-  /* Deux colonnes : contenu à gauche, accès et identifiants à droite. Replie en une colonne (sidebar sous le contenu) en dessous de 860px. */
+  /* Deux colonnes : contenu à gauche, accès et sources à droite. Replie en une colonne (encadré sous le contenu) en dessous de 860px. */
   .detail-layout {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 300px;
-    gap: 16px;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 48px;
     align-items: start;
   }
   .detail-main {
@@ -131,31 +144,42 @@
       grid-template-columns: 1fr;
     }
   }
-  /* Panneau unique regroupant les sections plates (structures, personnes, relations, sujets, résumé), séparées par des filets fins. */
-  .detail-body {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 8px 24px;
-    margin-bottom: 16px;
-  }
-  .detail-body:empty {
-    display: none;
-  }
   .abstract-text {
-    font-size: 0.95rem;
-    line-height: 1.6;
+    max-width: 75ch;
+    font-size: 1.02rem;
+    line-height: 1.65;
     color: var(--text);
     margin: 0;
   }
+  /* Six lignes environ ; fondu sur la dernière quand le résumé dépasse. */
+  .abstract-text.clamped {
+    max-height: calc(1.65em * 6);
+    overflow: hidden;
+  }
+  .abstract-text.clamped.overflows {
+    mask-image: linear-gradient(to bottom, black 70%, transparent);
+  }
 
   /* Le résumé garde les paragraphes que la source y dépose : conteneur en `div`, un `p` ne
-     pouvant pas en contenir un autre. Le dernier ne pousse pas la bordure de la section. */
+     pouvant pas en contenir un autre. */
   .abstract-text :global(p) {
     margin: 0 0 0.75rem;
   }
 
   .abstract-text :global(p:last-child) {
     margin-bottom: 0;
+  }
+  .read-more {
+    margin-top: 6px;
+    padding: 4px 0;
+    border: none;
+    background: none;
+    font: inherit;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .read-more:hover {
+    text-decoration: underline;
   }
 </style>

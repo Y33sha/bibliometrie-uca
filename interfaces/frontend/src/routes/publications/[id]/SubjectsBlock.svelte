@@ -5,6 +5,11 @@
 
   let { subjects, keywords }: { subjects: Subject[]; keywords: string[] } = $props();
 
+  // Mots-clés libres repliés au-delà des premiers.
+  const KEYWORD_CAP = 12;
+  let showAllKeywords = $state(false);
+  const shownKeywords = $derived(showAllKeywords ? keywords : keywords.slice(0, KEYWORD_CAP));
+
   function tooltip(s: Subject): string {
     return `Source : ${s.sources.join(", ")}`;
   }
@@ -23,9 +28,14 @@
     {#if keywords.length > 0}
       <div class="detail-sublabel">Mots-clés libres</div>
       <div class="detail-tags">
-        {#each keywords as kw (kw)}
+        {#each shownKeywords as kw (kw)}
           <span class="detail-tag free-keyword">{kw}</span>
         {/each}
+        {#if keywords.length > KEYWORD_CAP}
+          <button type="button" class="btn-add" onclick={() => (showAllKeywords = !showAllKeywords)}>
+            {showAllKeywords ? "Réduire" : `Voir les ${keywords.length} mots-clés`}
+          </button>
+        {/if}
       </div>
     {/if}
   </div>

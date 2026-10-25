@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
-  import { docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
+  import { docTypeColor, docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
   import type { PubDetail, RelatedPublication } from "./types";
 
   const { pub, relations = [] }: { pub: PubDetail; relations?: RelatedPublication[] } = $props();
@@ -30,8 +30,9 @@
 
 <div class="publication-header">
   <div class="publication-meta">
-    {#if pub.doc_type}<span class="doc-type-tag">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+    {#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
     {#if pub.publication_year}<span class="publication-year">{pub.publication_year}</span>{/if}
+    {#if pub.doi}<a class="publication-doi" href="https://doi.org/{pub.doi}" target="_blank" rel="noopener"><span class="doi-label">DOI</span> {pub.doi}</a>{/if}
   </div>
   <h1 class="publication-title-main"><PublicationTitle titre={pub.title} /></h1>
 
@@ -100,37 +101,38 @@
 
 <style>
   .publication-header {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 24px;
-    margin-bottom: 16px;
+    margin-bottom: 28px;
   }
   .publication-title-main {
-    font-size: 1.3rem;
-    font-weight: 600;
-    margin: 0 0 10px;
-    line-height: 1.4;
+    margin: 12px 0 12px;
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.25;
+    letter-spacing: -0.015em;
   }
   .publication-meta {
     display: flex;
-    gap: 10px;
+    gap: 6px 14px;
     align-items: center;
     flex-wrap: wrap;
-    margin-bottom: 10px;
-    font-size: 1rem;
-    color: var(--muted);
+    font-size: 0.9rem;
+    color: var(--text-secondary);
   }
   .publication-year {
     font-weight: 600;
   }
-  .doc-type-tag {
-    background: var(--accent);
-    color: #fff;
-    padding: 3px 9px;
-    border-radius: var(--radius);
-    font-size: 0.92rem;
-    font-weight: 500;
+  .publication-doi {
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+  }
+  .publication-doi:hover {
+    color: var(--accent);
+  }
+  .doi-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--muted);
   }
 
   /* Bandeau des relations, en pied de header : volontairement voyant (fond teinté + filet d'accent épais), hiérarchisé par niveau de gravité (couleur + ordre) pour qu'on saisisse au premier coup d'œil qu'une publication est rattachée, corrigée ou rétractée. */
