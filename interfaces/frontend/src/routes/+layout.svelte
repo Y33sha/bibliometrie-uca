@@ -201,6 +201,7 @@
     height: var(--header-height);
   }
   .site-title {
+    white-space: nowrap;
     font-family: "Ubuntu", sans-serif;
     font-size: 1.15rem;
     font-weight: 500;
@@ -222,6 +223,7 @@
   }
   /* Rubrique : pastille arrondie, fond plus clair pour la rubrique active. */
   .nav-link {
+    white-space: nowrap;
     color: rgba(255, 255, 255, 0.85);
     text-decoration: none;
     font-size: 0.92rem;
@@ -302,8 +304,18 @@
     padding: 24px;
   }
 
-  /* ── Responsive : hamburger + menu vertical sous 860px ── */
-  @media (max-width: 860px) {
+  /* ── Largeur intermédiaire : rubriques sans icône, plus serrées, pour tenir sur une ligne ── */
+  @media (max-width: 1100px) {
+    .nav-icon {
+      display: none;
+    }
+    .nav-link {
+      padding: 0 9px;
+    }
+  }
+
+  /* ── Responsive : hamburger + menu vertical sous 940px ── */
+  @media (max-width: 940px) {
     .nav-toggle {
       display: flex;
       align-items: center;

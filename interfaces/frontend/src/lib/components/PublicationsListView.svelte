@@ -592,7 +592,7 @@
 			{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
 		{/each}
 		<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
-			Plus de filtres
+			{showMoreFilters ? 'Cacher les filtres' : 'Plus de filtres'}
 			{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
 			<span class="more-filters-arrow">{showMoreFilters ? '▴' : '▾'}</span>
 		</button>
@@ -817,7 +817,6 @@
 	.more-filters-btn:hover,
 	.more-filters-btn.open { background: var(--hover); }
 	.more-filters-arrow { font-size: 0.7rem; }
-	/* Panneau « Plus de filtres » : une ligne par rubrique, libellé à gauche. */
 	/* Facettes optionnelles sur une ligne, rubriques séparées par un filet vertical. */
 	.more-filters {
 		display: flex;
