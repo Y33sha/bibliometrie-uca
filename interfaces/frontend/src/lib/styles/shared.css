@@ -98,12 +98,29 @@
 	font-family: inherit;
 }
 
+/* Champ de recherche d'une barre d'outils, loupe à gauche. */
+.toolbar input[type='search']:not(.facet-search) {
+	height: 36px;
+	padding: 0 12px 0 34px;
+	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-3.5-3.5'/%3E%3C/svg%3E") no-repeat 11px center;
+}
+
+/* Menu déroulant natif au gabarit des boutons de filtre : sans bordure, flèche dessinée, fond au survol. */
 .toolbar select {
-	padding: 6px 10px;
-	border: 1px solid var(--border);
+	appearance: none;
+	height: 34px;
+	padding: 0 26px 0 10px;
+	border: none;
 	border-radius: var(--radius);
-	font-size: 0.95rem;
-	font-family: inherit;
+	background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 500;
+	color: var(--text);
+	cursor: pointer;
+}
+.toolbar select:hover {
+	background-color: var(--hover);
 }
 
 /* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
@@ -116,19 +133,37 @@
 	flex: 1;
 }
 
-/* Toolbar card variant (with background, border, padding) */
+/* Zone recherche et filtres d'une liste. Le fond de page masque les lignes qui défilent sous la barre collante. */
 .toolbar-card {
-	padding: 10px 14px;
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
+	padding: 10px 0;
+	background: var(--bg);
 }
 
-/* Sticky toolbar variant */
+/* Barre collante sous le menu supérieur */
 .toolbar-sticky {
 	position: sticky;
-	top: 46px;
+	top: var(--header-height);
 	z-index: 50;
+}
+
+/* Action principale d'une barre d'outils (lien vers une autre vue) */
+.toolbar-action {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	height: 36px;
+	padding: 0 14px;
+	border-radius: var(--radius);
+	background: var(--accent);
+	color: white;
+	font-size: 0.9rem;
+	font-weight: 600;
+	text-decoration: none;
+	white-space: nowrap;
+}
+.toolbar-action:hover {
+	background: color-mix(in srgb, var(--accent), black 20%);
+	text-decoration: none;
 }
 
 /* ── Facettes : bouton, panneau et options des filtres de liste (FacetDropdown, EntityFilter, PresenceFilterToggle) ── */
@@ -140,22 +175,25 @@
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
-	padding: 6px 10px;
-	border: 1px solid var(--border);
+	height: 34px;
+	padding: 0 10px;
+	border: none;
 	border-radius: var(--radius);
-	background: var(--card);
-	font-size: 0.95rem;
+	background: transparent;
+	font-size: 0.9rem;
 	cursor: pointer;
 	color: var(--text);
 	white-space: nowrap;
 	font-family: inherit;
 }
 .facet-btn:hover {
-	border-color: color-mix(in srgb, var(--border), black 15%);
+	background: var(--hover);
 }
 .facet-btn.has-selection {
-	border-color: var(--accent);
+	border-radius: var(--radius-pill);
 	background: var(--accent-light);
+	color: var(--accent);
+	font-weight: 500;
 }
 /* Nombre de valeurs sélectionnées, sur le bouton. */
 .facet-badge {
@@ -248,30 +286,35 @@
 	}
 }
 
-/* ── Count badge (usually in toolbar) ── */
+/* ── Nombre de résultats (barre d'outils) ── */
 .count {
 	margin-left: auto;
 	font-size: 0.85rem;
-	color: var(--muted);
+	color: var(--text-secondary);
 	white-space: nowrap;
 }
 
-/* ── Export button ── */
+/* ── Action secondaire discrète (export) ── */
 .export-btn {
-	padding: 4px 10px;
-	border: 1px solid var(--border);
+	display: inline-flex;
+	align-items: center;
+	height: 36px;
+	padding: 0 12px;
+	border: none;
 	border-radius: var(--radius);
-	background: var(--card);
-	font-size: 0.85rem;
-	color: var(--muted);
+	background: transparent;
+	font: inherit;
+	font-size: 0.9rem;
+	font-weight: 500;
+	color: var(--accent);
 	text-decoration: none;
 	cursor: pointer;
 	white-space: nowrap;
 }
 
 .export-btn:hover {
-	border-color: var(--accent);
-	color: var(--accent);
+	background: var(--hover);
+	text-decoration: none;
 }
 
 /* ── Data table ── */

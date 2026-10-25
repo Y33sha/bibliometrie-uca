@@ -636,7 +636,7 @@
 			</button>
 		{/if}
 	{/if}
-	<a class="publication-link" href={pubsUrl}>Voir les publications &rarr;</a>
+	<a class="toolbar-action pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
 <!-- Ligne 2 : filtres à facettes, dérivés du registre `pivotSchema` (cf. `facetKeys`). -->
 <div class="toolbar facets-row">
@@ -686,7 +686,7 @@
 {/if}
 <div class="chart-area">
 	<canvas bind:this={chartCanvas}></canvas>
-	<button type="button" class="chart-export" onclick={exportChartPng}>Export PNG</button>
+	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
 {#if chartCatTotal > CHART_PAGE_SIZE}
 	<Pagination
@@ -706,42 +706,14 @@
 		flex-direction: column;
 		min-height: 0;
 	}
-	.publication-link {
-		margin-left: auto;
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		padding: 8px 14px;
-		background: var(--accent);
-		color: white;
-		text-decoration: none;
-		border-radius: var(--radius);
-		font-size: 0.95rem;
-		font-weight: 500;
-	}
-	.publication-link:hover { opacity: 0.9; }
+	.pubs-link { margin-left: auto; }
 
-	.toolbar {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 12px;
-	}
 	.facets-row { margin-bottom: 16px; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.groupby {
 		font-size: 0.9rem;
 		color: var(--muted);
 		white-space: nowrap;
-	}
-	.groupby select {
-		font-family: inherit;
-		font-size: 0.9rem;
-		padding: 5px 8px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		background: var(--card);
 	}
 	/* Séparateur vertical léger entre les groupes de contrôles du pivot. */
 	.sep {
@@ -754,11 +726,12 @@
 		font-family: inherit;
 		font-size: 1rem;
 		line-height: 1;
-		padding: 5px 9px;
-		border: 1px solid var(--border);
+		height: 34px;
+		padding: 0 10px;
+		border: none;
 		border-radius: var(--radius);
-		background: var(--card);
-		color: var(--muted);
+		background: transparent;
+		color: var(--text-secondary);
 		cursor: pointer;
 	}
 	.sort-dir:hover {
@@ -802,14 +775,7 @@
 		position: absolute;
 		top: 8px;
 		right: 8px;
-		padding: 4px 10px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
 		background: var(--card);
-		font-size: 0.85rem;
-		color: var(--muted);
-		cursor: pointer;
-		font-family: inherit;
 		opacity: 0;
 		transition: opacity 0.15s;
 	}
@@ -817,8 +783,7 @@
 		opacity: 1;
 	}
 	.chart-export:hover {
-		border-color: var(--accent);
-		color: var(--accent);
+		background: var(--hover);
 	}
 
 </style>

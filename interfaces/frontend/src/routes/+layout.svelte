@@ -152,6 +152,11 @@
     font-size: 0.95rem;
     color: inherit;
   }
+  :global(:where(input[type="search"]):focus) {
+    outline: none;
+    border-color: var(--accent-mid);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-mid) 20%, transparent);
+  }
   :global(input[type="search"]::-webkit-search-cancel-button) {
     -webkit-appearance: none;
     appearance: none;

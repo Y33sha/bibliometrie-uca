@@ -71,14 +71,14 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 
 ### Étape 3 — Recherche, filtres et menus
 
-- [ ] Zone recherche et filtres sans carte
-- [ ] Champ de recherche avec icône loupe, bordure fine, focus en couleur d'accent
-- [ ] Nombre de résultats en texte secondaire, sans encadré
-- [ ] Action principale en bouton plein couleur d'accent, actions secondaires (« Export CSV », « Export PNG ») en boutons discrets
-- [ ] Boutons de filtre sans bordure, fond au survol
+- [x] Zone recherche et filtres sans carte
+- [x] Champ de recherche avec icône loupe, bordure fine, focus en couleur d'accent
+- [x] Nombre de résultats en texte secondaire, sans encadré
+- [x] Action principale en bouton plein couleur d'accent, actions secondaires (« Export CSV », « Export PNG ») en boutons discrets
+- [x] Boutons de filtre sans bordure, fond au survol
 - [ ] Filtre actif en pastille couleur d'accent avec la valeur et une croix (« Années : 2020–2026 × », « Types : 6 sélectionnés × »), à la place des badges numérotés
-- [ ] Menus déroulants natifs (page Statistiques) au style des boutons de filtre
-- [ ] Pagination sans bordure, page active en couleur d'accent
+- [x] Menus déroulants natifs (page Statistiques) au style des boutons de filtre
+- [x] Pagination sans bordure, page active en couleur d'accent
 
 ### Étape 4 — Tableaux
 

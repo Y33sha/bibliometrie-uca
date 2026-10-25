@@ -51,10 +51,13 @@
 		margin: 16px 0;
 	}
 	button {
-		padding: 5px 12px;
-		border: 1px solid var(--border);
+		min-width: 34px;
+		height: 34px;
+		padding: 0 10px;
+		border: none;
 		border-radius: var(--radius);
-		background: var(--card);
+		background: transparent;
+		color: var(--text-secondary);
 		cursor: pointer;
 		font-size: 0.95rem;
 		font-family: inherit;
@@ -72,7 +75,7 @@
 	button.active {
 		background: var(--accent);
 		color: white;
-		border-color: var(--accent);
+		font-weight: 600;
 	}
 	.page-info {
 		font-size: 0.95rem;

@@ -583,7 +583,7 @@
 		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 		<span class="count">{listing.total} publication{listing.total > 1 ? 's' : ''}</span>
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
-		{#if showStatsLink}<a href={statsUrl} class="publication-link">Statistiques &rarr;</a>{/if}
+		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
 	</div>
 	<div class="toolbar publication-toolbar-facets">
 		<span class="facets-label">Filtrer par&nbsp;:</span>
@@ -798,37 +798,24 @@
 	.publication-toolbar { display: flex; flex-direction: column; gap: 8px; }
 	.publication-toolbar .toolbar { margin-bottom: 0; }
 	.publication-search { flex: 1; min-width: 220px; }
-	.publication-link {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		padding: 6px 12px;
-		background: var(--accent);
-		color: white;
-		text-decoration: none;
-		border-radius: var(--radius);
-		font-size: 0.9rem;
-		font-weight: 500;
-		white-space: nowrap;
-	}
-	.publication-link:hover { opacity: 0.9; }
 	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.more-filters-btn {
 		display: inline-flex;
 		align-items: center;
 		gap: 4px;
-		padding: 6px 10px;
-		border: 1px dashed var(--border);
+		height: 34px;
+		padding: 0 10px;
+		border: none;
 		border-radius: var(--radius);
 		background: none;
 		font: inherit;
-		font-size: 0.95rem;
-		color: var(--accent);
+		font-size: 0.9rem;
+		color: var(--text-secondary);
 		white-space: nowrap;
 		cursor: pointer;
 	}
 	.more-filters-btn:hover,
-	.more-filters-btn.open { border-color: var(--accent); }
+	.more-filters-btn.open { background: var(--hover); }
 	.more-filters-arrow { font-size: 0.7rem; }
 	/* Panneau « Plus de filtres » : une ligne par rubrique, libellé à gauche. */
 	.more-filters {
