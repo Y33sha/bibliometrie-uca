@@ -602,8 +602,7 @@
 			{#each sections.groups as g (g.label)}
 				{@const shown = g.filters.filter((f) => isShown(f, optionCount))}
 				{#if shown.length}
-					<div class="filter-group">
-						<span class="filter-group-label">{g.label}</span>
+					<div class="filter-group" role="group" aria-label={g.label} title={g.label}>
 						{#each shown as f (f.key)}{@render filterControl(f)}{/each}
 					</div>
 				{/if}
@@ -819,20 +818,20 @@
 	.more-filters-btn.open { background: var(--hover); }
 	.more-filters-arrow { font-size: 0.7rem; }
 	/* Panneau « Plus de filtres » : une ligne par rubrique, libellé à gauche. */
+	/* Facettes optionnelles sur une ligne, rubriques séparées par un filet vertical. */
 	.more-filters {
 		display: flex;
-		flex-direction: column;
-		gap: 8px;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 0;
 		padding-top: 8px;
 		border-top: 1px solid var(--border-subtle);
 	}
-	.filter-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-	.filter-group-label {
-		width: 130px;
-		flex-shrink: 0;
-		font-size: 0.85rem;
-		font-weight: 600;
-		color: var(--muted);
+	.filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+	.filter-group + .filter-group {
+		margin-left: 10px;
+		padding-left: 10px;
+		border-left: 1px solid var(--border);
 	}
 	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
