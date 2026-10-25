@@ -31,10 +31,11 @@ class TestKnownPlatforms:
         known = known_platform_of_source("S4306400194")
         assert known is not None
         assert (known.name, known.platform_type) == ("arXiv", PlatformType.PREPRINT_SERVER)
-        assert known_platform_of_source("S4406922393") is None
+        assert known_platform_of_source("S4306402634") is None
 
     def test_hal_est_une_archive(self):
         assert known_platform_of_source("S4306402512") == HAL
+        assert known_platform_of_source("S4406922393") == HAL  # portail HAL AMU
         assert HAL.platform_type is PlatformType.REPOSITORY
 
     def test_prefixe_de_plateforme_d_editeurs(self):

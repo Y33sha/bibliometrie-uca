@@ -1,4 +1,4 @@
-"""Liste fermée des plateformes connues : HAL, PubMed Central, Zenodo, serveurs de preprints et plateformes d'éditeurs. Une plateforme connue porte le nom de la liste.
+"""Liste fermée des plateformes connues : archives ouvertes, serveurs de preprints et plateformes d'éditeurs. Une plateforme connue porte le nom de la liste.
 
 Une plateforme d'éditeurs enregistre sous son propre préfixe DOI les articles des revues qu'elle diffuse : le titulaire du préfixe et le nom que Crossref donne à ces DOI sont alors la plateforme, pas l'éditeur. Un serveur de preprints se reconnaît par la source OpenAlex de ses localisations.
 
@@ -25,19 +25,25 @@ def _preprint_server(name: str, prefixes: set[str], openalex_ids: tuple[str, ...
     return KnownPlatform(name, PlatformType.PREPRINT_SERVER, frozenset(prefixes), openalex_ids)
 
 
-def _publisher_platform(name: str, prefixes: set[str]) -> KnownPlatform:
-    return KnownPlatform(name, PlatformType.PUBLISHER_PLATFORM, frozenset(prefixes))
+def _publisher_platform(
+    name: str, prefixes: set[str], openalex_ids: tuple[str, ...] = ()
+) -> KnownPlatform:
+    return KnownPlatform(name, PlatformType.PUBLISHER_PLATFORM, frozenset(prefixes), openalex_ids)
 
 
-HAL = KnownPlatform("HAL", PlatformType.REPOSITORY, openalex_ids=("S4306402512",))
-"""L'archive ouverte HAL, que HAL décrit lui-même et qu'OpenAlex décrit comme une de ses sources."""
+def _repository(name: str, openalex_ids: tuple[str, ...]) -> KnownPlatform:
+    return KnownPlatform(name, PlatformType.REPOSITORY, openalex_ids=openalex_ids)
 
-PUBMED_CENTRAL = KnownPlatform(
-    "PubMed Central", PlatformType.REPOSITORY, openalex_ids=("S2764455111",)
+
+HAL = _repository(
+    "HAL", ("S4306402512", "S4406922276", "S4406922393", "S4406922470", "S4377196329")
 )
-"""L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document."""
+"""L'archive ouverte HAL, que HAL décrit lui-même. OpenAlex range aussi des copies de HAL sous des sources de portails."""
 
-ZENODO = KnownPlatform("Zenodo", PlatformType.REPOSITORY, openalex_ids=("S4306400562",))
+PUBMED_CENTRAL = _repository("PubMed Central", ("S2764455111", "S4306400806"))
+"""L'archive de PubMed Central, que désigne aussi l'identifiant PMCID d'un document. La source OpenAlex de son miroir Europe PMC donne surtout des adresses de PubMed Central."""
+
+ZENODO = _repository("Zenodo", ("S4306400562",))
 """L'archive ouverte Zenodo, du CERN."""
 
 ARXIV = _preprint_server("arXiv", {"10.48550"}, ("S4306400194", "S4393918464"))
@@ -47,6 +53,8 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     HAL,
     PUBMED_CENTRAL,
     ZENODO,
+    _repository("Figshare", ("S4377196282",)),
+    _repository("CERN Document Server", ("S4306402195",)),
     ARXIV,
     _preprint_server("bioRxiv", {"10.1101", "10.64898"}, ("S4306402567",)),
     _preprint_server("medRxiv", {"10.1101", "10.64898"}, ("S3005729997",)),
@@ -68,7 +76,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _preprint_server("EdArXiv", set(), ("S4306402530",)),
     _preprint_server("EcoEvoRxiv", set(), ("S4306402488",)),
     _publisher_platform("Cairn", {"10.3917"}),
-    _publisher_platform("OpenEdition", {"10.4000"}),
+    _publisher_platform("OpenEdition", {"10.4000"}, ("S4306402281", "S4306401026")),
     _publisher_platform("Érudit", {"10.7202"}),
     _publisher_platform("Persée", {"10.3406"}),
     _publisher_platform("SciELO", {"10.1590", "10.4067", "10.7476"}),

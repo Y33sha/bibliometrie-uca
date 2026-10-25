@@ -35,6 +35,9 @@
     arXiv: asset('icons/arxiv.png'),
     "PubMed Central": asset('icons/ncbi.png'),
     Zenodo: asset('icons/zenodo.png'),
+    Figshare: asset('icons/figshare.png'),
+    "CERN Document Server": asset('icons/cds.ico'),
+    OpenEdition: asset('icons/openedition.png'),
   };
   // Pastilles colorées des icônes claires.
   const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
