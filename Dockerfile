@@ -5,7 +5,7 @@
 #
 # Préfixe de déploiement (URL sous laquelle l'appli est servie) :
 # - BASE_PATH consommé au BUILD par SvelteKit (URL générées en dur)
-# - ROOT_PATH consommé au RUNTIME par uvicorn (`--root-path`)
+# - ROOT_PATH consommé au RUNTIME par l'application FastAPI
 # Les deux doivent matcher. Vide par défaut → app servie à la racine (accès
 # direct sans reverse-proxy). Définir un sous-chemin pour un déploiement
 # derrière un proxy qui transmet ce préfixe :

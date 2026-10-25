@@ -39,7 +39,7 @@ from interfaces.api.models.errors import (
 )
 from interfaces.api.params import requested_offset
 from interfaces.api.rate_limit import read_allowed
-from interfaces.api.route_path import route_path
+from interfaces.api.route_path import RootPath, route_path
 from interfaces.api.session import check_auth_config, read_session
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
@@ -92,16 +92,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# `root_path` : préfixe de déploiement (par exemple `/bibliometrie` en production), vide à la
-# racine. Le routage l'ôte du chemin quand il y est, et laisse intact un chemin dont le reverse
-# proxy l'a retiré (cf. `route_path`).
+# Préfixe de déploiement (par exemple `/bibliometrie` en production), vide à la racine. Le
+# routage l'ôte du chemin quand il y est, et laisse intact un chemin dont le reverse proxy l'a
+# retiré (cf. `route_path`).
+ROOT_PATH = os.environ.get("ROOT_PATH", "")
+
 # Docs interactives coupées par défaut (`expose_api_docs`) : elles cartographient toute la
 # surface d'API, admin comprise. Activées en développement, absentes en production.
 _expose_docs = settings.expose_api_docs
 app = FastAPI(
     title="Bibliométrie",
     lifespan=lifespan,
-    root_path=os.environ.get("ROOT_PATH", ""),
     docs_url="/docs" if _expose_docs else None,
     redoc_url="/redoc" if _expose_docs else None,
     openapi_url="/openapi.json" if _expose_docs else None,
@@ -412,7 +413,7 @@ async def security_headers_middleware(
 # frontend est servi par l'API elle-même ; renseigné en développement, le serveur de
 # développement du frontend vivant sur un autre port.
 #
-# Déclaré en dernier, donc posé le plus à l'extérieur : les refus que composent les middlewares
+# Déclaré après eux, donc posé à leur extérieur : les refus que composent les middlewares
 # ci-dessus — 401 d'authentification, 429 des plafonds, 422 de pagination — portent alors les
 # en-têtes CORS comme les autres réponses. Sans cela, le navigateur d'une origine autorisée les
 # reçoit comme une erreur CORS opaque au lieu de leur code, et le message de refus est perdu.
@@ -423,6 +424,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Déclaré en dernier, donc posé le plus à l'extérieur : tout middleware trouve le préfixe dans la
+# requête.
+app.add_middleware(RootPath, root_path=ROOT_PATH)
 
 
 # ----- Include routers -----

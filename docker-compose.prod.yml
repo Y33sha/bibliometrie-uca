@@ -83,7 +83,7 @@ services:
       dockerfile: Dockerfile
       # Préfixe de déploiement (vide = racine). Définir ROOT_PATH dans .env
       # pour servir sous un sous-chemin derrière un reverse-proxy. La valeur
-      # doit être identique au build (frontend) et au runtime (uvicorn).
+      # doit être identique au build (frontend) et au runtime (application FastAPI).
       args:
         ROOT_PATH: ${ROOT_PATH:-}
     # Image nommée : le service `pipeline` la reprend telle quelle, sans reconstruire.

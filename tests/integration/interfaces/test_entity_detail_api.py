@@ -2,6 +2,7 @@
 
 import pytest
 
+from interfaces.api.app import ROOT_PATH
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import seed_serial
 
@@ -24,7 +25,7 @@ def test_absorbed_id_redirects_to_kept_with_query_string(client):
     r = client.get(f"/api/serials/{_ABSORBED_ID}?tab=dashboard", follow_redirects=False)
 
     assert r.status_code == 308
-    assert r.headers["location"] == f"{client.app.root_path}/api/serials/{kept}?tab=dashboard"
+    assert r.headers["location"] == f"{ROOT_PATH}/api/serials/{kept}?tab=dashboard"
     assert client.get(f"/api/serials/{_ABSORBED_ID}").json()["id"] == kept
 
 
