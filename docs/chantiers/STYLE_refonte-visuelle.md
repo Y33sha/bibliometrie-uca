@@ -127,7 +127,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 ### Étape 8 — Barre de navigation publique
 
 - [x] Rubriques en pastilles arrondies, rubrique active sur fond plus clair ; contraste des liens relevé ; hauteurs liées à `--header-height`
-- [ ] Choisir entre la barre teal et la barre blanche (rubrique active soulignée en teal) ; les deux s'essaient par `?nav=teal` et `?nav=clair` dans l'URL, mémorisé pour la session. Retirer ensuite la variante écartée et le mécanisme d'essai
+- [x] Barre teal retenue ; variante blanche écartée
 
 ### Étape 9 — Vérifications
 

@@ -23,18 +23,6 @@
   const isHalProblems = $derived(isActive("/hal-problems"));
   const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/monographs") || isActive("/subjects"));
 
-  // Essai de la barre publique : `?nav=clair` ou `?nav=teal` dans l'URL, mémorisé pour la session.
-  let navLight = $state(false);
-  $effect(() => {
-    const requested = page.url.searchParams.get("nav");
-    try {
-      if (requested) sessionStorage.setItem("nav", requested);
-      navLight = (requested ?? sessionStorage.getItem("nav")) === "clair";
-    } catch {
-      navLight = requested === "clair";
-    }
-  });
-
   let mobileNavOpen = $state(false);
   // Referme le menu mobile après chaque navigation.
   afterNavigate(() => {
@@ -55,7 +43,7 @@
   }
 </script>
 
-<div class="site-header" class:admin={isAdmin} class:light={navLight && !isAdmin}>
+<div class="site-header" class:admin={isAdmin}>
   {#if isAdmin}
     <div class="site-brand">
       <img src={asset('connectome.png')} alt="" class="site-icon" />
@@ -308,51 +296,6 @@
     font-weight: 600;
   }
 
-  /* Variante claire de la barre publique : fond teal très clair, rubrique active soulignée en teal au bas de la barre. */
-  .site-header.light {
-    background: var(--nav-light);
-    color: var(--text);
-    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, white);
-  }
-  .site-header.light .site-title {
-    color: var(--accent);
-  }
-  .site-header.light .nav-link,
-  .site-header.light .nav-switch-link {
-    color: var(--text-secondary);
-  }
-  /* Rubriques sur toute la hauteur de la barre : le trait de la rubrique active touche son bord inférieur. */
-  .site-header.light .nav-link {
-    height: var(--header-height);
-    border-radius: 0;
-  }
-  .site-header.light .nav-link:hover {
-    color: var(--text);
-    background: none;
-  }
-  .site-header.light .nav-link.active,
-  .site-header.light .nav-dropdown.active > .nav-link {
-    color: var(--accent);
-    font-weight: 600;
-    background: none;
-    box-shadow: inset 0 -3px 0 var(--accent-mid);
-  }
-  .site-header.light .nav-dropdown-menu {
-    background: var(--nav-light);
-    border: 1px solid var(--border);
-    border-top: none;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
-  }
-  .site-header.light .nav-dropdown-menu a {
-    color: var(--text);
-  }
-  .site-header.light .nav-dropdown-menu a:hover {
-    background: var(--hover);
-    color: var(--text);
-  }
-  .site-header.light .nav-dropdown-menu a.active {
-    color: var(--accent);
-  }
   .container {
     max-width: 1400px;
     margin: 0 auto;
@@ -382,10 +325,6 @@
     .site-header.admin .site-nav {
       background: var(--nav-admin);
     }
-    .site-header.light .site-nav {
-      background: var(--nav-light);
-      border-bottom: 1px solid var(--border);
-    }
     .site-nav.open {
       display: flex;
       /* Sur écran court, le menu déplié peut dépasser le bas du viewport : on borne sa hauteur et on le rend défilable pour atteindre le bas. */
@@ -397,9 +336,6 @@
       width: 100%;
       padding: 11px 22px;
       border-radius: 0;
-    }
-    .site-header.light .nav-link {
-      height: auto;
     }
     .nav-dropdown {
       height: auto;
