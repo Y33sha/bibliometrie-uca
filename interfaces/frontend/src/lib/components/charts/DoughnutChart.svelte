@@ -1,9 +1,7 @@
 <script lang="ts">
 	import { cssColor } from '#lib/components/charts/cssColor.js';
-	import { Chart, registerables, type LegendItem } from 'chart.js';
-	import ChartDataLabels from 'chartjs-plugin-datalabels';
-
-	Chart.register(...registerables, ChartDataLabels);
+	import type { LegendItem } from 'chart.js';
+	import { Chart } from '#lib/components/charts/chart.js';
 
 	export type DoughnutSegment = {
 		label: string;

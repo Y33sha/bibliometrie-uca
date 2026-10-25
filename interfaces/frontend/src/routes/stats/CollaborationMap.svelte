@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Chart } from 'chart.js';
+	import { Chart } from '#lib/components/charts/chart.js';
 	import { ChoroplethController, GeoFeature, ColorScale, ProjectionScale } from 'chartjs-chart-geo';
 	import { feature as topoFeature } from 'topojson-client';
 	import type { Topology } from 'topojson-specification';

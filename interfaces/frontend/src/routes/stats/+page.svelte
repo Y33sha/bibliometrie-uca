@@ -3,8 +3,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
-	import { Chart, registerables } from 'chart.js';
-	import ChartDataLabels from 'chartjs-plugin-datalabels';
+	import { Chart } from '#lib/components/charts/chart.js';
 	import { cssColor, oaStatusColor } from '#lib/components/charts/cssColor.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
@@ -25,8 +24,6 @@
 	} from '#lib/labels.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
-
-	Chart.register(...registerables, ChartDataLabels);
 
 	// Chaque changement de filtre relance le graphe : la requête précédente, encore en vol, est annulée.
 	const pivotRequest = latestRequest();

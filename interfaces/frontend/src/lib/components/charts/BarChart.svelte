@@ -1,9 +1,6 @@
 <script lang="ts">
 	import { cssColor } from '#lib/components/charts/cssColor.js';
-	import { Chart, registerables } from 'chart.js';
-	import ChartDataLabels from 'chartjs-plugin-datalabels';
-
-	Chart.register(...registerables, ChartDataLabels);
+	import { Chart } from '#lib/components/charts/chart.js';
 
 	let {
 		labels,
