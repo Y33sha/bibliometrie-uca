@@ -69,7 +69,6 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Identifiants (ROR, HAL, tutelles) en pastilles à fond clair, libellé en petites capitales grises
 - [x] Un seul style d'onglets pour `TabNav` et `HubTabs` : alignés à gauche, sans fond ni bordures latérales, onglet actif en texte foncé semi-gras souligné d'un trait de 2–3 px, filet fin sous l'ensemble
 - [x] Contenu de l'onglet directement sous les onglets, sans carte
-
 - [x] Fil d'Ariane fondé sur l'arborescence du site (`Breadcrumb`) à la place des liens de retour, sur les pages de détail publiques, la fiche structure admin et la page de qualité de la détection
 
 ### Étape 3 — Recherche, filtres et menus
@@ -81,7 +80,6 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Boutons de filtre sans bordure, fond au survol
 - [x] Menus déroulants natifs (page Statistiques) au style des boutons de filtre
 - [x] Pagination sans bordure, page active en couleur d'accent
-
 - [x] Chevrons dessinés à la place des triangles (menus, facettes, en-têtes triés), retournés quand le panneau est ouvert ou le tri croissant (`.chevron`, `SortChevron`)
 
 ### Étape 4 — Tableaux
@@ -128,56 +126,8 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Rubriques en pastilles arrondies, rubrique active sur fond plus clair ; contraste des liens relevé ; hauteurs liées à `--header-height`
 - [x] Barre teal retenue ; variante blanche écartée
 
-### Étape 9 — Vérifications
-
-- [ ] Contraste des gris de texte (au moins 4,5:1 pour le texte courant)
-- [ ] Couleurs des graphiques distinguables par la luminosité
-- [ ] Affichage à largeur réduite
-- [ ] Pages restantes : référentiels, problèmes HAL, adresses, pages d'erreur
-
 ## Questions ouvertes
 
 - Police : Source Sans 3 ou Inter, à trancher après essai sur d'autres écrans. La police écartée sera supprimée de `static/fonts/` et de `app.html`.
 - Compteurs dans les onglets d'entité (« Publications 1 849 »). Sans objet pour le dashboard, sans intérêt pour les adresses et les collaborations. Pour les autres onglets, reste à choisir entre le total de l'entité et le total filtré. `TabNav` accepte déjà un compteur.
 - Mode sombre, une fois toutes les couleurs en variables.
-
-## Annexe — valeurs de départ
-
-Valeurs à ajuster à l'écran.
-
-```css
-:root {
-	/* Accent */
-	--accent: #1f5f5f;        /* texte, bouton plein */
-	--accent-mid: #2f8a8a;    /* trait d'onglet actif, focus */
-	--accent-light: #e6f2f2;  /* fond de pastille, encart */
-
-	/* Navigation */
-	--nav-public: #2f7f7f;
-	--nav-admin: #1f5f5f;
-
-	/* Texte */
-	--text: #1d2433;
-	--text-secondary: #5b6474;
-	--muted: #6b7280;
-
-	/* Surfaces et lignes */
-	--bg: #fbfbfa;
-	--card: #ffffff;
-	--border: #ebedf0;
-	--hover: #f4f6f7;
-
-	/* Open access agrégé */
-	--open: #2e9b4f;
-	--embargoed: #d29a1e;
-	--closed: #4b5260;
-	--unknown: #c9ced6;
-
-	/* Action destructive */
-	--danger: #b42318;
-
-	/* Forme */
-	--radius: 8px;
-	--font: "Inter", system-ui, sans-serif;
-}
-```

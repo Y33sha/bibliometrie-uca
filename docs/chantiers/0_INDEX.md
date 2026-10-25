@@ -4,7 +4,6 @@
 
 ### En cours
 
-- [Refonte visuelle du frontend](STYLE_refonte-visuelle.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 
 ### Non commencé
@@ -19,6 +18,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-25 — [Refonte visuelle du frontend](archived/2026-10-25_STYLE_refonte-visuelle.md)
 - 2026-10-25 — [Collaborations entre structures](archived/2026-10-25_DATA_collaborations-structures.md)
 - 2026-10-25 — [Monographies](archived/2026-10-25_DATA_monographies.md)
 - 2026-10-25 — [Gestion et dédoublonnage assistés de la base personnes](archived/2026-10-25_DATA_personnes-dedoublonnage-assiste.md)
