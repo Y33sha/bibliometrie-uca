@@ -199,6 +199,7 @@ class TestHALIdConstruction:
             ("https://hal.science/hal-04123456", "hal-04123456"),  # strip URL
             ("https://hal.science/hal-04123456v2", "hal-04123456"),  # URL + version
             ("https://tel.archives-ouvertes.fr/tel-02345678", "tel-02345678"),  # URL autre portail
+            ("https://hal.inrae.fr/hal-04123456", "hal-04123456"),  # portail institutionnel
             # Identifiant OAI-PMH HAL exposé par OpenAlex dans location.id (source structurée,
             # présente même quand la landing page est une page éditeur).
             ("pmh:oai:HAL:cea-01736955v1", "cea-01736955"),
@@ -216,6 +217,7 @@ class TestHALIdConstruction:
             "gsi-2021",  # moins de 8 chiffres : fragment de DOI, pas un docid HAL
             "https://doi.org/10.3204/pubdb-2020-00553",  # hôte non-HAL
             "https://doi.org/10.1234/zenodo-12345678",  # hôte non-HAL, fragment au format d'un docid
+            "https://resolver.sub.uni-goettingen.de/purl?gro-2/84100",  # PURL étranger
             # Identifiants OAI-PMH de dépôts institutionnels : l'autorité n'est pas HAL, le regex
             # de docid attraperait sinon un fragment d'UUID (b454-3339841149, f-2861829395).
             "pmh:oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee",

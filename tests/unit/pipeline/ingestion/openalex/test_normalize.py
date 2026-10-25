@@ -77,6 +77,26 @@ class TestExtractLocationsData:
         _, ids = extract_locations_data(work)
         assert ids["related_dois"] == ["10.1/a", "10.2/b", "10.3/c"]
 
+    def test_collects_hal_ids_from_urls_and_location_id(self):
+        """hal_id collectés depuis les URLs et les location.id OAI-PMH, y compris un dépôt dont seule la location.id porte le hal_id."""
+        work = {
+            "locations": [
+                {"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"},
+                {
+                    "landing_page_url": "https://hal.science/hal-04000111",
+                    "id": "pmh:oai:HAL:hal-04000111v1",
+                },
+                {"landing_page_url": None, "id": "pmh:oai:HAL:hal-04000222v1"},
+            ]
+        }
+        _, ids = extract_locations_data(work)
+        assert ids["hal_id"] == ["hal-04000111", "hal-04000222"]
+
+    def test_no_hal_id(self):
+        work = {"locations": [{"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"}]}
+        _, ids = extract_locations_data(work)
+        assert "hal_id" not in ids
+
 
 # ── get_locations ────────────────────────────────────────────────
 

@@ -7,7 +7,11 @@ listes restent unionnées.
 
 import pytest
 
-from domain.publications.aggregation import assign_publisher, refresh_from_sources
+from domain.publications.aggregation import (
+    arbitrate_doc_type_with_article_subtype,
+    assign_publisher,
+    refresh_from_sources,
+)
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
@@ -351,3 +355,54 @@ class TestAssignPublisher:
             publication, sources, source_priority=self._ORDRE, prefix_publishers={"10.3917": 3}
         )
         assert publication.publisher_id == 8
+
+
+class TestArbitrageDuSousTypeDArticle:
+    """`arbitrate_doc_type_with_article_subtype` opère sur des types déjà traduits dans le référentiel, dans l'ordre de priorité des sources."""
+
+    @staticmethod
+    def _arbitrate(*pairs: tuple[str, str | None]) -> str:
+        return arbitrate_doc_type_with_article_subtype(
+            [_source_record(source=source, doc_type=doc_type) for source, doc_type in pairs]
+        )
+
+    def test_l_article_generique_cede_au_sous_type(self):
+        assert self._arbitrate(("crossref", "article"), ("hal", "review")) == "review"
+
+    def test_un_type_hors_article_n_est_pas_arbitre(self):
+        assert self._arbitrate(("crossref", "book_chapter"), ("hal", "review")) == "book_chapter"
+
+    def test_sans_sous_type_l_article_reste(self):
+        assert self._arbitrate(("crossref", "article"), ("hal", "article")) == "article"
+
+    def test_un_type_precis_en_tete_reste(self):
+        assert self._arbitrate(("theses", "thesis"), ("crossref", "article")) == "thesis"
+
+    def test_un_data_paper_de_hal_seul_se_lit_article(self):
+        assert (
+            self._arbitrate(("crossref", "article"), ("hal", "data_paper"), ("openalex", "article"))
+            == "article"
+        )
+
+    def test_un_data_paper_de_hal_en_tete_et_seul_se_lit_article(self):
+        assert self._arbitrate(("hal", "data_paper"), ("openalex", "article")) == "article"
+
+    def test_un_data_paper_corrobore_reste(self):
+        assert (
+            self._arbitrate(
+                ("crossref", "article"), ("hal", "data_paper"), ("openalex", "data_paper")
+            )
+            == "data_paper"
+        )
+
+    def test_le_data_paper_de_hal_ecarte_cede_a_un_autre_sous_type(self):
+        assert (
+            self._arbitrate(("crossref", "article"), ("hal", "data_paper"), ("openalex", "review"))
+            == "review"
+        )
+
+    def test_sans_source_le_type_est_other(self):
+        assert arbitrate_doc_type_with_article_subtype([]) == "other"
+
+    def test_des_sources_sans_type_donnent_other(self):
+        assert self._arbitrate(("crossref", None), ("hal", None)) == "other"

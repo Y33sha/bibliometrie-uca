@@ -115,6 +115,13 @@ class TestBuildSourceMeta:
         meta = _build_source_extras({"partenairesDeRecherche": [{"type": "x"}, {"nom": "LIMOS"}]})
         assert meta == {"partenaires": [{"nom": "LIMOS", "type": None, "ppn": None}]}
 
+    def test_entries_without_nom_give_none(self):
+        thesis = {
+            "ecolesDoctorale": [{"nom": ""}, {"ppn": "123"}],
+            "partenairesDeRecherche": [{"type": "lab"}],
+        }
+        assert _build_source_extras(thesis) is None
+
 
 # ── theses_source_record ─────────────────────────────────────────
 
@@ -130,6 +137,17 @@ class TestThesesSourceRecord:
         assert record.external_ids is None
         assert record.oa_status == "closed"
         assert record.serial_id is None
+
+    def test_defended_thesis(self):
+        assert self._call({"dateSoutenance": "15/03/2023"}).raw_doc_type == "thesis"
+
+    def test_ongoing_thesis(self):
+        record = self._call({"datePremiereInscriptionDoctorat": "01/09/2022"})
+        assert record.raw_doc_type == "ongoing_thesis"
+        assert record.publication_year == 2022
+
+    def test_malformed_date(self):
+        assert self._call({"dateSoutenance": "date-invalide"}).publication_year is None
 
     def test_nnt_normalized(self):
         record = self._call({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
