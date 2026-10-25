@@ -69,6 +69,11 @@
 		color: #fff;
 		font-size: 0.78rem;
 		line-height: 1.4;
+		/* Typographie propre : l'infobulle n'hérite pas de son contexte (en-tête de colonne en capitales, gras…). */
+		font-weight: 400;
+		text-transform: none;
+		letter-spacing: normal;
+		text-align: left;
 		padding: 6px 10px;
 		border-radius: var(--radius);
 		max-width: 500px;
