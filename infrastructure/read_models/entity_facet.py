@@ -24,6 +24,8 @@ class EntitySql(NamedTuple):
     join: str
     # Type SQL de l'identifiant, pour lire un libellé à partir de l'identifiant reçu en texte.
     id_type: str = "integer"
+    # Décompte des publications par entité. `COUNT(*)` suffit quand la jointure rend une ligne par couple publication–entité.
+    publication_count: str = "COUNT(*)"
 
 
 # La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
@@ -57,6 +59,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
             "JOIN publication_subjects ps ON ps.publication_id = p.id "
             "JOIN subjects s ON s.id = ps.subject_id"
         ),
+        publication_count="COUNT(DISTINCT p.id)",
     ),
     "partner": EntitySql(
         table="ror_organizations ro",
@@ -95,7 +98,7 @@ def entity_facet_rows(
 ) -> list[EntityFacetItem]:
     """Entités `kind` les plus représentées parmi les publications `p` qui satisfont `where_sql`.
 
-    Le décompte porte sur les publications distinctes : la jointure d'un sujet rend une ligne par source. Un terme de recherche d'au moins deux caractères filtre les entités par nom. Les organisations partenaires excluent les ROR propres aux structures `own_structure_ids`.
+    Le décompte porte sur les publications distinctes. Un terme de recherche d'au moins deux caractères filtre les entités par nom. Les organisations partenaires excluent les ROR propres aux structures `own_structure_ids`.
     """
     sql = ENTITY_SQL[kind]
     name_filter, name_binds = entity_name_clause(sql.label, search)
@@ -108,7 +111,7 @@ def entity_facet_rows(
     conn.execute(text("SET LOCAL jit = off"))
     rows = conn.execute(
         text(f"""
-            SELECT {sql.id} AS id, {sql.label} AS label, COUNT(DISTINCT p.id) AS n
+            SELECT {sql.id} AS id, {sql.label} AS label, {sql.publication_count} AS n
             FROM publications p
             {sql.join}
             WHERE {where_sql}{name_filter}
