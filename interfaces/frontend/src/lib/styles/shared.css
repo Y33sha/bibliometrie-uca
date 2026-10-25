@@ -30,7 +30,6 @@
 	/* Barre de navigation */
 	--nav-public: #2f7f7f;
 	--nav-public-menu: #286e6e; /* sous-menus déroulants */
-	--nav-light: #edf5f5;      /* barre publique claire */
 	--nav-admin: #1f5f5f;
 	--nav-admin-menu: #2a6c6c;
 
@@ -192,7 +191,6 @@
 	background: var(--hover);
 }
 .facet-btn.has-selection {
-	border-radius: var(--radius-pill);
 	background: var(--accent-light);
 	color: var(--accent);
 	font-weight: 500;
