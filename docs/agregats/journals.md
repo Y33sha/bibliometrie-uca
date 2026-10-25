@@ -17,7 +17,7 @@ Les tables qui référencent une revue ont des politiques de suppression différ
 
 ## Écriture par le pipeline
 
-**Création et résolution (`normalize`).** Les six normaliseurs appellent `find_or_create_journal` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie successivement l'`openalex_id`, puis les ISSN (`find_journal_by_issn_any`), puis le titre (`find_journal_by_name_form`, qui préfère les revues à ISSN en ligne), et crée la revue en dernier recours avec sa forme de nom. `enrich_journal` complète au passage les champs vides, sans jamais écraser une valeur existante, et la revue reçoit les ISSN qu'elle ne porte pas. L'enregistrement source reçoit le `journal_id` de la revue trouvée ou créée. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
+**Création et résolution (`normalize`).** Les six normaliseurs appellent `find_or_create_journal` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie successivement l'`openalex_id`, puis les ISSN (`find_journal_by_issn_any`), puis le titre (`find_journal_by_name_form`, qui préfère les revues à ISSN en ligne), et crée la revue en dernier recours avec sa forme de nom. La recherche par titre se limite aux formes de l'éditeur du document ou sans éditeur, et la forme de nom enregistre cet éditeur. `enrich_journal` complète au passage les champs vides, sans jamais écraser une valeur existante, et la revue reçoit les ISSN qu'elle ne porte pas. L'enregistrement source reçoit le `journal_id` de la revue trouvée ou créée. `normalize_openalex` déduit en outre l'`oa_model` du caractère ouvert de la source.
 
 **Enrichissement du référentiel (`publishers_journals`).** L'orchestrateur enchaîne, pour les sources dont les identifiants sont renseignés, la résolution des éditeurs, l'enrichissement depuis OpenAlex — frais de publication et type de revue pour celles restées indéterminées — puis l'import du référentiel DOAJ, qui renseigne `doaj_payload` et `is_in_doaj`. Les écritures passent par `PgJournalGatewayQueries` (`pipeline/transformation/publishing/journals/journals.py`), qui porte aussi les requêtes de sélection de chaque sous-étape.
 
@@ -27,11 +27,13 @@ Routeur `interfaces/api/routers/journals.py`, commandes dans `application/servic
 
 **Éditer une revue** (`PUT /api/journals/{id}`). Le repository re-dérive `title_normalized` à l'enregistrement. Si le type de revue change, `requalify_publications_for_journal` rejoue immédiatement le type de document de toutes ses publications et consigne un événement `journal.type_requalified`.
 
-**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_records`, `apc_payments` et `journal_name_forms`, puis recale les compteurs de publications. Les ISSN de la source rejoignent la cible, à revérifier dans le Sudoc. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
+**Fusionner deux revues** (`POST /api/journals/{id}/merge`). `merge_journal_into` repointe successivement `publications`, `source_records`, `apc_payments` et `journal_name_forms`, puis recale le compteur de publications et l'éditeur de la revue conservée. Les ISSN de la source rejoignent la cible, à revérifier dans le Sudoc. Chaque table est traitée explicitement parce qu'aucune suppression en cascade ne peut faire le travail : la base refuse de supprimer une revue tant qu'une publication la référence.
 
 **Prévisualiser un changement de type** (`GET /api/journals/{id}/type-change-impact`). Le chemin d'écriture réel est exécuté puis annulé, ce qui donne l'impact exact sans rien modifier.
 
 ## Lecture par le pipeline
+
+**Éditeur de la revue.** `journals.publisher_id` se calcule d'après les publications de la revue (`pipeline/transformation/publishing/journals/journal_publishers.py`) : l'éditeur le plus fréquent parmi ses publications de la dernière année qui en a un ; à égalité, le plus fréquent sur toutes les années ; à égalité encore, le plus petit identifiant. La phase `finalize` le recalcule à chaque run, une fusion de revues pour la revue conservée.
 
 **Compteur de publications.** `pipeline/transformation/publishing/publication_counts.py` recalcule `journals.publication_count`, puis celui des éditeurs. La phase `finalize` le recalcule en totalité, une fois le périmètre posé ; une fusion administrative ne recalcule que les revues concernées.
 

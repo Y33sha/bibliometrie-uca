@@ -4,8 +4,9 @@ Tâches (`pipeline.graph`), chacune dans sa transaction :
 
 1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `contribution_structures`, `publication_structures`.
 2. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
-3. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
-4. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
+3. **éditeur des revues** — recalcule l'éditeur de chaque revue d'après ses publications (`journal_publishers`).
+4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
+5. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
 La phase traite toutes les sources à chaque run et ignore `--sources` : une contribution change aussi par d'autres voies que la normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
 """
@@ -32,6 +33,9 @@ from pipeline.transformation.publications.publication_perimeter import (
 from pipeline.transformation.publishing.journals import delete_empty_journals
 from pipeline.transformation.publishing.journals.delete_empty_journals import (
     run_delete_empty_journals,
+)
+from pipeline.transformation.publishing.journals.journal_publishers import (
+    refresh_journal_publishers,
 )
 from pipeline.transformation.publishing.monographs import delete_empty_monographs
 from pipeline.transformation.publishing.monographs.delete_empty_monographs import (
@@ -98,6 +102,15 @@ class FinalizePhase:
             metrics.details["purged"] = _purge_publications(ctx.open_tx)
             return metrics
 
+        def journal_publishers(ctx: PhaseContext) -> PhaseMetrics:
+            with ctx.open_tx() as conn:
+                changed = refresh_journal_publishers(conn)
+            metrics = PhaseMetrics()
+            metrics.report = (
+                f"{quantity(changed, 'revue')} {inflect(changed, 'mise à jour', 'mises à jour')}"
+            )
+            return metrics
+
         def empty_containers(ctx: PhaseContext) -> PhaseMetrics:
             metrics = PhaseMetrics()
             _delete_empty_containers(self.empty_containers, metrics, ctx)
@@ -120,6 +133,9 @@ class FinalizePhase:
                     structures, section=sync_section, label="Structures des liens"
                 ),
                 "finalize.purge_publications": TaskStep(purge),
+                "finalize.journal_publishers": TaskStep(
+                    journal_publishers, label="Éditeur des revues"
+                ),
                 "finalize.delete_empty_containers": TaskStep(empty_containers),
                 "finalize.publication_counts": TaskStep(publication_counts),
             },
@@ -174,7 +190,7 @@ def _delete_empty_containers(
 def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger) -> None:
     """Recalcule le nombre de publications de chaque adresse, revue et éditeur.
 
-    Les trois se lisent des mêmes publications et contributions sources, stabilisées à ce point du pipeline. Le décompte des éditeurs somme celui des revues, donc le suit.
+    Les trois se lisent des mêmes publications et contributions sources, stabilisées à ce point du pipeline.
 
     Chaque décompte dure : sa ligne annonce le travail en cours, puis cède la place à son résultat.
     """

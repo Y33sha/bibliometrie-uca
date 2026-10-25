@@ -92,7 +92,7 @@ def find_or_create_journal(
 
     Cascade de recherche : `openalex_id`, puis chacun des ISSN valides fournis parmi les ISSN des revues, puis le titre normalisé parmi les formes de nom. Sans correspondance, le journal est créé.
 
-    Un journal trouvé voit ses métadonnées manquantes enrichies et reçoit les ISSN qu'il n'a pas ; le titre reçu devient une forme de nom — les variantes s'accumulent pour les matchs par titre suivants.
+    Un journal trouvé voit ses métadonnées manquantes enrichies et reçoit les ISSN qu'il n'a pas ; le titre reçu devient une forme de nom — les variantes s'accumulent pour les matchs par titre suivants. `publisher_id`, l'éditeur du document, restreint la recherche par titre et s'enregistre avec la forme de nom ; l'éditeur de la revue se calcule d'après ses publications.
     """
     if not title:
         return None
@@ -118,7 +118,6 @@ def find_or_create_journal(
         """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
         repo.enrich_journal(
             journal_id,
-            publisher_id=publisher_id,
             openalex_id=openalex_id if with_openalex else None,
             oa_model=oa_model if with_openalex else None,
         )
@@ -153,16 +152,12 @@ def find_or_create_journal(
             else None
         )
         if jid:
-            repo.enrich_journal(
-                jid, publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model
-            )
+            repo.enrich_journal(jid, openalex_id=openalex_id, oa_model=oa_model)
             repo.add_journal_issns(jid, issns)
             return jid
 
         # 4. Créer + enregistrer la forme de nom
-        created = repo.create_journal(
-            title=title, publisher_id=publisher_id, openalex_id=openalex_id, oa_model=oa_model
-        )
+        created = repo.create_journal(title=title, openalex_id=openalex_id, oa_model=oa_model)
         repo.add_journal_issns(created, issns)
         repo.add_journal_name_form(created, title_normalized, publisher_id)
         return created

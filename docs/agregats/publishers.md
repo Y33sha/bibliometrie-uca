@@ -18,7 +18,7 @@ Les tables `journals`, `monographs`, `source_records`, `publications`, `journal_
 
 ## Écriture par le pipeline
 
-**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la création de la revue. Seul OpenAlex fournit un identifiant d'éditeur. L'enregistrement source reçoit cet éditeur, sauf une production hébergée sans être publiée : preprint, jeu de données, rapport, thèse, ou document DataCite sans revue ni monographie, dont l'« éditeur » est l'entrepôt.
+**Rattachement (`normalize`).** Chaque normaliseur appelle `find_or_create_publisher` (`pipeline/transformation/publishing/find_or_create.py`), qui essaie d'abord l'identifiant OpenAlex, puis se rabat sur la forme de nom — reconnue ou créée — avant de transmettre l'éditeur à la recherche de la revue par son titre. Seul OpenAlex fournit un identifiant d'éditeur. L'enregistrement source reçoit cet éditeur, sauf une production hébergée sans être publiée : preprint, jeu de données, rapport, thèse, ou document DataCite sans revue ni monographie, dont l'« éditeur » est l'entrepôt.
 
 **Éditeur des publications (`publications`).** Le recalcul d'une publication lui donne l'éditeur de la date de publication : le titulaire du préfixe de son DOI Crossref, à défaut l'éditeur de ses enregistrements sources. Une plateforme d'éditeurs qui enregistre les DOI des revues qu'elle diffuse en est exclue (fiche [publications](publications.md)).
 

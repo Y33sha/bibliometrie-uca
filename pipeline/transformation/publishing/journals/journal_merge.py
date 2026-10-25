@@ -6,7 +6,6 @@ from domain.journals.journal import JournalType, ManualField
 from domain.merge import DataNature, MergedEntity
 from infrastructure.repositories.merge_steps import (
     MergeStep,
-    fill_empty,
     fill_empty_unique,
     record_redirect,
     transfer,
@@ -15,13 +14,15 @@ from infrastructure.repositories.merge_steps import (
 )
 from pipeline.transformation.publications import lifecycle
 from pipeline.transformation.publications.store import PublicationStore
+from pipeline.transformation.publishing.journals.journal_publishers import (
+    refresh_journal_publishers,
+)
 from pipeline.transformation.publishing.journals.requalify_journal import (
     correct_journal_records,
     requalify_journal_publications,
 )
 from pipeline.transformation.publishing.publication_counts import (
     refresh_journal_publication_count,
-    refresh_publisher_publication_count,
 )
 
 
@@ -107,7 +108,8 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "doi_namespaces": untouched("journal_doi_namespaces", "journal_id"),
     "title": untouched("journals", "title", "title_normalized").of_nature(DataNature.MIXED),
     "created_at": untouched("journals", "created_at"),
-    "publisher": fill_empty("journals", "publisher_id").of_nature(DataNature.MIXED),
+    # Éditeur calculé d'après les publications, recalculé après la fusion.
+    "publisher": untouched("journals", "publisher_id"),
     "openalex_id": fill_empty_unique("journals", "openalex_id"),
     "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
     "apc": _fill_empty_with_marker(
@@ -128,22 +130,14 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 
 def merge_journal_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Applique chaque étape de `MERGE_STEPS`, supprime la revue absorbée et enregistre sa redirection, puis recalcule les nombres de publications de la revue conservée et des éditeurs concernés."""
-    source_publisher_id = conn.execute(
-        text("SELECT publisher_id FROM journals WHERE id = :s"), {"s": source_id}
-    ).scalar()
+    """Applique chaque étape de `MERGE_STEPS`, supprime la revue absorbée et enregistre sa redirection, puis recalcule le nombre de publications et l'éditeur de la revue conservée."""
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
     conn.execute(text("DELETE FROM journals WHERE id = :s"), {"s": source_id})
     record_redirect(conn, MergedEntity.JOURNAL, target_id, source_id)
 
     refresh_journal_publication_count(conn, target_id)
-    target_publisher_id = conn.execute(
-        text("SELECT publisher_id FROM journals WHERE id = :t"), {"t": target_id}
-    ).scalar()
-    for publisher_id in {target_publisher_id, source_publisher_id}:
-        if publisher_id is not None:
-            refresh_publisher_publication_count(conn, publisher_id)
+    refresh_journal_publishers(conn, target_id)
 
 
 def merge_journals(conn: Connection, target_id: int, source_id: int) -> None:

@@ -171,7 +171,7 @@ class TestFindOrCreateJournal:
         assert found is not None
 
     def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
-        """Si on trouve par ISSN, les champs vides (eissn, publisher_id) sont remplis."""
+        """Une revue trouvée par ISSN reçoit l'ISSN qu'elle n'a pas. L'éditeur du document s'enregistre avec la forme de nom, la revue n'en reçoit pas."""
         existing = _journal(sa_sync_conn, issn="0028-0836")
         publisher_id = find_or_create_publisher("Springer", repo=publisher_store)
         _find_or_create(
@@ -181,12 +181,22 @@ class TestFindOrCreateJournal:
             publisher_id=publisher_id,
             repo=gateway,
         )
-        row = issn_columns(sa_sync_conn, existing)
-        row.publisher_id = _fetch_one(
-            sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=existing
-        ).publisher_id
-        assert row.eissn == "1476-4687"
-        assert row.publisher_id == publisher_id
+        assert issn_columns(sa_sync_conn, existing).eissn == "1476-4687"
+        assert (
+            _fetch_one(
+                sa_sync_conn, "SELECT publisher_id FROM journals WHERE id = :id", id=existing
+            ).publisher_id
+            is None
+        )
+        assert (
+            _fetch_one(
+                sa_sync_conn,
+                "SELECT count(*) AS n FROM journal_name_forms WHERE journal_id = :id AND publisher_id = :p",
+                id=existing,
+                p=publisher_id,
+            ).n
+            == 1
+        )
 
     def test_normalizes_issn_on_create(self, sa_sync_conn, gateway):
         j_id = _find_or_create("Nature", issn="00280836", eissn="1476-4687", repo=gateway)

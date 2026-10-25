@@ -1,4 +1,4 @@
-"""Orchestrateur de la phase `contributions` : synchronisation, purge des publications, référentiels vides, refresh des compteurs.
+"""Orchestrateur de la phase `finalize` : synchronisation, purge des publications, référentiels vides, refresh des compteurs.
 
 Le propos testé ici est l'enchaînement des tâches et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé de la phase.
 """
@@ -46,6 +46,7 @@ def _patch_sql(counts: _Counts) -> list:
             ("refresh_publications_perimeter_evidence", "périmètre des publications", 0),
             ("refresh_contribution_structures", "structures des groupes", None),
             ("refresh_publication_structures", "structures des publications", None),
+            ("refresh_journal_publishers", "éditeur des revues", 4),
             ("recompute_address_publication_count", "adresses", 7),
             ("refresh_journal_publication_counts", "revues", 3),
             ("refresh_publisher_publication_counts", "éditeurs", 2),
@@ -85,8 +86,8 @@ def test_rien_a_purger(open_tx, contexte):
 def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # périmètre des publications, matviews, purge, puis un décompte par famille : adresses, revues, éditeurs
-    assert open_tx.transactions == 6
+    # périmètre des publications, matviews, purge, éditeur des revues, puis un décompte par famille : adresses, revues, éditeurs
+    assert open_tx.transactions == 7
 
 
 def test_la_synchronisation_rend_les_contributions_du_perimetre(contexte, caplog):

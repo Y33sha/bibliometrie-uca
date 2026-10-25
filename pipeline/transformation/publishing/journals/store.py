@@ -128,17 +128,15 @@ class JournalStore:
         self,
         *,
         title: str,
-        publisher_id: int | None,
         openalex_id: str | None,
         oa_model: OaModel | None,
     ) -> int:
-        """Insère un journal et retourne son id. `title_normalized` est dérivé de `title`."""
+        """Insère un journal et retourne son id. `title_normalized` est dérivé de `title` ; l'éditeur se calcule d'après les publications (`refresh_journal_publishers`)."""
         stmt = (
             journals.insert()
             .values(
                 title=title,
                 title_normalized=normalize_text(title),
-                publisher_id=publisher_id,
                 openalex_id=openalex_id,
                 oa_model=oa_model,
             )
@@ -150,14 +148,12 @@ class JournalStore:
         self,
         journal_id: int,
         *,
-        publisher_id: int | None = None,
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
         # L'UPDATE n'est émis que si au moins une colonne NULL recevrait une valeur.
         """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
         fillable = (
-            (journals.c.publisher_id, publisher_id),
             (journals.c.openalex_id, openalex_id),
             (journals.c.oa_model, oa_model),
         )
@@ -168,7 +164,6 @@ class JournalStore:
             update(journals)
             .where(journals.c.id == journal_id, or_(*null_targets))
             .values(
-                publisher_id=func.coalesce(journals.c.publisher_id, publisher_id),
                 openalex_id=func.coalesce(journals.c.openalex_id, openalex_id),
                 # Le littéral est lié au type de la colonne : `coalesce` ne le lui emprunte pas, et
                 # `oa_model` est une enum, qu'un paramètre texte ne rejoint pas.

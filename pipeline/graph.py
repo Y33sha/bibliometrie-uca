@@ -1046,12 +1046,26 @@ TASKS: tuple[Task, ...] = (
         writes=("publications.id",),
     ),
     _task(
+        "finalize.journal_publishers",
+        "finalize",
+        reads=(
+            "journals.id",
+            "publications.journal_id",
+            "publications.publisher_id",
+            "publications.publication_year",
+        ),
+        writes=("journals.publisher_id",),
+        # Les revues que supprime ensuite `delete_empty_containers` n'ont pas de publication, donc pas d'éditeur.
+        previous_run=("journals.id",),
+    ),
+    _task(
         "finalize.delete_empty_containers",
         "finalize",
         reads=(
             "monographs.id",
             "monographs.journal_id",
             "journals.id",
+            "journals.publisher_id",
             "publishers.id",
             "source_records.journal_id",
             "source_records.monograph_id",
