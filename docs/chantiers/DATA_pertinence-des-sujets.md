@@ -23,6 +23,8 @@ Le score n'est pas une mesure de pertinence. Un seuil bas écarte des topics lé
 
 **Paires de domains OpenAlex.** Health × Life est sur-représentée (lift 1,34), les cinq autres paires sous-représentées (0,27 à 0,62). Sur 15 publications Health × Physical (1 070 au total), 10 portent un domain manifestement aberrant. Les libellés HAL, WoS et theses.fr des autres enregistrements sources suffisent à trancher.
 
+**Mécanisme des aberrations.** OpenAlex semble évaluer chaque topic indépendamment, puis rattacher au topic retenu toute sa chaîne de parents. Un topic plausible entraîne ainsi un domain absurde : « Competency Development and Evaluation » pour un référentiel de compétences en pharmacie clinique, avec le field « Psychology ».
+
 **Co-occurrences de sujets.** Les aberrations OpenAlex sont récurrentes : un même sujet mal attribué produit la même paire sur de nombreuses publications. Les paires rares ne les repèrent donc pas.
 
 ### Pistes
@@ -46,7 +48,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - le rejet d'un domain s'étend aux field, subfield et topics qui en descendent sur la publication ;
 - précision mesurée sur 15 publications, WoS compris : 10 vrais positifs, 1 faux positif, 4 cas limites.
 
-**Embeddings** (Specter2), au grain des topics feuille : embedding du titre et du résumé, centroïde par topic calculé sur ses publications, similarité cosinus entre chaque publication et le centroïde de chacun de ses topics, seuil de rejet. Chaque libellé porte le chemin de tous ses ancêtres.
+**Embeddings** (Specter2), au grain des topics feuille : embedding du titre et du résumé, centroïde par topic calculé sur ses publications, similarité cosinus entre chaque publication et le centroïde de chacun de ses topics, seuil de rejet. Chaque libellé porte le chemin de tous ses ancêtres. L'évaluation descend la hiérarchie : les sous-sujets d'un sujet écarté ne sont pas évalués.
 
 ## Décisions
 
@@ -68,9 +70,8 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 - [x] Tirage stratifié de 100 publications (`sample_subject_relevance`) : revues généralistes, publications sans domaine HAL ni discipline theses.fr, paires de domains rares, Health × Life, un seul domain ; 907 libellés OpenAlex. feeb8f8d1
 - [x] Préqualification par Claude, sur le titre, le résumé et la revue
-- [ ] Qualification à l'œil de chaque libellé (domain, field, subfield, topic) : pertinent, aberrant, limite
-- [ ] Accord entre la préqualification et la qualification à l'œil
-- [ ] Taux d'aberration par grain (domain, field, topic) : il dit si une piste au seul grain domain peut suffire
+- [x] Relecture à l'œil d'une partie des publications : la préqualification sert de référence
+- [x] Taux d'aberration par grain : 13 % des domains, 15 % des fields, 28 % des subfields, 34 % des topics. 79 des 100 topics aberrants sont sous un domain pertinent ou limite, 69 sous un field pertinent ou limite : une piste au grain domain ou field en écarte au plus 31 %
 
 ### Phase 2 — Classifieurs ISTEX
 
