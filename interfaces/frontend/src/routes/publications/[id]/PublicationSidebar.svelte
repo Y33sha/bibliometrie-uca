@@ -63,6 +63,9 @@
   const accessCopy = $derived(access.find((a) => a.url === accessUrl) ?? null);
   const viaPublisher = $derived(accessUrl != null && accessCopy == null);
   const otherAccess = $derived(access.filter((a) => a !== accessCopy));
+  // Les plateformes du registre restent visibles ; les autres dépôts sont repliés.
+  const knownAccess = $derived(otherAccess.filter((a) => a.known));
+  const unknownAccess = $derived(otherAccess.filter((a) => !a.known));
 
   // Licence de la copie donnée : celle de la version éditeur par le DOI, celle du dépôt par HAL ; inconnue pour les autres plateformes.
   const accessLicense = $derived(viaPublisher ? pub.license : accessCopy?.label === "HAL" ? pub.deposit_license : null);
@@ -103,8 +106,16 @@
     <div class="sidebar-block">
       <h2 class="sidebar-title">Autres accès</h2>
       <div class="sidebar-sources">
-        {#each otherAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
+        {#each knownAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
       </div>
+      {#if unknownAccess.length}
+        <details class="folded">
+          <summary>{unknownAccess.length} {knownAccess.length ? "autres dépôts" : unknownAccess.length > 1 ? "dépôts" : "dépôt"}</summary>
+          <div class="sidebar-sources">
+            {#each unknownAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
+          </div>
+        </details>
+      {/if}
     </div>
   {/if}
 
@@ -146,7 +157,7 @@
         {/each}
       </div>
       {#if secondarySources.length}
-        <details class="secondary-sources">
+        <details class="folded">
           <summary>{secondarySources.length} sources secondaires (pièces, versions)</summary>
           <div class="sidebar-sources">
             {#each secondarySources as s (s.source + s.source_id)}
@@ -255,21 +266,21 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Groupe replié des sources secondaires (pièces / versions convergées), fermé par défaut. */
-  .secondary-sources {
+  /* Groupe replié, fermé par défaut : dépôts hors registre, sources secondaires. */
+  .folded {
     margin-top: 6px;
   }
-  .secondary-sources > summary {
+  .folded > summary {
     font-size: 0.8rem;
     color: var(--muted);
     cursor: pointer;
     padding: 3px 0;
     user-select: none;
   }
-  .secondary-sources > summary:hover {
+  .folded > summary:hover {
     color: var(--text);
   }
-  .secondary-sources[open] > summary {
+  .folded[open] > summary {
     margin-bottom: 6px;
   }
 </style>

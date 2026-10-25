@@ -266,6 +266,8 @@ class AccessLinkOut(BaseModel):
 
     label: str
     url: str
+    known: bool
+    """La copie est hébergée par une plateforme du registre."""
 
 
 class ConsolidatedContributionOut(BaseModel):

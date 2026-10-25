@@ -28,8 +28,8 @@ def test_version_puis_ordre_d_arrivee():
     assert result == Access(
         url="https://doi.org/10.1/x",
         links=[
-            AccessLink("arXiv", "https://arxiv.org/abs/1"),
-            AccessLink("HAL", "https://hal.science/hal-1"),
+            AccessLink("arXiv", "https://arxiv.org/abs/1", known=True),
+            AccessLink("HAL", "https://hal.science/hal-1", known=True),
         ],
     )
 
@@ -43,7 +43,7 @@ def test_une_copie_par_plateforme():
             ),
         ]
     ).links
-    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2")]
+    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2", known=True)]
 
 
 def test_les_copies_fermees_sont_ecartees():
@@ -65,4 +65,11 @@ def test_seule_une_adresse_web_compte():
         _copy("ftp://x.org/a"),
         _copy("https://x.org/a", arrival=2),
     ]
-    assert access(copies) == Access("https://x.org/a", [AccessLink("x.org", "https://x.org/a")])
+    assert access(copies) == Access(
+        "https://x.org/a", [AccessLink("x.org", "https://x.org/a", known=False)]
+    )
+
+
+def test_un_depot_hors_registre_est_inconnu():
+    links = access([_copy("https://escholarship.org/uc/item/1", platform="eScholarship")]).links
+    assert links == [AccessLink("eScholarship", "https://escholarship.org/uc/item/1", known=False)]

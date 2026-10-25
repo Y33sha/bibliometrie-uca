@@ -292,7 +292,9 @@ def get_publication_detail(
         keywords=keywords,
         relations=relations,
         access_url=publication_access.url,
-        access=[AccessLinkOut(label=a.label, url=a.url) for a in publication_access.links],
+        access=[
+            AccessLinkOut(label=a.label, url=a.url, known=a.known) for a in publication_access.links
+        ],
         referenced_by=_referenced_by(sources, publication_access),
         external_identifiers=external_identifiers,
     )

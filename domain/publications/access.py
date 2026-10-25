@@ -2,6 +2,8 @@
 
 Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL. Quand une plateforme décrit elle-même la publication (HAL pour HAL), sa description décide de l'ouverture de ses copies : les copies que les autres sources lui attribuent sont écartées.
 
+Une plateforme du registre (`domain.platforms.registry`) est connue de l'interface ; les autres dépôts sont nommés par la source ou par l'hôte.
+
 Seule une copie à adresse `http` ou `https` compte : l'adresse vient des sources, et alimente un lien. La meilleure copie est l'adresse d'accès. Une copie désignée par le DOI de la publication peut l'être, mais ne figure pas parmi les liens : le DOI est affiché à part.
 """
 
@@ -9,10 +11,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from domain.platforms.registry import KNOWN_PLATFORMS
+
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
 _WEB_SCHEMES = frozenset({"http", "https"})
 _VERSION_RANK = {"publishedVersion": 0, "acceptedVersion": 1, "submittedVersion": 2}
 _UNKNOWN_VERSION_RANK = len(_VERSION_RANK)
+_KNOWN_PLATFORM_NAMES = frozenset(p.name for p in KNOWN_PLATFORMS)
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -34,6 +39,8 @@ class Copy:
 class AccessLink:
     label: str
     url: str
+    known: bool
+    """La copie est hébergée par une plateforme du registre."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,5 +81,8 @@ def access(copies: Iterable[Copy]) -> Access:
             best.setdefault(_label(copy), copy)
     return Access(
         url=ranked[0].url if ranked else None,
-        links=[AccessLink(label, copy.url) for label, copy in best.items()],
+        links=[
+            AccessLink(label, copy.url, copy.platform in _KNOWN_PLATFORM_NAMES)
+            for label, copy in best.items()
+        ],
     )

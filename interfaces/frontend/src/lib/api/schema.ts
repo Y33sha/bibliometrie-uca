@@ -2591,6 +2591,8 @@ export interface components {
             label: string;
             /** Url */
             url: string;
+            /** Known */
+            known: boolean;
         };
         /** AddIdentifier */
         AddIdentifier: {
