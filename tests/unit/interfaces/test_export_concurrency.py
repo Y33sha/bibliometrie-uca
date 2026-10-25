@@ -35,6 +35,13 @@ class TestPlafond:
         for slot in pris:
             slot.release()
 
+    def test_un_droit_est_rendu_au_jeu_dont_il_a_ete_pris(self):
+        """Un flux fermé après le renouvellement du jeu de droits (entre deux tests) laisse le jeu neuf intact."""
+        ancien = _prendre(1)[0]
+        reset_export_slots()
+        ancien.release()
+        assert len(_prendre(settings.max_concurrent_exports)) == settings.max_concurrent_exports
+
     def test_un_droit_rendu_redevient_disponible(self):
         pris = _prendre(settings.max_concurrent_exports)
         pris[0].release()
