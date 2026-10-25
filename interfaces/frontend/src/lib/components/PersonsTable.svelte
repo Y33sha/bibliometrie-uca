@@ -58,6 +58,7 @@
 <table class="data-table persons-table">
 	<thead>
 		<tr>
+			<th class="rh-col" title="Présente dans le SI RH">RH</th>
 			<th
 				class="sortable"
 				class:active={sort === 'name_asc' || sort === 'name_desc'}
@@ -86,10 +87,11 @@
 	</thead>
 	<tbody>
 		{#if persons.length === 0}
-			<TableStatusRow {loading} colspan={4 + countColumns.length} emptyText="Aucune personne trouvée" />
+			<TableStatusRow {loading} colspan={5 + countColumns.length} emptyText="Aucune personne trouvée" />
 		{:else}
 			{#each persons as p (p.id)}
 				<tr class:excluded={!!p.exclusion}>
+					<td class="rh-col">{#if p.has_rh}<RhCheck />{/if}</td>
 					<td>
 						{#if onopen}
 							<button
@@ -107,7 +109,6 @@
 								{titleCase(p.first_name)}
 							</a>
 						{/if}
-						{#if p.has_rh}<RhCheck />{/if}
 					</td>
 					<td>
 						<IdentifiersCell identifiers={p.identifiers} />
@@ -127,6 +128,8 @@
 <style>
 	.persons-table { min-width: 620px; }
 	.persons-table td { vertical-align: middle; }
+	.rh-col { width: 28px; padding-right: 0; text-align: center; }
+	.rh-col :global(.rh-check) { margin-left: 0; }
 	button.person-link.active { text-decoration: underline; }
 	tr.excluded { opacity: 0.45; }
 	tr.excluded:hover { opacity: 0.7; }
