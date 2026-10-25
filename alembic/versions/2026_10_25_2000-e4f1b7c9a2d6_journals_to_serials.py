@@ -4,7 +4,7 @@ Revision ID: e4f1b7c9a2d6
 Revises: c2e8a4d6f913
 Create Date: 2026-10-25 20:00:00.000000
 
-`journals` réunit revues, collections d'ouvrages, séries d'actes et médias : la table devient `serials`, ses tables satellites `serial_issns`, `serial_name_forms` et `serial_doi_namespaces`, la colonne `journal_id` des tables qui la référencent `serial_id`, son type `serial_type`. Suivent les séquences, contraintes et index qui portent ces noms, et les valeurs stockées qui nomment l'entité : marqueur de saisie manuelle, type d'entité des redirections, événements du journal d'audit, clés et règles des corrections.
+`journals` réunit revues, collections d'ouvrages, séries d'actes et médias : la table devient `serials`, ses tables satellites `serial_issns`, `serial_name_forms` et `serial_doi_namespaces`, la colonne `journal_id` des tables qui la référencent `serial_id`, son type `serial_type`. Suivent les séquences, contraintes et index qui portent ces noms, et les valeurs stockées qui nomment l'entité : marqueur de saisie manuelle, type d'entité des redirections, événements du journal d'audit, clés et règles des corrections, clés des métriques de l'historique des exécutions de phase.
 """
 
 from collections.abc import Sequence
@@ -147,14 +147,22 @@ _RULES = [
     ("THESIS_WITH_JOURNAL_TO_ARTICLE", "THESIS_WITH_SERIAL_TO_ARTICLE"),
 ]
 
+# Clés des métriques de l'historique des exécutions de phase : (ancienne, nouvelle).
+_METRICS = [
+    ("journals_merged", "serials_merged"),
+    ("journals_deleted", "serials_deleted"),
+    ("journals_typed_proceedings", "serials_typed_proceedings"),
+    ("journal_doi_namespaces", "serial_doi_namespaces"),
+]
 
-def _corrections_sql(table: str, pairs: list[tuple[str, str]]) -> str:
-    """Réécrit les clés et règles des corrections de `table` : la colonne `journal_id` ou `serial_id`, et chaque règle de `pairs`."""
-    expression = "corrections::text"
+
+def _rewrite_jsonb_sql(table: str, column: str, pairs: list[tuple[str, str]]) -> str:
+    """Remplace, dans la colonne jsonb `column` de `table`, chaque texte ancien de `pairs` par le nouveau."""
+    expression = f"{column}::text"
     for old, new in pairs:
         expression = f"replace({expression}, '{old}', '{new}')"
     pattern = "|".join(old for old, _ in pairs)
-    return f"UPDATE {table} SET corrections = CAST({expression} AS jsonb) WHERE corrections::text ~ '{pattern}'"
+    return f"UPDATE {table} SET {column} = CAST({expression} AS jsonb) WHERE {column}::text ~ '{pattern}'"
 
 
 def _statements(*, up: bool) -> list[str]:
@@ -180,6 +188,7 @@ def _statements(*, up: bool) -> list[str]:
     serial_type = pair("journal_type", "serial_type")
     entity = pair("journal", "serial")
     correction_pairs = [pair('"journal_id":', '"serial_id":'), *(pair(o, n) for o, n in _RULES)]
+    metric_pairs = [pair(f'"{o}":', f'"{n}":') for o, n in _METRICS]
     values = [
         "ALTER TYPE public.{} RENAME TO {}".format(*serial_type),
         "ALTER TYPE public.merged_entity RENAME VALUE '{}' TO '{}'".format(*entity),
@@ -191,8 +200,9 @@ def _statements(*, up: bool) -> list[str]:
         "WHERE aggregate_type = '{0}'".format(*entity),
         "UPDATE ops.audit_log SET payload = (payload - '{0}') || jsonb_build_object('{1}', payload->'{0}') "
         "WHERE payload ? '{0}'".format(*serial_type),
-        _corrections_sql("sources.source_records", correction_pairs),
-        _corrections_sql("publications.publications", correction_pairs),
+        _rewrite_jsonb_sql("sources.source_records", "corrections", correction_pairs),
+        _rewrite_jsonb_sql("publications.publications", "corrections", correction_pairs),
+        _rewrite_jsonb_sql("ops.pipeline_phase_executions", "metrics", metric_pairs),
     ]
     if up:
         return tables + columns + sequences + constraints + indexes + values
