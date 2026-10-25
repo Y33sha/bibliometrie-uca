@@ -16,7 +16,7 @@
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
-- [Simplification des services applicatifs](CODE_simplification-services.md)
+- [Simplification des services applicatifs et de leurs ports](CODE_simplification-services.md)
 
 ## Chantiers archivés
 

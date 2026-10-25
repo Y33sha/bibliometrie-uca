@@ -1,8 +1,10 @@
-# Chantier — Simplification des services applicatifs
+# Chantier — Simplification des services applicatifs et de leurs ports
 
 ## Contexte
 
-Une écriture de l'API est une fonction de `application/services/`, sans commit : la requête commite à son terme, avec ses événements d'audit (`db_conn`). Une relecture du dossier relève les sources de complexité suivantes.
+Une écriture de l'API est une fonction de `application/services/`, sans commit : la requête commite à son terme, avec ses événements d'audit (`db_conn`). Une relecture de `application/` relève les sources de complexité suivantes.
+
+### Services
 
 - Les ports de recalcul du pipeline (`PerimeterStructures`, `SerialRecompute`, `PublicationPerimeterRecompute`, `PublicationCountRecompute`, `CountryRecompute`) sont des instances uniques, qui reçoivent `conn` à chaque appel. Les services prennent donc `conn` pour le seul transmettre. Les repositories, eux, sont construits sur la connexion de la requête.
 - Chaque route d'écriture déclare de 3 à 6 dépendances pour fournir au service ses repositories et ses ports.
@@ -17,6 +19,16 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
   - les deux propagations qui suivent une écriture d'adresse vivent dans deux paquets : celle des pays dans `addresses/countries.py`, celle d'`in_perimeter` dans `contributions/core.py`.
 - Docstrings : plaidoyers (module `publishers`, `_merge`), renvoi au module voisin (module `serials`), description périmée de l'aperçu dans `requalify_publications_for_serial`, retours à la ligne non sémantiques dans `_resolve_rejection`.
 
+### Ports
+
+- Aucun port n'a de seconde implémentation, doublure de test comprise : les tests passent par la base.
+- Les 18 ports de lecture (`application/ports/read_models/`) sont lus chacun par un seul routeur. Seul `ConfigQueries` sert aussi à un service. Une lecture est déclarée trois fois : méthode du `Protocol`, le plus souvent sans docstring ; méthode de la classe `Pg…` ; fonction du module de l'adaptateur. 29 des 96 méthodes `Pg…` des lectures, et 17 des 65 des repositories, délèguent en une ligne à une fonction, à laquelle elles passent la connexion.
+- Les modèles Pydantic des ports de lecture sont les réponses de l'API (`PersonProfileResponse`, `PersonOut`…), construites par l'infrastructure et rendues par les routeurs.
+- Les docstrings des ports de repositories décrivent l'implémentation (tables, `ILIKE`, `pinned_groups_sql`) et nomment des modèles de réponse de l'API (`StructureOut`, `NameFormStatusResponse`).
+- Docstrings fausses : `ports/repositories/__init__.py` cite des repositories `Publication` et `DoiPrefix`, absents des ports ; `PublisherRepository` annonce un enrichissement des pays, sous un intertitre vide.
+- Les docstrings de module des ports de lecture nomment leur unique consommateur (« consommé par le router … ») ; celle de `_common.py` plaide son emplacement.
+- `ports/pipeline/phase_executions.py` ne déclare aucun port. Il contient les structures d'une exécution de phase, que l'orchestrateur du pipeline, l'observabilité et la lecture des exécutions par l'API partagent. Le pipeline importe `application` pour elles.
+
 ## Décisions
 
 - Les ports de recalcul sont construits sur la connexion de la requête par les fabriques de `interfaces/api/deps.py`, comme les repositories. Leurs méthodes perdent le paramètre `conn`.
@@ -24,6 +36,7 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 - Les créations de structure et de forme de nom reçoivent un modèle typé, déclaré dans le port comme `StructureUpdate`.
 - Les mises à jour des éditeurs et des périmètres gardent leur forme : un `edit` de l'agrégat, sur le modèle de `Serial.edit`, coûterait plus qu'il ne simplifie.
 - La vérification d'existence des fusions rend `None`.
+- La docstring d'un port décrit le contrat : ce que la méthode rend et lève, sans tables ni requêtes, sans modèle de réponse de l'API.
 
 ## Phasage
 
@@ -49,8 +62,14 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 
 ### Phase 4 — Docstrings
 
-- [ ] Relecture de style de `application/services/`
+- [ ] Docstrings fausses des ports corrigées
+- [ ] Docstrings des ports de repositories réduites au contrat
+- [ ] Relecture de style de `application/`
 
 ## Questions ouvertes
 
 - Un objet de service par agrégat, construit dans `deps.py`, réduirait chaque route d'écriture à une dépendance. Le volume de câblage restant après la phase 1 décide de son intérêt.
+- Ports de lecture. Leur `Protocol` reproduit l'adaptateur méthode par méthode, pour un seul appelant et une seule implémentation ; il tient l'infrastructure hors des routeurs (contrat d'import). Deux réductions possibles, cumulables :
+  - dans l'infrastructure, une seule déclaration par lecture : la méthode de la classe `Pg…` contient la requête, ou la fonction de module suffit ;
+  - sans `Protocol` de lecture, les routeurs reçoivent l'adaptateur concret. Les modèles de réponse restent dans `application/`, que l'infrastructure et les routeurs importent tous deux. Le contrat d'import s'assouplit pour les lectures.
+- Emplacement des structures d'une exécution de phase (`ports/pipeline/phase_executions.py`), hors des ports.
