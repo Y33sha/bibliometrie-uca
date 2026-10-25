@@ -7,7 +7,7 @@
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import OaDoughnut from '#lib/components/charts/OaDoughnut.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -68,13 +68,6 @@
 	let dashPubsByYear: { year: number; count: number }[] = $state([]);
 	let dashOa = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
 	let dashSubjects: SubjectFrequency[] = $state([]);
-
-	const oaSegments = $derived([
-		{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
-		{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
-		{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
-		{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' }
-	]);
 
 	const displayName = $derived(
 		profile
@@ -220,13 +213,7 @@
 					</div>
 					<div class="dash-card">
 						<h3>Open Access</h3>
-						<DoughnutChart segments={oaSegments} />
-						{#if dashOa.total > 0}
-							<div class="oa-summary">
-								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
-								({dashOa.open_access.toLocaleString('fr-FR')} / {dashOa.total.toLocaleString('fr-FR')})
-							</div>
-						{/if}
+						<OaDoughnut oa={dashOa} />
 					</div>
 				</div>
 			{/if}
@@ -326,22 +313,6 @@
 {/if}
 
 <style>
-	/* Dashboard */
-	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-	@media (max-width: 760px) {
-		.dash-grid { grid-template-columns: 1fr; }
-	}
-	.dash-card-wide { grid-column: 1 / -1; }
-	.dash-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 16px;
-		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
-	}
-	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
-	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
-
 	.thesis-role-heading {
 		font-size: 1rem;
 		font-weight: 600;

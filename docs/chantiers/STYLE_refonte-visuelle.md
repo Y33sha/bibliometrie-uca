@@ -44,8 +44,8 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [x] Fusionner `--text-muted` dans `--muted` (719aad2d3)
 - [x] Déclarer en variables les teals de la barre de navigation (`--nav-public`, `--nav-admin` et leurs sous-menus) (719aad2d3)
 - [x] Supprimer les couleurs de repli des appels `var()` (719aad2d3)
-- [x] Factoriser les styles dupliqués : pastilles de type de structure, bandeau des fiches structure, encart d'information, lien HAL des pages Problèmes HAL, pastille DOAJ, pastille de structure, files de triage (composant `PersonPairsList` pour les paires de personnes), infobulle de `FacetDropdown` (composant `Tooltip`)
-- [ ] Factoriser les palettes de graphiques : open access agrégé des dashboards de structure et de personne, nuage de sujets (`SubjectsCloud`, `SubjectGraph`)
+- [x] Factoriser les styles dupliqués : pastilles de type de structure, bandeau des fiches structure, encart d'information, lien HAL des pages Problèmes HAL, pastille DOAJ, pastille de structure, files de triage (composant `PersonPairsList` pour les paires de personnes), infobulle de `FacetDropdown` (composant `Tooltip`) (181901773)
+- [x] Factoriser les dashboards et leurs palettes : grille et cartes `.dash-*`, anneau open access des dashboards de structure et de personne (composant `OaDoughnut`, couleurs lues dans `--open`, `--embargoed`, `--closed`, `--unknown`), palette des sujets (`subjectColor`)
 - [ ] Remplacer les couleurs de rôle en dur par la variable de même rôle (écarts de teinte faibles acceptés) ; créer une variable pour un rôle qui n'en a pas
 - [ ] Teintes de survol calculées par `color-mix()`
 - [ ] Faire lire aux graphiques (`BarChart`, `DoughnutChart`, `SubjectsCloud`, dashboards) leurs couleurs dans les variables, valeurs actuelles inchangées
@@ -58,7 +58,7 @@ Chaque étape fait l'objet d'un test visuel par l'utilisatrice avant la suivante
 - [ ] Supprimer le bleu restant (boutons pleins, barres de graphiques, pagination active, liens)
 - [ ] Trois niveaux de gris de texte : `--text` (principal), `--text-secondary`, `--muted` (discret)
 - [ ] Fond de page blanc cassé très léger
-- [ ] Palette open access agrégée : nouvelles valeurs de `--open`, `--embargoed`, `--closed`, `--unknown` ; dashboard de structure branché sur ces variables
+- [ ] Palette open access agrégée : nouvelles valeurs de `--open`, `--embargoed`, `--closed`, `--unknown`
 - [ ] Style unique de titre de section ; suppression des bandeaux teal pleine largeur (fiche structure admin) et des titres gras dans des cartes (dashboard)
 - [ ] `--radius` unique, appliqué partout ; 999 px pour les pastilles
 

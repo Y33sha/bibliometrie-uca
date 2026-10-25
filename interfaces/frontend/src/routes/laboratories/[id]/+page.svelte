@@ -7,6 +7,7 @@
 	import { structureLabel } from '#lib/structureLabels.js';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
+	import OaDoughnut from '#lib/components/charts/OaDoughnut.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -60,12 +61,6 @@
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
 
-	const oaSegments = $derived([
-		{ label: 'Open Access', value: dashOa.open_access, color: '#2a7d4f' },
-		{ label: 'Sous embargo', value: dashOa.embargoed, color: '#b08900' },
-		{ label: 'Closed', value: dashOa.closed, color: '#c0392b' },
-		{ label: 'Indéterminé', value: dashOa.unknown, color: '#ccc' }
-	]);
 	const collabSegments = $derived([
 		{ label: 'International', value: dashCollab.international, color: '#3b6b9e' },
 		{ label: 'Domestique', value: dashCollab.domestic, color: '#e0e0e0' }
@@ -237,19 +232,13 @@
 					</div>
 					<div class="dash-card">
 						<h3>Open Access</h3>
-						<DoughnutChart segments={oaSegments} />
-						{#if dashOa.total > 0}
-							<div class="oa-summary">
-								{Math.round(dashOa.open_access / dashOa.total * 100)} % Open Access
-								({dashOa.open_access.toLocaleString('fr-FR')} / {dashOa.total.toLocaleString('fr-FR')})
-							</div>
-						{/if}
+						<OaDoughnut oa={dashOa} />
 					</div>
 					<div class="dash-card">
 						<h3>Collaborations internationales (articles)</h3>
 						<DoughnutChart segments={collabSegments} />
 						{#if dashCollab.total_articles > 0}
-							<div class="oa-summary">
+							<div class="dash-summary">
 								{Math.round(dashCollab.international / dashCollab.total_articles * 100)} % international
 								({dashCollab.international.toLocaleString('fr-FR')} / {dashCollab.total_articles.toLocaleString('fr-FR')} articles)
 							</div>
@@ -369,22 +358,6 @@
 	}
 	.tutelle-tag { background: var(--accent-light); color: var(--accent); }
 	.id-badge { margin-right: 8px; }
-
-	/* Dashboard */
-	.dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-	@media (max-width: 760px) {
-		.dash-grid { grid-template-columns: 1fr; }
-	}
-	.dash-card-wide { grid-column: 1 / -1; }
-	.dash-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: 6px;
-		padding: 16px;
-		min-width: 0; /* autorise la cellule grid à rétrécir sous la largeur du canvas */
-	}
-	.dash-card h3 { font-size: 0.95rem; font-weight: 600; margin: 0 0 12px; }
-	.oa-summary { text-align: center; font-size: 0.9rem; color: var(--muted); margin-top: 8px; }
 
 	/* Shared table styles */
 	.tab-content table {

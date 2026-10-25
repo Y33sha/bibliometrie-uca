@@ -1,5 +1,5 @@
 /**
- * Couleur sémantique d'un statut Open Access, reprise des variables CSS globales de la page statistiques (`--diamond`, `--gold`, `--hybrid`, `--bronze`, `--green`, `--embargoed`, `--closed`, `--unknown`, définies sur `:root` dans le layout racine). Le nom de variable correspond exactement à la valeur de `oa_status`.
+ * Couleur d'un statut open access, lue dans la variable CSS de même nom (`shared.css`) : une valeur de `oa_status` (`diamond`, `gold`, `hybrid`, `bronze`, `green`, `embargoed`, `closed`, `unknown`) ou la catégorie agrégée `open`.
  *
  * Résolue au runtime côté client (le canvas ne sait pas interpréter `var(...)`). Renvoie `undefined` côté serveur ou si la variable est absente : le composant graphique retombe alors sur sa palette neutre.
  */

@@ -760,6 +760,40 @@ a.structure-tag:hover {
 .structure-type-equipe { background: #d4f0ec; color: #2e8a7d; }
 .structure-type-admin { background: #dde3ea; color: #3d5266; }
 
+/* ── Dashboard d'une entité (structure, personne, revue, éditeur) ── */
+.dash-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 16px;
+}
+@media (max-width: 760px) {
+	.dash-grid {
+		grid-template-columns: 1fr;
+	}
+}
+.dash-card-wide {
+	grid-column: 1 / -1;
+}
+.dash-card {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 16px;
+	min-width: 0; /* autorise la cellule de grille à rétrécir sous la largeur du canvas */
+}
+.dash-card h3 {
+	font-size: 0.95rem;
+	font-weight: 600;
+	margin: 0 0 12px;
+}
+/* Part d'une modalité, sous un graphique en anneau. */
+.dash-summary {
+	text-align: center;
+	font-size: 0.9rem;
+	color: var(--muted);
+	margin-top: 8px;
+}
+
 /* ── Files de triage (administration des référentiels) ── */
 .triage-intro {
 	font-size: 0.85rem;

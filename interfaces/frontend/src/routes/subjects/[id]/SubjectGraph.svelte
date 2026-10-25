@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { subjectColor } from "#lib/subjectColor.js";
   import { onDestroy, onMount } from "svelte";
   import { DataSet, Network } from "vis-network/standalone";
   import type { Node, Edge, Options } from "vis-network/standalone";
@@ -20,11 +21,6 @@
   let container: HTMLDivElement | undefined = $state();
   let network: Network | undefined;
 
-  /** Palette identique à SubjectsCloud, pour cohérence visuelle entre le nuage et le graphe. Couleur stable par sujet via hash de l'id. */
-  const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
-  function colorFor(id: number): string {
-    return PALETTE[id % PALETTE.length];
-  }
 
   /** Taille de police adaptative au range du graphe en cours. */
   function nodeFontSize(
@@ -87,7 +83,7 @@
     // Texte nu : la couleur vient de la palette stable par id (mêmes règles que SubjectsCloud) ; le centre est agrandi pour rester identifiable une fois la physique figée.
     const fontFor = (id: number, usageCount: number, isCenter: boolean) => ({
       size: nodeFontSize(usageCount, minUsage, maxUsage) + (isCenter ? 6 : 0),
-      color: colorFor(id),
+      color: subjectColor(id),
       face: "system-ui, sans-serif",
     });
     const nodes: Node[] = [

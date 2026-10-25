@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { subjectColor } from "#lib/subjectColor.js";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import cloud from "d3-cloud";
@@ -16,11 +17,6 @@
   let width = $state(800);
   let height = $state(420);
 
-  // Palette douce ; couleur stable par sujet via hash de l'id (palette tournante). À garder visuelle, non-sémantique : on évite de mêler type concept/libre ou ontologie pour ne pas surcharger le sens visuel.
-  const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
-  function colorFor(id: number): string {
-    return PALETTE[id % PALETTE.length];
-  }
 
   function fontSizeFor(count: number, minCount: number, maxCount: number): number {
     const minSize = 11;
@@ -103,7 +99,7 @@
               text-anchor="middle"
               font-family="system-ui, sans-serif"
               font-size={w.size}
-              fill={colorFor(w.id)}
+              fill={subjectColor(w.id)}
               transform={`translate(${w.x ?? 0}, ${w.y ?? 0})`}
               style="cursor: pointer;"
             >
