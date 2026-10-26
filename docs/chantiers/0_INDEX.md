@@ -67,7 +67,6 @@
 - 2026-09-14 — [Langues : référentiel, normalisation et facette](archived/2026-09-14_DATA_langues.md)
 - 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 - 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
-- 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
 
 
 
