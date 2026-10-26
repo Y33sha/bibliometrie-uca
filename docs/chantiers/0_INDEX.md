@@ -98,8 +98,6 @@
 - 2026-06-28 — [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](archived/2026-06-28_METIER_visualisations-pivot.md)
 - 2026-06-26 — [Relations entre publications](archived/2026-06-26_METIER_relations-publications.md)
 - 2026-06-26 — [Déduplication des publications sans identifiant fiable (arête pairwise-gated)](archived/2026-06-26_DATA_dedup-pairwise-gated.md)
-- 2026-06-25 — [Écritures API : frontière transactionnelle (commit avant réponse)](archived/2026-06-25_CODE_commit-avant-reponse.md)
-- 2026-06-25 — [Résolution de la RA en amont de fetch_missing](archived/2026-06-25_CODE_resolve-ra-amont.md)
 
 
 
