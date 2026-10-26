@@ -50,6 +50,8 @@ dev = [
     "splink==5.0.0",           # record linkage probabiliste (Fellegi-Sunter) : estimation des poids du modèle des groupes d'auteurs
     "duckdb==2.0.0",           # moteur de Splink, et lecture des fichiers Parquet de l'estimation des poids
     "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
+    "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
+    "mkdocstrings-python==2.0.10", # référence du code dans le site, générée depuis les docstrings
 ]
 
 [tool.setuptools]

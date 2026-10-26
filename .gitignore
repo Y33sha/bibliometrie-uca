@@ -48,3 +48,5 @@ mutants/
 
 # Instances par université
 instances/
+# Site de la documentation, construit par zensical
+site/
