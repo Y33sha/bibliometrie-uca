@@ -393,31 +393,9 @@ class HalProblemsQueries:
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
-        # Conflit d'affiliation : HAL classe la publication in_perimeter, WoS/OpenAlex (seules à donner des adresses) non. `base_cte` agrège les drapeaux par enregistrement source avant de filtrer.
+        # Conflit d'affiliation : HAL classe la publication in_perimeter, WoS/OpenAlex (seules à donner des adresses) non.
         base_cte = """
-        WITH wos_oa_records AS (
-            SELECT id, publication_id
-            FROM source_records
-            WHERE source IN ('wos', 'openalex')
-              AND publication_id IS NOT NULL
-        ),
-        wos_oa_pub_summary AS (
-            SELECT
-                srs.publication_id,
-                bool_or(EXISTS (
-                    SELECT 1 FROM source_contribution_addresses sca
-                    JOIN source_contributions sc ON sc.id = sca.source_contribution_id
-                    WHERE sc.source_record_id = srs.id
-                )) AS any_addressed,
-                bool_or(EXISTS (
-                    SELECT 1 FROM source_contributions sc
-                    WHERE sc.source_record_id = srs.id
-                      AND sc.in_perimeter = TRUE
-                )) AS any_in_perimeter
-            FROM wos_oa_records srs
-            GROUP BY srs.publication_id
-        ),
-        hal_in_perimeter_pubs AS (
+        WITH hal_in_perimeter_pubs AS (
             SELECT DISTINCT sr.publication_id
             FROM source_records sr
             JOIN source_contributions sc ON sc.source_record_id = sr.id
@@ -428,8 +406,20 @@ class HalProblemsQueries:
         conflict_pubs AS (
             SELECT h.publication_id
             FROM hal_in_perimeter_pubs h
-            JOIN wos_oa_pub_summary s ON s.publication_id = h.publication_id
-            WHERE s.any_addressed AND NOT s.any_in_perimeter
+            WHERE NOT EXISTS (
+                SELECT 1 FROM source_records sr
+                JOIN source_contributions sc ON sc.source_record_id = sr.id
+                WHERE sr.publication_id = h.publication_id
+                  AND sr.source IN ('wos', 'openalex')
+                  AND sc.in_perimeter = TRUE
+            )
+            AND EXISTS (
+                SELECT 1 FROM source_records sr
+                JOIN source_contributions sc ON sc.source_record_id = sr.id
+                JOIN source_contribution_addresses sca ON sca.source_contribution_id = sc.id
+                WHERE sr.publication_id = h.publication_id
+                  AND sr.source IN ('wos', 'openalex')
+            )
         )
         """
 
