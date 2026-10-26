@@ -81,10 +81,6 @@
 - 2026-07-17 — [Périmètre APC : le résoudre dans l'adaptateur au lieu de le faire descendre du router](archived/2026-07-17_CODE_apc-perimetre-au-router.md)
 - 2026-07-17 — [Domaines HAL : libellés depuis la source, suppression de la table](archived/2026-07-17_CODE_hal-domaines-libelles.md)
 - 2026-07-17 — [Normalize : factoriser l'upsert des `source_publications`](archived/2026-07-17_CODE_normalize-upsert-source-publications.md)
-- 2026-07-12 — [Phase personnes — lisibilité et refonte](archived/2026-07-12_CODE_phase-persons.md)
-- 2026-07-12 — [Simplification de la phase sujets](archived/2026-07-12_CODE_simplification-sujets.md)
-- 2026-07-12 — [Fusion des publications — dénouer l'enchevêtrement](archived/2026-07-12_CODE_merge-publications.md)
-- 2026-07-11 — [Countries : caches pays intermédiaires](archived/2026-07-11_CODE_countries-caches-intermediaires.md)
 
 
 
