@@ -48,4 +48,5 @@ Cette distinction est pertinente pour le calcul, mais obscure pour l'utilisateur
 - **Années par défaut** de la page Statistiques : les garder quand l'URL ne contient pas d'années, ou les retirer pour qu'un lien depuis la liste sans filtre d'années montre le même corpus.
 - **Filtres liés à un contexte** : les transmettre quand le laboratoire ou la personne est seul sélectionné ? Statut HAL pour un seul laboratoire ; correspondance et périmètre pour une seule personne. Piste commune avec les listes d'entités liées ([Administration et navigation](UI_administration-et-navigation.md)).
 - **Découpage de l'indicateur « Montant des APC »** : une barre unique par catégorie, ou un découpage par voie open access.
+- **Groupes d'éditeurs** : faut-il compter les publications par groupe (Informa, Springer Nature, Elsevier) ? Une fiche d'éditeur garde la marque que donnent les sources (Routledge). Un lien de groupe entre fiches d'éditeurs donnerait le total du groupe, sans fusion.
 - **Du graphique à la liste**, idée à tester : un clic sur une barre ouvrirait la liste des publications filtrée sur le groupement cliqué.
