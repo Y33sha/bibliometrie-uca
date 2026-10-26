@@ -80,7 +80,7 @@ def assign_orphan_contribution(
 ) -> OrphanAssignResponse:
     """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou une contribution introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
     """
     if body.create_person is not None:
         person_id = contributions.assign_orphan_contribution_to_new_person(
@@ -106,13 +106,13 @@ def batch_assign_orphan_contributions(
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs contributions orphelines à une personne existante.
 
-    Les groupes absents ou déjà rattachés sont écartés du lot et journalisés ; le décompte rendu compte les groupes rattachés. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+    Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
     """
-    if not body.group_ids:
+    if not body.contribution_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
     assigned = contributions.batch_assign_orphan_contributions(
-        body.person_id, body.group_ids, force=body.force
+        body.person_id, body.contribution_ids, force=body.force
     )
     return OrphanBatchAssignResponse(assigned=assigned)
 
@@ -127,7 +127,7 @@ def exclude_contribution(
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
-    `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+    `contribution_id` désigne la contribution de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache la contribution et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
     contributions.exclude_contribution(contribution_id)
     return OkResponse()

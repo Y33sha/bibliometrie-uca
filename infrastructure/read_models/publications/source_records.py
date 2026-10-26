@@ -88,7 +88,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
                     FROM source_contribution_addresses sca
                     JOIN addresses addr ON addr.id = sca.address_id
                     WHERE sca.source_contribution_id = sc.id) AS raw_affiliation,
-                   gs.contribution_id, g.reference_position AS group_position, gs.method::text AS method,
+                   gs.contribution_id, g.reference_position, gs.method::text AS method,
                    gs.score, gs.margin
             FROM source_records sr
             JOIN source_contributions sc ON sc.source_record_id = sr.id
@@ -113,7 +113,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             raw_affiliation=r.raw_affiliation,
             countries=r.countries,
             contribution_id=r.contribution_id,
-            group_position=r.group_position,
+            reference_position=r.reference_position,
             method=r.method,
             score=r.score,
             margin=r.margin,

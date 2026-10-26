@@ -175,7 +175,7 @@ class PersonDetailQueries:
     def person_addresses(
         self, person_id: int, *, page: int, per_page: int
     ) -> PersonAddressesResponse:
-        """Adresses distinctes des contributions sources membres des groupes de cette personne."""
+        """Adresses distinctes des contributions sources des contributions de cette personne."""
         base_where = """a.id IN (
                 SELECT DISTINCT sca.address_id
                 FROM source_contribution_addresses sca

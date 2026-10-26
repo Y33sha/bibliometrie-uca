@@ -16,9 +16,11 @@ _OWNER, _OTHER, _THIRD = 1, 2, 3
 def _resolve(monkeypatch, votes: dict[int, int], status: str = "pending"):
     """Arbitre un conflit : ORCID attribué à `_OWNER` avec le statut `status`, voix des groupes `votes`. Rend les compteurs, le dépôt simulé et les accès SQL simulés."""
     queries = MagicMock()
-    queries.mark_identifier_groups.return_value = 0
+    queries.mark_identifier_contributions.return_value = 0
     monkeypatch.setattr(
-        identifier_arbitration, "mark_identifier_groups", queries.mark_identifier_groups
+        identifier_arbitration,
+        "mark_identifier_contributions",
+        queries.mark_identifier_contributions,
     )
     repo = MagicMock()
     repo.find_identifier.return_value.person_id = _OWNER
@@ -35,7 +37,7 @@ def test_la_majorite_d_une_autre_personne_transfere(monkeypatch):
     result, repo, queries = _resolve(monkeypatch, {_OWNER: 1, _OTHER: 2})
     assert result["transferred"] == 1
     repo.find_identifier.return_value.transfer_to.assert_called_once_with(_OTHER, source=ANY)
-    queries.mark_identifier_groups.assert_called_once_with(ANY, "orcid", _ORCID, _OWNER)
+    queries.mark_identifier_contributions.assert_called_once_with(ANY, "orcid", _ORCID, _OWNER)
 
 
 def test_la_majorite_du_titulaire_ne_transfere_pas(monkeypatch):

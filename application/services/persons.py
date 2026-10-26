@@ -37,7 +37,7 @@ class ContributionRef(TypedDict):
 
 
 class DetachResult(TypedDict):
-    """Résultat de `detach_contributions` : groupes détachés et formes de nom supprimées."""
+    """Résultat de `detach_contributions` : contributions détachées et formes de nom supprimées."""
 
     detached: int
     cleaned_forms: int
@@ -141,7 +141,7 @@ class PersonService:
     ) -> IdentifierStatusResult:
         """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-        Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les groupes de contributions sources que ses identifiants rejetés lui rattachent (`mark_groups_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
+        Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent (`mark_contributions_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
         """
         row = self._persons.update_identifier_status(ident_id, status)
         propagated = (
@@ -150,7 +150,7 @@ class PersonService:
             else 0
         )
         if status == AttributionStatus.REJECTED:
-            self._persons.mark_groups_of_rejected_identifiers(row["person_id"])
+            self._persons.mark_contributions_of_rejected_identifiers(row["person_id"])
         emit_event(
             "person_identifier.status_changed",
             "person",
@@ -166,13 +166,13 @@ class PersonService:
     ) -> NameFormStatusRow:
         """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-        `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il marque aussi pour la redécision de leur personne les groupes de la personne rattachés par le nom dont un membre contient la forme (`mark_groups_for_name_form`) : le run suivant les redécide. Les groupes épinglés ne sont pas marqués.
+        `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il marque aussi pour la redécision de leur personne les contributions de la personne rattachées par le nom dont une contribution source contient la forme (`mark_contributions_for_name_form`) : le run suivant les redécide. Les contributions épinglées restent en l'état.
 
         Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
         """
         row = self._persons.update_name_form_status(person_id, name_form, status)
         if status == AttributionStatus.REJECTED:
-            self._contributions.mark_groups_for_name_form(person_id, name_form)
+            self._contributions.mark_contributions_for_name_form(person_id, name_form)
         emit_event(
             "person_name_form.status_changed",
             "person",
@@ -186,9 +186,9 @@ class PersonService:
     ) -> DetachResult:
         """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
 
-        Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement du groupe de la personne). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
+        Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement de la contribution de la personne). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
 
-        Retourne {"detached": N, "cleaned_forms": K}, N groupes détachés.
+        Retourne {"detached": N, "cleaned_forms": K}, N contributions détachées.
         """
         publication_ids: set[int] = set()
         for a in contributions:

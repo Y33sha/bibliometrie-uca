@@ -13,9 +13,9 @@ def build_metrics(
     name_forms: Mapping[str, int],
     purge: Mapping[str, int],
 ) -> PhaseMetrics:
-    """Métriques de la phase : compteurs du rattachement des groupes (`resolve_groups`), de l'arbitrage des identifiants, de la régénération des formes de nom et de la purge.
+    """Métriques de la phase : compteurs du rattachement des contributions (`resolve_contributions`), de l'arbitrage des identifiants, de la régénération des formes de nom et de la purge.
 
-    `details.table` compte les groupes rattachés pendant le run, par mode de résolution (`ContributionMatchReason`), et ceux qui fondent une personne (`created`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
+    `details.table` compte les contributions rattachées pendant le run, par mode de résolution (`ContributionMatchReason`), et celles qui fondent une personne (`created`). Le mode `manual` réunit les épinglages appliqués et les décisions par épinglage.
     """
     attached = {
         reason: resolution.get(f"{ContributionOutcome.MATCH}:{reason}", 0)

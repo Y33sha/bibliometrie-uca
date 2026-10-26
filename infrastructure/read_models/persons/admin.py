@@ -28,7 +28,11 @@ from infrastructure.read_models.sql_fragments import (
     name_form_holder,
     other_name_form_holders,
 )
-from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role, identifier_neutralized
+from infrastructure.sql_fragments import (
+    CONTRIBUTIONS_AND_SOURCES,
+    has_author_role,
+    identifier_neutralized,
+)
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
@@ -63,10 +67,10 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
         CROSS JOIN unnest({_ID_TYPES_ARRAY_SQL}) k(k)
         JOIN pending p ON p.id_type = k.k AND p.id_value = ci.identifiers ->> k.k
     ),
-    -- Personnes porteuses : un membre de l'un de leurs groupes a l'identifiant et ne le neutralise pas.
+    -- Personnes porteuses : une contribution source de l'un de leurs contributions a l'identifiant et ne le neutralise pas.
     bearers AS (
         SELECT DISTINCT g.person_id, p.id_type, p.id_value
-        FROM {GROUP_MEMBERS}
+        FROM {CONTRIBUTIONS_AND_SOURCES}
         JOIN pending_identities p ON p.id = ci.id
         WHERE g.person_id IS NOT NULL
           AND NOT {identifier_neutralized("p.k")}
@@ -304,12 +308,12 @@ class PersonAdminQueries:
     def name_form_contributions(
         self, person_id: int, name_form: str
     ) -> NameFormContributionsResponse:
-        """Contributions sources d'une personne sous une forme de nom donnée : membres de ses groupes. S'y ajoutent les autres personnes qui ont cette forme sans l'avoir rejetée."""
+        """Contributions sources d'une personne sous une forme de nom donnée : contributions sources de ses contributions. S'y ajoutent les autres personnes qui ont cette forme sans l'avoir rejetée."""
         auth_rows = self._conn.execute(
             text(f"""
                 SELECT sc.source, sc.id AS source_contribution_id,
                        sr.publication_id, sr.title, sr.publication_year, sr.doi
-                FROM {GROUP_MEMBERS}
+                FROM {CONTRIBUTIONS_AND_SOURCES}
                 JOIN source_records sr ON sr.id = sc.source_record_id
                 WHERE g.person_id = :pid AND ci.author_name_normalized = :nf
                 ORDER BY sr.publication_year DESC, sr.title

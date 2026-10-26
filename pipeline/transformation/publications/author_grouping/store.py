@@ -12,7 +12,7 @@ from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
     corrected_by,
     in_clause,
-    propagate_group_attributes_sql,
+    propagate_contribution_attributes_sql,
     usable_identifier,
 )
 
@@ -28,7 +28,7 @@ _ATTRIBUTES_SNAPSHOT = "source_contribution_group_attributes_marks"
 # Marque pour la recomposition de leurs attributs les groupes des publications `:publications`.
 _MARK_GROUPS_OF_PUBLICATIONS_SQL = text(
     enqueue_sql(
-        Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+        Queue.CONTRIBUTION_ATTRIBUTES,
         "SELECT id FROM contributions WHERE publication_id = ANY(:publications)",
     )
 )
@@ -84,7 +84,7 @@ _DELETE_GROUPS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
 # Marque pour la redécision de leur personne les groupes recomposés `:ids` qui en ont une.
 _MARK_RECOMPOSED_SQL = text(
     enqueue_sql(
-        Queue.GROUP_RESOLUTION,
+        Queue.CONTRIBUTION_RESOLUTION,
         "SELECT id FROM contributions WHERE id = ANY(:ids) AND person_id IS NOT NULL",
     )
 )
@@ -145,7 +145,7 @@ class SourceContributionRow:
 
 
 @dataclass(frozen=True, slots=True)
-class GroupRow:
+class ContributionRow:
     """Groupe à écrire. `existing` : l'identifiant est celui d'un groupe déjà en base."""
 
     id: int
@@ -171,7 +171,7 @@ class BatchPlan:
     """Écritures d'un lot de publications."""
 
     publication_ids: Sequence[int]
-    groups: list[GroupRow]
+    groups: list[ContributionRow]
     removed: list[int]
     """Contributions sources dont l'appartenance en base est supprimée."""
     memberships: list[MembershipRow]
@@ -191,8 +191,8 @@ class SourceContributionGroupStore:
         self._conn = conn
 
     def propagate_attributes(self) -> tuple[int, int]:
-        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_group_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes mis à jour."""
-        queue = Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES
+        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes mis à jour."""
+        queue = Queue.CONTRIBUTION_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(
             self._conn.execute(
@@ -203,7 +203,7 @@ class SourceContributionGroupStore:
             ).scalar_one()
         )
         updated = self._conn.execute(
-            text(propagate_group_attributes_sql(f"SELECT id FROM {_ATTRIBUTES_SNAPSHOT}"))
+            text(propagate_contribution_attributes_sql(f"SELECT id FROM {_ATTRIBUTES_SNAPSHOT}"))
         ).rowcount
         delete_processed(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         self._conn.execute(text(f"DROP TABLE {_ATTRIBUTES_SNAPSHOT}"))
@@ -283,7 +283,7 @@ class SourceContributionGroupStore:
     def write(self, plan: BatchPlan) -> None:
         """Écrit les groupes et les doublons d'auteur des publications du lot, et marque leurs groupes pour la recomposition de leurs attributs.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Un groupe dont les membres changent est marqué pour la redécision de sa personne (`Queue.GROUP_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Un groupe dont les membres changent est marqué pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
         memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies

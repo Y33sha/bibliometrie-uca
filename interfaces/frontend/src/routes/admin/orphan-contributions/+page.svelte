@@ -165,7 +165,7 @@
 		await withRejectGuard(async (force) => {
 			await orphanContributions.batchAssign({
 				person_id: personId,
-				group_ids: items.map(o => o.contribution_id),
+				contribution_ids: items.map(o => o.contribution_id),
 				force,
 			});
 			selectedIds = new Set();
@@ -199,7 +199,7 @@
 		if (remaining.length) {
 			await orphanContributions.batchAssign({
 				person_id: data.person_id,
-				group_ids: remaining.map(o => o.contribution_id),
+				contribution_ids: remaining.map(o => o.contribution_id),
 			});
 		}
 		createModal = null;

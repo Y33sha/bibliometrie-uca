@@ -268,7 +268,7 @@ class TestEntreeDansLePerimetre:
 
         _setup_affiliations_test_data(sa_sync_conn)
         group_ungrouped(sa_sync_conn)
-        clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+        clear(sa_sync_conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
         _run_populate_affiliations(sa_sync_conn)
 
@@ -278,7 +278,7 @@ class TestEntreeDansLePerimetre:
                 " WHERE source_contribution_id = 80002"
             )
         ).scalar_one()
-        assert group in queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+        assert group in queued(sa_sync_conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
     def test_recalcul_cible_recompose_le_groupe(self, sa_sync_conn):
         """Le recalcul après une correction d'adresse recompose tout de suite les indices du groupe de la contribution source."""

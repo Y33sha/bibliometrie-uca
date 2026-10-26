@@ -18,7 +18,7 @@ class SourceContributionRef(BaseModel):
 
 
 class AssignOrphanContribution(BaseModel):
-    """Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage."""
+    """Attribution unitaire d'une contribution orpheline, désignée par son contribution. Seule à savoir créer la personne au passage."""
 
     contribution_id: int
     person_id: int | None = None
@@ -34,9 +34,9 @@ class AssignOrphanContribution(BaseModel):
 
 
 class BatchAssignOrphanContributions(BaseModel):
-    """Attribution en lot de contributions orphelines, désignées par leurs groupes de contributions sources, à une personne existante."""
+    """Attribution en lot de contributions orphelines, désignées par leurs contributions, à une personne existante."""
 
-    group_ids: list[int]
+    contribution_ids: list[int]
     person_id: int
     force: bool = False
 

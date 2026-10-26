@@ -101,8 +101,8 @@ class PersonRepository(Protocol):
         """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Retourne le nombre d'identifiants modifiés."""
         ...
 
-    def mark_groups_of_rejected_identifiers(self, person_id: int) -> int:
-        """Marque pour la redécision de leur personne les groupes de contributions sources de la personne rattachés par un identifiant `rejected` : le mode de résolution du groupe est le type de l'identifiant, et l'un de ses membres contient la valeur. Les groupes `manual` et ceux d'un autre mode ne sont pas marqués. Retourne le nombre de groupes marqués. Idempotent."""
+    def mark_contributions_of_rejected_identifiers(self, person_id: int) -> int:
+        """Marque pour la redécision de leur personne les contributions de la personne rattachées par un identifiant `rejected` : le mode de résolution de la contribution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur. Les contributions `manual` et celles d'un autre mode restent en l'état. Retourne le nombre de contributions marquées. Idempotent."""
         ...
 
     # ── person_name_forms ──────────────────────────────────────────

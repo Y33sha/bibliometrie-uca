@@ -3,7 +3,7 @@
 from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
-from pipeline.transformation.persons.groups import load_candidate_groups
+from pipeline.transformation.persons.contribution_resolution import load_candidate_contributions
 from pipeline.transformation.persons.identifier_arbitration import (
     fetch_identifier_votes,
     write_misplaced_neutralizations,
@@ -46,7 +46,7 @@ def _orcid_projete(conn):
     group_ungrouped(conn)
     [member] = [
         m
-        for by_group in load_candidate_groups(conn).values()
+        for by_group in load_candidate_contributions(conn).values()
         for members in by_group.values()
         for m in members
         if m.name.display() == "Jean Neutralisation"

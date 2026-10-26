@@ -1,6 +1,6 @@
-"""Purge de la phase personnes : marquage des groupes à forme de nom ambiguë, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre.
+"""Purge de la phase personnes : marquage des contributions à forme de nom ambiguë, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre.
 
-La purge tourne après `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. Les groupes rattachés par cette forme sont marqués pour la redécision de leur personne : au run suivant, le rattachement des groupes les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. Le groupe rejoint la personne au prénom plein au run d'après.
+La purge tourne après `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. Les contributions rattachées par cette forme sont marqués pour la redécision de leur personne : au run suivant, le rattachement des contributions les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. La contribution rejoint la personne au prénom plein au run d'après.
 """
 
 from sqlalchemy import Connection, text
@@ -13,8 +13,8 @@ from domain.persons.identifiers import (
 from infrastructure.db.queues import Queue
 from infrastructure.repositories.person_repository import person_without_decision_sql
 from infrastructure.sql_fragments import (
-    DETACHED_GROUP,
-    GROUP_MEMBERS,
+    CONTRIBUTIONS_AND_SOURCES,
+    DETACHED_CONTRIBUTION,
     active_name_form,
     identifier_neutralized,
     in_clause,
@@ -23,13 +23,13 @@ from infrastructure.sql_fragments import (
 
 
 def mark_ambiguous_nominal(conn: Connection) -> int:
-    """Marque pour la redécision de sa personne (`Queue.GROUP_RESOLUTION`) un groupe rattaché par le nom (`NAME_MATCH_REASONS`) dont un membre a une forme de nom qui désigne au moins deux personnes (formes actives, `active_name_form`). Le décompte écarte les personnes rejetées pour la publication du groupe, comme la résolution : un rejet qui laisse un seul candidat rend la forme univoque pour ce groupe. Rend le nombre de groupes marqués."""
-    # Les candidats (groupes nominaux à forme ambiguë) sont matérialisés d'abord : le décompte par publication se limite à eux.
+    """Marque pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`) une contribution rattachée par le nom (`NAME_MATCH_REASONS`) dont une contribution source a une forme de nom qui désigne au moins deux personnes (formes actives, `active_name_form`). Le décompte écarte les personnes rejetées pour la publication de la contribution, comme la résolution : un rejet qui laisse un seul candidat rend la forme univoque pour cette contribution. Rend le nombre de contributions marquées."""
+    # Les candidats (contributions nominales à forme ambiguë) sont matérialisés d'abord : le décompte par publication se limite à eux.
     return conn.execute(
         text(f"""
             WITH candidates AS MATERIALIZED (
                 SELECT DISTINCT g.id, g.publication_id, ci.author_name_normalized AS name_form
-                FROM {GROUP_MEMBERS}
+                FROM {CONTRIBUTIONS_AND_SOURCES}
                 WHERE g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
                   AND ci.author_name_normalized IN (
                       SELECT name_form
@@ -39,7 +39,7 @@ def mark_ambiguous_nominal(conn: Connection) -> int:
                       HAVING count(DISTINCT person_id) >= 2
                   )
             )
-            INSERT INTO {Queue.GROUP_RESOLUTION} (id)
+            INSERT INTO {Queue.CONTRIBUTION_RESOLUTION} (id)
             SELECT DISTINCT c.id
             FROM candidates c
             WHERE (
@@ -55,7 +55,7 @@ def mark_ambiguous_nominal(conn: Connection) -> int:
 
 
 def delete_unsupported_identifier_attributions(conn: Connection) -> int:
-    """Supprime les attributions d'identifiant posées par le pipeline (origine `auto`), encore en attente, qu'aucun membre des groupes de leur personne ne contient. Un membre qui neutralise l'identifiant compte comme sans lui. Les attributions confirmées, authentifiées ou saisies à la main restent. Rend le nombre d'attributions supprimées."""
+    """Supprime les attributions d'identifiant posées par le pipeline (origine `auto`), encore en attente, qu'aucune contribution source des contributions de leur personne ne contient. Une contribution source qui neutralise l'identifiant compte comme sans lui. Les attributions confirmées, authentifiées ou saisies à la main restent. Rend le nombre d'attributions supprimées."""
     return conn.execute(
         text(f"""
             DELETE FROM person_identifiers pi
@@ -63,7 +63,7 @@ def delete_unsupported_identifier_attributions(conn: Connection) -> int:
               AND pi.status = '{AttributionStatus.PENDING.value}'
               AND NOT EXISTS (
                   SELECT 1
-                  FROM {GROUP_MEMBERS}
+                  FROM {CONTRIBUTIONS_AND_SOURCES}
                   WHERE g.person_id = pi.person_id
                     AND ci.identifiers ->> pi.id_type::text = pi.id_value
                     AND NOT {identifier_neutralized("pi.id_type::text")}
@@ -73,7 +73,7 @@ def delete_unsupported_identifier_attributions(conn: Connection) -> int:
 
 
 def delete_persons_out_of_perimeter(conn: Connection) -> int:
-    """Supprime les personnes sans groupe du périmètre, sans fiche RH et sans décision humaine (`person_without_decision_sql`). Leurs groupes perdent d'abord leur personne. La suppression emporte leurs formes de nom et leurs identifiants. Rend le nombre de personnes supprimées."""
+    """Supprime les personnes sans contribution du périmètre, sans fiche RH et sans décision humaine (`person_without_decision_sql`). Leurs contributions perdent d'abord leur personne. La suppression emporte leurs formes de nom et leurs identifiants. Rend le nombre de personnes supprimées."""
     deletable = f"""
         NOT EXISTS (
             SELECT 1 FROM contributions g_in
@@ -82,10 +82,10 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
         AND NOT EXISTS (SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id)
         AND {person_without_decision_sql("p")}
     """
-    # La clé étrangère des groupes vide seulement `person_id` : le mode de résolution est vidé avec lui.
+    # La clé étrangère des contributions vide seulement `person_id` : le mode de résolution est vidé avec lui.
     conn.execute(
         text(f"""
-            UPDATE contributions g SET {DETACHED_GROUP}
+            UPDATE contributions g SET {DETACHED_CONTRIBUTION}
             FROM persons p WHERE g.person_id = p.id AND {deletable}
         """)
     )
@@ -93,7 +93,7 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
 
 
 def purge(conn: Connection) -> dict[str, int]:
-    """Marque pour la redécision les groupes nominaux à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes sans contribution du périmètre.
+    """Marque pour la redécision les contributions nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes sans contribution du périmètre.
 
     Rend les compteurs `{ambiguous_marked, deleted_attributions, deleted_persons}`. Le commit est laissé à l'appelant.
     """

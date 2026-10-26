@@ -18,7 +18,7 @@ from infrastructure.read_models.publications.models import PublicationLabItem
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import case_priority, has_author_role
 
-# Contribution orpheline, matière de la file de rattachement : groupe du périmètre, sous un rôle d'auteur, sans personne.
+# Contribution orpheline, matière de la file de rattachement : contribution du périmètre, sous un rôle d'auteur, sans personne.
 _ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')}"
 
 _ORPHANS_FROM = """
@@ -26,7 +26,7 @@ _ORPHANS_FROM = """
     JOIN publications p ON p.id = g.publication_id
 """
 
-# Membres du groupe `g` : contributions sources `sc_m`.
+# Contributions sources de la contribution `g` : contributions sources `sc_m`.
 _MEMBERS = """
     aligned_source_contributions gm
     JOIN source_contributions sc_m ON sc_m.id = gm.source_contribution_id
@@ -42,8 +42,8 @@ _DISPLAYED_MEMBER = f"""
     ) sc
 """
 
-# Laboratoires atteints par les membres du groupe `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`.
-_GROUP_LABS = f"""
+# Laboratoires atteints par les contributions sources de la contribution `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`.
+_CONTRIBUTION_LABS = f"""
     structures s
     WHERE s.structure_type = '{StructureType.LABO.value}'
       AND s.id IN (
@@ -69,9 +69,11 @@ def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dic
         lab_conditions = []
         if filters.lab_ids:
             binds["lab_ids"] = filters.lab_ids
-            lab_conditions.append(f"EXISTS (SELECT 1 FROM {_GROUP_LABS} AND s.id = ANY(:lab_ids))")
+            lab_conditions.append(
+                f"EXISTS (SELECT 1 FROM {_CONTRIBUTION_LABS} AND s.id = ANY(:lab_ids))"
+            )
         if filters.lab_none:
-            lab_conditions.append(f"NOT EXISTS (SELECT 1 FROM {_GROUP_LABS})")
+            lab_conditions.append(f"NOT EXISTS (SELECT 1 FROM {_CONTRIBUTION_LABS})")
         conditions.append(f"({' OR '.join(lab_conditions)})")
     return " AND ".join(f"({c})" for c in conditions), binds
 
@@ -115,7 +117,7 @@ class ContributionsQueries:
                            SELECT json_agg(lab ORDER BY lab.label)
                            FROM (
                                SELECT s.id, COALESCE(s.acronym, s.name) AS label
-                               FROM {_GROUP_LABS}
+                               FROM {_CONTRIBUTION_LABS}
                            ) lab
                        ), '[]') AS labs
                 {_ORPHANS_FROM}
@@ -155,14 +157,14 @@ class ContributionsQueries:
     ) -> OrphanContributionsFacetsResponse:
         """Facette laboratoires des contributions orphelines. Le filtre de recherche s'applique ; le filtre laboratoires, objet de la facette, ne s'applique pas."""
         where, binds = _orphans_where(filters, with_labs=False)
-        # Une ligne par laboratoire, plus une ligne `id` NULL pour les groupes sans laboratoire.
+        # Une ligne par laboratoire, plus une ligne `id` NULL pour les contributions sans laboratoire.
         rows = self._conn.execute(
             text(f"""
                 WITH orphan AS MATERIALIZED (SELECT g.id {_ORPHANS_FROM} WHERE {where})
                 SELECT lab.id, lab.label, COUNT(*) AS n
                 FROM orphan g
                 LEFT JOIN LATERAL (
-                    SELECT s.id, COALESCE(s.acronym, s.name) AS label FROM {_GROUP_LABS}
+                    SELECT s.id, COALESCE(s.acronym, s.name) AS label FROM {_CONTRIBUTION_LABS}
                 ) lab ON TRUE
                 GROUP BY lab.id, lab.label
                 ORDER BY lab.label

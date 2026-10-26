@@ -92,7 +92,7 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
         (pid, "manual"),
         pid,
     )
-    assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {matched_group}
+    assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {matched_group}
 
 
 def test_attach_refuse_quand_la_personne_a_un_groupe_manuel_dans_la_publication(sa_sync_conn):

@@ -87,7 +87,7 @@ class TestConflicts:
         assert _arbitrate(conn)["transferred"] == 1
 
         assert _orcid_owner(conn) == other
-        assert queued(conn, Queue.GROUP_RESOLUTION) == set(by_orcid)
+        assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == set(by_orcid)
         assert _person_of(conn, by_orcid[0]) == (owner, "orcid")
 
     def test_les_groupes_rattaches_par_l_identifiant_votent(self, sa_sync_conn):
@@ -136,12 +136,12 @@ def test_un_groupe_rattache_par_un_identifiant_mal_place_est_marque(sa_sync_conn
     with caplog.at_level(logging.INFO):
         result = _arbitrate(conn)
 
-    assert (result["neutralized"], result["marked_groups"]) == (3, 1)
+    assert (result["neutralized"], result["marked_contributions"]) == (3, 1)
     assert (
         "  ├─ Identifiants portés sous le nom d'une autre personne : 3 identifiants neutralisés"
         in caplog.messages
     )
-    assert queued(conn, Queue.GROUP_RESOLUTION) == {by_orcid}
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {by_orcid}
     assert _person_of(conn, by_orcid) == (dupont, "orcid")
 
 

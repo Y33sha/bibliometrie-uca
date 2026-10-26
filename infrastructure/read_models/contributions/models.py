@@ -1,6 +1,6 @@
 """Modèles de réponse : lectures sur les contributions.
 
-La file des contributions orphelines lit les groupes de contributions sources du périmètre rattachés à aucune personne.
+La file des contributions orphelines lit les contributions du périmètre rattachées à aucune personne.
 """
 
 from dataclasses import dataclass, field
@@ -16,20 +16,20 @@ class OrphanCountResponse(BaseModel):
 
 
 class OrphanContributionOut(BaseModel):
-    """Contribution orpheline : groupe de contributions sources du périmètre, sous un rôle d'auteur, rattaché à aucune personne."""
+    """Contribution orpheline : contribution du périmètre, sous un rôle d'auteur, rattachée à aucune personne."""
 
     contribution_id: int
     sources: list[str]
-    """Sources des membres du groupe, sans doublon, par ordre de priorité."""
+    """Sources des contributions sources de la contribution, sans doublon, par ordre de priorité."""
     full_name: str
-    """Nom du membre de la source la plus prioritaire."""
+    """Nom de la contribution source de la source la plus prioritaire."""
     last_name: str
     first_name: str
     publication_id: int
     publication_title: str
     publication_year: int | None
     labs: list[PublicationLabItem]
-    """Laboratoires du périmètre détectés dans les adresses des membres du groupe."""
+    """Laboratoires du périmètre détectés dans les adresses des contributions sources de la contribution."""
 
 
 class OrphanContributionsResponse(PaginatedResponse):
@@ -40,7 +40,7 @@ class OrphanContributionsResponse(PaginatedResponse):
 class OrphanFilters:
     """Filtres de la file des contributions orphelines.
 
-    `search` vise le nom des membres du groupe. `lab_ids` et `lab_none` se combinent en OU : groupes dont les adresses des membres désignent l'un des laboratoires, ou aucun laboratoire. Vides, ils laissent tout passer.
+    `search` vise le nom des contributions sources de la contribution. `lab_ids` et `lab_none` se combinent en OU : contributions dont les adresses des contributions sources désignent l'un des laboratoires, ou aucun laboratoire. Vides, ils laissent tout passer.
     """
 
     search: str = ""
@@ -49,7 +49,7 @@ class OrphanFilters:
 
 
 class OrphanContributionsFacetsResponse(BaseModel):
-    """Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les membres du groupe, et nombre de groupes sans laboratoire."""
+    """Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les contributions sources de la contribution, et nombre de contributions sans laboratoire."""
 
     labs: list[FacetOption]
     no_lab_count: int

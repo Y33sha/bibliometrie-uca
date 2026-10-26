@@ -239,17 +239,17 @@ def test_les_groupes_des_contributions_sources_dont_les_roles_changent_sont_marq
     _write(conn, source_record, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo A")])])
     source_contribution_id = _source_contributions(conn, source_record)[0][0]
     group = insert_group(conn, publication, [(source_contribution_id, source_record)])
-    clear(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+    clear(conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
     _write(conn, source_record, [_rec(0, "Dupont, Jean", addresses=[AddressRecord("Labo B")])])
-    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == set()
+    assert queued(conn, Queue.CONTRIBUTION_ATTRIBUTES) == set()
 
     _write(
         conn,
         source_record,
         [_rec(0, "Dupont, Jean", roles=["author", "editor"], addresses=[AddressRecord("Labo B")])],
     )
-    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == {group}
+    assert queued(conn, Queue.CONTRIBUTION_ATTRIBUTES) == {group}
 
 
 def test_decomptes_des_auteurs_de_l_enregistrement_source(sa_sync_conn):

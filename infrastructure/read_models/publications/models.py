@@ -401,9 +401,9 @@ class SourceRecordMetadataOut(BaseModel):
 
 
 class SourceContributionOut(BaseModel):
-    """Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
+    """Contribution source d'un enregistrement source, avec sa contribution : les contributions sources d'un même auteur dans la publication.
 
-    `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `person_id` : personne du groupe. `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
+    `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `reference_position`, position de la contribution source de référence de la contribution : absents pour une contribution source hors des contributions (collective, ou enregistrement écarté de l'alignement). `person_id` : personne de la contribution. `method`, `score`, `margin` : entrée de la contribution source dans sa contribution ; score et marge en bits, pour le modèle.
     """
 
     id: int
@@ -418,7 +418,7 @@ class SourceContributionOut(BaseModel):
     raw_affiliation: str | None
     countries: list[str] | None
     contribution_id: int | None
-    group_position: int | None
+    reference_position: int | None
     method: str | None
     score: float | None
     margin: float | None

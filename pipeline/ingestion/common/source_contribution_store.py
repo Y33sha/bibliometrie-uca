@@ -119,9 +119,9 @@ def key_hash_sql(exprs: Sequence[str]) -> str:
 
 _KEY_COLUMNS_SQL = ", ".join(CONTRIBUTOR_INFORMATION_KEY_COLUMNS)
 
-# Marque les groupes des contributions sources de la CTE `updated(id, attributes_changed)` dont les rôles ou le statut de correspondant changent.
-_MARK_GROUPS_OF_UPDATED = enqueue_sql(
-    Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES,
+# Marque les contributions des contributions sources de la CTE `updated(id, attributes_changed)` dont les rôles ou le statut de correspondant changent.
+_MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
+    Queue.CONTRIBUTION_ATTRIBUTES,
     """
     SELECT gm.contribution_id FROM aligned_source_contributions gm
     JOIN updated u ON u.id = gm.source_contribution_id
@@ -282,7 +282,7 @@ class SourceContributionStore:
             )
 
     def update_source_contributions_batch(self, values: list[SourceContributionUpdate]) -> None:
-        """Réécrit en place les contributions sources de `values`. Les marque pour le recalcul des pays, et marque les groupes de celles dont les rôles ou le statut de correspondant changent."""
+        """Réécrit en place les contributions sources de `values`. Les marque pour le recalcul des pays, et marque les contributions de celles dont les rôles ou le statut de correspondant changent."""
         # Une seule instruction : la contrainte `(source_record_id, author_position)`, différable, se vérifie en fin d'instruction, ce qui admet les permutations de positions.
         if not values:
             return
@@ -324,8 +324,8 @@ class SourceContributionStore:
                     (old.is_corresponding, old.roles) IS DISTINCT FROM (new.is_corresponding, new.roles)
                         AS attributes_changed
                 ),
-                marked_groups AS ("""
-                + _MARK_GROUPS_OF_UPDATED
+                marked_contributions AS ("""
+                + _MARK_CONTRIBUTIONS_OF_UPDATED
                 + ")"
                 + enqueue_sql(Queue.SOURCE_CONTRIBUTION_COUNTRIES, "SELECT id FROM updated")
             ).bindparams(bindparam("payload", type_=Jsonb)),

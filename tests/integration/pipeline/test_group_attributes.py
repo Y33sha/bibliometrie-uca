@@ -82,14 +82,14 @@ def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
         ["address", "hal_structure", "ror"],
         True,
     )
-    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == set()
+    assert queued(conn, Queue.CONTRIBUTION_ATTRIBUTES) == set()
     assert store.propagate_attributes() == (0, 0)
 
 
 def test_un_groupe_hors_file_garde_ses_attributs(sa_sync_conn):
     conn = sa_sync_conn
     group = _group_of_two(conn)
-    clear(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+    clear(conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
     assert SourceContributionGroupStore(conn).propagate_attributes() == (0, 0)
 

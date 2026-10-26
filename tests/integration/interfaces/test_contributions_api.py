@@ -251,7 +251,7 @@ class TestBatchAssignOrphanContributions:
         pid = seed_person()
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"group_ids": [], "person_id": pid},
+            json={"contribution_ids": [], "person_id": pid},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 0
@@ -260,7 +260,7 @@ class TestBatchAssignOrphanContributions:
         group = _seed_orphan()
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"group_ids": [group], "person_id": 999999999},
+            json={"contribution_ids": [group], "person_id": 999999999},
         )
         assert r.status_code == 404
 
@@ -269,7 +269,7 @@ class TestBatchAssignOrphanContributions:
         groups = [_seed_orphan(), _seed_orphan()]
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"group_ids": groups, "person_id": pid},
+            json={"contribution_ids": groups, "person_id": pid},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 2
@@ -280,7 +280,7 @@ class TestBatchAssignOrphanContributions:
         seed_rejected_contribution(publication, person_id=pid)
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"group_ids": [group], "person_id": pid},
+            json={"contribution_ids": [group], "person_id": pid},
         )
         assert r.status_code == 409
         assert r.json()["rejected_pairs"][0]["publication_id"] == publication
@@ -291,7 +291,7 @@ class TestBatchAssignOrphanContributions:
         seed_rejected_contribution(publication, person_id=pid)
         r = auth_client.post(
             "/api/contributions/orphans/batch-assign",
-            json={"group_ids": [group], "person_id": pid, "force": True},
+            json={"contribution_ids": [group], "person_id": pid, "force": True},
         )
         assert r.status_code == 200
         assert r.json()["assigned"] == 1

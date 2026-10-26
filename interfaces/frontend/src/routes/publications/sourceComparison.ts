@@ -213,7 +213,7 @@ export function authorRows(records: SourceRecord[], contributions: SourceContrib
 		const positions = group.map((s) => s.position).filter((p): p is number => p != null);
 		return {
 			row: { key, cells, divergent: group.length < present.size },
-			position: group[0].group_position ?? (positions.length ? Math.min(...positions) : Infinity),
+			position: group[0].reference_position ?? (positions.length ? Math.min(...positions) : Infinity),
 			name: group[0].full_name ?? '',
 		};
 	});

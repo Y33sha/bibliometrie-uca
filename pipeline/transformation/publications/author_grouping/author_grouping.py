@@ -38,7 +38,7 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
 )
 from pipeline.transformation.publications.author_grouping.store import (
     BatchPlan,
-    GroupRow,
+    ContributionRow,
     MembershipRow,
     SourceContributionGroupStore,
     SourceContributionRow,
@@ -226,13 +226,13 @@ def _plan_batch(
         unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
         on_publication()
     fresh = iter(store.group_ids(sum(1 for *_, gid in planned if gid is None)))
-    group_rows: list[GroupRow] = []
+    group_rows: list[ContributionRow] = []
     memberships: list[MembershipRow] = []
     for publication_id, (reference, members), gid in planned:
         existing_id = gid is not None
         contribution_id = gid if gid is not None else next(fresh)
         group_rows.append(
-            GroupRow(contribution_id, publication_id, positions[reference], existing_id)
+            ContributionRow(contribution_id, publication_id, positions[reference], existing_id)
         )
         for source_contribution, source_record, method, score, margin in members:
             methods[method] += 1

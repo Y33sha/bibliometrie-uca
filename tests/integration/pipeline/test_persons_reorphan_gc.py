@@ -73,7 +73,7 @@ def test_seuls_les_groupes_nominaux_a_forme_ambigue_sont_marques(sa_sync_conn):
 
     assert mark_ambiguous_nominal(conn) == 2
 
-    assert queued(conn, Queue.GROUP_RESOLUTION) == {by_name, by_compatible_name}
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {by_name, by_compatible_name}
     assert group_person(conn, by_name)[0] == a
 
 
@@ -107,7 +107,7 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     assert mark_ambiguous_nominal(conn) == 1
 
     # Un seul candidat pour la publication du groupe avec rejet ; deux pour l'autre : forme ambiguë.
-    assert queued(conn, Queue.GROUP_RESOLUTION) == {sans_rejet}
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {sans_rejet}
 
 
 def test_une_personne_sans_groupe_du_perimetre_est_supprimee(sa_sync_conn):

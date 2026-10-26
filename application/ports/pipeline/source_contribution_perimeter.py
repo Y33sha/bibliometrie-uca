@@ -14,5 +14,5 @@ class SourceContributionPerimeterRecompute(Protocol):
         source_contribution_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        """Recalcule les indices de l'entrée dans le périmètre des contributions sources données, de leurs groupes et de leurs publications, par les mêmes requêtes que le pipeline. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation."""
+        """Recalcule les indices de l'entrée dans le périmètre des contributions sources données, de leurs contributions et de leurs publications, par les mêmes requêtes que le pipeline. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation."""
         ...

@@ -58,7 +58,7 @@ class ContributionSkipReason(StrEnum):
     CREATION_NOT_ALLOWED = "creation_not_allowed"
     OUT_OF_PERIMETER = "out_of_perimeter"
     # La personne revient à une contribution mieux appuyée de la même publication (`settle_publication`).
-    # La valeur, enregistrée dans les métriques des exécutions, garde son nom d'origine.
+    # La valeur est la clé des métriques enregistrées par les exécutions du pipeline.
     PERSON_IN_OTHER_CONTRIBUTION = "person_in_other_group"
 
 

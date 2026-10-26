@@ -144,7 +144,7 @@ def test_un_groupe_recompose_garde_son_identifiant_et_sa_personne_et_entre_dans_
     groups = _groups(conn, publication)
     assert hal[0] in groups[martin] and len(groups[martin]) == 3
     assert tuple(_group_person(conn, martin)) == (person, "name")
-    assert martin in queued(conn, Queue.GROUP_RESOLUTION)
+    assert martin in queued(conn, Queue.CONTRIBUTION_RESOLUTION)
 
 
 def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
@@ -429,7 +429,7 @@ def test_le_groupement_marque_les_groupes_pour_la_recomposition_de_leurs_attribu
 
     groups = set(_groups(conn, publication))
     assert len(groups) == 2
-    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == groups
+    assert queued(conn, Queue.CONTRIBUTION_ATTRIBUTES) == groups
 
 
 def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):

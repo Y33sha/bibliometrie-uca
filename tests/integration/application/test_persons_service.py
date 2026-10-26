@@ -365,7 +365,7 @@ class TestIdentifierRejectionOnGroups:
 
         service.update_identifier_status(orcid, "rejected")
 
-        assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {orcid_group}
+        assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {orcid_group}
         assert _group_person(sa_sync_conn, orcid_group) == (p, "orcid")
 
     def test_group_without_the_value_is_untouched(self, sa_sync_conn, service):
@@ -996,7 +996,7 @@ class TestNameFormRejectionOnGroups:
 
         service.update_name_form_status(p, "intrus unique", "rejected")
 
-        assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {name_group, initials_group}
+        assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {name_group, initials_group}
         assert _group_person(sa_sync_conn, name_group) == (p, "name")
 
     def test_group_under_another_form_is_untouched(self, sa_sync_conn, service):

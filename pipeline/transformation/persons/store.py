@@ -22,7 +22,7 @@ def fetch_namesakes(conn: Connection) -> list[Namesake]:
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la décision d'un groupe corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
+    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la décision d'une contribution corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
     rows = conn.execute(
         text(f"""
             SELECT pi.id_value, pi.person_id,

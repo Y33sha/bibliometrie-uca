@@ -6,7 +6,7 @@ from domain.merge import DataNature, MergedEntity
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.merge import merged_exclusion
 from domain.persons.person import PersonExclusion
-from infrastructure.repositories.contribution_repository import detach_rejected_groups
+from infrastructure.repositories.contribution_repository import detach_rejected_contributions
 from infrastructure.repositories.merge_steps import (
     MergeStep,
     record_redirect,
@@ -16,7 +16,7 @@ from infrastructure.repositories.merge_steps import (
     without_decision_sql,
 )
 from infrastructure.repositories.person_repository import _name_forms
-from infrastructure.sql_fragments import DETACHED_GROUP
+from infrastructure.sql_fragments import DETACHED_CONTRIBUTION
 
 
 def _merge_distinct_persons(conn: Connection, target_id: int, source_id: int) -> None:
@@ -67,10 +67,10 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> None:
-    """Le groupe de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
+    """La contribution de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
     conn.execute(
         text(f"""
-            UPDATE contributions s SET {DETACHED_GROUP}
+            UPDATE contributions s SET {DETACHED_CONTRIBUTION}
             WHERE s.person_id = :s AND EXISTS (
                 SELECT 1 FROM contributions t
                 WHERE t.person_id = :t AND t.publication_id = s.publication_id
@@ -137,7 +137,7 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
     """
     for step in MERGE_STEPS.values():
         step.apply(conn, target_id, source_id)
-    detach_rejected_groups(conn, target_id)
+    detach_rejected_contributions(conn, target_id)
     conn.execute(text("DELETE FROM persons WHERE id = :id"), {"id": source_id})
     record_redirect(conn, MergedEntity.PERSON, target_id, source_id)
 
