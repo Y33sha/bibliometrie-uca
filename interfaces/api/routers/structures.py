@@ -22,7 +22,9 @@ from application.ports.read_models.structures_queries import (
 from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
+    NameFormCreate,
     NameFormUpdate,
+    StructureCreate,
     StructureRepository,
     StructureUpdate,
 )
@@ -38,8 +40,6 @@ from interfaces.api.deps import (
 from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     DeletedResponse,
-    NameFormCreate,
-    StructureCreate,
     StructureTutelleCreateResponse,
     TutelleCreate,
 )
@@ -74,19 +74,7 @@ def create_structure(
     repo: StructureRepository = Depends(structure_repo),
 ) -> StructureOut:
     """Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé."""
-    return StructureOut.model_validate(
-        structures_service.create_structure(
-            code=data.code,
-            name=data.name,
-            acronym=data.acronym,
-            structure_type=data.type,
-            ror_id=data.ror_id,
-            rnsr_id=data.rnsr_id,
-            hal_collection=data.hal_collection,
-            api_ids=data.api_ids,
-            repo=repo,
-        )
-    )
+    return StructureOut.from_structure(structures_service.create_structure(data, repo=repo))
 
 
 # ── Tutelles entre structures ────────────────────────────────────
@@ -142,16 +130,7 @@ def create_name_form(
 
     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
     """
-    return NameFormOut.model_validate(
-        structures_service.create_name_form(
-            structure_id=data.structure_id,
-            form_text=data.form_text,
-            is_word_boundary=data.is_word_boundary,
-            is_excluding=data.is_excluding,
-            requires_context_of=data.requires_context_of,
-            repo=repo,
-        )
-    )
+    return NameFormOut.model_validate(structures_service.create_name_form(data, repo=repo))
 
 
 @router.get("/name-forms/{form_id}", response_model=NameFormOut)
@@ -279,7 +258,7 @@ def update_structure(
 
     Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
     """
-    return StructureOut.model_validate(
+    return StructureOut.from_structure(
         structures_service.update_structure(structure_id, update=data, repo=repo)
     )
 

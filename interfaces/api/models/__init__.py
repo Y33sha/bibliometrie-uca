@@ -58,8 +58,6 @@ from interfaces.api.models.persons import (
 )
 from interfaces.api.models.serials import SerialTypeChange, SerialTypeChangeImpact
 from interfaces.api.models.structures import (
-    NameFormCreate,
-    StructureCreate,
     StructureTutelleCreateResponse,
     TutelleCreate,
 )
@@ -91,7 +89,6 @@ __all__ = [
     "MarkDistinctPersons",
     "MergeRequest",
     "MergeResponse",
-    "NameFormCreate",
     "NameFormStatusResponse",
     "OkResponse",
     "OrphanAssignResponse",
@@ -105,7 +102,6 @@ __all__ = [
     "ReviewAction",
     "SetCountry",
     "SourceContributionRef",
-    "StructureCreate",
     "StructureTutelleCreateResponse",
     "TotalCountResponse",
     "UpdateIdentifierStatus",

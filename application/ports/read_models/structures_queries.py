@@ -2,11 +2,11 @@
 
 Implémenté par `infrastructure.read_models.structures.PgStructuresQueries`.
 
-Le router importe `StructureOut` et `NameFormOut` pour valider les dicts que lui rendent les services applicatifs (`create_structure`, `update_structure`, `create_name_form`…), au-delà des lectures de ce port.
+`StructureOut` et `NameFormOut` composent aussi la réponse des écritures sur les structures.
 """
 
 from datetime import datetime
-from typing import Protocol
+from typing import Protocol, cast
 
 from pydantic import BaseModel
 
@@ -16,6 +16,7 @@ from application.ports.read_models._common import (
     PublicationYearCount,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
+from domain.structures.structure import Structure
 
 
 class StructureListItem(BaseModel):
@@ -46,6 +47,21 @@ class StructureOut(BaseModel):
     rnsr_id: str | None
     hal_collection: str | None
     api_ids: dict[str, list[str]] | None
+
+    @classmethod
+    def from_structure(cls, structure: Structure) -> "StructureOut":
+        """Réponse d'une structure enregistrée : son type sous le nom `type`, ses identifiants ROR et HAL en chaînes."""
+        return cls(
+            id=cast(int, structure.id),
+            code=structure.code,
+            name=structure.name,
+            acronym=structure.acronym,
+            type=structure.structure_type.value,
+            ror_id=structure.ror_id.value if structure.ror_id else None,
+            rnsr_id=structure.rnsr_id,
+            hal_collection=structure.hal_collection.value if structure.hal_collection else None,
+            api_ids=structure.api_ids,
+        )
 
 
 class RelatedStructureOut(BaseModel):

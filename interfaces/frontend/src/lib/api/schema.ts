@@ -3707,7 +3707,10 @@ export interface components {
             /** Other Persons */
             other_persons: components["schemas"]["OtherPersonOut"][];
         };
-        /** NameFormCreate */
+        /**
+         * NameFormCreate
+         * @description Champs d'une forme de nom de structure à créer.
+         */
         NameFormCreate: {
             /** Structure Id */
             structure_id: number;
@@ -5267,7 +5270,10 @@ export interface components {
             /** Domestic */
             domestic: number;
         };
-        /** StructureCreate */
+        /**
+         * StructureCreate
+         * @description Champs d'une structure à créer.
+         */
         StructureCreate: {
             /** Code */
             code: string;

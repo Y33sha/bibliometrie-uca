@@ -3,17 +3,16 @@
 Couvre les tables `structures`, `structure_parents` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
 """
 
-from typing import cast
-
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
+    NameFormCreate,
     NameFormUpdate,
+    StructureCreate,
     StructureNameFormRow,
     StructureNameFormUpdateFields,
     StructureRepository,
-    StructureRow,
     StructureTutelleRow,
     StructureUpdate,
 )
@@ -26,52 +25,26 @@ from domain.structures.tutelles import check_can_create_tutelle
 # ── structures : charger-muter-sauver l'agrégat ────────────────────
 
 
-def _to_row(structure: Structure) -> StructureRow:
-    """Sérialise l'agrégat vers la ligne de réponse : `structure_type` sous l'alias `type`, VOs `ror_id`/`hal_collection` rendus en chaînes canoniques."""
-    return {
-        "id": cast("int", structure.id),
-        "code": structure.code,
-        "name": structure.name,
-        "acronym": structure.acronym,
-        "type": structure.structure_type.value,
-        "ror_id": structure.ror_id.value if structure.ror_id else None,
-        "rnsr_id": structure.rnsr_id,
-        "hal_collection": structure.hal_collection.value if structure.hal_collection else None,
-        "api_ids": structure.api_ids,
-    }
-
-
-def create_structure(
-    *,
-    code: str,
-    name: str,
-    acronym: str | None = None,
-    structure_type: str,
-    ror_id: str | None = None,
-    rnsr_id: str | None = None,
-    hal_collection: str | None = None,
-    api_ids: dict[str, str | list[str]] | None = None,
-    repo: StructureRepository,
-) -> StructureRow:
-    """Crée une structure. Retourne la ligne insérée. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
+def create_structure(create: StructureCreate, *, repo: StructureRepository) -> Structure:
+    """Crée une structure et la rend. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
     structure = Structure.create(
-        code=code,
-        name=name,
-        structure_type=structure_type,
-        acronym=acronym,
-        ror_id=ror_id,
-        rnsr_id=rnsr_id,
-        hal_collection=hal_collection,
-        api_ids=api_ids,
+        code=create.code,
+        name=create.name,
+        structure_type=create.type,
+        acronym=create.acronym,
+        ror_id=create.ror_id,
+        rnsr_id=create.rnsr_id,
+        hal_collection=create.hal_collection,
+        api_ids=create.api_ids,
     )
     structure.id = repo.add(structure)
     emit_event(
         "structure.created",
         "structure",
         structure.id,
-        {"code": code, "name": name, "type": structure_type},
+        {"code": create.code, "name": create.name, "type": create.type},
     )
-    return _to_row(structure)
+    return structure
 
 
 def update_structure(
@@ -79,7 +52,7 @@ def update_structure(
     *,
     update: StructureUpdate,
     repo: StructureRepository,
-) -> StructureRow:
+) -> Structure:
     """Met à jour une structure. Charge l'agrégat, applique les champs fournis (validés), persiste. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
 
     Lève `NotFoundError` si la structure n'existe pas, `ValidationError` si aucun champ n'est fourni ou si une valeur est invalide.
@@ -99,7 +72,7 @@ def update_structure(
         structure_id,
         {"fields": sorted(applied)},
     )
-    return _to_row(structure)
+    return structure
 
 
 def _structure_edit(update: StructureUpdate) -> StructureEdit:
@@ -201,29 +174,21 @@ def delete_tutelle(
 # ── structure_name_forms ──────────────────────────────────────────
 
 
-def create_name_form(
-    *,
-    structure_id: int,
-    form_text: str,
-    is_word_boundary: bool = False,
-    is_excluding: bool = False,
-    requires_context_of: list[int] | None = None,
-    repo: StructureRepository,
-) -> StructureNameFormRow:
+def create_name_form(create: NameFormCreate, *, repo: StructureRepository) -> StructureNameFormRow:
     """Crée une forme de nom. Retourne la ligne insérée."""
-    form_text_normalized = normalize_text(form_text)
+    form_text_normalized = normalize_text(create.form_text)
     row = repo.create_name_form(
-        structure_id=structure_id,
+        structure_id=create.structure_id,
         form_text_normalized=form_text_normalized,
         # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
-        is_word_boundary=is_word_boundary or is_short_form(form_text_normalized),
-        is_excluding=is_excluding,
-        requires_context_of=requires_context_of,
+        is_word_boundary=create.is_word_boundary or is_short_form(form_text_normalized),
+        is_excluding=create.is_excluding,
+        requires_context_of=create.requires_context_of,
     )
     emit_event(
         "structure_name_form.created",
         "structure",
-        structure_id,
+        create.structure_id,
         {"form_id": row["id"], "form_text": row["form_text"]},
     )
     return row

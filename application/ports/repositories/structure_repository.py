@@ -9,6 +9,30 @@ from domain.structures.structure import Structure, StructureType
 from domain.types import JsonValue
 
 
+class StructureCreate(BaseModel):
+    """Champs d'une structure à créer."""
+
+    code: str
+    name: str
+    acronym: str | None = None
+    type: StructureType
+    ror_id: str | None = None
+    rnsr_id: str | None = None
+    hal_collection: str | None = None
+    # Une valeur seule (`str`) devient une liste à l'écriture (`StructureApiIds`).
+    api_ids: dict[str, str | list[str]] | None = None
+
+
+class NameFormCreate(BaseModel):
+    """Champs d'une forme de nom de structure à créer."""
+
+    structure_id: int
+    form_text: str
+    is_word_boundary: bool = False
+    is_excluding: bool = False
+    requires_context_of: list[int] | None = None
+
+
 class StructureUpdate(BaseModel):
     """Champs éditables d'une structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface un champ facultatif."""
 
@@ -40,20 +64,6 @@ class StructureNameFormUpdateFields(TypedDict, total=False):
     is_word_boundary: bool
     is_excluding: bool
     requires_context_of: list[int] | None
-
-
-class StructureRow(TypedDict):
-    """Ligne `structures` renvoyée par create / update (colonne `structure_type` exposée sous l'alias `type`). Alimente le DTO `StructureOut`."""
-
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
-    ror_id: str | None
-    rnsr_id: str | None
-    hal_collection: str | None
-    api_ids: dict[str, list[str]] | None
 
 
 class StructureTutelleRow(TypedDict):
