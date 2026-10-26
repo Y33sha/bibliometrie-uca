@@ -97,23 +97,24 @@ Vue détaillée d'un chercheur. Identifiants, données RH si existent.
 
 ## Laboratoires
 
-### Liste `/laboratories`
+### Liste `/structures`
 
-Liste des laboratoires avec tutelles, identifiant ROR et lien vers collection HAL.
+Liste des structures avec tutelles, identifiant ROR et lien vers collection HAL. Une facette de type est réglée par défaut sur les laboratoires.
 
 ![Laboratories](../img/screenshots/laboratories.png)
 
-### Détails `/laboratories/{id}`
+### Détails `/structures/{id}`
 
-Vue détaillée d'un laboratoire.
+Vue détaillée d'une structure.
 
 Onglets:
-- Dashboard (sujets, production, taux d'accès ouvert, collaborations internationales);
+- Dashboard (sujets, production, taux d'open access, collaborations internationales);
 - Publications;
 - Thèses;
 - Personnes: affiche les personnes liées à ce laboratoire via une publication (ne repose pas sur l'affiliation renseignée dans la base RH);
 - Collaborations: [organisations partenaires](../glossaire.md#organisation-partenaire), classées par nombre de copublications, filtrables par année, pays et type; le nombre de copublications mène à la liste des publications concernées;
-- Adresses (adresses ayant permis la détection de ce laboratoire dans les publications).
+- Adresses (adresses ayant permis la détection de ce laboratoire dans les publications), en session d'administration ;
+- Gestion (édition, tutelles, formes de nom), en session d'administration.
 
 ![Laboratory Details](../img/screenshots/laboratories_id_dashboard.png)
 
@@ -121,7 +122,7 @@ Onglets:
 
 ### Liste `/journals`
 
-Liste des revues avec filtres : recherche par titre ou ISSN, éditeur, type de revue, présence dans le DOAJ, modèle d'accès ouvert. La recherche par ISSN interroge les trois colonnes de support et les ISSN rejetés, avec ou sans tiret. Le filtre éditeur propose les éditeurs les plus représentés sous les filtres actifs, avec leur nombre de revues, et se cherche par nom. Triable par nombre de publications.
+Liste des revues avec filtres : recherche par titre ou ISSN, éditeur, type de revue, présence dans le DOAJ, modèle open access. La recherche par ISSN interroge les trois colonnes de support et les ISSN rejetés, avec ou sans tiret. Le filtre éditeur propose les éditeurs les plus représentés sous les filtres actifs, avec leur nombre de revues, et se cherche par nom. Triable par nombre de publications.
 
 ### Détails `/journals/{id}`
 
