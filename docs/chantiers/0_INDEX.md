@@ -190,9 +190,3 @@
 - 2026-04-30 — [Sujets / mots-clés](archived/2026-04-30_METIER_sujets-mots-cles.md)
 
   Les sujets et mots-clés étaient stockés dans `source_publications`mais pas exploités. Création des tables `subjects` et `subject_cooccurrences`. Création de la page sujets, création du nuage de mots dans les dashboards personne et labo.
-
-- 2026-04-28 — [Repenser `source_persons`](archived/2026-04-28_DATA_source-persons.md)
-
-  Clarification du rôle de la table `source_persons`. Elle était peuplée pour toutes les sources, y compris celles sans identité auteur stable (OA, WoS, auteurs HAL sans compte) avec des `source_id` synthétiques, impossibles à mapper utilement aux `persons` réelles. Le chantier restreint cette table aux sources avec identifiant stable (HAL avec`personId`, ScanR et theses.fr avec `idref`).
-
-  *NB*. Le chantier **DATA_simplify-source-tables** va plus loin dans la simplification du schéma en supprimant `source_persons` et `source_structures`.
