@@ -2,7 +2,7 @@
 
 `DbConn` fournit aux routes la connexion de la requête, sur laquelle les factories construisent les adaptateurs de lecture et les services d'écriture.
 
-La session admin vit dans `session.py` ; ce module n'en expose que le nom d'utilisateur attendu, par `Depends(...)`.
+Le jeton de session appartient à `session.py` ; ce module en tire l'utilisateur et ses rôles, lus dans `ops.users`.
 """
 
 import logging
@@ -30,6 +30,7 @@ from application.ports.read_models.serials_queries import SerialQueries
 from application.ports.read_models.stats_queries import StatsQueries
 from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
+from application.ports.repositories.user_repository import UserRepository
 from application.services.addresses import AddressService
 from application.services.config import ConfigService
 from application.services.contributions import ContributionService
@@ -39,6 +40,7 @@ from application.services.publishers import PublisherService
 from application.services.serials import SerialService
 from application.services.structures import StructureService
 from domain.merge import MergedEntity
+from domain.users import Role, SessionUser
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
 from infrastructure.read_models.config import PgConfigQueries
@@ -67,6 +69,7 @@ from infrastructure.repositories import (
     publisher_repository,
     serial_repository,
     structure_repository,
+    user_repository,
 )
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
@@ -84,7 +87,7 @@ from pipeline.public import (
 logger = logging.getLogger(__name__)
 
 
-# ----- Session admin -----
+# ----- Session -----
 
 
 def get_admin_user() -> str:
@@ -95,13 +98,28 @@ def get_admin_user() -> str:
     return settings.admin_user
 
 
-def admin_user_or_none(request: Request) -> str | None:
-    """Utilisateur de la session en cours, ou `None` faute de session valide — sans jamais refuser l'appel.
+def _session_user(token: str | None, conn: Connection) -> SessionUser | None:
+    login = read_session(token) if token else None
+    if login is None:
+        return None
+    roles = user_repository(conn).roles_of(login)
+    return SessionUser(login, roles) if roles is not None else None
 
-    Sert les lectures dont le contenu dépend de l'appelant sans lui être interdit : la configuration, dont une part est publique et le reste réservé à une session.
+
+def load_session_user(token: str | None) -> SessionUser | None:
+    """Utilisateur de la session portée par `token`, avec ses rôles. `None` sans jeton valide, ou pour un login absent de `ops.users`.
+
+    Ouvre sa propre connexion, en lecture seule : le middleware des écritures l'appelle avant que la requête ait la sienne.
     """
-    token = request.cookies.get("session")
-    return read_session(token) if token else None
+    with get_sync_engine().connect() as conn:
+        conn.execution_options(postgresql_readonly=True)
+        return _session_user(token, conn)
+
+
+def ensure_admin_user() -> None:
+    """Crée l'utilisateur `ADMIN_USER` avec le rôle admin s'il manque. Appelé au démarrage de l'API."""
+    with get_sync_engine().begin() as conn:
+        user_repository(conn).ensure_user(settings.admin_user, [Role.ADMIN])
 
 
 # ----- Factories DB -----
@@ -158,6 +176,21 @@ def db_conn(request: Request) -> Iterator[Connection]:
 # Seule déclaration de la connexion de la requête. Une déclaration d'un autre scope ouvrirait une
 # seconde connexion, avec sa propre transaction.
 DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
+
+
+# ----- Session, sur la connexion de la requête -----
+
+
+def session_user(request: Request, conn: DbConn) -> SessionUser | None:
+    """Utilisateur de la session en cours, ou `None`, sans jamais refuser l'appel.
+
+    Sert les lectures dont le contenu dépend de l'appelant : la configuration, dont une part est réservée à l'administration, et l'état de la session.
+    """
+    return _session_user(request.cookies.get("session"), conn)
+
+
+def user_repo(conn: DbConn) -> UserRepository:
+    return user_repository(conn)
 
 
 # ----- Lectures -----

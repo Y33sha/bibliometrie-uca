@@ -17,6 +17,9 @@
 - **`config`** : réglages d'exploitation du pipeline (périmètres actifs, années couvertes…).
 - **`audit_log`** : journal des événements (actions admin, fusions).
 - **`pipeline_phase_executions`** : historique d'exécution des phases.
+- **`users`** : utilisateurs autorisés à ouvrir une session, par leur identifiant de connexion.
+- **`roles`** : rôles que le code connaît (`domain.users.Role`).
+- **`user_roles`** : rôles attribués à chaque utilisateur.
 
 ## Propriété des tables
 
@@ -25,3 +28,5 @@
 | `countries`, `place_name_forms` | seed | `seed.sql` |
 | `languages`, `language_forms` | seed | `seed.sql` |
 | `config` | admin | `application/services/config/commands.py` |
+| `roles` | migrations | `alembic/versions/` |
+| `users`, `user_roles` | admin | `interfaces/cli/maintenance/manage_users.py` ; l'API crée `ADMIN_USER` au démarrage |

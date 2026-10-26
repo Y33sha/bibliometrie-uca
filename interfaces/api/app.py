@@ -32,7 +32,7 @@ from infrastructure.db.engine import build_sync_engine, set_sync_engine
 from infrastructure.db.read_only_guard import read_request
 from infrastructure.observability.log import configure_root_logging
 from infrastructure.settings import settings
-from interfaces.api.deps import READ_ONLY_METHODS
+from interfaces.api.deps import READ_ONLY_METHODS, ensure_admin_user, load_session_user
 from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
@@ -40,7 +40,7 @@ from interfaces.api.models.errors import (
 from interfaces.api.params import requested_offset
 from interfaces.api.rate_limit import read_allowed
 from interfaces.api.route_path import RootPath, route_path
-from interfaces.api.session import check_auth_config, read_session
+from interfaces.api.session import check_auth_config
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -85,6 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     anyio.to_thread.current_default_thread_limiter().total_tokens = settings.api_threadpool_size
     sync_engine = build_sync_engine("app")
     set_sync_engine(sync_engine)
+    await anyio.to_thread.run_sync(ensure_admin_user)
     try:
         yield
     finally:
@@ -243,7 +244,7 @@ async def read_only_guard_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification.
+    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification : 401 sans session valide, 403 sans le rôle admin.
 
     Journalise les actions admin réussies (statut < 400) sous le record structuré `admin_action`, qui porte l'utilisateur, la méthode, le chemin et le statut. Le chemin journalisé est celui du routage, indépendant du préfixe sous lequel l'application est servie : une même action porte le même nom d'un déploiement à l'autre.
     """
@@ -255,14 +256,15 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     if path.startswith("/api/auth/"):
         return await call_next(request)
 
-    token = request.cookies.get("session")
-    admin_user = read_session(token) if token else None
-    if not admin_user:
+    user = await anyio.to_thread.run_sync(load_session_user, request.cookies.get("session"))
+    if user is None:
         return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
+    if not user.is_admin:
+        return JSONResponse(status_code=403, content={"detail": "Droits insuffisants"})
 
     # Session d'audit de la requête : les services y rangent leurs événements (`emit_event`),
     # que `db_conn` écrit dans `audit_log` avant son commit.
-    token_ctx = audit_log.set_current_user(admin_user)
+    token_ctx = audit_log.set_current_user(user.login)
     try:
         response = await call_next(request)
     finally:
@@ -272,7 +274,7 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
         logger.info(
             "admin_action",
             extra={
-                "user": admin_user,
+                "user": user.login,
                 "method": request.method,
                 "path": path,
                 "status": response.status_code,

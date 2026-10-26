@@ -3,9 +3,11 @@
 Le jeton et son format appartiennent à `interfaces.api.session` ; le router le pose en cookie et l'en retire.
 """
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
-from interfaces.api.deps import get_admin_user
+from application.ports.repositories.user_repository import UserRepository
+from domain.users import SessionUser
+from interfaces.api.deps import get_admin_user, session_user, user_repo
 from interfaces.api.models import AuthCheckResponse, LoginRequest, OkResponse
 from interfaces.api.rate_limit import login_rate_limit
 from interfaces.api.session import (
@@ -13,7 +15,6 @@ from interfaces.api.session import (
     check_password,
     check_username,
     issue_token,
-    read_session,
     session_cookie_secure,
 )
 
@@ -25,10 +26,11 @@ def auth_login(
     data: LoginRequest,
     response: Response,
     _rate_limit: None = Depends(login_rate_limit),
+    users: UserRepository = Depends(user_repo),
 ) -> OkResponse:
     """Authentifie l'admin et pose un cookie de session signé.
 
-    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`), 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+    Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`) ou si `ADMIN_USER` est absent de `ops.users`, 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
     """
     # Les deux confrontations sont évaluées quel que soit le sort de la première : la
     # vérification du mot de passe coûte quelques centaines de millisecondes, sa comparaison
@@ -37,6 +39,8 @@ def auth_login(
     mot_de_passe_correspond = check_password(data.password)
     if not (nom_correspond and mot_de_passe_correspond):
         raise HTTPException(status_code=401, detail="Identifiants incorrects")
+    if users.roles_of(get_admin_user()) is None:
+        raise HTTPException(status_code=401, detail="Utilisateur non autorisé")
     response.set_cookie(
         key="session",
         value=issue_token(get_admin_user()),
@@ -50,12 +54,14 @@ def auth_login(
 
 
 @router.get("/check", response_model=AuthCheckResponse)
-def auth_check(session: str | None = Cookie(None, alias="session")) -> AuthCheckResponse:
-    """Indique si le cookie de session en cours est valide.
+def auth_check(user: SessionUser | None = Depends(session_user)) -> AuthCheckResponse:
+    """État de la session en cours : validité, utilisateur et rôles.
 
     Répond toujours 200 : le frontend s'en sert pour choisir entre le bouton de connexion et celui de déconnexion.
     """
-    return AuthCheckResponse(authenticated=bool(session and read_session(session)))
+    if user is None:
+        return AuthCheckResponse(authenticated=False)
+    return AuthCheckResponse(authenticated=True, login=user.login, roles=sorted(user.roles))
 
 
 @router.post("/logout", response_model=OkResponse)

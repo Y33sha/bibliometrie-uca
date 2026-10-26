@@ -105,6 +105,7 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `publisher_name_forms` | formes de noms pour reconnaître un éditeur | [publishing](04-publishing.md) |
 | `publishers` | référentiel des éditeurs | [publishing](04-publishing.md) |
 | `rejected_contributions` | rejets manuels de paires personne × publication | [persons](05-persons.md) |
+| `roles` | rôles d'utilisateur que le code connaît | [ops](07-ref-et-ops.md) |
 | `ror_dump_imports` | imports du dump ROR | [ref](07-ref-et-ops.md) |
 | `ror_organizations` | organisations du Research Organization Registry | [ref](07-ref-et-ops.md) |
 | `ror_relations` | relations parent/enfant entre organisations ROR | [ref](07-ref-et-ops.md) |
@@ -120,3 +121,5 @@ Les vues et vues matérialisées sont signalées comme telles.
 | `structures` | référentiel institutionnel | [structures](06-structures.md) |
 | `subject_cooccurrences` | *vue matérialisée* : paires de sujets co-présents | [publications](03-publications.md) |
 | `subjects` | référentiel des sujets / mots-clés | [publications](03-publications.md) |
+| `user_roles` | rôles attribués à chaque utilisateur | [ops](07-ref-et-ops.md) |
+| `users` | utilisateurs autorisés à ouvrir une session | [ops](07-ref-et-ops.md) |

@@ -17,7 +17,7 @@ export interface paths {
          * Auth Login
          * @description Authentifie l'admin et pose un cookie de session signé.
          *
-         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`), 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`) ou si `ADMIN_USER` est absent de `ops.users`, 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
          */
         post: operations["auth_login_api_auth_login_post"];
         delete?: never;
@@ -35,7 +35,7 @@ export interface paths {
         };
         /**
          * Auth Check
-         * @description Indique si le cookie de session en cours est valide.
+         * @description État de la session en cours : validité, utilisateur et rôles.
          *
          *     Répond toujours 200 : le frontend s'en sert pour choisir entre le bouton de connexion et celui de déconnexion.
          */
@@ -1709,7 +1709,7 @@ export interface paths {
          * List Config
          * @description Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
          *
-         *     Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+         *     Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
          */
         get: operations["list_config_api_config_get"];
         put?: never;
@@ -2844,11 +2844,18 @@ export interface components {
         AttributionStatus: "pending" | "confirmed" | "rejected" | "authenticated";
         /**
          * AuthCheckResponse
-         * @description Résultat de la vérification de session : `authenticated` dit si la requête porte une session valide.
+         * @description État de la session : `authenticated` dit si la requête porte une session valide, `login` et `roles` désignent son utilisateur.
          */
         AuthCheckResponse: {
             /** Authenticated */
             authenticated: boolean;
+            /** Login */
+            login?: string | null;
+            /**
+             * Roles
+             * @default []
+             */
+            roles: string[];
         };
         /**
          * BatchAssignOrphanContributions
@@ -5802,9 +5809,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -5815,15 +5820,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthCheckResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

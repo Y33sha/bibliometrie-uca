@@ -20,6 +20,7 @@ from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.serial_repository import SerialRepository
 from application.ports.repositories.structure_repository import StructureRepository
+from application.ports.repositories.user_repository import UserRepository
 
 from .address_repository import PgAddressRepository
 from .audit_repository import PgAuditRepository
@@ -30,6 +31,7 @@ from .person_repository import PgPersonRepository
 from .publisher_repository import PgPublisherRepository
 from .serial_repository import PgSerialRepository
 from .structure_repository import PgStructureRepository
+from .user_repository import PgUserRepository
 
 
 def address_repository(conn: Connection) -> AddressRepository:
@@ -66,3 +68,7 @@ def publisher_repository(conn: Connection) -> PublisherRepository:
 
 def structure_repository(conn: Connection) -> StructureRepository:
     return PgStructureRepository(conn)
+
+
+def user_repository(conn: Connection) -> UserRepository:
+    return PgUserRepository(conn)

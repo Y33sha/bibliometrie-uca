@@ -10,11 +10,12 @@ from fastapi import APIRouter, Depends
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
 from application.services.config import ConfigService
+from domain.users import SessionUser
 from interfaces.api.deps import (
-    admin_user_or_none,
     config_queries,
     config_service,
     perimeters_queries,
+    session_user,
 )
 from interfaces.api.models import ConfigValueUpdate
 
@@ -23,14 +24,14 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 @router.get("", response_model=list[ConfigItem])
 def list_config(
-    admin_user: str | None = Depends(admin_user_or_none),
+    user: SessionUser | None = Depends(session_user),
     queries: ConfigQueries = Depends(config_queries),
 ) -> list[ConfigItem]:
     """Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
 
-    Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+    Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
     """
-    return queries.list_config(public_only=admin_user is None)
+    return queries.list_config(public_only=user is None or not user.is_admin)
 
 
 @router.get("/institution", response_model=InstitutionOut)

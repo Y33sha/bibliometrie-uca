@@ -4,10 +4,41 @@ La fixture `auth_client` forge son jeton directement, sans passer par `/api/auth
 """
 
 import bcrypt
+import pytest
 from pydantic import SecretStr
 
 from infrastructure.settings import settings
-from interfaces.api.session import SESSION_MAX_AGE
+from interfaces.api.session import SESSION_MAX_AGE, issue_token
+from tests.integration.helpers.db import owner_pool
+
+
+def _roles_of(login: str) -> list[str] | None:
+    """Rôles de `login` lus en base, ou `None` s'il est absent de `ops.users`."""
+    with owner_pool() as cur:
+        cur.execute(
+            "SELECT array_remove(array_agg(ur.role_code ORDER BY ur.role_code), NULL) AS roles "
+            "FROM ops.users u LEFT JOIN ops.user_roles ur ON ur.user_id = u.id "
+            "WHERE u.login = %s GROUP BY u.id",
+            (login,),
+        )
+        row = cur.fetchone()
+        return row["roles"] if row else None
+
+
+def _add_user(login: str, *roles: str) -> None:
+    with owner_pool() as cur:
+        cur.execute("INSERT INTO ops.users (login) VALUES (%s) ON CONFLICT DO NOTHING", (login,))
+        for role in roles:
+            cur.execute(
+                "INSERT INTO ops.user_roles (user_id, role_code) "
+                "SELECT id, %s FROM ops.users WHERE login = %s ON CONFLICT DO NOTHING",
+                (role, login),
+            )
+
+
+def _remove_user(login: str) -> None:
+    with owner_pool() as cur:
+        cur.execute("DELETE FROM ops.users WHERE login = %s", (login,))
 
 
 class TestLogin:
@@ -70,20 +101,73 @@ class TestCheck:
     def test_reports_anonymous_visitor(self, client):
         r = client.get("/api/auth/check")
         assert r.status_code == 200
-        assert r.json() == {"authenticated": False}
+        assert r.json() == {"authenticated": False, "login": None, "roles": []}
 
     def test_reports_open_session(self, auth_client):
         r = auth_client.get("/api/auth/check")
         assert r.status_code == 200
-        assert r.json() == {"authenticated": True}
+        assert r.json() == {
+            "authenticated": True,
+            "login": settings.admin_user,
+            "roles": ["admin"],
+        }
 
     def test_reports_forged_cookie_as_anonymous(self, client):
         client.cookies.set("session", "admin|0.contribution source-inventee")
         try:
             r = client.get("/api/auth/check")
-            assert r.json() == {"authenticated": False}
+            assert r.json()["authenticated"] is False
         finally:
             client.cookies.clear()
+
+
+class TestUtilisateurs:
+    def test_l_admin_des_reglages_existe_au_demarrage(self, client):
+        assert _roles_of(settings.admin_user) == ["admin"]
+
+    def test_une_ecriture_sans_le_role_admin_est_refusee(self, client):
+        _add_user("lecteur")
+        client.cookies.set("session", issue_token("lecteur"))
+        try:
+            assert client.put("/api/config/inconnue", json={"value": 1}).status_code == 403
+            assert client.get("/api/auth/check").json() == {
+                "authenticated": True,
+                "login": "lecteur",
+                "roles": [],
+            }
+        finally:
+            client.cookies.clear()
+            _remove_user("lecteur")
+
+    def test_un_jeton_dont_le_login_est_absent_des_utilisateurs_est_refuse(self, client):
+        client.cookies.set("session", issue_token("parti"))
+        try:
+            assert client.put("/api/config/inconnue", json={"value": 1}).status_code == 401
+            assert client.get("/api/auth/check").json()["authenticated"] is False
+        finally:
+            client.cookies.clear()
+
+    @pytest.fixture
+    def _admin_retire(self):
+        _remove_user(settings.admin_user)
+        yield
+        _add_user(settings.admin_user, "admin")
+
+    @pytest.mark.usefixtures("_admin_retire")
+    def test_la_connexion_est_refusee_si_l_admin_est_absent_des_utilisateurs(
+        self, client, monkeypatch
+    ):
+        from interfaces.api import session as session_module
+
+        empreinte = bcrypt.hashpw(b"mot-de-passe-de-test", bcrypt.gensalt(rounds=4)).decode()
+        monkeypatch.setattr(session_module.settings, "admin_hash", SecretStr(empreinte))
+
+        r = client.post(
+            "/api/auth/login",
+            json={"username": settings.admin_user, "password": "mot-de-passe-de-test"},
+        )
+        assert r.status_code == 401
+        assert "session" not in r.cookies
 
 
 class TestLogout:

@@ -18,6 +18,7 @@ def test_lifespan_applique_la_taille_declaree(monkeypatch):
     monkeypatch.setattr(app_module, "check_auth_config", lambda: None)
     monkeypatch.setattr(app_module, "build_sync_engine", lambda identity: _EngineFactice())
     monkeypatch.setattr(app_module, "set_sync_engine", lambda engine: None)
+    monkeypatch.setattr(app_module, "ensure_admin_user", lambda: None)
     releve: list[float] = []
 
     async def scenario() -> None:
