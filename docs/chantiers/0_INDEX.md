@@ -141,8 +141,6 @@
 - 2026-05-18 — [Couverture de tests : viser 80 %](archived/2026-05-18_CODE_couverture-tests.md)
 - 2026-05-18 — [Typage strict des projections et DTOs](archived/2026-05-18_CODE_typage-projections-strict.md)
 - 2026-05-17 — [Audit « DSI qui reprend le projet »](archived/2026-05-17_CODE_audit-cto.md)
-- 2026-05-16 — [Normaliser les relations many-to-many cachées (arrays + JSONB de jointure)](archived/2026-05-16_DATA_jointures-many-to-many.md)
-- 2026-05-15 — [Domaine riche (entités métier)](archived/2026-05-15_CODE_rich-domain-model.md)
 
 
 
