@@ -48,6 +48,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Une seule liste des structures**, sous la route `structures`, avec une facette de type réglée par défaut sur les laboratoires.
 - **Éditeurs et publications en série** : les actions Modifier et Fusionner restent dans la cellule d'actions, affichée selon le rôle.
 - Pas de redirection des routes supprimées.
+- **Onglets « Adresses »** des fiches structure et personne réservés à la session admin.
 - **« Publications en série »** est le libellé de la liste et de la fiche, session ouverte ou non. La liste comporte des actes, des médias et des serveurs de preprints.
 
 ## Phasage

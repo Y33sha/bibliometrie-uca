@@ -40,7 +40,8 @@
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
-			return t === 'publications' || t === 'theses' || t === 'addresses' ? t : 'dashboard';
+			// L'onglet « Adresses » est réservé à la session admin.
+			return t === 'publications' || t === 'theses' || (t === 'addresses' && isAdmin()) ? t : 'dashboard';
 		})()
 	);
 
@@ -178,7 +179,7 @@
 			{ id: 'dashboard', label: 'Dashboard' },
 			{ id: 'publications', label: 'Publications' },
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
-			{ id: 'addresses', label: 'Adresses' },
+			...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
 		]}
 		onswitch={onTabSwitch}
 	/>

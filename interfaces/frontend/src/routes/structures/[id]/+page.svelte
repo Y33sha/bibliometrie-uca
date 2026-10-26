@@ -39,8 +39,8 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	// L'onglet « Gestion » est réservé à la session admin.
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', 'addresses', ...(isAdmin() ? ['management'] : [])];
+	// Les onglets « Adresses » et « Gestion » sont réservés à la session admin.
+	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', ...(isAdmin() ? ['addresses', 'management'] : [])];
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
@@ -205,8 +205,12 @@
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
 			{ id: 'persons', label: 'Personnes' },
 			{ id: 'collaborations', label: 'Collaborations' },
-			{ id: 'addresses', label: 'Adresses' },
-			...(isAdmin() ? [{ id: 'management', label: 'Gestion' }] : []),
+			...(isAdmin()
+				? [
+						{ id: 'addresses', label: 'Adresses' },
+						{ id: 'management', label: 'Gestion' },
+					]
+				: []),
 		]}
 		onswitch={onTabSwitch}
 		afterNavigate={syncUrl}
