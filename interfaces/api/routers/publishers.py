@@ -5,8 +5,6 @@ Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.pipeline.publication_count import PublicationCountRecompute
-from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.read_models.publishers_queries import (
     Publisher,
     PublisherDashboardResponse,
@@ -17,22 +15,11 @@ from application.ports.read_models.publishers_queries import (
     PublisherSort,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.ports.repositories.publisher_repository import (
-    PublisherRepository,
-    PublisherUpdate,
-)
-from application.ports.repositories.serial_repository import SerialRepository
-from application.services import publishers as publishers_service
+from application.ports.repositories.publisher_repository import PublisherUpdate
+from application.services.publishers import PublisherService
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from interfaces.api.deps import (
-    entity_detail,
-    publication_count_recompute,
-    publisher_queries,
-    publisher_repo,
-    serial_recompute,
-    serial_repo,
-)
+from interfaces.api.deps import entity_detail, publisher_queries, publisher_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
@@ -148,13 +135,13 @@ def get_publisher_subjects(
 def update_publisher(
     publisher_id: int,
     body: PublisherUpdate,
-    repo: PublisherRepository = Depends(publisher_repo),
+    publishers: PublisherService = Depends(publisher_service),
 ) -> OkResponse:
     """Met à jour un éditeur, champ par champ.
 
     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
     """
-    publishers_service.update_publisher(publisher_id, update=body, repo=repo)
+    publishers.update_publisher(publisher_id, body)
     return OkResponse()
 
 
@@ -166,25 +153,15 @@ def update_publisher(
 def merge(
     publisher_id: int,
     body: MergeRequest,
-    publishers: PublisherRepository = Depends(publisher_repo),
-    serials: SerialRepository = Depends(serial_repo),
-    recompute: SerialRecompute = Depends(serial_recompute),
-    publication_count_recompute: PublicationCountRecompute = Depends(publication_count_recompute),
+    publishers: PublisherService = Depends(publisher_service),
 ) -> MergeResponse:
     """Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
 
-        Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
+    Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
 
     Deux éditeurs qui portent des membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
 
-        Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+    Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
-    publishers_service.merge_publishers(
-        publisher_id,
-        body.source_id,
-        recompute=recompute,
-        publication_count_recompute=publication_count_recompute,
-        publisher_repo=publishers,
-        serial_repo=serials,
-    )
+    publishers.merge_publishers(publisher_id, body.source_id)
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

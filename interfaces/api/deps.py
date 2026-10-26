@@ -17,10 +17,6 @@ from application.ports.pipeline.countries import CountryRecompute as CountryReco
 from application.ports.pipeline.perimeter_structures import (
     PerimeterStructures as PerimeterStructuresPort,
 )
-from application.ports.pipeline.publication_count import (
-    PublicationCountRecompute as PublicationCountRecomputePort,
-)
-from application.ports.pipeline.serial_recompute import SerialRecompute as SerialRecomputePort
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.contributions_queries import ContributionsQueries
@@ -41,8 +37,6 @@ from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
-from application.ports.repositories.serial_repository import SerialRepository
 from application.ports.repositories.structure_repository import StructureRepository
 from application.services.addresses import (
     countries as countries_service,
@@ -50,6 +44,8 @@ from application.services.addresses import (
 )
 from application.services.contributions import ContributionService
 from application.services.persons import PersonService
+from application.services.publishers import PublisherService
+from application.services.serials import SerialService
 from domain.merge import MergedEntity
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
@@ -212,8 +208,10 @@ def serial_queries(conn: DbConn) -> SerialQueries:
     return PgSerialQueries(conn)
 
 
-def serial_repo(conn: DbConn) -> SerialRepository:
-    return serial_repository(conn)
+def serial_service(conn: DbConn) -> SerialService:
+    return SerialService(
+        serials=serial_repository(conn), recompute=SerialRecompute(conn), conn=conn
+    )
 
 
 def monograph_queries(conn: DbConn) -> MonographQueries:
@@ -224,8 +222,13 @@ def publisher_queries(conn: DbConn) -> PublisherQueries:
     return PgPublisherQueries(conn)
 
 
-def publisher_repo(conn: DbConn) -> PublisherRepository:
-    return publisher_repository(conn)
+def publisher_service(conn: DbConn) -> PublisherService:
+    return PublisherService(
+        publishers=publisher_repository(conn),
+        serials=serial_repository(conn),
+        serial_service=serial_service(conn),
+        publication_count_recompute=PublicationCountRecompute(conn),
+    )
 
 
 def perimeter_repo(conn: DbConn) -> PerimeterRepository:
@@ -306,16 +309,6 @@ def addresses_queries(conn: DbConn) -> AddressesQueries:
 def get_perimeter_structures(conn: DbConn) -> PerimeterStructuresPort:
     """Clôture des tutelles des périmètres."""
     return PerimeterStructures(conn)
-
-
-def serial_recompute(conn: DbConn) -> SerialRecomputePort:
-    """Requalification des publications d'une revue après son édition ou sa fusion."""
-    return SerialRecompute(conn)
-
-
-def publication_count_recompute(conn: DbConn) -> PublicationCountRecomputePort:
-    """`publication_count` d'un éditeur, après une fusion d'éditeurs."""
-    return PublicationCountRecompute(conn)
 
 
 def country_recompute(conn: DbConn) -> CountryRecomputePort:

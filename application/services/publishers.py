@@ -2,14 +2,13 @@
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
-from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.repositories.publisher_repository import (
     PublisherRepository,
     PublisherUpdate,
 )
 from application.ports.repositories.serial_repository import SerialRepository
 from application.services._merge import check_merge_pair
-from application.services.serials import merge_serials
+from application.services.serials import SerialService
 from domain.errors import (
     ConflictError,
     NotFoundError,
@@ -20,75 +19,72 @@ from domain.publishers.members import crossref_member_conflict
 from domain.publishers.merge import split_shared_title_pairs
 
 
-def update_publisher(
-    publisher_id: int,
-    *,
-    update: PublisherUpdate,
-    repo: PublisherRepository,
-) -> None:
-    """Charge l'éditeur, applique les champs explicitement fournis, persiste.
+class PublisherService:
+    """Écritures sur les éditeurs. La fusion de deux éditeurs fusionne aussi leurs revues homonymes (`SerialService`)."""
 
-    L'événement d'audit contient seulement les champs soumis.
+    def __init__(
+        self,
+        *,
+        publishers: PublisherRepository,
+        serials: SerialRepository,
+        serial_service: SerialService,
+        publication_count_recompute: PublicationCountRecompute,
+    ) -> None:
+        self._publishers = publishers
+        self._serials = serials
+        self._serial_service = serial_service
+        self._publication_count_recompute = publication_count_recompute
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si l'éditeur n'existe pas.
-    """
-    if not update.model_fields_set:
-        raise ValidationError("Aucun champ à mettre à jour")
+    def update_publisher(self, publisher_id: int, update: PublisherUpdate) -> None:
+        """Charge l'éditeur, applique les champs explicitement fournis, persiste.
 
-    publisher = repo.find_by_id(publisher_id)
-    if publisher is None:
-        raise NotFoundError(f"Éditeur {publisher_id} introuvable")
+        L'événement d'audit contient seulement les champs soumis.
 
-    # Les champs de `PublisherUpdate` ont les noms des attributs de l'agrégat.
-    champs = update.model_dump(exclude_unset=True, mode="json")
-    for field_name, value in update.model_dump(exclude_unset=True).items():
-        setattr(publisher, field_name, value)
-    repo.save(publisher)
-    emit_event("publisher.updated", "publisher", publisher_id, champs)
+        Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si l'éditeur n'existe pas.
+        """
+        if not update.model_fields_set:
+            raise ValidationError("Aucun champ à mettre à jour")
 
+        publisher = self._publishers.find_by_id(publisher_id)
+        if publisher is None:
+            raise NotFoundError(f"Éditeur {publisher_id} introuvable")
 
-def merge_publishers(
-    target_id: int,
-    source_id: int,
-    *,
-    publisher_repo: PublisherRepository,
-    serial_repo: SerialRepository,
-    recompute: SerialRecompute,
-    publication_count_recompute: PublicationCountRecompute,
-) -> None:
-    """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.
+        # Les champs de `PublisherUpdate` ont les noms des attributs de l'agrégat.
+        champs = update.model_dump(exclude_unset=True, mode="json")
+        for field_name, value in update.model_dump(exclude_unset=True).items():
+            setattr(publisher, field_name, value)
+        self._publishers.save(publisher)
+        emit_event("publisher.updated", "publisher", publisher_id, champs)
 
-    Les revues homonymes des deux éditeurs fusionnent d'abord. Des membres Crossref distincts de part et d'autre refusent la fusion (`ConflictError`). Une paire de revues homonymes aux ISSN contradictoires, ou un doublon de titre chez l'un des éditeurs, la bloque (`PublisherMergeBlockedError`).
+    def merge_publishers(self, target_id: int, source_id: int) -> None:
+        """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.
 
-    Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur un éditeur introuvable.
-    """
-    check_merge_pair(target_id, source_id, publisher_repo.find_by_id, label="Éditeur")
+        Les revues homonymes des deux éditeurs fusionnent d'abord. Des membres Crossref distincts de part et d'autre refusent la fusion (`ConflictError`). Une paire de revues homonymes aux ISSN contradictoires, ou un doublon de titre chez l'un des éditeurs, la bloque (`PublisherMergeBlockedError`).
 
-    # 1. Deux membres Crossref distincts désignent deux éditeurs : la fusion s'arrête là.
-    if conflict := crossref_member_conflict(
-        publisher_repo.crossref_member_ids(target_id),
-        publisher_repo.crossref_member_ids(source_id),
-    ):
-        raise ConflictError(f"Fusion refusée, {conflict} (cible / source)")
+        Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur un éditeur introuvable.
+        """
+        check_merge_pair(target_id, source_id, self._publishers.find_by_id, label="Éditeur")
 
-    # 2. Les revues homonymes des deux éditeurs fusionnent, sauf si une paire bloque. Toutes les
-    #    paires bloquantes partent ensemble dans l'erreur : l'UI les affiche d'un coup.
-    mergeable_pairs, blockers = split_shared_title_pairs(
-        serial_repo.find_shared_title_serial_pairs(target_id, source_id)
-    )
-    if blockers:
-        raise PublisherMergeBlockedError(blockers)
+        # 1. Deux membres Crossref distincts désignent deux éditeurs : la fusion s'arrête là.
+        if conflict := crossref_member_conflict(
+            self._publishers.crossref_member_ids(target_id),
+            self._publishers.crossref_member_ids(source_id),
+        ):
+            raise ConflictError(f"Fusion refusée, {conflict} (cible / source)")
 
-    for pair in mergeable_pairs:
-        merge_serials(
-            pair.target_serial_id,
-            pair.source_serial_id,
-            repo=serial_repo,
-            recompute=recompute,
+        # 2. Les revues homonymes des deux éditeurs fusionnent, sauf si une paire bloque. Toutes les
+        #    paires bloquantes partent ensemble dans l'erreur : l'UI les affiche d'un coup.
+        mergeable_pairs, blockers = split_shared_title_pairs(
+            self._serials.find_shared_title_serial_pairs(target_id, source_id)
         )
+        if blockers:
+            raise PublisherMergeBlockedError(blockers)
 
-    # 3. Les données de l'éditeur absorbé, selon leur règle de fusion.
-    publisher_repo.merge_publisher_into(target_id, source_id)
-    publication_count_recompute.refresh_publisher_publication_count(target_id)
+        for pair in mergeable_pairs:
+            self._serial_service.merge_serials(pair.target_serial_id, pair.source_serial_id)
 
-    emit_event("publisher.merged", "publisher", target_id, {"source_id": source_id})
+        # 3. Les données de l'éditeur absorbé, selon leur règle de fusion.
+        self._publishers.merge_publisher_into(target_id, source_id)
+        self._publication_count_recompute.refresh_publisher_publication_count(target_id)
+
+        emit_event("publisher.merged", "publisher", target_id, {"source_id": source_id})

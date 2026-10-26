@@ -15,13 +15,10 @@ from collections import Counter
 
 from sqlalchemy import Connection, text
 
-from application.services import publishers as publishers_service
 from domain.errors import ConflictError
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories.publisher_repository import PgPublisherRepository
-from infrastructure.repositories.serial_repository import PgSerialRepository
-from pipeline.public import PublicationCountRecompute, SerialRecompute
+from interfaces.api.deps import publisher_service
 
 log = setup_logger("merge_publisher_aliases", os.path.dirname(__file__))
 
@@ -111,14 +108,7 @@ def merge_aliases(conn: Connection, *, apply: bool) -> Counter[str]:
                 log.info("« %s » (%d) → « %s » (%d)", alias, source_id, target_name, targets[0])
                 continue
             try:
-                publishers_service.merge_publishers(
-                    targets[0],
-                    source_id,
-                    publisher_repo=PgPublisherRepository(conn),
-                    serial_repo=PgSerialRepository(conn),
-                    recompute=SerialRecompute(conn),
-                    publication_count_recompute=PublicationCountRecompute(conn),
-                )
+                publisher_service(conn).merge_publishers(targets[0], source_id)
             except ConflictError as e:
                 conn.rollback()
                 outcomes["refusées"] += 1

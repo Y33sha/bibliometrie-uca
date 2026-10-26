@@ -244,19 +244,11 @@ class TestEndToEndServiceIntegration:
 
     def test_serial_type_preview_emits_nothing(self, sa_sync_conn):
         """L'aperçu d'un changement de type annule son écriture : aucun événement n'en reste."""
-        from application.services.serials import preview_type_change_impact
         from domain.serials.serial import SerialType
-        from infrastructure.repositories import serial_repository
-        from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
+        from interfaces.api.deps import serial_service
         from tests.integration.helpers.serials import insert_serial
 
         serial_id = insert_serial(sa_sync_conn, title="Revue X")
         with _requete_admin(sa_sync_conn):
-            preview_type_change_impact(
-                serial_id,
-                serial_type=SerialType.MEDIA,
-                conn=sa_sync_conn,
-                repo=serial_repository(sa_sync_conn),
-                recompute=SerialRecompute(sa_sync_conn),
-            )
+            serial_service(sa_sync_conn).preview_type_change_impact(serial_id, SerialType.MEDIA)
         assert _count(sa_sync_conn) == 0
