@@ -27,7 +27,3 @@ class ConfigQueries(Protocol):
     """Lectures pour /api/config/*."""
 
     def list_config(self, *, public_only: bool) -> list[ConfigItem]: ...
-
-    def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
-        """Clés dont la valeur désigne ce périmètre. Sert à refuser la suppression d'un périmètre encore cité."""
-        ...

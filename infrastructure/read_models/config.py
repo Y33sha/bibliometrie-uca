@@ -1,9 +1,9 @@
 """Query services pour les paramètres applicatifs (table `config`).
 
-Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing complet et les clés qui référencent un périmètre. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, plafonds et délais d'interrogation — vivent à part, dans `pipeline/runtime/config.py`.
+Ce module sert la couche requêtes-API : `PgConfigQueries` rend au router admin le listing des paramètres. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, plafonds et délais d'interrogation — vivent à part, dans `pipeline/runtime/config.py`.
 """
 
-from sqlalchemy import Connection, select, text
+from sqlalchemy import Connection, select
 
 from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
 from domain.config import PUBLIC_CONFIG_KEYS
@@ -28,12 +28,3 @@ class PgConfigQueries(ConfigQueries):
             ConfigItem(key=r.key, value=r.value, description=r.description)
             for r in self._conn.execute(stmt)
         ]
-
-    def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
-        """Clés dont la valeur désigne ce périmètre."""
-        # `#>> '{}'` extrait le scalaire JSON ; faute d'opérateur SA Core direct, on passe par text() avec un bind nommé.
-        result = self._conn.execute(
-            text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
-            {"code": perimeter_code},
-        )
-        return [r.key for r in result]

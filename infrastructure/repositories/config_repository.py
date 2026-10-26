@@ -1,6 +1,6 @@
 """Adapter PostgreSQL sync pour la table `config`."""
 
-from sqlalchemy import Connection, update
+from sqlalchemy import Connection, text, update
 
 from application.ports.repositories.config_repository import ConfigRepository
 from domain.types import JsonValue
@@ -12,6 +12,14 @@ class PgConfigRepository(ConfigRepository):
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
+
+    def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
+        # `#>> '{}'` extrait le scalaire JSON ; faute d'opérateur SA Core direct, on passe par text() avec un bind nommé.
+        result = self._conn.execute(
+            text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
+            {"code": perimeter_code},
+        )
+        return [r.key for r in result]
 
     def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:
         stmt = (

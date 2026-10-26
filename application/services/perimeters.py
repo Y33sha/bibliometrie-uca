@@ -5,7 +5,7 @@ Un périmètre a des structures **racines** (`perimeters.root_structure_ids`) ; 
 
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
-from application.ports.read_models.config_queries import ConfigQueries
+from application.ports.repositories.config_repository import ConfigRepository
 from application.ports.repositories.perimeter_repository import (
     PerimeterRepository,
     PerimeterUpdate,
@@ -17,7 +17,7 @@ from domain.perimeters.perimeter import Perimeter
 class PerimeterService:
     """Écritures sur les périmètres.
 
-    `delete_perimeter` consulte la table `config` (`ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
+    `delete_perimeter` consulte la table `config` (`ConfigRepository`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
     """
 
     def __init__(
@@ -25,7 +25,7 @@ class PerimeterService:
         *,
         perimeters: PerimeterRepository,
         perimeter_structures: PerimeterStructures,
-        config: ConfigQueries,
+        config: ConfigRepository,
     ) -> None:
         self._perimeters = perimeters
         self._perimeter_structures = perimeter_structures

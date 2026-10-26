@@ -307,7 +307,7 @@ def perimeter_service(conn: DbConn) -> PerimeterService:
     return PerimeterService(
         perimeters=perimeter_repository(conn),
         perimeter_structures=PerimeterStructures(conn),
-        config=PgConfigQueries(conn),
+        config=PgConfigRepository(conn),
     )
 
 
