@@ -432,3 +432,28 @@ class TestLicense:
         )
         facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
         assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}
+
+
+def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):
+    lab = _lab(sa_sync_conn)
+    deposited = insert_publication(sa_sync_conn, "Deposited", oa_status="green")
+    gold = insert_publication(sa_sync_conn, "Gold", oa_status="gold", doi="10.1/gold")
+    embargoed = insert_publication(sa_sync_conn, "Embargoed", oa_status="embargoed")
+    sa_sync_conn.execute(
+        text(
+            "UPDATE publications SET best_copy_url = 'https://hal.science/hal-1' WHERE id = ANY(:ids)"
+        ),
+        {"ids": [deposited, embargoed]},
+    )
+    for publication in (deposited, gold, embargoed):
+        _attach(sa_sync_conn, publication, lab)
+
+    res = publications_queries(sa_sync_conn).list_publications(
+        filters=PublicationFilters(lab_ids=[lab]), page=1, per_page=50, sort="year_desc"
+    )
+
+    assert {p.id: p.access_url for p in res.publications} == {
+        deposited: "https://hal.science/hal-1",
+        gold: "https://doi.org/10.1/gold",
+        embargoed: None,
+    }

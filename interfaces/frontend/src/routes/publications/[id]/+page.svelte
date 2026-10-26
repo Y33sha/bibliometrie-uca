@@ -120,7 +120,7 @@
 
     <PublicationSidebar
       {pub}
-      bestCopyUrl={data!.access_url}
+      accessUrl={data!.access_url}
       access={data!.access}
       referencedBy={data!.referenced_by}
       externalIds={data!.external_identifiers}

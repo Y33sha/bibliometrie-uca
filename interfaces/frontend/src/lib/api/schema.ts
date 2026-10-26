@@ -4448,6 +4448,8 @@ export interface components {
             doc_type: string;
             /** Oa Status */
             oa_status: string;
+            /** Access Url */
+            access_url: string | null;
             /** License */
             license: string | null;
             /** Serial */

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { asset } from "$app/paths";
+  import AccessButton from "#lib/components/AccessButton.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
   import { accessTag } from "#lib/labels.js";
   import { licenseLabels } from "#lib/licenses.js";
@@ -8,13 +9,13 @@
 
   const {
     pub,
-    bestCopyUrl,
+    accessUrl,
     access,
     referencedBy,
     externalIds,
   }: {
     pub: PubDetail;
-    bestCopyUrl: string | null;
+    accessUrl: string | null;
     access: AccessLink[];
     referencedBy: Source[];
     externalIds: ExternalId[];
@@ -62,13 +63,6 @@
     if (accessLicense) licenseLabels().then((l) => (labels = l)).catch(() => {});
   });
 
-  // Le bouton d'accès mène à la meilleure copie ouverte, à défaut au DOI ; une publication fermée ou sous embargo n'en a pas.
-  const accessUrl = $derived.by(() => {
-    const oa = pub.oa_status;
-    if (oa === "closed" || oa === "embargoed") return null;
-    return bestCopyUrl ?? (pub.doi ? `https://doi.org/${pub.doi}` : null);
-  });
-
   // Plateforme de la copie donnée par le bouton : une copie listée, ou l'éditeur quand le bouton mène au DOI.
   const accessCopy = $derived(access.find((a) => a.url === accessUrl) ?? null);
   const viaPublisher = $derived(accessUrl != null && accessCopy == null);
@@ -82,14 +76,7 @@
 </script>
 
 <aside class="detail-sidebar">
-  {#if accessUrl}
-    <a class="access-btn" href={accessUrl} target="_blank" rel="noopener">
-      Lire le texte intégral
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M7 17L17 7M17 7H8M17 7v9" />
-      </svg>
-    </a>
-  {/if}
+  <AccessButton url={accessUrl} oaStatus={pub.oa_status} />
 
   {#if accessUrl && accessState}
     <div class="access-line">
@@ -97,21 +84,6 @@
       {#if accessLicense}<span class="access-license">· {labels[accessLicense] ?? accessLicense}</span>{/if}
       {#if accessCopy || viaPublisher}
         <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
-      {/if}
-    </div>
-  {:else if !accessUrl && accessState}
-    <!-- Sans copie ouverte : un bloc du même format que le bouton, non cliquable. -->
-    <div class="access-btn access-unavailable">
-      {#if pub.oa_status === "embargoed"}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
-        </svg>
-        Sous embargo
-      {:else}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
-        </svg>
-        Accès fermé
       {/if}
     </div>
   {/if}
@@ -205,27 +177,6 @@
     border-radius: var(--radius);
     background: color-mix(in srgb, var(--accent-light) 55%, var(--bg));
   }
-  .access-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: 44px;
-    border-radius: var(--radius);
-    background: var(--accent);
-    color: white;
-    font-weight: 700;
-    font-size: 1rem;
-    text-decoration: none;
-  }
-  a.access-btn:hover {
-    background: color-mix(in srgb, var(--accent), black 20%);
-    text-decoration: none;
-  }
-  .access-btn svg {
-    width: 16px;
-    height: 16px;
-  }
   .access-line {
     margin-top: 10px;
     font-size: 0.9rem;
@@ -246,12 +197,6 @@
   }
   .access-state {
     color: var(--open-text);
-  }
-  .access-unavailable {
-    background: var(--border);
-    color: var(--text-secondary);
-    font-weight: 600;
-    cursor: default;
   }
   .access-via {
     color: var(--muted);

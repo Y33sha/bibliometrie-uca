@@ -793,21 +793,6 @@
 	background: #c6e8e0;
 }
 
-/* Lien DOI : l'icône seule, sans pastille, qui prend la couleur d'accent au survol. */
-.source-doi {
-	color: var(--muted);
-}
-
-.source-doi:hover {
-	color: var(--accent);
-	transform: none;
-}
-
-.source-doi :is(svg) {
-	width: 16px;
-	height: 16px;
-}
-
 .source-placeholder {
 	visibility: hidden;
 }
@@ -1083,10 +1068,6 @@ a.badge-doaj:hover {
 
 .oa-lock-ongoing .oa-lock-label {
 	color: #999;
-}
-
-.oa-lock-embargo .oa-lock-label {
-	color: #856404;
 }
 
 /* ── OA tags ── */

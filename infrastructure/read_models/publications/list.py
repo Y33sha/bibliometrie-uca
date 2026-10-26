@@ -9,6 +9,7 @@ from typing import cast
 from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text, to_plain_text
+from domain.publications.access import access_url
 from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
@@ -294,12 +295,12 @@ def _publication_lines(
             "Laboratoires": row.labs or "",
             "Corresp.": "oui" if row.is_corresponding else "",
             "APC (€)": round(row.apc_total) if row.apc_total else "",
-            "Accès": "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé",
             "Voie OA": row.oa_status or "",
             "Licence": license_label(row.license) if row.license else "",
             "Statut HAL": HAL_DEPOSIT_STATUS_LABELS.get(row.hal_status or "", ""),
             "DOI": doi_url,
             "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
+            "Accès": access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",
         }
         yield writer.line([cell[header] for _, header in emitted])
 
@@ -410,7 +411,7 @@ class PublicationListQueries:
             text(f"""
                 SELECT
                     p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
-                    p.oa_status::text AS oa_status,
+                    p.oa_status::text AS oa_status, p.best_copy_url,
                     p.license::text AS license,
                     j.id AS serial_id,
                     j.title AS journal_title,
@@ -501,6 +502,7 @@ class PublicationListQueries:
                 doi=r.doi,
                 doc_type=r.doc_type,
                 oa_status=r.oa_status,
+                access_url=access_url(r.best_copy_url, oa_status=r.oa_status, doi=r.doi),
                 license=r.license,
                 serial_id=r.serial_id,
                 serial=r.journal_title,
@@ -534,7 +536,7 @@ class PublicationListQueries:
         sort: str,
         columns: list[str],
     ) -> Iterator[str]:
-        """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et liens (DOI + Sources) toujours présents.
+        """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et accès toujours présents.
 
         Rend le CSV par blocs, à emballer dans une réponse en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant, la copie de sa relecture et l'ajout du BOM en tête.
 
@@ -546,9 +548,9 @@ class PublicationListQueries:
         )
         order = _ORDER_MAP[sort]
 
-        # Titre et liens (DOI + Sources) toujours présents. `columns` vide => toutes.
+        # Titre et accès toujours présents. `columns` vide => toutes.
         requested = set(columns) if columns else set(EXPORT_COLUMNS)
-        requested |= {"title", "links"}
+        requested |= {"title", "access"}
         # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
         hal_status = (
             hal_status_expression(lab_hal_collection(self._conn, filters.lab_ids))
@@ -565,7 +567,7 @@ class PublicationListQueries:
             text(f"""
                 SELECT
                     p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
-                    p.oa_status::text AS oa_status,
+                    p.oa_status::text AS oa_status, p.best_copy_url,
                     p.license::text AS license,
                     j.title AS journal_title,
                     pub.name AS publisher_name,
@@ -618,18 +620,18 @@ class PublicationListQueries:
         spec: list[tuple[str, str]] = [
             ("type", "Type"),
             ("year", "Année"),
+            ("doi", "DOI"),
             ("title", "Titre"),
             ("serial", "Revue"),
             ("publisher", "Éditeur"),
             ("labs", "Laboratoires"),
             ("corr", "Corresp."),
             ("apc", "APC (€)"),
-            ("oa", "Accès"),
             ("oa_status", "Voie OA"),
             ("license", "Licence"),
             ("hal_status", "Statut HAL"),
-            ("links", "DOI"),
-            ("links", "Sources"),
+            ("sources", "Sources"),
+            ("access", "Accès"),
         ]
         emitted = [(key, header) for key, header in spec if key in requested]
 

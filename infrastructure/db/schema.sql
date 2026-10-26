@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict agJ4oF6K1HdsNWWAnrwPmxphv7jfcWAqpJu7T8aUb3DyQUBvponatG4brWHBePf
+\restrict bAFCqnO8EqiN3V070440VwNl5gVXQfKPwfhEvbi5XEDXvjBb6AZRZT9L2eaTyzq
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1675,6 +1675,7 @@ CREATE TABLE publications.publications (
     corrections jsonb DEFAULT '{}'::jsonb NOT NULL,
     publisher_id integer,
     doi_prefix text GENERATED ALWAYS AS (split_part(doi, '/'::text, 1)) STORED,
+    best_copy_url text,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
 
@@ -1691,6 +1692,13 @@ COMMENT ON COLUMN publications.publications.publisher_id IS 'Éditeur à la date
 --
 
 COMMENT ON COLUMN publications.publications.doi_prefix IS 'Préfixe du DOI, pour les jointures sur doi_prefixes.';
+
+
+--
+-- Name: COLUMN publications.best_copy_url; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.best_copy_url IS 'Adresse de la meilleure copie ouverte, parmi les localisations des enregistrements sources.';
 
 
 --
@@ -5371,5 +5379,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict agJ4oF6K1HdsNWWAnrwPmxphv7jfcWAqpJu7T8aUb3DyQUBvponatG4brWHBePf
+\unrestrict bAFCqnO8EqiN3V070440VwNl5gVXQfKPwfhEvbi5XEDXvjBb6AZRZT9L2eaTyzq
 

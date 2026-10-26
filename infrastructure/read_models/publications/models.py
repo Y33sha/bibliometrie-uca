@@ -42,11 +42,12 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "labs",
         "corr",
         "apc",
-        "oa",
+        "doi",
         "oa_status",
         "license",
         "hal_status",
-        "links",
+        "sources",
+        "access",
     }
 )
 
@@ -123,6 +124,8 @@ class PublicationListItem(BaseModel):
     doi: str | None
     doc_type: str
     oa_status: str
+    access_url: str | None
+    """Lien d'accès (`domain.publications.access.access_url`)."""
     license: str | None  # licence de la version éditeur
     serial: str | None
     serial_id: int | None

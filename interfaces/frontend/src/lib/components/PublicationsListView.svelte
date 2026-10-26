@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AccessButton from '#lib/components/AccessButton.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -150,6 +151,7 @@
 	const columnDefs = [
 		{ key: 'type',       label: 'Type' },
 		{ key: 'year',       label: 'Année' },
+		{ key: 'doi',        label: 'DOI' },
 		{ key: 'title',      label: 'Titre',      fixed: true },
 		{ key: 'serial',    label: 'Revue' },
 		{ key: 'publisher',  label: 'Éditeur' },
@@ -158,14 +160,14 @@
 		// svelte-ignore state_referenced_locally
 		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Corresp.' }] : []),
 		{ key: 'apc',        label: 'APC' },
-		{ key: 'oa',         label: 'OA' },
-		{ key: 'oa_status',    label: 'Voie OA' },
+		{ key: 'oa_status',  label: 'Voie OA' },
 		{ key: 'license',    label: 'Licence' },
 		// svelte-ignore state_referenced_locally
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
-		{ key: 'links',      label: 'Liens',      fixed: true },
+		{ key: 'sources',    label: 'Sources' },
+		{ key: 'access',     label: 'Accès',      fixed: true },
 	];
-	const initialHidden = ['apc', 'oa_status', 'license', 'publisher'];
+	const initialHidden = ['apc', 'oa_status', 'license', 'publisher', 'sources'];
 	// Libellés de la colonne Licence, servis par l'API.
 	let licenseNames = $state<Record<string, string>>({});
 	// svelte-ignore state_referenced_locally
@@ -222,7 +224,6 @@
 			label: 'Accès',
 			param: 'access',
 			facet: { type: 'labeled', apiKey: 'access' },
-			showColumns: ['oa', 'oa_status'],
 		},
 		{
 			key: 'halStatus',
@@ -270,7 +271,7 @@
 			param: 'oa_status',
 			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
 			group: 'Revue et éditeur',
-			showColumns: ['oa', 'oa_status'],
+			showColumns: ['oa_status'],
 		},
 		{
 			key: 'license',
@@ -360,6 +361,7 @@
 			param: 'source_filter',
 			group: 'Détails',
 			items: SOURCE_ITEMS,
+			showColumns: ['sources'],
 		},
 	];
 	const sections = filterSections(FILTERS);
@@ -616,6 +618,7 @@
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
 				An. <SortChevron direction={yearSort} />
 			</th>{/if}
+			{#if col('doi')}<th style="width:28px">DOI</th>{/if}
 			<th class="sortable publication-col-title" class:active={titleSort !== null} onclick={() => toggleSort('title')}>
 				Titre <SortChevron direction={titleSort} />
 			</th>
@@ -626,11 +629,12 @@
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				APC <SortChevron direction={apcSort} />
 			</th>{/if}
-			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
 			{#if col('license')}<th style="width:90px">Licence</th>{/if}
 			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
-			<th style="width:80px" class="col-menu-th">
+			{#if col('sources')}<th style="width:100px">Sources</th>{/if}
+			<th style="width:90px" class="col-menu-th">
+				Accès
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}
@@ -662,6 +666,13 @@
 						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
+					{#if col('doi')}<td class="doi-cell">
+						{#if p.doi}
+							<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="doi-link" title={p.doi}>
+								<img src={asset('icons/doi.svg')} alt="DOI" />
+							</a>
+						{/if}
+					</td>{/if}
 					<td><a href={resolve(`publications/${p.id}`)} class="publication-title"><PublicationTitle titre={p.title} /></a></td>
 					{#if col('serial')}<td class="journal-cell publication-col-journal">
 						{#if p.serial_id}
@@ -701,24 +712,6 @@
 							{/if}
 						{/if}
 					</td>{/if}
-					{#if col('oa')}<td class="oa-lock-cell">
-						{#if p.oa_status === 'embargoed'}
-							<span class="oa-lock-badge oa-lock-embargo">
-								<img src={asset('hourglass.svg')} alt="Sous embargo" class="oa-lock" title="Sous embargo : dépôt existant, accès différé" />
-								<span class="oa-lock-label">embargo</span>
-							</span>
-						{:else if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
-							<span class="oa-lock-badge oa-lock-open">
-								<img src={asset('lock-open.svg')} alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
-								<span class="oa-lock-label">ouvert</span>
-							</span>
-						{:else}
-							<span class="oa-lock-badge oa-lock-closed">
-								<img src={asset('lock-closed.svg')} alt="Closed" class="oa-lock" title="Accès fermé" />
-								<span class="oa-lock-label">fermé</span>
-							</span>
-						{/if}
-					</td>{/if}
 					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
 							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
@@ -730,7 +723,7 @@
 						{@const meta = HAL_STATUS_META[hs]}
 						<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
 					{/if}
-					<td class="links-cell">
+					{#if col('sources')}<td class="links-cell">
 						{#if p.hal_id}
 							<a href={p.record_urls.hal} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 								<img src={asset('icons/hal.ico')} alt="HAL" />
@@ -759,18 +752,8 @@
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
-						{#if p.doi}
-							<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="source-tag source-doi" title={p.doi}>
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-									<polyline points="15 3 21 3 21 9"/>
-									<line x1="10" y1="14" x2="21" y2="3"/>
-								</svg>
-							</a>
-						{:else}
-							<span class="source-tag source-placeholder"></span>
-						{/if}
-					</td>
+					</td>{/if}
+					<td class="access-cell"><AccessButton url={p.access_url} oaStatus={p.oa_status} compact /></td>
 				</tr>
 			{/each}
 		{/if}
@@ -822,6 +805,12 @@
 	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
+	.access-cell { white-space: nowrap; }
+
+	/* DOI : le logo seul, qui grossit au survol. */
+	.doi-link { display: inline-block; vertical-align: middle; transition: transform 0.1s; }
+	.doi-link:hover { transform: scale(1.15); }
+	.doi-link img { display: block; width: 20px; height: 20px; }
 
 	/* Statut HAL (lab) */
 	.hal-badge {

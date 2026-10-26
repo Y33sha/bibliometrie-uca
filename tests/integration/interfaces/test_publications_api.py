@@ -262,14 +262,11 @@ class TestPublicationsExports:
 
     def test_csv_export_respects_columns(self, client):
         """Le CSV reflète les colonnes visibles : seules les colonnes demandées
-        sont émises, + Titre et DOI/Sources (toujours présents)."""
+        sont émises, + Titre et Accès (toujours présents)."""
         r = client.get("/api/publications/export.csv", params={"columns": "type,year"})
         assert r.status_code == 200
         header = r.text.splitlines()[0].lstrip("﻿").split(",")
-        assert {"Type", "Année", "Titre", "DOI", "Sources"} <= set(header)
-        assert "Revue" not in header
-        assert "Laboratoires" not in header
-        assert "Accès" not in header
+        assert header == ["Type", "Année", "Titre", "Accès"]
 
     def test_csv_export_publisher_is_its_own_column(self, client):
         """L'éditeur sort quand sa colonne est demandée, indépendamment de la revue."""
