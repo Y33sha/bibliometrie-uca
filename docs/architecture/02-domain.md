@@ -4,7 +4,7 @@
 
 Le noyau porte les règles métier indépendamment de leur implémentation : il n'ouvre aucune connexion, ignore la base et le protocole HTTP, et n'importe que la bibliothèque standard.
 
-Les invariants de chaque agrégat, ses tables et son cycle de vie sont décrits dans les fiches de [docs/agregats/](../agregats/).
+Les tables de chaque entité et leurs écritures sont décrites dans le [modèle de données](../donnees/01-vue-d-ensemble.md).
 
 ## Agrégats
 

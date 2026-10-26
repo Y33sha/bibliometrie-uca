@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-Une structure est un établissement, une composante, un laboratoire, une équipe ou un partenaire. Les structures forment un référentiel saisi à la main. Un périmètre est un ensemble de structures, désigné par ses racines. Une adresse est le texte d'affiliation qu'une source donne pour une contribution source. Le pipeline reconnaît des structures dans les adresses, et en déduit l'appartenance des contributions sources au périmètre.
+Une structure est un établissement (université, école, CHU, organisme de recherche), un laboratoire, un site ou un service administratif. Les structures forment un référentiel saisi à la main. Un périmètre est un ensemble de structures, désigné par ses racines. Une adresse est le texte d'affiliation qu'une source donne pour une contribution source. Le pipeline reconnaît des structures dans les adresses, et en déduit l'appartenance des contributions sources au périmètre.
 
 Schéma PostgreSQL `structures`.
 
