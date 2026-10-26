@@ -126,10 +126,6 @@
 - 2026-06-03 — [Normalize : batcher l'insertion des authorships](archived/2026-06-03_CODE_batcher-normalize-authorships.md)
 - 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
 - 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)
-- 2026-05-31 — [Stockage des données brutes (raw store)](archived/2026-05-31_DATA_raw-data-store.md)
-- 2026-05-31 — [Cycle de vie des rows `staging` : machine à états, backoff, fraîcheur](archived/2026-05-31_DATA_cycle-vie-staging.md)
-- 2026-05-30 — [Exploitation de l'API CrossRef](archived/2026-05-30_METIER_crossref.md)
-- 2026-05-30 — [Cascade unifiée de matching personnes (`decide_person_match`)](archived/2026-05-30_METIER_decide-person-match.md)
 
 
 
