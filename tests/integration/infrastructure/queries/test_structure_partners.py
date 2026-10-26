@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from infrastructure.read_models.entity_labels.queries import entity_label
+from infrastructure.read_models.entity_labels.queries import EntityLabelQueries
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.read_models.structures.queries import StructuresQueries
 from tests.integration.helpers.persons import insert_person
@@ -67,5 +67,6 @@ def test_les_publications_se_filtrent_par_organisation_partenaire(sa_sync_conn):
 
 def test_libelle_d_une_organisation_partenaire(sa_sync_conn):
     insert_ror_tree(sa_sync_conn)
-    assert entity_label(sa_sync_conn, kind="partner", entity_id="0ger00001") == "Labor"
-    assert entity_label(sa_sync_conn, kind="serial", entity_id="0ger00001") is None
+    queries = EntityLabelQueries(sa_sync_conn)
+    assert queries.resolve_entity_label(kind="partner", entity_id="0ger00001").label == "Labor"
+    assert queries.resolve_entity_label(kind="serial", entity_id="0ger00001").label is None
