@@ -105,7 +105,6 @@
 - 2026-06-20 — [Extraction HAL : requête unique multi-collections](archived/2026-06-20_CODE_hal-extract-mono-requete.md)
 - 2026-06-20 — [Embargo HAL : statut OA intermédiaire « sous embargo »](archived/2026-06-20_METIER_embargo-oa-status.md)
 - 2026-06-19 — [Types de documents : enum, mappings, règles suspects](archived/2026-06-19_METIER_doc-types.md)
-- 2026-06-19 — [Matching cross-source des authorships](archived/2026-06-19_DATA_authorships-cross-source-matching.md)
 - 2026-06-19 — [Adresses → pays : détection, suggestion et performances de la cascade](archived/2026-06-19_DATA_addresses-countries.md)
 
 
