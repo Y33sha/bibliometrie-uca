@@ -15,7 +15,7 @@ Schéma PostgreSQL `structures`.
 | `structure_name_forms` | Formes de nom qui désignent la structure dans une adresse | Une forme de six caractères ou moins exige une frontière de mot |
 | `idref_structures` | Structure d'un laboratoire partenaire de thèse, désigné par son PPN IdRef | |
 
-Trois options règlent la reconnaissance d'une forme de nom. `is_word_boundary` exige une frontière de mot de part et d'autre de la forme. `is_excluding` fait de la forme un motif de rejet. `requires_context_of` exige la présence d'autres structures dans la même adresse.
+Les options `is_word_boundary`, `is_excluding` et `requires_context_of` règlent la [reconnaissance des formes de nom](../pipeline/04-affiliations.md) dans les adresses.
 
 ## Périmètres
 

@@ -1,6 +1,6 @@
 # Moissonnage
 
-*À jour le 2026-10-13.*
+*À jour le 2026-10-26.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
@@ -24,26 +24,22 @@ Une publication dont les auteurs signent sans affiliation au périmètre échapp
 - **Lots de personnes** : une requête réunit tous les identifiants d'un lot de personnes. Un document que plusieurs lots ramènent est écrit une fois.
 - **Provenance** : les lignes créées ont le mode d'entrée `person_identifier`.
 
-Socle commun dans `pipeline/ingestion/common/person_search.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/person_search.py`.
-
 ## Documents absents d'une source (`fetch_missing`)
 
 Le moissonnage interroge les sources sur le critère de l'affiliation : un document peut être présent dans une source et ne pas être trouvé par moissonnage, si l'affiliation n'y est pas correctement renseignée. On essaie donc de retrouver dans chaque source les documents trouvés seulement dans les autres.
 
 **Étape 1 — `fetch_missing.hal_by_id` : hal-id manquants.**
-Télécharge depuis HAL les documents dont le hal-id figure dans OpenAlex ou ScanR et qui sont absents de notre staging. Code dans `pipeline/ingestion/hal/fetch_missing.py`.
+Télécharge depuis HAL les documents dont le hal-id figure dans OpenAlex ou ScanR et qui sont absents de `staging`.
 
 **Étape 2 — `fetch_missing.hal_by_nnt` et `fetch_missing.theses_by_nnt` : thèses manquantes, par NNT.**
-Les deux recherches tournent en parallèle. Dans HAL, en mode full, les thèses de theses.fr sans document HAL (`pipeline/ingestion/hal/fetch_missing.py`). Dans theses.fr, les thèses dont le NNT figure dans une autre source et qui sont absentes du staging theses.fr, par exemple une thèse soutenue dans un autre établissement (`pipeline/ingestion/theses/fetch_missing.py`).
+Dans HAL, en mode full, les thèses de theses.fr sans document HAL. Dans theses.fr, les thèses dont le NNT figure dans une autre source et qui sont absentes de theses.fr dans `staging`, par exemple une thèse soutenue dans un autre établissement.
 
 **Étape 3 — `fetch_missing.doi.<source>` : DOI manquants par source.**
 Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
 
-Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishing.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe n'est pas encore résolu attend le run suivant.
+Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishing.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe est sans agence attend le run suivant.
 
-Sélection des DOI dans `pipeline/ingestion/common/doi_search.py`, requête propre à chaque source dans `pipeline/ingestion/<source>/fetch_missing.py`. Les recherches de `fetch_missing`, `fetch_stale` et `fetch_truncated` partagent la boucle de `pipeline/ingestion/common/lookup.py`.
-
-**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. Un DOI absent de son agence d'enregistrement (Crossref, DataCite) est soumis à doi.org ; un DOI que doi.org ne connaît pas est nullé par la phase `metadata_correction`. L'échec est définitif pour un identifiant absent du registre qui l'attribue : hal-id dans HAL, NNT dans theses.fr, DOI inconnu de doi.org. Les autres identifiants sont cherchés de nouveau au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant. Un document écrit dans `staging`, par quelque voie que ce soit, efface les échecs que ses DOI démentent dans sa source, et auprès de doi.org pour une agence d'enregistrement.
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. Un DOI absent de son agence d'enregistrement (Crossref, DataCite) est soumis à doi.org. La phase `metadata_correction` retire les DOI que doi.org ne connaît pas. L'échec est définitif pour un identifiant absent du registre qui l'attribue : hal-id dans HAL, NNT dans theses.fr, DOI inconnu de doi.org. Les autres identifiants sont cherchés de nouveau au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant. Un document écrit dans `staging`, par quelque voie que ce soit, efface les échecs que ses DOI démentent dans sa source, et auprès de doi.org pour une agence d'enregistrement.
 
 
 ## Documents périmés et disparus (`fetch_stale`)
@@ -61,6 +57,6 @@ La sélection se borne aux années de la fenêtre courante, lues sur `source_rec
 
 L'[API OpenAlex](../sources/03-openalex.md) plafonne la liste des auteurs à 100 par réponse ; au-delà, les auteurs surnuméraires sont absents du payload moissonné.
 
-Les works de 100 auteurs sont marqués par le flag `staging.authors_truncated`, au moissonnage comme à la recherche par DOI de `fetch_missing`, qui passent toutes deux par l'endpoint de liste. Cette phase retélécharge un par un les works marqués, récupère la liste complète des auteurs et supprime le flag. Un work qu'OpenAlex ne connaît plus perd aussi son flag. Quand OpenAlex est indisponible, le flag reste et le work est repris au run suivant.
+Le moissonnage et la recherche par DOI de `fetch_missing` marquent `staging.authors_truncated` sur les documents de 100 auteurs. Cette phase retélécharge un par un les documents marqués, récupère la liste complète des auteurs et retire la marque. Un document absent d'OpenAlex perd aussi sa marque. Quand OpenAlex est indisponible, la marque reste et le document est repris au run suivant.
 
-On ne met pas à jour `raw_hash`, qui reste l'empreinte du payload initial : tant que le moissonnage par lot renvoie le même payload, `raw_data` n'est pas écrasé.
+`raw_hash` reste l'empreinte du payload du moissonnage. Le moissonnage suivant, qui renvoie le même payload tronqué, laisse donc la liste complète en place.

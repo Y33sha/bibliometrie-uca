@@ -1,22 +1,8 @@
-#  Normalisation
+# Normalisation
 
-*À jour le 2026-10-25.*
+*À jour le 2026-10-26.*
 
-```mermaid
-flowchart LR
-    B[staging]-->|normalize_*|G
-    subgraph G[tables sources]
-        direction TB
-        C[source_records]---D[source_contributions]
-    end
-    C---serials---publishers
-    C---L[source_record_locations]---platforms
-    D---|source_contribution_addresses|F[addresses]
-    classDef new  fill:#bbf
-    class C,D,F,L,serials,publishers,platforms new;
-```
-
-Phase `normalize` : transforme les données brutes (`staging`) en tables structurées propres à chaque source — `source_records` et `source_contributions`. Peuple au passage les référentiels `publishers`, `serials` et `monographs`, écrit les localisations de chaque enregistrement source (`source_record_locations`) et leurs `platforms`, et crée les `addresses` ainsi que les liens `source_contribution_addresses` qui rattachent une contribution source d'auteur à ses adresses.
+La phase `normalize` transforme les données moissonnées (`staging`) en [enregistrements sources](../donnees/02-sources.md) et en contributions sources. Elle écrit aussi les localisations, les adresses, et crée ou reconnaît les publications en série, les monographies, les éditeurs et les plateformes.
 
 L'enregistrement source reçoit l'éditeur que nomme sa source, sauf une production hébergée sans être publiée : preprint, jeu de données, rapport, thèse, ou document DataCite sans publication en série ni monographie (`domain/publishers/attribution.py`). Les localisations et leurs plateformes sont décrites avec l'[édition](../donnees/07-publishing.md#plateformes).
 
@@ -32,15 +18,16 @@ Chaque normaliseur pose aussi la licence de l'enregistrement source (`source_rec
 
 En fin de phase, les `source_records` d'un document marqué `disappeared_at` par [`fetch_stale`](02-harvest.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_contributions` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 
-Conservés en base, les payloads bruts la font grossir hors de proportion avec les données normalisées qu'on en tire. En fin de phase, le `raw_data` du staging est donc vidé, puis un `VACUUM` récupère l'espace.
+En fin de phase, le `raw_data` de `staging` est vidé, puis un `VACUUM` récupère l'espace.
 
 ## Synchronisation des contributions sources
 
-Chaque contribution source entrante est rapprochée d'une contribution source en base aux mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source rapprochée garde son identifiant, donc sa personne et son épinglage. Les autres sont insérées ou supprimées.
+Chaque contribution source entrante est rapprochée d'une contribution source en base aux mêmes informations du contributeur (nom, prénom et identifiants normalisés, marque collective), puis de même position si ces informations sont répétées. Une contribution source rapprochée garde son identifiant, donc son épinglage. Les autres sont insérées ou supprimées.
 
 Un enregistrement source dont la partie auteurs du payload est inchangée depuis la dernière normalisation garde ses contributions sources en l'état. L'option `--normalize-full` vide l'empreinte de cette partie pour tous les enregistrements sources des sources normalisées : leurs contributions sources se resynchronisent à leur prochaine normalisation.
+
 ## Archivage du payload brut
 
-Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le [raw store](../../infrastructure/raw_store/) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option [`--raw-store`](../exploitation/03-pipeline.md#divers) déclenche cet archivage : sans elle, le payload est perdu à la vidange. Cette option est inopérante en production, où la racine du conteneur est en lecture seule.
+Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le raw store (`infrastructure/raw_store/`) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option [`--raw-store`](../exploitation/03-pipeline.md#divers) déclenche cet archivage : sans elle, le payload est perdu à la vidange. Cette option est inopérante en production, où la racine du conteneur est en lecture seule.
 
 Le script `interfaces/cli/maintenance/rehydrate_staging_from_raw_store.py` réinjecte les payloads d'une source, pour rejouer sa normalisation.
