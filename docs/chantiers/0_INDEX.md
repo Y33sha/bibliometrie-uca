@@ -144,10 +144,7 @@
 - 2026-05-16 — [Normaliser les relations many-to-many cachées (arrays + JSONB de jointure)](archived/2026-05-16_DATA_jointures-many-to-many.md)
 - 2026-05-15 — [Domaine riche (entités métier)](archived/2026-05-15_CODE_rich-domain-model.md)
 - 2026-05-15 — [Chasse aux `Any`](archived/2026-05-15_CODE_chasse-aux-any.md)
-- 2026-05-14 — [Séparer le matching de la normalisation](archived/2026-05-14_DATA_separer-matching-normalisation.md)
-- 2026-05-14 — [Rationalisation du matching/fusion de publications](archived/2026-05-14_CODE_deduplication-fusion-publications.md)
 
-- 2026-05-13 — [Simplification des tables sources](archived/2026-05-13_DATA_simplify-source-tables.md)
 
 
 
