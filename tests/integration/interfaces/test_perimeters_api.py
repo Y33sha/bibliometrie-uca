@@ -38,6 +38,19 @@ class TestListPerimeters:
         ids = [p["id"] for p in r.json()]
         assert pid in ids
 
+    def test_flags_the_persons_perimeter(self, client):
+        persons = seed_perimeter(code=uniq("persons"))
+        other = seed_perimeter(code=uniq("other"))
+        with owner_pool() as cur:
+            cur.execute("SELECT code FROM perimeters WHERE id = %s", (persons,))
+            seed_config("perimeter_persons", cur.fetchone()["code"])
+        try:
+            flags = {p["id"]: p["is_persons"] for p in client.get("/api/perimeters").json()}
+        finally:
+            _clear_config("perimeter_persons")
+        assert flags[persons] is True
+        assert flags[other] is False
+
 
 class TestCreatePerimeter:
     def test_creates_perimeter(self, auth_client):

@@ -151,7 +151,7 @@
 	<title>{pageTitle(lab ? structureLabel(lab) : 'Structure')}</title>
 </svelte:head>
 
-<Breadcrumb trail={[{ label: 'Labos', path: 'laboratories' }]} current={lab?.acronym || lab?.name} />
+<Breadcrumb trail={[{ label: 'Labos', path: 'structures' }]} current={lab?.acronym || lab?.name} />
 
 {#if error}
 	<div class="no-results">Structure introuvable</div>

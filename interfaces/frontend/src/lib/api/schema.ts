@@ -3959,7 +3959,7 @@ export interface components {
         };
         /**
          * PerimeterOut
-         * @description Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines.
+         * @description Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines. `is_persons` désigne le périmètre des personnes, celui de la liste publique des structures.
          */
         PerimeterOut: {
             /** Id */
@@ -3974,6 +3974,8 @@ export interface components {
             structures: components["schemas"]["PerimeterStructureItem"][];
             /** Structure Count */
             structure_count: number;
+            /** Is Persons */
+            is_persons: boolean;
         };
         /** PerimeterStructureItem */
         PerimeterStructureItem: {

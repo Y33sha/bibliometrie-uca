@@ -327,7 +327,7 @@
     )
       return;
     await structuresApi.remove(id);
-    goto(resolve('admin/structures'));
+    goto(resolve('structures'));
   }
 
   /* ── Edit modal ── */

@@ -11,7 +11,7 @@ class PerimeterStructureItem(BaseModel):
 
 
 class PerimeterOut(BaseModel):
-    """Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines."""
+    """Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines. `is_persons` désigne le périmètre des personnes, celui de la liste publique des structures."""
 
     id: int
     code: str
@@ -19,6 +19,7 @@ class PerimeterOut(BaseModel):
     root_structure_ids: list[int]
     structures: list[PerimeterStructureItem]
     structure_count: int
+    is_persons: bool
 
 
 class InstitutionOut(BaseModel):

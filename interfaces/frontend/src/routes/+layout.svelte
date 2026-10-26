@@ -52,7 +52,7 @@
   <nav class="site-nav" class:open={mobileNavOpen}>
     <a href={resolve('stats')} class="nav-link" class:active={isActive("/stats")}><i class="fi fi-rr-chart-histogram nav-icon" aria-hidden="true"></i>Stats</a>
     <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
-    <a href={resolve('laboratories')} class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
+    <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
     <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
     <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
       <button class="nav-link" class:active={isPublicReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
@@ -81,7 +81,6 @@
           <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
           <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
           <span class="nav-dropdown-group">Référentiels</span>
-          <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
           <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
           <span class="nav-dropdown-group">Adresses</span>
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>

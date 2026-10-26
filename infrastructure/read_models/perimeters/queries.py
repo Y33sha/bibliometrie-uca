@@ -155,6 +155,7 @@ class PerimetersQueries:
         perim_rows = self._conn.execute(
             text("SELECT id, code, name, root_structure_ids FROM perimeters ORDER BY id")
         ).all()
+        persons_code = persons_perimeter_code(self._conn)
         perimeters: list[PerimeterOut] = []
         for p_row in perim_rows:
             root_ids = list(p_row.root_structure_ids or [])
@@ -181,6 +182,7 @@ class PerimetersQueries:
                     root_structure_ids=root_ids,
                     structures=structures,
                     structure_count=len(resolved),
+                    is_persons=p_row.code == persons_code,
                 )
             )
         return perimeters
