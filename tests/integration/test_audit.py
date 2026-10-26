@@ -22,6 +22,7 @@ from application.audit_log import (
     set_current_user,
 )
 from infrastructure.repositories import audit_repository
+from interfaces.api.deps import person_service
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
@@ -157,18 +158,11 @@ class TestEndToEndServiceIntegration:
         return sa_sync_conn_owner
 
     def test_set_exclusion_emits_event(self, sa_sync_conn):
-        from application.services.persons import set_exclusion
         from domain.persons.person import PersonExclusion
-        from infrastructure.repositories import person_repository
 
         person_id = _person(sa_sync_conn)
         with _requete_admin(sa_sync_conn):
-            set_exclusion(
-                person_id,
-                PersonExclusion.OUT_OF_PERIMETER,
-                repo=person_repository(sa_sync_conn),
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            )
+            person_service(sa_sync_conn).set_exclusion(person_id, PersonExclusion.OUT_OF_PERIMETER)
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person.exclusion"
@@ -178,32 +172,22 @@ class TestEndToEndServiceIntegration:
 
     def test_set_exclusion_without_context_no_event(self, sa_sync_conn):
         """Hors requête d'administration (pipeline, script), rien n'est consigné, même quand un service écrit."""
-        from application.services.persons import set_exclusion
         from domain.persons.person import PersonExclusion
-        from infrastructure.repositories import person_repository
 
         person_id = _person(sa_sync_conn)
-        set_exclusion(
-            person_id,
-            PersonExclusion.NOT_A_PERSON,
-            repo=person_repository(sa_sync_conn),
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-        )
+        person_service(sa_sync_conn).set_exclusion(person_id, PersonExclusion.NOT_A_PERSON)
         record_pending_events(audit_repository(sa_sync_conn))
         assert _count(sa_sync_conn) == 0
 
     def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
         """`mark_distinct` est idempotent : un appel sur une paire déjà marquée n'émet pas d'événement supplémentaire."""
-        from application.services.persons import mark_distinct
-        from infrastructure.repositories import person_repository
-
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        repo = person_repository(sa_sync_conn)
+        persons = person_service(sa_sync_conn)
         with _requete_admin(sa_sync_conn):
-            mark_distinct(p1, p2, repo=repo)
-            mark_distinct(p1, p2, repo=repo)
-            mark_distinct(p2, p1, repo=repo)
+            persons.mark_distinct(p1, p2)
+            persons.mark_distinct(p1, p2)
+            persons.mark_distinct(p2, p1)
 
         n = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS n FROM audit_log WHERE event_type = 'person.marked_distinct'")
@@ -211,13 +195,10 @@ class TestEndToEndServiceIntegration:
         assert n == 1
 
     def test_merge_person_emits_event(self, sa_sync_conn):
-        from application.services.persons import merge_person
-        from infrastructure.repositories import person_repository
-
         target = _person(sa_sync_conn, last_name="A")
         source = _person(sa_sync_conn, last_name="B")
         with _requete_admin(sa_sync_conn):
-            merge_person(target, source, repo=person_repository(sa_sync_conn))
+            person_service(sa_sync_conn).merge_person(target, source)
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person.merged"
@@ -228,21 +209,12 @@ class TestEndToEndServiceIntegration:
     @pytest.mark.parametrize("status", ["confirmed", "rejected"])
     def test_name_form_status_emits_event(self, sa_sync_conn, status):
         """La confirmation comme le rejet d'une forme (action « détacher l'intrus ») émettent l'événement."""
-        from application.services.persons import update_name_form_status
-        from infrastructure.repositories import contribution_repository, person_repository
-
         person_id = _person(sa_sync_conn)
         insert_person_name_form(
             sa_sync_conn, person_id, name_form="x x", sources=["hal"], status="pending"
         )
         with _requete_admin(sa_sync_conn):
-            update_name_form_status(
-                person_id,
-                "x x",
-                status,
-                repo=person_repository(sa_sync_conn),
-                contribution_repo=contribution_repository(sa_sync_conn),
-            )
+            person_service(sa_sync_conn).update_name_form_status(person_id, "x x", status)
 
         row = _last_event(sa_sync_conn)
         assert row.event_type == "person_name_form.status_changed"

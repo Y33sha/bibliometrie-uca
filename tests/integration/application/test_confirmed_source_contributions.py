@@ -5,10 +5,10 @@ from sqlalchemy import text
 
 from application.services.contributions.assign_orphans import assign_orphan_contribution
 from application.services.contributions.core import reject_pair
-from application.services.persons import update_name_form_status
 from domain.errors import PersonAlreadyInPublicationError
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import contribution_repository, person_repository
+from interfaces.api.deps import person_service
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
@@ -106,13 +106,7 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
         ignore_conflict=True,
     )
 
-    update_name_form_status(
-        pid,
-        "jean martin",
-        "rejected",
-        repo=persons,
-        contribution_repo=contributions,
-    )
+    person_service(sa_sync_conn).update_name_form_status(pid, "jean martin", "rejected")
 
     assert (group_person(sa_sync_conn, pinned_group), _pin(sa_sync_conn, pinned)) == (
         (pid, "manual"),

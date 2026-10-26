@@ -53,6 +53,7 @@ from application.services.addresses import (
     countries as countries_service,
     structure_links as structure_links_service,
 )
+from application.services.persons import PersonService
 from domain.merge import MergedEntity
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
@@ -205,6 +206,14 @@ def hal_problems_queries(
 
 def person_repo(conn: DbConn) -> PersonRepository:
     return person_repository(conn)
+
+
+def person_service(conn: DbConn) -> PersonService:
+    return PersonService(
+        persons=person_repository(conn),
+        contributions=contribution_repository(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
 
 
 def serial_queries(conn: DbConn) -> SerialQueries:
