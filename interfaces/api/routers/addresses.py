@@ -1,6 +1,6 @@
 """Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par le port `AddressesQueries`, les écritures par les modules `structure_links` et `countries` de `application.services.addresses`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
+Les lectures passent par le port `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
 
 Les routes sont groupées par sujet, et dans chaque groupe les chemins littéraux précèdent ceux qui portent un identifiant — un chemin littéral déclaré après `/{addr_id}` s'y ferait absorber.
 """
@@ -9,7 +9,6 @@ from typing import Annotated, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from application.ports.pipeline.countries import CountryRecompute
 from application.ports.read_models.addresses_queries import (
     AddressDetected,
     AddressesCountriesResponse,
@@ -23,20 +22,13 @@ from application.ports.read_models.addresses_queries import (
     TextPredicate,
     TextPredicateMode,
 )
-from application.ports.repositories.address_repository import (
-    AddressCountryFilter,
-    AddressRepository,
-)
-from application.services.addresses import (
-    countries as countries_service,
-    structure_links as structure_links_service,
-)
+from application.ports.repositories.address_repository import AddressCountryFilter
+from application.services.addresses import AddressService
 from interfaces.api.deps import (
-    address_repo,
+    address_service,
     addresses_queries,
     bg_propagate_countries,
     bg_propagate_in_perimeter,
-    country_recompute,
 )
 from interfaces.api.models import (
     AddressPublicationsResponse,
@@ -140,14 +132,11 @@ def address_stats(
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
-    addr_repo: AddressRepository = Depends(address_repo),
+    addresses: AddressService = Depends(address_service),
 ) -> BatchUpdatedResponse:
     """Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure."""
-    updated, changed = structure_links_service.batch_review_structure_link(
-        data.address_ids,
-        data.structure_id,
-        data.is_confirmed,
-        repo=addr_repo,
+    updated, changed = addresses.batch_review_structure_link(
+        data.address_ids, data.structure_id, data.is_confirmed
     )
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
@@ -176,7 +165,7 @@ def review_address(
     action: ReviewAction,
     bg: BackgroundTasks,
     queries: AddressesQueries = Depends(addresses_queries),
-    addr_repo: AddressRepository = Depends(address_repo),
+    addresses: AddressService = Depends(address_service),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
 
@@ -184,12 +173,7 @@ def review_address(
     """
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Adresse introuvable")
-    changed = structure_links_service.review_structure_link(
-        addr_id,
-        action.structure_id,
-        action.is_confirmed,
-        repo=addr_repo,
-    )
+    changed = addresses.review_structure_link(addr_id, action.structure_id, action.is_confirmed)
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
     structures = queries.get_address_structures(addr_id)
@@ -227,21 +211,18 @@ def list_addresses_countries(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
-    addr_repo: AddressRepository = Depends(address_repo),
-    recompute: CountryRecompute = Depends(country_recompute),
+    addresses: AddressService = Depends(address_service),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre).
 
     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
     """
-    modified_ids = countries_service.batch_set_country(
+    modified_ids = addresses.batch_set_country(
         body.country_code,
         address_ids=body.address_ids,
         search=body.search,
         has_country=body.has_country,
         country_code_filter=body.country_code_filter,
-        repo=addr_repo,
-        country_recompute=recompute,
     )
     bg.add_task(bg_propagate_countries, modified_ids)
     return BatchCountryResponse(updated=len(modified_ids))
@@ -252,18 +233,12 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
-    addr_repo: AddressRepository = Depends(address_repo),
-    recompute: CountryRecompute = Depends(country_recompute),
+    addresses: AddressService = Depends(address_service),
 ) -> OkResponse:
     """Saisit à la main les pays d'une adresse ; une liste vide rend l'adresse aux moyens automatiques.
 
     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
-    countries_service.set_country(
-        addr_id,
-        body.countries,
-        repo=addr_repo,
-        country_recompute=recompute,
-    )
+    addresses.set_country(addr_id, body.countries)
     bg.add_task(bg_propagate_countries, [addr_id])
     return OkResponse()

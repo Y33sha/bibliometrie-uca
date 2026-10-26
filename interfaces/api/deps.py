@@ -1,6 +1,6 @@
 """Dépendances partagées des routers : factories DB, tâches de fond, réglages du serveur.
 
-`DbConn` fournit aux routes la connexion de la requête, sur laquelle les factories câblent les query services et les repositories.
+`DbConn` fournit aux routes la connexion de la requête, sur laquelle les factories construisent les adaptateurs de lecture et les services d'écriture.
 
 La session admin vit dans `session.py` ; ce module n'en expose que le nom d'utilisateur attendu, par `Depends(...)`.
 """
@@ -13,7 +13,6 @@ from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.audit_log import record_pending_events
-from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.contributions_queries import ContributionsQueries
@@ -31,12 +30,8 @@ from application.ports.read_models.serials_queries import SerialQueries
 from application.ports.read_models.stats_queries import StatsQueries
 from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
-from application.ports.repositories.address_repository import AddressRepository
-from application.ports.repositories.config_repository import ConfigRepository
-from application.services.addresses import (
-    countries as countries_service,
-    structure_links as structure_links_service,
-)
+from application.services.addresses import AddressService
+from application.services.config import ConfigService
 from application.services.contributions import ContributionService
 from application.services.perimeters import PerimeterService
 from application.services.persons import PersonService
@@ -165,10 +160,15 @@ def db_conn(request: Request) -> Iterator[Connection]:
 DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
 
 
-def subjects_queries(
-    conn: DbConn,
-) -> SubjectsQueries:
-    return PgSubjectsQueries(conn)
+# ----- Lectures -----
+
+
+def addresses_queries(conn: DbConn) -> AddressesQueries:
+    return PgAddressesQueries(conn)
+
+
+def config_queries(conn: DbConn) -> ConfigQueries:
+    return PgConfigQueries(conn)
 
 
 def contributions_queries(conn: DbConn) -> ContributionsQueries:
@@ -177,77 +177,6 @@ def contributions_queries(conn: DbConn) -> ContributionsQueries:
 
 def countries_queries(conn: DbConn) -> CountriesQueries:
     return PgCountriesQueries(conn)
-
-
-def config_queries(conn: DbConn) -> ConfigQueries:
-    return PgConfigQueries(conn)
-
-
-def config_repository(conn: DbConn) -> ConfigRepository:
-    return PgConfigRepository(conn)
-
-
-def hal_problems_queries(
-    conn: DbConn,
-) -> HalProblemsQueries:
-    return PgHalProblemsQueries(conn)
-
-
-def person_service(conn: DbConn) -> PersonService:
-    return PersonService(
-        persons=person_repository(conn),
-        contributions=contribution_repository(conn),
-        perimeter_recompute=PublicationPerimeterRecompute(conn),
-    )
-
-
-def serial_queries(conn: DbConn) -> SerialQueries:
-    return PgSerialQueries(conn)
-
-
-def serial_service(conn: DbConn) -> SerialService:
-    return SerialService(
-        serials=serial_repository(conn), recompute=SerialRecompute(conn), conn=conn
-    )
-
-
-def monograph_queries(conn: DbConn) -> MonographQueries:
-    return PgMonographQueries(conn)
-
-
-def publisher_queries(conn: DbConn) -> PublisherQueries:
-    return PgPublisherQueries(conn)
-
-
-def publisher_service(conn: DbConn) -> PublisherService:
-    return PublisherService(
-        publishers=publisher_repository(conn),
-        serials=serial_repository(conn),
-        serial_service=serial_service(conn),
-        publication_count_recompute=PublicationCountRecompute(conn),
-    )
-
-
-def perimeter_service(conn: DbConn) -> PerimeterService:
-    return PerimeterService(
-        perimeters=perimeter_repository(conn),
-        perimeter_structures=PerimeterStructures(conn),
-        config=PgConfigQueries(conn),
-    )
-
-
-def perimeters_queries(
-    conn: DbConn,
-) -> PerimetersQueries:
-    return PgPerimetersQueries(conn)
-
-
-def feedback_queries(conn: DbConn) -> FeedbackQueries:
-    return PgFeedbackQueries(conn)
-
-
-def stats_queries(conn: DbConn) -> StatsQueries:
-    return PgStatsQueries(conn)
 
 
 def entity_label_queries(conn: DbConn) -> EntityLabelQueries:
@@ -263,16 +192,28 @@ def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], Entit
     return dependency
 
 
-def structure_service(conn: DbConn) -> StructureService:
-    return StructureService(
-        structures=structure_repository(conn),
-        perimeters=perimeter_repository(conn),
-        perimeter_structures=PerimeterStructures(conn),
-    )
+def feedback_queries(conn: DbConn) -> FeedbackQueries:
+    return PgFeedbackQueries(conn)
 
 
-def structures_queries(conn: DbConn) -> StructuresQueries:
-    return PgStructuresQueries(conn)
+def hal_problems_queries(conn: DbConn) -> HalProblemsQueries:
+    return PgHalProblemsQueries(conn)
+
+
+def monograph_queries(conn: DbConn) -> MonographQueries:
+    return PgMonographQueries(conn)
+
+
+def perimeters_queries(conn: DbConn) -> PerimetersQueries:
+    return PgPerimetersQueries(conn)
+
+
+def persons_queries(conn: DbConn) -> PersonsQueries:
+    return PgPersonsQueries(conn)
+
+
+def pipeline_runs_queries(conn: DbConn) -> PipelineRunsQueries:
+    return PgPipelineRunsQueries(conn)
 
 
 def publications_queries(
@@ -280,6 +221,45 @@ def publications_queries(
     open_connection: Callable[[], Connection] = Depends(connection_factory),
 ) -> PublicationsQueries:
     return PgPublicationsQueries(conn, open_connection=open_connection)
+
+
+def publisher_queries(conn: DbConn) -> PublisherQueries:
+    return PgPublisherQueries(conn)
+
+
+def serial_queries(conn: DbConn) -> SerialQueries:
+    return PgSerialQueries(conn)
+
+
+def stats_queries(conn: DbConn) -> StatsQueries:
+    return PgStatsQueries(conn)
+
+
+def structures_queries(conn: DbConn) -> StructuresQueries:
+    return PgStructuresQueries(conn)
+
+
+def subjects_queries(conn: DbConn) -> SubjectsQueries:
+    return PgSubjectsQueries(conn)
+
+
+# ----- Écritures -----
+# Un service par agrégat, construit sur la connexion reçue : celle de la requête pour une route,
+# celle de la tâche de fond pour une tâche de fond, celle du script pour un script.
+
+
+def address_service(conn: DbConn) -> AddressService:
+    return AddressService(
+        addresses=address_repository(conn),
+        contributions=contribution_repository(conn),
+        country_recompute=CountryRecompute(conn),
+        perimeter_structures=PerimeterStructures(conn),
+        perimeter_recompute=SourceContributionPerimeterRecompute(conn),
+    )
+
+
+def config_service(conn: DbConn) -> ConfigService:
+    return ConfigService(config=PgConfigRepository(conn))
 
 
 def contribution_service(conn: DbConn) -> ContributionService:
@@ -290,30 +270,43 @@ def contribution_service(conn: DbConn) -> ContributionService:
     )
 
 
-def address_repo(conn: DbConn) -> AddressRepository:
-    return address_repository(conn)
+def perimeter_service(conn: DbConn) -> PerimeterService:
+    return PerimeterService(
+        perimeters=perimeter_repository(conn),
+        perimeter_structures=PerimeterStructures(conn),
+        config=PgConfigQueries(conn),
+    )
 
 
-def persons_queries(conn: DbConn) -> PersonsQueries:
-    return PgPersonsQueries(conn)
+def person_service(conn: DbConn) -> PersonService:
+    return PersonService(
+        persons=person_repository(conn),
+        contributions=contribution_repository(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
 
 
-def pipeline_runs_queries(
-    conn: DbConn,
-) -> PipelineRunsQueries:
-    return PgPipelineRunsQueries(conn)
+def publisher_service(conn: DbConn) -> PublisherService:
+    return PublisherService(
+        publishers=publisher_repository(conn),
+        serials=serial_repository(conn),
+        serial_service=serial_service(conn),
+        publication_count_recompute=PublicationCountRecompute(conn),
+    )
 
 
-def addresses_queries(conn: DbConn) -> AddressesQueries:
-    return PgAddressesQueries(conn)
+def serial_service(conn: DbConn) -> SerialService:
+    return SerialService(
+        serials=serial_repository(conn), recompute=SerialRecompute(conn), conn=conn
+    )
 
 
-# Recalculs du pipeline, construits comme les repositories sur la connexion de la requête.
-
-
-def country_recompute(conn: DbConn) -> CountryRecomputePort:
-    """Résolution des pays d'adresses et recalcul ciblé des pays des publications, exposés par le pipeline."""
-    return CountryRecompute(conn)
+def structure_service(conn: DbConn) -> StructureService:
+    return StructureService(
+        structures=structure_repository(conn),
+        perimeters=perimeter_repository(conn),
+        perimeter_structures=PerimeterStructures(conn),
+    )
 
 
 # ----- Tâches de fond (BackgroundTasks) -----
@@ -337,9 +330,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
     """Tâche de fond : propage les pays des adresses vers les publications."""
     _run_detached(
         "propagation des pays",
-        lambda conn: countries_service.propagate_countries_to_publications(
-            address_ids, country_recompute=CountryRecompute(conn)
-        ),
+        lambda conn: address_service(conn).propagate_countries_to_publications(address_ids),
     )
 
 
@@ -350,10 +341,5 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
     """
     _run_detached(
         "propagation d'in_perimeter",
-        lambda conn: structure_links_service.propagate_in_perimeter_for_addresses(
-            address_ids,
-            repo=contribution_repository(conn),
-            perimeter_structures=PerimeterStructures(conn),
-            perimeter_recompute=SourceContributionPerimeterRecompute(conn),
-        ),
+        lambda conn: address_service(conn).propagate_in_perimeter_for_addresses(address_ids),
     )
