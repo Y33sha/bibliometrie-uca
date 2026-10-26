@@ -1,25 +1,25 @@
-"""Groupes de contributions sources (`contributions`, `aligned_source_contributions`) pour les tests d'intégration."""
+"""Contributions (`contributions`, `aligned_source_contributions`) pour les tests d'intégration."""
 
 from sqlalchemy import Connection, text
 
 from infrastructure.db.queues import Queue, enqueue_sql
-from infrastructure.sql_fragments import propagate_group_attributes_sql
+from infrastructure.sql_fragments import propagate_contribution_attributes_sql
 from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import perimeter_evidence
 
 _MARK_UNGROUPED = enqueue_sql(
-    Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES, "SELECT contribution_id FROM ungrouped"
+    Queue.CONTRIBUTION_ATTRIBUTES, "SELECT contribution_id FROM ungrouped"
 )
 
 
-def insert_group(
+def align_source_contributions(
     conn: Connection,
     publication_id: int,
     source_contributions: list[tuple[int, int]],
     *,
     method: str = "name",
 ) -> int:
-    """Groupe les contributions sources `(contribution source, enregistrement source)` d'une publication, marque le groupe pour la recomposition de ses attributs comme le groupement, et renvoie l'`id` du groupe. La première fonde le groupe ; les autres le rejoignent par `method`."""
+    """Contribution les contributions sources `(contribution source, enregistrement source)` d'une publication, marque la contribution pour la recomposition de ses attributs comme le alignement, et renvoie l'`id` de la contribution. La première fonde la contribution ; les autres le rejoignent par `method`."""
     contribution_id = conn.execute(
         text("INSERT INTO contributions (publication_id) VALUES (:p) RETURNING id"),
         {"p": publication_id},
@@ -38,14 +38,14 @@ def insert_group(
                 "m": "reference" if rank == 0 else method,
             },
         )
-    mark(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES, [contribution_id])
+    mark(conn, Queue.CONTRIBUTION_ATTRIBUTES, [contribution_id])
     return contribution_id
 
 
-def add_group_member(
+def add_aligned_source_contribution(
     conn: Connection, contribution_id: int, source_contribution_id: int, source_record_id: int
 ) -> None:
-    """Ajoute la contribution source `source_contribution_id`, de l'enregistrement source `source_record_id`, au groupe `contribution_id`."""
+    """Ajoute la contribution source `source_contribution_id`, de l'enregistrement source `source_record_id`, à la contribution `contribution_id`."""
     conn.execute(
         text("""
             INSERT INTO aligned_source_contributions
@@ -56,8 +56,8 @@ def add_group_member(
     )
 
 
-def group_ungrouped(conn: Connection) -> None:
-    """Donne un groupe à elle seule à chaque contribution source sans groupe d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : le groupe que la phase `author_grouping` forme pour un auteur sans jumelle. Les groupes créés sont marqués pour la recomposition de leurs attributs."""
+def align_unaligned(conn: Connection) -> None:
+    """Donne une contribution à elle seule à chaque contribution source sans contribution d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : la contribution que la phase `author_grouping` forme pour un auteur sans jumelle. Les contributions créées sont marquées pour la recomposition de leurs attributs."""
     conn.execute(
         text(f"""
             WITH ungrouped AS (
@@ -80,13 +80,13 @@ def group_ungrouped(conn: Connection) -> None:
     )
 
 
-def recompose_group_attributes(conn: Connection) -> None:
-    """Recompose les attributs de tous les groupes depuis leurs membres, comme la phase `author_grouping` pour les groupes en file."""
-    conn.execute(text(propagate_group_attributes_sql("SELECT id FROM contributions")))
+def recompose_contribution_attributes(conn: Connection) -> None:
+    """Recompose les attributs de tous les contributions depuis leurs contributions sources, comme la phase `author_grouping` pour les contributions en file."""
+    conn.execute(text(propagate_contribution_attributes_sql("SELECT id FROM contributions")))
 
 
-def group_of(conn: Connection, source_contribution_id: int) -> int:
-    """L'`id` du groupe de la contribution source `source_contribution_id`."""
+def contribution_of(conn: Connection, source_contribution_id: int) -> int:
+    """L'`id` de la contribution de la contribution source `source_contribution_id`."""
     return conn.execute(
         text(
             "SELECT contribution_id FROM aligned_source_contributions"
@@ -96,10 +96,10 @@ def group_of(conn: Connection, source_contribution_id: int) -> int:
     ).scalar_one()
 
 
-def set_perimeter_author_group(
+def set_perimeter_author_contribution(
     conn: Connection, contribution_id: int, *, person_id: int | None = None, mode: str | None = None
 ) -> None:
-    """Fait du groupe `contribution_id` un groupe d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
+    """Fait de la contribution `contribution_id` une contribution d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
     conn.execute(
         text("""
             UPDATE contributions
@@ -113,7 +113,7 @@ def set_perimeter_author_group(
     )
 
 
-def insert_person_group(
+def insert_person_contribution(
     conn: Connection,
     source_contribution_id: int,
     *,
@@ -121,7 +121,7 @@ def insert_person_group(
     mode: str = "name",
     in_perimeter: bool = True,
 ) -> int:
-    """Place la contribution source `source_contribution_id` seule dans un groupe, et rattache ce groupe à la personne `person_id` par le mode de résolution `mode`. `in_perimeter` pose l'indice `address`. Renvoie l'`id` du groupe."""
+    """Place la contribution source `source_contribution_id` seule dans une contribution, et rattache cette contribution à la personne `person_id` par le mode de résolution `mode`. `in_perimeter` pose l'indice `address`. Renvoie l'`id` de la contribution."""
     row = conn.execute(
         text("""
             SELECT sc.source_record_id, sr.publication_id
@@ -130,7 +130,7 @@ def insert_person_group(
         """),
         {"s": source_contribution_id},
     ).one()
-    contribution_id = insert_group(
+    contribution_id = align_source_contributions(
         conn, row.publication_id, [(source_contribution_id, row.source_record_id)]
     )
     conn.execute(
@@ -151,8 +151,8 @@ def insert_person_group(
     return contribution_id
 
 
-def group_person(conn: Connection, contribution_id: int) -> tuple[int | None, str | None]:
-    """Personne et mode de résolution du groupe `contribution_id`."""
+def contribution_person(conn: Connection, contribution_id: int) -> tuple[int | None, str | None]:
+    """Personne et mode de résolution de la contribution `contribution_id`."""
     row = conn.execute(
         text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
         {"g": contribution_id},

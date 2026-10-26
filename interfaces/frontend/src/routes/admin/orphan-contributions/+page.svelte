@@ -3,13 +3,14 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { api, ApiError, orphanContributions } from '#lib/api/index.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { titleCase } from '#lib/utils.js';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { anchored } from '#lib/actions/anchored.js';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Modal from '#lib/components/Modal.svelte';
@@ -165,7 +166,7 @@
 		await withRejectGuard(async (force) => {
 			await orphanContributions.batchAssign({
 				person_id: personId,
-				group_ids: items.map(o => o.contribution_id),
+				contribution_ids: items.map(o => o.contribution_id),
 				force,
 			});
 			selectedIds = new Set();
@@ -199,7 +200,7 @@
 		if (remaining.length) {
 			await orphanContributions.batchAssign({
 				person_id: data.person_id,
-				group_ids: remaining.map(o => o.contribution_id),
+				contribution_ids: remaining.map(o => o.contribution_id),
 			});
 		}
 		createModal = null;
@@ -213,8 +214,7 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
-		const qs = p.toString();
-		replaceState(resolve('admin/orphan-contributions') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('admin/orphan-contributions'), p);
 	}
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
@@ -248,7 +248,7 @@
 
 <div class="toolbar">
 	<input type="search" placeholder="Filtrer par nom…" bind:value={search}
-		use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
+ onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput} autocomplete="off" />
 	<FacetDropdown
 		label="Laboratoires"
@@ -282,13 +282,7 @@
 	</div>
 {/if}
 
-{#if orphans.length === 0}
-	{#if list.loading}
-		<p class="loading-msg">Chargement des résultats en cours…</p>
-	{:else}
-		<p class="empty">Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.</p>
-	{/if}
-{:else}
+<ListStatus {list} emptyText="Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.">
 	<table class="data-table">
 		<thead>
 			<tr>
@@ -358,7 +352,7 @@
 	</table>
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
-{/if}
+</ListStatus>
 
 {#if createModal}
 	<Modal

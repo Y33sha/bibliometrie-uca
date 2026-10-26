@@ -57,7 +57,7 @@ _PURGE_BATCH_SIZE = 5000
 
 
 def count_contributions_in_perimeter(conn: Connection) -> int:
-    """Nombre de groupes de contributions sources du périmètre rattachés à une personne."""
+    """Nombre de contributions du périmètre rattachées à une personne."""
     return scalar_int(
         conn.execute(
             text("SELECT COUNT(*) FROM contributions WHERE person_id IS NOT NULL AND in_perimeter")

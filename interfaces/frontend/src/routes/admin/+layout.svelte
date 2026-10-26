@@ -8,7 +8,7 @@
 
 	// Sans le rôle admin, renvoie vers la connexion, qui ramène ensuite à la page demandée.
 	$effect(() => {
-		if (session.loaded && !isAdmin()) goto(loginUrl(page.url), { replaceState: true });
+		if (session.loaded && !isAdmin()) goto(loginUrl(page.url), { replace: true });
 	});
 </script>
 

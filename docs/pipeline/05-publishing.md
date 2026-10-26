@@ -1,10 +1,8 @@
 # Référentiels de l'édition
 
-*À jour le 2026-10-25.*
+*À jour le 2026-10-26.*
 
-La phase `publishing` complète les référentiels d'éditeurs, de publications en série et de monographies que la phase [normalize](03-normalize.md) alimente au fil des documents. Elle rattache chaque préfixe DOI à son éditeur et vérifie les ISSN des publications en série. Elle cherche auprès de sources externes leur type et leurs frais de publication. Elle fusionne les doublons et rattache les monographies à leur collection. Les entrées vides sont supprimées par la phase [finalize](10-finalize.md), après les dernières suppressions de publications. Le `serial_type` qu'elle pose nourrit la correction `serial_type → doc_type` de la phase [metadata_correction](06-metadata-correction.md), d'où sa place dans le pipeline.
-
-Les sous-étapes forment trois groupes, chacun sous son titre dans le journal : éditeurs, publications en série, monographies. Chaque sous-étape y tient une ligne de bilan.
+La phase `publishing` complète les [référentiels de l'édition](../donnees/07-publishing.md) que la phase [normalize](03-normalize.md) alimente. Elle rattache chaque préfixe DOI à son éditeur et vérifie les ISSN des publications en série. Elle cherche leur type auprès de sources externes. Elle fusionne les doublons et rattache les monographies à leur collection. La phase [finalize](10-finalize.md) supprime les entrées vides. La phase [metadata_correction](06-metadata-correction.md), qui suit, corrige le type de document des publications d'après le `serial_type`.
 
 ## Agences d'enregistrement DOI (`resolve_ra`)
 
@@ -28,7 +26,7 @@ Deux sous-étapes, une par agence d'enregistrement, interrogent `/prefixes/{pref
 
 4. **`enrich_serials_from_openalex`** — lit les [sources OpenAlex](../sources/03-openalex.md) pour renseigner le type de la revue. Sont reprises les revues qui ont un `openalex_id` et dont le type est inconnu (`serial_type = 'unknown'`).
 
-5. **`check_serials_in_sudoc`** — vérifie les ISSN des revues dans le [Sudoc](../sources/09-sources-supplementaires.md#sudoc). Sont reprises les revues dont un ISSN n'est pas vérifié, et celles dont un enregistrement contient un ISSN absent de leurs ISSN. Les notices Sudoc regroupent les ISSN de la revue par publication. Le groupe principal reste actif et donne l'ISSN-L. Les autres ISSN de la même revue prennent un statut : annulé, titre précédent ou suivant (`430`, `440`), supplément (`421`, `422`). Les ISSN d'une autre publication quittent la revue et sont gardés sans revue : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Une valeur mal formée est corrigée à une faute de frappe près. Chaque ISSN reçoit le support de sa notice et une date de vérification. Les règles sont détaillées dans `domain/serials/issn_check.py`. Un ISSN nouveau attend sa vérification. Les revues sont vérifiées 4 à la fois, à 5 requêtes par seconde au plus. Une revue dont une requête échoue reste à vérifier, et le run suivant la reprend.
+5. **`check_serials_in_sudoc`** — vérifie les ISSN des revues dans le [Sudoc](../sources/09-sources-supplementaires.md#sudoc). Sont reprises les revues dont un ISSN n'est pas vérifié, et celles dont un enregistrement contient un ISSN absent de leurs ISSN. Les notices Sudoc regroupent les ISSN de la revue par publication. Le groupe principal reste actif et donne l'ISSN-L. Les autres ISSN de la même revue prennent un statut : annulé, titre précédent ou suivant (`430`, `440`), supplément (`421`, `422`). Les ISSN d'une autre publication quittent la revue et sont gardés sans revue : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Une valeur mal formée est corrigée à une faute de frappe près. Chaque ISSN reçoit le support de sa notice Sudoc et une date de vérification. Les règles sont détaillées dans `domain/serials/issn_check.py`. Un ISSN nouveau attend sa vérification. Une revue dont une requête échoue reste à vérifier, et le run suivant la reprend.
 
 6. **`merge_duplicate_serials`** — fusionne les revues en double, selon cinq règles appliquées dans l'ordre :
     - revues vérifiées qui partagent leur ISSN-L ;

@@ -67,7 +67,7 @@ class PublisherMergeBlockedError(ConflictError):
 
 
 class ContributionAlreadyAssignedError(ConflictError):
-    """Attribution refusée : la contribution visée, groupe de contributions sources, est déjà rattachée à une personne.
+    """Attribution refusée : la contribution visée est déjà rattachée à une personne.
 
     Seule une contribution orpheline s'attribue ; reprendre une contribution rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
 

@@ -1,58 +1,45 @@
-# Schéma `persons`
+# Personnes
 
-*À jour le 2026-10-12.*
+*À jour le 2026-10-26.*
 
-Référentiel des individus.
+Une personne est un chercheur unifié à travers les sources. La phase `persons` rattache chaque [contribution](04-contributions.md) à une personne, et crée les personnes des contributions du périmètre. L'import du référentiel RH crée aussi des personnes. L'administration corrige le résultat, et le pipeline conserve ses décisions.
 
-**Périmètre** : `persons` couvre les personnes qui ont au moins une contribution source dans le périmètre. Conséquence : les co-auteurs externes des publications UCA n'ont pas de personne.
+Une personne a au moins une contribution du périmètre, une fiche RH ou une décision humaine. La phase `persons` supprime les autres. Les co-auteurs extérieurs au périmètre n'ont donc pas de personne.
 
-```mermaid
-flowchart LR
-    structures --- contributions
-    contributions --- publications
-    contributions ---- persons
-    source_contributions-->|match_or_create|persons
-    persons---hr_records
-    persons---person_identifiers
-    persons---person_name_forms
+## Tables
 
-    classDef manuel  fill:#8e5,stroke:#5a3
-    class structures manuel;
-    classDef csv fill:#fa5
-    class hr_records csv
-    classDef auto fill:#adf,stroke:#58c
-    class source_contributions,publications,person_identifiers,person_name_forms,contributions,persons auto
-    classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,contributions main
-```
+Schéma PostgreSQL `persons`.
 
-Légende :
-- **vert** : tables peuplées manuellement
-- **orange** : imports CSV
-- **bleu** : tables peuplées automatiquement par le pipeline à partir des imports API
-
-## Tables associées
-
-- **`hr_records`** : fiches RH, table satellite liée à `persons` (FK `person_id`, ON DELETE RESTRICT). Contient les données issues des exports RH : cf [doc sources](../sources/10-imports-manuels.md#extraction-rh).
-- **`person_identifiers`** : identifiants de personne, persistants — [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), etc. Chaque ligne associe un identifiant (`id_type` + `id_value`) à une personne (`person_id`). Le champ `source` dit d'où vient l'attribution — `manual` pour une décision humaine, `auto` pour une résolution du pipeline — et `status` où elle en est : `pending`, `confirmed`, `rejected` ou `authenticated`. La relation *many-to-one* permet de gérer les quelques cas d'ORCID multiples confirmés, et les nombreux cas d'identifiants (corrects ou erronés) en attente de vérification moissonnés dans les sources.
-- **`person_name_forms`** : formes de noms normalisées, servant à reconnaître une personne existante lors de la création.
-- **`distinct_persons`** : paires de personnes déclarées **distinctes malgré une forme de nom commune** ; les files de triage par nom et par identifiant du référentiel `admin/persons` écartent la paire.
+| Table | Contenu | Contrainte |
+|---|---|---|
+| `persons` | Nom et prénom, leurs formes normalisées, motif d'exclusion (`exclusion`) | |
+| `person_identifiers` | Identifiants de la personne : [ORCID](../glossaire.md#orcid), [idHAL](../glossaire.md#idhal), [IdRef](../glossaire.md#idref), compte HAL. `source` vaut `auto` pour le pipeline, `manual` pour l'administration. `status` vaut `pending`, `confirmed`, `rejected` ou `authenticated` | Un identifiant appartient à une seule personne |
+| `person_name_forms` | Formes de nom qui désignent la personne, avec leur `status` | Une forme peut désigner plusieurs personnes |
+| `hr_records` | Fiche du référentiel RH ([import](../sources/10-imports-manuels.md#extraction-rh)) | Une fiche par personne. La fiche empêche la suppression de la personne |
+| `distinct_persons` | Paires de personnes déclarées distinctes | |
 
 ## Décisions humaines
 
-Deux tables contiennent les arbitrages saisis à la main sur les contributions sources, et survivent aux reconstructions de la table `contributions` :
+Deux tables contiennent les décisions de l'administration sur le rattachement des contributions. Les reconstructions de `contributions` les conservent.
 
-- **`rejected_contributions`** — contributions rejetées : paires (publication, personne) écartées, enregistrées sur chaque enregistrement source de la publication. Clé primaire `(source_record_id, person_id)`.
-- **`confirmed_source_contributions`** — contributions sources confirmées : contributions sources épinglées sur une personne. Clé primaire `source_contribution_id`.
-
-## Propriété des tables
-
-| Table | Auteur | Écrit par |
+| Table | Décision | Clé |
 |---|---|---|
-| `persons` | mixte | créées par le pipeline (phase persons, `pipeline/transformation/persons/groups.py`) ou par l'import RH (`import_persons.py`) ; fusions, renommage et rejet en admin (`application/services/persons/commands.py`) |
-| `person_identifiers` | mixte | moissonnés par le pipeline ; ajout manuel et statut en admin (`application/services/persons/commands.py`) |
-| `person_name_forms` | mixte | peuplées par le pipeline (`populate_person_name_forms.py`) ; statut en admin |
-| `distinct_persons` | admin | `application/services/persons/commands.py` |
-| `hr_records` | import CSV | `interfaces/cli/imports/import_persons.py` |
-| `rejected_contributions` | admin | `application/services/contributions/core.py` |
-| `confirmed_source_contributions` | admin | `application/services/contributions/assign_orphans.py` |
+| `rejected_contributions` | La personne est écartée de la publication. Le rejet s'enregistre sur chaque enregistrement source de la publication | `(source_record_id, person_id)` |
+| `confirmed_source_contributions` | La contribution source est épinglée à la personne | `source_contribution_id` |
+
+## Écriture
+
+**Pipeline.** La [phase `persons`](../pipeline/09-persons.md) arbitre les identifiants, rattache les contributions, crée les personnes, régénère les formes de nom et purge. Les identifiants lus dans les sources entrent avec le statut `pending`.
+
+**Import RH** (`interfaces/cli/imports/import_persons.py`). Crée la personne et sa fiche RH.
+
+**Import des ORCID authentifiés** (`interfaces/cli/maintenance/import_authenticated_orcids.py`). Seul cet import pose le statut `authenticated`. Ce statut est définitif. Un déclencheur PostgreSQL garantit ces deux règles.
+
+**Administration** (`application/services/persons.py`) :
+
+- **Fusion.** La personne absorbée est supprimée, et son identifiant redirige vers la personne conservée. La personne qui a une fiche RH est toujours conservée. Deux personnes qui ont chacune une fiche RH ne fusionnent pas.
+- **Exclusion**, pour le motif `not_a_person` ou `out_of_perimeter`. L'appartenance de ses publications au périmètre est recalculée.
+- **Renommage.** Les formes de nom de la personne sont régénérées.
+- **Statut d'un identifiant ou d'une forme de nom.** Un rejet renvoie en redécision les contributions que l'identifiant ou la forme rattachait.
+- **Détachement.** La personne est écartée des publications choisies (`rejected_contributions`).
+- **Déclaration de deux personnes distinctes.** La paire sort des files de doublons.

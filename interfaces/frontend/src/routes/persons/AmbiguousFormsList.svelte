@@ -4,6 +4,7 @@
   import { persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import type { components } from "#lib/api/schema.js";
 
@@ -55,11 +56,7 @@
   homonymes (à confirmer chacune), soit un doublon (à fusionner).
 </p>
 
-{#if !list.loaded}
-  <div class="empty">Chargement…</div>
-{:else if list.items.length === 0 && !list.loading}
-  <div class="empty">Aucune forme ambiguë à trancher.</div>
-{:else}
+<ListStatus {list} emptyText="Aucune forme ambiguë à trancher.">
   <div class="triage-list">
     {#each list.items as form (form.name_form)}
       <div class="triage-item">
@@ -113,7 +110,7 @@
   </div>
 
   <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
-{/if}
+</ListStatus>
 
 <style>
   .form-head {

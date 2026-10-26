@@ -2,8 +2,8 @@
 
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
+from tests.integration.helpers.alignment import align_unaligned
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import (
@@ -262,26 +262,26 @@ class TestEntreeDansLePerimetre:
 
         assert _marked_for_reconciliation(sa_sync_conn, 80002) is False
 
-    def test_groupes_des_contributions_sources_entrees_marques(self, sa_sync_conn):
-        """Le groupe d'une contribution source dont les indices de périmètre changent est marqué pour la recomposition de ses attributs."""
+    def test_contributions_des_contributions_sources_entrees_marquees(self, sa_sync_conn):
+        """La contribution d'une contribution source dont les indices de périmètre changent est marqué pour la recomposition de ses attributs."""
         from sqlalchemy import text
 
         _setup_affiliations_test_data(sa_sync_conn)
-        group_ungrouped(sa_sync_conn)
-        clear(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+        align_unaligned(sa_sync_conn)
+        clear(sa_sync_conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
         _run_populate_affiliations(sa_sync_conn)
 
-        group = sa_sync_conn.execute(
+        contribution = sa_sync_conn.execute(
             text(
                 "SELECT contribution_id FROM aligned_source_contributions"
                 " WHERE source_contribution_id = 80002"
             )
         ).scalar_one()
-        assert group in queued(sa_sync_conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES)
+        assert contribution in queued(sa_sync_conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
-    def test_recalcul_cible_recompose_le_groupe(self, sa_sync_conn):
-        """Le recalcul après une correction d'adresse recompose tout de suite les indices du groupe de la contribution source."""
+    def test_recalcul_cible_recompose_la_contribution(self, sa_sync_conn):
+        """Le recalcul après une correction d'adresse recompose tout de suite les indices de la contribution de la contribution source."""
         from sqlalchemy import text
 
         from pipeline.transformation.structures.perimeter_evidence import (
@@ -289,7 +289,7 @@ class TestEntreeDansLePerimetre:
         )
 
         _setup_affiliations_test_data(sa_sync_conn)
-        group_ungrouped(sa_sync_conn)
+        align_unaligned(sa_sync_conn)
 
         SourceContributionPerimeterRecompute(sa_sync_conn).recompute_perimeter(
             [80002], [80000, 80001]

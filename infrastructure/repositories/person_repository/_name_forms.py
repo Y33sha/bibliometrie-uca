@@ -12,7 +12,7 @@ from domain.errors import ConflictError, NotFoundError
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
-from infrastructure.sql_fragments import GROUP_MEMBERS
+from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
 
 
 def refresh_canonical_name_forms(
@@ -81,7 +81,7 @@ def update_name_form_status(
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
-    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des membres de ses groupes. Rend le nombre de formes supprimées."""
+    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des contributions sources de ses contributions. Rend le nombre de formes supprimées."""
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf
@@ -89,7 +89,7 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
               AND pnf.status = '{AttributionStatus.PENDING.value}'
               AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
               AND NOT EXISTS (
-                  SELECT 1 FROM {GROUP_MEMBERS}
+                  SELECT 1 FROM {CONTRIBUTIONS_AND_SOURCES}
                   WHERE g.person_id = :pid
                     AND ci.author_name_normalized = pnf.name_form
               )

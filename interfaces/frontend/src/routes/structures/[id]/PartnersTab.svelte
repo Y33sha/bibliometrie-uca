@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
@@ -53,7 +54,7 @@
 	<FacetDropdown label="Années" allLabel="Toutes" options={facetOptions(partners.data?.years)} searchable bind:selected={selectedYears} onchange={onFilterChange} />
 	<FacetDropdown label="Pays" options={facetOptions(partners.data?.countries)} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 	<FacetDropdown label="Types" options={facetOptions(partners.data?.types)} bind:selected={selectedTypes} onchange={onFilterChange} />
-	<span class="count">{partners.total.toLocaleString('fr-FR')} organisation{partners.total > 1 ? 's' : ''} partenaire{partners.total > 1 ? 's' : ''}</span>
+	<ResultCount list={partners} one="organisation partenaire" many="organisations partenaires" />
 </div>
 
 <div class="table-scroll">
@@ -78,7 +79,7 @@
 				</tr>
 			{/each}
 			{#if partners.items.length === 0}
-				<TableStatusRow loading={partners.loading} colspan={4} emptyText="Aucune organisation partenaire ne correspond aux filtres." />
+				<TableStatusRow loading={partners.loading} error={partners.error} colspan={4} emptyText="Aucune organisation partenaire ne correspond aux filtres." />
 			{/if}
 		</tbody>
 	</table>

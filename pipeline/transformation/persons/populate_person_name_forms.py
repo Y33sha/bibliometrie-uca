@@ -1,10 +1,10 @@
 """Peuplement de `person_name_forms` à partir des sources existantes.
 
-Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(name_form, person_id, sources)` depuis les sources (personnes et membres de leurs groupes), puis synchronise la table par diff (insert/update/delete).
+Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(name_form, person_id, sources)` depuis les sources (personnes et contributions sources de leurs contributions), puis synchronise la table par diff (insert/update/delete).
 
 Sources :
 1. `persons.last_name` + `persons.first_name` (source: `'persons'`) — inclut les personnes exclues, qui restent des ancres du matching.
-2. le nom normalisé des informations du contributeur des membres des groupes rattachés à la personne (`contributor_information.author_name_normalized`, toutes sources biblio).
+2. le nom normalisé des informations du contributeur des contributions sources des contributions rattachées à la personne (`contributor_information.author_name_normalized`, toutes sources biblio).
 
 L'orchestrateur produit les formes "persons" en Python via `compute_person_name_forms` (variantes prénom/nom/initiales) et les charge dans la table temp `_raw_forms`. La fusion et la synchronisation se font ensuite côté SQL via `sync_from_raw_forms` (GROUP BY (name_form, person_id), agrégation des sources, diff INSERT/UPDATE/DELETE).
 """
@@ -16,7 +16,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
 from infrastructure.db.jsonb import Jsonb
-from infrastructure.sql_fragments import GROUP_MEMBERS
+from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
 
 
 class PersonNameRow(NamedTuple):
@@ -58,7 +58,7 @@ def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
 
 
 def create_temp_raw_forms_table(conn: Connection) -> None:
-    """Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes des membres des groupes sont lues directement par la query d'agrégation, sans transiter par cette table."""
+    """Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes des contributions sources des contributions sont lues directement par la query d'agrégation, sans transiter par cette table."""
     conn.execute(text("CREATE TEMP TABLE _raw_forms (name_form TEXT, person_id INT, source TEXT)"))
 
 
@@ -95,7 +95,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
                 UNION
                 SELECT ci.author_name_normalized AS name_form,
                        g.person_id, sc.source::text AS source
-                FROM {GROUP_MEMBERS}
+                FROM {CONTRIBUTIONS_AND_SOURCES}
                 WHERE g.person_id IS NOT NULL
                   AND ci.author_name_normalized IS NOT NULL
                   AND ci.author_name_normalized != ''

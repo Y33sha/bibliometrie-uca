@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import DocTypePill from '#lib/components/DocTypePill.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -23,8 +25,7 @@
 	function syncUrl() {
 		const p = new URLSearchParams();
 		if (list.page > 1) p.set('page', String(list.page));
-		const qs = p.toString();
-		replaceState(resolve('hal-problems/affiliation-conflicts') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('hal-problems/affiliation-conflicts'), p);
 	}
 
 
@@ -46,20 +47,16 @@
 </div>
 
 <div class="toolbar">
-	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
+	<ResultCount {list} one="publication" many="publications" />
 </div>
 
-{#if list.loading}
-	<div class="loading">Chargement…</div>
-{:else if list.items.length === 0}
-	<div class="no-results">Aucun conflit détecté</div>
-{:else}
+<ListStatus {list} emptyText="Aucun conflit détecté">
 	<div class="publication-list">
 		{#each list.items as pub}
 			<div class="publication-card">
 				<div class="publication-meta-line">
 					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+					{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
 					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{structureLabel(lab)}</span>{/each}
 					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 				</div>
@@ -77,10 +74,9 @@
 		{/each}
 	</div>
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
-{/if}
+</ListStatus>
 
 <style>
-	.count { font-size: 0.9rem; }
 	.publication-list { display: flex; flex-direction: column; gap: 8px; }
 	.publication-card {
 		background: var(--card);

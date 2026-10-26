@@ -146,7 +146,7 @@ function contribution(overrides: Partial<SourceContribution>): SourceContributio
 		raw_affiliation: null,
 		countries: null,
 		contribution_id: null,
-		group_position: null,
+		reference_position: null,
 		method: null,
 		score: null,
 		margin: null,
@@ -159,9 +159,9 @@ describe('authorRows', () => {
 
 	it("réunit les contributions sources d'un groupe sur une ligne, dans l'ordre de la liste de référence", () => {
 		const rows = authorRows(records, [
-			contribution({ id: 11, source_record_id: 1, position: 1, contribution_id: 7, group_position: 1 }),
-			contribution({ id: 21, source_record_id: 2, position: 0, contribution_id: 7, group_position: 1 }),
-			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, group_position: 0 }),
+			contribution({ id: 11, source_record_id: 1, position: 1, contribution_id: 7, reference_position: 1 }),
+			contribution({ id: 21, source_record_id: 2, position: 0, contribution_id: 7, reference_position: 1 }),
+			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, reference_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells.map((c) => c?.id ?? null))).toEqual([
 			[10, null],
@@ -174,7 +174,7 @@ describe('authorRows', () => {
 		const rows = authorRows(records, [
 			contribution({ id: 30, source_record_id: 1, position: null, roles: ['jury_member'] }),
 			contribution({ id: 12, source_record_id: 1, position: 2, collective: true }),
-			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, group_position: 0 }),
+			contribution({ id: 10, source_record_id: 1, position: 0, contribution_id: 6, reference_position: 0 }),
 		]);
 		expect(rows.map((r) => r.cells[0]?.id)).toEqual([10, 12, 30]);
 	});

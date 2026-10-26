@@ -1,15 +1,8 @@
-#  Résolution et création des personnes
+# Résolution et création des personnes
 
-*À jour le 2026-10-24.*
+*À jour le 2026-10-26.*
 
-```mermaid
-flowchart LR
-    A@{ shape: procs, label: "contributions"}-->B[persons]
-    classDef new  fill:#bbf
-    class B new;
-```
-
-La phase `persons` rattache chaque contribution à une personne. Une contribution source est un auteur tel qu'une source le donne sur une publication : un même chercheur en produit une par publication et par source. La phase `author_grouping` aligne les contributions sources d'un même auteur d'une publication dans une contribution (`contributions`, `aligned_source_contributions`). La phase décide la personne de chaque contribution à partir de toutes ses contributions sources alignées.
+La phase `persons` rattache chaque [contribution](../donnees/04-contributions.md) à une [personne](../donnees/05-persons.md). Elle décide la personne à partir de toutes les contributions sources alignées dans la contribution.
 
 Une contribution du périmètre au nom inconnu fonde une personne, d'après le nom d'une de ses contributions sources. Le nom vient de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet. L'ordre des sources départage ensuite : theses.fr, Crossref, DataCite, OpenAlex, ScanR, HAL, WoS. Les contributions au même nom, dans d'autres publications, la rejoignent dans le même passage.
 

@@ -6,7 +6,7 @@
 
 ### Définition des structures
 
-`admin/structures`
+`structures`, en session d'administration
 
 Le moissonnage nécessite des **structures** :
 * Créer les structures dont on veut moissonner les publications.
@@ -72,7 +72,7 @@ Le moissonnage porte sur un *périmètre*.
 Un périmètre se définit par une ou plusieurs structures racines, et inclut automatiquement tous leurs descendants.
 
 Pour moissonner tous les laboratoires d'une université:
-- Créer l'université et ses laboratoires dans `admin/structures` et renseigner leurs relations de tutelle.
+- Créer l'université et ses laboratoires dans `structures` et renseigner leurs relations de tutelle.
 - Créer un périmètre avec l'université pour structure racine.
 - Dans la section "Rôles des périmètres", sélectionner le périmètre concerné à chacune des deux étapes.
 
@@ -97,7 +97,7 @@ Permet d'affiner la liste des formes de nom par structure, pour améliorer progr
 
 ![Contrôle affiliations](../img/screenshots/admin_adresses_affiliation.png)
 
-- Contrôle qualité: visualiser les divergences entre détection automatisée et contrôle manuel => permet de repérer les formes de nom non détectées (à ajouter dans `admin/structures`) ou trop permissives (à supprimer, ou ajouter contexte plus contraignant).
+- Contrôle qualité: visualiser les divergences entre détection automatisée et contrôle manuel => permet de repérer les formes de nom non détectées (à ajouter dans l'onglet « Gestion » de la structure) ou trop permissives (à supprimer, ou ajouter contexte plus contraignant).
 
 ![Contrôle qualité](../img/screenshots/admin_adresses_qualite.png)
 
@@ -117,11 +117,11 @@ Il est nécessaire, en particulier apès les premiers runs, de **fusionner** les
 
 Un garde-fou empêche de fusionner ensemble deux personnes présentes dans l'[extraction RH](../sources/10-imports-manuels.md).
 
-La fusion s'opère depuis `admin/persons`: la file des doublons par nom (doublons probables en tête, homonymes en fin) présente les paires candidates; pour chacune, on fusionne vers la personne à conserver, ou on la marque comme distincte — elle sort alors de la file.
+La fusion s'opère depuis la liste des personnes, en session d'administration. La file des doublons par nom présente les paires candidates : doublons probables en tête, homonymes en fin. Pour chaque paire, on fusionne vers la personne à conserver, ou on marque la paire comme distincte, ce qui la retire de la file.
 
 #### Détachement des contributions attribuées à tort
 
-Quand on repère une publication attribuée au mauvais auteur, on peut détacher le lien depuis `admin/persons`. Circuit: trouver la personne; cliquer sur la ou les formes de nom concernées; sélectionner les publications liées et cliquer sur "Détacher *n* publications".
+Quand on repère une publication attribuée au mauvais auteur, on peut détacher le lien depuis la liste des personnes, en session d'administration. Circuit: trouver la personne; cliquer sur la ou les formes de nom concernées; sélectionner les publications liées et cliquer sur "Détacher *n* publications".
 
 ![Détacher publications](../img/screenshots/admin_persons_detacher.png)
 
@@ -135,7 +135,7 @@ Les PIDs présents dans les publications sont rattachés aux personnes pendant l
 
 Un PID se définit par: un **type** (`orcid`, `idref`, `idhal`) et une **valeur**.
 
-Un PID peut avoir quatre statuts: *pending*, *confirmed*, *rejected*, *authenticated*. Le statut par défaut est *pending*. La confirmation ou le rejet se fait manuellement depuis `admin/persons`, après vérification. Si une personne n'a pas de PID, on peut aussi les ajouter manuellement après recherche sur http://orcid.org/ ou https://www.idref.fr/.
+Un PID peut avoir quatre statuts: *pending*, *confirmed*, *rejected*, *authenticated*. Le statut par défaut est *pending*. La confirmation ou le rejet se fait manuellement depuis le volet de la personne, après vérification. Si une personne n'a pas de PID, on peut aussi les ajouter manuellement après recherche sur http://orcid.org/ ou https://www.idref.fr/.
 
 Les PIDs sont stockés dans la table [`person_identifiers`](../donnees/05-persons.md). Un PID ne peut être attribué qu'à une personne. Une tentative de réattribuer un PID déjà attribué (avec statut *confirmed* ou *pending*) lèvera une exception. La réattribution est possible quand le PID a un statut *rejected*.
 
@@ -143,7 +143,7 @@ TODO: expliquer *authenticated*
 
 > **Pourquoi un statut *rejected* ?**
 >
-> Certaines sources (OpenAlex, WOS) rattachent des PIDs à des publications de manière algorithmique, via leur propre référentiel auteurs. (Cf doc [sources](../sources/01-vue-d-ensemble.md#entités-auteurs)) Certaines attributions sont erronées (homonymes, initiale du prénom identique…)
+> Certaines sources (OpenAlex, WOS) rattachent des PIDs à des publications de manière algorithmique, via leur propre référentiel auteurs. (Cf doc [sources](../sources/01-vue-d-ensemble.md#auteurs)) Certaines attributions sont erronées (homonymes, initiale du prénom identique…)
 >
 > Conserver les PIDs rejetés garantit que s'ils réapparaissent dans les sources lors des prochains runs du pipeline, ils ne seront pas réaffectés à la même personne.
 >
@@ -151,7 +151,7 @@ TODO: expliquer *authenticated*
 
 #### Correction du nom
 
-La page `admin/persons` permet de corriger le nom et prénom si ceux issus des sources sont incorrects. C'est souvent le cas des patronymes composés: le parsing des sources a tendance à mettre la première partie du patronyme dans le prénom. Ex. : Alain Le Grand => prénom: "Alain Le", nom: "Grand". On constate aussi parfois des inversions nom-prénom.
+Le volet de la personne permet de corriger le nom et prénom si ceux issus des sources sont incorrects. C'est souvent le cas des patronymes composés: le parsing des sources a tendance à mettre la première partie du patronyme dans le prénom. Ex. : Alain Le Grand => prénom: "Alain Le", nom: "Grand". On constate aussi parfois des inversions nom-prénom.
 
 #### Contributions orphelines
 
@@ -161,7 +161,7 @@ La page `admin/orphan-contributions` donne accès aux [contributions](../glossai
 
 Il y a deux raisons possibles à cela:
 - Soit ces contributions ont été détachées manuellement d'un auteur;
-- Soit le pipeline n'a pas réussi à les attribuer, ce qui se produit dans un seul cas de figure: aucune résolution par PID n'était possible *et* la forme normalisée du nom d'auteur est ambiguë (au moins 2 personnes peuvent y correspondre, ce qui est fréquent pour les publications où le prénom est réduit à l'initiale).
+- Soit le pipeline n'a pas pu décider. Le plus souvent, aucun PID ne désigne une personne et le nom normalisé en désigne plusieurs, ce qui est fréquent quand le prénom est réduit à l'initiale. Les autres causes sont des PID ou des épinglages contradictoires, des candidats tous rejetés, ou des rôles de jury seuls ([rattachement des personnes](../pipeline/09-persons.md)).
 
 La page `admin/orphan-contributions` permet de rattacher les contributions en question, individuellement ou par batch, soit à une personne existante, soit à une nouvelle personne créée manuellement.
 

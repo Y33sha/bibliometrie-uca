@@ -2,11 +2,11 @@
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
 	import { api, ApiError, persons as personsApi } from '#lib/api/index.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
+	import { setQueryParam } from '#lib/url.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import type {
@@ -57,15 +57,6 @@
 		transform: (results) => results.filter((r) => r.id !== activeMergePersonId && !r.has_rh),
 	});
 
-	/* ── URL ── */
-
-	function setUrlParam(key: string, value: string | null) {
-		const url = new URL(window.location.href);
-		if (value) url.searchParams.set(key, value);
-		else url.searchParams.delete(key);
-		replaceState(url, {});
-	}
-
 	/* ── Compteurs ── */
 
 	async function queueCount(path: string): Promise<number> {
@@ -92,14 +83,14 @@
 		tab = t;
 		// Compteur « Doublons par nom » paresseux : sa détection (4 self-joins sur les personnes) coûte ~3 s, on ne la paie qu'à l'ouverture de l'onglet.
 		if (t === 'name-duplicates') loadNameDuplicateCount();
-		setUrlParam('tab', t === 'all' ? null : t);
+		void setQueryParam('tab', t === 'all' ? null : t);
 	}
 
 	/* ── Volet ── */
 
 	async function openDrawer(personId: number) {
 		selectedPersonId = personId;
-		setUrlParam('person', String(personId));
+		void setQueryParam('person', String(personId));
 		selectedPerson = await api<Person>(`/api/persons/${personId}/curation`);
 	}
 
@@ -107,7 +98,7 @@
 		selectedPersonId = null;
 		selectedPerson = null;
 		closeMergeSearch();
-		setUrlParam('person', null);
+		void setQueryParam('person', null);
 	}
 
 	// Après une mutation : relit la personne du volet, la liste et la file de triage affichée.
@@ -289,6 +280,8 @@
 <svelte:head>
 	<title>{pageTitle('Personnes')}</title>
 </svelte:head>
+
+<h1 class="visually-hidden">Personnes</h1>
 
 {#if isAdmin()}
 	<HubTabs

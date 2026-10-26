@@ -1,4 +1,4 @@
-"""Purge de la phase personnes : marquage des groupes à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
+"""Purge de la phase personnes : marquage des contributions à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
 
 from sqlalchemy import text
 
@@ -7,8 +7,8 @@ from pipeline.transformation.persons.purge import (
     delete_persons_out_of_perimeter,
     mark_ambiguous_nominal,
 )
+from tests.integration.helpers.alignment import contribution_person, insert_person_contribution
 from tests.integration.helpers.contributions import insert_confirmed_source_contribution
-from tests.integration.helpers.groups import group_person, insert_person_group
 from tests.integration.helpers.persons import (
     insert_hr_record,
     insert_person,
@@ -35,10 +35,10 @@ def _source_contribution(conn, *, form):
     )
 
 
-def _group(conn, *, form, person_id, mode="name", in_perimeter=True):
-    """Contribution source de forme `form`, seule dans son groupe, groupe rattaché à la personne `person_id` par le mode `mode`. Renvoie l'`id` du groupe."""
+def _contribution(conn, *, form, person_id, mode="name", in_perimeter=True):
+    """Contribution source de forme `form`, seule dans sa contribution rattachée à la personne `person_id` par le mode `mode`. Renvoie l'`id` de la contribution."""
     source_contribution = _source_contribution(conn, form=form)
-    return insert_person_group(
+    return insert_person_contribution(
         conn, source_contribution, person_id=person_id, mode=mode, in_perimeter=in_perimeter
     )
 
@@ -56,7 +56,7 @@ def _publication_of(conn, contribution_id):
     ).scalar_one()
 
 
-def test_seuls_les_groupes_nominaux_a_forme_ambigue_sont_marques(sa_sync_conn):
+def test_seules_les_contributions_nominales_a_forme_ambigue_sont_marquees(sa_sync_conn):
     conn = sa_sync_conn
     a = insert_person(conn, "Martin", first_name="Jean")
     b = insert_person(conn, "Martin", first_name="Jeanne")
@@ -65,16 +65,16 @@ def test_seuls_les_groupes_nominaux_a_forme_ambigue_sont_marques(sa_sync_conn):
     insert_person_name_form(conn, b, name_form="j martin")
     insert_person_name_form(conn, b, name_form="jean martin")
 
-    by_name = _group(conn, form="j martin", person_id=a)
-    by_compatible_name = _group(conn, form="j martin", person_id=a, mode="compatible_name")
-    _group(conn, form="jean martin", person_id=b)  # forme univoque
-    _group(conn, form="j martin", person_id=a, mode="manual")  # rattachement manuel
-    _group(conn, form="j martin", person_id=a, mode="orcid")  # rattachement par identifiant
+    by_name = _contribution(conn, form="j martin", person_id=a)
+    by_compatible_name = _contribution(conn, form="j martin", person_id=a, mode="compatible_name")
+    _contribution(conn, form="jean martin", person_id=b)  # forme univoque
+    _contribution(conn, form="j martin", person_id=a, mode="manual")  # rattachement manuel
+    _contribution(conn, form="j martin", person_id=a, mode="orcid")  # rattachement par identifiant
 
     assert mark_ambiguous_nominal(conn) == 2
 
-    assert queued(conn, Queue.GROUP_RESOLUTION) == {by_name, by_compatible_name}
-    assert group_person(conn, by_name)[0] == a
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {by_name, by_compatible_name}
+    assert contribution_person(conn, by_name)[0] == a
 
 
 def test_une_forme_rejetee_ne_designe_pas_sa_personne(sa_sync_conn):
@@ -83,14 +83,14 @@ def test_une_forme_rejetee_ne_designe_pas_sa_personne(sa_sync_conn):
     b = insert_person(conn, "Martin", first_name="Jeanne")
     insert_person_name_form(conn, a, name_form="j martin")
     insert_person_name_form(conn, b, name_form="j martin", status="rejected")
-    group = _group(conn, form="j martin", person_id=a)
+    contribution = _contribution(conn, form="j martin", person_id=a)
 
     assert mark_ambiguous_nominal(conn) == 0
-    assert group_person(conn, group)[0] == a
+    assert contribution_person(conn, contribution)[0] == a
 
 
 def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
-    """Comme la résolution, la purge écarte la personne rejetée pour la publication du groupe.
+    """Comme la résolution, la purge écarte la personne rejetée pour la publication de la contribution.
 
     Régression : la purge comptait toutes les personnes de la forme, et retirait à chaque run une personne que la résolution rattachait de nouveau.
     """
@@ -100,48 +100,53 @@ def test_un_rejet_pour_la_publication_leve_l_ambiguite(sa_sync_conn):
     insert_person_name_form(conn, rejetee, name_form="l tixier")
     insert_person_name_form(conn, retenue, name_form="l tixier")
 
-    avec_rejet = _group(conn, form="l tixier", person_id=retenue)
+    avec_rejet = _contribution(conn, form="l tixier", person_id=retenue)
     insert_rejected_contribution(conn, _publication_of(conn, avec_rejet), person_id=rejetee)
-    sans_rejet = _group(conn, form="l tixier", person_id=retenue)
+    sans_rejet = _contribution(conn, form="l tixier", person_id=retenue)
 
     assert mark_ambiguous_nominal(conn) == 1
 
-    # Un seul candidat pour la publication du groupe avec rejet ; deux pour l'autre : forme ambiguë.
-    assert queued(conn, Queue.GROUP_RESOLUTION) == {sans_rejet}
+    # Un seul candidat pour la publication de la contribution avec rejet ; deux pour l'autre : forme ambiguë.
+    assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == {sans_rejet}
 
 
-def test_une_personne_sans_groupe_du_perimetre_est_supprimee(sa_sync_conn):
-    """Une personne rattachée seulement à des groupes hors périmètre est supprimée, et ses groupes perdent leur personne. Un groupe du périmètre, une fiche RH ou une décision humaine la conservent."""
+def test_une_personne_sans_contribution_du_perimetre_est_supprimee(sa_sync_conn):
+    """Une personne rattachée seulement à des contributions hors périmètre est supprimée, et ses contributions perdent leur personne. Une contribution du périmètre, une fiche RH ou une décision humaine la conservent."""
     conn = sa_sync_conn
     hors = insert_person(conn, "Demougeot", first_name="Celine")
-    hors_groups = [
-        _group(conn, form="celine demougeot", person_id=hors, mode=mode, in_perimeter=False)
+    hors_contributions = [
+        _contribution(conn, form="celine demougeot", person_id=hors, mode=mode, in_perimeter=False)
         for mode in ("orcid", "name")
     ]
     mixte = insert_person(conn, "Mixte", first_name="M")
-    _group(conn, form="m mixte", person_id=mixte, mode="orcid", in_perimeter=False)
-    _group(conn, form="m mixte", person_id=mixte, mode="orcid")
+    _contribution(conn, form="m mixte", person_id=mixte, mode="orcid", in_perimeter=False)
+    _contribution(conn, form="m mixte", person_id=mixte, mode="orcid")
     rh = insert_person(conn, "Prof", first_name="P")
     insert_hr_record(conn, rh)
-    rh_group = _group(conn, form="p prof", person_id=rh, mode="orcid", in_perimeter=False)
+    rh_contribution = _contribution(
+        conn, form="p prof", person_id=rh, mode="orcid", in_perimeter=False
+    )
     exclue = insert_person(conn, "Exclue", first_name="E")
     conn.execute(text("UPDATE persons SET exclusion = 'not_a_person' WHERE id = :p"), {"p": exclue})
-    _group(conn, form="e exclue", person_id=exclue, mode="orcid", in_perimeter=False)
+    _contribution(conn, form="e exclue", person_id=exclue, mode="orcid", in_perimeter=False)
 
     delete_persons_out_of_perimeter(conn)
 
-    assert [group_person(conn, g) for g in hors_groups] == [(None, None), (None, None)]
+    assert [contribution_person(conn, g) for g in hors_contributions] == [
+        (None, None),
+        (None, None),
+    ]
     assert _person_exists(conn, hors) is False
     for kept in (mixte, rh, exclue):
         assert _person_exists(conn, kept) is True
-    assert group_person(conn, rh_group)[0] == rh
+    assert contribution_person(conn, rh_contribution)[0] == rh
 
 
-def test_une_fiche_rh_ou_un_groupe_du_perimetre_conserve_la_personne(sa_sync_conn):
+def test_une_fiche_rh_ou_une_contribution_du_perimetre_conserve_la_personne(sa_sync_conn):
     conn = sa_sync_conn
     empty = insert_person(conn, "Ghost", first_name="G")
     signed = insert_person(conn, "Real", first_name="R")
-    _group(conn, form="real r", person_id=signed)
+    _contribution(conn, form="real r", person_id=signed)
     rh = insert_person(conn, "Prof", first_name="P")
     insert_hr_record(conn, rh)
 
@@ -185,10 +190,10 @@ def test_une_decision_humaine_conserve_la_personne(sa_sync_conn):
     assert _person_exists(conn, confirmed_orcid) is False
 
 
-def test_une_personne_supprimee_libere_ses_groupes(sa_sync_conn):
+def test_une_personne_supprimee_libere_ses_contributions(sa_sync_conn):
     conn = sa_sync_conn
     empty = insert_person(conn, "Ghost", first_name="G")
-    group = conn.execute(
+    contribution = conn.execute(
         text(
             "INSERT INTO contributions (publication_id, person_id, resolution_mode)"
             " VALUES (:p, :person, 'name') RETURNING id"
@@ -199,4 +204,4 @@ def test_une_personne_supprimee_libere_ses_groupes(sa_sync_conn):
     delete_persons_out_of_perimeter(conn)
 
     assert _person_exists(conn, empty) is False
-    assert group_person(conn, group) == (None, None)
+    assert contribution_person(conn, contribution) == (None, None)

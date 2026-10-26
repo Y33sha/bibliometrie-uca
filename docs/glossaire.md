@@ -17,7 +17,7 @@ Information sur la ou les structure(s) de rattachement de chaque auteur d'une pu
 Elle est liée à un couple personne-publication, et non à une personne en tant que telle.
 
 ## APC
-*Article Processing Charges*. Frais de publication facturés par l'éditeur pour publier un article en accès ouvert. Peuvent aller de quelques centaines à plusieurs milliers d'euros selon la revue.
+*Article Processing Charges*. Frais de publication facturés par l'éditeur pour publier un article en open access. Peuvent aller de quelques centaines à plusieurs milliers d'euros selon la revue.
 
 Si la revue est *full open access*, on parle d'*open access gold*. Si la revue est sous abonnement, on parle de modèle hybride. Voir [voies *open access*](glossaire.md#voies-open-access).
 
@@ -33,10 +33,10 @@ Les [APC](glossaire.md#apc) (si présents) sont payés par la structure de ratta
 L'information "auteur correspondant" est inégalement renseignée dans les métadonnées des sources.
 
 ## Contribution
-Couple personne-publication, représentant la contribution d'un auteur et portant une [affiliation](glossaire.md#affiliation) institutionnelle. Pas un terme métier mais notion présente dans les métadonnées sources et dans le code.
+Participation d'un auteur à une publication, avec ses [affiliations](glossaire.md#affiliation). Elle réunit les mentions de cet auteur dans les différentes sources, et désigne sa personne quand elle est identifiée. Voir le [modèle de données](donnees/04-contributions.md).
 
 ## Collection HAL
-Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection porte un code, correspondant souvent à l'acronyme du laboratoire.
+Sous-portail HAL agrégeant les publications d'une structure (i.e. les publications déposées dans HAL et dont au moins un auteur a une affiliation à cette structure). Chaque collection a un code, correspondant souvent à l'acronyme du laboratoire.
 
 Exemple: https://hal.science/PIAF
 
@@ -49,7 +49,7 @@ Agence d'enregistrement de DOI, principalement pour les publications.
 Agence d'enregistrement de DOI, principalement pour les autres types de documents (jeux de données, etc.)
 
 ## DOAJ
-*Directory of Open Access Journals*. Répertoire des revues en accès ouvert.
+*Directory of Open Access Journals*. Répertoire des revues en open access.
 
 https://doaj.org/
 
@@ -141,9 +141,9 @@ On distingue plusieurs "voies" d'*open access* par des noms de couleur, selon le
 | Voie OA | Définition |
 |-------|-----------|
 | **Green** | Publication déposée en archive ouverte (HAL, arXiv...), en général par l'auteur, parallèlement à sa publication dans une revue. La version déposée peut être un *preprint* ou un *postprint*. |
-| **Gold** | Publication en accès ouvert dans une revue entièrement OA. Généralement payant (APC). |
+| **Gold** | Publication en open access dans une revue entièrement OA. Généralement payant (APC). |
 | **Diamond** | Sous-catégorie du *gold* : publication dans une revue diamant, c'est-à-dire une revue OA sans APC ni autres frais. Une revue est diamant quand elle est marquée comme telle dans le référentiel, ou quand le DOAJ la donne sans frais. Attention: [Unpaywall](sources/09-sources-supplementaires.md#unpaywall) ne distingue pas *diamond* de *gold*. |
-| **Hybrid** | Publication en accès ouvert dans une revue sous abonnement payant. L'auteur paie un APC pour rendre son article accessible en OA. Généralement déconseillé (l'institution paye les APC + l'abonnement à la revue). |
+| **Hybrid** | Publication en open access dans une revue sous abonnement payant. L'auteur paie un APC pour rendre son article accessible en OA. Généralement déconseillé (l'institution paye les APC + l'abonnement à la revue). |
 | **Bronze** | Publication accessible gratuitement sur le site de l'éditeur, sans licence OA explicite. *Open access* côté éditeur *de facto*, accès sans garantie de pérennité. |
 
 ## Web of Science (WoS)

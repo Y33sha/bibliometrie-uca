@@ -1,6 +1,6 @@
-"""Phase `author_grouping` : groupes des contributions sources d'un même auteur dans chaque publication (`contributions`, `aligned_source_contributions`).
+"""Phase `author_grouping` : contributions des contributions sources d'un même auteur dans chaque publication (`contributions`, `aligned_source_contributions`).
 
-Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des groupes. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque groupe reprend l'identifiant du groupe en base avec lequel il partage le plus de contributions sources.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque contribution reprend l'identifiant de la contribution en base avec lequel il partage le plus de contributions sources.
 
 Tâche `author_grouping.build`.
 """
@@ -19,11 +19,11 @@ from scipy.optimize import linear_sum_assignment
 from sqlalchemy import Connection
 
 from domain.publications.author_grouping import (
-    Group,
+    Contribution,
     ResidualModel,
     SourceContribution,
     align_publication,
-    plan_group_ids,
+    plan_contribution_ids,
     with_known_first_name,
 )
 from domain.publications.list_copies import copied_source_contributions
@@ -37,10 +37,10 @@ from pipeline.transformation.publications.author_grouping.residual_weights impor
     RESIDUAL_WEIGHTS,
 )
 from pipeline.transformation.publications.author_grouping.store import (
+    AuthorGroupingStore,
     BatchPlan,
-    GroupRow,
+    ContributionRow,
     MembershipRow,
-    SourceContributionGroupStore,
     SourceContributionRow,
 )
 
@@ -48,7 +48,7 @@ from pipeline.transformation.publications.author_grouping.store import (
 BATCH_SIZE = 1000
 BATCH_SOURCE_CONTRIBUTIONS = 200_000
 _MODEL = ResidualModel(RESIDUAL_WEIGHTS)
-# Source dont l'enregistrement source passe après les autres à longueur de liste égale : elle fonde un groupe seulement à défaut d'une autre.
+# Source dont l'enregistrement source passe après les autres à longueur de liste égale : elle fonde une contribution seulement à défaut d'une autre.
 DEFERRED_SOURCE = "scanr"
 
 
@@ -100,20 +100,22 @@ def deferred_source_records(rows: Sequence[SourceContributionRow]) -> set[int]:
     return {row.source_record for row in rows if row.source == DEFERRED_SOURCE}
 
 
-def group_publication(rows: Sequence[SourceContributionRow]) -> tuple[list[Group], dict[int, int]]:
-    """Groupes des contributions sources d'une publication et doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources qui ont une position. Les doublons restent hors des groupes."""
+def align_publication_contributions(
+    rows: Sequence[SourceContributionRow],
+) -> tuple[list[Contribution], dict[int, int]]:
+    """Contributions des contributions sources d'une publication et doublons d'auteur (doublon → première occurrence de son nom), parmi les contributions sources qui ont une position. Les doublons restent hors des contributions."""
     source_records = contributions_by_source_record(rows)
     copies: dict[int, int] = {}
     for source_contributions in source_records.values():
         copies |= copied_source_contributions(source_contributions)
     kept = {
-        n: [s for s in contributions if s.id not in copies]
-        for n, contributions in source_records.items()
+        n: [s for s in record_contributions if s.id not in copies]
+        for n, record_contributions in source_records.items()
     }
-    groups = align_publication(
+    contributions = align_publication(
         kept, model=_MODEL, assign=assign, deferred=deferred_source_records(rows)
     )
-    return groups, copies
+    return contributions, copies
 
 
 def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bool:
@@ -125,8 +127,8 @@ def _same_membership(stored: MembershipRow | None, planned: MembershipRow) -> bo
         return a is None if b is None else a is not None and math.isclose(a, b, rel_tol=1e-6)
 
     return (
-        (stored.group, stored.source_record, stored.method)
-        == (planned.group, planned.source_record, planned.method)
+        (stored.contribution, stored.source_record, stored.method)
+        == (planned.contribution, planned.source_record, planned.method)
         and close(stored.score, planned.score)
         and close(stored.margin, planned.margin)
     )
@@ -142,18 +144,20 @@ def membership_changes(
     return removed, inserted
 
 
-# Contribution source (champs de `SourceContributionRow` dans l'ordre), appartenance (contribution source, enregistrement source, méthode, score, marge) et groupe (contribution source de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
+# Contribution source (champs de `SourceContributionRow` dans l'ordre), appartenance (contribution source, enregistrement source, méthode, score, marge) et contribution (contribution source de référence, appartenances), en tuples : la forme la moins coûteuse à faire passer d'un processus à l'autre.
 type SourceContributionTuple = tuple[int, int, str, int, int | None, str, str, str, str, str]
 type MemberTuple = tuple[int, int, str, float | None, float | None]
-type GroupTuple = tuple[int, list[MemberTuple]]
-type Aligned = tuple[list[GroupTuple], dict[int, int]]
+type ContributionTuple = tuple[int, list[MemberTuple]]
+type Aligned = tuple[list[ContributionTuple], dict[int, int]]
 
 _SOURCE_CONTRIBUTION_FIELDS = attrgetter(*(f.name for f in fields(SourceContributionRow)))
 
 
 def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
-    """`group_publication` sur les contributions sources d'une publication en tuples, résultat en tuples."""
-    groups, copies = group_publication([SourceContributionRow(*row) for row in rows])
+    """`align_publication_contributions` sur les contributions sources d'une publication en tuples, résultat en tuples."""
+    contributions, copies = align_publication_contributions(
+        [SourceContributionRow(*row) for row in rows]
+    )
     return [
         (
             g.reference.id,
@@ -162,7 +166,7 @@ def align_rows(rows: Sequence[SourceContributionTuple]) -> Aligned:
                 for m in g.members
             ],
         )
-        for g in groups
+        for g in contributions
     ], copies
 
 
@@ -189,7 +193,7 @@ def pool_mapper(pool: ProcessPoolExecutor, workers: int) -> Mapper:
 
 
 def _plan_batch(
-    store: SourceContributionGroupStore,
+    store: AuthorGroupingStore,
     publication_ids: Sequence[int],
     methods: Counter[str],
     on_publication: Callable[[], None],
@@ -203,21 +207,20 @@ def _plan_batch(
             _SOURCE_CONTRIBUTION_FIELDS(row)
         )
         positions[row.id] = row.position
-    existing, stored = store.fetch_groups(publication_ids)
-    planned: list[tuple[int, GroupTuple, int | None]] = []
+    existing, stored = store.fetch_contributions(publication_ids)
+    planned: list[tuple[int, ContributionTuple, int | None]] = []
     unmatched: list[int] = []
     recomposed: list[int] = []
     copies: dict[int, int] = {}
     results = mapper(align_rows, [rows_by_publication.get(p, []) for p in publication_ids])
-    for publication_id, (groups, publication_copies) in zip(publication_ids, results, strict=True):
+    for publication_id, (contributions, publication_copies) in zip(
+        publication_ids, results, strict=True
+    ):
         copies |= publication_copies
-        old = {
-            gid: frozenset(contributions)
-            for gid, contributions in existing.get(publication_id, {}).items()
-        }
-        new = [frozenset(m[0] for m in members) for _, members in groups]
-        ids = plan_group_ids(old, new)
-        planned += [(publication_id, g, gid) for g, gid in zip(groups, ids, strict=True)]
+        old = {gid: frozenset(members) for gid, members in existing.get(publication_id, {}).items()}
+        new = [frozenset(m[0] for m in members) for _, members in contributions]
+        ids = plan_contribution_ids(old, new)
+        planned += [(publication_id, g, gid) for g, gid in zip(contributions, ids, strict=True)]
         recomposed += [
             gid
             for gid, members in zip(ids, new, strict=True)
@@ -225,14 +228,14 @@ def _plan_batch(
         ]
         unmatched += sorted(set(old) - {gid for gid in ids if gid is not None})
         on_publication()
-    fresh = iter(store.group_ids(sum(1 for *_, gid in planned if gid is None)))
-    group_rows: list[GroupRow] = []
+    fresh = iter(store.new_contribution_ids(sum(1 for *_, gid in planned if gid is None)))
+    contribution_rows: list[ContributionRow] = []
     memberships: list[MembershipRow] = []
     for publication_id, (reference, members), gid in planned:
         existing_id = gid is not None
         contribution_id = gid if gid is not None else next(fresh)
-        group_rows.append(
-            GroupRow(contribution_id, publication_id, positions[reference], existing_id)
+        contribution_rows.append(
+            ContributionRow(contribution_id, publication_id, positions[reference], existing_id)
         )
         for source_contribution, source_record, method, score, margin in members:
             methods[method] += 1
@@ -242,17 +245,19 @@ def _plan_batch(
                 )
             )
     removed, inserted = membership_changes(stored, memberships)
-    return BatchPlan(publication_ids, group_rows, removed, inserted, unmatched, recomposed, copies)
+    return BatchPlan(
+        publication_ids, contribution_rows, removed, inserted, unmatched, recomposed, copies
+    )
 
 
-def regroup(
-    store: SourceContributionGroupStore,
+def realign(
+    store: AuthorGroupingStore,
     publication_ids: Sequence[int],
     methods: Counter[str] | None = None,
     on_publication: Callable[[], None] = lambda: None,
     mapper: Mapper = map,
 ) -> int:
-    """Recalcule et écrit les groupes et les doublons d'auteur de ces publications, sans commit. Rend le nombre de groupes écrits ; `methods` compte les appartenances par origine."""
+    """Recalcule et écrit les contributions et les doublons d'auteur de ces publications, sans commit. Rend le nombre de contributions écrites ; `methods` compte les appartenances par origine."""
     plan = _plan_batch(
         store,
         publication_ids,
@@ -261,24 +266,24 @@ def regroup(
         mapper,
     )
     store.write(plan)
-    return len(plan.groups)
+    return len(plan.contributions)
 
 
-def build_groups(
+def build_contributions(
     conn: Connection,
-    store: SourceContributionGroupStore,
+    store: AuthorGroupingStore,
     logger: logging.Logger,
     *,
     rebuild: bool = False,
 ) -> PhaseMetrics:
-    """Recalcule les groupes des publications en file, lot par lot, avec un commit par lot. Chaque lot supprime ses marquages traités avant son commit. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les groupes d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
+    """Recalcule les contributions des publications en file, lot par lot, avec un commit par lot. Chaque lot supprime ses marquages traités avant son commit. Rafraîchit ensuite le recouvrement des listes d'auteurs. Les contributions d'une publication supprimée disparaissent avec elle (`ON DELETE CASCADE`).
 
     `rebuild` marque d'abord toutes les publications, pour appliquer une évolution des règles d'alignement sur tout le stock. Le marquage est commité aussitôt : un run interrompu reprend les publications restantes.
     """
     if rebuild:
         marked = store.mark_all()
         conn.commit()
-        step(logger, "%s marquées à regrouper", quantity(marked, "publication"))
+        step(logger, "%s marquées à réaligner", quantity(marked, "publication"))
     dirty = store.snapshot_queued_publications()
     publication_ids = [publication_id for publication_id, _ in dirty]
     step(logger, "auteurs à aligner dans %s", quantity(len(publication_ids), "publication"))
@@ -289,7 +294,7 @@ def build_groups(
         return PhaseMetrics()
     metrics = PhaseMetrics(seen=len(publication_ids))
     methods: Counter[str] = Counter()
-    group_count = 0
+    contribution_count = 0
     workers = min(available_cpus(), len(publication_ids))
     with (
         ProcessPoolExecutor(max_workers=workers) if workers > 1 else nullcontext() as pool,
@@ -297,7 +302,7 @@ def build_groups(
     ):
         mapper: Mapper = pool_mapper(pool, workers) if pool is not None else map
         for batch in publication_batches(dirty):
-            group_count += regroup(store, batch, methods, progress.advance, mapper)
+            contribution_count += realign(store, batch, methods, progress.advance, mapper)
             store.delete_processed_marks(batch)
             conn.commit()
     # Marquages relevés des publications supprimées.
@@ -312,25 +317,23 @@ def build_groups(
     metrics.add(updated=len(publication_ids))
     metrics.details["summary"] = {
         "publications": len(publication_ids),
-        "groups": group_count,
+        "groups": contribution_count,
         **{str(method): count for method, count in methods.items()},
     }
-    metrics.report = (
-        f"{quantity(len(publication_ids), 'publication')}, {quantity(group_count, 'groupe')}"
-    )
+    metrics.report = f"{quantity(len(publication_ids), 'publication')}, {quantity(contribution_count, 'contribution')}"
     return metrics
 
 
 @dataclass(frozen=True)
 class AuthorGroupingPhase:
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Recalcule les groupes des publications en file, puis les attributs des groupes en file : l'affiliation d'un membre change sans que son groupe change."""
+        """Recalcule les contributions des publications en file, puis les attributs des contributions en file : l'affiliation d'une contribution source change sans que sa contribution change."""
 
         def build_task(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:
-                return build_groups(
+                return build_contributions(
                     conn,
-                    SourceContributionGroupStore(conn),
+                    AuthorGroupingStore(conn),
                     ctx.logger,
                     rebuild=ctx.options.rebuild_author_grouping,
                 )
@@ -342,7 +345,7 @@ class AuthorGroupingPhase:
                 waiting(f"{LAST_BRANCH}en cours", ctx.logger) as line,
                 ctx.open_tx() as conn,
             ):
-                queued, updated = SourceContributionGroupStore(conn).propagate_attributes()
+                queued, updated = AuthorGroupingStore(conn).propagate_attributes()
                 line.conclude(
                     f"{LAST_BRANCH}{quantity(queued, 'contribution examinée', 'contributions examinées')},"
                     f" {quantity(updated, 'mise à jour', 'mises à jour')}"
@@ -359,7 +362,7 @@ class AuthorGroupingPhase:
             {
                 "author_grouping.build": TaskStep(build_task, label="Bilan"),
                 "author_grouping.attributes": TaskStep(
-                    attributes_task, label="Attributs des groupes"
+                    attributes_task, label="Attributs des contributions"
                 ),
             },
             ctx,

@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import DocTypePill from '#lib/components/DocTypePill.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -34,8 +36,7 @@
 		const p = new URLSearchParams();
 		if (selectedLabId) p.set('lab_id', String(selectedLabId));
 		if (list.page > 1) p.set('page', String(list.page));
-		const qs = p.toString();
-		replaceState(resolve('hal-problems/missing-collections') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('hal-problems/missing-collections'), p);
 	}
 
 	async function loadLabs() {
@@ -80,37 +81,37 @@
 			<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
 		{/each}
 	</select>
-	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
+	<ResultCount {list} one="publication" many="publications" />
 </div>
 
-{#if !labsLoaded || (selectedLabId && list.loading)}
+{#if !labsLoaded}
 	<div class="loading">Chargement…</div>
-{:else if list.items.length === 0 && selectedLabId}
-	<div class="no-results">Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})</div>
-{:else}
-	<div class="publication-list">
-		{#each list.items as pub}
-			<div class="publication-card">
-				<div class="publication-meta-line">
-					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-					{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
+{:else if selectedLabId}
+	<ListStatus {list} emptyText="Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})">
+		<div class="publication-list">
+			{#each list.items as pub}
+				<div class="publication-card">
+					<div class="publication-meta-line">
+						{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
+						{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
+						{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
+						<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
+					</div>
+					<div class="hal-list">
+						{#if pub.hal_links.length}
+							{#each pub.hal_links as link (link.source_id)}
+								<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
+							{/each}
+						{/if}
+						{#if pub.doi}
+							<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
+						{/if}
+					</div>
 				</div>
-				<div class="hal-list">
-					{#if pub.hal_links.length}
-						{#each pub.hal_links as link (link.source_id)}
-							<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
-						{/each}
-					{/if}
-					{#if pub.doi}
-						<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
-					{/if}
-				</div>
-			</div>
-		{/each}
-	</div>
-	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
+			{/each}
+		</div>
+		<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
+	</ListStatus>
 {/if}
 
 <style>
@@ -124,7 +125,6 @@
 		color: var(--accent);
 		min-width: 300px;
 	}
-	.count { font-size: 0.9rem; }
 	.publication-list { display: flex; flex-direction: column; gap: 8px; }
 	.publication-card {
 		background: var(--card);

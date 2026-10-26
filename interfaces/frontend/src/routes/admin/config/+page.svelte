@@ -247,7 +247,7 @@
 
 <svelte:head><title>{pageTitle("Configuration")}</title></svelte:head>
 
-<h2>Configuration du pipeline</h2>
+<h1>Configuration du pipeline</h1>
 <p class="subtitle">Les modifications prennent effet au prochain lancement du pipeline.</p>
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
@@ -443,7 +443,7 @@
 {/if}
 
 <style>
-  h2 {
+  h1 {
     font-size: 1.2rem;
     font-weight: 600;
     margin: 0 auto 4px;

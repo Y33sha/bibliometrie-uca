@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL sync pour les contributions (groupes de contributions sources) et les source_contributions."""
+"""Adapter PostgreSQL sync pour les contributions (contributions) et les source_contributions."""
 
 from datetime import datetime
 from typing import cast
@@ -6,25 +6,25 @@ from typing import cast
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.contribution_repository import (
+    AlignedSourceContributionRow,
     ContributionRepository,
-    GroupMemberRow,
-    GroupRow,
+    ContributionRow,
 )
-from domain.persons.group_matching import NAME_MATCH_REASONS
+from domain.persons.contribution_matching import NAME_MATCH_REASONS
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.sql_fragments import (
-    DETACHED_GROUP,
-    GROUP_MEMBERS,
+    CONTRIBUTIONS_AND_SOURCES,
+    DETACHED_CONTRIBUTION,
     REJECTED_PAIRS,
     in_clause,
-    pinned_groups_sql,
+    pinned_contributions_sql,
 )
 
 
-def detach_rejected_groups(
+def detach_rejected_contributions(
     conn: Connection, person_id: int, publication_id: int | None = None
 ) -> int:
-    """Retire la personne à ses groupes des publications où elle est rejetée, et retire les épinglages de leurs membres à elle. Avec `publication_id`, sur cette publication seulement. Rend le nombre de groupes détachés.
+    """Retire la personne à ses contributions des publications où elle est rejetée, et retire les épinglages de leurs contributions sources à elle. Avec `publication_id`, sur cette publication seulement. Rend le nombre de contributions détachées.
 
     Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
     """
@@ -44,7 +44,7 @@ def detach_rejected_groups(
     return conn.execute(
         text(f"""
             UPDATE contributions g
-            SET {DETACHED_GROUP}
+            SET {DETACHED_CONTRIBUTION}
             FROM ({REJECTED_PAIRS}) r
             WHERE r.publication_id = g.publication_id
               AND r.person_id = :pid AND g.person_id = :pid {scope}
@@ -73,15 +73,15 @@ class PgContributionRepository(ContributionRepository):
             {"aid": source_contribution_id},
         ).scalar_one_or_none()
 
-    # ── Contributions : groupes de contributions sources ─────────────
+    # ── Contributions : contributions ─────────────
 
-    def mark_groups_for_name_form(self, person_id: int, name_form: str) -> int:
+    def mark_contributions_for_name_form(self, person_id: int, name_form: str) -> int:
         return enqueue(
             self._conn,
-            Queue.GROUP_RESOLUTION,
+            Queue.CONTRIBUTION_RESOLUTION,
             f"""
                 SELECT g.id
-                FROM {GROUP_MEMBERS}
+                FROM {CONTRIBUTIONS_AND_SOURCES}
                 WHERE g.person_id = :pid
                   AND g.resolution_mode IN {in_clause(NAME_MATCH_REASONS)}
                   AND ci.author_name_normalized = :nf
@@ -89,19 +89,21 @@ class PgContributionRepository(ContributionRepository):
             {"pid": person_id, "nf": name_form},
         )
 
-    def find_groups(self, group_ids: list[int]) -> list[GroupRow]:
-        if not group_ids:
+    def find_contributions(self, contribution_ids: list[int]) -> list[ContributionRow]:
+        if not contribution_ids:
             return []
         rows = self._conn.execute(
             text(
                 "SELECT id, person_id, publication_id FROM contributions"
                 " WHERE id = ANY(:ids) ORDER BY id"
             ),
-            {"ids": group_ids},
+            {"ids": contribution_ids},
         ).all()
-        return [cast(GroupRow, dict(row._mapping)) for row in rows]
+        return [cast(ContributionRow, dict(row._mapping)) for row in rows]
 
-    def manual_groups_of_person(self, person_id: int, publication_ids: list[int]) -> dict[int, int]:
+    def manual_contributions_of_person(
+        self, person_id: int, publication_ids: list[int]
+    ) -> dict[int, int]:
         if not publication_ids:
             return {}
         rows = self._conn.execute(
@@ -114,8 +116,10 @@ class PgContributionRepository(ContributionRepository):
         ).all()
         return {row.publication_id: row.id for row in rows}
 
-    def find_group_members(self, group_ids: list[int]) -> list[GroupMemberRow]:
-        if not group_ids:
+    def find_aligned_source_contributions(
+        self, contribution_ids: list[int]
+    ) -> list[AlignedSourceContributionRow]:
+        if not contribution_ids:
             return []
         rows = self._conn.execute(
             text("""
@@ -127,9 +131,9 @@ class PgContributionRepository(ContributionRepository):
                 WHERE gm.contribution_id = ANY(:ids)
                 ORDER BY gm.source_contribution_id
             """),
-            {"ids": group_ids},
+            {"ids": contribution_ids},
         ).all()
-        return [cast(GroupMemberRow, dict(row._mapping)) for row in rows]
+        return [cast(AlignedSourceContributionRow, dict(row._mapping)) for row in rows]
 
     def reject_contribution(self, publication_id: int, person_id: int) -> None:
         self._conn.execute(
@@ -163,7 +167,7 @@ class PgContributionRepository(ContributionRepository):
         )
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
-        return detach_rejected_groups(self._conn, person_id, publication_id)
+        return detach_rejected_contributions(self._conn, person_id, publication_id)
 
     # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
 
@@ -179,7 +183,7 @@ class PgContributionRepository(ContributionRepository):
             """),
             {"ids": source_contribution_ids, "pid": person_id},
         )
-        for sql in pinned_groups_sql(
+        for sql in pinned_contributions_sql(
             "SELECT contribution_id FROM aligned_source_contributions"
             " WHERE source_contribution_id = ANY(:ids)"
         ):

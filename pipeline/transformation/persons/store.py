@@ -22,7 +22,7 @@ def fetch_namesakes(conn: Connection) -> list[Namesake]:
 
 
 def fetch_identifier_to_person_map(conn: Connection, id_type: str) -> dict[str, IdentifiedPerson]:
-    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la décision d'un groupe corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
+    """Le nom normalisé de la personne ciblée accompagne le `person_id` : la décision d'une contribution corrobore le match identifiant par le nom (`decide_match_by_identifier`), et refuse l'identifiant d'une contribution source étrangère."""
     rows = conn.execute(
         text(f"""
             SELECT pi.id_value, pi.person_id,
@@ -74,7 +74,7 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
 
 
 def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
-    """Garde de matching : une paire `(publication, personne)` rejetée n'est jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.group_matching.decide_group`)."""
+    """Garde de matching : une paire `(publication, personne)` rejetée n'est jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.contribution_matching.decide_contribution`)."""
     rows = conn.execute(
         text(f"""
             SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids

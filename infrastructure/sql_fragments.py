@@ -27,20 +27,20 @@ def case_priority(values: tuple[str, ...], col: str) -> str:
 
 
 def person_source_contribution(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à un groupe (`aligned_source_contributions`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors groupe."""
+    """Condition vraie quand la contribution source aliasée `source_contribution` désigne une personne : elle appartient à une contribution (`aligned_source_contributions`). Les contributions sources collectives, les doublons d'auteur et celles des enregistrements sources écartés de l'alignement restent hors contribution."""
     return (
         "EXISTS (SELECT 1 FROM aligned_source_contributions gm"
         f" WHERE gm.source_contribution_id = {source_contribution}.id)"
     )
 
 
-GROUP_MEMBERS = """
+CONTRIBUTIONS_AND_SOURCES = """
     contributions g
     JOIN aligned_source_contributions gm ON gm.contribution_id = g.id
     JOIN source_contributions sc ON sc.id = gm.source_contribution_id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
 """
-"""Clause `FROM` des groupes `g` et de leurs membres : contributions sources `sc`, avec leurs informations du contributeur `ci`."""
+"""Clause `FROM` des contributions `g` et de leurs contributions sources : contributions sources `sc`, avec leurs informations du contributeur `ci`."""
 
 
 def pinned(source_contribution_id: str) -> str:
@@ -56,8 +56,8 @@ def active_name_form(form: str) -> str:
     )
 
 
-DETACHED_GROUP = "person_id = NULL, resolution_mode = NULL"
-"""Affectations d'un `UPDATE contributions` qui retire sa personne à un groupe."""
+DETACHED_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
+"""Affectations d'un `UPDATE contributions` qui retire sa personne à une contribution."""
 
 
 def diamond_journal_sql(serial: str = "j") -> str:
@@ -70,7 +70,7 @@ def diamond_journal_sql(serial: str = "j") -> str:
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source ou le groupe aliasé `source_contribution` tient le rôle d'auteur."""
+    """Condition vraie quand la contribution source ou la contribution aliasé `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
@@ -261,14 +261,14 @@ def self_declared_preprint_sql(alias: str = "sr") -> str:
     return f"COALESCE(jsonb_exists({source_extra_json(SourceExtra.RELATION, alias)}, '{CROSSREF_PREPRINT_OF}'), false)"
 
 
-def propagate_group_attributes_sql(group_ids: str) -> str:
-    """Recompose les attributs des groupes de contributions sources de la requête `group_ids` depuis leurs membres : correspondant si un membre le dit, union des rôles et des indices de périmètre. Seuls les groupes dont un attribut change sont écrits."""
+def propagate_contribution_attributes_sql(contribution_ids: str) -> str:
+    """Recompose les attributs des contributions de la requête `group_ids` depuis leurs contributions sources : correspondant si une contribution source le dit, union des rôles et des indices de périmètre. Seules les contributions dont un attribut change sont écrites."""
     return f"""
         WITH members AS (
             SELECT gm.contribution_id, sc.is_corresponding, sc.perimeter_evidence, sc.roles
             FROM aligned_source_contributions gm
             JOIN source_contributions sc ON sc.id = gm.source_contribution_id
-            WHERE gm.contribution_id IN ({group_ids})
+            WHERE gm.contribution_id IN ({contribution_ids})
         ),
         scal AS (
             SELECT contribution_id, bool_or(is_corresponding) AS is_corr FROM members GROUP BY contribution_id
@@ -294,10 +294,10 @@ def propagate_group_attributes_sql(group_ids: str) -> str:
     """
 
 
-def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
-    """Deux requêtes, à jouer dans l'ordre, qui rattachent à la personne épinglée les groupes de la requête `group_ids` dont un membre est épinglé.
+def pinned_contributions_sql(contribution_ids: str) -> tuple[str, str]:
+    """Deux requêtes, à jouer dans l'ordre, qui rattachent à la personne épinglée les contributions de la requête `group_ids` dont une contribution source est épinglée.
 
-    Un groupe dont les membres sont épinglés à plusieurs personnes reste en l'état. Dans une publication, un groupe par personne au plus : un groupe épinglé cède devant un autre groupe manuel de la même personne, et prend sa personne à un autre groupe non manuel. La première requête libère ces autres groupes, la seconde rattache les groupes épinglés en mode `manual`.
+    Une contribution dont les contributions sources sont épinglées à plusieurs personnes reste en l'état. Dans une publication, une contribution par personne au plus : une contribution épinglée cède devant une autre contribution manuelle de la même personne, et prend sa personne à une autre contribution non manuelle. La première requête libère ces autres contributions, la seconde rattache les contributions épinglées en mode `manual`.
     """
     target = f"""
         WITH pinned AS (
@@ -305,7 +305,7 @@ def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
             FROM confirmed_source_contributions c
             JOIN aligned_source_contributions gm
                 ON gm.source_contribution_id = c.source_contribution_id
-            WHERE gm.contribution_id IN ({group_ids})
+            WHERE gm.contribution_id IN ({contribution_ids})
             GROUP BY gm.contribution_id
             HAVING count(DISTINCT c.person_id) = 1
         ),
@@ -323,7 +323,7 @@ def pinned_groups_sql(group_ids: str) -> tuple[str, str]:
     """
     release = f"""{target}
         UPDATE contributions o
-        SET {DETACHED_GROUP}
+        SET {DETACHED_CONTRIBUTION}
         FROM target t
         WHERE o.publication_id = t.publication_id AND o.person_id = t.person_id AND o.id <> t.id
     """

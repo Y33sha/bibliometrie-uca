@@ -1,5 +1,5 @@
 import type { components } from '#lib/api/schema.js';
-import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '#lib/labels.js';
+import { CONTRIBUTION_ROLE_ORDER, docTypeLabel, oaStatusLabel } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
@@ -121,7 +121,7 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'doc_type',
 			label: 'Type',
-			cell: (r) => ({ text: r.doc_type ? (docTypeSingular[r.doc_type] ?? r.doc_type) : null }),
+			cell: (r) => ({ text: r.doc_type ? docTypeLabel(r.doc_type) : null }),
 			compared: (r) => r.doc_type,
 		},
 		{
@@ -160,7 +160,7 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'oa_status',
 			label: 'Statut OA',
-			cell: (r) => ({ text: r.oa_status ? (oaLabelsMap[r.oa_status] ?? r.oa_status) : null }),
+			cell: (r) => ({ text: r.oa_status ? oaStatusLabel(r.oa_status) : null }),
 			compared: (r) => r.oa_status,
 		},
 	];
@@ -195,7 +195,7 @@ export function otherRoles(s: SourceContribution): string[] {
 	return (s.roles ?? []).filter((r) => r !== 'author').sort((a, b) => rank(a) - rank(b));
 }
 
-/** Lignes des listes d'auteurs, pour des enregistrements déjà ordonnés : une ligne par groupe de contributions sources, une par contribution source hors des groupes, dans l'ordre de la liste de référence. Les lignes sans position viennent en dernier, par nom. */
+/** Lignes des listes d'auteurs, pour des enregistrements déjà ordonnés : une ligne par contribution, une par contribution source hors des contributions, dans l'ordre de la liste de référence. Les lignes sans position viennent en dernier, par nom. */
 export function authorRows(records: SourceRecord[], contributions: SourceContribution[]): AuthorRow[] {
 	const column = new Map(records.map((r, i) => [r.id, i]));
 	const members = new Map<string, SourceContribution[]>();
@@ -213,7 +213,7 @@ export function authorRows(records: SourceRecord[], contributions: SourceContrib
 		const positions = group.map((s) => s.position).filter((p): p is number => p != null);
 		return {
 			row: { key, cells, divergent: group.length < present.size },
-			position: group[0].group_position ?? (positions.length ? Math.min(...positions) : Infinity),
+			position: group[0].reference_position ?? (positions.length ? Math.min(...positions) : Infinity),
 			name: group[0].full_name ?? '',
 		};
 	});

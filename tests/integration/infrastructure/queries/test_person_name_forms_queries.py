@@ -9,7 +9,7 @@ from pipeline.transformation.persons.populate_person_name_forms import (
     insert_raw_forms_batch,
     sync_from_raw_forms,
 )
-from tests.integration.helpers.groups import insert_person_group
+from tests.integration.helpers.alignment import insert_person_contribution
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -76,10 +76,10 @@ class TestSyncFromRawForms:
         assert _fetch_pnf_for(sa_sync_conn, pid) == [("dupond j", ["persons"])]
         assert inserted == 1 and updated == 0 and deleted == 0
 
-    def test_aggregates_sources_across_group_members_and_persons(self, sa_sync_conn):
-        """Une forme présente en `_raw_forms` (source 'persons') et portée par un membre HAL d'un groupe de la personne réunit les deux sources."""
+    def test_aggregates_sources_across_aligned_source_contributions_and_persons(self, sa_sync_conn):
+        """Une forme présente en `_raw_forms` (source 'persons') et portée par une contribution source HAL d'une contribution de la personne réunit les deux sources."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        insert_person_group(
+        insert_person_contribution(
             sa_sync_conn, _source_contribution(sa_sync_conn, "dupond j", "hal"), person_id=pid
         )
 
@@ -88,7 +88,7 @@ class TestSyncFromRawForms:
         assert ("dupond j", ["hal", "persons"]) in _fetch_pnf_for(sa_sync_conn, pid)
 
     def test_deletes_missing_form(self, sa_sync_conn):
-        """Une forme en base absente de l'état attendu (ni dans `_raw_forms`, ni portée par un membre des groupes de la personne) est supprimée."""
+        """Une forme en base absente de l'état attendu (ni dans `_raw_forms`, ni portée par une contribution source des contributions de la personne) est supprimée."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         insert_person_name_form(sa_sync_conn, pid, name_form="obsolete", sources=["persons"])
 
@@ -100,10 +100,10 @@ class TestSyncFromRawForms:
     def test_updates_sources_when_changed(self, sa_sync_conn):
         """Une forme en base dont `sources` diffère de l'attendu est mise à jour, sans suppression ni insertion."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        insert_person_group(
+        insert_person_contribution(
             sa_sync_conn, _source_contribution(sa_sync_conn, "dupond j", "openalex"), person_id=pid
         )
-        # Sources en base : ['hal'], alors que le membre du groupe vient d'OpenAlex.
+        # Sources en base : ['hal'], alors que la contribution source de la contribution vient d'OpenAlex.
         insert_person_name_form(sa_sync_conn, pid, name_form="dupond j", sources=["hal"])
 
         inserted, updated, deleted = _sync(sa_sync_conn)

@@ -1,7 +1,7 @@
 """L'arbitrage des identifiants ignore les contributions sources collectives."""
 
 from pipeline.transformation.persons.identifier_arbitration import fetch_identifier_votes
-from tests.integration.helpers.groups import group_ungrouped
+from tests.integration.helpers.alignment import align_unaligned
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
@@ -33,7 +33,7 @@ def test_contribution_source_collective_ne_vote_pas(sa_sync_conn):
         sa_sync_conn, "Jean Zetaindividu", collective=False, source_id="c-coll-7", orcid=_ORCID
     )
 
-    group_ungrouped(sa_sync_conn)
+    align_unaligned(sa_sync_conn)
     votes = fetch_identifier_votes(sa_sync_conn, "orcid")
 
     assert votes[_ORCID] == {"jean zetaindividu": 1}

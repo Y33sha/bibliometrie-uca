@@ -2,8 +2,8 @@
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { replaceState } from '$app/navigation';
 	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
+	import { setQueryParam } from '#lib/url.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
@@ -54,10 +54,7 @@
 
 	function selectTab(t: TabKey) {
 		tab = t;
-		const url = new URL(window.location.href);
-		if (t === 'all') url.searchParams.delete('tab');
-		else url.searchParams.set('tab', t);
-		replaceState(url, {});
+		void setQueryParam('tab', t === 'all' ? null : t);
 	}
 
 	// Clé d'API utilisée pour invalider le cache de SerialsListView après une édition ou fusion (force un reload via incrément).
@@ -189,6 +186,8 @@
 <svelte:head>
 	<title>{pageTitle("Publications en série")}</title>
 </svelte:head>
+
+<h1 class="visually-hidden">Publications en série</h1>
 
 {#if isAdmin()}
 	<HubTabs

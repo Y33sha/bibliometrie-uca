@@ -1,13 +1,15 @@
 <script lang="ts">
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+  import ResultCount from '#lib/components/ResultCount.svelte';
   import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
-  import { replaceState } from "$app/navigation";
+  import { replaceQuery } from "#lib/url.js";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
   import { structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { autofocus } from "#lib/actions/focus.js";
@@ -46,9 +48,7 @@
     if (currentTab !== "fn") sp.set("tab", currentTab);
     if (search) sp.set("search", search);
     if (list.page > 1) sp.set("page", String(list.page));
-    const qs = sp.toString();
-    const newUrl = window.location.pathname + (qs ? "?" + qs : "");
-    replaceState(newUrl, {});
+    void replaceQuery(window.location.pathname, sp);
   }
 
   // ---------- State ----------
@@ -256,7 +256,7 @@
     trail={[{ label: "Affiliations", path: currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses" }]}
     current="Qualité de la détection"
   />
-  <h2>Qualité de la détection</h2>
+  <h1>Qualité de la détection</h1>
 
   <!-- Stats row -->
   {#if stats}
@@ -313,14 +313,12 @@
       <button class="tab-btn" class:active={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
       <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
-    <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-    <span class="count">{list.total} adresses</span>
+    <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+    <ResultCount {list} one="adresse" many="adresses" />
   </div>
 
   <!-- Table -->
-  {#if addresses.length === 0}
-    <div class="empty">Aucune adresse trouvée &mdash; la détection est parfaite pour ce cas !</div>
-  {:else}
+  <ListStatus {list} emptyText="Aucune adresse trouvée — la détection est parfaite pour ce cas !">
     <table class="data-table">
       <thead>
         <tr>
@@ -377,7 +375,7 @@
     </table>
 
     <Pagination page={list.page} pages={list.pages} onchange={onPageChange} />
-  {/if}
+  </ListStatus>
 
   <!-- Context picker -->
   {#if ctxPicker}
@@ -402,7 +400,7 @@
 </div>
 
 <style>
-  h2 {
+  h1 {
     font-size: 1.2rem;
     font-weight: 600;
     margin: 0 0 16px;

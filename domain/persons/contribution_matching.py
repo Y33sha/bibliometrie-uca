@@ -1,13 +1,13 @@
-"""Décision de rattachement d'un groupe de contributions sources à une personne.
+"""Décision de rattachement d'une contribution à une personne.
 
-Un groupe réunit les contributions sources d'un même auteur dans une publication (phase `author_grouping`). La décision réunit les signaux de tous ses membres avant de trancher, du plus fiable au moins fiable :
+Une contribution réunit les contributions sources d'un même auteur dans une publication (phase `author_grouping`). La décision réunit les signaux de toutes ses contributions sources avant de trancher, du plus fiable au moins fiable :
 
-1. épinglage d'un membre par l'administration ;
-2. identifiants fiables des membres (ORCID déposé par l'auteur, compte HAL, IdRef), chacun corroboré par le nom du membre qui le porte ;
-3. forme de nom, seulement pour un groupe du périmètre ;
-4. création d'une personne, pour un groupe du périmètre au nom inconnu.
+1. épinglage d'une contribution source par l'administration ;
+2. identifiants fiables des contributions sources (ORCID déposé par l'auteur, compte HAL, IdRef), chacun corroboré par le nom de la contribution source qui le contient ;
+3. forme de nom, seulement pour une contribution du périmètre ;
+4. création d'une personne, pour une contribution du périmètre au nom inconnu.
 
-Deux personnes désignées au même niveau laissent le groupe sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à un seul groupe (`settle_publication`).
+Deux personnes désignées au même niveau laissent la contribution sans personne. Les personnes rejetées pour la publication sont écartées des candidats à chaque niveau. Dans une publication, une personne revient à une seule contribution (`settle_publication`).
 """
 
 from collections.abc import Mapping, MutableMapping, Sequence
@@ -36,19 +36,19 @@ IDENTIFIER_ORDER: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.HAL_PERSON_ID,
     PersonIdentifierType.IDREF,
 )
-"""Identifiants qui rattachent un groupe, du plus fiable au moins fiable."""
+"""Identifiants qui rattachent une contribution, du plus fiable au moins fiable."""
 
 
-class GroupOutcome(StrEnum):
-    """Issue de la décision sur un groupe."""
+class ContributionOutcome(StrEnum):
+    """Issue de la décision sur une contribution."""
 
     MATCH = "match"
     CREATE = "create"
     SKIP = "skip"
 
 
-class GroupSkipReason(StrEnum):
-    """Motif d'un groupe laissé sans personne."""
+class ContributionSkipReason(StrEnum):
+    """Motif d'une contribution laissée sans personne."""
 
     PIN_CONFLICT = "pin_conflict"
     IDENTIFIER_CONFLICT = "identifier_conflict"
@@ -57,12 +57,13 @@ class GroupSkipReason(StrEnum):
     ALL_CANDIDATES_REJECTED = "all_candidates_rejected"
     CREATION_NOT_ALLOWED = "creation_not_allowed"
     OUT_OF_PERIMETER = "out_of_perimeter"
-    # La personne revient à un groupe mieux appuyé de la même publication (`settle_publication`).
-    PERSON_IN_OTHER_GROUP = "person_in_other_group"
+    # La personne revient à une contribution mieux appuyée de la même publication (`settle_publication`).
+    # La valeur est la clé des métriques enregistrées par les exécutions du pipeline.
+    PERSON_IN_OTHER_CONTRIBUTION = "person_in_other_group"
 
 
-class GroupMatchReason(StrEnum):
-    """Signal qui rattache un groupe à une personne. Reflet du type PostgreSQL `resolution_mode`."""
+class ContributionMatchReason(StrEnum):
+    """Signal qui rattache une contribution à une personne. Reflet du type PostgreSQL `resolution_mode`."""
 
     MANUAL = "manual"
     ORCID = "orcid"
@@ -72,19 +73,19 @@ class GroupMatchReason(StrEnum):
     COMPATIBLE_NAME = "compatible_name"
 
 
-# Signaux qui rattachent un groupe à une personne par le nom.
-NAME_MATCH_REASONS = (GroupMatchReason.NAME, GroupMatchReason.COMPATIBLE_NAME)
+# Signaux qui rattachent une contribution à une personne par le nom.
+NAME_MATCH_REASONS = (ContributionMatchReason.NAME, ContributionMatchReason.COMPATIBLE_NAME)
 
-_REASON_BY_IDENTIFIER: dict[PersonIdentifierType, GroupMatchReason] = {
-    PersonIdentifierType.ORCID: GroupMatchReason.ORCID,
-    PersonIdentifierType.HAL_PERSON_ID: GroupMatchReason.HAL_PERSON_ID,
-    PersonIdentifierType.IDREF: GroupMatchReason.IDREF,
+_REASON_BY_IDENTIFIER: dict[PersonIdentifierType, ContributionMatchReason] = {
+    PersonIdentifierType.ORCID: ContributionMatchReason.ORCID,
+    PersonIdentifierType.HAL_PERSON_ID: ContributionMatchReason.HAL_PERSON_ID,
+    PersonIdentifierType.IDREF: ContributionMatchReason.IDREF,
 }
 
 
 @dataclass(frozen=True)
-class GroupMember:
-    """Contribution source d'un groupe, telle que la décision la lit.
+class AlignedSourceContribution:
+    """Contribution source alignée dans une contribution, telle que la décision la lit.
 
     `identifiers` : identifiants non neutralisés par la contribution source. `pinned_person_id` : personne à laquelle l'administration l'a épinglée.
     """
@@ -147,12 +148,12 @@ class PersonIndex:
 
 
 @dataclass(frozen=True)
-class GroupDecision:
-    """Décision sur un groupe. `evidence` : signaux qui désignent une personne, `(signal, source du membre, personne)`. `refused` : identifiants refusés faute de nom compatible, `(type, valeur, personne)`."""
+class ContributionDecision:
+    """Décision sur une contribution. `evidence` : signaux qui désignent une personne, `(signal, source de la contribution source, personne)`. `refused` : identifiants refusés faute de nom compatible, `(type, valeur, personne)`."""
 
-    outcome: GroupOutcome
+    outcome: ContributionOutcome
     person_id: int | None = None
-    reason: GroupMatchReason | GroupSkipReason | None = None
+    reason: ContributionMatchReason | ContributionSkipReason | None = None
     evidence: tuple[tuple[str, str, int], ...] = field(default=())
     refused: tuple[tuple[str, str, int], ...] = field(default=())
 
@@ -161,20 +162,24 @@ def _single(candidates: set[int]) -> int | None:
     return next(iter(candidates)) if len(candidates) == 1 else None
 
 
-def decide_group(
-    members: Sequence[GroupMember],
+def decide_contribution(
+    members: Sequence[AlignedSourceContribution],
     index: PersonIndex,
     rejected_person_ids: frozenset[int] = frozenset(),
-) -> GroupDecision:
-    """Rattache le groupe `members` à une personne, en crée une, ou le laisse sans personne.
+) -> ContributionDecision:
+    """Rattache la contribution formée des contributions sources `members` à une personne, en crée une, ou la laisse sans personne.
 
-    `rejected_person_ids` : personnes rejetées pour la publication du groupe.
+    `rejected_person_ids` : personnes rejetées pour la publication de la contribution.
     """
     pinned = {m.pinned_person_id for m in members if m.pinned_person_id is not None}
     if pinned:
         if (person_id := _single(pinned)) is not None:
-            return GroupDecision(GroupOutcome.MATCH, person_id, GroupMatchReason.MANUAL)
-        return GroupDecision(GroupOutcome.SKIP, reason=GroupSkipReason.PIN_CONFLICT)
+            return ContributionDecision(
+                ContributionOutcome.MATCH, person_id, ContributionMatchReason.MANUAL
+            )
+        return ContributionDecision(
+            ContributionOutcome.SKIP, reason=ContributionSkipReason.PIN_CONFLICT
+        )
 
     evidence: list[tuple[str, str, int]] = []
     refused: list[tuple[str, str, int]] = []
@@ -195,38 +200,40 @@ def decide_group(
     if identified:
         if (person_id := _single(identified)) is not None:
             strongest = PersonIdentifierType(evidence[0][0])
-            return GroupDecision(
-                GroupOutcome.MATCH,
+            return ContributionDecision(
+                ContributionOutcome.MATCH,
                 person_id,
                 _REASON_BY_IDENTIFIER[strongest],
                 tuple(evidence),
                 tuple(refused),
             )
-        return GroupDecision(
-            GroupOutcome.SKIP,
-            reason=GroupSkipReason.IDENTIFIER_CONFLICT,
+        return ContributionDecision(
+            ContributionOutcome.SKIP,
+            reason=ContributionSkipReason.IDENTIFIER_CONFLICT,
             evidence=tuple(evidence),
             refused=tuple(refused),
         )
 
     if not any(m.in_perimeter for m in members):
-        return GroupDecision(
-            GroupOutcome.SKIP, reason=GroupSkipReason.OUT_OF_PERIMETER, refused=tuple(refused)
+        return ContributionDecision(
+            ContributionOutcome.SKIP,
+            reason=ContributionSkipReason.OUT_OF_PERIMETER,
+            refused=tuple(refused),
         )
     return _decide_by_name(members, index, rejected_person_ids, tuple(refused))
 
 
 def _decide_by_name(
-    members: Sequence[GroupMember],
+    members: Sequence[AlignedSourceContribution],
     index: PersonIndex,
     rejected_person_ids: frozenset[int],
     refused: tuple[tuple[str, str, int], ...],
-) -> GroupDecision:
-    """Décision par le nom des membres. Un membre dont la forme désigne une seule personne l'emporte sur un membre au nom ambigu ; deux membres qui désignent deux personnes laissent le groupe sans personne."""
+) -> ContributionDecision:
+    """Décision par le nom des contributions sources. Une contribution source dont la forme désigne une seule personne l'emporte sur une contribution source au nom ambigu. Deux contributions sources qui désignent deux personnes laissent la contribution sans personne."""
     allow_create = any(allow_person_creation(list(m.roles)) for m in members)
-    matched: dict[int, GroupMatchReason] = {}
+    matched: dict[int, ContributionMatchReason] = {}
     evidence: list[tuple[str, str, int]] = []
-    undecidable: GroupSkipReason | None = None
+    undecidable: ContributionSkipReason | None = None
     for m in members:
         person_ids = next(
             (list(index.name_forms[f]) for f in m.name_forms if f in index.name_forms), None
@@ -241,74 +248,76 @@ def _decide_by_name(
         if outcome.action == "match":
             assert outcome.person_id is not None
             reason = (
-                GroupMatchReason.COMPATIBLE_NAME
+                ContributionMatchReason.COMPATIBLE_NAME
                 if outcome.reason == MatchReason.COMPATIBLE_NAME
-                else GroupMatchReason.NAME
+                else ContributionMatchReason.NAME
             )
             # Une forme exacte prime sur des initiales compatibles pour la même personne.
-            if matched.get(outcome.person_id) != GroupMatchReason.NAME:
+            if matched.get(outcome.person_id) != ContributionMatchReason.NAME:
                 matched[outcome.person_id] = reason
             evidence.append((reason, m.source, outcome.person_id))
         elif outcome.reason == MatchReason.AMBIGUOUS_NAME_FORM:
-            undecidable = GroupSkipReason.AMBIGUOUS_NAME_FORM
+            undecidable = ContributionSkipReason.AMBIGUOUS_NAME_FORM
         elif outcome.reason == MatchReason.ALL_CANDIDATES_REJECTED and undecidable is None:
-            undecidable = GroupSkipReason.ALL_CANDIDATES_REJECTED
+            undecidable = ContributionSkipReason.ALL_CANDIDATES_REJECTED
     if matched:
         if (person_id := _single(set(matched))) is not None:
-            return GroupDecision(
-                GroupOutcome.MATCH, person_id, matched[person_id], tuple(evidence), refused
+            return ContributionDecision(
+                ContributionOutcome.MATCH, person_id, matched[person_id], tuple(evidence), refused
             )
-        return GroupDecision(
-            GroupOutcome.SKIP,
-            reason=GroupSkipReason.NAME_CONFLICT,
+        return ContributionDecision(
+            ContributionOutcome.SKIP,
+            reason=ContributionSkipReason.NAME_CONFLICT,
             evidence=tuple(evidence),
             refused=refused,
         )
     if undecidable is not None:
-        return GroupDecision(GroupOutcome.SKIP, reason=undecidable, refused=refused)
+        return ContributionDecision(ContributionOutcome.SKIP, reason=undecidable, refused=refused)
     if allow_create:
-        return GroupDecision(GroupOutcome.CREATE, refused=refused)
-    return GroupDecision(
-        GroupOutcome.SKIP, reason=GroupSkipReason.CREATION_NOT_ALLOWED, refused=refused
+        return ContributionDecision(ContributionOutcome.CREATE, refused=refused)
+    return ContributionDecision(
+        ContributionOutcome.SKIP,
+        reason=ContributionSkipReason.CREATION_NOT_ALLOWED,
+        refused=refused,
     )
 
 
-_STRENGTH: dict[GroupMatchReason, int] = {
-    GroupMatchReason.MANUAL: 0,
-    GroupMatchReason.ORCID: 1,
-    GroupMatchReason.HAL_PERSON_ID: 1,
-    GroupMatchReason.IDREF: 1,
-    GroupMatchReason.NAME: 2,
-    GroupMatchReason.COMPATIBLE_NAME: 2,
+_STRENGTH: dict[ContributionMatchReason, int] = {
+    ContributionMatchReason.MANUAL: 0,
+    ContributionMatchReason.ORCID: 1,
+    ContributionMatchReason.HAL_PERSON_ID: 1,
+    ContributionMatchReason.IDREF: 1,
+    ContributionMatchReason.NAME: 2,
+    ContributionMatchReason.COMPATIBLE_NAME: 2,
 }
 """Rang d'un rattachement, du mieux appuyé au moins bien appuyé : épinglage, identifiant, nom."""
 
 
 def settle_publication(
-    decisions: Mapping[int, tuple[GroupDecision, int]], taken: frozenset[int] = frozenset()
-) -> dict[int, GroupDecision]:
-    """Décisions des groupes d'une publication, une personne au plus par publication.
+    decisions: Mapping[int, tuple[ContributionDecision, int]], taken: frozenset[int] = frozenset()
+) -> dict[int, ContributionDecision]:
+    """Décisions des contributions d'une publication, une contribution au plus par personne.
 
-    `decisions` : décision et nombre de membres de chaque groupe, par identifiant de groupe. `taken` : personnes déjà rattachées à un autre groupe de la publication ; un groupe qui en désigne une reste sans personne. Quand plusieurs groupes désignent la même personne, elle revient au groupe le mieux appuyé (épinglage, puis identifiant, puis nom), à égalité au groupe qui a le plus de membres, puis au plus petit identifiant. Les autres groupes restent sans personne.
+    `decisions` : décision et nombre de contributions sources de chaque contribution, par identifiant de contribution. `taken` : personnes déjà rattachées à une autre contribution de la publication ; une contribution qui en désigne une reste sans personne. Quand plusieurs contributions désignent la même personne, elle revient à la contribution la mieux appuyée (épinglage, puis identifiant, puis nom), à égalité à celle qui a le plus de contributions sources, puis au plus petit identifiant. Les autres contributions restent sans personne.
     """
 
     def rank(contribution_id: int) -> tuple[int, int, int]:
         decision, member_count = decisions[contribution_id]
-        assert isinstance(decision.reason, GroupMatchReason)
+        assert isinstance(decision.reason, ContributionMatchReason)
         return (_STRENGTH[decision.reason], -member_count, contribution_id)
 
     by_person: dict[int, list[int]] = {}
     for contribution_id, (decision, _) in decisions.items():
-        if decision.outcome == GroupOutcome.MATCH and decision.person_id is not None:
+        if decision.outcome == ContributionOutcome.MATCH and decision.person_id is not None:
             by_person.setdefault(decision.person_id, []).append(contribution_id)
     settled = {contribution_id: decision for contribution_id, (decision, _) in decisions.items()}
-    for person_id, group_ids in by_person.items():
-        kept = set() if person_id in taken else {min(group_ids, key=rank)}
-        for contribution_id in set(group_ids) - kept:
+    for person_id, contribution_ids in by_person.items():
+        kept = set() if person_id in taken else {min(contribution_ids, key=rank)}
+        for contribution_id in set(contribution_ids) - kept:
             decision = settled[contribution_id]
-            settled[contribution_id] = GroupDecision(
-                GroupOutcome.SKIP,
-                reason=GroupSkipReason.PERSON_IN_OTHER_GROUP,
+            settled[contribution_id] = ContributionDecision(
+                ContributionOutcome.SKIP,
+                reason=ContributionSkipReason.PERSON_IN_OTHER_CONTRIBUTION,
                 evidence=decision.evidence,
                 refused=decision.refused,
             )
@@ -328,10 +337,10 @@ NAME_SOURCE_PRIORITY: tuple[Source, ...] = (
 _NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(NAME_SOURCE_PRIORITY)}
 
 
-def founding_name(members: Sequence[GroupMember]) -> tuple[str, str]:
-    """(nom de famille, prénom) de la personne que fonde un groupe : ceux d'un membre d'une source qui sépare nom et prénom, de préférence au prénom complet, puis selon la préséance des sources (`NAME_SOURCE_PRIORITY`)."""
+def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, str]:
+    """(nom de famille, prénom) de la personne que fonde une contribution : ceux d'une contribution source d'une source qui sépare nom et prénom, de préférence au prénom complet, puis selon la préséance des sources (`NAME_SOURCE_PRIORITY`)."""
 
-    def rank(member: GroupMember) -> tuple[bool, bool, int, tuple[str, str]]:
+    def rank(member: AlignedSourceContribution) -> tuple[bool, bool, int, tuple[str, str]]:
         last_name, first_name = member.name.split()
         reduced = not first_name or first_name_initials(first_name) is not None
         return (
@@ -345,9 +354,9 @@ def founding_name(members: Sequence[GroupMember]) -> tuple[str, str]:
 
 
 def identifiers_to_attribute(
-    members: Sequence[GroupMember], decision: GroupDecision
+    members: Sequence[AlignedSourceContribution], decision: ContributionDecision
 ) -> list[dict[str, str]]:
-    """Identifiants fiables des membres d'un groupe rattaché, à attribuer à sa personne. Les valeurs dont la corroboration a été refusée (`decision.refused`) en sont écartées."""
+    """Identifiants fiables des contributions sources d'une contribution rattachée, à attribuer à sa personne. Les valeurs dont la corroboration a été refusée (`decision.refused`) en sont écartées."""
     refused = {(id_type, value) for id_type, value, _ in decision.refused}
     return [
         {

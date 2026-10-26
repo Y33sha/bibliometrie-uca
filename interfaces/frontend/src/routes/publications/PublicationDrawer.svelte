@@ -34,7 +34,7 @@
       });
   });
 
-  // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par groupe de contributions sources d'un même auteur.
+  // Une colonne par enregistrement source ; une ligne par champ, puis une ligne par contribution d'un même auteur.
   const records = $derived(data ? orderRecords(data.source_records) : []);
   const rows = $derived(comparisonRows(records));
   const authors = $derived(data ? authorRows(records, data.source_contributions) : []);

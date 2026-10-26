@@ -16,7 +16,7 @@ https://developers.openalex.org/
 
 **Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.serial_type`.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit `publishers.country` (ISO-2 depuis `country_codes[0]`) là où la base n'en porte pas. Couverture limitée — environ 13 % des éditeurs locaux ont un `openalex_id` — les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
+**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit `publishers.country` (ISO-2 depuis `country_codes[0]`) là où la base n'en a pas. Couverture limitée — environ 13 % des éditeurs locaux ont un `openalex_id` — les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
 
 ## Données récupérées
 
@@ -178,7 +178,7 @@ Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverte
 
 ## Particularités
 
-- Les requêtes API paginées tronquent les authorships à **100 auteurs max** par publication ; ces works sont marqués `staging.authors_truncated` à l'extraction, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les re-télécharge individuellement pour récupérer la liste complète.
+- Les requêtes API paginées tronquent les `authorships` à **100 auteurs max** par publication ; ces works sont marqués `staging.authors_truncated` à l'extraction, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les re-télécharge individuellement pour récupérer la liste complète.
 > Le re-téléchargement met à jour `raw_data` sans toucher à `raw_hash`, qui reste l'empreinte du payload paginé. Tant que le moissonnage rend ce même payload, l'UPSERT laisse `raw_data` en place, et la liste complète des auteurs survit. Un payload modifié écrase `raw_data`, troncature comprise, et la même exécution le retélécharge.
-- Le `raw_author_name` de l'authorship est plus fiable que `author.display_name` (ce dernier est un nom unifié par l'algo OA, qui peut être erroné).
+- Le `raw_author_name` d'un élément de `authorships` est plus fiable que `author.display_name` (ce dernier est un nom unifié par l'algo OA, qui peut être erroné).
 - Deux ORCID coexistent dans le payload, de provenances opposées. On retient `authorship.raw_orcid`, provenant de la source moissonnée par OpenAlex . On **ignore** `author.orcid` (ORCID de l'**entité auteur unifiée** par le clustering OpenAlex, régulièrement fautif). Le `raw_orcid` retenu figure dans les informations du contributeur (`contributor_information.identifiers`, reliée par `source_contributions.contributor_information_id`) et utilisé directement comme signal de résolution côté pipeline persons (source OpenAlex inscrite dans [`ORCID_MATCH_SOURCES`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/persons/matching.py)), sans filtre par nom.

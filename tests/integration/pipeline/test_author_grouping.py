@@ -7,8 +7,8 @@ from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.author_grouping import author_grouping
-from pipeline.transformation.publications.author_grouping.author_grouping import build_groups
-from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
+from pipeline.transformation.publications.author_grouping.author_grouping import build_contributions
+from pipeline.transformation.publications.author_grouping.store import AuthorGroupingStore
 from tests.integration.helpers.contributions import upsert_split_contributor_information
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
@@ -41,8 +41,8 @@ def _source_record(conn, publication_id, source, source_id, names, roles=None, p
     ]
 
 
-def _groups(conn, publication_id):
-    """Contributions sources de chaque groupe de la publication : identifiant de groupe → ensemble de contributions sources."""
+def _contributions(conn, publication_id):
+    """Contributions sources de chaque contribution de la publication : identifiant de contribution → ensemble de contributions sources."""
     rows = conn.execute(
         text("""
             SELECT g.id, gs.source_contribution_id FROM contributions g
@@ -52,13 +52,13 @@ def _groups(conn, publication_id):
         {"p": publication_id},
     ).all()
     out: dict[int, set[int]] = {}
-    for gid, contribution in rows:
-        out.setdefault(gid, set()).add(contribution)
+    for gid, source_contribution_id in rows:
+        out.setdefault(gid, set()).add(source_contribution_id)
     return out
 
 
 def _run(conn):
-    return build_groups(conn, SourceContributionGroupStore(conn), logger)
+    return build_contributions(conn, AuthorGroupingStore(conn), logger)
 
 
 def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
@@ -73,12 +73,12 @@ def test_un_identifiant_neutralise_reste_hors_de_l_alignement(conn):
         neutralized_identifiers={"orcid": "shared", "idref": "misplaced"},
     )
 
-    [row] = SourceContributionGroupStore(conn).fetch_source_contributions([publication])
+    [row] = AuthorGroupingStore(conn).fetch_source_contributions([publication])
 
     assert (row.id, row.orcid, row.idref) == (source_contribution, "", "")
 
 
-def test_les_contributions_sources_d_un_meme_auteur_sont_groupees(conn):
+def test_les_contributions_sources_d_un_meme_auteur_sont_alignees(conn):
     publication = insert_publication(conn)
     hal = _source_record(
         conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b"), ("durand", "c")]
@@ -87,64 +87,66 @@ def test_les_contributions_sources_d_un_meme_auteur_sont_groupees(conn):
 
     metrics = _run(conn)
 
-    groups = sorted(_groups(conn, publication).values(), key=min)
-    assert groups == [{hal[0], oa[0]}, {hal[1]}, {hal[2], oa[1]}]
+    contributions = sorted(_contributions(conn, publication).values(), key=min)
+    assert contributions == [{hal[0], oa[0]}, {hal[1]}, {hal[2], oa[1]}]
     assert metrics.details["summary"] == {"publications": 1, "groups": 3, "reference": 3, "name": 2}
     assert publication not in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
-def _attached_group(conn, publication, source_contribution):
-    """Rattache à une personne le groupe de `source_contribution` et rend son identifiant."""
-    group = next(
+def _attached_contribution(conn, publication, source_contribution):
+    """Rattache à une personne la contribution de `source_contribution` et rend son identifiant."""
+    contribution = next(
         gid
-        for gid, contributions in _groups(conn, publication).items()
-        if source_contribution in contributions
+        for gid, members in _contributions(conn, publication).items()
+        if source_contribution in members
     )
     person = insert_person(conn, "Martin", first_name="Anne")
     conn.execute(
         text(
             "UPDATE contributions SET person_id = :person, resolution_mode = 'name' WHERE id = :g"
         ),
-        {"person": person, "g": group},
+        {"person": person, "g": contribution},
     )
     mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
-    return group, person
+    return contribution, person
 
 
-def _group_person(conn, group):
+def _contribution_person(conn, contribution):
     return conn.execute(
         text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
-        {"g": group},
+        {"g": contribution},
     ).one()
 
 
-def test_un_groupe_aux_membres_inchanges_garde_sa_personne(conn):
+def test_une_contribution_aux_contributions_sources_inchangees_garde_sa_personne(conn):
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
     _run(conn)
-    martin, person = _attached_group(conn, publication, hal[0])
+    martin, person = _attached_contribution(conn, publication, hal[0])
 
     _run(conn)
 
-    assert tuple(_group_person(conn, martin)) == (person, "name")
+    assert tuple(_contribution_person(conn, martin)) == (person, "name")
 
 
-def test_un_groupe_recompose_garde_son_identifiant_et_sa_personne_et_entre_dans_la_file(conn):
-    """Un nouveau membre ne vide pas le groupe : sa personne est à redécider."""
+def test_une_contribution_recomposee_garde_son_identifiant_et_sa_personne_et_entre_dans_la_file(
+    conn,
+):
+    """Une nouvelle contribution source ne vide pas la contribution : sa personne est à redécider."""
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
     _run(conn)
-    martin, person = _attached_group(conn, publication, hal[0])
+    martin, person = _attached_contribution(conn, publication, hal[0])
     _source_record(conn, publication, "crossref", "10.1/x", [("martin", "a"), ("petit", "b")])
 
     _run(conn)
 
-    groups = _groups(conn, publication)
-    assert hal[0] in groups[martin] and len(groups[martin]) == 3
-    assert tuple(_group_person(conn, martin)) == (person, "name")
-    assert martin in queued(conn, Queue.GROUP_RESOLUTION)
+    contributions = _contributions(conn, publication)
+    assert hal[0] in contributions[martin] and len(contributions[martin]) == 3
+    assert tuple(_contribution_person(conn, martin)) == (person, "name")
+    assert martin in queued(conn, Queue.CONTRIBUTION_RESOLUTION)
 
 
 def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
@@ -161,21 +163,23 @@ def test_un_recalcul_sans_changement_laisse_les_appartenances_en_place(conn):
     assert dict(conn.execute(text(tuples)).all()) == before
 
 
-def test_la_reconstruction_regroupe_les_publications_non_marquees(conn):
+def test_la_reconstruction_realigne_les_publications_non_marquees(conn):
     publication = insert_publication(conn)
     _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a"), ("petit", "b")])
     _run(conn)
     conn.execute(text("DELETE FROM contributions WHERE publication_id = :p"), {"p": publication})
 
-    metrics = build_groups(conn, SourceContributionGroupStore(conn), logger, rebuild=True)
+    metrics = build_contributions(conn, AuthorGroupingStore(conn), logger, rebuild=True)
 
     assert metrics.details["summary"]["publications"] >= 1
-    assert len(_groups(conn, publication)) == 2
+    assert len(_contributions(conn, publication)) == 2
 
 
-def test_un_enregistrement_source_deplace_quitte_les_groupes_de_sa_publication(conn, monkeypatch):
-    """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont un groupe contient encore la contribution source."""
+def test_un_enregistrement_source_deplace_quitte_les_contributions_de_sa_publication(
+    conn, monkeypatch
+):
+    """Régression : la publication d'arrivée est traitée dans un lot antérieur à celle de départ, dont une contribution contient encore la contribution source."""
     monkeypatch.setattr(author_grouping, "BATCH_SIZE", 1)
     arrival = insert_publication(conn)
     departure = insert_publication(conn)
@@ -191,11 +195,11 @@ def test_un_enregistrement_source_deplace_quitte_les_groupes_de_sa_publication(c
 
     _run(conn)
 
-    assert any(moved[0] in contributions for contributions in _groups(conn, arrival).values())
-    assert all(moved[0] not in contributions for contributions in _groups(conn, departure).values())
+    assert any(moved[0] in members for members in _contributions(conn, arrival).values())
+    assert all(moved[0] not in members for members in _contributions(conn, departure).values())
 
 
-def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
+def test_les_contributions_d_une_publication_supprimee_sont_supprimees(conn):
     publication = insert_publication(conn)
     _source_record(conn, publication, "hal", "hal-1", [("martin", "anne")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
@@ -205,7 +209,7 @@ def test_les_groupes_d_une_publication_supprimee_sont_supprimes(conn):
 
     _run(conn)
 
-    assert _groups(conn, publication) == {}
+    assert _contributions(conn, publication) == {}
     orphans = conn.execute(
         text("""
             SELECT count(*) FROM aligned_source_contributions gs
@@ -270,7 +274,7 @@ def test_seules_les_versions_et_les_pieces_sont_ecartees_de_l_alignement(conn, r
 
     _run(conn)
 
-    assert ({hal[0], oa[0]} in _groups(conn, publication).values()) is grouped
+    assert ({hal[0], oa[0]} in _contributions(conn, publication).values()) is grouped
 
 
 def test_scanr_issu_d_un_depot_hal_present_s_aligne(conn):
@@ -280,7 +284,7 @@ def test_scanr_issu_d_un_depot_hal_present_s_aligne(conn):
 
     _run(conn)
 
-    assert {hal[0], scanr[0]} in _groups(conn, publication).values()
+    assert {hal[0], scanr[0]} in _contributions(conn, publication).values()
 
 
 def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
@@ -320,7 +324,7 @@ def _duplicate_of(conn, source_contributions):
     return dict(rows.all())
 
 
-def test_les_copies_d_une_liste_restent_hors_des_groupes(conn):
+def test_les_copies_d_une_liste_restent_hors_des_contributions(conn):
     publication = insert_publication(conn)
     names = [("martin", "anne"), ("petit", "bruno"), ("durand", "claire")]
     hal = _source_record(conn, publication, "hal", "hal-1", names + names)
@@ -331,7 +335,7 @@ def test_les_copies_d_une_liste_restent_hors_des_groupes(conn):
     originals = dict.fromkeys(hal[:3])
     copies = dict(zip(hal[3:], hal[:3], strict=True))
     assert _duplicate_of(conn, hal) == originals | copies
-    assert sorted(_groups(conn, publication).values(), key=min) == [
+    assert sorted(_contributions(conn, publication).values(), key=min) == [
         {hal[i], oa[i]} for i in range(3)
     ]
 
@@ -360,8 +364,8 @@ def test_les_roles_s_alignent_ensemble(conn):
 
     _run(conn)
 
-    groups = _groups(conn, publication).values()
-    assert {hal[0], oa[1]} in groups and {hal[1], oa[2]} in groups
+    contributions = _contributions(conn, publication).values()
+    assert {hal[0], oa[1]} in contributions and {hal[1], oa[2]} in contributions
 
 
 def test_le_jury_sans_position_s_aligne_par_le_nom(conn):
@@ -381,7 +385,7 @@ def test_le_jury_sans_position_s_aligne_par_le_nom(conn):
 
     _run(conn)
 
-    assert {theses[1], hal[0]} in _groups(conn, publication).values()
+    assert {theses[1], hal[0]} in _contributions(conn, publication).values()
 
 
 _ORCID = "0000-0002-1825-0097"
@@ -406,7 +410,7 @@ def test_le_prenom_d_un_identifiant_confirme_aligne_les_initiales(conn):
 
     _run(conn)
 
-    assert {hal[1], oa} in _groups(conn, publication).values()
+    assert {hal[1], oa} in _contributions(conn, publication).values()
 
 
 def test_le_prenom_d_un_identifiant_en_attente_reste_ignore(conn):
@@ -414,22 +418,22 @@ def test_le_prenom_d_un_identifiant_en_attente_reste_ignore(conn):
 
     _run(conn)
 
-    assert {hal[0], oa} in _groups(conn, publication).values()
+    assert {hal[0], oa} in _contributions(conn, publication).values()
 
 
 def _dirty(conn, publication_id):
     return publication_id in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
 
 
-def test_le_groupement_marque_les_groupes_pour_la_recomposition_de_leurs_attributs(conn):
+def test_l_alignement_marque_les_contributions_pour_la_recomposition_de_leurs_attributs(conn):
     publication = insert_publication(conn)
     _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
 
     _run(conn)
 
-    groups = set(_groups(conn, publication))
-    assert len(groups) == 2
-    assert queued(conn, Queue.SOURCE_CONTRIBUTION_GROUP_ATTRIBUTES) == groups
+    contributions = set(_contributions(conn, publication))
+    assert len(contributions) == 2
+    assert queued(conn, Queue.CONTRIBUTION_ATTRIBUTES) == contributions
 
 
 def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):
@@ -443,10 +447,10 @@ def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):
     assert not _dirty(conn, publication)
 
 
-def test_un_marquage_fait_pendant_le_groupement_reste_en_file(conn):
-    """Régression : le groupement effaçait le marquage d'une publication remarquée après son relevé."""
+def test_un_marquage_fait_pendant_l_alignement_reste_en_file(conn):
+    """Régression : le alignement effaçait le marquage d'une publication remarquée après son relevé."""
     publication = insert_publication(conn)
-    store = SourceContributionGroupStore(conn)
+    store = AuthorGroupingStore(conn)
     store.snapshot_queued_publications()
     mark(conn, Queue.PUBLICATION_CONTRIBUTIONS, [publication])
 
@@ -456,7 +460,7 @@ def test_un_marquage_fait_pendant_le_groupement_reste_en_file(conn):
     assert _dirty(conn, publication)
 
 
-def test_une_decision_sur_l_identifiant_marque_la_publication_a_regrouper(conn):
+def test_une_decision_sur_l_identifiant_marque_la_publication_a_realigner(conn):
     publication, _, _ = _homonyms_with_orcid(conn, "pending")
     _run(conn)
 
@@ -468,7 +472,7 @@ def test_une_decision_sur_l_identifiant_marque_la_publication_a_regrouper(conn):
     assert _dirty(conn, publication) is True
 
 
-def test_un_changement_de_prenom_marque_la_publication_a_regrouper(conn):
+def test_un_changement_de_prenom_marque_la_publication_a_realigner(conn):
     publication, _, _ = _homonyms_with_orcid(conn, "confirmed")
     _run(conn)
 

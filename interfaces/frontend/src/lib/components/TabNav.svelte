@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import { goto } from '$app/navigation';
+	import { setQueryParam } from '#lib/url.js';
 
 	export interface TabDef {
 		id: string;
@@ -30,13 +30,7 @@
 
 	function switchTab(tab: string) {
 		if (tab === activeTab) return;
-		const url = new URL(page.url.href);
-		if (tab === defaultTab) {
-			url.searchParams.delete('tab');
-		} else {
-			url.searchParams.set('tab', tab);
-		}
-		const nav = goto(url.toString(), { replaceState: true, reset: false });
+		const nav = setQueryParam('tab', tab === defaultTab ? null : tab);
 		if (afterNavigate) nav.then(afterNavigate);
 		onswitch?.(tab);
 	}

@@ -1,19 +1,12 @@
-#  Alignement des auteurs
+# Alignement des auteurs
 
-*À jour le 2026-10-24.*
+*À jour le 2026-10-26.*
 
-```mermaid
-flowchart LR
-    A@{ shape: procs, label: "source_contributions"}-->B[contributions]
-    classDef new  fill:#bbf
-    class B new;
-```
-
-La phase `author_grouping` réunit dans une contribution (`contributions`) les contributions sources d'un même auteur dans une publication, une par enregistrement source au plus (`aligned_source_contributions`). Elle vient après la phase `publications`, qui réunit les enregistrements sources d'un même document, et avant la phase [`persons`](09-persons.md), qui décide la personne de chaque contribution.
+La phase `author_grouping` réunit dans une [contribution](../donnees/04-contributions.md) les contributions sources d'un même auteur dans une publication, une par enregistrement source au plus (`aligned_source_contributions`). Elle vient après la phase `publications`, qui réunit les enregistrements sources d'un même document, et avant la phase [`persons`](09-persons.md), qui décide la personne de chaque contribution.
 
 ## Publications à recalculer
 
-Les contributions d'une publication se recalculent entièrement, donc le résultat est indépendant de l'ordre d'arrivée des enregistrements sources. La file `publication_contributions_queue` liste les publications à recalculer : un enregistrement source y arrive ou en part, ou ses contributions sources changent. `--rebuild-author-grouping` les marque toutes. Les publications se traitent par lots, réparties entre des processus, un par processeur disponible.
+Les contributions d'une publication se recalculent entièrement, donc le résultat est indépendant de l'ordre d'arrivée des enregistrements sources. La file `publication_contributions_queue` liste les publications à recalculer : un enregistrement source y arrive ou en part, ou ses contributions sources changent. `--rebuild-author-grouping` les marque toutes.
 
 ## Contributions sources écartées
 
@@ -53,4 +46,4 @@ Chaque contribution reprend l'identifiant de la contribution en base avec laquel
 
 La tâche `author_grouping.attributes` recompose les attributs des contributions de la file `contribution_attributes_queue` : `roles`, `is_corresponding` et `perimeter_evidence` sont l'union de ceux des contributions sources alignées.
 
-La vue `publication_author_alignment` mesure le recouvrement des listes d'auteurs de chaque publication. Elle sert l'onglet des fusions suspectes de l'administration.
+La vue matérialisée `publication_author_alignment` mesure le recouvrement des listes d'auteurs de chaque publication. Elle sert l'onglet des fusions suspectes de l'administration.

@@ -61,7 +61,7 @@
 <svelte:head><title>{pageTitle("Pipeline")}</title></svelte:head>
 
 <div class="page-header">
-  <h2>Pipeline</h2>
+  <h1>Pipeline</h1>
 </div>
 
 <div class="layout">
@@ -88,8 +88,9 @@
 </div>
 
 <style>
-  .page-header h2 {
+  .page-header h1 {
     margin: 0 0 16px;
+    font-size: 1.5rem;
   }
   .layout {
     display: grid;

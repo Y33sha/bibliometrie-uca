@@ -42,12 +42,15 @@
 	let {
 		items,
 		loading = false,
+		error = null,
 		sort,
 		onToggleSort,
 		showLabsColumn = false,
 	}: {
 		items: ThesisRow[];
 		loading?: boolean;
+		/** Message du chargement en échec. */
+		error?: string | null;
 		sort: PublicationSort;
 		onToggleSort: (column: ThesisSortColumn) => void;
 		showLabsColumn?: boolean;
@@ -123,7 +126,7 @@
 	</thead>
 	<tbody>
 		{#if items.length === 0}
-			<TableStatusRow {loading} colspan={cv.visibleColumns.length} emptyText="Aucune thèse" />
+			<TableStatusRow {loading} {error} colspan={cv.visibleColumns.length} emptyText="Aucune thèse" />
 		{/if}
 		{#each items as t (t.id)}
 			{@const insc = formatDate(t.date_inscription)}

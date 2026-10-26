@@ -1,6 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
-	import { autofocus } from '#lib/actions/focus.js';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
@@ -159,7 +159,6 @@
 		type="search"
 		placeholder="Rechercher dans les noms…"
 		bind:value={search}
-		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
@@ -184,7 +183,7 @@
 			onchange={onFilterChange}
 		/>
 	{/if}
-	<span class="count">{publishers.total.toLocaleString('fr-FR')} éditeur{publishers.total > 1 ? 's' : ''}</span>
+	<ResultCount list={publishers} one="éditeur" many="éditeurs" />
 </div>
 
 <div class="table-scroll">
@@ -236,7 +235,7 @@
 			</tr>
 		{/each}
 		{#if publishers.items.length === 0}
-			<TableStatusRow loading={publishers.loading} colspan={actionCell ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
+			<TableStatusRow loading={publishers.loading} error={publishers.error} colspan={actionCell ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>

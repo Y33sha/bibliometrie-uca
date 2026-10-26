@@ -1,4 +1,4 @@
-"""Idempotence : phase personnes (arbitrage des identifiants, rattachement des groupes, formes de nom, purge)."""
+"""Idempotence : phase personnes (arbitrage des identifiants, rattachement des contributions, formes de nom, purge)."""
 
 import logging
 
@@ -6,11 +6,11 @@ from sqlalchemy import text
 
 from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
-from pipeline.transformation.persons.groups import resolve_groups
+from pipeline.transformation.persons.contribution_resolution import resolve_contributions
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
 from pipeline.transformation.persons.populate_person_name_forms import populate
 from pipeline.transformation.persons.purge import purge
-from tests.integration.helpers.groups import group_ungrouped, recompose_group_attributes
+from tests.integration.helpers.alignment import align_unaligned, recompose_contribution_attributes
 from tests.integration.helpers.persons import insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -47,14 +47,14 @@ def _setup(conn) -> dict[str, int]:
                 identifiers=identifiers,
                 in_perimeter=True,
             )
-    group_ungrouped(conn)
-    recompose_group_attributes(conn)
+    align_unaligned(conn)
+    recompose_contribution_attributes(conn)
     return persons
 
 
 def _run(conn) -> None:
     arbitrate_identifier_conflicts(conn, logging.getLogger("test"), repo=PgPersonRepository(conn))
-    resolve_groups(conn, logging.getLogger("test"))
+    resolve_contributions(conn, logging.getLogger("test"))
     populate(conn)
     purge(conn)
 
@@ -83,7 +83,7 @@ def test_deux_executions_donnent_le_meme_etat(sa_sync_conn):
     assert _state(sa_sync_conn) == first
 
 
-def test_les_groupes_d_un_meme_compte_hal_vont_a_la_meme_personne(sa_sync_conn):
+def test_les_contributions_d_un_meme_compte_hal_vont_a_la_meme_personne(sa_sync_conn):
     persons = _setup(sa_sync_conn)
 
     _run(sa_sync_conn)
@@ -94,7 +94,7 @@ def test_les_groupes_d_un_meme_compte_hal_vont_a_la_meme_personne(sa_sync_conn):
     assert dict(attached) == {persons["eve"]: 2, persons["frank"]: 1, persons["grace"]: 1}
 
 
-def test_l_orcid_des_membres_est_attribue(sa_sync_conn):
+def test_l_orcid_des_contributions_sources_est_attribue(sa_sync_conn):
     persons = _setup(sa_sync_conn)
 
     _run(sa_sync_conn)

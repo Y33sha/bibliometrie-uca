@@ -27,7 +27,7 @@ from infrastructure.read_models.persons.models import (
     PersonSearchResult,
 )
 from infrastructure.read_models.sql_fragments import other_name_form_holders
-from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role
+from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES, has_author_role
 
 # Sous scope `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
 _LAB_SCOPED_CONTRIBUTIONS = (
@@ -156,7 +156,7 @@ class PersonListQueries:
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
         """Formes de nom d'une personne, avec leur état d'arbitrage.
 
-        Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui ont la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes où un membre d'un groupe de la personne signe sous cette forme.
+        Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui ont la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes où une contribution source d'une contribution de la personne signe sous cette forme.
         """
         rows = self._conn.execute(
             text(f"""
@@ -167,7 +167,7 @@ class PersonListQueries:
                         FROM ({other_name_form_holders("pnf.name_form", "pnf.person_id")}) holders
                        ) AS shared_count,
                        (SELECT COUNT(DISTINCT g.publication_id)
-                        FROM {GROUP_MEMBERS}
+                        FROM {CONTRIBUTIONS_AND_SOURCES}
                         WHERE g.person_id = pnf.person_id
                           AND ci.author_name_normalized = pnf.name_form
                        ) AS publication_count

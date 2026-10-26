@@ -317,7 +317,7 @@ class TestRefreshFromSources:
         assert source_record_publication is None
 
     def test_out_of_scope_deletion_cascades_contributions(self, sa_sync_conn):
-        """La suppression d'un type non admissible emporte les groupes de contributions sources (FK ON DELETE CASCADE) ; la personne, elle, survit."""
+        """La suppression d'un type non admissible emporte les contributions (FK ON DELETE CASCADE) ; la personne, elle, survit."""
         conn = sa_sync_conn
         pid = _insert_publication(conn, doc_type="article", publication_year=2024)
         _source_record(

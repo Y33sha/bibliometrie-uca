@@ -1,6 +1,7 @@
 <script lang="ts">
   import { asset } from "$app/paths";
   import type { AssetPath } from "$app/types";
+  import { identifierTypeLabel } from "#lib/labels.js";
   import { halPersonUrl } from "#lib/utils.js";
 
   let {
@@ -14,37 +15,30 @@
     confirmed?: boolean;
   } = $props();
 
-  const META: Record<
-    string,
-    { url: (v: string) => string; icon: AssetPath; cls: string; label: string }
-  > = {
+  const META: Record<string, { url: (v: string) => string; icon: AssetPath; cls: string }> = {
     orcid: {
       url: (v) => `https://orcid.org/${v}`,
       icon: "icons/orcid.ico",
       cls: "id-orcid",
-      label: "ORCID",
     },
     idhal: {
       url: (v) => `https://hal.science/search/index/?q=%2A&authIdHal_s=${v}`,
       icon: "icons/hal.ico",
       cls: "id-hal",
-      label: "idHAL",
     },
     idref: {
       url: (v) => `https://www.idref.fr/${v}`,
       icon: "icons/idref.png",
       cls: "id-idref",
-      label: "IdRef",
     },
     hal_person_id: {
       url: halPersonUrl,
       icon: "icons/hal.ico",
       cls: "id-hal",
-      label: "Compte HAL",
     },
   };
 
-  const meta = $derived(META[id_type] ?? null);
+  const meta = $derived(META[id_type] ? { ...META[id_type], label: identifierTypeLabel(id_type) } : null);
 </script>
 
 {#if meta}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import PersonPairsList from "./PersonPairsList.svelte";
+  import { identifierTypeLabel } from "#lib/labels.js";
   import type { components } from "#lib/api/schema.js";
 
   type Pair = components["schemas"]["IdentifierConflictPairOut"];
@@ -25,13 +26,13 @@
   {reloadKey}
 >
   {#snippet intro()}
-    Paires de personnes portant la <strong>même valeur d'identifiant</strong> (ORCID, IdRef, hal_person_id, idHAL). Mêmes nom et réseau (labos, publications) ⇒ <em>doublon</em> à fusionner ; personnes
+    Paires de personnes portant la <strong>même valeur d'identifiant</strong> (ORCID, IdRef, compte HAL, idHAL). Mêmes nom et réseau (labos, publications) ⇒ <em>doublon</em> à fusionner ; personnes
     manifestement distinctes ⇒ <em>erreur d'attribution</em> de l'identifiant, à laisser (marquer distinctes).
   {/snippet}
   {#snippet pairHeader(pair: Pair)}
     <div class="shared-row">
       {#each pair.shared_identifiers as s (s.id_type + s.id_value)}
-        <span class="ident-chip"><span class="it">{s.id_type}</span>{s.id_value}</span>
+        <span class="ident-chip"><span class="it">{identifierTypeLabel(s.id_type)}</span>{s.id_value}</span>
       {/each}
     </div>
   {/snippet}

@@ -188,7 +188,7 @@ class TestMergePersons:
         )
 
     def test_merge_transfers_contributions_one_per_publication(self, sa_sync_conn, service):
-        """Régression : les groupes de contributions sources référencent la personne. Dans une publication où la conservée a déjà un groupe, le groupe de l'absorbée perd sa personne et garde ses contributions sources."""
+        """Régression : les contributions référencent la personne. Dans une publication où la conservée a déjà une contribution, la contribution de l'absorbée perd sa personne et garde ses contributions sources."""
         conn = sa_sync_conn
         target = _person(conn, "Dupont", first_name="Jean")
         source = _person(conn, "Dupont", first_name="J.")

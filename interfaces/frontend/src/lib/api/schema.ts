@@ -1523,7 +1523,7 @@ export interface paths {
          * Assign Orphan Contribution
          * @description Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou une contribution introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1545,7 +1545,7 @@ export interface paths {
          * Batch Assign Orphan Contributions
          * @description Attribue plusieurs contributions orphelines à une personne existante.
          *
-         *     Les groupes absents ou déjà rattachés sont écartés du lot et journalisés ; le décompte rendu compte les groupes rattachés. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
          */
         post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
@@ -1571,7 +1571,7 @@ export interface paths {
          * Exclude Contribution
          * @description Rejette une contribution : cette personne n'a pas signé cette publication.
          *
-         *     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     `contribution_id` désigne la contribution de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache la contribution et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
          */
         patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
@@ -2816,7 +2816,7 @@ export interface components {
         };
         /**
          * AssignOrphanContribution
-         * @description Attribution unitaire d'une contribution orpheline, désignée par son groupe de contributions sources. Seule à savoir créer la personne au passage.
+         * @description Attribution unitaire d'une contribution orpheline, désignée par son contribution. Seule à savoir créer la personne au passage.
          */
         AssignOrphanContribution: {
             /** Contribution Id */
@@ -2859,11 +2859,11 @@ export interface components {
         };
         /**
          * BatchAssignOrphanContributions
-         * @description Attribution en lot de contributions orphelines, désignées par leurs groupes de contributions sources, à une personne existante.
+         * @description Attribution en lot de contributions orphelines, désignées par leurs contributions, à une personne existante.
          */
         BatchAssignOrphanContributions: {
-            /** Group Ids */
-            group_ids: number[];
+            /** Contribution Ids */
+            contribution_ids: number[];
             /** Person Id */
             person_id: number;
             /**
@@ -3089,7 +3089,7 @@ export interface components {
         };
         /**
          * DetachContributionsResponse
-         * @description Décompte d'un détachement de contributions : groupes de contributions sources détachés de la personne, formes de nom nettoyées.
+         * @description Décompte d'un détachement de contributions : contributions détachées de la personne, formes de nom nettoyées.
          */
         DetachContributionsResponse: {
             /** Detached */
@@ -3300,7 +3300,7 @@ export interface components {
             /** Hal Person Id */
             hal_person_id: number;
             /** Full Name */
-            full_name: string;
+            full_name: string | null;
             /** Idhal */
             idhal: string | null;
             /** Orcid */
@@ -3848,7 +3848,7 @@ export interface components {
         };
         /**
          * OrphanContributionOut
-         * @description Contribution orpheline : groupe de contributions sources du périmètre, sous un rôle d'auteur, rattaché à aucune personne.
+         * @description Contribution orpheline : contribution du périmètre, sous un rôle d'auteur, rattachée à aucune personne.
          */
         OrphanContributionOut: {
             /** Contribution Id */
@@ -3872,7 +3872,7 @@ export interface components {
         };
         /**
          * OrphanContributionsFacetsResponse
-         * @description Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les membres du groupe, et nombre de groupes sans laboratoire.
+         * @description Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les contributions sources de la contribution, et nombre de contributions sans laboratoire.
          */
         OrphanContributionsFacetsResponse: {
             /** Labs */
@@ -5056,9 +5056,9 @@ export interface components {
         };
         /**
          * SourceContributionOut
-         * @description Contribution source d'un enregistrement source, avec son groupe : les contributions sources d'un même auteur dans la publication.
+         * @description Contribution source d'un enregistrement source, avec sa contribution : les contributions sources d'un même auteur dans la publication.
          *
-         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `group_position`, position de la contribution source de référence du groupe : absents pour une contribution source hors des groupes (collective, ou enregistrement écarté de l'alignement). `person_id` : personne du groupe. `method`, `score`, `margin` : entrée de la contribution source dans son groupe ; score et marge en bits, pour le modèle.
+         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `reference_position`, position de la contribution source de référence de la contribution : absents pour une contribution source hors des contributions (collective, ou enregistrement écarté de l'alignement). `person_id` : personne de la contribution. `method`, `score`, `margin` : entrée de la contribution source dans sa contribution ; score et marge en bits, pour le modèle.
          */
         SourceContributionOut: {
             /** Id */
@@ -5085,8 +5085,8 @@ export interface components {
             countries: string[] | null;
             /** Contribution Id */
             contribution_id: number | null;
-            /** Group Position */
-            group_position: number | null;
+            /** Reference Position */
+            reference_position: number | null;
             /** Method */
             method: string | null;
             /** Score */

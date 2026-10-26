@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { page } from '$app/state';
 	import FacetDropdown, { type FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
@@ -231,7 +231,7 @@
 </script>
 
 <div class="toolbar toolbar-card toolbar-sticky">
-	<input type="search" placeholder="Rechercher par nom..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher par nom..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<PresenceFilterToggle
 		label="Identifiants"
 		items={IDENTIFIER_ITEMS}
@@ -253,12 +253,13 @@
 		<FacetDropdown label="Activité" options={activityOptions} bind:selected={selectedActivity} onchange={onFilterChange} />
 		<FacetDropdown label="Exclusion" options={exclusionOptions} allLabel="Toutes" bind:selected={selectedExclusions} onchange={onFilterChange} />
 	{/if}
-	<span class="count">{dir.total} personne{dir.total > 1 ? 's' : ''}</span>
+	<ResultCount list={dir} one="personne" many="personnes" />
 </div>
 
 <PersonsTable
 	persons={dir.items}
 	loading={dir.loading}
+	error={dir.error}
 	sort={currentSort}
 	{onSortChange}
 	perimeterCount={isAdmin()}

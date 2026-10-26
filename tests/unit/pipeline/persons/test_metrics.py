@@ -16,7 +16,7 @@ def _metrics():
             "skip:ambiguous_name_form": 3,
             "create": 1,
         },
-        arbitration={"neutralized": 5, "marked_groups": 2, "transferred": 1},
+        arbitration={"neutralized": 5, "marked_contributions": 2, "transferred": 1},
         name_forms={"inserted": 7},
         purge={"reorphaned": 2, "deleted_attributions": 0, "deleted_persons": 3},
     )

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
+	import { setQueryParam } from '#lib/url.js';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
@@ -26,16 +26,15 @@
 	);
 
 	function selectPublication(id: number | null) {
-		const url = new URL(page.url.href);
-		if (id === null) url.searchParams.delete('publication');
-		else url.searchParams.set('publication', String(id));
-		void goto(url, { replaceState: true, reset: false });
+		void setQueryParam('publication', id === null ? null : String(id));
 	}
 </script>
 
 <svelte:head>
 	<title>{pageTitle("Publications")}</title>
 </svelte:head>
+
+<h1 class="visually-hidden">Publications</h1>
 
 {#if isAdmin()}
 	<HubTabs

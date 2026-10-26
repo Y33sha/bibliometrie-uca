@@ -3,7 +3,7 @@
 from sqlalchemy import text
 
 from interfaces.cli.oneshot.delete_initials_last_name_persons import delete_persons
-from tests.integration.helpers.contributions import group_id_of, insert_contribution
+from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 
@@ -41,11 +41,11 @@ def test_dry_run_n_ecrit_rien(sa_sync_conn):
     assert _exists(sa_sync_conn, pid)
 
 
-def test_vide_les_groupes_de_la_personne_supprimee(sa_sync_conn):
+def test_vide_les_contributions_de_la_personne_supprimee(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "P.P.", first_name="Lechalard")
     publication_id = insert_publication(sa_sync_conn)
     insert_contribution(sa_sync_conn, publication_id, person_id=pid)
-    contribution_id = group_id_of(sa_sync_conn, publication_id, pid)
+    contribution_id = contribution_id_of(sa_sync_conn, publication_id, pid)
 
     assert delete_persons(sa_sync_conn, apply=True) == [pid]
     assert sa_sync_conn.execute(

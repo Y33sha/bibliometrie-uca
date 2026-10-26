@@ -1,12 +1,14 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
+  import ResultCount from "#lib/components/ResultCount.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { resolve } from "$app/paths";
-  import { replaceState } from "$app/navigation";
+  import { replaceQuery } from "#lib/url.js";
   import { page } from "$app/state";
   import { onMount } from "svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { halPersonUrl, titleCase } from "#lib/utils.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
 
   import type { components } from "#lib/api/schema.js";
@@ -22,8 +24,7 @@
   function syncUrl() {
     const p = new URLSearchParams();
     if (list.page > 1) p.set("page", String(list.page));
-    const qs = p.toString();
-    replaceState(resolve('hal-problems/duplicate-accounts') + (qs ? "?" + qs : ""), {});
+    void replaceQuery(resolve('hal-problems/duplicate-accounts'), p);
   }
 
   onMount(() => {
@@ -42,14 +43,10 @@
 <div class="info-box">Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.</div>
 
 <div class="toolbar">
-  <span class="count">{list.total} personne{list.total > 1 ? "s" : ""}</span>
+  <ResultCount {list} one="personne" many="personnes" />
 </div>
 
-{#if list.loading}
-  <div class="loading">Chargement…</div>
-{:else if list.items.length === 0}
-  <div class="no-results">Aucun doublon détecté</div>
-{:else}
+<ListStatus {list} emptyText="Aucun doublon détecté">
   <table class="data-table">
     <thead>
       <tr>
@@ -100,12 +97,9 @@
       syncUrl();
     }}
   />
-{/if}
+</ListStatus>
 
 <style>
-  .count {
-    font-size: 0.9rem;
-  }
   .data-table td {
     font-size: 0.9rem;
   }

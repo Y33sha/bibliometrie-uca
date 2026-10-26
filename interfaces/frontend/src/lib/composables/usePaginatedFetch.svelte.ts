@@ -1,5 +1,11 @@
-import { api, cancel } from '#lib/api/index.js';
+import { api, ApiError, cancel } from '#lib/api/index.js';
 import { dropPageParam, isPageOutOfRange } from '#lib/pagination.js';
+
+/** Message affiché à la place d'une liste dont le chargement échoue : le `detail` de la réponse en erreur, sinon son statut HTTP. */
+function loadErrorMessage(e: unknown): string {
+	if (e instanceof ApiError) return `Chargement impossible : ${e.detailMessage ?? `erreur ${e.status}`}`;
+	return 'Chargement impossible';
+}
 
 /**
  * Composable pour le chargement paginé de données.
@@ -39,6 +45,8 @@ export function usePaginatedFetch<T, R = Record<string, unknown>>(opts: Paginate
 	let loaded = $state(false);
 	// `true` dès la création : tant que le premier `load()` n'a pas abouti, on n'a pas de données — les tableaux affichent « Chargement… », pas « vide ».
 	let loading = $state(true);
+	// Message du dernier chargement en échec, `null` après un chargement réussi. Un échec vide la liste et `data`.
+	let error: string | null = $state(null);
 
 	const perPage = opts.perPage ?? 50;
 	const currentKey = (): string =>
@@ -68,6 +76,12 @@ export function usePaginatedFetch<T, R = Record<string, unknown>>(opts: Paginate
 			pages = range.pages;
 			page = range.page;
 			loaded = true;
+			error = null;
+		} catch (e) {
+			data = null;
+			items = [];
+			total = 0;
+			error = loadErrorMessage(e);
 		} finally {
 			loading = false;
 		}
@@ -101,6 +115,7 @@ export function usePaginatedFetch<T, R = Record<string, unknown>>(opts: Paginate
 		get pages() { return pages; },
 		get loaded() { return loaded; },
 		get loading() { return loading; },
+		get error() { return error; },
 		load,
 		goToPage,
 	};

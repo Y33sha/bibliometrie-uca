@@ -4,7 +4,7 @@ Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials
 
 Une tâche dépend des tâches placées avant elle qui écrivent ce qu'elle lit. Une lecture déclarée `previous_run` lit aussi ce qu'une tâche placée après elle, ou elle-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
-La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
+La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche de la contribution.
 """
 
 from collections.abc import Iterable, Sequence
@@ -34,7 +34,7 @@ class Task:
     network: str | None = None
     # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`.
     maintenance: tuple[str, ...] = ()
-    # Groupe de tâches consécutives exécutées en parallèle.
+    # Contribution de tâches consécutives exécutées en parallèle.
     parallel_group: str | None = None
 
 
@@ -118,7 +118,7 @@ def _writes_read(reader: Task, writer: Task) -> list[str]:
 
 
 def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
-    """Pour chaque tâche, les tâches placées avant elle, hors de son groupe parallèle, qui écrivent ce qu'elle lit."""
+    """Pour chaque tâche, les tâches placées avant elle, hors de sa contribution parallèle, qui écrivent ce qu'elle lit."""
     return {
         reader.name: {
             writer.name
@@ -265,7 +265,7 @@ TASKS: tuple[Task, ...] = (
                 "contributor_information",
                 "addresses.id",
                 "countries",
-                # Groupes des contributions sources dont les rôles ou le statut de correspondant changent.
+                # Contributions des contributions sources dont les rôles ou le statut de correspondant changent.
                 "aligned_source_contributions",
                 *_containers(source),
             ),
@@ -289,7 +289,7 @@ TASKS: tuple[Task, ...] = (
                 "contribution_attributes_queue",
                 *_containers(source),
             ),
-            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, les référentiels que trouvent ou créent toutes les sources et que `publishing` fusionne et supprime, et les groupes écrits par `author_grouping`.
+            # Ses propres lignes de `staging`, enregistrements sources et contributions sources, les référentiels que trouvent ou créent toutes les sources et que `publishing` fusionne et supprime, et les contributions écrites par `author_grouping`.
             previous_run=(
                 "staging",
                 "source_records",
@@ -427,7 +427,7 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             "source_contributions.source",
             "source_records.publication_year",
-            # Groupes des contributions sources dont les indices changent, marqués pour la recomposition de leurs attributs.
+            # Contributions des contributions sources dont les indices changent, marquées pour la recomposition de leurs attributs.
             "aligned_source_contributions",
         ),
         writes=(
@@ -915,11 +915,11 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.duplicate_of",
             "publication_contributions_queue",
             "contribution_attributes_queue",
-            # Un groupe rattaché dont les membres changent est marqué pour la redécision de sa personne.
+            # Une contribution rattachée dont les contributions sources changent est marquée pour la redécision de sa personne.
             "contribution_resolution_queue",
             "publication_author_alignment",
         ),
-        # Publications que `finalize.purge_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des groupes qu'écrit la phase `persons`.
+        # Publications que `finalize.purge_publications` supprime plus loin dans le même run ; marquages que la tâche retire elle-même ; personnes, identifiants, neutralisations et personnes des contributions qu'écrit la phase `persons`.
         previous_run=(
             "publications.id",
             "publication_contributions_queue",
@@ -969,13 +969,13 @@ TASKS: tuple[Task, ...] = (
         ),
         writes=(
             "source_contributions.neutralized_identifiers",
-            # Publications dont une contribution source change de neutralisation : leurs groupes sont à recalculer.
+            # Publications dont une contribution source change de neutralisation : leurs contributions sont à recalculer.
             "publication_contributions_queue",
-            # Groupes rattachés par un identifiant neutralisé ou transféré, à redécider.
+            # Contributions rattachés par un identifiant neutralisé ou transféré, à redécider.
             "contribution_resolution_queue",
             "person_identifiers",
         ),
-        # Identifiants attribués par `resolve_groups` et supprimés par `purge` ; groupes rattachés par `resolve_groups` et vidés par `purge`.
+        # Identifiants attribués par `resolve_contributions` et supprimés par `purge` ; contributions rattachées par `resolve_contributions` et vidées par `purge`.
         previous_run=(
             "person_identifiers",
             "contributions.person_id",
@@ -983,7 +983,7 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "persons.resolve_groups",
+        "persons.resolve_contributions",
         "persons",
         reads=(
             "contributions.id",
@@ -1012,7 +1012,7 @@ TASKS: tuple[Task, ...] = (
             # Marquages traités, retirés de la file.
             "contribution_resolution_queue",
         ),
-        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, groupes vidés et marqués par `purge`.
+        # Formes de nom régénérées par `populate` ; personnes, identifiants et formes supprimés, contributions vidées et marquées par `purge`.
         previous_run=(
             "person_identifiers",
             "person_name_forms",
@@ -1034,7 +1034,7 @@ TASKS: tuple[Task, ...] = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Groupes vidés et personnes supprimées par `purge`.
+        # Contributions vidés et personnes supprimées par `purge`.
         previous_run=("persons", "person_name_forms", "contributions.person_id"),
     ),
     _task(
@@ -1058,7 +1058,7 @@ TASKS: tuple[Task, ...] = (
             "rejected_contributions",
             "distinct_persons",
         ),
-        # La suppression d'une personne emporte ses formes de nom et vide ses groupes ; un groupe à forme de nom ambiguë est marqué pour la redécision de sa personne.
+        # La suppression d'une personne emporte ses formes de nom et vide ses contributions ; une contribution à forme de nom ambiguë est marquée pour la redécision de sa personne.
         writes=(
             "contributions.person_id",
             "contributions.resolution_mode",
@@ -1296,7 +1296,7 @@ TASKS: tuple[Task, ...] = (
 # ── Phases ────────────────────────────────────────────────────
 
 _RUN_PHASE = "run"
-"""Groupe des tâches que l'orchestrateur exécute avant toute phase."""
+"""Contribution des tâches que l'orchestrateur exécute avant toute phase."""
 
 PHASE_ORDER: tuple[str, ...] = tuple(
     dict.fromkeys(task.phase for task in TASKS if task.phase != _RUN_PHASE)

@@ -1,74 +1,39 @@
-# Schéma `publications`
+# Publications
 
-*À jour le 2026-10-25.*
+*À jour le 2026-10-26.*
 
-Référentiel consolidé des productions de recherche et de leurs contributions. Cf [doc pipeline](../pipeline/07-publications.md) pour la logique de résolution d'entités.
+Une publication est la référence unifiée d'un document. Elle réunit les enregistrements sources qui décrivent ce document, quelle que soit leur source. Les jeux de données, les logiciels et les thèses sont aussi des publications. Le pipeline calcule chaque publication à partir de ses enregistrements sources.
 
-```mermaid
-flowchart LR
-    structures --- contributions
-    contributions --- publications
-    contributions --- persons
-    structures --- apc_payments
-    apc_payments ---|DOI| publications
-    source_records-->|match_or_create|publications
-    publications---|publication_subjects|subjects
-    publications---serials
-    serials---publishers
-    publications---publishers
+Une publication a au moins un enregistrement source, un type de document admissible et une contribution rattachée à une personne. Le pipeline supprime les autres.
 
+## Tables
 
-    classDef manuel  fill:#8e5,stroke:#5a3
-    class structures manuel;
-    classDef csv fill:#fa5
-    class apc_payments csv
-    classDef auto fill:#adf,stroke:#58c
-    class source_records,publications,serials,publishers,contributions,persons,subjects auto
-    classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,contributions main
-```
+Schéma PostgreSQL `publications`.
 
-Légende :
-- **vert** : tables peuplées manuellement
-- **orange** : imports CSV
-- **bleu** : tables peuplées automatiquement par le pipeline à partir des imports API
-
-## Tables associées
-
-- **`publications_detail`** : satellite 1:1 de `publications` qui contient les métadonnées volumineuses. Cf. [données dérivées](08-donnees-derivees.md).
-- **`publication_relations`** : relations sémantiques entre publications distinctes mais apparentées (preprint ↔ version publiée, supplément ↔ article, erratum ↔ article corrigé…). Peuplée par la phase `relations`.
-
-## `contributions` — contributions des auteurs aux publications
-
-Une contribution réunit les contributions sources d'un même auteur dans une publication, une par enregistrement source au plus (`aligned_source_contributions`). Elle est formée par la phase `author_grouping`. Elle désigne la personne de l'auteur (`person_id`) et le mode du rattachement (`resolution_mode`), ou aucune personne : elle est alors orpheline. Une personne a au plus une contribution par publication. Les contributions sources collectives, les doublons d'auteur et les contributions sources des enregistrements sources écartés de l'alignement ne sont dans aucune contribution.
-
-Colonnes notables :
-
-- `reference_position` : position de l'auteur dans la liste d'auteurs la plus longue
-- `perimeter_evidence`, `in_perimeter` : indices de périmètre, union de ceux des contributions sources alignées ; `in_perimeter` est vrai dès qu'il y a un indice
-- `roles` (text[]), `is_corresponding` : union de ceux des contributions sources alignées
-
-`contribution_structures (contribution_id, structure_id)` donne les affiliations résolues des contributions rattachées à une personne non exclue. C'est une **vue matérialisée**, réunion des `source_contribution_structures` de leurs contributions sources alignées, rafraîchie par la phase `finalize`.
-
-**Une édition d'administration laisse la vue matérialisée en l'état.** La review d'un lien adresse ↔ structure et l'attribution d'une contribution orpheline recalculent `in_perimeter` en direct, mais l'agrégation des structures reste sur l'état de la dernière exécution du pipeline.
-
-Les décisions humaines sont dans le [schéma `persons`](05-persons.md#décisions-humaines).
-
-## Sujets / mots-clés
-
-Trois tables alimentées par la phase `subjects` du pipeline :
-
-- **`subjects`** : référentiel des sujets/mots-clés indexés.
-- **`publication_subjects`** : table de liaison publication ↔ sujet, avec la source du lien.
-- **`subject_cooccurrences`** : matrice de co-occurrences entre sujets, alimentée à partir de `publication_subjects`.
-
-## Propriété des tables
-
-| Table | Auteur | Écrit par |
+| Table | Contenu | Contrainte |
 |---|---|---|
-| `publications` | pipeline | `pipeline/transformation/publications/consolidation.py` (`refresh_from_sources` recalcule depuis les sources) |
-| `publications_detail` | pipeline | `pipeline/transformation/publications/store.py` |
-| `publication_relations` | pipeline | phase `relations` |
-| `contributions`, `aligned_source_contributions` | mixte | alignement par la phase `author_grouping`, personne par la phase `persons` (`pipeline/transformation/persons/groups.py`) ; décisions de l'administration (`application/services/contributions/`) |
-| `subjects`, `publication_subjects` | pipeline | `pipeline/transformation/publications/subjects/subject_ingestion.py` |
-| `subject_cooccurrences` | pipeline | `pipeline/transformation/publications/subjects/subject_cooccurrences.py` (matview) |
+| `publications` | Métadonnées consolidées : titre, type de document, année, DOI, statut d'accès, licences, langue, pays, publication en série, monographie, éditeur. `sources` : sources qui décrivent la publication. `publisher_id` : éditeur à la date de publication. `best_copy_url` : meilleure copie ouverte. `in_perimeter` : vrai dès qu'il y a un indice de périmètre | Un DOI par publication, sans distinction de casse |
+| `publications_detail` | Résumé, mots-clés, thématiques et données bibliographiques | Une ligne par publication |
+| `publication_relations` | Lien orienté d'une publication vers une publication apparentée ou vers un DOI, avec le type de relation et sa source | La cible est une publication ou un DOI |
+
+Les frais de publication (`apc_payments`) sont décrits avec l'[édition](07-publishing.md).
+
+## Sujets
+
+Un sujet est un concept issu d'une ontologie : domaine HAL, discipline de thèse, vedette RAMEAU, concept OpenAlex, catégorie du Web of Science. Les mots-clés libres restent sur l'enregistrement source.
+
+| Table | Contenu | Contrainte |
+|---|---|---|
+| `subjects` | Libellé, langue, nombre de publications (`usage_count`) | Un sujet par libellé, sans distinction de casse |
+| `publication_subjects` | Lien entre une publication et un sujet, avec la source qui le fournit | Un lien par publication, sujet et source |
+| `subject_cooccurrences` | Vue matérialisée : paires de sujets présents ensemble sur au moins deux publications | |
+
+`publication_subjects.rejected` exclut un lien des décomptes et le conserve aux recalculs. Seule une écriture directe en base pose cette colonne.
+
+## Écriture
+
+Seul le pipeline écrit ces tables. Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06-metadata-correction.md) sur l'enregistrement source.
+
+- La phase [`publications`](../pipeline/07-publications.md) regroupe les enregistrements sources en publications, puis recalcule les métadonnées de chaque publication touchée. Une publication réunie à une autre est supprimée : son identifiant redirige vers la publication conservée, et ses frais de publication passent à celle-ci.
+- La phase [`finalize`](../pipeline/10-finalize.md) reporte le périmètre sur les publications et supprime les publications sans contribution rattachée.
+- Les [enrichissements](../pipeline/11-enrichissements.md) écrivent les relations, les sujets, les pays et le statut d'accès.

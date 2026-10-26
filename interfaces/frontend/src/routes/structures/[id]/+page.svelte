@@ -16,6 +16,7 @@
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import ThesesListView from '#lib/components/ThesesListView.svelte';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -323,7 +324,7 @@
 				</thead>
 				<tbody>
 					{#if addresses.items.length === 0}
-						<tr><td colspan="2" class="no-results">Aucune adresse</td></tr>
+						<TableStatusRow loading={addresses.loading} error={addresses.error} colspan={2} emptyText="Aucune adresse" />
 					{:else}
 						{#each addresses.items as a (a.id)}
 							<tr>

@@ -2,7 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import refresh_structure_matviews
 
@@ -26,7 +26,7 @@ def insert_author(
     """Un auteur de `publication`, dont la contribution source cite `ror`, rattaché ou non à `person`. Rend l'`id` de la contribution source."""
     record = insert_source_record(conn, publication, source="openalex", source_id=source_id)
     source_contribution = insert_source_contribution(conn, record)
-    contribution = insert_group(conn, publication, [(source_contribution, record)])
+    contribution = align_source_contributions(conn, publication, [(source_contribution, record)])
     conn.execute(
         text("""
             UPDATE contributions SET roles = '{author}', person_id = :p,

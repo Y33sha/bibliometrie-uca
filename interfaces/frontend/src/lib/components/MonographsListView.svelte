@@ -1,9 +1,9 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { autofocus } from '#lib/actions/focus.js';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -153,7 +153,6 @@
 		class="search"
 		placeholder="Rechercher par titre ou ISBN…"
 		bind:value={search}
-		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
@@ -179,7 +178,7 @@
 			onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
 		/>
 	{/if}
-	<span class="count">{monographs.total.toLocaleString('fr-FR')} monographie{monographs.total > 1 ? 's' : ''}</span>
+	<ResultCount list={monographs} one="monographie" many="monographies" />
 </div>
 
 <div class="table-scroll">
@@ -216,7 +215,7 @@
 				</tr>
 			{/each}
 			{#if monographs.items.length === 0}
-				<TableStatusRow loading={monographs.loading} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
+				<TableStatusRow loading={monographs.loading} error={monographs.error} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
 			{/if}
 		</tbody>
 	</table>

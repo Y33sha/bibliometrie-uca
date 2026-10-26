@@ -29,8 +29,8 @@ def _source_contribution(conn, publication_id, *, source="hal", roles=None):
     ), source_record_id
 
 
-def _join_group(conn, source_contribution, *, publication_id, person_id):
-    """Ajoute la contribution source `(id, enregistrement source)` au groupe de la personne dans la publication."""
+def _join_contribution(conn, source_contribution, *, publication_id, person_id):
+    """Ajoute la contribution source `(id, enregistrement source)` à la contribution de la personne dans la publication."""
     source_contribution_id, source_record_id = source_contribution
     conn.execute(
         text("""
@@ -90,7 +90,7 @@ class TestPersonTheses:
 
 
 class TestMemberReads:
-    """Les lectures d'affichage passent par les membres des groupes de la personne."""
+    """Les lectures d'affichage passent par les contributions sources des contributions de la personne."""
 
     def test_theses_count_counts_member_non_author_theses(self, sa_sync_conn):
         person = insert_person(sa_sync_conn, "Directrice")
@@ -99,26 +99,26 @@ class TestMemberReads:
         member = _source_contribution(
             sa_sync_conn, thesis, source="theses", roles=["thesis_director"]
         )
-        _join_group(sa_sync_conn, member, publication_id=thesis, person_id=person)
+        _join_contribution(sa_sync_conn, member, publication_id=thesis, person_id=person)
 
         profile = PersonsQueries(sa_sync_conn).person_profile(person)
 
         assert profile is not None
         assert profile.theses_count == 1
 
-    def test_addresses_come_from_group_members(self, sa_sync_conn):
-        """L'adresse d'un membre du groupe figure ; celle d'une contribution source hors des groupes de la personne, non."""
+    def test_addresses_come_from_aligned_source_contributions(self, sa_sync_conn):
+        """L'adresse d'une contribution source de la contribution figure ; celle d'une contribution source hors des contributions de la personne, non."""
         person = insert_person(sa_sync_conn, "Adressee")
         publication = insert_publication(sa_sync_conn)
         other_publication = insert_publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication, person_id=person, roles=["author"])
         member = _source_contribution(sa_sync_conn, publication)
-        _join_group(sa_sync_conn, member, publication_id=publication, person_id=person)
+        _join_contribution(sa_sync_conn, member, publication_id=publication, person_id=person)
         outsider, _ = _source_contribution(sa_sync_conn, other_publication)
-        member_address = insert_address(sa_sync_conn, "Membre du groupe")
+        member_address = insert_address(sa_sync_conn, "Membre de la contribution")
         insert_source_contribution_address(sa_sync_conn, member[0], address_id=member_address)
         insert_source_contribution_address(
-            sa_sync_conn, outsider, address_id=insert_address(sa_sync_conn, "Hors groupe")
+            sa_sync_conn, outsider, address_id=insert_address(sa_sync_conn, "Hors contribution")
         )
 
         response = PersonsQueries(sa_sync_conn).person_addresses(person, page=1, per_page=50)

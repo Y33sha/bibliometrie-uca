@@ -1,4 +1,4 @@
-"""Décisions pures des groupes de contributions sources."""
+"""Décisions pures de l'alignement des auteurs."""
 
 import math
 
@@ -17,7 +17,7 @@ from domain.publications.author_grouping import (
     jaro_winkler,
     link_threshold,
     longest_ordered,
-    plan_group_ids,
+    plan_contribution_ids,
     position_only,
     with_known_first_name,
 )
@@ -52,11 +52,11 @@ def _greedy(matrix):
     return out
 
 
-def _grouped(groups):
-    """Contributions sources de chaque groupe de plus d'une contribution source, avec la méthode de chaque membre."""
+def _aligned(contributions):
+    """Contributions sources de chaque contribution qui en a plusieurs, avec la méthode de chacune."""
     return sorted(
         sorted((m.source_contribution, m.method) for m in g.members)
-        for g in groups
+        for g in contributions
         if len(g.members) > 1
     )
 
@@ -67,17 +67,23 @@ class TestAlignPublication:
             1: _source_record(1, [("martin", "a"), ("petit", "b"), ("durand", "c")]),
             2: _source_record(2, [("martin", "a"), ("durand", "c")]),
         }
-        groups = align_publication(source_records)
-        assert _grouped(groups) == [
+        contributions = align_publication(source_records)
+        assert _aligned(contributions) == [
             [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
             [(102, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
         ]
 
     def test_homonymes_lies_dans_l_ordre(self):
         names = [("martin", "a"), ("zhang", "y"), ("zhang", "y"), ("durand", "c")]
-        groups = align_publication({1: _source_record(1, names), 2: _source_record(2, names)})
-        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(groups)
-        assert [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.ORDER)] in _grouped(groups)
+        contributions = align_publication(
+            {1: _source_record(1, names), 2: _source_record(2, names)}
+        )
+        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _aligned(
+            contributions
+        )
+        assert [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.ORDER)] in _aligned(
+            contributions
+        )
 
     def test_une_paire_seule_dans_un_trou_se_lie_dans_l_ordre(self):
         """« Ahmad T » n'est unique ni par le patronyme ni par l'initiale, à cause de « Ahmad Tahania » plus loin ; seul de sa clé dans son trou, il se lie par l'ordre."""
@@ -92,12 +98,12 @@ class TestAlignPublication:
             ],
         )
         other = _source_record(2, [("martin", "a"), ("ahmad", "t"), ("petit", "b")])
-        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _grouped(
+        assert [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)] in _aligned(
             align_publication({1: reference, 2: other})
         )
 
-    def test_l_identifiant_d_un_membre_lie_au_groupe(self):
-        """La référence est sans ORCID ; un membre venu du deuxième enregistrement source a l'ORCID, et le troisième enregistrement source rejoint son groupe, même dans l'ordre inverse."""
+    def test_l_identifiant_d_une_contribution_source_lie_a_la_contribution(self):
+        """La référence est sans ORCID ; une contribution source venue du deuxième enregistrement source a l'ORCID, et le troisième enregistrement source rejoint sa contribution, même dans l'ordre inverse."""
         reference = _source_record(1, [("martin", "anne"), ("martin", "bruno")])
         with_orcid = [
             SourceContribution(200, 2, 0, "martin", "a", orcid="A"),
@@ -107,8 +113,8 @@ class TestAlignPublication:
             SourceContribution(300, 3, 0, "martin", "", orcid="B"),
             SourceContribution(301, 3, 1, "martin", "", orcid="A"),
         ]
-        groups = align_publication({1: reference, 2: with_orcid, 3: without_name})
-        assert _grouped(groups) == [
+        contributions = align_publication({1: reference, 2: with_orcid, 3: without_name})
+        assert _aligned(contributions) == [
             [
                 (100, GroupingMethod.REFERENCE),
                 (200, GroupingMethod.NAME),
@@ -121,18 +127,18 @@ class TestAlignPublication:
             ],
         ]
 
-    def test_un_identifiant_present_dans_deux_groupes_ne_lie_rien(self):
+    def test_un_identifiant_present_dans_deux_contributions_ne_lie_rien(self):
         reference = _source_record(1, [("martin", "anne"), ("martin", "bruno")])
         both = [
             SourceContribution(200, 2, 0, "martin", "a", orcid="A"),
             SourceContribution(201, 2, 1, "martin", "b", orcid="A"),
         ]
-        groups = align_publication(
+        contributions = align_publication(
             {1: reference, 2: both, 3: [SourceContribution(300, 3, 0, "martin", "", orcid="A")]}
         )
         assert all(
             300 not in {m.source_contribution for m in g.members} or len(g.members) == 1
-            for g in groups
+            for g in contributions
         )
 
     def test_un_lien_qui_croise_l_ordre_est_ecarte(self):
@@ -140,21 +146,21 @@ class TestAlignPublication:
         reference = [("martin", "a"), ("petit", "b"), ("durand", "c"), ("ferrer", "j")]
         other = [("ferrer", "a"), ("martin", "a"), ("petit", "b"), ("durand", "c")]
         source_records = {1: _source_record(1, reference), 2: _source_record(2, other)}
-        assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] not in _grouped(
+        assert [(103, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)] not in _aligned(
             align_publication(source_records)
         )
 
     def test_un_patronyme_rendu_unique_par_un_lien_se_lie_au_second_passage(self):
-        """Deux « Martin » de chaque côté : le prénom complet lie Anne, puis le patronyme lie le Martin sans prénom au seul groupe « Martin » resté libre."""
+        """Deux « Martin » de chaque côté : le prénom complet lie Anne, puis le patronyme lie le Martin sans prénom à la seule contribution « Martin » restée libre."""
         reference = _source_record(1, [("martin", "anne"), ("martin", "bruno"), ("petit", "c")])
         other = _source_record(2, [("martin", "anne"), ("martin", "")])
-        assert _grouped(align_publication({1: reference, 2: other})) == [
+        assert _aligned(align_publication({1: reference, 2: other})) == [
             [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
             [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
         ]
 
-    def test_un_groupe_fonde_par_une_liste_plus_courte_suit_son_voisin_precedent(self):
-        """« Giromini » manque à la liste la plus longue : son groupe se range après « Durand », son voisin précédent. Sa position brute le rangerait après « Roux »."""
+    def test_une_contribution_fondee_par_une_liste_plus_courte_suit_sa_voisine_precedente(self):
+        """« Giromini » manque à la liste la plus longue : sa contribution se range après « Durand », son voisin précédent. Sa position brute le rangerait après « Roux »."""
         longest = _source_record(
             1, [("martin", "a"), ("petit", "b"), ("durand", "c"), ("leroy", "d"), ("roux", "e")]
         )
@@ -163,8 +169,8 @@ class TestAlignPublication:
             [("martin", "a"), ("petit", "b"), ("durand", "c"), ("giromini", "p"), ("leroy", "d")],
             start=1,
         )
-        groups = align_publication({1: longest, 2: shorter})
-        assert [g.reference.last_name for g in groups] == [
+        contributions = align_publication({1: longest, 2: shorter})
+        assert [g.reference.last_name for g in contributions] == [
             "martin",
             "petit",
             "durand",
@@ -181,8 +187,8 @@ class TestAlignPublication:
             SourceContribution(201, 2, None, "durand", "claire"),
             SourceContribution(202, 2, None, "petit", "bruno"),
         ]
-        groups = align_publication({1: reference, 2: unordered})
-        assert sorted(_grouped(groups)) == [
+        contributions = align_publication({1: reference, 2: unordered})
+        assert sorted(_aligned(contributions)) == [
             [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
             [(101, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
             [(102, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
@@ -192,20 +198,20 @@ class TestAlignPublication:
         """Les quatre autres sources donnent « Roger-Leroi Valerie » : le prénom tient la place du patronyme pour tout l'enregistrement source."""
         reference = [("piaton", "sophie"), ("roger leroi", "valerie"), ("vallet", "guillaume t")]
         inverted = [("sophie", "piaton"), ("valerie", "roger leroi"), ("guillaume", "vallet")]
-        groups = align_publication(
+        contributions = align_publication(
             {1: _source_record(1, reference), 2: _source_record(2, inverted)}
         )
-        assert _grouped(groups) == [
+        assert _aligned(contributions) == [
             [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.NAME)],
             [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.NAME)],
             [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
         ]
 
-    def test_a_longueur_egale_un_enregistrement_source_reporte_ne_fonde_pas_les_groupes(self):
+    def test_a_longueur_egale_un_enregistrement_source_reporte_ne_fonde_pas_les_contributions(self):
         first = _source_record(1, [("hollandts", "xavier"), ("hollandts", "xavier")])
         second = _source_record(2, [("valiorgue", "bertrand"), ("hollandts", "xavier")])
-        groups = align_publication({1: first, 2: second}, deferred={1})
-        assert {g.reference.id for g in groups} >= {200, 201}
+        contributions = align_publication({1: first, 2: second}, deferred={1})
+        assert {g.reference.id for g in contributions} >= {200, 201}
 
     def test_le_residu_de_la_regle_est_transmis_par_enregistrement_source(self):
         reference = [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")]
@@ -213,8 +219,8 @@ class TestAlignPublication:
         received = []
         align_publication(
             {1: _source_record(1, reference), 2: _source_record(2, other)},
-            on_residual=lambda source_record, contributions, groups: received.append(
-                (source_record, contributions, groups)
+            on_residual=lambda source_record, record_contributions, contributions: received.append(
+                (source_record, record_contributions, contributions)
             ),
         )
         assert received == [
@@ -237,12 +243,12 @@ class TestAlignPublication:
         )
         reference = [("martin", "a"), ("garcia navarro", "j e"), ("durand", "c")]
         other = [("martin", "a"), ("navarro", "j e garcia"), ("durand", "c")]
-        groups = align_publication(
+        contributions = align_publication(
             {1: _source_record(1, reference), 2: _source_record(2, other)},
             model=model,
             assign=_greedy,
         )
-        variant = next(g for g in groups if g.reference.id == 101)
+        variant = next(g for g in contributions if g.reference.id == 101)
         member = next(m for m in variant.members if m.source_contribution == 201)
         assert member.method == GroupingMethod.MODEL
         assert member.score == pytest.approx(18.0)
@@ -251,7 +257,7 @@ class TestAlignPublication:
     def test_la_position_seule_ne_lie_pas(self):
         """Deux listes sans aucun nom commun : le même trou ne suffit pas à lier deux auteurs."""
         model = ResidualModel(RESIDUAL_WEIGHTS)
-        groups = align_publication(
+        contributions = align_publication(
             {
                 1: _source_record(1, [("martin", "anne"), ("petit", "bruno")]),
                 2: _source_record(2, [("durand", "claire"), ("leroy", "denis")]),
@@ -259,12 +265,12 @@ class TestAlignPublication:
             model=model,
             assign=_greedy,
         )
-        assert _grouped(groups) == []
+        assert _aligned(contributions) == []
 
     def test_un_identifiant_commun_lie_malgre_des_noms_sans_ressemblance(self):
         model = ResidualModel(RESIDUAL_WEIGHTS)
         orcid = "0000-0001-2345-6789"
-        groups = align_publication(
+        contributions = align_publication(
             {
                 1: [SourceContribution(100, 1, 0, "martin", "anne", orcid)],
                 2: [SourceContribution(200, 2, 0, "dupont", "claire", orcid)],
@@ -272,7 +278,9 @@ class TestAlignPublication:
             model=model,
             assign=_greedy,
         )
-        assert _grouped(groups) == [[(100, GroupingMethod.REFERENCE), (200, GroupingMethod.MODEL)]]
+        assert _aligned(contributions) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.MODEL)]
+        ]
 
     def test_au_maximum_une_contribution_source_par_enregistrement_source(self):
         names = [("zhang", "y"), ("zhang", "y"), ("zhang", "y")]
@@ -281,9 +289,9 @@ class TestAlignPublication:
             2: _source_record(2, names[:2]),
             3: _source_record(3, names[:1]),
         }
-        for group in align_publication(source_records):
-            source_records_of_group = [m.source_record for m in group.members]
-            assert len(source_records_of_group) == len(set(source_records_of_group))
+        for contribution in align_publication(source_records):
+            source_records_of_contribution = [m.source_record for m in contribution.members]
+            assert len(source_records_of_contribution) == len(set(source_records_of_contribution))
 
 
 class TestPositionOnly:
@@ -324,12 +332,14 @@ class TestConflictingInitials:
         """« V. Balakrishnan » occupe la place de « S. Balaji » entre deux auteurs liés : le modèle ne les lie pas."""
         reference = _source_record(1, [("martin", "a"), ("balaji", "s"), ("durand", "c")])
         other = _source_record(2, [("martin", "a"), ("balakrishnan", "v"), ("durand", "c")])
-        groups = align_publication(
+        contributions = align_publication(
             {1: reference, 2: other},
             model=ResidualModel(RESIDUAL_WEIGHTS),
             assign=_greedy,
         )
-        assert all(len(g.members) == 1 for g in groups if g.reference.last_name.startswith("bala"))
+        assert all(
+            len(g.members) == 1 for g in contributions if g.reference.last_name.startswith("bala")
+        )
 
 
 class TestFullFirstName:
@@ -424,24 +434,24 @@ class TestResidualModel:
         assert model.score(_author(), _author()) == 19.0
 
 
-def test_seuil_log2_du_nombre_de_groupes():
+def test_seuil_log2_du_nombre_de_contributions():
     assert link_threshold(8) == 3.0
     assert link_threshold(1) == 1.0
     assert link_threshold(1000) == pytest.approx(math.log2(1000))
 
 
-class TestPlanGroupIds:
-    def test_groupes_inchanges_gardent_leur_identifiant(self):
+class TestPlanContributionIds:
+    def test_contributions_inchangees_gardent_leur_identifiant(self):
         old = {7: frozenset({1, 2}), 9: frozenset({3})}
-        assert plan_group_ids(old, [frozenset({3}), frozenset({1, 2})]) == [9, 7]
+        assert plan_contribution_ids(old, [frozenset({3}), frozenset({1, 2})]) == [9, 7]
 
     def test_le_plus_grand_recouvrement_reprend_l_identifiant(self):
         old = {7: frozenset({1, 2, 3})}
-        assert plan_group_ids(old, [frozenset({1}), frozenset({2, 3, 4})]) == [None, 7]
+        assert plan_contribution_ids(old, [frozenset({1}), frozenset({2, 3, 4})]) == [None, 7]
 
     def test_egalite_le_plus_petit_identifiant(self):
         old = {7: frozenset({1}), 5: frozenset({2})}
-        assert plan_group_ids(old, [frozenset({1, 2})]) == [5]
+        assert plan_contribution_ids(old, [frozenset({1, 2})]) == [5]
 
-    def test_groupe_sans_ancien_correspondant(self):
-        assert plan_group_ids({}, [frozenset({1})]) == [None]
+    def test_contribution_sans_ancienne_correspondante(self):
+        assert plan_contribution_ids({}, [frozenset({1})]) == [None]

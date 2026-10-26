@@ -1,10 +1,11 @@
 <script lang="ts">
 	import AccessButton from '#lib/components/AccessButton.svelte';
+	import DocTypePill from '#lib/components/DocTypePill.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
 	import { withBase } from '#lib/paths.js';
@@ -32,11 +33,9 @@
 		type ListFilter,
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import { oaLabelsMap } from '#lib/labels.js';
+	import { oaLabelsMap, oaStatusLabel } from '#lib/labels.js';
 	import { licenseLabels } from '#lib/licenses.js';
 	import {
-		docTypeSingular,
-		docTypeColor,
 		docTypePlural,
 		docTypeFamilies,
 		publicationsDocTypes,
@@ -568,8 +567,8 @@
 
 <div class="toolbar-card toolbar-sticky publication-toolbar">
 	<div class="toolbar publication-toolbar-main">
-		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-		<span class="count">{listing.total} publication{listing.total > 1 ? 's' : ''}</span>
+		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+		<ResultCount list={listing} one="publication" many="publications" />
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
 	</div>
@@ -646,7 +645,7 @@
 	</thead>
 	<tbody>
 		{#if listing.items.length === 0}
-			<TableStatusRow loading={listing.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (onopenPublication ? 1 : 0)} emptyText="Aucune publication trouvée" />
+			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (onopenPublication ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === activePublicationId}>
@@ -664,7 +663,7 @@
 						</td>
 					{/if}
 					{#if col('type')}<td>
-						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
+						{#if p.doc_type}<DocTypePill docType={p.doc_type} />{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					{#if col('doi')}<td class="doi-cell">
@@ -711,7 +710,7 @@
 					</td>{/if}
 					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
-							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
+							<span class="oa-tag oa-{p.oa_status}">{oaStatusLabel(p.oa_status)}</span>
 						{/if}
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{p.license ? (licenseNames[p.license] ?? p.license) : ''}</td>{/if}

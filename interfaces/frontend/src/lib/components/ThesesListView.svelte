@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { page } from '$app/state';
 	import { withBase } from '#lib/paths.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
@@ -180,7 +180,6 @@
 		type="search"
 		placeholder="Rechercher par titre ou sujet..."
 		bind:value={search}
-		use:autofocus
 		oninput={onSearchInput}
 		onkeydown={(e: KeyboardEvent) => {
 			if (e.key === 'Enter') {
@@ -211,11 +210,11 @@
 		counts={facets.sourceCounts}
 		onchange={() => onFilterChange()}
 	/>
-	<span class="count">{listing.total} thèse{listing.total > 1 ? 's' : ''}</span>
+	<ResultCount list={listing} one="thèse" many="thèses" />
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
-<ThesesTable items={listing.items} loading={listing.loading} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
+<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
 <Pagination
 	page={listing.page}
 	pages={listing.pages}

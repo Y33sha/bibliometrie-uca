@@ -1,10 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { addresses as addressesApi, api } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
@@ -96,8 +97,7 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
-		const qs = p.toString();
-		replaceState(resolve('admin/countries') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('admin/countries'), p);
 	}
 
 	function onFilterChange() {
@@ -199,10 +199,10 @@
 <h1>Attribution des pays aux adresses</h1>
 
 <div class="toolbar">
-	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
 	<span class="toolbar-spacer"></span>
-	<span class="count">{list.total.toLocaleString('fr-FR')} adresse{list.total > 1 ? 's' : ''}</span>
+	<ResultCount {list} one="adresse" many="adresses" />
 </div>
 
 <div class="batch-bar">
@@ -269,6 +269,9 @@
 				</td>
 			</tr>
 		{/each}
+		{#if addresses.length === 0}
+			<TableStatusRow loading={list.loading} error={list.error} colspan={4} emptyText="Aucune adresse trouvée." />
+		{/if}
 	</tbody>
 </table>
 

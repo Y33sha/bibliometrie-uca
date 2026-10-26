@@ -1,15 +1,13 @@
-# Vue d'ensemble
+# Architecture
 
-*À jour le 2026-09-05.*
-
-Le système se lit selon deux axes complémentaires : **deux programmes** couplés par la base de données (vue d'exécution), et **quatre couches** organisant le code à l'intérieur de chaque programme (vue logicielle).
+*À jour le 2026-10-26.*
 
 ## Deux programmes, une base
 
-Le code héberge deux programmes de natures différentes, qui ne s'appellent jamais directement : ils ne communiquent qu'à travers la base PostgreSQL.
+Le code contient deux programmes qui communiquent seulement par la base PostgreSQL.
 
-- **L'application web** (`interfaces/api/` + `interfaces/frontend/`) : un processus FastAPI permanent, piloté par les requêtes des utilisateurs. Elle sert les pages web et restitue les données sous forme de listes, tableaux de bord et exports CSV.
-- **Le pipeline** (paquet `pipeline/`, commande `run_pipeline`) : un traitement par lots, déclenché par un ordonnanceur. Il **dérive** le référentiel : moissonnage des sources, normalisation, résolution d'entités, enrichissements.
+- **L'application web** (`interfaces/api/` et `interfaces/frontend/`) : un processus FastAPI permanent, qui répond aux requêtes des utilisateurs. Elle sert les pages, les listes, les tableaux de bord et les exports CSV.
+- **Le pipeline** (paquet `pipeline/`, commande `run_pipeline`) : un traitement par lots, lancé par un ordonnanceur. Il moissonne les sources et en déduit le référentiel.
 
 ```
   sources externes
@@ -17,78 +15,77 @@ Le code héberge deux programmes de natures différentes, qui ne s'appellent jam
         ▼  moissonnage
   ┌──────────────┐                ┌──────────────┐               ┌───────────────┐
   │   pipeline   │ ── écrit ────► │  base        │ ── lit ─────► │  application  │ ◄── utilisateurs
-  │   (batch)    │   (dérive)     │  PostgreSQL  │               │  web (API     │
+  │   (batch)    │                │  PostgreSQL  │               │  web (API     │
   │              │ ◄── relit ──── │              │ ◄── écrit ─── │  + frontend)  │
   └──────────────┘                └──────────────┘               └───────────────┘
 ```
 
-Les données saisies manuellement via l'API — données de référence (structures, périmètre, configuration) et arbitrages admin — deviennent des **entrées** que le pipeline relit et **préserve** à chaque passe.
+Les données saisies dans l'administration (structures, périmètres, configuration, décisions humaines) sont des entrées que le pipeline relit et conserve à chaque exécution.
 
-## Vue logicielle
+## Couches
 
-Le projet suit une architecture **hexagonale (DDD)**.
+Le code de l'application web suit une architecture hexagonale.
 
-- Le cœur du système est `application/` (services et orchestrateurs), qui dépend de `domain/` (noyau pur).
-- Autour de ce cœur, deux familles d'adaptateurs : `interfaces/` (entrants — HTTP, CLI) et `infrastructure/` (sortants — base, APIs externes, logs).
-- `application/` déclare des ports (`Protocol`) dans `application/ports/`, `infrastructure/` en fournit les implémentations, et les services et orchestrateurs reçoivent un port en paramètre — jamais une classe concrète.
-- Seul le composition root de `interfaces/` instancie ces implémentations.
-
-Cette vue par couches se superpose à la vue par programme : `domain/` sert aux deux programmes, tandis que les couches extérieures se répartissent entre l'application web et le pipeline, quelques modules restant partagés. Le détail se lit dans les fiches de chaque couche.
-
+- `domain/` contient les règles métier, sans entrée-sortie.
+- `application/` contient les services d'écriture. Ils atteignent l'extérieur par des ports (`Protocol`) déclarés dans `application/ports/`.
+- `infrastructure/` contient les adaptateurs sortants : SQL, journalisation. Ils implémentent les ports.
+- `interfaces/` contient les adaptateurs entrants : routes HTTP, frontend, scripts en ligne de commande. Son composition root instancie les adaptateurs.
 
 ```
                     ┌─────────────────────────────┐
                     │  domain/                    │
                     │  entités, value objects,    │
-                    │  règles métier pures        │  (zéro I/O)
+                    │  règles métier              │  (zéro I/O)
                     └──────────────▲──────────────┘
                                    │
     ┌──────────────────────────────┴─────────────────────────────┐
     │  application/                    ┌───────────────────────┐ │
-    │  services, orchestrateurs        │  ports/  (Protocol)   │ │
+    │  services                        │  ports/  (Protocol)   │ │
     │                                  └─────────────▲─────────┘ │
     └───────────▲────────────────────────────────────┼───────────┘
-                │ services, orchestrateurs et ports  │ implémente
+                │ services et ports                  │ implémente
     ┌───────────┴─────────────┐           ┌──────────┴───────────┐
     │  interfaces/            │           │  infrastructure/     │
     │  adaptateurs entrants   │           │  adaptateurs sortants│
-    │  (routers, CLI)         │           │  (PostgreSQL,        │
-    │  ┌───────────────────┐  │ instancie │  APIs externes,      │
-    │  │ composition root  ├──┼──────────►│  logs)               │
+    │  (routers, CLI)         │           │  (PostgreSQL, logs)  │
+    │  ┌───────────────────┐  │ instancie │                      │
+    │  │ composition root  ├──┼──────────►│                      │
     │  └───────────────────┘  │           │                      │
     └─────────────────────────┘           └──────────────────────┘
 ```
 
-## Contrats d'architecture
+Le pipeline est un paquet racine, hors de ces couches. Il importe `domain/` et les modules techniques d'`infrastructure/`. Seul `interfaces/` l'importe.
 
-Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyproject.toml`, section `[tool.importlinter]`, et nommé ici en regard.
+## Contrats d'import
 
-1. **Le noyau n'importe que la bibliothèque standard.** `domain/` n'atteint aucun paquet tiers et aucune autre couche. Les modules permis sont ceux que Python publie pour sa version, dans `sys.stdlib_module_names`.
-   → `Domain : rien hors bibliothèque standard`
+Des contrats `import-linter`, déclarés dans `pyproject.toml`, vérifient ces règles. Un commentaire justifie chaque contrat.
 
-2. **Les imports vont vers le noyau.** `interfaces/` atteint les trois autres couches. `infrastructure/` et `application/` atteignent `domain/`, qui n'importe aucune autre couche. `application/` n'importe pas `infrastructure/` : les services et orchestrateurs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
-   → `Couches DDD (layered)`
+**Couches**
 
-3. **Les écritures passent par un service, les lectures vont directement au SQL.** Un router d'écriture reçoit un service d'`application/` ; seul ce côté passe par des ports. Un router de lecture reçoit l'adaptateur de `infrastructure/read_models/`, qui déclare aussi ses modèles de réponse. Les deux reçoivent leurs dépendances par `Depends(...)`, dont les fabriques sont déclarées dans `interfaces/api/deps.py`. Hors lectures, les routers n'importent pas `infrastructure/`.
-   → `Routers : pas d'import direct de infrastructure`
+- `Domain : rien hors bibliothèque standard` : `domain/` importe seulement la bibliothèque standard.
+- `Couches DDD (layered)` : les imports vont de `interfaces/` vers `application/` et `infrastructure/`, puis vers `domain/`. `application/` atteint l'infrastructure par ses ports.
+- `Adapters : la connexion se reçoit, elle ne s'ouvre pas` : les repositories et les lectures travaillent sur la connexion de leur appelant.
 
-4. **Seul le composition root instancie les repositories concrets.** Pour l'application web, c'est `interfaces/api/deps.py`, qui les remet aux services d'écriture. (Par ailleurs, chaque script de `interfaces/cli/` est son propre composition root.)
-   → `Composition root : repositories concrets uniquement dans deps`
+**Pipeline**
 
-5. **Un adaptateur reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les repositories travaillent sur la connexion que leur appelant leur remet.
-   → `Adapters : la connexion se reçoit, elle ne s'ouvre pas`
+- `Pipeline : hors des couches hexagonales` : le pipeline importe `domain/` et `infrastructure/`, jamais `application/` ni `interfaces/`.
+- `Pipeline : importé par interfaces seulement` : `domain/`, `application/` et `infrastructure/` ignorent le pipeline.
+- `Pipeline : le noyau d'exécution ignore les phases` : le graphe des tâches et l'exécution ignorent les modules des phases.
+- `Sources : les orchestrateurs de phase les importent, jamais l'inverse` : le module d'une source ignore les orchestrateurs de phase qui l'appellent.
 
-6. **L'API n'émet aucune requête réseau.** Aucun module servant une requête HTTP n'atteint un client réseau, y compris par une chaîne d'imports. Tout le trafic sortant appartient au pipeline.
-   → `API : aucune requête réseau sortante`
+**API**
 
-7. **L'API ne lance aucun programme.** Aucun module de la couche API n'atteint un lanceur de processus, directement ou indirectement.
-   → `API : aucun lancement de programme`
+- `Routers : pas d'import direct de infrastructure` : une route d'écriture reçoit un service, une route de lecture reçoit sa lecture de `infrastructure/read_models/`, par `Depends`.
+- `Composition root : repositories concrets uniquement dans deps` : seul `interfaces/api/deps.py` instancie les repositories.
+- `API : le pipeline par son interface publique` : l'API importe seulement `pipeline/public.py`.
+- `API : aucune requête réseau sortante` : aucun module de l'API n'atteint un client réseau, même par une chaîne d'imports.
+- `API : aucun lancement de programme` : aucun module de l'API n'atteint un lanceur de processus.
 
-## Suite
+## Pages
 
-- [`domain/`](02-domain.md) — entités et logique métier
-- [`application/`](03-application.md) — services, orchestrateurs, injection des dépendances
-- [`infrastructure/`](04-infrastructure.md) — adaptateurs sortants, transactions
-- [`interfaces/`](05-interfaces.md) — adaptateurs entrants
-- [Composition roots](06-composition-roots.md) — instanciation et câblage des adaptateurs
-- [Tests](07-tests.md) — tests unitaires, tests d'intégration, couverture
+- [`domain/`](02-domain.md)
+- [`application/`](03-application.md)
+- [`infrastructure/`](04-infrastructure.md), avec les transactions
+- [`interfaces/`](05-interfaces.md)
+- [Composition roots](06-composition-roots.md)
+- [Tests](07-tests.md)

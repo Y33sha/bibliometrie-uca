@@ -30,7 +30,7 @@ Le score n'est pas une mesure de pertinence. Un seuil bas écarte des topics lé
 
 ### Pistes
 
-Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
+Les pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 **Classifieurs ISTEX.** La plateforme ISTEX TDM propose des web services de classification gratuits, appelables document par document. Aucun ne rend de score. Chacun propose une seule classe par document : il ne confirme pas le second domain d'une publication pluridisciplinaire. Les services reçoivent des lots `[{id, value}]`. Grain : domaine HAL, ou domain et field OpenAlex.
 
@@ -51,9 +51,11 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 **Embeddings** (Specter2), au grain des topics feuille : embedding du titre et du résumé, centroïde par topic calculé sur ses publications, similarité cosinus entre chaque publication et le centroïde de chacun de ses topics, seuil de rejet. Chaque libellé porte le chemin de tous ses ancêtres. L'évaluation descend la hiérarchie : les sous-sujets d'un sujet écarté ne sont pas évalués.
 
+**Distillation.** Un modèle de langage annote, une seule fois, quelques milliers de libellés. Un classifieur léger apprend sur ces annotations à partir de variables calculées en base, puis tourne seul dans le pipeline, sans tokens. Les signaux qui plafonnent seuls (score OpenAlex, rang du topic, arbitres, profil du laboratoire) deviennent ses variables.
+
 ## Décisions
 
-- **Auditer avant de coder.** Les trois pistes sont évaluées sur un même échantillon qualifié à l'œil, de la moins coûteuse à la plus coûteuse : classifieurs ISTEX, vote des arbitres, embeddings. Le choix d'une piste ou d'une combinaison suit les bilans.
+- **Auditer avant de coder.** Les pistes sont évaluées sur un même échantillon qualifié à l'œil, de la moins coûteuse à la plus coûteuse : classifieurs ISTEX, vote des arbitres, embeddings, distillation. Le choix d'une piste ou d'une combinaison suit les bilans.
 - **Un libellé est inclus dans son parent.** Un libellé pertinent rend ses ancêtres pertinents. Un libellé aberrant rend ses descendants aberrants. La qualification de l'échantillon et chaque piste respectent cette inclusion.
 - **WoS est exclu des arbitres** : l'abonnement va être résilié.
 - **Un rejet automatique se recalcule. Un rejet manuel est une décision humaine durable.**
@@ -128,10 +130,37 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [x] Un seul domain par publication : sur une publication à plusieurs domains, seul le domain au centroïde le plus proche est gardé (centroïdes sur 150 membres). Le domain gardé est pertinent pour 43 publications sur 52. Mais 39 des 52 publications ont au moins deux domains non aberrants : la règle rejette 35 domains pertinents pour 11 aberrants. Avec une marge (rejet seulement si le domain est nettement plus loin que le meilleur), la précision plafonne à 50 %. Un domain secondaire légitime est aussi loin du centroïde qu'un domain aberrant
 - [x] Jugement au grain field : centroïdes des 26 fields (150 membres chacun), embeddings centrés ; le field le plus proche de la publication est toujours gardé ; un field rejeté entraîne ses descendants ; un domain tombe quand tous ses fields tombent. AUC des fields : rang parmi les 26, 0,78 ; écart au meilleur field, 0,75 ; typicité, 0,72. Meilleurs points, tous niveaux : typicité < 0,02, précision 75 %, rappel 18 % (domains rejetés : 5 aberrants, 1 pertinent) ; rang au-delà du 8e field, précision 58 %, rappel 32 %. Les 69 topics aberrants sous un field correct restent hors d'atteinte de ce niveau
 - [x] Descente field puis subfield, embeddings centrés : membres d'un field retirés si leur field arrive au-delà du 8e rang parmi les 26 (5 % retirés) ; membres d'un subfield retirés si leur field parent arrive au-delà du 8e rang (12 % retirés) ; centroïdes des subfields sur 70 membres au plus (244 subfields sur 251). Au grain subfield, la descente rejette autant de libellés pertinents qu'aberrants. Meilleur point, tous niveaux : field au-delà du 6e rang et subfield dans les 70 % les plus éloignés de ses frères, précision 51 %, rappel 42 %
+- [x] Reranker `BAAI/bge-reranker-v2-m3` (cross-encoder) : chaque paire réunit la publication (titre et résumé) et le sujet (chemin, description et mots-clés OpenAlex, disponibles à tous les niveaux). AUC domain / field / subfield / topic : 0,69 / 0,75 / 0,71 / 0,65. Règle descendante depuis le field, précision 59 %, rappel 15 % au mieux. Le reranker ne fait pas mieux que les embeddings
 - [x] Bilan des embeddings : toutes les variantes plafonnent entre 50 et 75 % de précision, pour un rappel de 18 à 66 %. Elles identifient le sujet principal d'une publication ; elles ne distinguent pas un sujet secondaire légitime d'un sujet aberrant
 - [ ] Coût d'un passage sur le stock et sur chaque run
 
-### Phase 5 — Hiérarchie des sujets
+### Phase 5 — Distillation
+
+#### Annotation
+
+- [ ] Tirage d'environ 350 publications (environ 3 000 libellés), hors échantillon de référence : moitié au hasard, pour mesurer la fréquence des aberrations dans le corpus ; moitié par les strates de la phase 1, pour couvrir les cas rares
+- [ ] Annotation par un modèle de langage, par l'API : titre, résumé et revue seulement, sans les sujets des autres sources ni les profils, qui servent de variables ; mêmes définitions que la phase 1 (pertinent, limite, aberrant) ; règle d'inclusion appliquée aux verdicts ; une raison courte par verdict
+- [ ] Cohérence : annotation des 100 publications de l'échantillon de référence par le même procédé, comparée à la préqualification de la phase 1
+- [ ] Contrôle à l'aveugle : qualification d'environ 40 publications par Laura, sans voir les verdicts du modèle (page de qualification sans préqualification) ; accord par niveau avec le modèle de langage
+
+#### Variables
+
+- [ ] Variables légères, calculées en base : niveau du libellé ; score OpenAlex ; rang du topic dans l'enregistrement ; nombre de domains et de fields de la publication ; soutien du domain par les domaines HAL, la discipline theses.fr et la revue DOAJ ; soutien par le profil des laboratoires et par celui de la revue ; fréquence du libellé dans le corpus et dans les laboratoires de la publication
+- [ ] Variables lourdes, ajoutées seulement si elles améliorent nettement le classifieur : rang de la publication parmi les centroïdes des fields, typicité
+
+#### Apprentissage et évaluation
+
+- [ ] Classifieur : régression logistique, puis gradient boosting si l'écart le justifie ; un seul modèle, le niveau en variable
+- [ ] Validation croisée par publication (les libellés d'une même publication restent dans le même pli) ; précision et rappel par niveau, avec la règle descendante
+- [ ] Test final sur l'échantillon de référence, tenu à l'écart de l'apprentissage
+- [ ] Point de fonctionnement : seuil qui atteint la précision cible
+
+#### Exploitation
+
+- [ ] Coefficients du classifieur versionnés dans le dépôt, avec le jeu annoté et le script d'apprentissage
+- [ ] Réannotation d'un échantillon quand OpenAlex fait évoluer ses classements ; mesure de la dérive avant tout réapprentissage
+
+### Phase 6 — Hiérarchie des sujets
 
 - [ ] Schéma : `subjects` porte vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé
 - [ ] Normalizer OpenAlex : `extract_topics` conserve l'identifiant de chaque niveau
@@ -145,13 +174,13 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [ ] Interface : couleur par domaine de haut niveau dans les graphiques de sujets ; domains OpenAlex écartés
 - [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`
 
-### Phase 6 — Choix et mise en œuvre
+### Phase 7 — Choix et mise en œuvre
 
-- [ ] Choix de la piste ou de la combinaison, d'après les bilans des phases 2 à 4
+- [ ] Choix de la piste ou de la combinaison, d'après les bilans des phases 2 à 5
 - [ ] Forme du stockage des rejets automatiques et manuels
 - [ ] Phasage de la mise en œuvre dans la phase `subjects`
 
-### Phase 7 — Rejets dans l'interface
+### Phase 8 — Rejets dans l'interface
 
 - [ ] Nuages de sujets (`entity_subjects_sql`), filtre et facette par sujet (`infrastructure/read_models/filters.py`, `entity_facet.py`) : liens rejetés écartés
 - [ ] `/publications/[id]` : `get_publication_subjects` rend le statut de rejet ; `SubjectsBlock.svelte` barre et grise les sujets rejetés
@@ -160,6 +189,9 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ## Questions ouvertes
 
+- **Précision cible** du classifieur : le niveau en dessous duquel un rejet automatique fait plus de tort que de bien.
+- **Modèle de langage d'annotation** : modèle, coût en tokens (de l'ordre de 2 000 tokens par publication, soit moins d'un million pour 350 publications).
+- **Dépendance** : scikit-learn dans le projet pour l'apprentissage ; en production, la régression logistique se réduit à des coefficients et se calcule sans bibliothèque.
 - **Stockage des rejets.** Le booléen `rejected` confond rejet automatique et rejet manuel. Un rejet manuel accroché à `publication_id` disparaît avec la publication. Quelle forme donner aux deux ?
 - **Édition manuelle des rejets** : dans ce chantier ou dans [la gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) ?
 - **Doublons à l'affichage** : une cinquantaine de libellés communs à deux vocabulaires (« Informatique », domaine HAL et discipline de thèse), et des homonymes internes à OpenAlex (« Biochemistry », subfield de deux fields). À regrouper à l'affichage s'ils gênent.

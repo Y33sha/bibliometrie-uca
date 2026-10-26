@@ -7,10 +7,10 @@ from sqlalchemy import text
 from infrastructure.read_models.hal_problems.models import NoMissingCollections
 from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.groups import insert_group
-from tests.integration.helpers.persons import insert_person
+from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
     insert_source_contribution,
@@ -43,7 +43,7 @@ def _create_lab(conn, code="LAB", hal_collection=None):
 def _create_hal_source_contribution_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
-    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur, membre d'un groupe rattaché à `person_id`."""
+    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur, contribution source d'une contribution rattachée à `person_id`."""
     publication = insert_publication(
         conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}"
     )
@@ -54,38 +54,74 @@ def _create_hal_source_contribution_with_hal_id(
         raw_author_name=raw_author_name,
         identifiers={"hal_person_id": hal_person_id},
     )
-    group = insert_group(conn, publication, [(source_contribution, source_record)])
+    contribution = align_source_contributions(
+        conn, publication, [(source_contribution, source_record)]
+    )
     conn.execute(
         text(
             "UPDATE contributions SET person_id = :person, resolution_mode = 'manual' WHERE id = :g"
         ),
-        {"person": person_id, "g": group},
+        {"person": person_id, "g": contribution},
+    )
+
+
+def _attribute_hal_account(conn, person_id, hal_person_id, status=None):
+    insert_person_identifier(
+        conn, person_id, id_type="hal_person_id", id_value=str(hal_person_id), status=status
     )
 
 
 class TestHalDuplicateAccounts:
-    def test_detects_person_with_two_hal_accounts(self, sa_sync_conn):
+    def test_details_each_attributed_account_by_its_contributions(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn)
-        _create_hal_source_contribution_with_hal_id(
-            sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1", raw_author_name="A"
-        )
-        _create_hal_source_contribution_with_hal_id(
-            sa_sync_conn, person_id=pid, hal_person_id=43, source_id="hal-2", raw_author_name="B"
-        )
+        for hal_person_id, source_id, name in ((42, "hal-1", "A"), (43, "hal-2", "B")):
+            _attribute_hal_account(sa_sync_conn, pid, hal_person_id)
+            _create_hal_source_contribution_with_hal_id(
+                sa_sync_conn,
+                person_id=pid,
+                hal_person_id=hal_person_id,
+                source_id=source_id,
+                raw_author_name=name,
+            )
 
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
-        assert res.total >= 1
-        ours = next((p for p in res.persons if p.person_id == pid), None)
-        assert ours is not None
-        assert len(ours.hal_accounts) == 2
+
+        assert res.total == 1
+        [ours] = res.persons
+        assert ours.person_id == pid
+        assert [(a.hal_person_id, a.full_name, a.publication_count) for a in ours.hal_accounts] == [
+            (42, "A", 1),
+            (43, "B", 1),
+        ]
+
+    def test_lists_an_attributed_account_absent_from_contributions(self, sa_sync_conn):
+        pid = insert_person(sa_sync_conn)
+        _attribute_hal_account(sa_sync_conn, pid, 42)
+        _attribute_hal_account(sa_sync_conn, pid, 43)
+
+        [ours] = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50).persons
+
+        assert [(a.full_name, a.publication_count) for a in ours.hal_accounts] == [
+            (None, 0),
+            (None, 0),
+        ]
 
     def test_ignores_single_account(self, sa_sync_conn):
         pid = insert_person(sa_sync_conn)
+        _attribute_hal_account(sa_sync_conn, pid, 42)
+        res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
+        assert res.total == 0
+
+    def test_ignores_rejected_attribution(self, sa_sync_conn):
+        """Le compte rejeté pour la personne figure dans ses contributions : publication mal attribuée, hors du périmètre de la page."""
+        pid = insert_person(sa_sync_conn)
+        _attribute_hal_account(sa_sync_conn, pid, 42)
+        _attribute_hal_account(sa_sync_conn, pid, 43, status="rejected")
         _create_hal_source_contribution_with_hal_id(
-            sa_sync_conn, person_id=pid, hal_person_id=42, source_id="hal-1"
+            sa_sync_conn, person_id=pid, hal_person_id=43, source_id="hal-1"
         )
         res = _q(sa_sync_conn).hal_duplicate_accounts(page=1, per_page=50)
-        assert not any(p.person_id == pid for p in res.persons)
+        assert res.total == 0
 
 
 class TestHalDuplicatePublicationsByDoi:
@@ -123,6 +159,14 @@ class TestHalDuplicatePublicationsByDoi:
         _source_record(sa_sync_conn, publication, source_id="h-uniq", doi="10.1/u")
         res = _q(sa_sync_conn).hal_duplicate_publications_by_doi(page=1, per_page=50)
         assert res.total == 0
+
+    def test_ignores_deposits_without_publication(self, sa_sync_conn):
+        """Des dépôts hors périmètre, sans publication, partagent un DOI."""
+        _source_record(sa_sync_conn, None, source_id="h-out-1", doi="10.1/out")
+        _source_record(sa_sync_conn, None, source_id="h-out-2", doi="10.1/out")
+        res = _q(sa_sync_conn).hal_duplicate_publications_by_doi(page=1, per_page=50)
+        assert res.total == 0
+        assert res.pairs == []
 
 
 class TestHalDuplicatePublicationsByMetadata:

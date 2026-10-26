@@ -11,8 +11,12 @@ from interfaces.api.deps import contribution_service, person_service
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
+from tests.integration.helpers.alignment import (
+    align_source_contributions,
+    contribution_person,
+    set_perimeter_author_contribution,
+)
 from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.groups import group_person, insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import insert_person, insert_person_name_form
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import queued
@@ -20,7 +24,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 
 def _orphan_source_contribution(conn):
-    """Publication + source_record + source_contribution orpheline, seul membre d'un groupe d'auteur du périmètre sans personne. Retourne (source_contribution_id, groupe, publication_id)."""
+    """Publication + source_record + source_contribution orpheline, seule contribution source d'une contribution d'auteur du périmètre sans personne. Retourne (source_contribution_id, contribution, publication_id)."""
     publication = insert_publication(conn, "t", normalize_title=False, doc_type=None)
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
@@ -32,9 +36,9 @@ def _orphan_source_contribution(conn):
         raw_author_name="Jean Martin",
         author_name_normalized="jean martin",
     )
-    group = insert_group(conn, publication, [(sa, source_record)])
-    set_perimeter_author_group(conn, group)
-    return sa, group, publication
+    contribution = align_source_contributions(conn, publication, [(sa, source_record)])
+    set_perimeter_author_contribution(conn, contribution)
+    return sa, contribution, publication
 
 
 def _pin(conn, source_contribution_id):
@@ -48,16 +52,16 @@ def _pin(conn, source_contribution_id):
 
 def test_attach_pins(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
-    sa, group, _publication = _orphan_source_contribution(sa_sync_conn)
-    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, group)
-    assert group_person(sa_sync_conn, group) == (pid, "manual")
+    sa, contribution, _publication = _orphan_source_contribution(sa_sync_conn)
+    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, contribution)
+    assert contribution_person(sa_sync_conn, contribution) == (pid, "manual")
     assert _pin(sa_sync_conn, sa) == pid
 
 
 def test_detach_unpins(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
-    sa, group, publication = _orphan_source_contribution(sa_sync_conn)
-    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, group)
+    sa, contribution, publication = _orphan_source_contribution(sa_sync_conn)
+    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, contribution)
     assert _pin(sa_sync_conn, sa) == pid
 
     reject_pair(
@@ -67,16 +71,18 @@ def test_detach_unpins(sa_sync_conn):
         repo=contribution_repository(sa_sync_conn),
     )
     assert _pin(sa_sync_conn, sa) is None
-    assert group_person(sa_sync_conn, group) == (None, None)
+    assert contribution_person(sa_sync_conn, contribution) == (None, None)
 
 
-def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
-    """Rejeter une forme de nom marque pour la redécision les groupes rattachés par le nom sous cette forme, sauf ceux que l'admin a épinglés sur la personne."""
+def test_name_form_rejection_spares_pinned_contributions(sa_sync_conn):
+    """Rejeter une forme de nom marque pour la redécision les contributions rattachées par le nom sous cette forme, sauf ceux que l'admin a épinglés sur la personne."""
     pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
-    pinned, pinned_group, _ = _orphan_source_contribution(sa_sync_conn)
-    _, matched_group, _ = _orphan_source_contribution(sa_sync_conn)
-    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, pinned_group)
-    set_perimeter_author_group(sa_sync_conn, matched_group, person_id=pid, mode="name")
+    pinned, pinned_contribution, _ = _orphan_source_contribution(sa_sync_conn)
+    _, matched_contribution, _ = _orphan_source_contribution(sa_sync_conn)
+    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, pinned_contribution)
+    set_perimeter_author_contribution(
+        sa_sync_conn, matched_contribution, person_id=pid, mode="name"
+    )
     insert_person_name_form(
         sa_sync_conn,
         pid,
@@ -88,18 +94,20 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
 
     person_service(sa_sync_conn).update_name_form_status(pid, "jean martin", "rejected")
 
-    assert (group_person(sa_sync_conn, pinned_group), _pin(sa_sync_conn, pinned)) == (
+    assert (contribution_person(sa_sync_conn, pinned_contribution), _pin(sa_sync_conn, pinned)) == (
         (pid, "manual"),
         pid,
     )
-    assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {matched_group}
+    assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {matched_contribution}
 
 
-def test_attach_refuse_quand_la_personne_a_un_groupe_manuel_dans_la_publication(sa_sync_conn):
+def test_attach_refuse_quand_la_personne_a_une_contribution_manuelle_dans_la_publication(
+    sa_sync_conn,
+):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
-    _, group, publication = _orphan_source_contribution(sa_sync_conn)
+    _, contribution, publication = _orphan_source_contribution(sa_sync_conn)
     manual = insert_contribution(sa_sync_conn, publication, person_id=pid)
 
     with pytest.raises(PersonAlreadyInPublicationError) as error:
-        contribution_service(sa_sync_conn).assign_orphan_contribution(pid, group)
+        contribution_service(sa_sync_conn).assign_orphan_contribution(pid, contribution)
     assert error.value.contribution_id == manual

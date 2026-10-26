@@ -162,4 +162,4 @@ Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes)
 ## Particularités
 
 - **Source sous contrat, moissonnée sur demande.** Le crédit d'appels est acheté à l'année, donc WoS reste hors des exécutions ordinaires : l'option `--include-wos` l'y ajoute.
-- **`daisng_id` sert de filtre, pas d'identifiant.** Cette entité auteur algorithmique n'est pas conservée en base. Une entrée qui en manque, ou qui manque de nom complet, est écartée : elle ne porte pas de contribution source exploitable.
+- **`daisng_id` sert de filtre, pas d'identifiant.** Cette entité auteur algorithmique n'est pas conservée en base. Une entrée qui en manque, ou qui manque de nom complet, est écartée : elle ne donne aucune contribution source exploitable.

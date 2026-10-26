@@ -15,9 +15,10 @@ from domain.urls import is_host
 # techrxiv, opticaopen…). On normalise vers le DOI "concept" (sans version)
 # qui pointe toujours vers la dernière version.
 _DOI_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
-# Suffixe `/pdf` parfois collé au DOI quand une source expose l'URL de la
-# ressource PDF au lieu du DOI canonique — strip pour éviter les doublons.
-_DOI_PDF_SUFFIX = re.compile(r"/pdf$", re.IGNORECASE)
+# Suffixe d'URL d'éditeur (`/pdf`, `/full`, `/abstract`) collé au DOI quand une source expose
+# l'URL d'une page de l'article au lieu du DOI seul. Le DOI suffixé est inconnu de doi.org
+# et double la publication du DOI sans suffixe.
+_DOI_URL_PAGE_SUFFIX = re.compile(r"/(?:pdf|full|abstract)$", re.IGNORECASE)
 _DOI_URL_PREFIXES = (
     "https://doi.org/",
     "http://doi.org/",
@@ -44,7 +45,7 @@ def clean_doi(raw: str | None) -> str | None:
 
     Lowercase systématique : la spec DOI Handbook précise que le préfixe `10.xxxx` est insensible à la casse, et CrossRef (registre officiel) traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules évite les faux doublons cross-sources.
 
-    Idempotent par construction : une passe (`_normalize_doi_step`) est réappliquée jusqu'au point fixe. Chaque transformation retire des caractères ou est une substitution idempotente (minuscule, tirets Unicode), sans jamais en ajouter : l'itération converge, et un DOI déjà normalisé est renvoyé inchangé. L'itération est nécessaire parce qu'une étape de fin (suffixe `.vN`) peut ré-exposer du travail pour une étape de début (slash ou `/pdf` final), résidu qu'une passe unique laisserait.
+    Idempotent par construction : une passe (`_normalize_doi_step`) est réappliquée jusqu'au point fixe. Chaque transformation retire des caractères ou est une substitution idempotente (minuscule, tirets Unicode), sans jamais en ajouter : l'itération converge, et un DOI déjà normalisé est renvoyé inchangé. L'itération est nécessaire parce qu'une étape de fin (suffixe `.vN`) peut ré-exposer du travail pour une étape de début (slash ou suffixe d'URL d'éditeur final), résidu qu'une passe unique laisserait.
     """
     if not raw:
         return None
@@ -59,7 +60,7 @@ def clean_doi(raw: str | None) -> str | None:
 
 
 def _normalize_doi_step(s: str) -> str:
-    """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes `/pdf` et `.vN`.
+    """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes d'URL d'éditeur (`/pdf`, `/full`, `/abstract`) et `.vN`.
 
     Ne converge pas seule : c'est `clean_doi` qui la réitère jusqu'au point fixe."""
     if s.startswith("doi:"):
@@ -92,7 +93,7 @@ def _normalize_doi_step(s: str) -> str:
         s = s[:-1]
     if s.endswith("(") and s.count("(") > s.count(")"):
         s = s[:-1]
-    s = _DOI_PDF_SUFFIX.sub("", s)
+    s = _DOI_URL_PAGE_SUFFIX.sub("", s)
     return _DOI_VERSION_SUFFIX.sub("", s)
 
 

@@ -2,6 +2,8 @@
   import { untrack } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { docTypeLabel } from "#lib/labels.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
@@ -40,11 +42,7 @@
   tort. Pour chaque enregistrement source, le nombre de ses auteurs retrouvés dans un autre enregistrement source.
 </p>
 
-{#if !list.loaded}
-  <div class="empty">Chargement…</div>
-{:else if list.items.length === 0 && !list.loading}
-  <div class="empty">Aucune fusion suspecte.</div>
-{:else}
+<ListStatus {list} emptyText="Aucune fusion suspecte.">
   <div class="triage-list">
     {#each list.items as item (item.publication_id)}
       <div class="triage-item" class:active={item.publication_id === activePublicationId}>
@@ -53,7 +51,7 @@
             <PublicationTitle titre={item.title} />
           </button>
           <span class="meta">
-            {item.doc_type}{#if item.publication_year} · {item.publication_year}{/if} ·
+            {docTypeLabel(item.doc_type)}{#if item.publication_year} · {item.publication_year}{/if} ·
             <a href={resolve(`publications/${item.publication_id}`)} target="_blank" rel="noopener"
               >listes d'auteurs</a
             >
@@ -78,7 +76,7 @@
   </div>
 
   <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
-{/if}
+</ListStatus>
 
 <style>
   .triage-item.active {

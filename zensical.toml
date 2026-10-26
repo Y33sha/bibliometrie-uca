@@ -1,0 +1,35 @@
+[project]
+site_name = "Bibliométrie UCA"
+docs_dir = "docs"
+site_dir = "site"
+exclude_docs = """
+/chantiers/
+"""
+
+[project.theme]
+language = "fr"
+features = [
+  "navigation.sections",
+  "navigation.indexes",
+  "search.highlight",
+]
+
+[project.markdown_extensions]
+admonition = {}
+attr_list = {}
+tables = {}
+toc.permalink = true
+toc.slugify.object = "pymdownx.slugs.slugify"
+toc.slugify.kwds.case = "lower"
+pymdownx.superfences.custom_fences = [
+  { name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" },
+]
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["."]
+options.show_source = false
+options.members_order = "source"
+
+[project.plugins.api-autonav]
+modules = ["domain"]
+nav_section_title = "Référence du code"

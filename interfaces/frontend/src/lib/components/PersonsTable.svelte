@@ -15,6 +15,7 @@
 	let {
 		persons,
 		loading = false,
+		error = null,
 		sort,
 		onSortChange,
 		perimeterCount = false,
@@ -23,6 +24,8 @@
 	}: {
 		persons: PersonRow[];
 		loading?: boolean;
+		/** Message du chargement en échec. */
+		error?: string | null;
 		sort: string;
 		onSortChange: (newSort: string) => void;
 		/** Ajoute la colonne des publications dans le périmètre de l'établissement. */
@@ -87,7 +90,7 @@
 	</thead>
 	<tbody>
 		{#if persons.length === 0}
-			<TableStatusRow {loading} colspan={5 + countColumns.length + (onopen ? 1 : 0)} emptyText="Aucune personne trouvée" />
+			<TableStatusRow {loading} {error} colspan={5 + countColumns.length + (onopen ? 1 : 0)} emptyText="Aucune personne trouvée" />
 		{:else}
 			{#each persons as p (p.id)}
 				<tr class:excluded={!!p.exclusion} class:active-row={activeId === p.id}>

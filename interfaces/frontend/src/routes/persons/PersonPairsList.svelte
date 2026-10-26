@@ -4,6 +4,7 @@
   import { ApiError, persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import { confirmMerge } from "./confirmMerge";
   import type { CurationPerson } from "./types";
@@ -86,11 +87,7 @@
 
 {#if error}<p class="error">{error}</p>{/if}
 
-{#if !list.loaded}
-  <div class="empty">Chargement…</div>
-{:else if list.items.length === 0 && !list.loading}
-  <div class="empty">{emptyText}</div>
-{:else}
+<ListStatus {list} {emptyText}>
   <div class="triage-list">
     {#each list.items as pair, i (i)}
       <div class="triage-item">
@@ -131,7 +128,7 @@
   </div>
 
   <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
-{/if}
+</ListStatus>
 
 {#snippet personCol(p: CurationPerson)}
   <div class="person-col">

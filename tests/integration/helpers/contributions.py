@@ -74,7 +74,7 @@ def insert_contribution(
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,
 ) -> int:
-    """Insère une contribution : groupe de contributions sources sans membre, rattaché à la personne en mode `manual`. Renvoie l'`id` du groupe. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
+    """Insère une contribution : contribution sans contribution source, rattachée à la personne en mode `manual`. Renvoie l'`id` de la contribution. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
     return insert_row(
         conn,
         "contributions",
@@ -90,8 +90,8 @@ def insert_contribution(
     )
 
 
-def group_id_of(conn: Connection, publication_id: int, person_id: int) -> int:
-    """L'`id` du groupe de contributions sources de la personne `person_id` dans la publication `publication_id`."""
+def contribution_id_of(conn: Connection, publication_id: int, person_id: int) -> int:
+    """L'`id` de la contribution de la personne `person_id` dans la publication `publication_id`."""
     return conn.execute(
         text(
             "SELECT id FROM contributions"

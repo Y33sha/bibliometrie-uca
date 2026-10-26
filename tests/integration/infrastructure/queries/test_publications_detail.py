@@ -10,8 +10,11 @@ from infrastructure.read_models.publications.detail import (
     get_publication_subjects,
 )
 from pipeline.ingestion.common.locations import LocationFacts, LocationStore, known_platform_facts
-from tests.integration.helpers.contributions import group_id_of, insert_contribution
-from tests.integration.helpers.groups import add_group_member, insert_group
+from tests.integration.helpers.alignment import (
+    add_aligned_source_contribution,
+    align_source_contributions,
+)
+from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
@@ -50,9 +53,9 @@ class TestGetPublicationDetail:
         )
         insert_contribution(sa_sync_conn, publication, person_id=pid)
         source_contribution = insert_source_contribution(sa_sync_conn, source_record)
-        add_group_member(
+        add_aligned_source_contribution(
             sa_sync_conn,
-            group_id_of(sa_sync_conn, publication, pid),
+            contribution_id_of(sa_sync_conn, publication, pid),
             source_contribution,
             source_record,
         )
@@ -66,8 +69,8 @@ class TestGetPublicationDetail:
         assert detail.contributions[0].source_hal is True
         assert detail.contributions[0].source_openalex is False
 
-    def test_contributions_are_groups_with_person(self, sa_sync_conn):
-        """Les auteurs consolidés sont les groupes rattachés à une personne, dans l'ordre de `reference_position`. Les sources sont celles des enregistrements sources des membres du groupe."""
+    def test_contributions_have_a_person(self, sa_sync_conn):
+        """Les auteurs consolidés sont les contributions rattachées à une personne, dans l'ordre de `reference_position`. Les sources sont celles des enregistrements sources des contributions sources de la contribution."""
         first = insert_person(sa_sync_conn, "Premier", first_name="A")
         second = insert_person(sa_sync_conn, "Second", first_name="B")
         publication = insert_publication(sa_sync_conn)
@@ -79,19 +82,19 @@ class TestGetPublicationDetail:
         )
         insert_contribution(sa_sync_conn, publication, person_id=second, author_position=2)
         insert_contribution(sa_sync_conn, publication, person_id=first, author_position=1)
-        # Contribution source HAL de la personne, hors de son groupe : sans effet sur les sources.
+        # Contribution source HAL de la personne, hors de sa contribution : sans effet sur les sources.
         insert_source_contribution(sa_sync_conn, hal_record)
         openalex_contribution = insert_source_contribution(
             sa_sync_conn, openalex_record, source="openalex"
         )
-        add_group_member(
+        add_aligned_source_contribution(
             sa_sync_conn,
-            group_id_of(sa_sync_conn, publication, first),
+            contribution_id_of(sa_sync_conn, publication, first),
             openalex_contribution,
             openalex_record,
         )
         orphan = insert_source_contribution(sa_sync_conn, hal_record, author_position=3)
-        insert_group(sa_sync_conn, publication, [(orphan, hal_record)])
+        align_source_contributions(sa_sync_conn, publication, [(orphan, hal_record)])
 
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None

@@ -19,13 +19,13 @@ from pipeline.transformation.publications.publication_perimeter import (
 )
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
-from tests.integration.helpers.config import set_config
-from tests.integration.helpers.contributions import group_id_of, insert_contribution
-from tests.integration.helpers.groups import (
-    add_group_member,
-    insert_group,
-    set_perimeter_author_group,
+from tests.integration.helpers.alignment import (
+    add_aligned_source_contribution,
+    align_source_contributions,
+    set_perimeter_author_contribution,
 )
+from tests.integration.helpers.config import set_config
+from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -73,7 +73,7 @@ def address_service(sa_sync_conn):
 # ── exclude_contribution ────────────────────────────────────────
 
 
-def _group_person(conn, contribution_id):
+def _contribution_person(conn, contribution_id):
     return conn.execute(
         text("SELECT person_id, resolution_mode::text AS mode FROM contributions WHERE id = :g"),
         {"g": contribution_id},
@@ -81,9 +81,9 @@ def _group_person(conn, contribution_id):
 
 
 class TestExcludeContribution:
-    """exclude_contribution enregistre le rejet dans `rejected_contributions`, puis détache le groupe de la paire (cœur partagé `reject_pair`)."""
+    """exclude_contribution enregistre le rejet dans `rejected_contributions`, puis détache la contribution de la paire (cœur partagé `reject_pair`)."""
 
-    def test_rejects_and_detaches_group(self, sa_sync_conn, service):
+    def test_rejects_and_detaches_contribution(self, sa_sync_conn, service):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication_id)
@@ -91,7 +91,7 @@ class TestExcludeContribution:
 
         service.exclude_contribution(contribution_id)
 
-        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
+        assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
         # Rejet enregistré dans le sidecar
         assert (
             sa_sync_conn.execute(
@@ -108,12 +108,12 @@ class TestExcludeContribution:
         with pytest.raises(NotFoundError):
             service.exclude_contribution(999999)
 
-    def test_raises_not_found_for_group_without_person(self, sa_sync_conn, service):
-        """Un groupe sans personne n'est pas une contribution."""
+    def test_raises_not_found_for_contribution_without_person(self, sa_sync_conn, service):
+        """Une contribution sans personne n'est pas une contribution."""
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
-        contribution_id = insert_group(
+        contribution_id = align_source_contributions(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
@@ -130,18 +130,18 @@ class TestExcludeContribution:
         insert_contribution(sa_sync_conn, publication_id, person_id=p1)
         a2 = insert_contribution(sa_sync_conn, publication_id, person_id=p2)
 
-        service.exclude_contribution(group_id_of(sa_sync_conn, publication_id, p1))
+        service.exclude_contribution(contribution_id_of(sa_sync_conn, publication_id, p1))
 
-        assert _group_person(sa_sync_conn, a2) == (p2, "manual")
+        assert _contribution_person(sa_sync_conn, a2) == (p2, "manual")
 
 
 # ── reject_pair ───────────────────────────────────────────────
 
 
 class TestRejectPair:
-    """reject_pair : cœur partagé — store peuplé, groupe de la paire détaché."""
+    """reject_pair : cœur partagé — store peuplé, contribution de la paire détachée."""
 
-    def test_detaches_group_of_pair(self, sa_sync_conn, repo):
+    def test_detaches_contribution_of_pair(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
@@ -168,9 +168,9 @@ class TestRejectPair:
             ).first()
             is not None
         )
-        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
+        assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
 
-    def test_does_not_touch_other_persons_groups(self, sa_sync_conn, repo):
+    def test_does_not_touch_other_persons_contributions(self, sa_sync_conn, repo):
         publication_id = _publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication_id)
         p1 = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
@@ -185,15 +185,15 @@ class TestRejectPair:
             repo=repo,
         )
 
-        assert _group_person(sa_sync_conn, g1) == (None, None)
-        assert _group_person(sa_sync_conn, g2) == (p2, "manual")
+        assert _contribution_person(sa_sync_conn, g1) == (None, None)
+        assert _contribution_person(sa_sync_conn, g2) == (p2, "manual")
 
 
 # ── propagate_in_perimeter_for_addresses ───────────────────────────────
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources, de leurs groupes et de leurs publications, après une modification de address_structures.
+    """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources, de leurs contributions et de leurs publications, après une modification de address_structures.
 
     `contribution_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
 
@@ -228,9 +228,9 @@ class TestPropagateUcaForAddresses:
         source_record_id = _source_record(sa_sync_conn, publication_id)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id, roles=["author"])
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
-        add_group_member(
+        add_aligned_source_contribution(
             sa_sync_conn,
-            group_id_of(sa_sync_conn, publication_id, person_id),
+            contribution_id_of(sa_sync_conn, publication_id, person_id),
             source_contribution_id,
             source_record_id,
         )
@@ -262,7 +262,7 @@ class TestPropagateUcaForAddresses:
                 "        WHERE contribution_id = a.id) AS structure_ids "
                 "FROM contributions a WHERE a.id = :id"
             ),
-            {"id": group_id_of(sa_sync_conn, publication_id, person_id)},
+            {"id": contribution_id_of(sa_sync_conn, publication_id, person_id)},
         ).one()
         assert a.in_perimeter is True
         assert a.structure_ids == [uca_id]
@@ -335,19 +335,19 @@ class TestRejectionAnchoredOnSourceRecords:
         assert self._rejected(sa_sync_conn, publication_a, person_id)
 
 
-# ── Groupes des décisions humaines ──────────────────────────────
+# ── Contributions des décisions humaines ──────────────────────────────
 
 
-class TestHumanDecisionsOnGroups:
-    """Les décisions humaines écrivent aussi le groupe, que les lecteurs affichent sans attendre le run suivant."""
+class TestHumanDecisionsOnContributions:
+    """Les décisions humaines écrivent aussi la contribution, que les lecteurs affichent sans attendre le run suivant."""
 
-    def test_le_rejet_detache_le_groupe(self, sa_sync_conn, repo):
+    def test_le_rejet_detache_la_contribution(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         insert_source_contribution(sa_sync_conn, source_record_id)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        contribution_id = group_id_of(sa_sync_conn, publication_id, person_id)
+        contribution_id = contribution_id_of(sa_sync_conn, publication_id, person_id)
 
         reject_pair(
             publication_id,
@@ -356,34 +356,36 @@ class TestHumanDecisionsOnGroups:
             repo=repo,
         )
 
-        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
+        assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
 
-    def test_l_epinglage_rattache_le_groupe_sans_personne(self, sa_sync_conn, repo):
+    def test_l_epinglage_rattache_la_contribution_sans_personne(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
-        contribution_id = insert_group(
+        contribution_id = align_source_contributions(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
         repo.pin_contributions([source_contribution_id], person_id)
 
-        assert _group_person(sa_sync_conn, contribution_id) == (person_id, "manual")
+        assert _contribution_person(sa_sync_conn, contribution_id) == (person_id, "manual")
 
-    def test_l_epinglage_cede_devant_un_groupe_manuel_de_la_personne(self, sa_sync_conn, repo):
+    def test_l_epinglage_cede_devant_une_contribution_manuelle_de_la_personne(
+        self, sa_sync_conn, repo
+    ):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
-        other_group = insert_group(
+        other_contribution = align_source_contributions(
             sa_sync_conn, publication_id, [(source_contribution_id, source_record_id)]
         )
 
         repo.pin_contributions([source_contribution_id], person_id)
 
-        assert _group_person(sa_sync_conn, other_group) == (None, None)
+        assert _contribution_person(sa_sync_conn, other_contribution) == (None, None)
 
 
 def _publication_evidence(conn, publication_id):
@@ -394,7 +396,7 @@ def _publication_evidence(conn, publication_id):
 
 
 class TestHumanDecisionsOnPublicationPerimeter:
-    """Les décisions humaines recalculent l'appartenance au périmètre des publications dont elles changent les groupes."""
+    """Les décisions humaines recalculent l'appartenance au périmètre des publications dont elles changent les contributions."""
 
     def test_le_rejet_sort_la_publication_du_perimetre(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
@@ -415,16 +417,16 @@ class TestHumanDecisionsOnPublicationPerimeter:
         assert _publication_evidence(sa_sync_conn, publication_id) == []
 
     def _orphan(self, conn, source_id):
-        """Publication hors périmètre dont le seul groupe, sans personne, est un groupe d'auteur du périmètre. Rend (publication, groupe)."""
+        """Publication hors périmètre dont le seule contribution, sans personne, est une contribution d'auteur du périmètre. Rend (publication, contribution)."""
         publication_id = insert_publication(conn)
         source_record_id = _source_record(conn, publication_id, source_id=source_id)
         source_contribution_id = insert_source_contribution(
             conn, source_record_id, author_name_normalized="jean dupont"
         )
-        contribution_id = insert_group(
+        contribution_id = align_source_contributions(
             conn, publication_id, [(source_contribution_id, source_record_id)]
         )
-        set_perimeter_author_group(conn, contribution_id)
+        set_perimeter_author_contribution(conn, contribution_id)
         return publication_id, contribution_id
 
     def test_l_attribution_fait_entrer_la_publication(self, sa_sync_conn, service):
@@ -437,10 +439,12 @@ class TestHumanDecisionsOnPublicationPerimeter:
 
     def test_l_attribution_en_lot_fait_entrer_les_publications(self, sa_sync_conn, service):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
-        first, first_group = self._orphan(sa_sync_conn, "hal-a")
-        second, second_group = self._orphan(sa_sync_conn, "hal-b")
+        first, first_contribution = self._orphan(sa_sync_conn, "hal-a")
+        second, second_contribution = self._orphan(sa_sync_conn, "hal-b")
 
-        service.batch_assign_orphan_contributions(person_id, [first_group, second_group])
+        service.batch_assign_orphan_contributions(
+            person_id, [first_contribution, second_contribution]
+        )
 
         assert _publication_evidence(sa_sync_conn, first) == ["address"]
         assert _publication_evidence(sa_sync_conn, second) == ["address"]

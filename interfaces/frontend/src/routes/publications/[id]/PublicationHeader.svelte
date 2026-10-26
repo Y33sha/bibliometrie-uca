@@ -1,7 +1,8 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import DocTypePill from "#lib/components/DocTypePill.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
-  import { docTypeColor, docTypeSingular, relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
+  import { relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
   import type { PubDetail, RelatedPublication } from "./types";
 
   const { pub, relations = [] }: { pub: PubDetail; relations?: RelatedPublication[] } = $props();
@@ -30,7 +31,7 @@
 
 <div class="publication-header">
   <div class="publication-meta">
-    {#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+    {#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
     {#if pub.publication_year}<span class="publication-year">{pub.publication_year}</span>{/if}
     {#if pub.doi}<span class="publication-doi"><span class="doi-label">DOI</span> <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>{/if}
   </div>

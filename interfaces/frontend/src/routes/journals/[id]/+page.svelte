@@ -5,8 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { oaLabelsMap } from '#lib/labels.js';
-	import { docTypeSingular, issnLabel } from '#lib/labels.js';
+	import { docTypeLabel, issnLabel, oaStatusLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
@@ -41,14 +40,14 @@
 	// Distributions en segments pour les doughnuts ; `expected=false` (valeur inattendue pour le type de revue / modèle OA) est signalé visuellement par le composant (couleur d'alerte + ⚠ en légende), sans énumérer les valeurs attendues.
 	const docTypeSegments = $derived(
 		(dashboard?.doc_types ?? []).map((d) => ({
-			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
+			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
 			value: d.count,
 			expected: d.expected
 		}))
 	);
 	const oaStatusSegments = $derived(
 		(dashboard?.oa_statuses ?? []).map((o) => ({
-			label: o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)',
+			label: o.oa_status ? oaStatusLabel(o.oa_status) : '(non renseigné)',
 			value: o.count,
 			color: oaStatusColor(o.oa_status),
 			expected: o.expected
@@ -58,6 +57,7 @@
 	let showRawDoaj = $state(false);
 
 	let serialTypeLabels: Record<string, string> = $state({});
+	let oaModelLabels: Record<string, string> = $state({});
 
 	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé via le toggle (« Voir payload brut ») pour permettre l'exploration au-delà de cette sélection.
 	const READABLE_DOAJ_FIELDS: { key: string; label: string }[] = [
@@ -98,10 +98,14 @@
 	}
 
 	onMount(async () => {
-		const labelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
-			serialTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+		const typeLabelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
+			serialTypeLabels = labelMap(opts);
 		});
-		await Promise.all([loadSerial(), labelsP]);
+		const oaModelLabelsP = api<EnumOption[]>('/api/serials/oa-models').then((opts) => {
+			oaModelLabels = labelMap(opts);
+		});
+		await Promise.all([loadSerial(), typeLabelsP, oaModelLabelsP]);
 		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
@@ -156,7 +160,7 @@
 			{/if}
 			{#if journal.oa_model}
 				<span class="entity-meta-label">OA</span>
-				<span class="entity-tag">{journal.oa_model}</span>
+				<span class="entity-tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
 			{/if}
 		</div>
 	</div>
