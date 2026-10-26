@@ -36,6 +36,7 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 - Les créations de structure et de forme de nom reçoivent un modèle typé, déclaré dans le port comme `StructureUpdate`.
 - Les mises à jour des éditeurs et des périmètres gardent leur forme : un `edit` de l'agrégat, sur le modèle de `Serial.edit`, coûterait plus qu'il ne simplifie.
 - La vérification d'existence des fusions rend `None`.
+- Chaque agrégat a un objet de service, qui reçoit ses repositories et ses recalculs à la construction. Une fabrique de `deps.py` le construit sur une connexion ; une route d'écriture reçoit seulement le service.
 - La docstring d'un port décrit le contrat : ce que la méthode rend et lève, sans tables ni requêtes, sans modèle de réponse de l'API.
 - Le statut, les signaux et les métriques d'une exécution de phase vont dans `domain/pipeline_runs.py`, que le pipeline, l'infrastructure et `application/` importent tous trois. `PhaseExecution` va dans `infrastructure/observability/phase_executions.py`, son seul utilisateur. Le pipeline importe alors `domain/` et l'infrastructure, sans exception pour `application/`.
 
@@ -72,9 +73,17 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 - [x] Vocabulaire d'une exécution de phase dans `domain/pipeline_runs.py`, `PhaseExecution` dans l'infrastructure ; exception `pipeline.** -> application.ports.**` retirée du contrat d'import
 - [x] `PhaseStatus` en `StrEnum` ; statut d'un run calculé par `worst_status` (domaine), seule déclaration de la règle
 
+### Phase 6 — Un objet de service par agrégat
+
+- [x] `PersonService` (`c4cedae14`)
+- [x] `ContributionService` : rejet et attribution des contributions orphelines réunis dans un module (`bf0fe23b2`)
+- [x] `SerialService` et `PublisherService` ; les scripts ponctuels construisent leurs services par les fabriques de `deps.py` (`73e0c5acd`)
+- [x] `StructureService` et `PerimeterService` (`b2785cb87`)
+- [x] `AddressService`, tâches de fond comprises, et `ConfigService` ; `deps.py` sépare lectures et écritures (`280e5be75`)
+- [x] Documentation d'architecture
+
 ## Questions ouvertes
 
-- Un objet de service par agrégat, construit dans `deps.py`, réduirait chaque route d'écriture à une dépendance. Le volume de câblage restant après la phase 1 décide de son intérêt.
 - Ports de lecture. Leur `Protocol` reproduit l'adaptateur méthode par méthode, pour une seule implémentation et, le plus souvent, un seul routeur ; il tient l'infrastructure hors des routeurs (contrat d'import). Deux réductions possibles, cumulables :
   - dans l'infrastructure, une seule déclaration par lecture : la méthode de la classe `Pg…` contient la requête, ou la fonction de module suffit ;
   - sans `Protocol` de lecture, les routeurs reçoivent l'adaptateur concret. Les modèles de réponse restent dans `application/`, que l'infrastructure et les routeurs importent tous deux. Le contrat d'import s'assouplit pour les lectures.
