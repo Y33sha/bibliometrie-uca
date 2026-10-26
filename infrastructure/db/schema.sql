@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7wwhJbehffC6WGP28fjKDGgS40DyYqSh0opGC8rsBV0h5yYU4WynWQauk7qYz3O
+\restrict agJ4oF6K1HdsNWWAnrwPmxphv7jfcWAqpJu7T8aUb3DyQUBvponatG4brWHBePf
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2057,7 +2057,6 @@ CREATE TABLE publishing.serial_issns (
     support public.issn_support,
     linking boolean DEFAULT false NOT NULL,
     status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
-    replaced_by text,
     sudoc_checked_at timestamp with time zone
 );
 
@@ -2095,13 +2094,6 @@ COMMENT ON COLUMN publishing.serial_issns.linking IS 'Vrai pour l''ISSN-L de la 
 --
 
 COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
-
-
---
--- Name: COLUMN serial_issns.replaced_by; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.serial_issns.replaced_by IS 'ISSN successeur : titre suivant, forme corrigée d''une valeur mal formée.';
 
 
 --
@@ -5379,5 +5371,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7wwhJbehffC6WGP28fjKDGgS40DyYqSh0opGC8rsBV0h5yYU4WynWQauk7qYz3O
+\unrestrict agJ4oF6K1HdsNWWAnrwPmxphv7jfcWAqpJu7T8aUb3DyQUBvponatG4brWHBePf
 
