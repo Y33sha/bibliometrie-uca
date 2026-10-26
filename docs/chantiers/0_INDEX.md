@@ -95,8 +95,6 @@
 - 2026-07-01 — [Observabilité du pipeline](archived/2026-07-01_CODE_observabilite-pipeline.md)
 - 2026-06-30 — [Brancher le domaine riche orphelin](archived/2026-06-30_CODE_domaine-riche-orphelin.md)
 - 2026-06-29 — [Déduire le journal_id manquant par préfixe DOI](archived/2026-06-29_DATA_journal-id-par-doi-prefix.md)
-- 2026-06-28 — [Visualisations dynamiques (pivot listes ↔ tableaux de bord)](archived/2026-06-28_METIER_visualisations-pivot.md)
-- 2026-06-26 — [Déduplication des publications sans identifiant fiable (arête pairwise-gated)](archived/2026-06-26_DATA_dedup-pairwise-gated.md)
 
 
 

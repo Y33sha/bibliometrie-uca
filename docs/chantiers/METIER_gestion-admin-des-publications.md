@@ -12,7 +12,7 @@
 
 **La comparaison des sources** vit dans la page publique d'une publication (`publications/[id]/SourceComparison.svelte`, 501 lignes), réservée à l'administration connectée. Elle aligne les auteurs par position pour quatre sources codées en dur : HAL, OpenAlex, WoS, ScanR. La réponse de l'API (`PublicationDetailResponse`) porte une liste de contributions sources par source nommée (`hal_contributions`, `openalex_contributions`…) : Crossref et DataCite n'y figurent pas.
 
-**Une conception antérieure existe.** La fiche archivée [dédoublonnage par paires gardées](archived/2026-06-26_DATA_dedup-pairwise-gated.md) esquisse des « contrôles admin » sur le modèle opt-out : le pipeline fusionne d'office, l'administration contrôle a posteriori.
+**Une conception antérieure** esquisse des « contrôles admin » sur le modèle opt-out : le pipeline fusionne d'office, l'administration contrôle a posteriori.
 - Détecteur de fusions suspectes : recouvrement d'auteurs faible ou nul, titre court ou générique, `container_title` divergent pour les chapitres, groupe anormalement gros.
 - Verdicts ancrés sur les `source_records`, jamais sur les `publications`, dont l'identifiant change à chaque réconciliation : un discriminant de scission (valeurs différentes ⇒ jamais dans le même groupe) et un jeton de fusion forcée (valeur commune ⇒ même groupe), branchés sur les mécanismes de regroupement existants.
 
