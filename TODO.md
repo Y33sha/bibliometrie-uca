@@ -1,13 +1,3 @@
-python -m interfaces.cli.oneshot.backfill_source_record_publishers
-python -m interfaces.cli.oneshot.apply_known_platforms
-run_pipeline --only publications
-python -m interfaces.cli.oneshot.detach_ebook_platforms
-python -m interfaces.cli.oneshot.apply_known_platforms
-python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store --sources hal,openalex
-run_pipeline --from normalize --sources hal,openalex --no-extras
-python -m interfaces.cli.oneshot.merge_publisher_aliases
-python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles
-
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 * [ ] plafond d'interrogations sudoc
