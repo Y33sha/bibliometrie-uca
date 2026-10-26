@@ -2,7 +2,7 @@
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
@@ -36,8 +36,7 @@
 		const p = new URLSearchParams();
 		if (selectedLabId) p.set('lab_id', String(selectedLabId));
 		if (list.page > 1) p.set('page', String(list.page));
-		const qs = p.toString();
-		replaceState(resolve('hal-problems/missing-collections') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('hal-problems/missing-collections'), p);
 	}
 
 	async function loadLabs() {

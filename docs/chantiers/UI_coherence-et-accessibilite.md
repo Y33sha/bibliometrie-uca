@@ -107,7 +107,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - **Valeur absente** : cellule vide.
 - **Export CSV sur toutes les listes.** Menu de colonnes sur les listes à nombreuses colonnes.
 - **Aucun défilement horizontal de la page**, à toutes les largeurs. Un tableau trop large défile dans son conteneur, avec un indice visuel au bord.
-- **Navigation SvelteKit** : `goto(url, { replace: true })`, à la place de `replaceState`.
+- **Écriture de l'URL** par `replaceQuery` et `setQueryParam` (`lib/url.ts`), qui appellent `goto(url, { replace: true, reset: false })`.
 - **Sous-menus de navigation** ouverts au clic, au clavier et au survol ; fermés par Échap et par un clic extérieur.
 - **Structure de page** : un `<main>`, un lien d'évitement, un seul H1 par page, titres de section en H2 sur les fiches. Le nom du site est hors des titres. Le H1 des listes est réservé aux lecteurs d'écran.
 - **Aucun focus automatique au chargement d'une page.** Seul un champ ouvert par une action le prend : édition en place, sélecteur, filtre ajouté.
@@ -128,8 +128,8 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 2. API de navigation SvelteKit
 
-- [ ] `goto(..., { replace: true })` dans les 6 fichiers
-- [ ] Les 10 pages en `replaceState()` sur `goto`
+- [x] `replaceQuery` et `setQueryParam` dans `lib/url.ts`, utilisés par `useUrlFilters`, `pagination.ts`, `TabNav` et les 10 pages
+- [x] Redirections de `routes/+page.svelte` et `admin/+layout.svelte` en `goto(..., { replace: true })`
 
 ### 3. Libellés
 

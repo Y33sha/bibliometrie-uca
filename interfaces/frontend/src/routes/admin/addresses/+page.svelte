@@ -4,7 +4,7 @@
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { addresses as addressesApi, api, ApiError, structures as structuresApi } from '#lib/api/index.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import { toast } from '#lib/dialogs.svelte.js';
@@ -95,9 +95,7 @@
 		if (currentValidation !== 'pending') sp.set('validation', currentValidation);
 		serializePredicateParams(sp);
 		if (list.page > 1) sp.set('page', String(list.page));
-		const qs = sp.toString();
-		const newUrl = window.location.pathname + (qs ? '?' + qs : '');
-		replaceState(newUrl, {});
+		void replaceQuery(window.location.pathname, sp);
 	}
 
 	// ---- Reactive state ----

@@ -3,7 +3,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { api, ApiError, orphanContributions } from '#lib/api/index.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -214,8 +214,7 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
-		const qs = p.toString();
-		replaceState(resolve('admin/orphan-contributions') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('admin/orphan-contributions'), p);
 	}
 
 	let debounceTimer: ReturnType<typeof setTimeout>;

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -37,8 +37,7 @@
 		if (activeTab !== 'doi') p.set('tab', activeTab);
 		if (doi.page > 1) p.set('doi_page', String(doi.page));
 		if (meta.page > 1) p.set('meta_page', String(meta.page));
-		const qs = p.toString();
-		replaceState(resolve('hal-problems/duplicate-publications') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('hal-problems/duplicate-publications'), p);
 	}
 
 	function switchTab(tab: 'doi' | 'meta') {

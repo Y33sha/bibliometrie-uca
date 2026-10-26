@@ -2,7 +2,7 @@
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -25,8 +25,7 @@
 	function syncUrl() {
 		const p = new URLSearchParams();
 		if (list.page > 1) p.set('page', String(list.page));
-		const qs = p.toString();
-		replaceState(resolve('hal-problems/affiliation-conflicts') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('hal-problems/affiliation-conflicts'), p);
 	}
 
 

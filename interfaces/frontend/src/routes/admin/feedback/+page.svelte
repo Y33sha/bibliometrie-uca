@@ -3,7 +3,7 @@
   import ResultCount from '#lib/components/ResultCount.svelte';
   import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
-  import { replaceState } from "$app/navigation";
+  import { replaceQuery } from "#lib/url.js";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
@@ -48,9 +48,7 @@
     if (currentTab !== "fn") sp.set("tab", currentTab);
     if (search) sp.set("search", search);
     if (list.page > 1) sp.set("page", String(list.page));
-    const qs = sp.toString();
-    const newUrl = window.location.pathname + (qs ? "?" + qs : "");
-    replaceState(newUrl, {});
+    void replaceQuery(window.location.pathname, sp);
   }
 
   // ---------- State ----------

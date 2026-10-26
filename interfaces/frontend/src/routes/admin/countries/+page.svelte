@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
-	import { replaceState } from '$app/navigation';
+	import { replaceQuery } from '#lib/url.js';
 	import { addresses as addressesApi, api } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
@@ -97,8 +97,7 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedCountry.length === 1) p.set('country', selectedCountry[0]);
-		const qs = p.toString();
-		replaceState(resolve('admin/countries') + (qs ? '?' + qs : ''), {});
+		void replaceQuery(resolve('admin/countries'), p);
 	}
 
 	function onFilterChange() {

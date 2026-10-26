@@ -7,8 +7,8 @@ vi.mock('$app/navigation', () => ({
 }));
 vi.mock('$app/paths', () => ({ resolve: (path: string) => '/bibliometrie/' + path }));
 
-// `syncUrl` appelle `goto(url, { replaceState, reset })`.
-const GOTO_OPTS = { replaceState: true, reset: false };
+// `syncUrl` appelle `goto(url, { replace, reset })`.
+const GOTO_OPTS = { replace: true, reset: false };
 
 // Import APRÈS les mocks pour qu'ils s'appliquent.
 const { useUrlFilters } = await import('./useUrlFilters.svelte');
