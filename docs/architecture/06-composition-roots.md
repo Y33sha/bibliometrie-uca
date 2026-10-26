@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-Un composition root est l'endroit où les adaptateurs concrets sont instanciés et câblés aux services et orchestrateurs. Ailleurs, on reçoit un port en paramètre.
+Un composition root instancie les adaptateurs concrets et les remet aux services. Le reste du code reçoit ses dépendances en paramètre.
 
 **L'API en a deux.**
 - `app.py` construit l'engine au démarrage et le libère à l'arrêt ;

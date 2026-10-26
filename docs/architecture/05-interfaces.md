@@ -20,6 +20,6 @@
 
 ## Routes synchrones
 
-Aucune route n'est `async def`. FastAPI les exécute donc dans le threadpool de Starlette. Les seules fonctions `async` sont les constructions qu'impose Starlette — cycle de vie, gestionnaires d'erreurs, middlewares — et aucune ne touche la base.
+Aucune route n'est `async def`. FastAPI les exécute donc dans le threadpool d'anyio. Les seules fonctions `async` sont les constructions qu'impose Starlette — cycle de vie, gestionnaires d'erreurs, middlewares — et aucune ne touche la base.
 
 La concurrence de l'API est donc celle du threadpool, dimensionné par `API_THREADPOOL_SIZE`. Le plafond du pool de connexions (`DB_POOL_MAX`) doit être au moins égal.
