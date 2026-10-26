@@ -39,7 +39,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 ## Décisions
 
 - **L'administration est un état de la session.** Un seul site. Les pages communes ajoutent leurs fonctions d'administration quand l'utilisateur de la session a le rôle admin. Les pages propres à l'administration (pipeline, configuration, adresses, pays, files de triage) restent des pages à part, dans la même barre de navigation.
-- **Connexion par le CAS de l'université.** La table `users` liste les utilisateurs autorisés, par leur identifiant CAS. Les rôles (`roles`, `user_roles`) sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
+- **Comptes : `users`, `roles`, `user_roles`.** La table `users` liste les utilisateurs autorisés. Les rôles sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
 - **Une page par structure**, sous la route `structures/[id]`. Un onglet « Gestion », réservé à l'admin, comporte l'édition, les tutelles et les formes de nom. Les libellés publics (« Laboratoires », « Chercheurs ») sont indépendants des routes.
 - **Volet d'édition ouvert par une icône** sur la ligne. Le titre ou le nom mène à la fiche.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
@@ -49,15 +49,14 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 ### 1. Comptes et rôles
 
 - [x] Tables `users`, `roles`, `user_roles` ; premier utilisateur admin déclaré dans les réglages (c74e9350c)
-- [ ] Connexion par le CAS ; refus d'un identifiant absent de `users`
 - [x] Session contenant l'identifiant de l'utilisateur ; garde des écritures qui exige le rôle admin (c74e9350c)
 - [x] `/api/auth/check` rend l'utilisateur et ses rôles (c74e9350c)
 
 ### 2. Session et navigation
 
-- [ ] État de session lu une fois dans le layout racine et partagé, à la place des appels de `admin/+layout.svelte` et de `persons/[id]`
-- [ ] Une seule barre de navigation ; entrées d'administration affichées selon le rôle ; suppression des liens « Admin » et « Public »
-- [ ] Retour à la page de départ après connexion
+- [x] État de session lu une fois dans le layout racine et partagé, à la place des appels de `admin/+layout.svelte` et de `persons/[id]` (d8d6c273d)
+- [x] Une seule barre de navigation ; entrées d'administration affichées selon le rôle ; suppression des liens « Admin » et « Public » (d8d6c273d)
+- [x] Retour à la page de départ après connexion (d8d6c273d)
 
 ### 3. Référentiels communs
 
@@ -77,4 +76,4 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
 - **Repère visuel du mode admin.** La barre d'administration a sa couleur (`--nav-admin`). La garder pour la session ouverte, ou signaler la session autrement.
 - **Vocabulaire des listes.** Un libellé par liste, session ouverte ou non : « Revues » ou « Publications en série » (la liste comporte des actes, des médias et des serveurs de preprints), « Labos » ou « Structures », « Chercheurs » ou « Personnes ».
-- **Comptes** : ajout des utilisateurs (ligne de commande ou interface), connexion sans CAS en développement, rôles autres qu'admin.
+- **Comptes** : page de gestion des utilisateurs, rôles autres qu'admin.
