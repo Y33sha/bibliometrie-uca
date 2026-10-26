@@ -3300,7 +3300,7 @@ export interface components {
             /** Hal Person Id */
             hal_person_id: number;
             /** Full Name */
-            full_name: string;
+            full_name: string | null;
             /** Idhal */
             idhal: string | null;
             /** Orcid */

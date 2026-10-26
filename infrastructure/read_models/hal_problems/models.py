@@ -126,7 +126,7 @@ class HalAffiliationConflictsResponse(PaginatedResponse):
 
 class HalAccountSummary(BaseModel):
     hal_person_id: int
-    full_name: str
+    full_name: str | None
     idhal: str | None
     orcid: str | None
     idref: str | None

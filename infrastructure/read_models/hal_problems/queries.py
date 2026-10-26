@@ -7,6 +7,7 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.source_records.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 from infrastructure.read_models._common import StructureRef
 from infrastructure.read_models.hal_problems.models import (
@@ -39,23 +40,19 @@ _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
-# Contributions sources HAL alignées dans une contribution rattachée à une personne `g.person_id`, avec la référence d'un compte HAL.
-_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
-    FROM contributions g
-    JOIN aligned_source_contributions m ON m.contribution_id = g.id
-    JOIN source_contributions sc ON sc.id = m.source_contribution_id
-    JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-    WHERE sc.source = 'hal'
-      AND g.person_id IS NOT NULL
-      AND {_HAL_PERSON_ID} IS NOT NULL
-"""
+# Condition sur une attribution d'identifiant `pi` : compte HAL attribué à la personne `pi.person_id`, hors attributions rejetées.
+_HAL_ACCOUNT_ATTRIBUTION = (
+    f"pi.id_type = '{PersonIdentifierType.HAL_PERSON_ID.value}'"
+    f" AND pi.status <> '{AttributionStatus.REJECTED.value}'"
+)
 
-# Personnes portant au moins deux comptes HAL distincts : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
+# Personnes auxquelles au moins deux comptes HAL sont attribués : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
-    SELECT g.person_id
-    {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-    GROUP BY g.person_id
-    HAVING COUNT(DISTINCT {_HAL_PERSON_ID}) >= 2
+    SELECT pi.person_id
+    FROM person_identifiers pi
+    WHERE {_HAL_ACCOUNT_ATTRIBUTION}
+    GROUP BY pi.person_id
+    HAVING COUNT(*) >= 2
 """
 
 
@@ -129,22 +126,39 @@ class HalProblemsQueries:
         ).one()
         total = total_row.total
 
+        # Chaque compte HAL attribué se détaille par les contributions sources HAL des contributions de la personne qui contiennent sa référence. Un compte absent de ces contributions a un nom vide et zéro publication.
         rows = self._conn.execute(
             text(f"""
-                WITH hal_accounts AS (
-                    SELECT
-                        g.person_id,
-                        ({_HAL_PERSON_ID})::int AS hal_person_id,
-                        MIN({contributor_display_name()}) AS full_name,
-                        MIN({_ORCID}) AS orcid,
-                        MIN({_IDHAL}) AS idhal,
-                        MIN({_IDREF}) AS idref,
-                        COUNT(*) AS publication_count
-                    {_HAL_ACCOUNT_SOURCE_CONTRIBUTIONS}
-                    GROUP BY g.person_id, {_HAL_PERSON_ID}
+                WITH page_persons AS MATERIALIZED (
+                    SELECT p.id, p.last_name, p.first_name, (prh.id IS NOT NULL) AS has_rh
+                    FROM persons p
+                    LEFT JOIN hr_records prh ON prh.person_id = p.id
+                    WHERE p.id IN ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS})
+                    ORDER BY LOWER(p.last_name), LOWER(p.first_name)
+                    LIMIT :pg_limit OFFSET :pg_offset
+                ),
+                hal_accounts AS (
+                    SELECT pi.person_id, pi.id_value::int AS hal_person_id, s.*
+                    FROM person_identifiers pi
+                    CROSS JOIN LATERAL (
+                        SELECT
+                            MIN({contributor_display_name()}) AS full_name,
+                            MIN({_ORCID}) AS orcid,
+                            MIN({_IDHAL}) AS idhal,
+                            MIN({_IDREF}) AS idref,
+                            COUNT(*) AS publication_count
+                        FROM contributions g
+                        JOIN aligned_source_contributions m ON m.contribution_id = g.id
+                        JOIN source_contributions sc ON sc.id = m.source_contribution_id
+                        JOIN contributor_information ci ON ci.id = sc.contributor_information_id
+                        WHERE g.person_id = pi.person_id
+                          AND sc.source = 'hal'
+                          AND {_HAL_PERSON_ID} = pi.id_value
+                    ) s
+                    WHERE {_HAL_ACCOUNT_ATTRIBUTION}
+                      AND pi.person_id IN (SELECT id FROM page_persons)
                 )
-                SELECT p.id AS person_id, p.last_name, p.first_name,
-                       (prh.id IS NOT NULL) AS has_rh,
+                SELECT pp.id AS person_id, pp.last_name, pp.first_name, pp.has_rh,
                        (SELECT json_agg(json_build_object(
                            'hal_person_id', ha.hal_person_id,
                            'full_name', ha.full_name,
@@ -153,13 +167,10 @@ class HalProblemsQueries:
                            'idref', ha.idref,
                            'publication_count', ha.publication_count
                        ) ORDER BY ha.hal_person_id)
-                        FROM hal_accounts ha WHERE ha.person_id = p.id
+                        FROM hal_accounts ha WHERE ha.person_id = pp.id
                        ) AS hal_accounts
-                FROM persons p
-                LEFT JOIN hr_records prh ON prh.person_id = p.id
-                WHERE p.id IN ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS})
-                ORDER BY LOWER(p.last_name), LOWER(p.first_name)
-                LIMIT :pg_limit OFFSET :pg_offset
+                FROM page_persons pp
+                ORDER BY LOWER(pp.last_name), LOWER(pp.first_name)
             """),
             {"pg_limit": per_page, "pg_offset": offset},
         ).all()
