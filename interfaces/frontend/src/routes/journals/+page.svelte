@@ -190,7 +190,6 @@
 	<title>{pageTitle("Publications en série")}</title>
 </svelte:head>
 
-<h1>Publications en série</h1>
 <p class="hint">
 	Liste des publications en série observées sur les publications du périmètre {institution.name}. Cliquer
 	sur une publication en série pour explorer ses publications, sa répartition par type/OA
@@ -285,7 +284,6 @@
 {/if}
 
 <style>
-	h1 { margin: 0 0 8px; font-size: 1.5rem; }
 	.hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
 
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }

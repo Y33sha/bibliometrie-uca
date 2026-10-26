@@ -122,7 +122,6 @@
 	<title>{pageTitle("Éditeurs")}</title>
 </svelte:head>
 
-<h1>Éditeurs</h1>
 <p class="hint">
 	Liste des éditeurs des publications en série observées sur les publications du périmètre
 	{institution.name}. Cliquer sur un éditeur pour explorer ses publications en série et ses
@@ -223,7 +222,6 @@
 {/if}
 
 <style>
-	h1 { margin: 0 0 8px; font-size: 1.5rem; }
 	.hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
 
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
