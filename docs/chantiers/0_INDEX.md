@@ -171,15 +171,4 @@
 
   Adoption de SQLAlchemy Core (pas l'ORM) comme *query builder* de référence pour les queries dynamiques, en coexistence pragmatique avec du SQL brut là où c'est plus lisible (CTE complexes, opérations JSON spécifiques à PostgreSQL).
 
-- 2026-05-09 — [Convergence sync/async (suppression de la duplication)](archived/2026-05-09_CODE_sync-async-deduplication.md)
-
-  Deux familles de repositories quasi identiques : *sync* (utilisées par le pipeline et les CLI) et *async* (utilisées par les routes FastAPI). Déduplication et passage en *sync* partout. Les routes `def` sont exécutées dans un threadpool Starlette (~40 workers par défaut).
-
-- 2026-05-08 — [Formalisation des règles métier dans `domain/`](archived/2026-05-08_CODE_regles-metier-domain.md)
-
-  Exploration de la codebase pour retrouver des invariants métier implicites dispersés dans `application/` et les rapatrier dans `domain/`.
-
-- 2026-05-06 — [Inversion de dépendance dans les routers](archived/2026-05-06_CODE_routers-di.md)
-
-  18 routers sur 20 importaient depuis `/infrastructure`, malgré l'interdiction documentée mais non enforcée. Mise en conformité et règle verrouillée par `import-linter`.
 
