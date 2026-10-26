@@ -4,8 +4,7 @@
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { oaLabelsMap } from '#lib/labels.js';
-	import { docTypeSingular } from '#lib/labels.js';
+	import { docTypeLabel, oaStatusLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
@@ -42,13 +41,13 @@
 	// Distributions en segments pour les doughnuts (palette neutre ; pas de notion d'« attendu » au niveau éditeur, agrégat multi-revues).
 	const docTypeSegments = $derived(
 		(dashboard?.doc_types ?? []).map((d) => ({
-			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
+			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
 			value: d.count
 		}))
 	);
 	const oaStatusSegments = $derived(
 		(dashboard?.oa_statuses ?? []).map((o) => ({
-			label: o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)',
+			label: o.oa_status ? oaStatusLabel(o.oa_status) : '(non renseigné)',
 			value: o.count,
 			color: oaStatusColor(o.oa_status)
 		}))

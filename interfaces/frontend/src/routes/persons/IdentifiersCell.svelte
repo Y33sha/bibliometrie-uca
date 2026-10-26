@@ -1,6 +1,7 @@
 <script lang="ts">
   import IdentifierLink from "#lib/components/IdentifierLink.svelte";
   import { autofocus } from "#lib/actions/focus.js";
+  import { identifierTypeLabel } from "#lib/labels.js";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
 
   let {
@@ -27,7 +28,7 @@
           : ident.status === "confirmed"
             ? "confirmé"
             : "en attente";
-    return `${ident.id_type} (${ident.source}) — ${label}`;
+    return `${identifierTypeLabel(ident.id_type)} (${ident.source}) — ${label}`;
   }
 </script>
 
@@ -105,9 +106,9 @@
 {#if form}
   <div class="id-form">
     <select bind:value={form.id_type}>
-      <option value="orcid">ORCID</option>
-      <option value="idhal">idHAL</option>
-      <option value="idref">IdRef</option>
+      {#each ["orcid", "idhal", "idref"] as idType (idType)}
+        <option value={idType}>{identifierTypeLabel(idType)}</option>
+      {/each}
     </select>
     <input
       type="text"

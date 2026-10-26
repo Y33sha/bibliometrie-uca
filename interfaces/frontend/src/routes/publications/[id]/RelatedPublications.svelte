@@ -1,7 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
-  import { docTypeSingular, relationTypeLabel } from "#lib/labels.js";
+  import { docTypeLabel, relationTypeLabel } from "#lib/labels.js";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import type { RelatedPublication } from "./types";
 
@@ -21,9 +21,6 @@
   function label(rt: string): string {
     return relationTypeLabel[rt] ?? rt;
   }
-  function docTypeLabel(dt: string | null | undefined): string {
-    return dt ? (docTypeSingular[dt] ?? dt) : "";
-  }
 </script>
 
 {#if relations.length > 0}
@@ -38,7 +35,7 @@
               {#if r.publication_id}
                 <a href={resolve(`publications/${r.publication_id}`)}><PublicationTitle titre={r.title ?? r.doi} /></a>
                 <span class="meta">
-                  {#if r.publication_year}{r.publication_year}{/if}{#if r.publication_year && r.doc_type} · {/if}{docTypeLabel(r.doc_type)}
+                  {#if r.publication_year}{r.publication_year}{/if}{#if r.publication_year && r.doc_type} · {/if}{#if r.doc_type}{docTypeLabel(r.doc_type)}{/if}
                 </span>
               {:else}
                 <a href="https://doi.org/{r.doi}" target="_blank" rel="noopener">{r.doi}</a>

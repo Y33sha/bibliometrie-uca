@@ -64,6 +64,11 @@ export const docTypePlural: Record<string, string> = {
 	physical_object: 'Objets physiques'
 };
 
+/** Libellé (singulier) d'un `doc_type`, sinon la valeur brute. */
+export function docTypeLabel(docType: string): string {
+	return docTypeSingular[docType] ?? docType;
+}
+
 /** Familles de doc_types : un niveau grossier au-dessus du `doc_type` fin, pour grouper et filtrer les listes (distinguer les publications au sens strict des autres objets). Couvre exhaustivement l'enum `doc_type` ; l'ordre est celui d'affichage. Mémoires exclus des listes par ailleurs et thèses en cours invisibles → la famille académique s'intitule « Thèses » (ses membres visibles sont thèses + HDR). */
 export const docTypeFamilies: { key: string; label: string; types: string[] }[] = [
 	{
@@ -227,6 +232,24 @@ export const oaLabelsMap: Record<string, string> = {
 	closed: 'Closed',
 	unknown: 'Indéterminé'
 };
+
+/** Libellé d'un statut OA, sinon la valeur brute. */
+export function oaStatusLabel(oaStatus: string): string {
+	return oaLabelsMap[oaStatus] ?? oaStatus;
+}
+
+/** Libellés des types d'identifiant d'une personne. */
+export const identifierTypeLabels: Record<string, string> = {
+	orcid: 'ORCID',
+	idhal: 'idHAL',
+	idref: 'IdRef',
+	hal_person_id: 'Compte HAL'
+};
+
+/** Libellé d'un type d'identifiant d'une personne, sinon la valeur brute. */
+export function identifierTypeLabel(idType: string): string {
+	return identifierTypeLabels[idType] ?? idType;
+}
 
 
 /** Classes CSS associées aux statuts d'identifiant personne. */

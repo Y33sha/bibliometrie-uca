@@ -13,6 +13,7 @@
 	import { paramsToQuery } from '#lib/utils.js';
 	import {
 		oaLabelsMap,
+		oaStatusLabel,
 		docTypePlural,
 		docTypeFamilies,
 		docTypeGroupedColors,
@@ -116,7 +117,7 @@
 	}
 	function dimLabel(dim: string, value: string): string {
 		if (dim === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
-		if (dim === 'oa_voie') return oaLabelsMap[value] ?? value;
+		if (dim === 'oa_voie') return oaStatusLabel(value);
 		if (dim === 'doc_type_grouped')
 			return docTypePlural[value] ?? docTypeFamilies.find((f) => f.key === value)?.label ?? value;
 		// Libellés servis par la facette, y compris celui des publications sans licence.

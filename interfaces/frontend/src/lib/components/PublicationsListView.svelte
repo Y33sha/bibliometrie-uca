@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AccessButton from '#lib/components/AccessButton.svelte';
+	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
@@ -32,11 +33,9 @@
 		type ListFilter,
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import { oaLabelsMap } from '#lib/labels.js';
+	import { oaLabelsMap, oaStatusLabel } from '#lib/labels.js';
 	import { licenseLabels } from '#lib/licenses.js';
 	import {
-		docTypeSingular,
-		docTypeColor,
 		docTypePlural,
 		docTypeFamilies,
 		publicationsDocTypes,
@@ -664,7 +663,7 @@
 						</td>
 					{/if}
 					{#if col('type')}<td>
-						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
+						{#if p.doc_type}<DocTypePill docType={p.doc_type} />{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					{#if col('doi')}<td class="doi-cell">
@@ -711,7 +710,7 @@
 					</td>{/if}
 					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
-							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
+							<span class="oa-tag oa-{p.oa_status}">{oaStatusLabel(p.oa_status)}</span>
 						{/if}
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{p.license ? (licenseNames[p.license] ?? p.license) : ''}</td>{/if}

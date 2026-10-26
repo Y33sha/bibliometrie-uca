@@ -2,6 +2,7 @@
   import { untrack } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { docTypeLabel } from "#lib/labels.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
@@ -50,7 +51,7 @@
             <PublicationTitle titre={item.title} />
           </button>
           <span class="meta">
-            {item.doc_type}{#if item.publication_year} · {item.publication_year}{/if} ·
+            {docTypeLabel(item.doc_type)}{#if item.publication_year} · {item.publication_year}{/if} ·
             <a href={resolve(`publications/${item.publication_id}`)} target="_blank" rel="noopener"
               >listes d'auteurs</a
             >

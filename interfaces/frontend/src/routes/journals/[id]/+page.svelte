@@ -5,8 +5,7 @@
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { oaLabelsMap } from '#lib/labels.js';
-	import { docTypeSingular, issnLabel } from '#lib/labels.js';
+	import { docTypeLabel, issnLabel, oaStatusLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
@@ -41,14 +40,14 @@
 	// Distributions en segments pour les doughnuts ; `expected=false` (valeur inattendue pour le type de revue / modèle OA) est signalé visuellement par le composant (couleur d'alerte + ⚠ en légende), sans énumérer les valeurs attendues.
 	const docTypeSegments = $derived(
 		(dashboard?.doc_types ?? []).map((d) => ({
-			label: d.doc_type ? (docTypeSingular[d.doc_type] ?? d.doc_type) : '(non renseigné)',
+			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
 			value: d.count,
 			expected: d.expected
 		}))
 	);
 	const oaStatusSegments = $derived(
 		(dashboard?.oa_statuses ?? []).map((o) => ({
-			label: o.oa_status ? (oaLabelsMap[o.oa_status] ?? o.oa_status) : '(non renseigné)',
+			label: o.oa_status ? oaStatusLabel(o.oa_status) : '(non renseigné)',
 			value: o.count,
 			color: oaStatusColor(o.oa_status),
 			expected: o.expected

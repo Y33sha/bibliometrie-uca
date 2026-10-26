@@ -10,6 +10,7 @@
 	import { toast } from '#lib/dialogs.svelte.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
+	import { docTypeLabel } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
@@ -633,7 +634,7 @@
 											</div>
 											<div class="publication-meta-inline">
 												{p.publication_year}
-												{#if p.doc_type}&middot; {p.doc_type}{/if}
+												{#if p.doc_type}&middot; {docTypeLabel(p.doc_type)}{/if}
 												{#if p.author_name}&middot; {p.author_name}{/if}
 												{#if p.journal_title}&middot; {p.journal_title}{/if}
 												{#if p.doi}

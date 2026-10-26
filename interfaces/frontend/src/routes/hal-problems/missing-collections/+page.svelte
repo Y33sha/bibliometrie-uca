@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
@@ -7,7 +8,6 @@
 	import { onMount } from 'svelte';
 	import { api } from '#lib/api/index.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -93,7 +93,7 @@
 				<div class="publication-card">
 					<div class="publication-meta-line">
 						{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-						{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+						{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
 						{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
 						<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 					</div>

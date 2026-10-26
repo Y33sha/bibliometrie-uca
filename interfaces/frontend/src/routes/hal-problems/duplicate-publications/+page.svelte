@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { pageTitle } from '#lib/institution.svelte.js';
+	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
+	import { docTypeLabel } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -88,7 +89,7 @@
 				<div class="doi-card">
 					<div class="publication-meta-line">
 						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
-						{#if pair.publication.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pair.publication.doc_type)}">{docTypeSingular[pair.publication.doc_type] || pair.publication.doc_type}</span>{/if}
+						{#if pair.publication.doc_type}<DocTypePill docType={pair.publication.doc_type} />{/if}
 						<a href={resolve(`publications/${pair.publication.id}`)} class="publication-title"><PublicationTitle titre={pair.publication.title} /></a>
 					</div>
 					<div class="hal-list">
@@ -96,7 +97,7 @@
 							<div class="hal-row">
 								<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
 								{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
-								{#if hd.hal_doc_type}<span class="meta-badge type-badge">{hd.hal_doc_type}</span>{/if}
+								{#if hd.hal_doc_type}<span class="meta-badge type-badge">{docTypeLabel(hd.hal_doc_type)}</span>{/if}
 								<span class="author-count">{hd.author_count} aut.</span>
 							</div>
 						{/each}
@@ -125,7 +126,7 @@
 								<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
 								<div class="publication-meta-line">
 									{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-									{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+									{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
 									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
 								</div>
 								<div class="hal-list">
@@ -133,7 +134,7 @@
 										<div class="hal-row">
 											<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
 											{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
-											{#if hd.hal_doc_type}<span class="meta-badge type-badge">{hd.hal_doc_type}</span>{/if}
+											{#if hd.hal_doc_type}<span class="meta-badge type-badge">{docTypeLabel(hd.hal_doc_type)}</span>{/if}
 											<span class="author-count">{hd.author_count} aut.</span>
 										</div>
 									{/each}

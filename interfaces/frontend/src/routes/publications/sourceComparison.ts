@@ -1,5 +1,5 @@
 import type { components } from '#lib/api/schema.js';
-import { CONTRIBUTION_ROLE_ORDER, docTypeSingular, oaLabelsMap } from '#lib/labels.js';
+import { CONTRIBUTION_ROLE_ORDER, docTypeLabel, oaStatusLabel } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
@@ -121,7 +121,7 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'doc_type',
 			label: 'Type',
-			cell: (r) => ({ text: r.doc_type ? (docTypeSingular[r.doc_type] ?? r.doc_type) : null }),
+			cell: (r) => ({ text: r.doc_type ? docTypeLabel(r.doc_type) : null }),
 			compared: (r) => r.doc_type,
 		},
 		{
@@ -160,7 +160,7 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'oa_status',
 			label: 'Statut OA',
-			cell: (r) => ({ text: r.oa_status ? (oaLabelsMap[r.oa_status] ?? r.oa_status) : null }),
+			cell: (r) => ({ text: r.oa_status ? oaStatusLabel(r.oa_status) : null }),
 			compared: (r) => r.oa_status,
 		},
 	];
