@@ -1,5 +1,5 @@
 /**
- * Types partagés par la page `admin/persons` et ses sous-composants.
+ * Types partagés par la page des personnes et ses composants d'administration.
  *
  * Les types de réponses API proviennent du schéma OpenAPI généré (`#lib/api/schema.ts`) ; seuls les états d'UI locaux restent définis ici.
  */

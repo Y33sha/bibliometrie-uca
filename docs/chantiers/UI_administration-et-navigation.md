@@ -90,7 +90,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 #### 3f. Personnes
 
-- [ ] `PersonsListView` : facettes d'administration, colonne du périmètre, icône de volet, onglets de triage, bandeau des contributions orphelines ; suppression de la réécriture de `admin/persons`
+- [x] `PersonsListView` : facettes d'administration, colonne du périmètre, icône de volet, onglets de triage, bandeau des contributions orphelines ; suppression de la réécriture de `admin/persons`
 
 ### 4. Listes d'entités liées
 

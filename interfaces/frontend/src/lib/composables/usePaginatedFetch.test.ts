@@ -185,7 +185,7 @@ describe('usePaginatedFetch', () => {
 	});
 
 	it('une liste dont la page reste hors de l’URL ne touche pas l’URL', async () => {
-		window.history.replaceState({}, '', '/admin/persons?page=3');
+		window.history.replaceState({}, '', '/persons?page=3');
 		gotoSpy.mockClear();
 		apiSpy
 			.mockImplementationOnce(async () => ({ items: [], total: 10, page: 2, pages: 1 }))

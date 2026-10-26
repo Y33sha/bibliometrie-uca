@@ -239,7 +239,7 @@
 
 <div class="header">
 	<h1>Contributions orphelines ({list.total})</h1>
-	<a href={resolve('admin/persons')} class="btn">← Retour aux personnes</a>
+	<a href={resolve('persons')} class="btn">← Retour aux personnes</a>
 </div>
 
 <div class="info-box">

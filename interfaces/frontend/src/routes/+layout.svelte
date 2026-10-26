@@ -80,8 +80,6 @@
           <span class="nav-dropdown-group">Pipeline</span>
           <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
           <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
-          <span class="nav-dropdown-group">Référentiels</span>
-          <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
           <span class="nav-dropdown-group">Adresses</span>
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
