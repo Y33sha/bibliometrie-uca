@@ -1,9 +1,9 @@
-"""Attributs des groupes de contributions sources recomposés depuis leurs membres, pour les groupes en file (`SourceContributionGroupStore.propagate_attributes`)."""
+"""Attributs des contributions recomposés depuis leurs contributions sources, pour les contributions en file (`AuthorGroupingStore.propagate_attributes`)."""
 
 from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
-from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
+from pipeline.transformation.publications.author_grouping.store import AuthorGroupingStore
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
@@ -68,10 +68,12 @@ def _attributes(conn, group):
     ).one()
 
 
-def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
+def test_les_attributs_de_la_contribution_reunissent_ceux_de_ses_contributions_sources(
+    sa_sync_conn,
+):
     conn = sa_sync_conn
     group = _group_of_two(conn)
-    store = SourceContributionGroupStore(conn)
+    store = AuthorGroupingStore(conn)
 
     assert store.propagate_attributes() == (1, 1)
 
@@ -86,11 +88,11 @@ def test_les_attributs_du_groupe_reunissent_ceux_de_ses_membres(sa_sync_conn):
     assert store.propagate_attributes() == (0, 0)
 
 
-def test_un_groupe_hors_file_garde_ses_attributs(sa_sync_conn):
+def test_une_contribution_hors_file_garde_ses_attributs(sa_sync_conn):
     conn = sa_sync_conn
     group = _group_of_two(conn)
     clear(conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
-    assert SourceContributionGroupStore(conn).propagate_attributes() == (0, 0)
+    assert AuthorGroupingStore(conn).propagate_attributes() == (0, 0)
 
     assert _attributes(conn, group).roles is None

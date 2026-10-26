@@ -18,7 +18,7 @@ from infrastructure.repositories.publisher_repository import PgPublisherReposito
 from infrastructure.repositories.serial_repository import PgSerialRepository
 from infrastructure.repositories.structure_repository import PgStructureRepository
 from pipeline.ingestion.common.staging import StagingStore
-from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
+from pipeline.transformation.publications.author_grouping.store import AuthorGroupingStore
 from pipeline.transformation.publications.consolidation import source_records_of
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
@@ -61,7 +61,7 @@ class TestRelevesRendantUneListe:
         assert store.fetch_staging_by_ids([1]) == []
 
     def test_les_contributions_sources_a_grouper_s_accordent(self, sa_sync_conn_owner):
-        store = SourceContributionGroupStore(sa_sync_conn_owner)
+        store = AuthorGroupingStore(sa_sync_conn_owner)
         assert store.fetch_source_contributions([1]) == []
 
     def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):

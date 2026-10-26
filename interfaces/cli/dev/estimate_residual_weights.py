@@ -53,7 +53,7 @@ from pipeline.transformation.publications.author_grouping.author_grouping import
     publication_batches,
 )
 from pipeline.transformation.publications.author_grouping.store import (
-    SourceContributionGroupStore,
+    AuthorGroupingStore,
     SourceContributionRow,
 )
 
@@ -147,7 +147,7 @@ def _collector(records: list[dict[str, object]], publication_id: int) -> Residua
 
 def export(conn: Connection, residual_path: Path, source_contributions_path: Path) -> None:
     """Écrit le résidu de la règle et les contributions sources du modèle complet à partir des contributions sources en base."""
-    store = SourceContributionGroupStore(conn)
+    store = AuthorGroupingStore(conn)
     t0 = time.perf_counter()
     publications = [(r[0], r[1]) for r in conn.execute(_PUBLICATIONS_SQL)]
     log.info("%d publications à plusieurs enregistrements sources", len(publications))

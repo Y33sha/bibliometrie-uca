@@ -23,10 +23,10 @@ _HUMAN_STATUSES = (AttributionStatus.CONFIRMED.value, AttributionStatus.AUTHENTI
 _SNAPSHOT = "publication_contributions_marks"
 
 # Relevé de la file `contribution_attributes_queue`.
-_ATTRIBUTES_SNAPSHOT = "source_contribution_group_attributes_marks"
+_ATTRIBUTES_SNAPSHOT = "contribution_attributes_marks"
 
-# Marque pour la recomposition de leurs attributs les groupes des publications `:publications`.
-_MARK_GROUPS_OF_PUBLICATIONS_SQL = text(
+# Marque pour la recomposition de leurs attributs les contributions des publications `:publications`.
+_MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_ATTRIBUTES,
         "SELECT id FROM contributions WHERE publication_id = ANY(:publications)",
@@ -43,7 +43,7 @@ def _known_first_name(id_type: str) -> str:
     )"""
 
 
-# Contributions sources à grouper, hors collectifs, hors enregistrements sources à liste répétée (`REPEATED_LIST_CASES`).
+# Contributions sources à aligner, hors collectifs, hors enregistrements sources à liste répétée (`REPEATED_LIST_CASES`).
 _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     WITH records AS (
         SELECT sr.id, sr.publication_id, sr.source::text AS source,
@@ -67,7 +67,7 @@ _SOURCE_CONTRIBUTIONS_SQL = text(f"""
     WHERE NOT sc.collective
 """)
 
-_GROUPS_SQL = text("""
+_CONTRIBUTIONS_SQL = text("""
     SELECT g.id, g.publication_id, gs.source_contribution_id, gs.source_record_id,
            gs.method::text AS method, gs.score, gs.margin
     FROM contributions g
@@ -79,9 +79,9 @@ _DELETE_MEMBERSHIPS_SQL = text(
     "DELETE FROM aligned_source_contributions WHERE source_contribution_id = ANY(:source_contributions)"
 )
 
-_DELETE_GROUPS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
+_DELETE_CONTRIBUTIONS_SQL = text("DELETE FROM contributions WHERE id = ANY(:ids)")
 
-# Marque pour la redécision de leur personne les groupes recomposés `:ids` qui en ont une.
+# Marque pour la redécision de leur personne les contributions recomposées `:ids` qui en ont une.
 _MARK_RECOMPOSED_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_RESOLUTION,
@@ -108,12 +108,12 @@ _UPDATE_POSITIONS_SQL = text("""
     WHERE g.id = u.id
 """)
 
-_GROUP_IDS_SQL = text(
+_NEW_CONTRIBUTION_IDS_SQL = text(
     "SELECT nextval(pg_get_serial_sequence('publications.contributions', 'id'))"
     " FROM generate_series(1, :n)"
 )
 
-_INSERT_GROUPS_SQL = text("""
+_INSERT_CONTRIBUTIONS_SQL = text("""
     INSERT INTO contributions (id, publication_id, reference_position)
     SELECT * FROM unnest(
         CAST(:ids AS integer[]), CAST(:publications AS integer[]), CAST(:positions AS smallint[]))
@@ -123,14 +123,14 @@ _INSERT_MEMBERSHIPS_SQL = text("""
     INSERT INTO aligned_source_contributions
         (source_contribution_id, contribution_id, source_record_id, method, score, margin)
     SELECT * FROM unnest(
-        CAST(:source_contributions AS integer[]), CAST(:groups AS integer[]), CAST(:source_records AS integer[]),
+        CAST(:source_contributions AS integer[]), CAST(:contributions AS integer[]), CAST(:source_records AS integer[]),
         CAST(:methods AS grouping_method[]), CAST(:scores AS real[]), CAST(:margins AS real[]))
 """)
 
 
 @dataclass(frozen=True, slots=True)
 class SourceContributionRow:
-    """Contribution source à grouper, telle que la base la rend."""
+    """Contribution source à aligner, telle que la base la rend."""
 
     publication_id: int
     source_record: int
@@ -146,7 +146,7 @@ class SourceContributionRow:
 
 @dataclass(frozen=True, slots=True)
 class ContributionRow:
-    """Groupe à écrire. `existing` : l'identifiant est celui d'un groupe déjà en base."""
+    """Contribution à écrire. `existing` : l'identifiant est celui d'une contribution déjà en base."""
 
     id: int
     publication_id: int
@@ -156,10 +156,10 @@ class ContributionRow:
 
 @dataclass(frozen=True, slots=True)
 class MembershipRow:
-    """Appartenance d'une contribution source à un groupe."""
+    """Appartenance d'une contribution source à une contribution."""
 
     source_contribution: int
-    group: int
+    contribution: int
     source_record: int
     method: str
     score: float | None
@@ -171,27 +171,27 @@ class BatchPlan:
     """Écritures d'un lot de publications."""
 
     publication_ids: Sequence[int]
-    groups: list[ContributionRow]
+    contributions: list[ContributionRow]
     removed: list[int]
     """Contributions sources dont l'appartenance en base est supprimée."""
     memberships: list[MembershipRow]
     """Appartenances à insérer."""
     unmatched: list[int]
-    """Groupes en base sans correspondant, supprimés."""
+    """Contributions en base sans correspondant, supprimés."""
     recomposed: list[int]
-    """Groupes en base dont les membres changent : ils perdent leur personne, que la phase `persons` redécide."""
+    """Contributions en base dont les contributions sources changent : elles perdent leur personne, que la phase `persons` redécide."""
     copies: dict[int, int]
     """Doublon d'auteur → première occurrence de son nom (`duplicate_of`)."""
 
 
-class SourceContributionGroupStore:
-    """Lectures et écritures des groupes de contributions sources."""
+class AuthorGroupingStore:
+    """Lectures et écritures des contributions."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
     def propagate_attributes(self) -> tuple[int, int]:
-        """Recompose les attributs des groupes en file depuis leurs membres (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de groupes en file et le nombre de groupes mis à jour."""
+        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de contributions en file et le nombre de contributions mis à jour."""
         queue = Queue.CONTRIBUTION_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(
@@ -216,13 +216,13 @@ class SourceContributionGroupStore:
         )
 
     def mark_all(self) -> int:
-        """Marque toutes les publications pour le groupement. Rend le nombre de publications marquées."""
+        """Marque toutes les publications pour le alignement. Rend le nombre de publications marquées."""
         return enqueue(
             self._conn, Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM publications", {}
         )
 
     def snapshot_queued_publications(self) -> list[tuple[int, int]]:
-        """Relève la file des publications à regrouper. Rend celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
+        """Relève la file des publications à réaligner. Rend celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         snapshot(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT)
         rows = self._conn.execute(
             text(f"""
@@ -247,21 +247,21 @@ class SourceContributionGroupStore:
     def fetch_source_contributions(
         self, publication_ids: Sequence[int]
     ) -> list[SourceContributionRow]:
-        """Contributions sources à grouper de ces publications."""
+        """Contributions sources à aligner de ces publications."""
         rows = self._conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
             {"publications": list(publication_ids), "repeated": list(REPEATED_LIST_CASES)},
         )
         return rows_as(SourceContributionRow, rows)
 
-    def fetch_groups(
+    def fetch_contributions(
         self, publication_ids: Sequence[int]
     ) -> tuple[dict[int, dict[int, set[int]]], dict[int, MembershipRow]]:
-        """Groupes en base de ces publications : publication → groupe → contributions sources, et appartenance de chaque contribution source groupée."""
-        groups: dict[int, dict[int, set[int]]] = {}
+        """Contributions en base de ces publications : publication → contribution → contributions sources, et appartenance de chaque contribution source alignée."""
+        contributions: dict[int, dict[int, set[int]]] = {}
         memberships: dict[int, MembershipRow] = {}
-        for row in self._conn.execute(_GROUPS_SQL, {"publications": list(publication_ids)}):
-            members = groups.setdefault(row.publication_id, {}).setdefault(row.id, set())
+        for row in self._conn.execute(_CONTRIBUTIONS_SQL, {"publications": list(publication_ids)}):
+            members = contributions.setdefault(row.publication_id, {}).setdefault(row.id, set())
             if row.source_contribution_id is not None:
                 members.add(row.source_contribution_id)
                 memberships[row.source_contribution_id] = MembershipRow(
@@ -272,20 +272,24 @@ class SourceContributionGroupStore:
                     row.score,
                     row.margin,
                 )
-        return groups, memberships
+        return contributions, memberships
 
-    def group_ids(self, n: int) -> list[int]:
-        """`n` identifiants tirés de la séquence des groupes."""
+    def new_contribution_ids(self, n: int) -> list[int]:
+        """`n` identifiants tirés de la séquence des contributions."""
         if not n:
             return []
-        return list(self._conn.execute(_GROUP_IDS_SQL, {"n": n}).scalars())
+        return list(self._conn.execute(_NEW_CONTRIBUTION_IDS_SQL, {"n": n}).scalars())
 
     def write(self, plan: BatchPlan) -> None:
-        """Écrit les groupes et les doublons d'auteur des publications du lot, et marque leurs groupes pour la recomposition de leurs attributs.
+        """Écrit les contributions et les doublons d'auteur des publications du lot, et marque leurs contributions pour la recomposition de leurs attributs.
 
-        Un groupe déjà en base garde son identifiant, sa personne et son mode de résolution. Un groupe dont les membres changent est marqué pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution dont les contributions sources changent est marqué pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
-        publication_ids, groups, removed = plan.publication_ids, plan.groups, plan.removed
+        publication_ids, contributions, removed = (
+            plan.publication_ids,
+            plan.contributions,
+            plan.removed,
+        )
         memberships, unmatched_ids, copies = plan.memberships, plan.unmatched, plan.copies
         self._conn.execute(
             _CLEAR_COPIES_SQL, {"publications": list(publication_ids), "copies": list(copies)}
@@ -297,19 +301,19 @@ class SourceContributionGroupStore:
         if removed:
             self._conn.execute(_DELETE_MEMBERSHIPS_SQL, {"source_contributions": list(removed)})
         if unmatched_ids:
-            self._conn.execute(_DELETE_GROUPS_SQL, {"ids": list(unmatched_ids)})
+            self._conn.execute(_DELETE_CONTRIBUTIONS_SQL, {"ids": list(unmatched_ids)})
         if plan.recomposed:
             self._conn.execute(_MARK_RECOMPOSED_SQL, {"ids": list(plan.recomposed)})
-        kept = [g for g in groups if g.existing]
+        kept = [g for g in contributions if g.existing]
         if kept:
             self._conn.execute(
                 _UPDATE_POSITIONS_SQL,
                 {"ids": [g.id for g in kept], "positions": [g.reference_position for g in kept]},
             )
-        created = [g for g in groups if not g.existing]
+        created = [g for g in contributions if not g.existing]
         if created:
             self._conn.execute(
-                _INSERT_GROUPS_SQL,
+                _INSERT_CONTRIBUTIONS_SQL,
                 {
                     "ids": [g.id for g in created],
                     "publications": [g.publication_id for g in created],
@@ -321,7 +325,7 @@ class SourceContributionGroupStore:
                 _INSERT_MEMBERSHIPS_SQL,
                 {
                     "source_contributions": [m.source_contribution for m in memberships],
-                    "groups": [m.group for m in memberships],
+                    "contributions": [m.contribution for m in memberships],
                     "source_records": [m.source_record for m in memberships],
                     "methods": [m.method for m in memberships],
                     "scores": [m.score for m in memberships],
@@ -329,5 +333,5 @@ class SourceContributionGroupStore:
                 },
             )
         self._conn.execute(
-            _MARK_GROUPS_OF_PUBLICATIONS_SQL, {"publications": list(publication_ids)}
+            _MARK_CONTRIBUTIONS_OF_PUBLICATIONS_SQL, {"publications": list(publication_ids)}
         )
