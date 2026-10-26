@@ -1,4 +1,4 @@
-"""Tâche `persons.resolve_groups` : rattache à une personne les groupes de contributions sources qui n'en ont pas (`domain.persons.group_matching`).
+"""Tâche `persons.resolve_groups` : rattache à une personne les groupes de contributions sources qui n'en ont pas (`domain.persons.contribution_matching`).
 
 Les épinglages s'appliquent d'abord : un groupe dont un membre est épinglé prend la personne épinglée (`pinned_groups_sql`). Un groupe déjà rattaché garde sinon sa personne, jusqu'à sa redécision quand il entre dans la file `Queue.GROUP_RESOLUTION` : ses membres changent, ou l'identifiant ou la forme de nom qui le rattachait est invalidé. Sont décidés les groupes sans personne qui ont un membre du périmètre, un membre épinglé, ou un membre dont un identifiant fiable est attribué à une personne, et les groupes non manuels de la file. Un groupe de la file qui désigne encore sa personne la garde ; un groupe que sa décision ne rattache plus la perd. Les groupes du périmètre au nom inconnu sont traités ensuite, un à un, contre l'index tenu à jour : un groupe rejoint une personne créée plus tôt dans le passage, ou fonde la sienne (`create_persons`).
 """
@@ -9,20 +9,20 @@ from sqlalchemy import Connection, text
 
 from domain.errors import ValidationError
 from domain.normalize import normalize_text
-from domain.persons.contributor_name import ContributorName
-from domain.persons.group_matching import (
+from domain.persons.contribution_matching import (
     IDENTIFIER_ORDER,
-    GroupDecision,
-    GroupMatchReason,
-    GroupMember,
-    GroupOutcome,
-    GroupSkipReason,
+    AlignedSourceContribution,
+    ContributionDecision,
+    ContributionMatchReason,
+    ContributionOutcome,
+    ContributionSkipReason,
     PersonIndex,
-    decide_group,
+    decide_contribution,
     founding_name,
     identifiers_to_attribute,
     settle_publication,
 )
+from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
 from domain.persons.person import validated_name
@@ -70,7 +70,7 @@ _CANDIDATES_SQL = " UNION ".join(
         SELECT g.id AS contribution_id
         FROM {_RESOLUTION_SNAPSHOT} q
         JOIN contributions g ON g.id = q.id
-        WHERE g.resolution_mode IS DISTINCT FROM '{GroupMatchReason.MANUAL}'
+        WHERE g.resolution_mode IS DISTINCT FROM '{ContributionMatchReason.MANUAL}'
         """,
         *(
             strong_identifier_source_contributions(
@@ -146,13 +146,17 @@ def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> P
     )
 
 
-def load_candidate_groups(conn: Connection) -> dict[int, dict[int, list[GroupMember]]]:
+def load_candidate_groups(
+    conn: Connection,
+) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
     """Membres des groupes à décider, par publication puis par groupe : groupes sans personne, et groupes non manuels de la file à redécider. Relève la file (`snapshot`) : `resolve_groups` en retire ensuite les marquages relevés."""
     snapshot(conn, Queue.GROUP_RESOLUTION, _RESOLUTION_SNAPSHOT)
-    groups: dict[int, dict[int, list[GroupMember]]] = defaultdict(lambda: defaultdict(list))
+    groups: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
+        lambda: defaultdict(list)
+    )
     for r in conn.execute(text(_MEMBERS_SQL)):
         groups[r.publication_id][r.contribution_id].append(
-            GroupMember(
+            AlignedSourceContribution(
                 source=r.source,
                 name=ContributorName.from_columns(
                     r.raw_author_name, r.raw_last_name, r.raw_first_name
@@ -167,7 +171,7 @@ def load_candidate_groups(conn: Connection) -> dict[int, dict[int, list[GroupMem
 
 
 def taken_persons(
-    conn: Connection, groups: dict[int, dict[int, list[GroupMember]]]
+    conn: Connection, groups: dict[int, dict[int, list[AlignedSourceContribution]]]
 ) -> dict[int, frozenset[int]]:
     """Personnes rattachées à un autre groupe de chaque publication des groupes à décider."""
     rows = conn.execute(
@@ -183,31 +187,31 @@ def taken_persons(
 
 
 def decide_groups(
-    groups: dict[int, dict[int, list[GroupMember]]],
+    groups: dict[int, dict[int, list[AlignedSourceContribution]]],
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
     taken: dict[int, frozenset[int]],
     progress: Progress | None = None,
-) -> dict[int, GroupDecision]:
+) -> dict[int, ContributionDecision]:
     """Décision de chaque groupe, une personne au plus par publication. `progress` avance d'un groupe décidé et retient les groupes rattachés."""
-    decisions: dict[int, GroupDecision] = {}
+    decisions: dict[int, ContributionDecision] = {}
     for publication_id, by_group in groups.items():
         rejected_here = rejected.get(publication_id, frozenset())
         decided = {
-            contribution_id: (decide_group(members, index, rejected_here), len(members))
+            contribution_id: (decide_contribution(members, index, rejected_here), len(members))
             for contribution_id, members in by_group.items()
         }
         settled = settle_publication(decided, taken.get(publication_id, frozenset()))
         if progress is not None:
             for decision in settled.values():
                 progress.advance()
-                if decision.outcome == GroupOutcome.MATCH:
+                if decision.outcome == ContributionOutcome.MATCH:
                     progress.keep()
         decisions |= settled
     return decisions
 
 
-def release_groups(conn: Connection, decisions: dict[int, GroupDecision]) -> int:
+def release_groups(conn: Connection, decisions: dict[int, ContributionDecision]) -> int:
     """Retire leur personne aux groupes que leur décision rattache à une autre personne, à une personne à créer ou à aucune. Précède toute écriture : une publication compte une personne au plus, et la personne retirée peut revenir à un autre groupe de la publication. Rend le nombre de groupes concernés."""
     if not decisions:
         return 0
@@ -216,18 +220,19 @@ def release_groups(conn: Connection, decisions: dict[int, GroupDecision]) -> int
         {
             "ids": list(decisions),
             "persons": [
-                d.person_id if d.outcome == GroupOutcome.MATCH else None for d in decisions.values()
+                d.person_id if d.outcome == ContributionOutcome.MATCH else None
+                for d in decisions.values()
             ],
         },
     ).rowcount
 
 
-def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> int:
+def write_decisions(conn: Connection, decisions: dict[int, ContributionDecision]) -> int:
     """Écrit la personne et le mode des groupes rattachés, quand ils changent. Rend le nombre de groupes écrits."""
     matched = [
         (contribution_id, d.person_id, str(d.reason))
         for contribution_id, d in decisions.items()
-        if d.outcome == GroupOutcome.MATCH
+        if d.outcome == ContributionOutcome.MATCH
     ]
     if not matched:
         return 0
@@ -239,8 +244,8 @@ def write_decisions(conn: Connection, decisions: dict[int, GroupDecision]) -> in
 
 def attribute_identifiers(
     conn: Connection,
-    groups: dict[int, dict[int, list[GroupMember]]],
-    decisions: dict[int, GroupDecision],
+    groups: dict[int, dict[int, list[AlignedSourceContribution]]],
+    decisions: dict[int, ContributionDecision],
 ) -> None:
     """Attribue en attente, à la personne de chaque groupe rattaché par la décision, les identifiants fiables de ses membres (`identifiers_to_attribute`)."""
     members_by_group = {
@@ -250,7 +255,7 @@ def attribute_identifiers(
     }
     repo = PgPersonRepository(conn)
     for contribution_id, decision in decisions.items():
-        if decision.outcome != GroupOutcome.MATCH or decision.person_id is None:
+        if decision.outcome != ContributionOutcome.MATCH or decision.person_id is None:
             continue
         add_identifiers_from_contributions(
             decision.person_id,
@@ -261,8 +266,8 @@ def attribute_identifiers(
 
 def create_persons(
     conn: Connection,
-    groups: dict[int, dict[int, list[GroupMember]]],
-    decisions: dict[int, GroupDecision],
+    groups: dict[int, dict[int, list[AlignedSourceContribution]]],
+    decisions: dict[int, ContributionDecision],
     index: PersonIndex,
     rejected: dict[int, frozenset[int]],
     taken: dict[int, frozenset[int]],
@@ -276,16 +281,18 @@ def create_persons(
         taken_here = set(taken.get(publication_id, frozenset())) | {
             decisions[contribution_id].person_id
             for contribution_id in by_group
-            if decisions[contribution_id].outcome == GroupOutcome.MATCH
+            if decisions[contribution_id].outcome == ContributionOutcome.MATCH
         }
         for contribution_id in sorted(by_group):
-            if decisions[contribution_id].outcome != GroupOutcome.CREATE:
+            if decisions[contribution_id].outcome != ContributionOutcome.CREATE:
                 continue
             members = by_group[contribution_id]
             if progress is not None:
                 progress.advance()
-            decision = decide_group(members, index, rejected.get(publication_id, frozenset()))
-            if decision.outcome == GroupOutcome.CREATE:
+            decision = decide_contribution(
+                members, index, rejected.get(publication_id, frozenset())
+            )
+            if decision.outcome == ContributionOutcome.CREATE:
                 try:
                     last_name, first_name = validated_name(*founding_name(members))
                 except ValidationError:
@@ -301,22 +308,22 @@ def create_persons(
                 created += 1
                 if progress is not None:
                     progress.keep()
-                decision = GroupDecision(
-                    GroupOutcome.CREATE,
+                decision = ContributionDecision(
+                    ContributionOutcome.CREATE,
                     person_id,
-                    GroupMatchReason.NAME,
+                    ContributionMatchReason.NAME,
                     decision.evidence,
                     decision.refused,
                 )
-            elif decision.outcome == GroupOutcome.MATCH and decision.person_id in taken_here:
-                decision = GroupDecision(
-                    GroupOutcome.SKIP,
-                    reason=GroupSkipReason.PERSON_IN_OTHER_GROUP,
+            elif decision.outcome == ContributionOutcome.MATCH and decision.person_id in taken_here:
+                decision = ContributionDecision(
+                    ContributionOutcome.SKIP,
+                    reason=ContributionSkipReason.PERSON_IN_OTHER_CONTRIBUTION,
                     evidence=decision.evidence,
                     refused=decision.refused,
                 )
             decisions[contribution_id] = decision
-            if decision.person_id is None or decision.outcome == GroupOutcome.SKIP:
+            if decision.person_id is None or decision.outcome == ContributionOutcome.SKIP:
                 continue
             conn.execute(
                 _WRITE_SQL,
@@ -341,26 +348,26 @@ def apply_pins(conn: Connection) -> int:
 
 
 # Libellés des modes de rattachement dans le journal.
-_MODE_LABELS: dict[GroupMatchReason, str] = {
-    GroupMatchReason.MANUAL: "par épinglage",
-    GroupMatchReason.ORCID: "par ORCID",
-    GroupMatchReason.HAL_PERSON_ID: "par compte HAL",
-    GroupMatchReason.IDREF: "par IdRef",
-    GroupMatchReason.NAME: "par nom sans homonymie",
-    GroupMatchReason.COMPATIBLE_NAME: "par initiales compatibles",
+_MODE_LABELS: dict[ContributionMatchReason, str] = {
+    ContributionMatchReason.MANUAL: "par épinglage",
+    ContributionMatchReason.ORCID: "par ORCID",
+    ContributionMatchReason.HAL_PERSON_ID: "par compte HAL",
+    ContributionMatchReason.IDREF: "par IdRef",
+    ContributionMatchReason.NAME: "par nom sans homonymie",
+    ContributionMatchReason.COMPATIBLE_NAME: "par initiales compatibles",
 }
 
 
 def _log_identified(
-    logger: ScopedOrPlainLogger, decisions: dict[int, GroupDecision], pinned: int
+    logger: ScopedOrPlainLogger, decisions: dict[int, ContributionDecision], pinned: int
 ) -> None:
     """Contributions identifiées, mode de rattachement par mode de rattachement, nombres alignés à droite. Les épinglages appliqués avant la décision comptent avec le mode `manual`."""
-    by_mode: Counter[GroupMatchReason] = Counter(
+    by_mode: Counter[ContributionMatchReason] = Counter(
         d.reason
         for d in decisions.values()
-        if d.outcome == GroupOutcome.MATCH and isinstance(d.reason, GroupMatchReason)
+        if d.outcome == ContributionOutcome.MATCH and isinstance(d.reason, ContributionMatchReason)
     )
-    by_mode[GroupMatchReason.MANUAL] += pinned
+    by_mode[ContributionMatchReason.MANUAL] += pinned
     total = sum(by_mode.values())
     breakdown(
         logger,
@@ -398,10 +405,14 @@ def resolve_groups(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, i
     unidentified = [
         d
         for d in decisions.values()
-        if d.outcome != GroupOutcome.MATCH
-        and d.reason not in (GroupSkipReason.OUT_OF_PERIMETER, GroupSkipReason.CREATION_NOT_ALLOWED)
+        if d.outcome != ContributionOutcome.MATCH
+        and d.reason
+        not in (
+            ContributionSkipReason.OUT_OF_PERIMETER,
+            ContributionSkipReason.CREATION_NOT_ALLOWED,
+        )
     ]
-    to_create = sum(1 for d in unidentified if d.outcome == GroupOutcome.CREATE)
+    to_create = sum(1 for d in unidentified if d.outcome == ContributionOutcome.CREATE)
     undecidable = len(unidentified) - to_create
     logger.info(
         "%s%s du périmètre %s",

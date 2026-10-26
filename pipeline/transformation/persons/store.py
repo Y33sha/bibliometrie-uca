@@ -74,7 +74,7 @@ def fetch_name_form_status_map(conn: Connection) -> dict[tuple[str, int], str]:
 
 
 def fetch_rejected_person_ids_by_publication(conn: Connection) -> dict[int, frozenset[int]]:
-    """Garde de matching : une paire `(publication, personne)` rejetée n'est jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.group_matching.decide_group`)."""
+    """Garde de matching : une paire `(publication, personne)` rejetée n'est jamais re-rattachée. Une publication est rejetée pour une personne dès qu'un de ses enregistrements sources l'est. Le caller élimine ces personnes des candidats (cf. `domain.persons.contribution_matching.decide_contribution`)."""
     rows = conn.execute(
         text(f"""
             SELECT publication_id, array_agg(DISTINCT person_id) AS person_ids

@@ -10,7 +10,7 @@ from application.ports.repositories.contribution_repository import (
     GroupMemberRow,
     GroupRow,
 )
-from domain.persons.group_matching import NAME_MATCH_REASONS
+from domain.persons.contribution_matching import NAME_MATCH_REASONS
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.sql_fragments import (
     DETACHED_GROUP,

@@ -38,7 +38,7 @@ from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
-from domain.persons.group_matching import GroupMatchReason
+from domain.persons.contribution_matching import ContributionMatchReason
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from domain.platforms.platform import PLATFORM_TYPES
@@ -725,17 +725,17 @@ idref_structures = Table(
 )
 
 
-# ── Contributions (groupes et contributions sources) ──────────────────────────
+# ── Contributions et contributions sources alignées ──────────────────────────
 
 
-# `contribution_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie un groupe de
-# contributions sources rattaché à une personne non exclue aux structures de ses membres.
+# `contribution_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie une contribution
+# rattachée à une personne non exclue aux structures de ses contributions sources.
 # Pas modélisée dans le metadata SQLAlchemy — tous les accès se font en SQL brut par nom
 # (lectures) ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
 # en table.
 #
 # `publication_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) : lien
-# publication↔structure dédoublonné, dérivé des groupes d'auteur × `contribution_structures`.
+# publication↔structure dédoublonné, dérivé des contributions × `contribution_structures`.
 # Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
 # + REFRESH dans le pipeline, après `contribution_structures`).
 
@@ -753,7 +753,7 @@ rejected_contributions = Table(
 
 grouping_method_enum = PgEnum(*GroupingMethod, name="grouping_method", create_type=False)
 
-resolution_mode_enum = PgEnum(*GroupMatchReason, name="resolution_mode", create_type=False)
+resolution_mode_enum = PgEnum(*ContributionMatchReason, name="resolution_mode", create_type=False)
 
 contributions = Table(
     "contributions",
@@ -765,7 +765,7 @@ contributions = Table(
     Column("reference_position", SmallInteger),
     Column("is_corresponding", Boolean),
     Column("roles", ARRAY(Text)),
-    # Indices de l'entrée dans le périmètre, union de ceux des membres ; `in_perimeter` en découle.
+    # Indices de l'entrée dans le périmètre, union de ceux des contributions sources ; `in_perimeter` en découle.
     Column(
         "perimeter_evidence",
         ARRAY(perimeter_evidence_enum),
@@ -786,7 +786,7 @@ contributions = Table(
     comment=(
         "Contributions sources d'un même auteur dans une publication, avec au maximum une "
         "contribution source par enregistrement source. reference_position : position dans la "
-        "liste la plus longue. Une personne correspond au maximum à un groupe par publication."
+        "liste la plus longue. Une personne a au maximum une contribution par publication."
     ),
     schema="publications",
     # Place gardée dans chaque page pour les mises à jour HOT des attributs et de `reference_position`.
@@ -813,7 +813,7 @@ aligned_source_contributions = Table(
         name="aligned_source_contributions_score_check",
     ),
     comment=(
-        "Appartenance d'une contribution source à son groupe. method : origine du lien. score et "
+        "Appartenance d'une contribution source à sa contribution. method : origine du lien. score et "
         "margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la "
         "meilleure autre possibilité de l'affectation."
     ),
@@ -821,7 +821,7 @@ aligned_source_contributions = Table(
 )
 
 # `publication_author_alignment` (MATERIALIZED VIEW, migration 5c1d8e3a7f20) : recouvrement des
-# listes d'auteurs de chaque publication à plusieurs enregistrements sources, dérivé des groupes de contributions sources.
+# listes d'auteurs de chaque publication à plusieurs enregistrements sources, dérivé des contributions.
 # Sert la file des fusions suspectes. SQL brut + REFRESH en fin de phase `author_grouping`.
 
 

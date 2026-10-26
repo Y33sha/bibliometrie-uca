@@ -5,7 +5,7 @@ La purge tourne après `populate_person_name_forms`, qui régénère les formes 
 
 from sqlalchemy import Connection, text
 
-from domain.persons.group_matching import NAME_MATCH_REASONS
+from domain.persons.contribution_matching import NAME_MATCH_REASONS
 from domain.persons.identifiers import (
     AttributionStatus,
     IdentifierOrigin,
