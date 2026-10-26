@@ -87,7 +87,7 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 
 - [x] `PerimeterService` consulte la configuration par `ConfigRepository` (`63c68ec43`)
 - [x] Une lecture par paquet de `infrastructure/read_models/`, modèles de réponse dans `models.py` ; `Protocol` de lecture supprimés, classes `Pg…` renommées ; contrats d'import et documentation d'architecture
-- [ ] Une seule déclaration par lecture : la requête dans la méthode de la classe, sans fonction relayée
+- [x] Une seule déclaration par lecture : la requête dans la méthode de la classe, sans fonction relayée. Les paquets découpés par thème (`persons`, `publications`, `stats`) déclarent une classe par module, réunies par héritage dans `queries.py` (`574ecbd0e`, `005e58b20`, `ae6839d9a`, `0cd60dfb0`)
 
 ## Questions ouvertes
 
