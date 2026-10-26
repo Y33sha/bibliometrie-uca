@@ -43,15 +43,24 @@ class SubjectNeighborOut(BaseModel):
     cooccurrence_count: int
 
 
+class SubjectNeighborLink(BaseModel):
+    """Co-occurrence entre deux voisins d'un sujet, `subject_a_id` < `subject_b_id`."""
+
+    subject_a_id: int
+    subject_b_id: int
+    cooccurrence_count: int
+
+
 class SubjectDetailResponse(BaseModel):
-    """Détail d'un sujet et ses voisins par co-occurrence."""
+    """Détail d'un sujet, ses voisins par co-occurrence et les co-occurrences entre ces voisins."""
 
     subject: SubjectListItem
     neighbors: list[SubjectNeighborOut]
+    neighbor_links: list[SubjectNeighborLink]
 
 
 class SubjectFrequency(BaseModel):
-    """Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les nuages de sujets de leurs pages de détail."""
+    """Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs dashboards."""
 
     id: int
     label: str

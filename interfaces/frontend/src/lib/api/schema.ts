@@ -5496,16 +5496,18 @@ export interface components {
         };
         /**
          * SubjectDetailResponse
-         * @description Détail d'un sujet et ses voisins par co-occurrence.
+         * @description Détail d'un sujet, ses voisins par co-occurrence et les co-occurrences entre ces voisins.
          */
         SubjectDetailResponse: {
             subject: components["schemas"]["SubjectListItem"];
             /** Neighbors */
             neighbors: components["schemas"]["SubjectNeighborOut"][];
+            /** Neighbor Links */
+            neighbor_links: components["schemas"]["SubjectNeighborLink"][];
         };
         /**
          * SubjectFrequency
-         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les nuages de sujets de leurs pages de détail.
+         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs dashboards.
          */
         SubjectFrequency: {
             /** Id */
@@ -5541,6 +5543,18 @@ export interface components {
             items: components["schemas"]["SubjectListItem"][];
             /** Pages */
             readonly pages: number;
+        };
+        /**
+         * SubjectNeighborLink
+         * @description Co-occurrence entre deux voisins d'un sujet, `subject_a_id` < `subject_b_id`.
+         */
+        SubjectNeighborLink: {
+            /** Subject A Id */
+            subject_a_id: number;
+            /** Subject B Id */
+            subject_b_id: number;
+            /** Cooccurrence Count */
+            cooccurrence_count: number;
         };
         /**
          * SubjectNeighborOut

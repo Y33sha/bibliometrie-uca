@@ -9,6 +9,7 @@ from application.ports.read_models.subjects_queries import (
     SubjectDetailResponse,
     SubjectListItem,
     SubjectListResponse,
+    SubjectNeighborLink,
     SubjectNeighborOut,
     SubjectsQueries,
 )
@@ -105,7 +106,25 @@ class PgSubjectsQueries(SubjectsQueries):
             )
             for r in neighbor_rows
         ]
-        return SubjectDetailResponse(subject=subject, neighbors=neighbors)
+        link_rows = self._conn.execute(
+            text("""
+                SELECT subject_a_id, subject_b_id, count AS cooccurrence_count
+                FROM subject_cooccurrences
+                WHERE subject_a_id = ANY(:ids) AND subject_b_id = ANY(:ids) AND count >= :min_count
+            """),
+            {"ids": [n.id for n in neighbors], "min_count": min_cooccurrence_count},
+        ).all()
+        neighbor_links = [
+            SubjectNeighborLink(
+                subject_a_id=r.subject_a_id,
+                subject_b_id=r.subject_b_id,
+                cooccurrence_count=r.cooccurrence_count,
+            )
+            for r in link_rows
+        ]
+        return SubjectDetailResponse(
+            subject=subject, neighbors=neighbors, neighbor_links=neighbor_links
+        )
 
 
 __all__ = ["PgSubjectsQueries"]
