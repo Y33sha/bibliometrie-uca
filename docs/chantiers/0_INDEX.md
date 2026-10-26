@@ -8,6 +8,7 @@
 
 ### Non commencé
 
+- [Administration intégrée au site, navigation entre entités liées](UI_administration-et-navigation.md)
 - [Contenu des dashboards de structure et de personne](METIER_dashboards.md)
 - [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
@@ -20,7 +21,7 @@
 
 ## Chantiers archivés
 
-- 2026-10-25 — [Refonte visuelle du frontend](archived/2026-10-25_STYLE_refonte-visuelle.md)
+- 2026-10-25 — [Refonte visuelle du frontend](archived/2026-10-25_UI_refonte-visuelle.md)
 - 2026-10-25 — [Collaborations entre structures](archived/2026-10-25_DATA_collaborations-structures.md)
 - 2026-10-25 — [Monographies](archived/2026-10-25_DATA_monographies.md)
 - 2026-10-25 — [Gestion et dédoublonnage assistés de la base personnes](archived/2026-10-25_DATA_personnes-dedoublonnage-assiste.md)
