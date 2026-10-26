@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { addresses as addressesApi, api } from '#lib/api/index.js';
@@ -200,7 +199,7 @@
 <h1>Attribution des pays aux adresses</h1>
 
 <div class="toolbar">
-	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
 	<span class="toolbar-spacer"></span>
 	<span class="count">{list.total.toLocaleString('fr-FR')} adresse{list.total > 1 ? 's' : ''}</span>

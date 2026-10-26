@@ -1,6 +1,5 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -188,7 +187,6 @@
 		type="search"
 		placeholder="Rechercher par titre ou ISSN"
 		bind:value={search}
-		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>

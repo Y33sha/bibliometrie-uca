@@ -2,7 +2,6 @@
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
 	import { api, ApiError, structures as structuresApi } from '#lib/api/index.js';
@@ -191,7 +190,6 @@
 		type="search"
 		placeholder="Rechercher une structure..."
 		bind:value={search}
-		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; } }}
 	/>
 	<FacetDropdown label="Types" options={typeOptions} bind:selected={selectedTypes} />

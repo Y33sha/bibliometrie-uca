@@ -72,6 +72,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
   Le lien « Connexion », à opacité 0,6, est plus pâle encore.
 - `select` de Manques collections sans nom accessible.
 - Graphe des sujets : éléments focusables imbriqués dans le SVG.
+- svelte-check : 9 avertissements d'accessibilité. Des `div` cliquables sans gestion du clavier dans `FacetDropdown`, `ColumnMenu`, `Modal`, `DialogHost`, `EntityFilter`, `PresenceFilterToggle` et Affiliations ; un dialogue sans `tabindex` dans Qualité de la détection. `npm run check` échoue seulement sur les erreurs.
 
 **API de navigation SvelteKit dépréciées** (avertissements en console).
 
@@ -109,6 +110,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - **Navigation SvelteKit** : `goto(url, { replace: true })`, à la place de `replaceState`.
 - **Sous-menus de navigation** ouverts au clic, au clavier et au survol ; fermés par Échap et par un clic extérieur.
 - **Structure de page** : un `<main>`, un lien d'évitement, un seul H1 par page, titres de section en H2 sur les fiches. Le nom du site est hors des titres. Le H1 des listes est réservé aux lecteurs d'écran.
+- **Aucun focus automatique au chargement d'une page.** Seul un champ ouvert par une action le prend : édition en place, sélecteur, filtre ajouté.
 - **Contraste de 4,5:1 au minimum** pour tout texte, navigation comprise.
 - **Nombres au format français** : séparateur de milliers, virgule décimale, espace avant « % ».
 - **Un style d'encart par niveau** : information, avertissement.
@@ -121,6 +123,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 - [ ] Sous-menus au clic et au clavier, `aria-expanded`, fermeture par Échap et clic extérieur ; suppression des `role="navigation"` internes
 - [ ] `<main>`, lien d'évitement, nom du site hors des titres, H1 des listes réservé aux lecteurs d'écran
+- [x] Focus automatique retiré des recherches de page ; sur Affiliations, le champ d'un filtre texte ajouté prend le focus
 - [ ] Contraste des liens de navigation, du lien actif et du lien « Connexion »
 
 ### 2. API de navigation SvelteKit
@@ -157,6 +160,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [ ] Nom accessible du `select` de Manques collections
 - [ ] Graphe des sujets sans éléments focusables imbriqués
 - [ ] Titres de section des fiches en H2
+- [ ] Avertissements d'accessibilité de svelte-check
 
 ### 7. Couleurs en dur
 
@@ -186,5 +190,4 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ## Questions ouvertes
 
-- **Focus initial dans la recherche des listes.** Il permet de saisir une recherche dès l'ouverture. Il place le clavier après la navigation. Le lecteur d'écran commence à la recherche, sans annoncer le titre de la page.
 - **Dashboards d'éditeur et de publication en série** sans chiffres clés : à traiter avec le [contenu des dashboards](METIER_dashboards.md).

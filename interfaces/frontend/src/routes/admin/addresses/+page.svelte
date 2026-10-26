@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { institution, loadInstitution, pageTitle } from '#lib/institution.svelte.js';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { replaceState } from '$app/navigation';
@@ -10,7 +10,6 @@
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';
 
@@ -106,6 +105,7 @@
 	let currentValidation = $state('pending');
 	const newTextPredicate = (): TextPredicate => ({ mode: 'contains', term: '' });
 	let textPredicates = $state<TextPredicate[]>([newTextPredicate()]);
+	const textPredicateInputs: HTMLInputElement[] = [];
 	let structurePredicates = $state<StructurePredicate[]>([]);
 	let currentStructureId = $state<number | null>(null);
 
@@ -290,8 +290,11 @@
 
 	// ---- Prédicats composables ----
 
-	function addTextPredicate(): void {
+	// Le champ du filtre ajouté prend le focus ; celui du filtre affiché au chargement le laisse à la page.
+	async function addTextPredicate(): Promise<void> {
 		textPredicates = [...textPredicates, newTextPredicate()];
+		await tick();
+		textPredicateInputs[textPredicates.length - 1]?.focus();
 	}
 
 	function addStructurePredicate(): void {
@@ -484,7 +487,7 @@
 					placeholder="texte recherché…"
 					autocomplete="off"
 					value={tp.term}
-					use:autofocus
+					bind:this={textPredicateInputs[i]}
 					onkeydown={(e) => { if (e.key === 'Escape') { onTextTermInput(i, ''); } }}
 					oninput={(e) => onTextTermInput(i, (e.target as HTMLInputElement).value)}
 				/>

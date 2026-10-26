@@ -4,7 +4,6 @@
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
 	import { withBase } from '#lib/paths.js';
@@ -568,7 +567,7 @@
 
 <div class="toolbar-card toolbar-sticky publication-toolbar">
 	<div class="toolbar publication-toolbar-main">
-		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 		<span class="count">{listing.total} publication{listing.total > 1 ? 's' : ''}</span>
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}

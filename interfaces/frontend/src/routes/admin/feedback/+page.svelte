@@ -314,7 +314,7 @@
       <button class="tab-btn" class:active={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
       <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
-    <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+    <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
     <span class="count">{list.total} adresses</span>
   </div>
 

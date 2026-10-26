@@ -1,7 +1,6 @@
 <script lang="ts">
   import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount } from "svelte";
-  import { autofocus } from "#lib/actions/focus.js";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
@@ -61,7 +60,6 @@
       type="search"
       placeholder="Rechercher dans les libellés…"
       bind:value={search}
-      use:autofocus
       onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
       oninput={onSearchInput}
     />

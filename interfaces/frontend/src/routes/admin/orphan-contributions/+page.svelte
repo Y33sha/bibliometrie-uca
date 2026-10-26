@@ -249,7 +249,7 @@
 
 <div class="toolbar">
 	<input type="search" placeholder="Filtrer par nom…" bind:value={search}
-		use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
+ onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput} autocomplete="off" />
 	<FacetDropdown
 		label="Laboratoires"

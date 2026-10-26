@@ -1,5 +1,4 @@
 <script lang="ts">
-	import { autofocus } from '#lib/actions/focus.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { withBase } from '#lib/paths.js';
@@ -180,7 +179,6 @@
 		type="search"
 		placeholder="Rechercher par titre ou sujet..."
 		bind:value={search}
-		use:autofocus
 		oninput={onSearchInput}
 		onkeydown={(e: KeyboardEvent) => {
 			if (e.key === 'Enter') {

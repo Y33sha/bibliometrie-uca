@@ -3,7 +3,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { autofocus } from '#lib/actions/focus.js';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -153,7 +152,6 @@
 		class="search"
 		placeholder="Rechercher par titre ou ISBN…"
 		bind:value={search}
-		use:autofocus
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>

@@ -1,6 +1,5 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { autofocus } from '#lib/actions/focus.js';
 	import { page } from '$app/state';
 	import FacetDropdown, { type FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
@@ -231,7 +230,7 @@
 </script>
 
 <div class="toolbar toolbar-card toolbar-sticky">
-	<input type="search" placeholder="Rechercher par nom..." bind:value={search} use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher par nom..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<PresenceFilterToggle
 		label="Identifiants"
 		items={IDENTIFIER_ITEMS}
