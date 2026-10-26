@@ -121,11 +121,6 @@
 - 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](archived/2026-06-05_CODE_strategie-tests.md)
 - 2026-06-04 — [Matérialiser le périmètre (`perimeter_structures`) — audit `in_perimeter` : conservé](archived/2026-06-04_DATA_perimeter-materialise.md)
 - 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
-- 2026-06-03 — [Zenodo : dédup concept/version en matching, pas en normalize](archived/2026-06-03_METIER_zenodo-concept-version.md)
-- 2026-06-03 — [Données dérivées : audit + cadre de décision (matérialisation vs vue)](archived/2026-06-03_DATA_donnees-derivees.md)
-- 2026-06-03 — [Normalize : batcher l'insertion des authorships](archived/2026-06-03_CODE_batcher-normalize-authorships.md)
-- 2026-06-02 — [Authorships : build source-agnostique en une passe convergente](archived/2026-06-02_CODE_simplifier-build-authorships.md)
-- 2026-06-01 — [Sidecar `rejected_authorships` (extraire `authorships.excluded`)](archived/2026-06-01_DATA_rejected-authorships-sidecar.md)
 
 
 
