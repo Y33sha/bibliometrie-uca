@@ -62,7 +62,6 @@
 - 2026-09-30 — [Preprints fusionnés avec leur article par substitution de DOI](archived/2026-09-30_DATA_fusions-preprints-par-doi.md)
 - 2026-09-30 — [Signatures conservées à la renormalisation](archived/2026-09-30_DATA_signatures-conservees.md)
 - 2026-09-22 — [Revues : ISSN vérifiés, doublons et préfixes DOI](archived/2026-09-22_DATA_revues-issn-et-doublons.md)
-- 2026-09-22 — [Table des ISSN](archived/2026-09-22_DATA_table-issn.md)
 
 
 
