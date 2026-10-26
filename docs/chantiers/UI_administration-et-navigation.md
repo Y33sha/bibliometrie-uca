@@ -32,14 +32,14 @@ Les contributions orphelines ont leur page (`admin/orphan-contributions`), signa
 | Éditeur | Dashboard, Revues, Monographies, Publications |
 | Sujet | Sujets associés, Publications |
 
-Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed` dans `filterRegistry.ts`). Les filtres des onglets Personnes et Thèses du laboratoire et de l'onglet Publications du sujet sont absents de l'URL (`urlSync={false}`). La liste générale des publications lit tous ses filtres dans l'URL : `/publications?lab_id=…&subject_id=…` fonctionne. La liste des personnes reçoit le laboratoire par le composant parent seulement.
+Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed` dans `filterRegistry.ts`). Les filtres des onglets Personnes et Thèses du laboratoire et de l'onglet Publications du sujet sont absents de l'URL (`urlSync={false}`) : le retour depuis une fiche les perd. Par défaut, la liste générale des publications retient les seuls types de la famille « Publications » (`restrictToPublications`), les onglets tous les types. Pour le LMBP : 2 555 publications dans `/publications?lab_id=205`, 3 468 dans l'onglet. La liste générale des publications lit tous ses filtres dans l'URL : `/publications?lab_id=…&subject_id=…` fonctionne. La liste des personnes reçoit le laboratoire par le composant parent seulement.
 
 **Fonctions liées à un contexte.** L'onglet Publications d'un laboratoire comporte la colonne et la facette « Statut HAL », calculées d'après la collection HAL du laboratoire. L'onglet Publications d'une personne comporte la colonne et la facette « Auteur correspondant », la facette du périmètre et l'exclusion d'une contribution.
 
 ## Décisions
 
 - **L'administration est un état de la session.** Un seul site. Les pages communes ajoutent leurs fonctions d'administration quand l'utilisateur de la session a le rôle admin. Les pages propres à l'administration (pipeline, configuration, adresses, pays, files de triage) restent des pages à part, dans la même barre de navigation.
-- **Schéma des comptes : `users`, `roles`, `user_roles`.** La session désigne l'utilisateur. Les droits viennent de ses rôles.
+- **Connexion par le CAS de l'université.** La table `users` liste les utilisateurs autorisés, par leur identifiant CAS. Les rôles (`roles`, `user_roles`) sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
 - **Une page par structure**, sous la route `structures/[id]`. Un onglet « Gestion », réservé à l'admin, comporte l'édition, les tutelles et les formes de nom. Les libellés publics (« Laboratoires », « Chercheurs ») sont indépendants des routes.
 - **Volet d'édition ouvert par une icône** sur la ligne. Le titre ou le nom mène à la fiche.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
@@ -48,7 +48,8 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 ### 1. Comptes et rôles
 
-- [ ] Tables `users`, `roles`, `user_roles` ; compte initial repris des réglages
+- [ ] Tables `users`, `roles`, `user_roles` ; premier utilisateur admin déclaré dans les réglages
+- [ ] Connexion par le CAS ; refus d'un identifiant absent de `users`
 - [ ] Session contenant l'identifiant de l'utilisateur ; dépendance d'API qui exige un rôle
 - [ ] `/api/auth/check` rend l'utilisateur et ses rôles
 
@@ -75,4 +76,5 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Liste des structures.** La liste publique montre les laboratoires, celle de l'administration toutes les structures. Une seule liste, avec une facette de type réglée par défaut sur les laboratoires ?
 - **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
 - **Repère visuel du mode admin.** La barre d'administration a sa couleur (`--nav-admin`). La garder pour la session ouverte, ou signaler la session autrement.
-- **Comptes** : stockage des mots de passe, création des comptes (ligne de commande ou interface), rôles autres qu'admin.
+- **Vocabulaire des listes.** Un libellé par liste, session ouverte ou non : « Revues » ou « Publications en série » (la liste comporte des actes, des médias et des serveurs de preprints), « Labos » ou « Structures », « Chercheurs » ou « Personnes ».
+- **Comptes** : ajout des utilisateurs (ligne de commande ou interface), connexion sans CAS en développement, rôles autres qu'admin.
