@@ -16,6 +16,7 @@ from sqlalchemy import Connection, func, select, update
 
 from domain.dates import date_to_french
 from domain.normalize import sanitize_optional_text
+from domain.pipeline_runs import PhaseStatus
 from domain.publications.identifiers import ISSN
 from domain.serials.issns import IssnStatus
 from domain.serials.serial import SerialType
@@ -241,7 +242,7 @@ def _import_doaj(
         message = f"DOAJ : aucune revue reconnue parmi {stats.total_rows} lignes de l'export, revues inchangées"
         logger.warning(message)
         metrics.signals.append(
-            {"level": "warning", "code": "dump_unrecognized", "message": message}
+            {"level": PhaseStatus.WARNING, "code": "dump_unrecognized", "message": message}
         )
         metrics.report = "aucune revue reconnue, revues inchangées"
         return metrics

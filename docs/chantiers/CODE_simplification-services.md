@@ -70,6 +70,7 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 ### Phase 5 — Compte rendu d'exécution des phases
 
 - [x] Vocabulaire d'une exécution de phase dans `domain/pipeline_runs.py`, `PhaseExecution` dans l'infrastructure ; exception `pipeline.** -> application.ports.**` retirée du contrat d'import
+- [x] `PhaseStatus` en `StrEnum` ; statut d'un run calculé par `worst_status` (domaine), seule déclaration de la règle
 
 ## Questions ouvertes
 

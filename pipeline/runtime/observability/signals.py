@@ -6,6 +6,7 @@ Utilisés par les phases à interrogation externe (`harvest`, `fetch_missing`, `
 import logging
 from collections.abc import Sequence, Set
 
+from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import PROFILES
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
@@ -20,7 +21,7 @@ def signal_source_unconfigured(
     logger.warning("%s : source %s non configurée — sautée : %s", phase, source, reason)
     metrics.signals.append(
         {
-            "level": "warning",
+            "level": PhaseStatus.WARNING,
             "code": "source_unconfigured",
             "message": f"{source} non configurée — sautée : {reason}",
         }
@@ -41,7 +42,7 @@ def signal_source_unavailable(
     )
     metrics.signals.append(
         {
-            "level": "warning",
+            "level": PhaseStatus.WARNING,
             "code": "source_unavailable",
             "message": f"{source} coupée après une série de requêtes en échec, items reportés au prochain run",
         }

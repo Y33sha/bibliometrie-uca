@@ -25,6 +25,7 @@ if TYPE_CHECKING:
     from sqlalchemy import Connection
 
 from domain.config import ConfigKey
+from domain.pipeline_runs import PhaseStatus
 from domain.sources.registry import ALL_SOURCES
 from infrastructure.observability.log import (
     PHASE_MARKER,
@@ -441,11 +442,11 @@ def _run_one_phase(
             recorder.record(
                 phase=name,
                 started_at=phase_started_at,
-                status="warning" if interrupted else "error",
+                status=PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR,
                 metrics=PhaseMetrics().to_payload(time.time() - t0_phase),
                 signals=[
                     {
-                        "level": "warning" if interrupted else "error",
+                        "level": PhaseStatus.WARNING if interrupted else PhaseStatus.ERROR,
                         "code": "interrupted" if interrupted else "exception",
                         "message": message,
                     }
@@ -462,7 +463,7 @@ def _run_one_phase(
         recorder.record(
             phase=name,
             started_at=phase_started_at,
-            status="warning" if metrics.signals else "ok",
+            status=PhaseStatus.WARNING if metrics.signals else PhaseStatus.OK,
             metrics=metrics.to_payload(duration),
             signals=metrics.signals,
             details=metrics.details,

@@ -5,9 +5,23 @@ Le pipeline le produit, `infrastructure/observability/` l'enregistre dans `pipel
 Le statut et les signaux disent la santé du run : `error` est décidé par l'orchestrateur sur exception, `warning` et les signaux sont remontés par la phase elle-même (source indisponible, série de 429, conflit d'identifiant…).
 """
 
-from typing import Literal, TypedDict
+from collections.abc import Iterable
+from enum import StrEnum
+from typing import TypedDict
 
-PhaseStatus = Literal["ok", "warning", "error"]
+
+class PhaseStatus(StrEnum):
+    """Statut d'une exécution de phase, et niveau d'un signal. Les membres sont rangés du moins grave au plus grave."""
+
+    OK = "ok"
+    WARNING = "warning"
+    ERROR = "error"
+
+
+def worst_status(statuses: Iterable[PhaseStatus]) -> PhaseStatus:
+    """Statut le plus grave parmi `statuses` ; `OK` sans statut. C'est le statut d'un run."""
+    order = list(PhaseStatus)
+    return max(statuses, key=order.index, default=PhaseStatus.OK)
 
 
 class Signal(TypedDict):

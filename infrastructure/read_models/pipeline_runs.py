@@ -6,7 +6,6 @@ Adapter SA pour le port `PipelineRunsQueries`. L'écart de durée est recalculé
 from __future__ import annotations
 
 from collections import defaultdict
-from collections.abc import Iterable
 from statistics import median as _statistics_median
 from typing import cast
 
@@ -19,7 +18,7 @@ from application.ports.read_models.pipeline_runs_queries import (
     RunDetail,
     RunSummary,
 )
-from domain.pipeline_runs import PhaseMetricsPayload, PhaseStatus, Signal
+from domain.pipeline_runs import PhaseMetricsPayload, PhaseStatus, Signal, worst_status
 
 
 def _median_duration(durations: list[float]) -> float | None:
@@ -32,16 +31,6 @@ def _duration_ratio(duration_s: float, historical_median_s: float | None) -> flo
     if historical_median_s is None or historical_median_s == 0:
         return None
     return duration_s / historical_median_s
-
-
-def _worst_status(statuses: Iterable[PhaseStatus]) -> PhaseStatus:
-    """Statut d'un run = le pire de ses phases, dans l'ordre error > warning > ok."""
-    seen = set(statuses)
-    if "error" in seen:
-        return "error"
-    if "warning" in seen:
-        return "warning"
-    return "ok"
 
 
 class PgPipelineRunsQueries(PipelineRunsQueries):
@@ -60,9 +49,6 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
                            min(started_at) AS started_at,
                            max(ended_at) AS ended_at,
                            count(*) AS phase_count,
-                           CASE WHEN bool_or(status = 'error') THEN 'error'
-                                WHEN bool_or(status = 'warning') THEN 'warning'
-                                ELSE 'ok' END AS status,
                            sum((metrics ->> 'duration_s')::float) AS total_duration_s,
                            jsonb_agg(
                                jsonb_build_object('phase', phase, 'status', status)
@@ -71,7 +57,7 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
                     FROM pipeline_phase_executions
                     GROUP BY run_id
                 )
-                SELECT a.run_id, a.started_at, a.ended_at, a.phase_count, a.status,
+                SELECT a.run_id, a.started_at, a.ended_at, a.phase_count,
                        a.total_duration_s, a.phases, r.mode, r.sources
                 FROM agg a
                 JOIN LATERAL (
@@ -84,20 +70,25 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
             ),
             {"limit": limit, "offset": offset},
         ).all()
-        return [
-            RunSummary(
-                run_id=r.run_id,
-                started_at=r.started_at,
-                ended_at=r.ended_at,
-                mode=r.mode,
-                sources=list(r.sources),
-                status=cast(PhaseStatus, r.status),
-                phase_count=r.phase_count,
-                total_duration_s=r.total_duration_s,
-                phases=[PhaseBrief(phase=p["phase"], status=p["status"]) for p in r.phases],
+        summaries = []
+        for r in rows:
+            phases = [
+                PhaseBrief(phase=p["phase"], status=PhaseStatus(p["status"])) for p in r.phases
+            ]
+            summaries.append(
+                RunSummary(
+                    run_id=r.run_id,
+                    started_at=r.started_at,
+                    ended_at=r.ended_at,
+                    mode=r.mode,
+                    sources=list(r.sources),
+                    status=worst_status(p.status for p in phases),
+                    phase_count=r.phase_count,
+                    total_duration_s=r.total_duration_s,
+                    phases=phases,
+                )
             )
-            for r in rows
-        ]
+        return summaries
 
     def get_run(self, run_id: int) -> RunDetail | None:
         """Détail d'un run : ses phases dans l'ordre d'exécution, rendement et écart de durée recalculés."""
@@ -127,7 +118,7 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
                     phase=r.phase,
                     started_at=r.started_at,
                     ended_at=r.ended_at,
-                    status=cast(PhaseStatus, r.status),
+                    status=PhaseStatus(r.status),
                     duration_s=duration_s,
                     metrics=metrics,
                     details=r.details,
@@ -143,7 +134,7 @@ class PgPipelineRunsQueries(PipelineRunsQueries):
             ended_at=max(p.ended_at for p in phases),
             mode=rows[0].mode,
             sources=list(rows[0].sources),
-            status=_worst_status(p.status for p in phases),
+            status=worst_status(p.status for p in phases),
             total_duration_s=sum(p.duration_s for p in phases),
             phases=phases,
         )

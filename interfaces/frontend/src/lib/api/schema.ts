@@ -4203,11 +4203,7 @@ export interface components {
         PhaseBrief: {
             /** Phase */
             phase: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
         };
         /**
          * PhaseExecutionDetail
@@ -4226,11 +4222,7 @@ export interface components {
              * Format: date-time
              */
             ended_at: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
             /** Duration S */
             duration_s: number;
             metrics: components["schemas"]["PhaseMetricsPayload"];
@@ -4267,6 +4259,12 @@ export interface components {
             /** Duration S */
             duration_s: number;
         };
+        /**
+         * PhaseStatus
+         * @description Statut d'une exécution de phase, et niveau d'un signal. Les membres sont rangés du moins grave au plus grave.
+         * @enum {string}
+         */
+        PhaseStatus: "ok" | "warning" | "error";
         /**
          * PivotDimensionOut
          * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction).
@@ -4771,11 +4769,7 @@ export interface components {
             mode: string;
             /** Sources */
             sources: string[];
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
             /** Total Duration S */
             total_duration_s: number;
             /** Phases */
@@ -4802,11 +4796,7 @@ export interface components {
             mode: string;
             /** Sources */
             sources: string[];
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
             /** Phase Count */
             phase_count: number;
             /** Total Duration S */
@@ -5059,11 +5049,7 @@ export interface components {
          *     `level` aligne la couleur de la phase (`warning` ou `error`), `code` permet le regroupement, `message` est lisible tel quel.
          */
         Signal: {
-            /**
-             * Level
-             * @enum {string}
-             */
-            level: "ok" | "warning" | "error";
+            level: components["schemas"]["PhaseStatus"];
             /** Code */
             code: string;
             /** Message */
