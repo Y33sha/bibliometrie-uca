@@ -18,7 +18,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - Champ de recherche pleine largeur sur les publications. Ailleurs, sa largeur varie de 220 à 350 px.
 - Libellé « Filtrer par : » seulement sur Publications et Statistiques.
 - Compteur à gauche de l'export sur Publications et Thèses, aligné à droite sur les autres listes, sous la recherche sur Sujets.
-- Export CSV seulement sur Publications et Thèses ; menu de colonnes « ⋯ » aussi.
+- Export CSV seulement sur Publications et Thèses ; menu de colonnes « ⋯ » aussi. L'API sert seulement ces deux exports (`/api/publications/export.csv`, `/api/publications/export-theses.csv`).
 - Champ « Occurrences min » de Sujets sans le style des autres contrôles.
 - Placeholders terminés par « ... », « … », « . » ou sans ponctuation.
 
@@ -73,6 +73,11 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - `select` de Manques collections sans nom accessible.
 - Graphe des sujets : éléments focusables imbriqués dans le SVG.
 
+**API de navigation SvelteKit dépréciées** (avertissements en console).
+
+- `goto(..., { replaceState: true })` dans `routes/+page.svelte`, `admin/+layout.svelte`, `publications/+page.svelte`, `TabNav.svelte`, `pagination.ts`, `useUrlFilters.svelte.ts`.
+- `replaceState()` de `$app/navigation` dans 10 pages, qui synchronisent chacune leur URL à la main : les quatre pages Problèmes HAL, `journals`, `persons`, `admin/addresses`, `admin/countries`, `admin/feedback`, `admin/orphan-contributions`.
+
 **Administration.**
 
 - Titre de page en H1 (Pays, Contributions orphelines), en H2 (Configuration, Pipeline, Qualité de la détection) ou absent (Affiliations). Menu « Logs », titre « Pipeline ».
@@ -99,7 +104,9 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - **Un seul style d'identifiant**, en `--mono`, sur les listes comme dans les en-têtes d'entité.
 - **Un seul composant de barres horizontales** : `SubjectBars` sert aussi aux pays partenaires.
 - **Valeur absente** : cellule vide.
-- **Aucun défilement horizontal de la page**, à toutes les largeurs. Un tableau trop large défile dans son conteneur.
+- **Export CSV sur toutes les listes.** Menu de colonnes sur les listes à nombreuses colonnes.
+- **Aucun défilement horizontal de la page**, à toutes les largeurs. Un tableau trop large défile dans son conteneur, avec un indice visuel au bord.
+- **Navigation SvelteKit** : `goto(url, { replace: true })`, à la place de `replaceState`.
 - **Sous-menus de navigation** ouverts au clic, au clavier et au survol ; fermés par Échap et par un clic extérieur.
 - **Structure de page** : un `<main>`, un lien d'évitement, un seul H1 par page (le nom du site sort des titres), titres de section en H2 sur les fiches.
 - **Contraste de 4,5:1 au minimum** pour tout texte, navigation comprise.
@@ -116,19 +123,25 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [ ] `<main>`, lien d'évitement, nom du site hors des titres
 - [ ] Contraste des liens de navigation, du lien actif et du lien « Connexion »
 
-### 2. Libellés
+### 2. API de navigation SvelteKit
+
+- [ ] `goto(..., { replace: true })` dans les 6 fichiers
+- [ ] Les 10 pages en `replaceState()` sur `goto`
+
+### 3. Libellés
 
 - [ ] Registre des libellés de facettes et de colonnes ; menu de colonnes et en-têtes sur le registre
 - [ ] Un nom par page Problèmes HAL, sans abréviation au menu
 - [ ] « National » à la place de « Domestique » ; titres de dashboard identiques entre éditeur et publication en série
 - [ ] Placeholders
 
-### 3. En-tête de page et barre d'outils
+### 4. En-tête de page et barre d'outils
 
 - [ ] Composant d'en-tête de page : Sujets, Problèmes HAL, administration
 - [ ] Composant de barre d'outils : toutes les listes, pages Problèmes HAL comprises ; champ « Occurrences min » au style des contrôles
+- [ ] Export CSV de chaque liste, API comprise
 
-### 4. Composants
+### 5. Composants
 
 - [ ] Style d'identifiant unique (ISSN, ISBN, HAL)
 - [ ] Pays partenaires en `SubjectBars`
@@ -137,14 +150,6 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [ ] Liste des éditeurs : filets de la colonne des préfixes, valeur absente en cellule vide
 - [ ] Manques collections en tableau
 - [ ] Fiche publication : titres de section homogènes, bouton « Accès fermé »
-
-### 5. Responsivité
-
-- [ ] Aucun défilement horizontal de la page sur `/structures`, `/subjects`, `/subjects/[id]`
-- [ ] Tableaux en mobile (voir Questions ouvertes)
-- [ ] Barre d'outils des publications, séparateurs de la page Statistiques
-- [ ] Fil d'Ariane et ligne revue / éditeur de la fiche publication
-- [ ] Indice de défilement des onglets ; libellé « Tutelles » solidaire de ses valeurs
 
 ### 6. Accessibilité restante
 
@@ -165,14 +170,18 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [ ] Chiffres clés de Qualité de la détection en `KeyFigures` ; format des nombres
 - [ ] Contrôles stylés ; sélecteur de pays par ligne, boutons de rejet et de validation
 - [ ] Pastille de source OpenAlex distincte de l'open access ; abréviations
-- [ ] Aucun défilement horizontal de la page en 390 px
 - [ ] Libellés des cases à cocher et des `select` ; en-tête cliquable d'Affiliations sans contrôle imbriqué ; contrastes
+
+### 9. Responsivité
+
+- [ ] Aucun défilement horizontal de la page : `/structures`, `/subjects`, `/subjects/[id]`, Configuration, Pipeline, Affiliations, Pays, Contributions orphelines
+- [ ] Indice de défilement au bord des tableaux et des onglets
+- [ ] Barre d'outils des publications, séparateurs de la page Statistiques
+- [ ] Fil d'Ariane et ligne revue / éditeur de la fiche publication
+- [ ] Libellé « Tutelles » solidaire de ses valeurs ; compteurs d'Affiliations
 
 ## Questions ouvertes
 
-- **Titre visible sur les listes.** Les listes s'ouvrent sur la barre d'outils. Leur donner un H1 visible, ou un H1 réservé aux lecteurs d'écran.
-- **Tableaux en mobile.** Une carte par ligne sous une largeur seuil, ou défilement dans le conteneur avec colonnes secondaires masquées.
-- **Export CSV et menu de colonnes** sur toutes les listes, ou seulement sur les publications et les thèses.
+- **Titre des listes.** Les listes s'ouvrent sur la barre d'outils. Le RGAA (critère 9.1) exige une hiérarchie de titres pertinente, sans imposer de H1. Pistes : aucun titre, ou un H1 réservé aux lecteurs d'écran.
 - **Focus initial dans la recherche** des publications : le garder avec le lien d'évitement, ou le retirer.
 - **Dashboards d'éditeur et de publication en série** sans chiffres clés : à traiter avec le [contenu des dashboards](METIER_dashboards.md).
-- **Contrôle automatisé** : test Playwright et axe-core dans la CI, sur les pages principales.
