@@ -20,7 +20,7 @@
     page.url.searchParams.get("tab") === "publications" ? "publications" : "graph",
   );
 
-  const NEIGHBORS_LIMIT = 20;
+  const NEIGHBORS_LIMIT = 15;
   const MIN_COOCCURRENCE = 3;
 
   let data = $state<SubjectDetailResponse | null>(null);
