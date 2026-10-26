@@ -24,7 +24,7 @@ Une localisation est une copie d'un document : une page, éventuellement un PDF,
 
 ## Lecture par le pipeline
 
-**Éditeur d'une publication.** Le préfixe DOI d'une plateforme d'éditeurs désigne la plateforme : ni son titulaire ni un enregistrement source qui le nomme ne donnent l'éditeur (fiche [publications](publications.md)). La liste des plateformes connues contient ces préfixes.
+**Éditeur d'une publication.** Le préfixe DOI d'une plateforme d'éditeurs désigne la plateforme : ni son titulaire ni un enregistrement source qui le nomme ne donnent l'éditeur (fiche [publications](../donnees/03-publications.md)). La liste des plateformes connues contient ces préfixes.
 
 **Serveur de preprints.** Le bilan Science ouverte (`interfaces/cli/maintenance/report_open_science.py`) reconnaît le serveur de preprints d'une publication par la plateforme de ses localisations, à défaut par le préfixe de son DOI.
 

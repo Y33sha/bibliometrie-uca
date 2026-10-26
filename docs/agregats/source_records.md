@@ -17,7 +17,7 @@ Un enregistrement source est l'image d'un document dans **une** source — HAL, 
 | `source_contribution_addresses` | Lien entre une contribution source et ses adresses | `source_contribution_id`, `address_id` |
 | `source_contribution_structures` | Vue matérialisée : contribution source ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |
 
-En amont se trouve `staging.raw_data`, qui conserve les données moissonnées et leur empreinte. En aval, `publications` reçoit le résultat de la fusion. Les contributions sources ont leur propre fiche, [source_contributions](source_contributions.md), et leur consolidation relève d'[contributions](contributions.md).
+En amont se trouve `staging.raw_data`, qui conserve les données moissonnées et leur empreinte. En aval, `publications` reçoit le résultat de la fusion. Les contributions sources ont leur propre fiche, [source_contributions](source_contributions.md), et leur consolidation relève d'[contributions](../donnees/04-contributions.md).
 
 ## Écriture par le pipeline
 

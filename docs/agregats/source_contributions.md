@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-24.*
 
-Une contribution source est un auteur tel qu'**une** source le donne pour un enregistrement source : une ligne par position d'auteur dans un [enregistrement source](source_records.md). C'est la pièce qui relie tout le reste. Elle référence les informations du contributeur telles que la source les donne, puis la phase `author_grouping` l'aligne dans la [contribution](contributions.md) de son auteur, qui désigne la personne. Cinq phases du pipeline l'écrivent ou l'alignent ; l'API n'y touche pas.
+Une contribution source est un auteur tel qu'**une** source le donne pour un enregistrement source : une ligne par position d'auteur dans un [enregistrement source](source_records.md). C'est la pièce qui relie tout le reste. Elle référence les informations du contributeur telles que la source les donne, puis la phase `author_grouping` l'aligne dans la [contribution](../donnees/04-contributions.md) de son auteur, qui désigne la personne. Cinq phases du pipeline l'écrivent ou l'alignent ; l'API n'y touche pas.
 
 Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce qu'elles concernent : les rôles dans `domain/publications/contribution_roles.py`, l'extraction propre à chaque source dans `domain/sources/`, les identifiants dans `domain/persons/`.
 
@@ -16,9 +16,9 @@ Aucun objet de domaine ne lui correspond. Ses règles sont réparties selon ce q
 | `source_contribution_structures` | Vue matérialisée : contribution source ↔ structure du périmètre, avec l'indice | dérivée des adresses, des ROR, des structures HAL, des structures de thèse et du périmètre |
 | `confirmed_source_contributions` | Contribution source épinglée par une décision humaine | `(source_contribution_id, person_id)` |
 
-L'enregistrement source parent est décrit dans [source_records](source_records.md), la contribution consolidée en aval dans [contributions](contributions.md), qui décrit aussi `rejected_contributions`.
+L'enregistrement source parent est décrit dans [source_records](source_records.md), la contribution consolidée en aval dans [contributions](../donnees/04-contributions.md), qui décrit aussi `rejected_contributions`.
 
-Les informations du contributeur (`contributor_information_id`) — nom normalisé et identifiants — sont un fait que la source fournit, enregistré dès `normalize`. Elles servent à dédoublonner des contributions sources identiques. La personne n'est pas portée par la contribution source, mais par la [contribution](contributions.md) dans laquelle elle est alignée.
+Les informations du contributeur (`contributor_information_id`) — nom normalisé et identifiants — sont un fait que la source fournit, enregistré dès `normalize`. Elles servent à dédoublonner des contributions sources identiques. La personne n'est pas portée par la contribution source, mais par la [contribution](../donnees/04-contributions.md) dans laquelle elle est alignée.
 
 ## Écriture par le pipeline
 
@@ -30,7 +30,7 @@ Les informations du contributeur (`contributor_information_id`) — nom normalis
 
 ## Écriture par l'API — édition manuelle
 
-Aucune colonne de `source_contributions` n'est écrite par l'API. L'édition manuelle est décrite côté [personnes](../donnees/05-persons.md) et [contributions](contributions.md).
+Aucune colonne de `source_contributions` n'est écrite par l'API. L'édition manuelle est décrite côté [personnes](../donnees/05-persons.md) et [contributions](../donnees/04-contributions.md).
 
 **Épingler une contribution source** l'inscrit dans `confirmed_source_contributions`. La décision porte sur cette contribution source précisément ; la phase `persons` donne la personne épinglée à la contribution qui l'aligne, à chaque passage.
 
