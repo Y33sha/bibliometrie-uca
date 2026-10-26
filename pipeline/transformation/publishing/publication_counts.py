@@ -83,6 +83,9 @@ def refresh_publisher_publication_counts(conn: Connection) -> int:
 class PublicationCountRecompute:
     """Recalcul ciblé du `publication_count` d'un éditeur, exposé à l'API par `pipeline/public.py`."""
 
-    def refresh_publisher_publication_count(self, conn: Connection, publisher_id: int) -> None:
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
+    def refresh_publisher_publication_count(self, publisher_id: int) -> None:
         """Recalcule le `publication_count` de l'éditeur."""
-        refresh_publisher_publication_count(conn, publisher_id)
+        refresh_publisher_publication_count(self._conn, publisher_id)

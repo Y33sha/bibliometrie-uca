@@ -68,10 +68,6 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
     if di:
         source_extras[SourceExtra.DATE_INSCRIPTION] = di
 
-    discipline = thesis.get("discipline")
-    if discipline:
-        source_extras[SourceExtra.DISCIPLINE] = discipline
-
     if institution := thesis.get("etabSoutenanceN"):
         source_extras[SourceExtra.ETABLISSEMENT] = institution
     if institution_ppn := as_str(thesis.get("etabSoutenancePpn")):

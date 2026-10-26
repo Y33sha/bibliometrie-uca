@@ -2,7 +2,7 @@
 
 from functools import partial
 
-from infrastructure.read_models.structures import PgStructuresQueries
+from infrastructure.read_models.structures.queries import StructuresQueries
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import (
     ensure_country,
@@ -39,7 +39,7 @@ class TestListLaboratories:
     def test_lists_labos_in_perimeter(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB-1", name="Lab 1")
         _setup_perimeter(sa_sync_conn, [lab])
-        labs = PgStructuresQueries(sa_sync_conn).list_structures(
+        labs = StructuresQueries(sa_sync_conn).list_structures(
             types=["labo"], search="", in_perimeter=True
         )
         ids = [lab_.id for lab_ in labs]
@@ -49,7 +49,7 @@ class TestListLaboratories:
         # La racine de périmètre (université) n'est plus masquée : elle figure dans les tutelles.
         lab = insert_structure(sa_sync_conn, "LAB-2")
         root = _setup_perimeter(sa_sync_conn, [lab])
-        labs = PgStructuresQueries(sa_sync_conn).list_structures(
+        labs = StructuresQueries(sa_sync_conn).list_structures(
             types=["labo"], search="", in_perimeter=True
         )
         lab_row = next(lab_ for lab_ in labs if lab_.id == lab)
@@ -62,7 +62,7 @@ class TestListLaboratories:
         lab = insert_structure(conn, "LAB-D", structure_type="labo")
         team = insert_structure(conn, "TEAM-D", structure_type="equipe")
         _setup_perimeter(conn, [lab, team])
-        q = PgStructuresQueries(conn)
+        q = StructuresQueries(conn)
 
         ids = {r.id for r in q.list_structures(types=["labo"], search="", in_perimeter=True)}
         assert lab in ids
@@ -80,9 +80,7 @@ class TestListLaboratories:
         _setup_perimeter(conn, [lab, team])
         ids = {
             r.id
-            for r in PgStructuresQueries(conn).list_structures(
-                types=[], search="", in_perimeter=True
-            )
+            for r in StructuresQueries(conn).list_structures(types=[], search="", in_perimeter=True)
         }
         assert {lab, team} <= ids
 
@@ -91,7 +89,7 @@ class TestListLaboratories:
         outside = insert_structure(conn, "LAB-OUT", structure_type="labo")
         ids = {
             r.id
-            for r in PgStructuresQueries(conn).list_structures(
+            for r in StructuresQueries(conn).list_structures(
                 types=["labo"], search="", in_perimeter=False
             )
         }
@@ -100,11 +98,11 @@ class TestListLaboratories:
 
 class TestGetLaboratory:
     def test_returns_none_for_missing(self, sa_sync_conn):
-        assert PgStructuresQueries(sa_sync_conn).get_structure_detail(999_999) is None
+        assert StructuresQueries(sa_sync_conn).get_structure_detail(999_999) is None
 
     def test_returns_full_profile(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB", name="Le labo", hal_collection="LAB-COL")
-        res = PgStructuresQueries(sa_sync_conn).get_structure_detail(lab)
+        res = StructuresQueries(sa_sync_conn).get_structure_detail(lab)
         assert res is not None
         assert res.structure.code == "LAB"
         assert res.structure.hal_collection == "LAB-COL"
@@ -119,7 +117,7 @@ class TestGetLaboratoryAddresses:
         addr = insert_address(sa_sync_conn, "A")
         insert_address_structure(sa_sync_conn, addr, structure_id=lab, is_confirmed=True)
 
-        res = PgStructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
+        res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
         assert addr in ids
 
@@ -127,7 +125,7 @@ class TestGetLaboratoryAddresses:
         lab = insert_structure(sa_sync_conn, "LAB")
         addr = insert_address(sa_sync_conn, "R")
         insert_address_structure(sa_sync_conn, addr, structure_id=lab, is_confirmed=False)
-        res = PgStructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
+        res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
         assert addr not in ids
 
@@ -135,7 +133,7 @@ class TestGetLaboratoryAddresses:
 class TestGetLaboratoryDashboard:
     def test_returns_structure_even_when_empty(self, sa_sync_conn):
         lab = insert_structure(sa_sync_conn, "LAB")
-        res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
+        res = StructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.publications_by_year == []
         assert res.oa.total == 0
         assert res.collab.total_articles == 0
@@ -151,7 +149,7 @@ class TestGetLaboratoryDashboard:
         aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
         add_contribution_structure(sa_sync_conn, aid, lab)
 
-        res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
+        res = StructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.oa.open_access == 1
         assert res.collab.international == 1
         assert any(c.code == "us" for c in res.top_countries)
@@ -167,7 +165,7 @@ class TestGetLaboratoryDashboard:
         aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
         add_contribution_structure(sa_sync_conn, aid, lab)
 
-        res = PgStructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
+        res = StructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
         assert res.collab.total_articles == 1
         assert res.collab.international == 0
         assert res.collab.domestic == 1
@@ -199,7 +197,7 @@ class TestGetLaboratorySubjects:
             insert_publication_subject(sa_sync_conn, p, subject_id=ai)
         insert_publication_subject(sa_sync_conn, p1, subject_id=bio)
 
-        res = PgStructuresQueries(sa_sync_conn).get_structure_subjects(lab, limit=10)
+        res = StructuresQueries(sa_sync_conn).get_structure_subjects(lab, limit=10)
         assert len(res) == 2
         assert res[0].label == "AI"
         assert res[0].count == 3

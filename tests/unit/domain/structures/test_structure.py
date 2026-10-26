@@ -87,6 +87,18 @@ class TestStructureApply:
         assert s.ror_id == RorId("02feahw73")
         assert s.hal_collection == HalCollection("LIMOS")
 
+    def test_none_clears_an_optional_field(self):
+        s = Structure(
+            id=1,
+            code="X",
+            name="Lab",
+            structure_type=StructureType.LABO,
+            acronym="LB",
+            ror_id=RorId("02feahw73"),
+        )
+        assert s.apply(acronym=None, ror_id=None) == ["acronym", "ror_id"]
+        assert (s.acronym, s.ror_id) == (None, None)
+
     def test_invalid_type_is_refused(self):
         s = Structure(id=1, code="X", name="Lab", structure_type=StructureType.LABO)
         with pytest.raises(ValidationError, match="Type de structure invalide"):

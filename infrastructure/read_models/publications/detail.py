@@ -2,7 +2,15 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models.publications_queries import (
+from domain.platforms.registry import HAL
+from domain.publications.access import Access, Copy, access
+from domain.publications.doc_types import DocType
+from domain.publications.relations import RelationType, inverse_relation
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
+from domain.source_records.source_extras import SourceExtra
+from domain.sources.registry import Source
+from infrastructure.read_models.publications.models import (
     AccessLinkOut,
     ConsolidatedContributionOut,
     ExternalIdentifierOut,
@@ -14,19 +22,11 @@ from application.ports.read_models.publications_queries import (
     ThesesContributionOut,
     ThesisMeta,
 )
-from application.ports.read_models.subjects_queries import SubjectOut
-from domain.platforms.registry import HAL
-from domain.publications.access import Access, Copy, access
-from domain.publications.doc_types import DocType
-from domain.publications.relations import RelationType, inverse_relation
-from domain.source_records.external_ids import ExternalIdType
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
-from domain.source_records.source_extras import SourceExtra
-from domain.sources.registry import Source
 from infrastructure.read_models.sql_fragments import (
     contribution_has_source,
     contributor_display_name,
 )
+from infrastructure.read_models.subjects.models import SubjectOut
 from infrastructure.sql_fragments import active_issns, corrected_by
 
 
@@ -226,7 +226,8 @@ def get_publication_detail(
     if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
         extras_row = conn.execute(
             text(f"""
-                SELECT sr.source_extras AS source_record_extras, p.source_extras AS publication_extras
+                SELECT sr.source_extras AS source_record_extras, sr.topics->>'discipline' AS discipline,
+                       p.source_extras AS publication_extras
                 FROM publications p
                 LEFT JOIN source_records sr
                        ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
@@ -239,7 +240,7 @@ def get_publication_detail(
             source_record_extras = extras_row.source_record_extras or {}
             publication_extras = extras_row.publication_extras or {}
             thesis_meta = ThesisMeta(
-                discipline=source_record_extras.get(SourceExtra.DISCIPLINE),
+                discipline=extras_row.discipline,
                 ecoles_doctorales=source_record_extras.get(SourceExtra.ECOLES_DOCTORALES),
                 partenaires=source_record_extras.get(SourceExtra.PARTENAIRES),
                 date_soutenance=source_record_extras.get(SourceExtra.DATE_SOUTENANCE)
@@ -251,7 +252,9 @@ def get_publication_detail(
     subjects = get_publication_subjects(conn, publication_id)
     relations = get_publication_relations(conn, publication_id)
     external_identifiers = get_publication_external_identifiers(conn, publication_id)
-    publication_access = access(get_publication_copies(conn, publication_id))
+    publication_access = access(
+        get_publication_copies(conn, publication_id), doi=publication_row.doi
+    )
 
     structures = structures_by_id(
         conn, {sid for a in contributions for sid in a.structure_ids or []}
@@ -291,7 +294,9 @@ def get_publication_detail(
         keywords=keywords,
         relations=relations,
         access_url=publication_access.url,
-        access=[AccessLinkOut(label=a.label, url=a.url) for a in publication_access.links],
+        access=[
+            AccessLinkOut(label=a.label, url=a.url, known=a.known) for a in publication_access.links
+        ],
         referenced_by=_referenced_by(sources, publication_access),
         external_identifiers=external_identifiers,
     )
@@ -314,7 +319,7 @@ def get_publication_copies(conn: Connection, publication_id: int) -> list[Copy]:
     """Localisations des enregistrements sources de la publication, hors formes secondaires. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text(f"""
-            SELECT l.url, l.version, l.is_oa, pl.name AS platform,
+            SELECT l.url, l.version, l.is_oa, pl.name AS platform, pl.openalex_id AS platform_openalex_id,
                    (sr.source = 'hal' AND pl.openalex_id = ANY(:hal_ids)) AS described_by_platform,
                    sr.id AS arrival
             FROM source_record_locations l
@@ -335,6 +340,7 @@ def get_publication_copies(conn: Connection, publication_id: int) -> list[Copy]:
             version=r.version,
             is_oa=r.is_oa,
             platform=r.platform,
+            platform_openalex_id=r.platform_openalex_id,
             described_by_platform=r.described_by_platform,
             arrival=r.arrival,
         )

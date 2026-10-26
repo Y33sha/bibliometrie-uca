@@ -183,10 +183,8 @@ class TestAssignOrphanContribution:
         assert r.json()["person_id"] == pid
 
     def test_assign_visible_immediately(self, auth_client):
-        # Régression (chantier commit-avant-réponse) : le command handler commit
-        # avant l'envoi de la réponse, donc le rattachement est lisible depuis une
-        # connexion indépendante. Garde-fou du passage final du teardown de
-        # db_conn en rollback — un handler sans `commit()` ferait échouer ce test.
+        # La requête est committée avant l'envoi de la réponse : le rattachement est lisible
+        # depuis une connexion indépendante.
         pid = seed_person()
         group = _seed_orphan()
         r = auth_client.post(

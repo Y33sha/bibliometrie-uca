@@ -66,7 +66,7 @@ La résolution lit `addresses(id, normalized_text)` et `structure_name_forms`. L
 
 ## Lecture par l'API
 
-Routeur `interfaces/api/routers/addresses.py`, port `application/ports/read_models/addresses_queries.py`, adaptateur `PgAddressesQueries` — distinct des modules d'écriture du pipeline. Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
+Routeur `interfaces/api/routers/addresses.py`, Lecture `infrastructure/read_models/addresses/`, classe `AddressesQueries` — distinct des modules d'écriture du pipeline. Le référentiel des pays est servi à part, par `interfaces/api/routers/countries.py`.
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|

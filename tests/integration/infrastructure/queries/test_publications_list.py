@@ -4,13 +4,13 @@ from functools import partial
 
 from sqlalchemy import text
 
-from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.list import (
     export_publications_csv,
     export_theses_csv,
     list_publications,
 )
+from infrastructure.read_models.publications.models import PublicationFilters
 from tests.integration.helpers.contributions import group_id_of, insert_contribution
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person

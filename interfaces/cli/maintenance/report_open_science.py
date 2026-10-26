@@ -24,7 +24,10 @@ from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.read_models.structures import AUTHOR_SOURCE_CONTRIBUTION, AUTHORED_PUBLICATION
+from infrastructure.read_models.structures.queries import (
+    AUTHOR_SOURCE_CONTRIBUTION,
+    AUTHORED_PUBLICATION,
+)
 from infrastructure.sql_fragments import diamond_journal_sql
 
 EVOLUTION_YEARS = 5

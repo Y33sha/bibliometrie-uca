@@ -45,4 +45,5 @@ Cette distinction est pertinente pour le calcul, mais obscure pour l'utilisateur
 ## Questions ouvertes
 
 - **Années par défaut** de la page Statistiques : les garder quand l'URL ne contient pas d'années, ou les retirer pour qu'un lien depuis la liste sans filtre d'années montre le même corpus.
+- **Filtres liés à un contexte** : les transmettre quand le laboratoire ou la personne est seul sélectionné ? Statut HAL pour un seul laboratoire ; correspondance et périmètre pour une seule personne. Piste commune avec les listes d'entités liées ([Administration et navigation](UI_administration-et-navigation.md)).
 - **Découpage de l'indicateur « Montant des APC »** : une barre unique par catégorie, ou un découpage par voie open access.

@@ -7,11 +7,11 @@ La trace brute d'une exécution vit dans le flux de sortie standard de l'orchest
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.read_models.pipeline_runs_queries import (
-    PipelineRunsQueries,
+from infrastructure.read_models.pipeline_runs.models import (
     RunDetail,
     RunSummary,
 )
+from infrastructure.read_models.pipeline_runs.queries import PipelineRunsQueries
 from interfaces.api.deps import pipeline_runs_queries
 from pipeline.public import PHASE_ORDER
 

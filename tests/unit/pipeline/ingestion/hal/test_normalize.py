@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, get_container_facts), `hal_source_record` (métadonnées canoniques, collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
+Couvre les helpers (get_title, build_hal_external_ids, get_container_facts), `hal_source_record` (métadonnées canoniques, collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
 
 Pattern : doublures de stores + `MagicMock`, pas de DB.
 """
@@ -80,6 +80,34 @@ class TestGetTitle:
 
     def test_empty_title_list_falls_back_to_label(self):
         assert get_title({"title_s": [], "label_s": "L"}) == "L"
+
+
+# ── build_hal_external_ids ───────────────────────────────────────
+
+
+class TestBuildHalExternalIds:
+    def test_minimal(self):
+        assert build_hal_external_ids({}, "hal-1234", None) == {"hal_id": ["hal-1234"]}
+
+    def test_nnt(self):
+        assert build_hal_external_ids({}, "hal-1", "2021CLFA0030")["nnt"] == "2021CLFA0030"
+
+    def test_pmid_from_pubmedid(self):
+        assert (
+            build_hal_external_ids({"pubmedid_s": "28973220"}, "hal-1", None)["pmid"] == "28973220"
+        )
+
+    def test_pmcid_from_link(self):
+        doc = {"linkExtUrl_s": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084"}
+        assert build_hal_external_ids(doc, "hal-1", None)["pmcid"] == "PMC5625084"
+
+    def test_arxiv_from_link_list(self):
+        doc = {"linkExtUrl_s": ["https://arxiv.org/abs/2401.00123"]}
+        assert build_hal_external_ids(doc, "hal-1", None)["arxiv_id"] == "2401.00123"
+
+    def test_non_id_link_ignored(self):
+        doc = {"linkExtUrl_s": "https://example.com/openaccess"}
+        assert build_hal_external_ids(doc, "hal-1", None) == {"hal_id": ["hal-1"]}
 
 
 # ── conteneurs ───────────────────────────────────────────────────

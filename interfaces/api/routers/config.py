@@ -6,20 +6,22 @@ La table `config` porte les réglages d'exploitation : années couvertes, choix 
 from typing import cast
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import Connection
 
-from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
-from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.config_repository import ConfigRepository
-from application.services.config import commands as config_commands
+from application.services.config import ConfigService
+from domain.users import SessionUser
+from infrastructure.read_models.config.models import (
+    ConfigItem,
+)
+from infrastructure.read_models.config.queries import ConfigQueries
+from infrastructure.read_models.perimeters.models import (
+    InstitutionOut,
+)
+from infrastructure.read_models.perimeters.queries import PerimetersQueries
 from interfaces.api.deps import (
-    admin_user_or_none,
-    audit_repo,
     config_queries,
-    config_repository,
-    db_conn,
+    config_service,
     perimeters_queries,
+    session_user,
 )
 from interfaces.api.models import ConfigValueUpdate
 
@@ -28,14 +30,14 @@ router = APIRouter(prefix="/api/config", tags=["config"])
 
 @router.get("", response_model=list[ConfigItem])
 def list_config(
-    admin_user: str | None = Depends(admin_user_or_none),
+    user: SessionUser | None = Depends(session_user),
     queries: ConfigQueries = Depends(config_queries),
 ) -> list[ConfigItem]:
     """Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
 
-    Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+    Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
     """
-    return queries.list_config(public_only=admin_user is None)
+    return queries.list_config(public_only=user is None or not user.is_admin)
 
 
 @router.get("/institution", response_model=InstitutionOut)
@@ -48,17 +50,13 @@ def institution(queries: PerimetersQueries = Depends(perimeters_queries)) -> Ins
 def update_config(
     key: str,
     body: ConfigValueUpdate,
-    conn: Connection = Depends(db_conn),
-    config: ConfigRepository = Depends(config_repository),
-    audit: AuditRepository = Depends(audit_repo),
+    config: ConfigService = Depends(config_service),
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif.
 
     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
     """
-    row = config_commands.update_config_value(
-        conn, key, body.value, config=config, audit_repo=audit
-    )
+    row = config.update_config_value(key, body.value)
     return ConfigItem(
         key=cast(str, row["key"]),
         value=row["value"],

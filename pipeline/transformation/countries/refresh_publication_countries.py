@@ -264,16 +264,17 @@ def refresh(conn: Connection, logger: logging.Logger) -> int:
 class CountryRecompute:
     """Résolution des pays d'un lot d'adresses et recalcul ciblé de leurs caches (port injecté par l'API)."""
 
-    def resolve_address_countries(self, conn: Connection, address_ids: list[int]) -> int:
-        return resolve_address_countries(conn, address_ids)
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
-    def refresh_source_records_countries_for_addresses(
-        self, conn: Connection, address_ids: list[int]
-    ) -> int:
+    def resolve_address_countries(self, address_ids: list[int]) -> int:
+        return resolve_address_countries(self._conn, address_ids)
+
+    def refresh_source_records_countries_for_addresses(self, address_ids: list[int]) -> int:
         """Recalcule `source_contributions.countries` des contributions sources liées à l'une des `address_ids`, puis `source_records.countries` de leurs documents. Idempotent. Retourne le nombre de documents mis à jour."""
         if not address_ids:
             return 0
-        conn.execute(
+        self._conn.execute(
             text(
                 """
                 WITH scoped_sa AS (
@@ -285,7 +286,7 @@ class CountryRecompute:
             ),
             {"ids": address_ids},
         )
-        return conn.execute(
+        return self._conn.execute(
             text(
                 """
                 WITH scoped_sp AS (
@@ -301,13 +302,11 @@ class CountryRecompute:
             {"ids": address_ids},
         ).rowcount
 
-    def refresh_publications_countries_for_addresses(
-        self, conn: Connection, address_ids: list[int]
-    ) -> int:
+    def refresh_publications_countries_for_addresses(self, address_ids: list[int]) -> int:
         """Recalcule `publications.countries` (union des `source_records.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
         if not address_ids:
             return 0
-        return conn.execute(
+        return self._conn.execute(
             text(
                 """
                 WITH scoped_publications AS (

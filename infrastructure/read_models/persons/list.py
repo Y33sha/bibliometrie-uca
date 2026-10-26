@@ -2,14 +2,6 @@
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.read_models.persons_queries import (
-    NameFormSummaryOut,
-    PersonFilters,
-    PersonIdentifierOut,
-    PersonListResponse,
-    PersonOut,
-    PersonSearchResult,
-)
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
@@ -26,6 +18,14 @@ from infrastructure.read_models.filters import (
     persons_sort_clause,
 )
 from infrastructure.read_models.persons.identifiers import person_identifiers
+from infrastructure.read_models.persons.models import (
+    NameFormSummaryOut,
+    PersonFilters,
+    PersonIdentifierOut,
+    PersonListResponse,
+    PersonOut,
+    PersonSearchResult,
+)
 from infrastructure.read_models.sql_fragments import other_name_form_holders
 from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role
 

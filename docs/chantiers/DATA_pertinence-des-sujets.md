@@ -8,9 +8,8 @@ Base locale au 2026-10-25 : 74 585 publications, 734 400 liens publication–suj
 - **Rejet inutilisé.** La colonne `publication_subjects.rejected` existe, mais aucun code ne l'écrit. L'ingestion conserve les liens rejetés. `usage_count` et `subject_cooccurrences` les écartent, donc les pages `/subjects` et `/subjects/[id]` aussi. Les nuages de sujets (`entity_subjects_sql`), le filtre par sujet et la fiche d'une publication les montrent.
 - **Publications sans sujet** : 1 626.
 - **Sujet incohérent avec la revue** : signal inexploité. Les sujets DOAJ sont connus pour 2 325 revues sur 10 860 (`serials.doaj_payload`).
-- **Libellés à la place des codes.** Chaque enregistrement source porte le libellé de ses sujets, et l'extracteur lie les publications aux libellés. Les codes existent pourtant : HAL les porte dans chaque entrée de domaine (`sdv.bbm.bm_FacetSep_…`), ScanR stocke le PPN des vedettes sudoc. Le normalizer OpenAlex (`extract_topics`) garde le nom et le score de chaque niveau, et écarte les identifiants.
-- **Hiérarchie aplatie.** `subjects` porte un libellé, sans vocabulaire ni parent. Deux vocabulaires qui partagent un libellé partagent un sujet. La chaîne domain → field → subfield → topic d'OpenAlex existe seulement dans `source_records.topics`.
-- **Discipline des thèses en double.** La fiche d'une thèse lit `source_extras.discipline`. L'extracteur de sujets lit la copie `topics.discipline`.
+- **Hiérarchie.** `subjects` porte un libellé, sans vocabulaire ni parent. La chaîne domain → field → subfield → topic d'OpenAlex et le chemin des domaines HAL existent seulement dans `source_records.topics`. Le libellé ne suffit pas à situer un sujet OpenAlex : « Social Sciences » est domain et field ; « Biochemistry », « Genetics », « Pharmacology » sont des subfields de deux fields différents. Le normalizer OpenAlex écarte les identifiants. 3 001 libellés sont partagés entre plusieurs sources, donc fusionnés en un sujet.
+- **Besoins de l'interface.** Les graphiques de sujets demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
 
 ### Constats de l'exploration (corpus de 46 000 publications)
 
@@ -25,11 +24,15 @@ Le score n'est pas une mesure de pertinence. Un seuil bas écarte des topics lé
 
 **Paires de domains OpenAlex.** Health × Life est sur-représentée (lift 1,34), les cinq autres paires sous-représentées (0,27 à 0,62). Sur 15 publications Health × Physical (1 070 au total), 10 portent un domain manifestement aberrant. Les libellés HAL, WoS et theses.fr des autres enregistrements sources suffisent à trancher.
 
+**Mécanisme des aberrations.** OpenAlex semble évaluer chaque topic indépendamment, puis rattacher au topic retenu toute sa chaîne de parents. Un topic plausible entraîne ainsi un domain absurde : « Competency Development and Evaluation » pour un référentiel de compétences en pharmacie clinique, avec le field « Psychology ».
+
 **Co-occurrences de sujets.** Les aberrations OpenAlex sont récurrentes : un même sujet mal attribué produit la même paire sur de nombreuses publications. Les paires rares ne les repèrent donc pas.
 
-### Classifieurs ISTEX
+### Pistes
 
-La plateforme ISTEX TDM propose des web services de classification gratuits, appelables document par document. Aucun ne rend de score.
+Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
+
+**Classifieurs ISTEX.** La plateforme ISTEX TDM propose des web services de classification gratuits, appelables document par document. Aucun ne rend de score. Chacun propose une seule classe par document : il ne confirme pas le second domain d'une publication pluridisciplinaire. Les services reçoivent des lots `[{id, value}]`. Grain : domaine HAL, ou domain et field OpenAlex.
 
 | Service | Entrée | Sortie | Performance annoncée |
 |---|---|---|---|
@@ -38,72 +41,125 @@ La plateforme ISTEX TDM propose des web services de classification gratuits, app
 | [sciencemetrixClass](https://services.istex.fr/classification-en-domaines-scientifiques-science-metrix/) | résumé anglais, 100 caractères minimum | 3 niveaux Science-Metrix, libellés | exactitude 0,85 |
 | [pascalFrancisClass](https://services.istex.fr/classification-en-domaines-scientifiques/) | texte anglais | plan Pascal ou Francis, profondeur 1 à 3 | — |
 
+**Vote des arbitres**, au grain des domains OpenAlex (4 valeurs) :
+
+- arbitres : domaines HAL, disciplines theses.fr de la même publication, sujets DOAJ de sa revue (premier niveau de la classification LCC) ;
+- un arbitre peut soutenir plusieurs domains (« Neurosciences » soutient Health et Life) ;
+- sur une publication à plusieurs domains, un domain sans soutien est rejeté si un autre domain a au moins un soutien. Le seuil « au moins deux soutiens » perd 12 vrais positifs sur 20 cas : les arbitres HAL réduits à « Sciences du Vivant » ne le franchissent jamais ;
+- le rejet d'un domain s'étend aux field, subfield et topics qui en descendent sur la publication ;
+- précision mesurée sur 15 publications, WoS compris : 10 vrais positifs, 1 faux positif, 4 cas limites.
+
+**Embeddings** (Specter2), au grain des topics feuille : embedding du titre et du résumé, centroïde par topic calculé sur ses publications, similarité cosinus entre chaque publication et le centroïde de chacun de ses topics, seuil de rejet. Chaque libellé porte le chemin de tous ses ancêtres. L'évaluation descend la hiérarchie : les sous-sujets d'un sujet écarté ne sont pas évalués.
+
 ## Décisions
 
-- **Un sujet codé est identifié par son vocabulaire et son code.** La table des sujets porte son libellé et son parent. Les sources sans code gardent le libellé comme identifiant.
-- **Vote des arbitres au grain des domains OpenAlex** (4 valeurs) :
-  - arbitres : domaines HAL, catégories WoS, disciplines theses.fr de la même publication, sujets DOAJ de sa revue (premier niveau de la classification LCC) ;
-  - un arbitre peut soutenir plusieurs domains (« Neurosciences » soutient Health et Life) ;
-  - sur une publication à plusieurs domains, un domain sans soutien est rejeté si un autre domain a au moins un soutien. Le seuil « au moins deux soutiens » perd 12 vrais positifs sur 20 cas : les arbitres HAL réduits à « Sciences du Vivant » ne le franchissent jamais ;
-  - le rejet d'un domain s'étend aux field, subfield et topics qui en descendent sur la publication ;
-  - précision mesurée sur 15 publications : 10 vrais positifs, 1 faux positif, 4 cas limites.
-- **Le vote est une règle du pipeline.** La phase `subjects` l'applique à chaque publication qu'elle ingère. Un rejet automatique se recalcule. Un rejet manuel est une décision humaine durable.
-- **Classifieurs ISTEX avant Specter2.** Ils donnent un arbitre indépendant de l'algorithme OpenAlex, et des sujets aux publications qui n'en ont aucun. Specter2 se prototype seulement si leur évaluation montre qu'ils ne suffisent pas.
-- **Specter2 au grain des topics feuille.** Embedding du titre et du résumé, centroïde par topic calculé sur les liens non rejetés, similarité cosinus, seuil calibré sur des cas qualifiés à l'œil.
+- **Auditer avant de coder.** Les trois pistes sont évaluées sur un même échantillon qualifié à l'œil, de la moins coûteuse à la plus coûteuse : classifieurs ISTEX, vote des arbitres, embeddings. Le choix d'une piste ou d'une combinaison suit les bilans.
+- **Un libellé est inclus dans son parent.** Un libellé pertinent rend ses ancêtres pertinents. Un libellé aberrant rend ses descendants aberrants. La qualification de l'échantillon et chaque piste respectent cette inclusion.
+- **WoS est exclu des arbitres** : l'abonnement va être résilié.
+- **Un rejet automatique se recalcule. Un rejet manuel est une décision humaine durable.**
 - **Affichage des rejets.** Les liens rejetés sont exclus des décomptes et des listes : `/subjects`, `/subjects/[id]`, nuages de sujets des personnes, structures, revues et éditeurs, filtre par sujet. La fiche `/publications/[id]` les affiche barrés et grisés, pour le contrôle visuel des rejets.
+- **Hiérarchie des sujets stockée.** Un sujet est identifié par son vocabulaire et son code dans ce vocabulaire, à défaut son libellé. Il porte son niveau et son parent.
+- **Une seule table de sujets.** `subjects` porte le vocabulaire, le code, le niveau et le parent ; `publication_subjects` relie les publications à ces sujets. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
+- **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
+- **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
+- **Les 4 domains OpenAlex sont écartés des graphiques.**
 - **Pistes écartées** : seuil sur le score OpenAlex, co-occurrences rares entre topics feuille, seuil « au moins deux soutiens ».
 
 ## Phasage
 
-### Phase 1 — Sujets codés
+### Discipline des thèses
 
-- [ ] Schéma : vocabulaire, code, libellé et code parent des sujets ; contrainte d'unicité sur (vocabulaire, code)
-- [ ] OpenAlex : `extract_topics` conserve l'identifiant de chaque niveau (`domains/2`, `fields/33`, `subfields/3312`, `T12443`) avec son nom et le score
-- [ ] HAL : l'extracteur lit le code de domaine dans chaque entrée de `hal_domains` ; parent déduit du code (`sdv.bbm.bm` → `sdv.bbm`)
-- [ ] ScanR : l'extracteur lit le PPN des vedettes sudoc
-- [ ] theses.fr : l'extracteur lit la discipline dans `source_extras` ; le normalizer cesse d'écrire `topics.discipline`
-- [ ] WoS et vedettes RAMEAU de theses.fr : identifiant selon la question ouverte « Sources sans code »
-- [ ] Extracteurs de `subject_extractors.py` : ils rendent (vocabulaire, code, libellé, parent) ; `subject_cache` et `subject_store` écrivent par code
+- [x] Une seule copie de la discipline, `topics.discipline`, lue par l'extracteur de sujets et par la fiche de la thèse ; le normalizer theses.fr cesse d'écrire `source_extras.discipline`
+- [ ] Stock : retrait de `source_extras.discipline` des enregistrements theses.fr par un script ponctuel
+
+### Phase 1 — Échantillon de référence
+
+- [x] Tirage stratifié de 100 publications (`sample_subject_relevance`) : revues généralistes, publications sans domaine HAL ni discipline theses.fr, paires de domains rares, Health × Life, un seul domain ; 907 libellés OpenAlex. feeb8f8d1
+- [x] Préqualification par Claude, sur le titre, le résumé et la revue
+- [x] Relecture à l'œil d'une partie des publications : la préqualification sert de référence
+- [x] Taux d'aberration par grain : 13 % des domains, 15 % des fields, 28 % des subfields, 34 % des topics. 79 des 100 topics aberrants sont sous un domain pertinent ou limite, 69 sous un field pertinent ou limite : une piste au grain domain ou field en écarte au plus 31 %
+
+### Phase 2 — Classifieurs ISTEX
+
+- [ ] Débit et limites d'usage de halClass et openAlexClass
+- [ ] Couverture : part des publications pourvues d'un résumé, d'un résumé anglais ; même mesure sur les publications sans sujet
+- [ ] Appels sur l'échantillon (`evaluate_istex_classifiers`) ; accord avec la qualification au grain domain et field
+- [ ] Bilan : précision et rappel des rejets qui en découleraient, couverture, coût d'un passage sur le stock et sur chaque run
+
+### Phase 3 — Vote des arbitres
+
+- [x] Correspondance des arbitres vers les domains OpenAlex : codes de domaine HAL, codes LCC des revues DOAJ, mots-clés des disciplines theses.fr (libellés libres, 471 distincts)
+- [x] Prototype sur l'échantillon, cascade comprise (`prototype_subject_vote`)
+- [x] Variante : profil de la revue (domains de ses autres publications) et profil des laboratoires (domains de leurs autres publications), calculés sur les domaines HAL, les disciplines theses.fr et les revues DOAJ. Un profil vote à partir de 20 publications, soutient les domains qui pèsent au moins 15 %, et s'abstient s'il soutient les quatre
+- [x] Bilan. Sur les 52 publications à plusieurs domains, l'échantillon compte 20 domains aberrants : les effectifs sont faibles.
+
+  | Arbitres | Publications où le vote s'applique | Domains rejetés : aberrants / pertinents / limites | Précision et rappel, tous niveaux |
+  |---|---|---|---|
+  | Publication (HAL, theses.fr, DOAJ) | 32 | 8 / 14 / 7 | 48 %, 23 % |
+  | Profil de la revue | 10 | 0 / 1 / 1 | 60 %, 3 % |
+  | Profil des laboratoires | 39 | 7 / 4 / 4 | 72 %, 17 % |
+  | Publication + laboratoires | 43 | 8 / 5 / 5 | 70 %, 20 % |
+
+  Les arbitres de la publication rejettent à tort surtout à la frontière Health/Life : un seul code HAL (`sdv`, `sdv.mhep`) soutient l'un des deux domains quand la publication relève des deux. Confondre Health et Life dans le vote n'améliore pas la précision. Le vote au grain domain plafonne bas : la plupart des aberrations sont des topics sous un domain correct.
+- [ ] Variante : classifieur ISTEX comme arbitre supplémentaire
+
+### Phase 4 — Embeddings
+
+- [x] Décision de mener la phase : les pistes au grain domain ou field n'atteignent pas les topics aberrants sous un domain correct
+- [x] Prototype sans centroïdes, modèle multilingue `intfloat/multilingual-e5-base` : similarité entre la publication (titre et résumé) et le chemin complet de chaque libellé, règle descendante.
+
+  | Score | AUC domain / field / subfield / topic |
+  |---|---|
+  | Similarité cosinus | 0,67 / 0,71 / 0,72 / 0,71 |
+  | Rang parmi tous les libellés du niveau | 0,72 / 0,80 / 0,83 / 0,77 |
+  | Écart au meilleur libellé de la publication au même niveau | 0,71 / 0,71 / 0,71 / 0,69 |
+
+  Meilleurs points de fonctionnement, tous niveaux : écart ≤ −0,03, précision 70 %, rappel 32 % ; rang dans la moitié basse du niveau, précision 59 %, rappel 35 %. À précision égale, le rappel dépasse celui du vote (20 %). Le modèle `BAAI/bge-m3`, deux fois plus gros, ne fait pas mieux (AUC du rang : 0,77 / 0,77 / 0,77 / 0,75). Le libellé seul, quelques mots, décrit mal un sujet : les centroïdes devraient faire mieux
+- [x] Prototype à centroïdes, `multilingual-e5-base` : centroïde de chaque libellé sur 20 autres publications qui le portent, de préférence en premier topic (7 326 publications encodées). Score : typicité, part des publications du libellé moins proches du centroïde que la publication évaluée.
+
+  | Score | AUC domain / field / subfield / topic |
+  |---|---|
+  | Similarité cosinus au centroïde | 0,79 / 0,67 / 0,63 / 0,59 |
+  | Typicité | 0,84 / 0,66 / 0,60 / 0,58 |
+
+  Les centroïdes font mieux que les libellés au grain domain, moins bien en dessous. Règle descendante sur la typicité : précision 47 %, rappel 52 %. Un topic aberrant est textuellement plausible : OpenAlex attribue ses topics d'après le titre et le résumé, et une similarité de texte reproduit son signal. L'incohérence se voit au grain domain
+- [x] Centroïdes recalculés niveau par niveau (150 membres par domain, 20 en dessous) : à chaque niveau, retrait des membres atypiques pour un ancêtre ou pour le libellé lui-même, puis nouveau centroïde. Le nettoyage dégrade l'AUC sous le domain (topic : 0,58 sans nettoyage, 0,56 en retirant 5 % par niveau, 0,49 en retirant 10 %) : la typicité au domain écarte des publications périphériques mais légitimes, et les centroïdes restants reposent sur trop peu de membres
+- [x] Embeddings centrés (retrait du vecteur moyen) : AUC 0,86 / 0,66 / 0,63 / 0,61 ; règle descendante, précision 49 %, rappel 66 %, contre 48 % et 47 % sans centrage. Le bruit éditorial des résumés (copyright, balises) touche moins de 4 % des textes : pas de nettoyage
+- [x] Un seul domain par publication : sur une publication à plusieurs domains, seul le domain au centroïde le plus proche est gardé (centroïdes sur 150 membres). Le domain gardé est pertinent pour 43 publications sur 52. Mais 39 des 52 publications ont au moins deux domains non aberrants : la règle rejette 35 domains pertinents pour 11 aberrants. Avec une marge (rejet seulement si le domain est nettement plus loin que le meilleur), la précision plafonne à 50 %. Un domain secondaire légitime est aussi loin du centroïde qu'un domain aberrant
+- [x] Jugement au grain field : centroïdes des 26 fields (150 membres chacun), embeddings centrés ; le field le plus proche de la publication est toujours gardé ; un field rejeté entraîne ses descendants ; un domain tombe quand tous ses fields tombent. AUC des fields : rang parmi les 26, 0,78 ; écart au meilleur field, 0,75 ; typicité, 0,72. Meilleurs points, tous niveaux : typicité < 0,02, précision 75 %, rappel 18 % (domains rejetés : 5 aberrants, 1 pertinent) ; rang au-delà du 8e field, précision 58 %, rappel 32 %. Les 69 topics aberrants sous un field correct restent hors d'atteinte de ce niveau
+- [x] Descente field puis subfield, embeddings centrés : membres d'un field retirés si leur field arrive au-delà du 8e rang parmi les 26 (5 % retirés) ; membres d'un subfield retirés si leur field parent arrive au-delà du 8e rang (12 % retirés) ; centroïdes des subfields sur 70 membres au plus (244 subfields sur 251). Au grain subfield, la descente rejette autant de libellés pertinents qu'aberrants. Meilleur point, tous niveaux : field au-delà du 6e rang et subfield dans les 70 % les plus éloignés de ses frères, précision 51 %, rappel 42 %
+- [x] Bilan des embeddings : toutes les variantes plafonnent entre 50 et 75 % de précision, pour un rappel de 18 à 66 %. Elles identifient le sujet principal d'une publication ; elles ne distinguent pas un sujet secondaire légitime d'un sujet aberrant
+- [ ] Coût d'un passage sur le stock et sur chaque run
+
+### Phase 5 — Hiérarchie des sujets
+
+- [ ] Schéma : `subjects` porte vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé
+- [ ] Normalizer OpenAlex : `extract_topics` conserve l'identifiant de chaque niveau
+- [ ] Normalizer theses.fr : les vedettes RAMEAU gardent leur PPN
+- [ ] Stock OpenAlex et theses.fr : réhydratation depuis le raw store, puis normalisation
+- [ ] Extracteurs (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent ; domaines HAL par leur code, OpenAlex par ses identifiants, vedettes RAMEAU de ScanR et de theses.fr par leur PPN, discipline de theses.fr par son libellé ; extracteur WoS retiré
+- [ ] Ingestion de la phase `subjects` par (vocabulaire, code) ; reconstruction du stock
+- [ ] Rattachement des domaines de haut niveau de chaque vocabulaire à la palette commune : codes HAL, mots-clés des disciplines theses.fr (correspondances du prototype de vote)
+- [ ] Interface : couleur par domaine de haut niveau dans les graphiques de sujets ; domains OpenAlex écartés
 - [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`
-- [ ] Stock : renormalisation depuis `staging` des enregistrements OpenAlex et theses.fr, puis `--rebuild-subjects`
 
-### Phase 2 — Vote des arbitres
+### Phase 6 — Choix et mise en œuvre
 
-- [ ] Correspondance arbitres → domains OpenAlex, en données du domaine : codes de domaine HAL, catégories WoS, disciplines theses.fr, premier niveau LCC des sujets DOAJ
-- [ ] Règle pure dans `domain/` : domains rejetés d'une publication et leurs descendants
-- [ ] Ingestion de `subjects` : lecture des sujets DOAJ de la revue, application de la règle, marquage des liens rejetés automatiquement
-- [ ] Une revue dont les sujets DOAJ changent remet ses publications dans l'ingestion des sujets ; lectures déclarées dans `pipeline/graph.py`
-- [ ] Tests sur des publications réelles qualifiées à l'œil : paire Health × Physical, arbitre HAL réduit à « Sciences du Vivant », multi-affectation
-- [ ] Mesure sur le stock : nombre de domains rejetés par paire, échantillon qualifié à l'œil pour vérifier la précision
-- [ ] Documentation : `docs/agregats/subjects.md`
+- [ ] Choix de la piste ou de la combinaison, d'après les bilans des phases 2 à 4
+- [ ] Forme du stockage des rejets automatiques et manuels
+- [ ] Phasage de la mise en œuvre dans la phase `subjects`
 
-### Phase 3 — Rejets dans l'interface
+### Phase 7 — Rejets dans l'interface
 
 - [ ] Nuages de sujets (`entity_subjects_sql`), filtre et facette par sujet (`infrastructure/read_models/filters.py`, `entity_facet.py`) : liens rejetés écartés
 - [ ] `/publications/[id]` : `get_publication_subjects` rend le statut de rejet ; `SubjectsBlock.svelte` barre et grise les sujets rejetés
 - [ ] Guide utilisateur : sens d'un sujet barré
 
-### Phase 4 — Évaluation des classifieurs ISTEX
-
-- [ ] Couverture : part des publications pourvues d'un résumé, d'un résumé anglais ; même mesure sur les publications sans sujet
-- [ ] Échantillon de publications dont les sujets HAL, WoS ou theses.fr sont connus ; appels à halClass et openAlexClass
-- [ ] Accord avec les sujets des sources et avec les domains OpenAlex retenus par le vote
-- [ ] Décision d'usage : arbitre du vote, source de sujets pour les publications sans sujet, ou abandon
-
-### Phase 5 — Specter2, si les classifieurs ISTEX ne suffisent pas
-
-- [ ] Choix du modèle, de l'exécution et de la persistance des vecteurs (question ouverte « Specter2 »)
-- [ ] Embeddings du titre et du résumé de chaque publication
-- [ ] Centroïde par topic feuille OpenAlex, sur les liens non rejetés
-- [ ] Similarité cosinus de chaque lien ; vue d'administration pour calibrer le seuil
-- [ ] Rejet des liens sous le seuil
-
 ## Questions ouvertes
 
 - **Stockage des rejets.** Le booléen `rejected` confond rejet automatique et rejet manuel. Un rejet manuel accroché à `publication_id` disparaît avec la publication. Quelle forme donner aux deux ?
 - **Édition manuelle des rejets** : dans ce chantier ou dans [la gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) ?
-- **Sources sans code.** WoS et theses.fr (discipline, vedettes RAMEAU) donnent-elles un code ? À défaut, le libellé sert d'identifiant.
-- **Libellés et parents** : lus dans les enregistrements sources (chemin HAL, chaîne OpenAlex), ou dans les référentiels des sources (API HAL `ref/domain`, entités OpenAlex) ?
-- **Provenance des sujets ISTEX** : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
+- **Doublons à l'affichage** : une cinquantaine de libellés communs à deux vocabulaires (« Informatique », domaine HAL et discipline de thèse), et des homonymes internes à OpenAlex (« Biochemistry », subfield de deux fields). À regrouper à l'affichage s'ils gênent.
+- **Niveaux écartés des graphiques** au-delà des domains OpenAlex : fields, premier niveau HAL.
+- **Provenance des sujets ISTEX**, si les classifieurs donnent des sujets aux publications qui n'en ont pas : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
 - **Specter2** : variante du modèle (`allenai/specter2_base`, `proximity`, `classification`), exécution (locale sur CPU ou GPU, ou hébergée), persistance des vecteurs (pgvector ou fichier numpy). 74 600 publications à encoder.
-- **Specter2 et le vote** : Specter2 remplace-t-il le vote, ou les deux règles se cumulent-elles ?

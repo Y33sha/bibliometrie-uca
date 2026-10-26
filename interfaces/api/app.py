@@ -32,15 +32,15 @@ from infrastructure.db.engine import build_sync_engine, set_sync_engine
 from infrastructure.db.read_only_guard import read_request
 from infrastructure.observability.log import configure_root_logging
 from infrastructure.settings import settings
-from interfaces.api.deps import READ_ONLY_METHODS
+from interfaces.api.deps import READ_ONLY_METHODS, ensure_admin_user, load_session_user
 from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
 )
 from interfaces.api.params import requested_offset
 from interfaces.api.rate_limit import read_allowed
-from interfaces.api.route_path import route_path
-from interfaces.api.session import check_auth_config, read_session
+from interfaces.api.route_path import RootPath, route_path
+from interfaces.api.session import check_auth_config
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
 # Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 # ----- Lifespan -----
 #
 # Construit l'engine SQLAlchemy au démarrage et le libère à l'arrêt.
-# Les routes le consomment via `db_conn`.
+# Les routes le consomment via `DbConn`.
 
 
 @asynccontextmanager
@@ -85,6 +85,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     anyio.to_thread.current_default_thread_limiter().total_tokens = settings.api_threadpool_size
     sync_engine = build_sync_engine("app")
     set_sync_engine(sync_engine)
+    await anyio.to_thread.run_sync(ensure_admin_user)
     try:
         yield
     finally:
@@ -92,18 +93,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# `root_path` : préfixe de déploiement (par exemple `/bibliometrie` en production).
-# Le serveur ASGI retire ce préfixe (uvicorn `--root-path` ou variable
-# d'environnement `UVICORN_ROOT_PATH`) avant que FastAPI route ; la valeur sert ici
-# à générer les URLs absolues d'OpenAPI et les redirections. Vide par défaut : en
-# développement local, ou derrière un reverse proxy qui le retire en amont.
+# Préfixe de déploiement (par exemple `/bibliometrie` en production), vide à la racine. Le
+# routage l'ôte du chemin quand il y est, et laisse intact un chemin dont le reverse proxy l'a
+# retiré (cf. `route_path`).
+ROOT_PATH = os.environ.get("ROOT_PATH", "")
+
 # Docs interactives coupées par défaut (`expose_api_docs`) : elles cartographient toute la
 # surface d'API, admin comprise. Activées en développement, absentes en production.
 _expose_docs = settings.expose_api_docs
 app = FastAPI(
     title="Bibliométrie",
     lifespan=lifespan,
-    root_path=os.environ.get("ROOT_PATH", ""),
     docs_url="/docs" if _expose_docs else None,
     redoc_url="/redoc" if _expose_docs else None,
     openapi_url="/openapi.json" if _expose_docs else None,
@@ -244,7 +244,7 @@ async def read_only_guard_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification.
+    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification : 401 sans session valide, 403 sans le rôle admin.
 
     Journalise les actions admin réussies (statut < 400) sous le record structuré `admin_action`, qui porte l'utilisateur, la méthode, le chemin et le statut. Le chemin journalisé est celui du routage, indépendant du préfixe sous lequel l'application est servie : une même action porte le même nom d'un déploiement à l'autre.
     """
@@ -256,15 +256,15 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     if path.startswith("/api/auth/"):
         return await call_next(request)
 
-    token = request.cookies.get("session")
-    admin_user = read_session(token) if token else None
-    if not admin_user:
+    user = await anyio.to_thread.run_sync(load_session_user, request.cookies.get("session"))
+    if user is None:
         return JSONResponse(status_code=401, content={"detail": "Non authentifié"})
+    if not user.is_admin:
+        return JSONResponse(status_code=403, content={"detail": "Droits insuffisants"})
 
-    # Propager l'utilisateur dans le contexte async pour que emit_event()
-    # l'inclue dans les enregistrements audit_log, sans polluer les
-    # signatures des services métier.
-    token_ctx = audit_log.set_current_user(admin_user)
+    # Session d'audit de la requête : les services y rangent leurs événements (`emit_event`),
+    # que `db_conn` écrit dans `audit_log` avant son commit.
+    token_ctx = audit_log.set_current_user(user.login)
     try:
         response = await call_next(request)
     finally:
@@ -274,7 +274,7 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
         logger.info(
             "admin_action",
             extra={
-                "user": admin_user,
+                "user": user.login,
                 "method": request.method,
                 "path": path,
                 "status": response.status_code,
@@ -415,7 +415,7 @@ async def security_headers_middleware(
 # frontend est servi par l'API elle-même ; renseigné en développement, le serveur de
 # développement du frontend vivant sur un autre port.
 #
-# Déclaré en dernier, donc posé le plus à l'extérieur : les refus que composent les middlewares
+# Déclaré après eux, donc posé à leur extérieur : les refus que composent les middlewares
 # ci-dessus — 401 d'authentification, 429 des plafonds, 422 de pagination — portent alors les
 # en-têtes CORS comme les autres réponses. Sans cela, le navigateur d'une origine autorisée les
 # reçoit comme une erreur CORS opaque au lieu de leur code, et le message de refus est perdu.
@@ -426,6 +426,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Déclaré en dernier, donc posé le plus à l'extérieur : tout middleware trouve le préfixe dans la
+# requête.
+app.add_middleware(RootPath, root_path=ROOT_PATH)
 
 
 # ----- Include routers -----

@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models._common import EntityFacetItem, EntityKind
+from infrastructure.read_models._common import EntityFacetItem, EntityKind
 from infrastructure.read_models.filters import OWN_RORS_SQL
 from infrastructure.sql_fragments import has_author_role
 

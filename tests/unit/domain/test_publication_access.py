@@ -1,6 +1,10 @@
 """Liens d'accès d'une publication (`domain.publications.access`)."""
 
+from domain.platforms.registry import ARXIV, HAL, ZENODO
 from domain.publications.access import Access, AccessLink, Copy, access
+
+_OPENALEX_IDS = {p.name: p.openalex_ids[0] for p in (ARXIV, HAL, ZENODO)}
+_DOI = "10.1/x"
 
 
 def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arrival=1) -> Copy:
@@ -9,13 +13,18 @@ def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arri
         version=version,
         is_oa=is_oa,
         platform=platform,
+        platform_openalex_id=_OPENALEX_IDS.get(platform or ""),
         described_by_platform=described,
         arrival=arrival,
     )
 
 
+def _access(copies) -> Access:
+    return access(copies, doi=_DOI)
+
+
 def test_version_puis_ordre_d_arrivee():
-    result = access(
+    result = _access(
         [
             _copy("https://hal.science/hal-1", platform="HAL", described=True, arrival=1),
             _copy(
@@ -28,14 +37,14 @@ def test_version_puis_ordre_d_arrivee():
     assert result == Access(
         url="https://doi.org/10.1/x",
         links=[
-            AccessLink("arXiv", "https://arxiv.org/abs/1"),
-            AccessLink("HAL", "https://hal.science/hal-1"),
+            AccessLink("arXiv", "https://arxiv.org/abs/1", known=True),
+            AccessLink("HAL", "https://hal.science/hal-1", known=True),
         ],
     )
 
 
 def test_une_copie_par_plateforme():
-    links = access(
+    links = _access(
         [
             _copy("https://arxiv.org/abs/1", platform="arXiv", arrival=1),
             _copy(
@@ -43,11 +52,11 @@ def test_une_copie_par_plateforme():
             ),
         ]
     ).links
-    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2")]
+    assert links == [AccessLink("arXiv", "https://arxiv.org/abs/1v2", known=True)]
 
 
 def test_les_copies_fermees_sont_ecartees():
-    assert access([_copy("https://pubmed.ncbi.nlm.nih.gov/1", is_oa=False)]) == Access(None, [])
+    assert _access([_copy("https://pubmed.ncbi.nlm.nih.gov/1", is_oa=False)]) == Access(None, [])
 
 
 def test_hal_decide_de_l_ouverture_de_ses_copies():
@@ -56,7 +65,7 @@ def test_hal_decide_de_l_ouverture_de_ses_copies():
         _copy("https://hal.science/hal-1", platform="HAL", described=True, is_oa=False),
         _copy("https://hal.science/hal-1", version="submittedVersion", platform="HAL", arrival=2),
     ]
-    assert access(copies) == Access(None, [])
+    assert _access(copies) == Access(None, [])
 
 
 def test_seule_une_adresse_web_compte():
@@ -65,4 +74,36 @@ def test_seule_une_adresse_web_compte():
         _copy("ftp://x.org/a"),
         _copy("https://x.org/a", arrival=2),
     ]
-    assert access(copies) == Access("https://x.org/a", [AccessLink("x.org", "https://x.org/a")])
+    assert _access(copies) == Access(
+        "https://x.org/a", [AccessLink("x.org", "https://x.org/a", known=False)]
+    )
+
+
+def test_un_depot_hors_registre_est_inconnu():
+    links = _access([_copy("https://escholarship.org/uc/item/1", platform="eScholarship")]).links
+    assert links == [AccessLink("eScholarship", "https://escholarship.org/uc/item/1", known=False)]
+
+
+def test_une_copie_designee_par_un_autre_doi_figure_sur_sa_plateforme():
+    """La copie Zenodo, désignée par son propre DOI, figure ; celle au DOI de la publication et celle sans plateforme sont écartées."""
+    links = _access(
+        [
+            _copy("https://doi.org/10.1/X", version="publishedVersion", platform="Dépôt"),
+            _copy("https://doi.org/10.5281/zenodo.1", platform="Zenodo", arrival=2),
+            _copy("https://doi.org/10.9/y", arrival=3),
+        ]
+    ).links
+    assert links == [AccessLink("Zenodo", "https://doi.org/10.5281/zenodo.1", known=True)]
+
+
+def test_une_plateforme_du_registre_porte_le_nom_du_registre():
+    copy = Copy(
+        url="https://zenodo.org/records/1",
+        version=None,
+        is_oa=True,
+        platform="Zenodo (CERN European Organization for Nuclear Research)",
+        platform_openalex_id=ZENODO.openalex_ids[0],
+        described_by_platform=False,
+        arrival=1,
+    )
+    assert _access([copy]).links == [AccessLink("Zenodo", copy.url, known=True)]

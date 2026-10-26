@@ -8,12 +8,6 @@ from typing import cast
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.read_models.publications_queries import (
-    EXPORT_COLUMNS,
-    PublicationFilters,
-    PublicationListItem,
-    PublicationListResponse,
-)
 from domain.normalize import normalize_text, to_plain_text
 from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
@@ -49,6 +43,12 @@ from infrastructure.read_models.filters import (
     source_clause,
     subject_clause,
     year_clause,
+)
+from infrastructure.read_models.publications.models import (
+    EXPORT_COLUMNS,
+    PublicationFilters,
+    PublicationListItem,
+    PublicationListResponse,
 )
 from infrastructure.sql_fragments import has_author_role, source_extra
 

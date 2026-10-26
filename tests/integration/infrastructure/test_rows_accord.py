@@ -11,8 +11,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 
-from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
+from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
 from infrastructure.repositories.serial_repository import PgSerialRepository

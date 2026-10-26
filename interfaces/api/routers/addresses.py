@@ -1,6 +1,6 @@
 """Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par le port `AddressesQueries`, les écritures par les command handlers de `application.services.addresses.commands`, qui committent avant que le router ne rende la main. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
+Les lectures passent par `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
 
 Les routes sont groupées par sujet, et dans chaque groupe les chemins littéraux précèdent ceux qui portent un identifiant — un chemin littéral déclaré après `/{addr_id}` s'y ferait absorber.
 """
@@ -8,13 +8,12 @@ Les routes sont groupées par sujet, et dans chaque groupe les chemins littérau
 from typing import Annotated, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
-from application.ports.pipeline.countries import CountryRecompute
-from application.ports.read_models.addresses_queries import (
+from application.ports.repositories.address_repository import AddressCountryFilter
+from application.services.addresses import AddressService
+from infrastructure.read_models.addresses.models import (
     AddressDetected,
     AddressesCountriesResponse,
-    AddressesQueries,
     AddressListFilters,
     AddressListResponse,
     AddressStatsResponse,
@@ -24,20 +23,12 @@ from application.ports.read_models.addresses_queries import (
     TextPredicate,
     TextPredicateMode,
 )
-from application.ports.repositories.address_repository import (
-    AddressCountryFilter,
-    AddressRepository,
-)
-from application.ports.repositories.audit_repository import AuditRepository
-from application.services.addresses import commands as address_commands
+from infrastructure.read_models.addresses.queries import AddressesQueries
 from interfaces.api.deps import (
-    address_repo,
+    address_service,
     addresses_queries,
-    audit_repo,
     bg_propagate_countries,
     bg_propagate_in_perimeter,
-    country_recompute,
-    db_conn,
 )
 from interfaces.api.models import (
     AddressPublicationsResponse,
@@ -141,18 +132,11 @@ def address_stats(
 def batch_review(
     data: BatchReviewAction,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
-    addr_repo: AddressRepository = Depends(address_repo),
-    audit: AuditRepository = Depends(audit_repo),
+    addresses: AddressService = Depends(address_service),
 ) -> BatchUpdatedResponse:
     """Confirme, rejette ou réinitialise le lien d'un lot d'adresses à une même structure."""
-    updated, changed = address_commands.batch_review_structure_link(
-        conn,
-        data.address_ids,
-        data.structure_id,
-        data.is_confirmed,
-        repo=addr_repo,
-        audit_repo=audit,
+    updated, changed = addresses.batch_review_structure_link(
+        data.address_ids, data.structure_id, data.is_confirmed
     )
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
@@ -180,10 +164,8 @@ def review_address(
     addr_id: int,
     action: ReviewAction,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
     queries: AddressesQueries = Depends(addresses_queries),
-    addr_repo: AddressRepository = Depends(address_repo),
-    audit: AuditRepository = Depends(audit_repo),
+    addresses: AddressService = Depends(address_service),
 ) -> AddressReviewResponse:
     """Confirme, rejette ou réinitialise le lien entre une adresse et une structure.
 
@@ -191,14 +173,7 @@ def review_address(
     """
     if not queries.address_exists(addr_id):
         raise HTTPException(status_code=404, detail="Adresse introuvable")
-    changed = address_commands.review_structure_link(
-        conn,
-        addr_id,
-        action.structure_id,
-        action.is_confirmed,
-        repo=addr_repo,
-        audit_repo=audit,
-    )
+    changed = addresses.review_structure_link(addr_id, action.structure_id, action.is_confirmed)
     if changed:
         bg.add_task(bg_propagate_in_perimeter, changed)
     structures = queries.get_address_structures(addr_id)
@@ -236,25 +211,18 @@ def list_addresses_countries(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
-    addr_repo: AddressRepository = Depends(address_repo),
-    recompute: CountryRecompute = Depends(country_recompute),
-    audit: AuditRepository = Depends(audit_repo),
+    addresses: AddressService = Depends(address_service),
 ) -> BatchCountryResponse:
     """Ajoute un pays à des adresses (par IDs ou par filtre).
 
     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
     """
-    modified_ids = address_commands.batch_set_country(
-        conn,
+    modified_ids = addresses.batch_set_country(
         body.country_code,
         address_ids=body.address_ids,
         search=body.search,
         has_country=body.has_country,
         country_code_filter=body.country_code_filter,
-        repo=addr_repo,
-        country_recompute=recompute,
-        audit_repo=audit,
     )
     bg.add_task(bg_propagate_countries, modified_ids)
     return BatchCountryResponse(updated=len(modified_ids))
@@ -265,22 +233,12 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
-    conn: Connection = Depends(db_conn),
-    addr_repo: AddressRepository = Depends(address_repo),
-    recompute: CountryRecompute = Depends(country_recompute),
-    audit: AuditRepository = Depends(audit_repo),
+    addresses: AddressService = Depends(address_service),
 ) -> OkResponse:
     """Saisit à la main les pays d'une adresse ; une liste vide rend l'adresse aux moyens automatiques.
 
     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
-    affected = address_commands.set_country(
-        conn,
-        addr_id,
-        body.countries,
-        repo=addr_repo,
-        country_recompute=recompute,
-        audit_repo=audit,
-    )
-    bg.add_task(bg_propagate_countries, affected)
+    addresses.set_country(addr_id, body.countries)
+    bg.add_task(bg_propagate_countries, [addr_id])
     return OkResponse()

@@ -3,34 +3,64 @@
 from datetime import datetime
 from typing import Protocol, TypedDict
 
-from domain.structures.structure import Structure
+from pydantic import BaseModel
+
+from domain.structures.structure import Structure, StructureType
 from domain.types import JsonValue
 
 
-class StructureNameFormUpdateFields(TypedDict, total=False):
-    """Partial update sur la table `structure_name_forms`.
+class StructureCreate(BaseModel):
+    """Champs d'une structure à créer."""
 
-    `form_text` reçu en clair est normalisé par le service via `normalize_text` avant d'être passé au repo.
-    """
+    code: str
+    name: str
+    acronym: str | None = None
+    type: StructureType
+    ror_id: str | None = None
+    rnsr_id: str | None = None
+    hal_collection: str | None = None
+    # Une valeur seule (`str`) devient une liste à l'écriture (`StructureApiIds`).
+    api_ids: dict[str, str | list[str]] | None = None
+
+
+class NameFormCreate(BaseModel):
+    """Champs d'une forme de nom de structure à créer."""
+
+    structure_id: int
+    form_text: str
+    is_word_boundary: bool = False
+    is_excluding: bool = False
+    requires_context_of: list[int] | None = None
+
+
+class StructureUpdate(BaseModel):
+    """Champs éditables d'une structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface un champ facultatif."""
+
+    name: str | None = None
+    acronym: str | None = None
+    type: StructureType | None = None
+    ror_id: str | None = None
+    rnsr_id: str | None = None
+    hal_collection: str | None = None
+    api_ids: dict[str, str | list[str]] | None = None
+
+
+class NameFormUpdate(BaseModel):
+    """Champs éditables d'une forme de nom de structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface `requires_context_of`."""
+
+    form_text: str | None = None
+    is_word_boundary: bool | None = None
+    is_excluding: bool | None = None
+    requires_context_of: list[int] | None = None
+
+
+class StructureNameFormUpdateFields(TypedDict, total=False):
+    """Champs d'une forme de nom à écrire, `form_text` déjà normalisé."""
 
     form_text: str
     is_word_boundary: bool
     is_excluding: bool
     requires_context_of: list[int] | None
-
-
-class StructureRow(TypedDict):
-    """Ligne `structures` renvoyée par create / update (colonne `structure_type` exposée sous l'alias `type`). Alimente le DTO `StructureOut`."""
-
-    id: int
-    code: str
-    name: str
-    acronym: str | None
-    type: str
-    ror_id: str | None
-    rnsr_id: str | None
-    hal_collection: str | None
-    api_ids: dict[str, list[str]] | None
 
 
 class StructureTutelleRow(TypedDict):
@@ -49,7 +79,7 @@ class StructureTutelleDeletedRow(TypedDict):
 
 
 class StructureNameFormRow(TypedDict):
-    """Ligne `structure_name_forms` renvoyée par create / update. Alimente le DTO `NameFormOut`."""
+    """Forme de nom de structure, rendue par la création et la mise à jour."""
 
     id: int
     structure_id: int
@@ -73,7 +103,7 @@ class StructureRepository(Protocol):
     # ── structures : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
-        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_parents` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
+        """Charge l'agrégat `Structure` avec ses formes de nom, ou `None` si la structure n'existe pas. Les tutelles sont hors de l'agrégat (`get_ancestor_ids`)."""
         ...
 
     def add(self, structure: Structure) -> int:
@@ -81,7 +111,7 @@ class StructureRepository(Protocol):
         ...
 
     def save(self, structure: Structure) -> None:
-        """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
+        """Enregistre les champs éditables d'une structure chargée ; le code est immuable. Lève `NotFoundError` si la structure n'existe pas."""
         ...
 
     def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:

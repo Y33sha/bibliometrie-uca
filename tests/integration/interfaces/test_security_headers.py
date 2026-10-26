@@ -90,7 +90,7 @@ class TestMiseEnCache:
 
 
 class TestOrdreDeLaPile:
-    """Le middleware CORS enveloppe les autres, et voit donc les réponses qu'ils composent.
+    """Le middleware CORS enveloppe ceux qui composent des réponses, et voit donc les refus qu'ils émettent. Seule l'inscription du préfixe de déploiement, qui ne répond jamais, l'enveloppe à son tour.
 
     Un refus dépourvu d'en-têtes CORS arrive au navigateur d'une origine autorisée comme une erreur CORS opaque : le code et le message de refus sont perdus, et la page ne peut rien en dire. Or les middlewares d'authentification, de plafond et de pagination composent leurs refus eux-mêmes, sans laisser passer la requête — d'où l'ordre.
 
@@ -101,6 +101,7 @@ class TestOrdreDeLaPile:
         from fastapi.middleware.cors import CORSMiddleware
 
         from interfaces.api.app import app
+        from interfaces.api.route_path import RootPath
 
         # Starlette range la pile du plus extérieur au plus intérieur.
-        assert app.user_middleware[0].cls is CORSMiddleware
+        assert [m.cls for m in app.user_middleware[:2]] == [RootPath, CORSMiddleware]

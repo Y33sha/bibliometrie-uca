@@ -152,6 +152,47 @@ config = Table(
 )
 
 
+users = Table(
+    "users",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column(
+        "login",
+        Text,
+        nullable=False,
+        comment=(
+            "Identifiant de connexion : identifiant CAS, ou ADMIN_USER pour la connexion "
+            "par mot de passe."
+        ),
+    ),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    UniqueConstraint("login", name="users_login_key"),
+    comment="Utilisateurs autorisés à ouvrir une session.",
+    schema="ops",
+)
+
+
+roles = Table(
+    "roles",
+    metadata,
+    Column("code", Text, primary_key=True),
+    Column("label", Text, nullable=False),
+    comment="Rôles que le code connaît (domain.users.Role).",
+    schema="ops",
+)
+
+
+user_roles = Table(
+    "user_roles",
+    metadata,
+    Column("user_id", Integer, nullable=False),
+    Column("role_code", Text, nullable=False),
+    PrimaryKeyConstraint("user_id", "role_code", name="user_roles_pkey"),
+    comment="Rôles attribués à chaque utilisateur.",
+    schema="ops",
+)
+
+
 merge_redirects = Table(
     "merge_redirects",
     metadata,

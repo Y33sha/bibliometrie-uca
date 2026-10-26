@@ -12,11 +12,10 @@ EMAIL_LIKE = re.compile(r"\b(e?[-_]?mails?|courriels?)\b", re.IGNORECASE)
 """Ce qui nomme une adresse électronique, aux frontières de mot près : « maillon » n'en est pas une."""
 
 SERVING_LAYERS = (
-    "application/ports/read_models",
     "infrastructure/read_models",
     "interfaces/api",
 )
-"""Couches qui composent une réponse de lecture : les contrats, le SQL qui les remplit, la surface HTTP."""
+"""Couches qui composent une réponse de lecture : les modèles de réponse et le SQL qui les remplit, la surface HTTP."""
 
 
 def test_aucun_champ_du_contrat_d_api_ne_porte_une_adresse():

@@ -47,7 +47,7 @@ Routeur `interfaces/api/routers/serials.py`, commandes dans `application/service
 
 ## Lecture par l'API
 
-Port `application/ports/read_models/serials_queries.py`, adaptateur `PgSerialQueries`. L'administration nomme l'entité « Publications en série » (`/admin/serials`) ; les pages publiques gardent « Revues » (`/journals`).
+Lecture `infrastructure/read_models/serials/`, classe `SerialQueries`. L'administration nomme l'entité « Publications en série » (`/admin/serials`) ; les pages publiques gardent « Revues » (`/journals`).
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|

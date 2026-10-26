@@ -24,7 +24,7 @@ from collections.abc import Mapping
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, at_path
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.read_models.perimeters import get_extraction_api_ids
+from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.http_retry import http_request_with_retry
 from pipeline.ingestion.api_params import API_BASE_URLS, request_budget

@@ -5,29 +5,19 @@ L'exclusion vise une contribution rattachée à une personne, par son `contribut
 Les routes sont groupées par sujet, et les chemins littéraux précèdent celui qui porte un identifiant — un chemin littéral déclaré après `/{contribution_id}` s'y ferait absorber.
 """
 
-from fastapi import APIRouter, Depends, Query
-from sqlalchemy import Connection
+from typing import cast
 
-from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
-from application.ports.read_models.contributions_queries import (
-    ContributionsQueries,
+from fastapi import APIRouter, Depends, Query
+
+from application.services.contributions import ContributionService
+from infrastructure.read_models.contributions.models import (
     OrphanContributionsFacetsResponse,
     OrphanContributionsResponse,
     OrphanCountResponse,
     OrphanFilters,
 )
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.contribution_repository import ContributionRepository
-from application.ports.repositories.person_repository import PersonRepository
-from application.services.contributions import commands as contribution_commands
-from interfaces.api.deps import (
-    audit_repo,
-    contribution_repo,
-    contributions_queries,
-    db_conn,
-    person_repo,
-    publication_perimeter_recompute,
-)
+from infrastructure.read_models.contributions.queries import ContributionsQueries
+from interfaces.api.deps import contribution_service, contributions_queries
 from interfaces.api.filters import parse_lab_id
 from interfaces.api.models import (
     AssignOrphanContribution,
@@ -86,31 +76,22 @@ def orphan_contributions_facets(
 )
 def assign_orphan_contribution(
     body: AssignOrphanContribution,
-    conn: Connection = Depends(db_conn),
-    persons: PersonRepository = Depends(person_repo),
-    contributions: ContributionRepository = Depends(contribution_repo),
-    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
+    contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanAssignResponse:
     """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
     """
-    new_person: tuple[str, str] | None = None
-    if body.create_person:
-        new_person = (body.create_person.last_name, body.create_person.first_name)
-
-    person_id = contribution_commands.assign_orphan_contribution(
-        conn,
-        body.contribution_id,
-        person_id=body.person_id,
-        new_person=new_person,
-        repo=persons,
-        contribution_repo=contributions,
-        perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
-        force=body.force,
-    )
+    if body.create_person is not None:
+        person_id = contributions.assign_orphan_contribution_to_new_person(
+            body.contribution_id,
+            body.create_person.last_name,
+            body.create_person.first_name,
+            force=body.force,
+        )
+    else:
+        person_id = cast(int, body.person_id)
+        contributions.assign_orphan_contribution(person_id, body.contribution_id, force=body.force)
     return OrphanAssignResponse(person_id=person_id)
 
 
@@ -121,11 +102,7 @@ def assign_orphan_contribution(
 )
 def batch_assign_orphan_contributions(
     body: BatchAssignOrphanContributions,
-    conn: Connection = Depends(db_conn),
-    persons: PersonRepository = Depends(person_repo),
-    contributions: ContributionRepository = Depends(contribution_repo),
-    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
+    contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs contributions orphelines à une personne existante.
 
@@ -134,15 +111,8 @@ def batch_assign_orphan_contributions(
     if not body.group_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
-    assigned = contribution_commands.batch_assign_orphan_contributions(
-        conn,
-        body.person_id,
-        body.group_ids,
-        repo=persons,
-        contribution_repo=contributions,
-        perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
-        force=body.force,
+    assigned = contributions.batch_assign_orphan_contributions(
+        body.person_id, body.group_ids, force=body.force
     )
     return OrphanBatchAssignResponse(assigned=assigned)
 
@@ -153,22 +123,11 @@ def batch_assign_orphan_contributions(
 @router.patch("/{contribution_id}/exclude", response_model=OkResponse)
 def exclude_contribution(
     contribution_id: int,
-    conn: Connection = Depends(db_conn),
-    repo: ContributionRepository = Depends(contribution_repo),
-    persons: PersonRepository = Depends(person_repo),
-    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
-    audit: AuditRepository = Depends(audit_repo),
+    contributions: ContributionService = Depends(contribution_service),
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
-    contribution_commands.exclude_contribution(
-        conn,
-        contribution_id,
-        repo=repo,
-        person_repo=persons,
-        perimeter_recompute=perimeter_recompute,
-        audit_repo=audit,
-    )
+    contributions.exclude_contribution(contribution_id)
     return OkResponse()

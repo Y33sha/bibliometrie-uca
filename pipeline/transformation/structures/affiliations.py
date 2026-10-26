@@ -17,7 +17,7 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from infrastructure.read_models.perimeters import (
+from infrastructure.read_models.perimeters.queries import (
     get_extraction_structure_ids,
     get_persons_structure_ids_list,
 )

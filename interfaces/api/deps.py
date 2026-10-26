@@ -1,76 +1,48 @@
 """Dépendances partagées des routers : factories DB, tâches de fond, réglages du serveur.
 
-`db_conn` fournit aux routes, par `Depends(...)`, la connexion sur laquelle les factories câblent les query services et les repositories.
+`DbConn` fournit aux routes la connexion de la requête, sur laquelle les factories construisent les adaptateurs de lecture et les services d'écriture.
 
-La session admin vit dans `session.py` ; ce module n'en expose que le nom d'utilisateur attendu, par `Depends(...)`.
+Le jeton de session appartient à `session.py` ; ce module en tire l'utilisateur et ses rôles, lus dans `ops.users`.
 """
 
 import logging
 from collections.abc import Callable, Iterator
+from typing import Annotated
 
 from fastapi import Depends, Request
 from sqlalchemy import Connection
 
-from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
-from application.ports.pipeline.perimeter_structures import (
-    PerimeterStructures as PerimeterStructuresPort,
-)
-from application.ports.pipeline.publication_count import (
-    PublicationCountRecompute as PublicationCountRecomputePort,
-)
-from application.ports.pipeline.publication_perimeter import (
-    PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
-)
-from application.ports.pipeline.serial_recompute import SerialRecompute as SerialRecomputePort
-from application.ports.read_models.addresses_queries import AddressesQueries
-from application.ports.read_models.config_queries import ConfigQueries
-from application.ports.read_models.contributions_queries import ContributionsQueries
-from application.ports.read_models.countries_queries import CountriesQueries
-from application.ports.read_models.entity_labels_queries import EntityLabelQueries
-from application.ports.read_models.feedback_queries import FeedbackQueries
-from application.ports.read_models.hal_problems_queries import HalProblemsQueries
-from application.ports.read_models.monographs_queries import MonographQueries
-from application.ports.read_models.perimeters_queries import PerimetersQueries
-from application.ports.read_models.persons_queries import PersonsQueries
-from application.ports.read_models.pipeline_runs_queries import PipelineRunsQueries
-from application.ports.read_models.publications_queries import PublicationsQueries
-from application.ports.read_models.publishers_queries import PublisherQueries
-from application.ports.read_models.serials_queries import SerialQueries
-from application.ports.read_models.stats_queries import StatsQueries
-from application.ports.read_models.structures_queries import StructuresQueries
-from application.ports.read_models.subjects_queries import SubjectsQueries
-from application.ports.repositories.address_repository import AddressRepository
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.config_repository import ConfigRepository
-from application.ports.repositories.contribution_repository import ContributionRepository
-from application.ports.repositories.perimeter_repository import PerimeterRepository
-from application.ports.repositories.person_repository import PersonRepository
-from application.ports.repositories.publisher_repository import PublisherRepository
-from application.ports.repositories.serial_repository import SerialRepository
-from application.ports.repositories.structure_repository import StructureRepository
-from application.services.addresses import countries as countries_service
-from application.services.contributions.core import propagate_in_perimeter_for_addresses
+from application.audit_log import record_pending_events
+from application.ports.repositories.user_repository import UserRepository
+from application.services.addresses import AddressService
+from application.services.config import ConfigService
+from application.services.contributions import ContributionService
+from application.services.perimeters import PerimeterService
+from application.services.persons import PersonService
+from application.services.publishers import PublisherService
+from application.services.serials import SerialService
+from application.services.structures import StructureService
 from domain.merge import MergedEntity
-from infrastructure.db.dml_guard import has_uncommitted_dml, reset_dml_flag
+from domain.users import Role, SessionUser
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.read_models.addresses import PgAddressesQueries
-from infrastructure.read_models.config import PgConfigQueries
-from infrastructure.read_models.contributions import PgContributionsQueries
-from infrastructure.read_models.countries import PgCountriesQueries
-from infrastructure.read_models.entity_labels import PgEntityLabelQueries
-from infrastructure.read_models.feedback import PgFeedbackQueries
-from infrastructure.read_models.hal_problems import PgHalProblemsQueries
-from infrastructure.read_models.merge_redirects import PgMergeRedirectQueries
-from infrastructure.read_models.monographs import PgMonographQueries
-from infrastructure.read_models.perimeters import PgPerimetersQueries
-from infrastructure.read_models.persons import PgPersonsQueries
-from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
-from infrastructure.read_models.publications import PgPublicationsQueries
-from infrastructure.read_models.publishers import PgPublisherQueries
-from infrastructure.read_models.serials import PgSerialQueries
-from infrastructure.read_models.stats import PgStatsQueries
-from infrastructure.read_models.structures import PgStructuresQueries
-from infrastructure.read_models.subjects import PgSubjectsQueries
+from infrastructure.read_models.addresses.queries import AddressesQueries
+from infrastructure.read_models.config.queries import ConfigQueries
+from infrastructure.read_models.contributions.queries import ContributionsQueries
+from infrastructure.read_models.countries.queries import CountriesQueries
+from infrastructure.read_models.entity_labels.queries import EntityLabelQueries
+from infrastructure.read_models.feedback.queries import FeedbackQueries
+from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
+from infrastructure.read_models.merge_redirects.queries import MergeRedirectQueries
+from infrastructure.read_models.monographs.queries import MonographQueries
+from infrastructure.read_models.perimeters.queries import PerimetersQueries
+from infrastructure.read_models.persons.queries import PersonsQueries
+from infrastructure.read_models.pipeline_runs.queries import PipelineRunsQueries
+from infrastructure.read_models.publications.queries import PublicationsQueries
+from infrastructure.read_models.publishers.queries import PublisherQueries
+from infrastructure.read_models.serials.queries import SerialQueries
+from infrastructure.read_models.stats.queries import StatsQueries
+from infrastructure.read_models.structures.queries import StructuresQueries
+from infrastructure.read_models.subjects.queries import SubjectsQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,
@@ -80,6 +52,7 @@ from infrastructure.repositories import (
     publisher_repository,
     serial_repository,
     structure_repository,
+    user_repository,
 )
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
@@ -97,7 +70,7 @@ from pipeline.public import (
 logger = logging.getLogger(__name__)
 
 
-# ----- Session admin -----
+# ----- Session -----
 
 
 def get_admin_user() -> str:
@@ -108,13 +81,28 @@ def get_admin_user() -> str:
     return settings.admin_user
 
 
-def admin_user_or_none(request: Request) -> str | None:
-    """Utilisateur de la session en cours, ou `None` faute de session valide — sans jamais refuser l'appel.
+def _session_user(token: str | None, conn: Connection) -> SessionUser | None:
+    login = read_session(token) if token else None
+    if login is None:
+        return None
+    roles = user_repository(conn).roles_of(login)
+    return SessionUser(login, roles) if roles is not None else None
 
-    Sert les lectures dont le contenu dépend de l'appelant sans lui être interdit : la configuration, dont une part est publique et le reste réservé à une session.
+
+def load_session_user(token: str | None) -> SessionUser | None:
+    """Utilisateur de la session portée par `token`, avec ses rôles. `None` sans jeton valide, ou pour un login absent de `ops.users`.
+
+    Ouvre sa propre connexion, en lecture seule : le middleware des écritures l'appelle avant que la requête ait la sienne.
     """
-    token = request.cookies.get("session")
-    return read_session(token) if token else None
+    with get_sync_engine().connect() as conn:
+        conn.execution_options(postgresql_readonly=True)
+        return _session_user(token, conn)
+
+
+def ensure_admin_user() -> None:
+    """Crée l'utilisateur `ADMIN_USER` avec le rôle admin s'il manque. Appelé au démarrage de l'API."""
+    with get_sync_engine().begin() as conn:
+        user_repository(conn).ensure_user(settings.admin_user, [Role.ADMIN])
 
 
 # ----- Factories DB -----
@@ -127,7 +115,7 @@ READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 def _open_connection(request: Request) -> Connection:
     """Connexion tirée de l'engine, avec les caractéristiques de la requête en cours.
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un command handler committerait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
 
     Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
     """
@@ -151,198 +139,190 @@ def connection_factory(request: Request) -> Callable[[], Connection]:
 
 
 def db_conn(request: Request) -> Iterator[Connection]:
-    """Connection SQLAlchemy ouverte pour la durée de la requête, via `Depends(db_conn)`.
+    """Connexion de la requête, servie aux routes par `DbConn`. Sa transaction est celle de la requête.
 
-    La persistance est la prérogative du service : son command handler appelle `conn.commit()` lui-même avant de retourner, ce qui persiste la donnée *avant* l'envoi de la réponse. FastAPI exécute le teardown des dépendances `yield` après cet envoi : un commit placé ici arriverait trop tard, et un GET ou une tâche de fond déclenchés dans l'intervalle liraient l'état antérieur.
+    Une requête d'écriture qui aboutit est committée en sortie, avec les événements d'audit qu'elle a émis (`record_pending_events`) ; une exception l'annule. Cette sortie précède l'envoi de la réponse (`scope="function"`) : un GET ou une tâche de fond déclenchés ensuite lisent l'état committé. Les services ne committent pas ; le pipeline et les scripts committent eux-mêmes.
 
-    En sortie, la transaction est **annulée** (`rollback`) : une session de lecture, ou une session dont le command handler a committé, n'a rien à persister. Du DML qui atteint cette sortie sans commit signale une écriture qui contourne les command handlers : le rollback la perd, et un warning la signale. Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion.
-
-    Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`) : la base refuse alors l'écriture, là où le rollback de sortie ne rattrape que celle restée non committée.
+    Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion. Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`).
     """
     with _open_connection(request) as conn:
-        reset_dml_flag(conn)
         try:
             yield conn
         except Exception:
             conn.rollback()
             raise
-        if conn.in_transaction():
-            escaped_dml = has_uncommitted_dml(conn)
-            conn.rollback()
-            if escaped_dml:
-                logger.warning(
-                    "DML annulé : %s %s a émis une écriture qui n'est pas passée par un "
-                    "command handler committant ; le rollback de fin de db_conn l'a perdue.",
-                    request.method,
-                    request.url.path,
-                )
+        if request.method not in READ_ONLY_METHODS:
+            record_pending_events(audit_repository(conn))
+            conn.commit()
 
 
-def subjects_queries(
-    conn: Connection = Depends(db_conn),
-) -> SubjectsQueries:
-    return PgSubjectsQueries(conn)
+# Seule déclaration de la connexion de la requête. Une déclaration d'un autre scope ouvrirait une
+# seconde connexion, avec sa propre transaction.
+DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
 
 
-def contributions_queries(conn: Connection = Depends(db_conn)) -> ContributionsQueries:
-    return PgContributionsQueries(conn)
+# ----- Session, sur la connexion de la requête -----
 
 
-def countries_queries(conn: Connection = Depends(db_conn)) -> CountriesQueries:
-    return PgCountriesQueries(conn)
+def session_user(request: Request, conn: DbConn) -> SessionUser | None:
+    """Utilisateur de la session en cours, ou `None`, sans jamais refuser l'appel.
+
+    Sert les lectures dont le contenu dépend de l'appelant : la configuration, dont une part est réservée à l'administration, et l'état de la session.
+    """
+    return _session_user(request.cookies.get("session"), conn)
 
 
-def config_queries(conn: Connection = Depends(db_conn)) -> ConfigQueries:
-    return PgConfigQueries(conn)
+def user_repo(conn: DbConn) -> UserRepository:
+    return user_repository(conn)
 
 
-def config_repository(conn: Connection = Depends(db_conn)) -> ConfigRepository:
-    return PgConfigRepository(conn)
+# ----- Lectures -----
 
 
-def hal_problems_queries(
-    conn: Connection = Depends(db_conn),
-) -> HalProblemsQueries:
-    return PgHalProblemsQueries(conn)
+def addresses_queries(conn: DbConn) -> AddressesQueries:
+    return AddressesQueries(conn)
 
 
-def audit_repo(conn: Connection = Depends(db_conn)) -> AuditRepository:
-    return audit_repository(conn)
+def config_queries(conn: DbConn) -> ConfigQueries:
+    return ConfigQueries(conn)
 
 
-def person_repo(conn: Connection = Depends(db_conn)) -> PersonRepository:
-    return person_repository(conn)
+def contributions_queries(conn: DbConn) -> ContributionsQueries:
+    return ContributionsQueries(conn)
 
 
-def serial_queries(conn: Connection = Depends(db_conn)) -> SerialQueries:
-    return PgSerialQueries(conn)
+def countries_queries(conn: DbConn) -> CountriesQueries:
+    return CountriesQueries(conn)
 
 
-def serial_repo(conn: Connection = Depends(db_conn)) -> SerialRepository:
-    return serial_repository(conn)
-
-
-def monograph_queries(conn: Connection = Depends(db_conn)) -> MonographQueries:
-    return PgMonographQueries(conn)
-
-
-def publisher_queries(conn: Connection = Depends(db_conn)) -> PublisherQueries:
-    return PgPublisherQueries(conn)
-
-
-def publisher_repo(conn: Connection = Depends(db_conn)) -> PublisherRepository:
-    return publisher_repository(conn)
-
-
-def perimeter_repo(conn: Connection = Depends(db_conn)) -> PerimeterRepository:
-    return perimeter_repository(conn)
-
-
-def perimeters_queries(
-    conn: Connection = Depends(db_conn),
-) -> PerimetersQueries:
-    return PgPerimetersQueries(conn)
-
-
-def feedback_queries(conn: Connection = Depends(db_conn)) -> FeedbackQueries:
-    return PgFeedbackQueries(conn)
-
-
-def stats_queries(conn: Connection = Depends(db_conn)) -> StatsQueries:
-    return PgStatsQueries(conn)
-
-
-def entity_label_queries(conn: Connection = Depends(db_conn)) -> EntityLabelQueries:
-    return PgEntityLabelQueries(conn)
+def entity_label_queries(conn: DbConn) -> EntityLabelQueries:
+    return EntityLabelQueries(conn)
 
 
 def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], EntityDetail]:
     """Dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
 
-    def dependency(request: Request, conn: Connection = Depends(db_conn)) -> EntityDetail:
-        return EntityDetail(entity, request, PgMergeRedirectQueries(conn))
+    def dependency(request: Request, conn: DbConn) -> EntityDetail:
+        return EntityDetail(entity, request, MergeRedirectQueries(conn))
 
     return dependency
 
 
-def structure_repo(conn: Connection = Depends(db_conn)) -> StructureRepository:
-    return structure_repository(conn)
+def feedback_queries(conn: DbConn) -> FeedbackQueries:
+    return FeedbackQueries(conn)
 
 
-def structures_queries(conn: Connection = Depends(db_conn)) -> StructuresQueries:
-    return PgStructuresQueries(conn)
+def hal_problems_queries(conn: DbConn) -> HalProblemsQueries:
+    return HalProblemsQueries(conn)
+
+
+def monograph_queries(conn: DbConn) -> MonographQueries:
+    return MonographQueries(conn)
+
+
+def perimeters_queries(conn: DbConn) -> PerimetersQueries:
+    return PerimetersQueries(conn)
+
+
+def persons_queries(conn: DbConn) -> PersonsQueries:
+    return PersonsQueries(conn)
+
+
+def pipeline_runs_queries(conn: DbConn) -> PipelineRunsQueries:
+    return PipelineRunsQueries(conn)
 
 
 def publications_queries(
-    conn: Connection = Depends(db_conn),
+    conn: DbConn,
     open_connection: Callable[[], Connection] = Depends(connection_factory),
 ) -> PublicationsQueries:
-    return PgPublicationsQueries(conn, open_connection=open_connection)
+    return PublicationsQueries(conn, open_connection=open_connection)
 
 
-def contribution_repo(conn: Connection = Depends(db_conn)) -> ContributionRepository:
-    return contribution_repository(conn)
+def publisher_queries(conn: DbConn) -> PublisherQueries:
+    return PublisherQueries(conn)
 
 
-def address_repo(conn: Connection = Depends(db_conn)) -> AddressRepository:
-    return address_repository(conn)
+def serial_queries(conn: DbConn) -> SerialQueries:
+    return SerialQueries(conn)
 
 
-def persons_queries(conn: Connection = Depends(db_conn)) -> PersonsQueries:
-    return PgPersonsQueries(conn)
+def stats_queries(conn: DbConn) -> StatsQueries:
+    return StatsQueries(conn)
 
 
-def pipeline_runs_queries(
-    conn: Connection = Depends(db_conn),
-) -> PipelineRunsQueries:
-    return PgPipelineRunsQueries(conn)
+def structures_queries(conn: DbConn) -> StructuresQueries:
+    return StructuresQueries(conn)
 
 
-def addresses_queries(conn: Connection = Depends(db_conn)) -> AddressesQueries:
-    return PgAddressesQueries(conn)
+def subjects_queries(conn: DbConn) -> SubjectsQueries:
+    return SubjectsQueries(conn)
 
 
-# `PerimeterStructures` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_perimeter_structures_singleton: PerimeterStructuresPort = PerimeterStructures()
+# ----- Écritures -----
+# Un service par agrégat, construit sur la connexion reçue : celle de la requête pour une route,
+# celle de la tâche de fond pour une tâche de fond, celle du script pour un script.
 
 
-def get_perimeter_structures() -> PerimeterStructuresPort:
-    return _perimeter_structures_singleton
+def address_service(conn: DbConn) -> AddressService:
+    return AddressService(
+        addresses=address_repository(conn),
+        contributions=contribution_repository(conn),
+        country_recompute=CountryRecompute(conn),
+        perimeter_structures=PerimeterStructures(conn),
+        perimeter_recompute=SourceContributionPerimeterRecompute(conn),
+    )
 
 
-# `SerialRecompute` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_serial_recompute_singleton: SerialRecomputePort = SerialRecompute()
+def config_service(conn: DbConn) -> ConfigService:
+    return ConfigService(config=PgConfigRepository(conn))
 
 
-def serial_recompute() -> SerialRecomputePort:
-    """Requalification des publications d'une revue après son édition ou sa fusion."""
-    return _serial_recompute_singleton
+def contribution_service(conn: DbConn) -> ContributionService:
+    return ContributionService(
+        persons=person_repository(conn),
+        contributions=contribution_repository(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
 
 
-# Recalculs sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_publication_perimeter_recompute_singleton: PublicationPerimeterRecomputePort = (
-    PublicationPerimeterRecompute()
-)
-_publication_count_recompute_singleton: PublicationCountRecomputePort = PublicationCountRecompute()
+def perimeter_service(conn: DbConn) -> PerimeterService:
+    return PerimeterService(
+        perimeters=perimeter_repository(conn),
+        perimeter_structures=PerimeterStructures(conn),
+        config=PgConfigRepository(conn),
+    )
 
 
-def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
-    """Appartenance au périmètre des publications, après une décision sur une personne ou sur ses contributions."""
-    return _publication_perimeter_recompute_singleton
+def person_service(conn: DbConn) -> PersonService:
+    return PersonService(
+        persons=person_repository(conn),
+        contributions=contribution_repository(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
 
 
-def publication_count_recompute() -> PublicationCountRecomputePort:
-    """`publication_count` d'un éditeur, après une fusion d'éditeurs."""
-    return _publication_count_recompute_singleton
+def publisher_service(conn: DbConn) -> PublisherService:
+    return PublisherService(
+        publishers=publisher_repository(conn),
+        serials=serial_repository(conn),
+        serial_service=serial_service(conn),
+        publication_count_recompute=PublicationCountRecompute(conn),
+    )
 
 
-# Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_country_recompute_singleton: CountryRecomputePort = CountryRecompute()
+def serial_service(conn: DbConn) -> SerialService:
+    return SerialService(
+        serials=serial_repository(conn), recompute=SerialRecompute(conn), conn=conn
+    )
 
 
-def country_recompute() -> CountryRecomputePort:
-    """Résolution des pays d'adresses et recalcul ciblé des pays des publications, exposés par le pipeline."""
-    return _country_recompute_singleton
+def structure_service(conn: DbConn) -> StructureService:
+    return StructureService(
+        structures=structure_repository(conn),
+        perimeters=perimeter_repository(conn),
+        perimeter_structures=PerimeterStructures(conn),
+    )
 
 
 # ----- Tâches de fond (BackgroundTasks) -----
@@ -353,7 +333,7 @@ def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
 
     Une tâche de fond s'exécute pendant l'envoi de la réponse, en parallèle de la requête qui l'a enregistrée : la connexion de celle-ci appartient à un autre contexte, et la partager laisserait une transaction ouverte (idle in transaction). `engine.begin()` commite en sortie, annule sur exception, et ferme dans les deux cas.
 
-    L'exception est piégée et loguée : une tâche de fond n'a personne à qui la remonter, la réponse étant partie. `work` voit les écritures que le command handler de la requête a committées avant de retourner.
+    L'exception est piégée et loguée : une tâche de fond n'a personne à qui la remonter, la réponse étant partie. `work` voit les écritures de la requête, committées avant l'envoi de sa réponse.
     """
     try:
         with get_sync_engine().begin() as conn:
@@ -366,9 +346,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
     """Tâche de fond : propage les pays des adresses vers les publications."""
     _run_detached(
         "propagation des pays",
-        lambda conn: countries_service.propagate_countries_to_publications(
-            conn, address_ids, country_recompute=_country_recompute_singleton
-        ),
+        lambda conn: address_service(conn).propagate_countries_to_publications(address_ids),
     )
 
 
@@ -379,11 +357,5 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
     """
     _run_detached(
         "propagation d'in_perimeter",
-        lambda conn: propagate_in_perimeter_for_addresses(
-            conn,
-            address_ids,
-            repo=contribution_repository(conn),
-            perimeter_structures=get_perimeter_structures(),
-            perimeter_recompute=SourceContributionPerimeterRecompute(),
-        ),
+        lambda conn: address_service(conn).propagate_in_perimeter_for_addresses(address_ids),
     )

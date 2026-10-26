@@ -1,32 +1,12 @@
-"""Port SerialRepository — édition de l'agrégat Serial dans l'administration.
+"""Port SerialRepository — édition de l'agrégat Serial dans l'administration."""
 
-L'agrégat Publisher est dans `publisher_repository.py` (principe ISP). Les deux agrégats sont liés par `serials.publisher_id` (FK) mais manipulés par des opérations distinctes — séparer les ports réduit la surface sur laquelle chaque call site s'engage.
-
-La méthode `find_shared_title_serial_pairs` vit ici : c'est une query sur la table `serials`, appelée par le service de fusion d'éditeurs pour détecter les conflits avant `merge_publisher_into`.
-"""
-
-from typing import Protocol, TypedDict
+from typing import Protocol
 
 from pydantic import BaseModel
 
-from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
+from domain.publishers.merge import SharedTitlePair
+from domain.serials.issns import IssnStatus, IssnSupport
 from domain.serials.serial import OaModel, Serial, SerialType
-
-
-class SharedTitleSerialPair(TypedDict):
-    """Paire de revues homonymes entre deux éditeurs, et leurs identifiants normalisés.
-
-    Rendue par `find_shared_title_serial_pairs` : chaque ligne contient les deux revues et leurs ISSN. Le service détecte ainsi en une passe les conflits qui empêchent une fusion.
-    """
-
-    target_serial_id: int
-    target_title: str
-    source_serial_id: int
-    source_title: str
-    t_title: str
-    s_title: str
-    t_issns: list[SerialIssn]
-    s_issns: list[SerialIssn]
 
 
 class SerialIssnInput(BaseModel):
@@ -40,12 +20,7 @@ class SerialIssnInput(BaseModel):
 
 
 class SerialUpdate(BaseModel):
-    """Champs éditables d'une revue, en modification sélective.
-
-    Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
-
-    `serial_type` et `oa_model` ont les types du domaine, que les enums SQL des mêmes noms reprennent. Leurs valeurs se vérifient ici.
-    """
+    """Champs éditables d'une revue, en modification sélective : seuls les champs explicitement fournis sont écrits."""
 
     title: str | None = None
     issns: list[SerialIssnInput] | None = None
@@ -59,17 +34,17 @@ class SerialRepository(Protocol):
     """Contrat d'édition de l'agrégat Serial dans l'administration."""
 
     def find_by_id(self, serial_id: int) -> Serial | None:
-        """Hydrate l'aggregate `Serial` complet. Retourne None si le journal n'existe pas. Les `serial_name_forms` restent une projection séparée, hors de l'aggregate."""
+        """Charge l'agrégat `Serial`, ou `None` si la revue n'existe pas. Ses formes de nom sont hors de l'agrégat."""
         ...
 
     def save(self, serial: Serial) -> None:
-        """Persiste une revue chargée : UPDATE de ses champs éditables par l'API. `title_normalized` est re-dérivé du titre ; les colonnes gérées par le pipeline ne sont pas touchées. Lève `NotFoundError` si l'id est absent."""
+        """Enregistre les champs éditables d'une revue chargée. Lève `NotFoundError` si la revue n'existe pas."""
         ...
 
     def find_shared_title_serial_pairs(
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[SharedTitleSerialPair]:
-        """Paires de revues (une du `target_publisher_id`, une du `source_publisher_id`) partageant le même `title_normalized`. Chaque ligne contient `target_serial_id`, `source_serial_id` et les six valeurs ISSN/eISSN/ISSN-L des deux côtés. Le service détecte ainsi les conflits d'ISSN en une seule requête."""
+    ) -> list[SharedTitlePair]:
+        """Paires de revues de même titre normalisé, l'une de `target_publisher_id`, l'autre de `source_publisher_id`, avec leurs titres et leurs ISSN."""
         ...

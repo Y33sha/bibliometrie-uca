@@ -1,6 +1,6 @@
 """Lecture seule des méthodes HTTP sans effet de bord, enforcée par PostgreSQL.
 
-La connexion s'ouvre en lecture seule sur `GET`, `HEAD` et `OPTIONS` : une écriture émise depuis un point d'entrée de lecture est refusée par la base (SQLSTATE `25006`), qu'elle soit committée ou non. Le garde-fou DML, lui, ne rattrape que l'écriture restée non committée, et seulement après coup.
+La connexion s'ouvre en lecture seule sur `GET`, `HEAD` et `OPTIONS` : une écriture émise depuis un point d'entrée de lecture est refusée par la base (SQLSTATE `25006`), qu'elle soit committée ou non.
 
 La règle vaut pour les deux façons dont une connexion naît pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture répartie sur plusieurs connexions. Un garde-fou d'exécution refuse celle qui naîtrait par un troisième chemin.
 
@@ -12,7 +12,7 @@ from contextvars import copy_context
 from types import SimpleNamespace
 
 import pytest
-from sqlalchemy import Connection, text
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from interfaces.api import deps
@@ -121,7 +121,7 @@ class TestGardeFouDExecution:
     @pytest.fixture
     def probe_client(self, monkeypatch, sa_engine_app):
         """Application d'épreuve portant le vrai middleware, et deux routes de lecture."""
-        from fastapi import Depends, FastAPI
+        from fastapi import FastAPI
         from starlette.testclient import TestClient
 
         from interfaces.api.app import read_only_guard_middleware
@@ -132,13 +132,13 @@ class TestGardeFouDExecution:
         probe.middleware("http")(read_only_guard_middleware)
 
         @probe.get("/evadee")
-        def evadee(conn: Connection = Depends(deps.db_conn)) -> dict:
+        def evadee(conn: deps.DbConn) -> dict:
             with conn.engine.connect() as autre:
                 autre.execute(text(_PROBE_WRITE))
             return {}
 
         @probe.get("/evadee-en-parallele")
-        def evadee_en_parallele(conn: Connection = Depends(deps.db_conn)) -> dict:
+        def evadee_en_parallele(conn: deps.DbConn) -> dict:
             """Reproduit la structure du calcul parallèle des facettes : une tâche par thread, chacune emportant sa copie du contexte."""
 
             def travail() -> None:
@@ -150,7 +150,7 @@ class TestGardeFouDExecution:
             return {}
 
         @probe.get("/servie")
-        def servie(conn: Connection = Depends(deps.db_conn)) -> dict:
+        def servie(conn: deps.DbConn) -> dict:
             return {"un": conn.execute(text("SELECT 1")).scalar()}
 
         return TestClient(probe)

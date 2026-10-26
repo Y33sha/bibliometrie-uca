@@ -1,205 +1,174 @@
 <script lang="ts">
-  import { cssVar } from "#lib/components/charts/cssVar.js";
-  import { onDestroy, onMount } from "svelte";
-  import { DataSet, Network } from "vis-network/standalone";
-  import type { Node, Edge, Options } from "vis-network/standalone";
   import type { components } from "#lib/api/schema.js";
-
-  // Palette tournante des sujets, non sémantique.
-  const PALETTE = ["#075985", "#0369a1", "#7c3aed", "#9333ea", "#be123c", "#b45309"];
+  import { CX, CY, subjectGraphLayout, type GraphNode } from "./subjectGraphLayout";
 
   type SubjectListItem = components["schemas"]["SubjectListItem"];
   type SubjectNeighbor = components["schemas"]["SubjectNeighborOut"];
+  type SubjectNeighborLink = components["schemas"]["SubjectNeighborLink"];
 
+  // Graphe radial d'un sujet : le sujet au centre, ses voisins autour. Un voisin est d'autant plus proche du centre que l'association est spécifique ; les sujets apparentés se placent côte à côte.
   let {
     subject,
     neighbors,
+    links,
     onSelect,
   }: {
     subject: SubjectListItem;
     neighbors: SubjectNeighbor[];
+    links: SubjectNeighborLink[];
     onSelect: (id: number) => void;
   } = $props();
 
-  let container: HTMLDivElement | undefined = $state();
-  let network: Network | undefined;
+  const layout = $derived(subjectGraphLayout(subject, neighbors, links));
 
+  let hovered = $state<GraphNode | null>(null);
 
-  /** Taille de police adaptative au range du graphe en cours. */
-  function nodeFontSize(
-    usageCount: number,
-    minUsage: number,
-    maxUsage: number,
-  ): number {
-    const minSize = 18;
-    const maxSize = 38;
-    if (maxUsage === minUsage) return (minSize + maxSize) / 2;
-    const t =
-      (Math.log10(usageCount + 1) - Math.log10(minUsage + 1)) /
-      (Math.log10(maxUsage + 1) - Math.log10(minUsage + 1));
-    return minSize + t * (maxSize - minSize);
+  function percent(spec: number): string {
+    return (spec * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %";
   }
-
-  /** Wrap un label sur les espaces (jamais en milieu de mot). vis-network respecte les `\n` dans les labels ; on précalcule les retours à la ligne plutôt que de laisser `widthConstraint` couper. */
-  function wrapLabel(label: string, maxCharsPerLine = 18): string {
-    const words = label.split(/\s+/).filter(Boolean);
-    if (words.length === 0) return label;
-    const lines: string[] = [];
-    let current = "";
-    for (const word of words) {
-      if (current && current.length + 1 + word.length > maxCharsPerLine) {
-        lines.push(current);
-        current = word;
-      } else {
-        current = current ? `${current} ${word}` : word;
-      }
-    }
-    if (current) lines.push(current);
-    return lines.join("\n");
-  }
-
-  /** Longueur de l'arête en fonction de la *spécificité côté voisin* :
-   *
-   *      spec = cooc / usage_neighbor
-   *
-   *  C'est la fraction des publications du voisin qui touchent au sujet central. Asymétrique, dévalorise les sujets omniprésents (ex. un parent très large a peu de spécificité côté lui-même), qui sont alors relégués à la périphérie du graphe sans être filtrés.
-   *
-   *  Échelle log pour ne pas écraser les faibles spécificités. */
-  function edgeLength(spec: number, minSpec: number, maxSpec: number): number {
-    const minLen = 120;
-    const maxLen = 500;
-    if (maxSpec === minSpec) return (minLen + maxLen) / 2;
-    // log(0) → −∞, on ajoute un epsilon ; on a déjà spec > 0 puisque cooc >= min_cooccurrence >= 1 et usage > 0.
-    const eps = 1e-6;
-    const t =
-      (Math.log(spec + eps) - Math.log(minSpec + eps)) /
-      (Math.log(maxSpec + eps) - Math.log(minSpec + eps));
-    return maxLen - (maxLen - minLen) * t;
-  }
-
-
-  function buildData(): { nodes: Node[]; edges: Edge[] } {
-    // Min/max sur tous les nœuds visibles (centre + voisins) pour calibrer les tailles relativement au graphe courant.
-    const allUsages = [subject.usage_count, ...neighbors.map((n) => n.usage_count)];
-    const minUsage = Math.min(...allUsages);
-    const maxUsage = Math.max(...allUsages);
-    // Texte nu : la couleur vient d'une palette tournante, stable pour un même sujet ; le centre est agrandi pour rester identifiable une fois la physique figée.
-    const fontFor = (id: number, usageCount: number, isCenter: boolean) => ({
-      size: nodeFontSize(usageCount, minUsage, maxUsage) + (isCenter ? 6 : 0),
-      color: PALETTE[id % PALETTE.length],
-      face: cssVar("font"),
-    });
-    const nodes: Node[] = [
-      {
-        id: subject.id,
-        label: wrapLabel(subject.label),
-        font: fontFor(subject.id, subject.usage_count, true),
-      },
-    ];
-    const edges: Edge[] = [];
-    // Spécificité côté voisin : `cooc / usage_neighbor`. Bornée à 1.
-    const specificities = neighbors.map((n) =>
-      n.usage_count > 0 ? Math.min(1, n.cooccurrence_count / n.usage_count) : 0,
-    );
-    const minSpec = specificities.length ? Math.min(...specificities) : 0;
-    const maxSpec = specificities.length ? Math.max(...specificities) : 0;
-    for (const [i, n] of neighbors.entries()) {
-      nodes.push({
-        id: n.id,
-        label: wrapLabel(n.label),
-        font: fontFor(n.id, n.usage_count, false),
-      });
-      const spec = specificities[i];
-      edges.push({
-        from: subject.id,
-        to: n.id,
-        value: n.cooccurrence_count,
-        length: edgeLength(spec, minSpec, maxSpec),
-        title: `${n.cooccurrence_count} co-occurrences (spécificité ${(spec * 100).toFixed(1)} %)`,
-      });
-    }
-    return { nodes, edges };
-  }
-
-  function buildOptions(): Options {
-    return {
-      nodes: {
-        // Texte nu, sans cercle ni rectangle : aligne visuellement le graphe avec le nuage de mots du dashboard. Les arêtes connectent au centre du label.
-        shape: "text",
-      },
-      edges: {
-        scaling: { min: 1, max: 8 },
-        color: { color: cssVar("border"), highlight: cssVar("muted"), hover: cssVar("muted") },
-        smooth: { enabled: true, type: "continuous", roundness: 0.3 },
-      },
-      physics: {
-        solver: "forceAtlas2Based",
-        forceAtlas2Based: {
-          gravitationalConstant: -120,
-          centralGravity: 0.005,
-          springLength: 200,
-          springConstant: 0.06,
-          avoidOverlap: 1,
-        },
-        stabilization: { iterations: 300 },
-      },
-      interaction: {
-        hover: true,
-        tooltipDelay: 150,
-        // Déplacement de la vue et zoom conservés ; celui des nœuds non : la disposition
-        // est figée après stabilisation, et `avoidOverlap` écarte déjà les chevauchements.
-        dragNodes: false,
-      },
-    };
-  }
-
-  // Quand `subject` ou `neighbors` changent (navigation), on rebuild les datasets.
-  $effect(() => {
-    if (!network) return;
-    const { nodes, edges } = buildData();
-    network.setData({
-      nodes: new DataSet<Node>(nodes),
-      edges: new DataSet<Edge>(edges),
-    });
-  });
-
-  onMount(() => {
-    if (!container) return;
-    const { nodes, edges } = buildData();
-    network = new Network(
-      container,
-      {
-        nodes: new DataSet<Node>(nodes),
-        edges: new DataSet<Edge>(edges),
-      },
-      buildOptions(),
-    );
-    network.on("click", (params: { nodes: (string | number)[] }) => {
-      if (params.nodes.length === 0) return;
-      const clickedId = Number(params.nodes[0]);
-      if (clickedId !== subject.id) onSelect(clickedId);
-    });
-    // Une fois la physique stabilisée : recentre puis la désactive, ce qui fige la disposition.
-    network.once("stabilizationIterationsDone", () => {
-      network?.fit({ animation: false });
-      network?.setOptions({ physics: { enabled: false } });
-    });
-  });
-
-  onDestroy(() => {
-    network?.destroy();
-    network = undefined;
-  });
 </script>
 
-<div bind:this={container} class="graph"></div>
+<div class="graph">
+  <svg
+    viewBox="{layout.box.x} {layout.box.y} {layout.box.width} {layout.box.height}"
+    style="max-width: {layout.box.width}px"
+    role="img"
+    aria-label="Graphe des sujets associés à {subject.label}"
+  >
+    {#each layout.nodes as n (n.neighbor.id)}
+      <line
+        x1={CX}
+        y1={CY}
+        x2={n.x}
+        y2={n.y}
+        class="edge"
+        class:active={hovered === n}
+        stroke-width={layout.strokeWidth(n.neighbor.cooccurrence_count)}
+      />
+    {/each}
+
+    <circle cx={CX} cy={CY} r={layout.centerR} class="center" />
+
+    {#each layout.nodes as n (n.neighbor.id)}
+      {@const right = n.x >= CX}
+      <g
+        class="node"
+        class:active={hovered === n}
+        role="link"
+        tabindex="0"
+        aria-label={n.neighbor.label}
+        onmouseenter={() => (hovered = n)}
+        onmouseleave={() => (hovered = null)}
+        onfocus={() => (hovered = n)}
+        onblur={() => (hovered = null)}
+        onclick={() => onSelect(n.neighbor.id)}
+        onkeydown={(e) => {
+          if (e.key === "Enter") onSelect(n.neighbor.id);
+        }}
+      >
+        <circle cx={n.x} cy={n.y} r={n.r} />
+        <text
+          x={n.x + (right ? n.r + 6 : -n.r - 6)}
+          y={n.y}
+          class="label"
+          text-anchor={right ? "start" : "end"}
+          dominant-baseline="middle">{n.neighbor.label}</text
+        >
+      </g>
+    {/each}
+
+    <!-- Titre du sujet central, dessiné en dernier pour rester au-dessus. -->
+    <text x={CX} y={CY + layout.centerR + 18} class="label center-label" text-anchor="middle">{subject.label}</text>
+  </svg>
+
+  {#if hovered}
+    <div
+      class="graph-tip"
+      style="left: {((hovered.x - layout.box.x) / layout.box.width) * 100}%; top: {((hovered.y + hovered.r - layout.box.y) / layout.box.height) * 100}%"
+    >
+      <div class="tip-title">{hovered.neighbor.label}</div>
+      <div>{hovered.neighbor.cooccurrence_count.toLocaleString("fr-FR")} publications en commun</div>
+      <div>
+        {percent(hovered.specificity)} des publications de ce sujet portent aussi « {subject.label} »
+      </div>
+      <div class="tip-muted">{hovered.neighbor.usage_count.toLocaleString("fr-FR")} publications au total</div>
+    </div>
+  {/if}
+</div>
 
 <style>
   .graph {
+    position: relative;
+  }
+  svg {
+    display: block;
     width: 100%;
-    height: 70vh;
-    background: var(--card);
-    border: 1px solid var(--border);
+    height: auto;
+    margin: 0 auto;
+    overflow: visible;
+  }
+  .edge {
+    stroke: var(--border);
+    stroke-linecap: round;
+  }
+  .edge.active {
+    stroke: var(--accent-mid);
+  }
+  .center {
+    fill: var(--accent-mid);
+    stroke: var(--bg);
+    stroke-width: 3;
+  }
+  .node {
+    cursor: pointer;
+    outline: none;
+  }
+  .node circle {
+    fill: var(--muted);
+    stroke: var(--bg);
+    stroke-width: 2;
+  }
+  .node.active circle {
+    fill: var(--accent-mid);
+  }
+  .label {
+    font-size: 13px;
+    fill: var(--text);
+    /* Halo du fond de page : les libellés restent lisibles sur les liens. */
+    paint-order: stroke;
+    stroke: var(--bg);
+    stroke-width: 4px;
+    stroke-linejoin: round;
+  }
+  .node.active .label {
+    fill: var(--accent);
+    font-weight: 600;
+  }
+  .center-label {
+    font-size: 15px;
+    font-weight: 700;
+    fill: var(--accent);
+  }
+  .graph-tip {
+    position: absolute;
+    z-index: 10;
+    transform: translate(-50%, 10px);
+    width: 280px;
+    padding: 10px 12px;
     border-radius: var(--radius);
+    background: var(--card);
+    box-shadow: 0 6px 20px rgba(16, 24, 40, 0.14), 0 0 0 1px rgba(16, 24, 40, 0.06);
+    font-size: 0.85rem;
+    line-height: 1.45;
+    color: var(--text-secondary);
+    pointer-events: none;
+  }
+  .tip-title {
+    margin-bottom: 4px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .tip-muted {
+    color: var(--muted);
   }
 </style>

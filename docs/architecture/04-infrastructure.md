@@ -1,6 +1,6 @@
 # Infrastructure — adaptateurs sortants
 
-*À jour le 2026-09-05.*
+*À jour le 2026-10-25.*
 
 `infrastructure/` implémente les [ports](03-application.md#ports) : SQL, journalisation. Seuls les composition roots et le pipeline l'importent.
 
@@ -17,10 +17,12 @@
 
 Les adaptateurs de `repositories/` construisent des objets du domaine : ils hydratent un agrégat, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_doi`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
 
-`read_models/` rend des lignes, sans hydratation : des projections plates que les routers passent à leur modèle Pydantic.
+`read_models/` contient les lectures de l'API, sans hydratation : un paquet par lecture, avec ses requêtes et ses modèles de réponse (`models.py`). Les routers les reçoivent directement, sans port.
 
 ## Transactions
 
-La règle générale est qu'une unité de travail tient dans une transaction, ouverte et commitée par le service ou l'orchestrateur, non par l'adaptateur.
+Une unité de travail tient dans une transaction, que seul son appelant commite : la requête pour l'API, le script ou la phase du pipeline pour le reste.
+
+Pour l'API, `db_conn` (`interfaces/api/deps.py`) ouvre la connexion de la requête, que les repositories partagent. Une requête d'écriture qui aboutit est commitée avant l'envoi de la réponse, avec les événements d'audit qu'elle a émis ; une exception l'annule. Une requête de lecture s'ouvre en lecture seule.
 
 Les phases du pipeline qui traitent de grands ensembles commitent par lots, toutes les N opérations, si bien qu'un plantage ne perd que le dernier lot. À l'intérieur d'un lot, chaque item est isolé dans un savepoint : une erreur annule l'item fautif seul, sans emporter les autres.

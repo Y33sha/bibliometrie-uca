@@ -126,10 +126,8 @@ class TestCreateStructure:
         assert r.status_code == 409
 
     def test_create_visible_immediately(self, auth_client):
-        # Régression (chantier commit-avant-réponse) : la structure écrite par le POST
-        # est commitée avant l'envoi de la réponse, donc lisible depuis une connexion
-        # indépendante. Garde-fou du passage final du teardown de db_conn en
-        # rollback — un command handler sans `commit()` ferait alors échouer ce test.
+        # La requête est committée avant l'envoi de la réponse : la structure est lisible
+        # depuis une connexion indépendante.
         code = uniq("READBACK")
         r = auth_client.post(
             "/api/structures",

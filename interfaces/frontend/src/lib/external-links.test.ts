@@ -42,8 +42,9 @@ const HOTES_AFFICHABLES = new Set([
 const COMPOSITION =
 	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
 const INTERNE = /^(pubsUrl|statsUrl)$/;
-/* `resolve` compose un chemin de l'application sous le préfixe de déploiement. */
-const ROUTE = /^resolve\(/;
+/* `resolve` compose un chemin de l'application sous le préfixe de déploiement ; `loginUrl` y
+ * ajoute la page de retour après connexion. */
+const ROUTE = /^(resolve|loginUrl)\(/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. Lien vers le portail d'une
  * source, composé par l'API : l'hôte y est écrit dans le code et l'identifiant encodé

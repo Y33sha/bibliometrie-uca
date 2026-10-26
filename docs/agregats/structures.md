@@ -42,6 +42,6 @@ Créer ou modifier un rattachement, comme supprimer une structure, recalcule les
 
 ## Lecture par l'API
 
-**Administration.** Port `application/ports/read_models/structures_queries.py`, adaptateur `PgStructuresQueries` : liste filtrable par type, avec une recherche sur le nom, l'acronyme et le code qui ignore les accents ; détail d'une structure avec ses parents, ses enfants et ses formes de nom.
+**Administration.** Lecture `infrastructure/read_models/structures/`, classe `StructuresQueries` : liste filtrable par type, avec une recherche sur le nom, l'acronyme et le code qui ignore les accents ; détail d'une structure avec ses parents, ses enfants et ses formes de nom.
 
 **Page des laboratoires.** Lecture des structures de type laboratoire appartenant au périmètre, avec leurs tutelles. Les types affichés sont réglables par configuration.

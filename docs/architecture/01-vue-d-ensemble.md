@@ -69,11 +69,11 @@ Chaque règle est vérifiée par un contrat `import-linter`, déclaré dans `pyp
 2. **Les imports vont vers le noyau.** `interfaces/` atteint les trois autres couches. `infrastructure/` et `application/` atteignent `domain/`, qui n'importe aucune autre couche. `application/` n'importe pas `infrastructure/` : les services et orchestrateurs reçoivent leurs dépendances par les **ports** (`Protocol`) de `application/ports/`, que `infrastructure/` implémente.
    → `Couches DDD (layered)`
 
-3. **Les routers n'importent pas `infrastructure/` directement.** Ils reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans `interfaces/api/deps.py`. Le chemin indirect qui passe par ces fabriques reste permis.
+3. **Les écritures passent par un service, les lectures vont directement au SQL.** Un router d'écriture reçoit un service d'`application/` ; seul ce côté passe par des ports. Un router de lecture reçoit l'adaptateur de `infrastructure/read_models/`, qui déclare aussi ses modèles de réponse. Les deux reçoivent leurs dépendances par `Depends(...)`, dont les fabriques sont déclarées dans `interfaces/api/deps.py`. Hors lectures, les routers n'importent pas `infrastructure/`.
    → `Routers : pas d'import direct de infrastructure`
 
-4. **Seul le composition root instancie les adaptateurs concrets.** Pour l'application web, ce sont `interfaces/api/app.py` et `interfaces/api/deps.py` ; partout ailleurs sous `interfaces/api/`, on passe par un port. (Par ailleurs, chaque script de `interfaces/cli/` est son propre composition root.)
-   → `Composition root : Pg* concrets uniquement dans app et deps`
+4. **Seul le composition root instancie les repositories concrets.** Pour l'application web, c'est `interfaces/api/deps.py`, qui les remet aux services d'écriture. (Par ailleurs, chaque script de `interfaces/cli/` est son propre composition root.)
+   → `Composition root : repositories concrets uniquement dans deps`
 
 5. **Un adaptateur reçoit sa connexion, il ne l'ouvre pas.** Les modules de lecture et les repositories travaillent sur la connexion que leur appelant leur remet.
    → `Adapters : la connexion se reçoit, elle ne s'ouvre pas`

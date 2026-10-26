@@ -5,16 +5,16 @@ Alimente le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.read_models.hal_problems_queries import (
+from infrastructure.read_models.hal_problems.models import (
     HalAffiliationConflictsResponse,
     HalCollectionLab,
     HalDoiDuplicatesResponse,
     HalDuplicateAccountsResponse,
     HalMetaDuplicatesResponse,
     HalMissingCollectionsResponse,
-    HalProblemsQueries,
     NoMissingCollections,
 )
+from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
 from interfaces.api.deps import hal_problems_queries
 
 router = APIRouter(prefix="/api/hal-problems", tags=["hal-problems"])

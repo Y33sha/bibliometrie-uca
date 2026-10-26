@@ -19,11 +19,10 @@ from pathlib import Path
 
 from sqlalchemy import Connection, text
 
-from application.services.persons import core as persons_service
 from domain.errors import ConflictError
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.observability.log import setup_logger
-from infrastructure.repositories.person_repository import PgPersonRepository
+from interfaces.api.deps import person_service
 
 log = setup_logger("merge_reviewed_person_duplicates", os.path.dirname(__file__))
 
@@ -51,7 +50,7 @@ def current_person(conn: Connection, person_id: int) -> int | None:
 def merge_pairs(conn: Connection, pairs: Iterable[tuple[int, int]], *, apply: bool) -> Counter[str]:
     """Fusionne chaque couple (conservée, absorbée), commite chaque fusion si `apply`, et rend le décompte des issues."""
     outcomes: Counter[str] = Counter()
-    repo = PgPersonRepository(conn)
+    persons = person_service(conn)
     for kept, absorbed in pairs:
         target, source = current_person(conn, kept), current_person(conn, absorbed)
         if target is None or source is None:
@@ -62,7 +61,7 @@ def merge_pairs(conn: Connection, pairs: Iterable[tuple[int, int]], *, apply: bo
             outcomes["déjà fusionnées"] += 1
             continue
         try:
-            persons_service.merge_person(target, source, repo=repo)
+            persons.merge_person(target, source)
         except ConflictError as e:
             log.warning("%s", e)
             outcomes["deux fiches RH"] += 1

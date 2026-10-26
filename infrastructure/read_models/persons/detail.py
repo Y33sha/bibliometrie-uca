@@ -2,13 +2,20 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models._common import (
+from domain.dates import today
+from domain.publications.contribution_roles import ContributionRole
+from domain.publications.doc_types import DOC_TYPE_FAMILIES
+from domain.sources.registry import Source
+from domain.structures.structure import StructureType
+from infrastructure.read_models._common import (
     DashboardOa,
     PublicationYearCount,
     StructureRef,
     page_count,
 )
-from application.ports.read_models.persons_queries import (
+from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
+from infrastructure.read_models.persons.identifiers import person_identifiers
+from infrastructure.read_models.persons.models import (
     PersonAddressesResponse,
     PersonAddressOut,
     PersonAddressStruct,
@@ -19,14 +26,7 @@ from application.ports.read_models.persons_queries import (
     PersonThesesSection,
     PersonThesis,
 )
-from application.ports.read_models.subjects_queries import SubjectFrequency
-from domain.dates import today
-from domain.publications.contribution_roles import ContributionRole
-from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.sources.registry import Source
-from domain.structures.structure import StructureType
-from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
-from infrastructure.read_models.persons.identifiers import person_identifiers
+from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.sql_fragments import has_author_role, in_clause
 
 

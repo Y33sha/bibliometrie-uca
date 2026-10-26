@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from infrastructure.read_models.perimeters import (
+from infrastructure.read_models.perimeters.queries import (
     get_extraction_api_ids,
     get_extraction_structure_ids,
     get_hal_collections,

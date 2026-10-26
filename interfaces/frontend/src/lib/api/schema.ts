@@ -17,7 +17,7 @@ export interface paths {
          * Auth Login
          * @description Authentifie l'admin et pose un cookie de session signé.
          *
-         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`), 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
+         *     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`) ou si `ADMIN_USER` est absent de `ops.users`, 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
          */
         post: operations["auth_login_api_auth_login_post"];
         delete?: never;
@@ -35,7 +35,7 @@ export interface paths {
         };
         /**
          * Auth Check
-         * @description Indique si le cookie de session en cours est valide.
+         * @description État de la session en cours : validité, utilisateur et rôles.
          *
          *     Répond toujours 200 : le frontend s'en sert pour choisir entre le bouton de connexion et celui de déconnexion.
          */
@@ -792,7 +792,7 @@ export interface paths {
          * Update Structure
          * @description Met à jour une structure, champ par champ.
          *
-         *     Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une structure inconnue.
+         *     Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
          */
         put: operations["update_structure_api_structures__structure_id__put"];
         post?: never;
@@ -1523,7 +1523,7 @@ export interface paths {
          * Assign Orphan Contribution
          * @description Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1709,7 +1709,7 @@ export interface paths {
          * List Config
          * @description Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
          *
-         *     Sans session, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+         *     Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
          */
         get: operations["list_config_api_config_get"];
         put?: never;
@@ -1969,11 +1969,11 @@ export interface paths {
          * Merge
          * @description Fusionne l'éditeur `source_id` dans l'éditeur `publisher_id`.
          *
-         *         Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
+         *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
          *
          *     Deux éditeurs qui portent des membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
          *
-         *         Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+         *     Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2591,6 +2591,8 @@ export interface components {
             label: string;
             /** Url */
             url: string;
+            /** Known */
+            known: boolean;
         };
         /** AddIdentifier */
         AddIdentifier: {
@@ -2842,11 +2844,18 @@ export interface components {
         AttributionStatus: "pending" | "confirmed" | "rejected" | "authenticated";
         /**
          * AuthCheckResponse
-         * @description Résultat de la vérification de session : `authenticated` dit si la requête porte une session valide.
+         * @description État de la session : `authenticated` dit si la requête porte une session valide, `login` et `roles` désignent son utilisateur.
          */
         AuthCheckResponse: {
             /** Authenticated */
             authenticated: boolean;
+            /** Login */
+            login?: string | null;
+            /**
+             * Roles
+             * @default []
+             */
+            roles: string[];
         };
         /**
          * BatchAssignOrphanContributions
@@ -3033,7 +3042,7 @@ export interface components {
         };
         /**
          * CurationPersonOut
-         * @description Fiche personne allégée, commune aux files de curation (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer.
+         * @description Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer.
          */
         CurationPersonOut: {
             /** Person Id */
@@ -3167,7 +3176,7 @@ export interface components {
         };
         /**
          * EntityLabelResponse
-         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté.
+         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id est transporté.
          */
         EntityLabelResponse: {
             /** Label */
@@ -3199,7 +3208,7 @@ export interface components {
          * FacetOption
          * @description Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
          *
-         *     `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il porte le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
+         *     `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il contient le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
          */
         FacetOption: {
             /** Value */
@@ -3495,7 +3504,7 @@ export interface components {
         };
         /**
          * IdentifierConflictPairOut
-         * @description Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
+         * @description Deux personnes distinctes qui ont la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
          */
         IdentifierConflictPairOut: {
             person_a: components["schemas"]["CurationPersonOut"];
@@ -3705,7 +3714,10 @@ export interface components {
             /** Other Persons */
             other_persons: components["schemas"]["OtherPersonOut"][];
         };
-        /** NameFormCreate */
+        /**
+         * NameFormCreate
+         * @description Champs d'une forme de nom de structure à créer.
+         */
         NameFormCreate: {
             /** Structure Id */
             structure_id: number;
@@ -3777,7 +3789,10 @@ export interface components {
             /** Publication Count */
             publication_count: number;
         };
-        /** NameFormUpdate */
+        /**
+         * NameFormUpdate
+         * @description Champs éditables d'une forme de nom de structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface `requires_context_of`.
+         */
         NameFormUpdate: {
             /** Form Text */
             form_text?: string | null;
@@ -4195,11 +4210,7 @@ export interface components {
         PhaseBrief: {
             /** Phase */
             phase: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
         };
         /**
          * PhaseExecutionDetail
@@ -4218,11 +4229,7 @@ export interface components {
              * Format: date-time
              */
             ended_at: string;
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
             /** Duration S */
             duration_s: number;
             metrics: components["schemas"]["PhaseMetricsPayload"];
@@ -4260,6 +4267,12 @@ export interface components {
             duration_s: number;
         };
         /**
+         * PhaseStatus
+         * @description Statut d'une exécution de phase, et niveau d'un signal. Les membres sont rangés du moins grave au plus grave.
+         * @enum {string}
+         */
+        PhaseStatus: "ok" | "warning" | "error";
+        /**
          * PivotDimensionOut
          * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction).
          */
@@ -4293,7 +4306,7 @@ export interface components {
         };
         /**
          * PivotResponse
-         * @description Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
+         * @description Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
          */
         PivotResponse: {
             /** Measure */
@@ -4593,9 +4606,9 @@ export interface components {
             /** Serial Types */
             serial_types: components["schemas"]["SerialTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__read_models__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["infrastructure__read_models__publishers__models__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__read_models__publishers_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["infrastructure__read_models__publishers__models__OaStatusCount"][];
         };
         /**
          * PublisherListItem
@@ -4652,9 +4665,7 @@ export interface components {
         PublisherType: "commercial" | "learned_society" | "academic_institution" | "repository" | "aggregator" | "media" | "unknown";
         /**
          * PublisherUpdate
-         * @description Champs éditables d'un éditeur, en modification sélective.
-         *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `name_normalized`, dérivé de `name`, est posé par le repository.
+         * @description Champs éditables d'un éditeur, en modification sélective : seuls les champs explicitement fournis sont écrits.
          */
         PublisherUpdate: {
             /** Name */
@@ -4765,11 +4776,7 @@ export interface components {
             mode: string;
             /** Sources */
             sources: string[];
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
             /** Total Duration S */
             total_duration_s: number;
             /** Phases */
@@ -4796,11 +4803,7 @@ export interface components {
             mode: string;
             /** Sources */
             sources: string[];
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "warning" | "error";
+            status: components["schemas"]["PhaseStatus"];
             /** Phase Count */
             phase_count: number;
             /** Total Duration S */
@@ -4814,15 +4817,15 @@ export interface components {
          *
          *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
          *
-         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue ne porte pas la valeur correspondante, ou que celle-ci n'est pas mappée.
+         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue n'a pas la valeur correspondante, ou que celle-ci n'est pas mappée.
          */
         SerialDashboardResponse: {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__read_models__serials_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["infrastructure__read_models__serials__models__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__read_models__serials_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["infrastructure__read_models__serials__models__OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -4993,11 +4996,7 @@ export interface components {
         };
         /**
          * SerialUpdate
-         * @description Champs éditables d'une revue, en modification sélective.
-         *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
-         *
-         *     `serial_type` et `oa_model` ont les types du domaine, que les enums SQL des mêmes noms reprennent. Leurs valeurs se vérifient ici.
+         * @description Champs éditables d'une revue, en modification sélective : seuls les champs explicitement fournis sont écrits.
          */
         SerialUpdate: {
             /** Title */
@@ -5057,11 +5056,7 @@ export interface components {
          *     `level` aligne la couleur de la phase (`warning` ou `error`), `code` permet le regroupement, `message` est lisible tel quel.
          */
         Signal: {
-            /**
-             * Level
-             * @enum {string}
-             */
-            level: "ok" | "warning" | "error";
+            level: components["schemas"]["PhaseStatus"];
             /** Code */
             code: string;
             /** Message */
@@ -5128,7 +5123,7 @@ export interface components {
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
          */
         SourceRecordMetadataOut: {
             /** Id */
@@ -5252,7 +5247,7 @@ export interface components {
         };
         /**
          * StructureCollaborations
-         * @description Articles de la structure, selon qu'ils portent ou non une affiliation étrangère.
+         * @description Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère.
          */
         StructureCollaborations: {
             /** Total Articles */
@@ -5262,7 +5257,10 @@ export interface components {
             /** Domestic */
             domestic: number;
         };
-        /** StructureCreate */
+        /**
+         * StructureCreate
+         * @description Champs d'une structure à créer.
+         */
         StructureCreate: {
             /** Code */
             code: string;
@@ -5462,7 +5460,10 @@ export interface components {
          * @enum {string}
          */
         StructureType: "universite" | "chu" | "ecole" | "labo" | "equipe" | "site" | "onr" | "admin" | "autre";
-        /** StructureUpdate */
+        /**
+         * StructureUpdate
+         * @description Champs éditables d'une structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface un champ facultatif.
+         */
         StructureUpdate: {
             /** Name */
             name?: string | null;
@@ -5482,16 +5483,18 @@ export interface components {
         };
         /**
          * SubjectDetailResponse
-         * @description Détail d'un sujet et ses voisins par co-occurrence.
+         * @description Détail d'un sujet, ses voisins par co-occurrence et les co-occurrences entre ces voisins.
          */
         SubjectDetailResponse: {
             subject: components["schemas"]["SubjectListItem"];
             /** Neighbors */
             neighbors: components["schemas"]["SubjectNeighborOut"][];
+            /** Neighbor Links */
+            neighbor_links: components["schemas"]["SubjectNeighborLink"][];
         };
         /**
          * SubjectFrequency
-         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les nuages de sujets de leurs pages de détail.
+         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs dashboards.
          */
         SubjectFrequency: {
             /** Id */
@@ -5527,6 +5530,18 @@ export interface components {
             items: components["schemas"]["SubjectListItem"][];
             /** Pages */
             readonly pages: number;
+        };
+        /**
+         * SubjectNeighborLink
+         * @description Co-occurrence entre deux voisins d'un sujet, `subject_a_id` < `subject_b_id`.
+         */
+        SubjectNeighborLink: {
+            /** Subject A Id */
+            subject_a_id: number;
+            /** Subject B Id */
+            subject_b_id: number;
+            /** Cooccurrence Count */
+            cooccurrence_count: number;
         };
         /**
          * SubjectNeighborOut
@@ -5703,7 +5718,7 @@ export interface components {
          * DocTypeCount
          * @description Compteur de publications par `doc_type` pour un éditeur.
          */
-        application__ports__read_models__publishers_queries__DocTypeCount: {
+        infrastructure__read_models__publishers__models__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
@@ -5713,7 +5728,7 @@ export interface components {
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour un éditeur.
          */
-        application__ports__read_models__publishers_queries__OaStatusCount: {
+        infrastructure__read_models__publishers__models__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
@@ -5725,7 +5740,7 @@ export interface components {
          *
          *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `serial_type` de la revue (`domain.serials.expected`), ce qui laisse le frontend signaler les autres.
          */
-        application__ports__read_models__serials_queries__DocTypeCount: {
+        infrastructure__read_models__serials__models__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
@@ -5739,7 +5754,7 @@ export interface components {
          *
          *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.serials.expected`).
          */
-        application__ports__read_models__serials_queries__OaStatusCount: {
+        infrastructure__read_models__serials__models__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
@@ -5794,9 +5809,7 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
-            cookie?: {
-                session?: string | null;
-            };
+            cookie?: never;
         };
         requestBody?: never;
         responses: {
@@ -5807,15 +5820,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuthCheckResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

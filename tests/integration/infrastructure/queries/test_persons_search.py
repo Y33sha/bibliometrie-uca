@@ -4,8 +4,8 @@ L'annuaire et l'autocomplétion appliquent la même règle : prénom et nom se s
 
 import pytest
 
-from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.list import list_persons, search_persons
+from infrastructure.read_models.persons.models import PersonFilters
 from tests.integration.helpers.persons import insert_person
 
 

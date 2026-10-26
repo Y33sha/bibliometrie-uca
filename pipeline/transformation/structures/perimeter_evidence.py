@@ -95,20 +95,22 @@ def sync_perimeter_evidence(
 class SourceContributionPerimeterRecompute:
     """Recalcul ciblé du périmètre après une correction d'adresse par l'administration (port injecté par l'API)."""
 
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
+
     def recompute_perimeter(
         self,
-        conn: Connection,
         source_contribution_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
         """Rafraîchit la matview `source_contribution_structures`, puis recalcule les indices des contributions sources données, de leurs groupes et de leurs publications, par les mêmes requêtes que le pipeline."""
-        refresh_source_contribution_structures(conn)
+        refresh_source_contribution_structures(self._conn)
         sync_perimeter_evidence(
-            conn,
+            self._conn,
             perimeter_ids=perimeter_structure_ids,
             source_contribution_ids=source_contribution_ids,
         )
-        conn.execute(
+        self._conn.execute(
             text(
                 propagate_group_attributes_sql(
                     "SELECT contribution_id FROM aligned_source_contributions"
@@ -117,7 +119,7 @@ class SourceContributionPerimeterRecompute:
             ),
             {"source_contribution_ids": source_contribution_ids},
         )
-        publication_ids = conn.execute(
+        publication_ids = self._conn.execute(
             text("""
                 SELECT DISTINCT sr.publication_id
                 FROM source_contributions sc
@@ -127,4 +129,4 @@ class SourceContributionPerimeterRecompute:
             """),
             {"ids": source_contribution_ids},
         ).scalars()
-        refresh_publications_perimeter_evidence(conn, publication_ids=list(publication_ids))
+        refresh_publications_perimeter_evidence(self._conn, publication_ids=list(publication_ids))

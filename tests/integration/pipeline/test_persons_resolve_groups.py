@@ -4,7 +4,6 @@ import logging
 
 from sqlalchemy import text
 
-from application.services.persons.core import create_person
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import person_repository
 from pipeline.transformation.persons.groups import resolve_groups
@@ -120,7 +119,7 @@ class TestCreation:
 
 def test_une_personne_deja_rattachee_dans_la_publication_n_est_pas_reprise(sa_sync_conn):
     conn = sa_sync_conn
-    person = create_person("Martin", "Jean", repo=person_repository(conn))
+    person = person_repository(conn).create("Martin", "Jean")
     publication = insert_publication(conn)
     attached = _group(conn, publication, [("hal", "Jean Martin", None, True)])
     conn.execute(
@@ -305,7 +304,7 @@ class TestPersonIndex:
 
     def test_une_forme_de_nom_unique_rattache_le_groupe_du_perimetre(self, sa_sync_conn):
         conn = sa_sync_conn
-        person = create_person("Martin", "Pierre", repo=person_repository(conn))
+        person = person_repository(conn).create("Martin", "Pierre")
         group = _group(conn, insert_publication(conn), [("hal", "Pierre Martin", None, True)])
 
         resolve_groups(conn, logging.getLogger("test"))
@@ -315,7 +314,7 @@ class TestPersonIndex:
     def test_un_nom_inverse_rattache_par_la_forme_de_nom(self, sa_sync_conn):
         """Contribution source au nom et prénom inversés : sa forme « nom prénom » rejoint Pierre Martin."""
         conn = sa_sync_conn
-        person = create_person("Martin", "Pierre", repo=person_repository(conn))
+        person = person_repository(conn).create("Martin", "Pierre")
         publication = insert_publication(conn)
         source_record = insert_source_record(conn, publication, source="crossref")
         inverted = insert_source_contribution(
@@ -335,7 +334,7 @@ class TestPersonIndex:
 
     def test_une_attribution_rejetee_ne_rattache_pas(self, sa_sync_conn):
         conn = sa_sync_conn
-        person = create_person("Dupont", "Jean", repo=person_repository(conn))
+        person = person_repository(conn).create("Dupont", "Jean")
         insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="rejected")
         group = _group(
             conn, insert_publication(conn), [("openalex", "Jean Dupont", {"orcid": _ORCID}, False)]
@@ -347,7 +346,7 @@ class TestPersonIndex:
 
     def test_une_forme_de_nom_rejetee_refuse_l_identifiant(self, sa_sync_conn):
         conn = sa_sync_conn
-        person = create_person("Dupont", "Jean", repo=person_repository(conn))
+        person = person_repository(conn).create("Dupont", "Jean")
         insert_person_identifier(
             conn, person, id_type="hal_person_id", id_value="111222", status="confirmed"
         )
@@ -366,7 +365,7 @@ class TestPersonIndex:
 
     def test_une_paire_rejetee_bloque_le_rattachement_par_identifiant(self, sa_sync_conn):
         conn = sa_sync_conn
-        person = create_person("Dupont", "Jean", repo=person_repository(conn))
+        person = person_repository(conn).create("Dupont", "Jean")
         insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
         publication = insert_publication(conn)
         group = _group(conn, publication, [("openalex", "Jean Dupont", {"orcid": _ORCID}, True)])
@@ -378,8 +377,8 @@ class TestPersonIndex:
 
     def test_un_rejet_leve_l_ambiguite_d_une_forme_de_nom(self, sa_sync_conn):
         conn = sa_sync_conn
-        rejected = create_person("Dupont", "Jean", repo=person_repository(conn))
-        kept = create_person("Dupont", "Jacques", repo=person_repository(conn))
+        rejected = person_repository(conn).create("Dupont", "Jean")
+        kept = person_repository(conn).create("Dupont", "Jacques")
         publication = insert_publication(conn)
         group = _group(conn, publication, [("openalex", "J Dupont", None, True)])
         insert_rejected_contribution(conn, publication, person_id=rejected, ignore_conflict=True)
@@ -480,7 +479,7 @@ class TestResolutionQueue:
         Régression : l'écriture du nouveau rattachement précédait le retrait de l'ancien et violait l'unicité de la personne dans la publication.
         """
         conn = sa_sync_conn
-        person = create_person("Martin", "Jean", repo=person_repository(conn))
+        person = person_repository(conn).create("Martin", "Jean")
         insert_person_identifier(conn, person, id_type="orcid", id_value=_ORCID, status="confirmed")
         publication = insert_publication(conn)
         by_name = _group(conn, publication, [("hal", "Jean Martin", None, True)])

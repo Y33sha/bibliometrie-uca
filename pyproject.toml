@@ -64,8 +64,8 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipelin
 # ----------------------------------------------------------------------
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
-# `scripts/` outille le dépôt sans être distribué : ses imports relèvent de l'environnement de
-# développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
+# `scripts/` et les hooks de `.claude/` outillent le dépôt sans être distribués : leurs imports
+# relèvent de l'environnement de développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
 # hors du dépôt. L'estimation des poids du modèle des groupes d'auteurs tourne sur le poste de
 # développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement.
 extend_exclude = [
@@ -73,6 +73,7 @@ extend_exclude = [
     ".venv",
     "venv",
     "scripts",
+    ".claude",
     "data",
     "interfaces/cli/dev/estimate_residual_weights.py",
 ]
@@ -109,12 +110,9 @@ source_modules = ["pipeline"]
 forbidden_modules = ["application", "interfaces"]
 # Le pipeline importe `domain/` et les modules techniques d'`infrastructure/` (connexion,
 # réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`.
-# Exception : `application.ports` est zone neutre, pour le pipeline comme pour `infrastructure/`
-# (voir le contrat des couches) : le pipeline en importe les structures de transport.
-ignore_imports = [
-    "infrastructure.** -> application.ports.**",
-    "pipeline.** -> application.ports.**",
-]
+# `infrastructure/`, que le pipeline importe, dépend des ports d'`application/` : ce chemin indirect
+# est admis.
+ignore_imports = ["infrastructure.** -> application.ports.**"]
 
 [[tool.importlinter.contracts]]
 name = "Pipeline : importé par interfaces seulement"
@@ -157,32 +155,26 @@ name = "Routers : pas d'import direct de infrastructure"
 type = "forbidden"
 source_modules = ["interfaces.api.routers"]
 forbidden_modules = ["infrastructure"]
-# Les routers FastAPI pilotent des use-cases applicatifs et reçoivent
-# leurs dépendances via `Depends(...)` (factories dans
-# `interfaces.api.deps`, composition root). La construction des
-# adapters et l'accès direct à l'infra (queries, repos, pool, engine)
-# y sont interdits. Cf. docs/architecture/01-vue-d-ensemble.md.
+# Les routers reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans
+# `interfaces.api.deps` (composition root). Une écriture passe par un service d'`application/`.
+# Une lecture importe son adaptateur de `infrastructure.read_models`, pour en typer la
+# dépendance et en lire les modèles de réponse. Cf. docs/architecture/01-vue-d-ensemble.md.
 #
-# Imports transitifs autorisés : `routers → deps → infrastructure` est
-# le chemin attendu (composition root), donc on n'interdit que les
-# imports directs.
+# Imports transitifs autorisés : `routers → deps → infrastructure` est le chemin attendu
+# (composition root), donc on n'interdit que les imports directs.
 allow_indirect_imports = "true"
+ignore_imports = ["interfaces.api.routers.** -> infrastructure.read_models.**"]
 
 [[tool.importlinter.contracts]]
-name = "Composition root : Pg* concrets uniquement dans app et deps"
+name = "Composition root : repositories concrets uniquement dans deps"
 type = "forbidden"
 source_modules = ["interfaces.api"]
-forbidden_modules = [
-    "infrastructure.repositories",
-    "infrastructure.read_models",
-]
-# Verrouillage d'une règle de docs/architecture/01-vue-d-ensemble.md :
-# seul `interfaces/api/deps.py` instancie les `Pg*` concrets ; les routers et autres modules
-# sous `interfaces.api/` passent par un port via `Depends(...)`. L'interface publique du
+forbidden_modules = ["infrastructure.repositories"]
+# Seul `interfaces/api/deps.py` instancie les repositories concrets, qu'il remet aux services
+# d'écriture ; les routers reçoivent ces services par `Depends(...)`. L'interface publique du
 # pipeline relève de son propre contrat.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
-    "interfaces.api.deps -> infrastructure.read_models.**",
     "interfaces.api.** -> pipeline.public",
 ]
 
@@ -509,12 +501,12 @@ unannotated-return = "error"
 # `schema.ts` dérive du contrat. Les trois premiers modules en relèvent ; `facets` appelle une
 # facette par son nom (`getattr`).
 [[tool.pyrefly.sub-config]]
-matches = "application/ports/read_models/config_queries.py"
+matches = "infrastructure/read_models/config/models.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
 [[tool.pyrefly.sub-config]]
-matches = "application/ports/read_models/pipeline_runs_queries.py"
+matches = "infrastructure/read_models/pipeline_runs/models.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 

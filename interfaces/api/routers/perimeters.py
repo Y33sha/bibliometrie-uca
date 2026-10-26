@@ -4,25 +4,14 @@ Un périmètre (table `perimeters`) nomme des structures racines dans sa colonne
 """
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import Connection
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructures
-from application.ports.read_models.config_queries import ConfigQueries
-from application.ports.read_models.perimeters_queries import PerimeterOut, PerimetersQueries
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.perimeter_repository import (
-    PerimeterRepository,
-    PerimeterUpdate,
+from application.ports.repositories.perimeter_repository import PerimeterUpdate
+from application.services.perimeters import PerimeterService
+from infrastructure.read_models.perimeters.models import (
+    PerimeterOut,
 )
-from application.services.perimeters import commands as perimeter_commands
-from interfaces.api.deps import (
-    audit_repo,
-    config_queries,
-    db_conn,
-    get_perimeter_structures,
-    perimeter_repo,
-    perimeters_queries,
-)
+from infrastructure.read_models.perimeters.queries import PerimetersQueries
+from interfaces.api.deps import perimeter_service, perimeters_queries
 from interfaces.api.models import (
     CreatedIdResponse,
     OkResponse,
@@ -46,23 +35,14 @@ def list_perimeters(
 @router.post("", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
-    conn: Connection = Depends(db_conn),
-    repo: PerimeterRepository = Depends(perimeter_repo),
-    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
-    audit: AuditRepository = Depends(audit_repo),
+    perimeters: PerimeterService = Depends(perimeter_service),
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et doit être un jeton unique, sans espace : un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
     """
-    pid = perimeter_commands.create_perimeter(
-        conn,
-        code=body.code,
-        name=body.name,
-        root_structure_ids=body.root_structure_ids,
-        audit_repo=audit,
-        repo=repo,
-        perimeter_structures=perimeter_structures,
+    pid = perimeters.create_perimeter(
+        code=body.code, name=body.name, root_structure_ids=body.root_structure_ids
     )
     return CreatedIdResponse(id=pid)
 
@@ -71,39 +51,24 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
-    conn: Connection = Depends(db_conn),
-    repo: PerimeterRepository = Depends(perimeter_repo),
-    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
-    audit: AuditRepository = Depends(audit_repo),
+    perimeters: PerimeterService = Depends(perimeter_service),
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
 
     Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
     """
-    perimeter_commands.update_perimeter(
-        conn,
-        perimeter_id,
-        update=body,
-        repo=repo,
-        perimeter_structures=perimeter_structures,
-        audit_repo=audit,
-    )
+    perimeters.update_perimeter(perimeter_id, body)
     return OkResponse()
 
 
 @router.delete("/{perimeter_id}", response_model=OkResponse)
 def delete_perimeter(
     perimeter_id: int,
-    conn: Connection = Depends(db_conn),
-    repo: PerimeterRepository = Depends(perimeter_repo),
-    config: ConfigQueries = Depends(config_queries),
-    audit: AuditRepository = Depends(audit_repo),
+    perimeters: PerimeterService = Depends(perimeter_service),
 ) -> OkResponse:
     """Supprime un périmètre.
 
     Renvoie 409 si une clé de configuration le désigne encore — le pipeline s'y appuierait sans le trouver. Les lignes de la clôture matérialisée s'en vont avec lui, par cascade.
     """
-    perimeter_commands.delete_perimeter(
-        conn, perimeter_id, repo=repo, config=config, audit_repo=audit
-    )
+    perimeters.delete_perimeter(perimeter_id)
     return OkResponse()

@@ -5,9 +5,9 @@ Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contributi
 
 from sqlalchemy import text
 
-from application.ports.read_models.persons_queries import PersonFilters
 from domain.persons.person import PersonExclusion
-from infrastructure.read_models.persons import PgPersonsQueries
+from infrastructure.read_models.persons.models import PersonFilters
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import (
     insert_person,
@@ -38,7 +38,7 @@ class TestListLabScope:
         p_out = insert_person(sa_sync_conn, "Outlab")
         _contribution_in_lab(sa_sync_conn, p_out, lab_id=None)
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         res = q.list_persons(
             filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
         )
@@ -53,7 +53,7 @@ class TestListLabScope:
         p_out = insert_person(sa_sync_conn, "Outlab")
         _contribution_in_lab(sa_sync_conn, p_out, lab_id=None)
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         res = q.list_persons(filters=PersonFilters(), page=1, per_page=50, sort="name_asc")
         ids = {p.id for p in res.persons}
         assert {p_in, p_out} <= ids
@@ -65,7 +65,7 @@ class TestListLabScope:
         _contribution_in_lab(sa_sync_conn, person, lab_id=lab)
         _contribution_in_lab(sa_sync_conn, person, lab_id=None)
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         scoped = q.list_persons(
             filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
         )
@@ -81,7 +81,7 @@ class TestListLabScope:
         _contribution_in_lab(sa_sync_conn, person, in_perimeter=True)
         _contribution_in_lab(sa_sync_conn, person, roles=("jury",), in_perimeter=True)
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         listed = next(
             p
             for p in q.list_persons(
@@ -102,7 +102,7 @@ class TestListLabScope:
         p_out = insert_person(sa_sync_conn, "Outlab")
         _contribution_in_lab(sa_sync_conn, p_out, lab_id=None)
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         scoped = q.persons_facets(filters=PersonFilters(lab_id=lab))
         unscoped = q.persons_facets(filters=PersonFilters())
         # Le scope labo ne compte que la personne du labo (rh.no ≥ 1 scopé,
@@ -118,7 +118,7 @@ class TestListLabScope:
         p2 = insert_person(sa_sync_conn, "Martin")
         _contribution_in_lab(sa_sync_conn, p2, lab_id=lab)
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         both = q.persons_facets(filters=PersonFilters(lab_id=lab))
         dupont = q.persons_facets(filters=PersonFilters(lab_id=lab, search="dupont"))
         assert both.rh.yes + both.rh.no == 2
@@ -145,7 +145,7 @@ class TestExclusionFilter:
         return ids
 
     def _listed(self, conn, *exclusions):
-        page = PgPersonsQueries(conn).list_persons(
+        page = PersonsQueries(conn).list_persons(
             filters=PersonFilters(search=self.SEARCH, exclusions=list(exclusions)),
             page=1,
             per_page=50,
@@ -164,7 +164,7 @@ class TestExclusionFilter:
 
     def test_facets_follow_exclusion(self, sa_sync_conn):
         self._persons(sa_sync_conn)
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         assert q.persons_facets(filters=PersonFilters(search=self.SEARCH)).rh.no == 3
         retained = PersonFilters(search=self.SEARCH, exclusions=[None])
         assert q.persons_facets(filters=retained).rh.no == 1
@@ -181,7 +181,7 @@ class TestExclusionFilter:
         )
         _contribution_in_lab(sa_sync_conn, p_excl, lab_id=lab)
 
-        res = PgPersonsQueries(sa_sync_conn).list_persons(
+        res = PersonsQueries(sa_sync_conn).list_persons(
             filters=PersonFilters(lab_id=lab), page=1, per_page=50, sort="name_asc"
         )
         assert {p.id for p in res.persons} == {p_ok}
@@ -200,7 +200,7 @@ class TestPendingFacets:
             sa_sync_conn, p_clean, name_form="cf", sources=["hal"], status="confirmed"
         )
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         res = q.list_persons(
             filters=PersonFilters(has_pending_forms=True), page=1, per_page=50, sort="name_asc"
         )
@@ -227,7 +227,7 @@ class TestPendingFacets:
             status="confirmed",
         )
 
-        q = PgPersonsQueries(sa_sync_conn)
+        q = PersonsQueries(sa_sync_conn)
         res = q.list_persons(
             filters=PersonFilters(has_pending_identifiers=True),
             page=1,

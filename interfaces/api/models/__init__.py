@@ -2,7 +2,7 @@
 
 Le découpage des modules suit celui des routers (`interfaces/api/routers/*`). Ce `__init__` re-expose les classes au niveau du package, qui est le point d'importation : `from interfaces.api.models import X`.
 
-Les projections de lecture rendues par un port vivent auprès de lui, dans `application/ports/api/` : leur contrat appartient à la couche application, et un port ne peut pas importer `interfaces/`.
+Les modèles de réponse des lectures sont déclarés avec leur requête, dans `infrastructure/read_models/<lecture>/models.py`.
 """
 
 from interfaces.api.models._common import (
@@ -58,11 +58,7 @@ from interfaces.api.models.persons import (
 )
 from interfaces.api.models.serials import SerialTypeChange, SerialTypeChangeImpact
 from interfaces.api.models.structures import (
-    NameFormCreate,
-    NameFormUpdate,
-    StructureCreate,
     StructureTutelleCreateResponse,
-    StructureUpdate,
     TutelleCreate,
 )
 
@@ -93,9 +89,7 @@ __all__ = [
     "MarkDistinctPersons",
     "MergeRequest",
     "MergeResponse",
-    "NameFormCreate",
     "NameFormStatusResponse",
-    "NameFormUpdate",
     "OkResponse",
     "OrphanAssignResponse",
     "OrphanBatchAssignResponse",
@@ -108,9 +102,7 @@ __all__ = [
     "ReviewAction",
     "SetCountry",
     "SourceContributionRef",
-    "StructureCreate",
     "StructureTutelleCreateResponse",
-    "StructureUpdate",
     "TotalCountResponse",
     "UpdateIdentifierStatus",
     "UpdateNameFormStatus",

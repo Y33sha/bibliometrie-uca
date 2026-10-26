@@ -35,7 +35,7 @@ Le pipeline ne modifie jamais un périmètre. Il recalcule `perimeter_structures
 
 ## Lecture par l'API
 
-Port `application/ports/read_models/perimeters_queries.py`, adaptateur `PgPerimetersQueries` dans `infrastructure/read_models/perimeters.py`. La clôture des périmètres appartient au pipeline (`PerimeterQueries`, dans `pipeline/transformation/structures/perimeter.py`) ; l'API l'appelle par le port `PerimeterStructuresQueries`.
+Lecture `infrastructure/read_models/perimeters/`, classe `PerimetersQueries`. La clôture des périmètres appartient au pipeline (`PerimeterQueries`, dans `pipeline/transformation/structures/perimeter.py`) ; l'API l'appelle par le port `PerimeterStructuresQueries`.
 
 `list_perimeters_with_structures` rend chaque périmètre avec ses structures racines et le nombre de structures atteintes après descente. Le routeur des structures expose par ailleurs l'appartenance d'une structure à un périmètre.
 

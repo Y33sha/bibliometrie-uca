@@ -4,13 +4,13 @@ from collections.abc import Mapping
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.read_models.publications_queries import (
+from domain.source_records.biblio import BiblioKey, JournalKey
+from infrastructure.read_models.publications.detail import structures_by_id
+from infrastructure.read_models.publications.models import (
     PublicationSourcesResponse,
     SourceContributionOut,
     SourceRecordMetadataOut,
 )
-from domain.source_records.biblio import BiblioKey, JournalKey
-from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
     source_contribution_structure_ids,

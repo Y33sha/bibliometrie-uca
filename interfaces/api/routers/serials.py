@@ -6,26 +6,9 @@ Les chemins littéraux — `/oa-models`, `/types`, `/facets` — précèdent `/{
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import Connection
 
-from application.ports.pipeline.serial_recompute import SerialRecompute
-from application.ports.read_models._common import EntityFacetResponse
-from application.ports.read_models.serials_queries import (
-    DoiNamespaceConflictsResponse,
-    LikelyProceedingsResponse,
-    SerialDashboardResponse,
-    SerialDetailResponse,
-    SerialDuplicatesResponse,
-    SerialFilters,
-    SerialListResponse,
-    SerialQueries,
-    SerialsFacetsResponse,
-    SerialSort,
-)
-from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.ports.repositories.audit_repository import AuditRepository
-from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
-from application.services.serials import commands as serial_commands
+from application.ports.repositories.serial_repository import SerialUpdate
+from application.services.serials import SerialService
 from domain.merge import MergedEntity
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,
@@ -33,14 +16,21 @@ from domain.serials.serial import (
     SERIAL_TYPE_LABELS_FR,
     SERIAL_TYPES,
 )
-from interfaces.api.deps import (
-    audit_repo,
-    db_conn,
-    entity_detail,
-    serial_queries,
-    serial_recompute,
-    serial_repo,
+from infrastructure.read_models._common import EntityFacetResponse
+from infrastructure.read_models.serials.models import (
+    DoiNamespaceConflictsResponse,
+    LikelyProceedingsResponse,
+    SerialDashboardResponse,
+    SerialDetailResponse,
+    SerialDuplicatesResponse,
+    SerialFilters,
+    SerialListResponse,
+    SerialsFacetsResponse,
+    SerialSort,
 )
+from infrastructure.read_models.serials.queries import SerialQueries
+from infrastructure.read_models.subjects.models import SubjectFrequency
+from interfaces.api.deps import entity_detail, serial_queries, serial_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_vocabulary_csv
 from interfaces.api.models import (
@@ -258,9 +248,7 @@ def get_serial_subjects(
 def get_type_change_impact(
     serial_id: int,
     body: SerialTypeChange,
-    conn: Connection = Depends(db_conn),
-    repo: SerialRepository = Depends(serial_repo),
-    recompute: SerialRecompute = Depends(serial_recompute),
+    serials: SerialService = Depends(serial_service),
 ) -> SerialTypeChangeImpact:
     """Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à la valeur demandée.
 
@@ -268,13 +256,7 @@ def get_type_change_impact(
 
     La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
     """
-    count = serial_commands.preview_type_change_impact(
-        conn,
-        serial_id,
-        serial_type=body.serial_type,
-        repo=repo,
-        recompute=recompute,
-    )
+    count = serials.preview_type_change_impact(serial_id, body.serial_type)
     return SerialTypeChangeImpact(count=count)
 
 
@@ -282,10 +264,7 @@ def get_type_change_impact(
 def update_serial(
     serial_id: int,
     body: SerialUpdate,
-    conn: Connection = Depends(db_conn),
-    repo: SerialRepository = Depends(serial_repo),
-    audit: AuditRepository = Depends(audit_repo),
-    recompute: SerialRecompute = Depends(serial_recompute),
+    serials: SerialService = Depends(serial_service),
 ) -> OkResponse:
     """Met à jour une revue, champ par champ.
 
@@ -293,14 +272,7 @@ def update_serial(
 
     Un `serial_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_serial`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
     """
-    serial_commands.update_serial(
-        conn,
-        serial_id,
-        update=body,
-        repo=repo,
-        audit_repo=audit,
-        recompute=recompute,
-    )
+    serials.update_serial(serial_id, body)
     return OkResponse()
 
 
@@ -308,21 +280,11 @@ def update_serial(
 def merge(
     serial_id: int,
     body: MergeRequest,
-    conn: Connection = Depends(db_conn),
-    repo: SerialRepository = Depends(serial_repo),
-    audit: AuditRepository = Depends(audit_repo),
-    recompute: SerialRecompute = Depends(serial_recompute),
+    serials: SerialService = Depends(serial_service),
 ) -> MergeResponse:
     """Fusionne la revue `source_id` dans la revue `serial_id`.
 
     Les publications et les métadonnées de la source passent à la cible, puis la source est supprimée. Les publications absorbées sont requalifiées contre le `serial_type` de la cible (`merge_serials`). Renvoie 422 sur deux identifiants égaux, 404 si l'une des deux revues est introuvable.
     """
-    serial_commands.merge_serials(
-        conn,
-        serial_id,
-        body.source_id,
-        recompute=recompute,
-        repo=repo,
-        audit_repo=audit,
-    )
+    serials.merge_serials(serial_id, body.source_id)
     return MergeResponse(merged=True, source_id=body.source_id, target_id=serial_id)

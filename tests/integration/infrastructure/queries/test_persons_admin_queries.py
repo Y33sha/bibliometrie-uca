@@ -129,7 +129,7 @@ def test_une_forme_compte_les_publications_des_groupes_de_la_personne(sa_sync_co
 
 # Tests pour `hal_duplicate_accounts` déplacés vers
 # `tests/integration/infrastructure/queries/test_hal_problems.py` —
-# la query est maintenant exposée par PgHalProblemsQueries.
+# la query est maintenant exposée par HalProblemsQueries.
 
 
 def _attribute(conn, person_id, id_type, id_value, status):

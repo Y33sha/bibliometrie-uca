@@ -38,7 +38,7 @@ class ContributionRepository(Protocol):
     # ── Contributions : groupes de contributions sources ─────────────
 
     def mark_groups_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Marque pour la redécision de leur personne les groupes de contributions sources de la personne rattachés par le nom (`name`, `compatible_name`) dont un membre porte la forme de nom. Les groupes `manual` et ceux d'un autre mode ne sont pas marqués. Retourne le nombre de groupes marqués."""
+        """Marque pour la redécision de leur personne les groupes de contributions sources de la personne rattachés par le nom (`name`, `compatible_name`) dont un membre contient la forme de nom. Les groupes `manual` et ceux d'un autre mode ne sont pas marqués. Retourne le nombre de groupes marqués."""
         ...
 
     def find_groups(self, group_ids: list[int]) -> list[GroupRow]:
@@ -69,17 +69,17 @@ class ContributionRepository(Protocol):
         """Retire la personne à son groupe de cette publication, où elle est rejetée, et retire les épinglages des contributions sources de la publication à elle. Rend le nombre de groupes détachés."""
         ...
 
-    # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
+    # ── Épinglage par l'administration ─────────────────────────────
 
     def pin_contributions(self, source_contribution_ids: list[int], person_id: int) -> None:
-        """Épingle des contributions sources à une personne dans `confirmed_source_contributions`, et rattache leurs groupes à la personne (`pinned_groups_sql`). Upsert par contribution source : le dernier épinglage l'emporte."""
+        """Épingle des contributions sources à une personne, et rattache leurs groupes à la personne. Le dernier épinglage d'une contribution source l'emporte."""
         ...
 
-    # ── Propagation UCA depuis les adresses ────────────────────────
+    # ── Périmètre, depuis les adresses ─────────────────────────────
 
     def find_source_contributions_by_addresses(
         self,
         address_ids: list[int],
     ) -> list[int]:
-        """Ids des contributions sources liées à l'une des adresses données (via `source_contribution_addresses`)."""
+        """Ids des contributions sources liées à l'une des adresses données."""
         ...

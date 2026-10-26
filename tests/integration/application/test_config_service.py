@@ -1,10 +1,10 @@
-"""Tests de caractérisation pour application/services/config/commands.py."""
+"""Tests de caractérisation pour application/services/config.py."""
 
 import pytest
 
-from application.services.config.commands import update_config_value
 from domain.errors import NotFoundError
 from infrastructure.repositories import config_repository
+from interfaces.api.deps import config_service
 from tests.integration.helpers.config import set_config
 
 
@@ -17,9 +17,9 @@ def sync_config(sa_sync_conn):
 
 
 class TestUpdateConfigValue:
-    def test_raises_not_found(self, sa_sync_conn, sync_config):
+    def test_raises_not_found(self, sa_sync_conn):
         with pytest.raises(NotFoundError):
-            update_config_value(sa_sync_conn, "nonexistent", "x", config=sync_config)
+            config_service(sa_sync_conn).update_config_value("nonexistent", "x")
 
     def test_updates_existing(self, sa_sync_conn, sync_config):
         set_config(sa_sync_conn, "test_key", "old")

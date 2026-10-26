@@ -4,7 +4,7 @@
 
 from sqlalchemy import Connection, text
 
-from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 
 
 class EmptyExtractionPerimeterError(RuntimeError):
@@ -45,8 +45,11 @@ def refresh_perimeter_structures(conn: Connection) -> None:
 class PerimeterStructures:
     """Clôture des tutelles des périmètres : rematérialisation et lecture (port injecté par l'API)."""
 
-    def refresh(self, conn: Connection) -> None:
-        refresh_perimeter_structures(conn)
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
-    def persons_structure_ids(self, conn: Connection) -> list[int]:
-        return get_persons_structure_ids_list(conn)
+    def refresh(self) -> None:
+        refresh_perimeter_structures(self._conn)
+
+    def persons_structure_ids(self) -> list[int]:
+        return get_persons_structure_ids_list(self._conn)

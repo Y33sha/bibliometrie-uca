@@ -6,7 +6,6 @@ Chaque `*_clause(...)` retourne un `WhereClause | None`, composable via `assembl
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from application.ports.read_models.publications_queries import NO_LICENSE
 from domain.normalize import normalize_text
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
@@ -18,6 +17,7 @@ from domain.publications.metadata import (
 )
 from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
 from domain.structures.structure import StructureType
+from infrastructure.read_models.publications.models import NO_LICENSE
 from infrastructure.sql_fragments import has_author_role
 
 

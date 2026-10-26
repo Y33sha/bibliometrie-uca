@@ -21,7 +21,6 @@ from enum import StrEnum
 
 from sqlalchemy import Connection, text
 
-from application.services.persons.core import create_person
 from domain.normalize import normalize_text, sanitize_optional_text
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.scalars import scalar_int
@@ -68,7 +67,7 @@ def import_rh_person(
 ) -> RhImportOutcome:
     """Crée la personne et sa fiche `hr_records`, sauf doublon : même nom normalisé, même service et même fonction.
 
-    La création passe par `create_person`, qui dérive les formes de nom.
+    La création passe par `PersonRepository.create`, qui dérive les formes de nom.
     """
     duplicate = conn.execute(
         _RH_DUPLICATE,
@@ -81,7 +80,7 @@ def import_rh_person(
     ).first()
     if duplicate is not None:
         return RhImportOutcome.DUPLICATE
-    person_id = create_person(last_name, first_name, repo=person_repository(conn))
+    person_id = person_repository(conn).create(last_name, first_name)
     conn.execute(
         _INSERT_RH,
         {

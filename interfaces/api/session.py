@@ -2,7 +2,7 @@
 
 Le jeton est un payload signé HMAC-SHA256 avec `session_secret`, de la forme `<payload>.<signature>`. Le format du payload — l'utilisateur et l'instant d'émission — ne sort pas de ce module : `issue_token` le compose, `read_session` le défait et rend l'utilisateur. Ses appelants ne connaissent que le jeton opaque et le nom qui en sort.
 
-`routers/auth.py` émet le jeton à la connexion et le pose en cookie ; le middleware d'`app.py` le relit pour garder les écritures et nommer l'auteur des événements d'audit.
+`routers/auth.py` émet le jeton à la connexion et le pose en cookie ; `deps.py` le relit et cherche son utilisateur et ses rôles dans `ops.users`.
 """
 
 import hashlib

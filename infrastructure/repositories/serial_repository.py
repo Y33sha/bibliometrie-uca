@@ -11,12 +11,10 @@ from typing import NamedTuple, cast
 
 from sqlalchemy import Connection, delete, select, update
 
-from application.ports.repositories.serial_repository import (
-    SerialRepository,
-    SharedTitleSerialPair,
-)
+from application.ports.repositories.serial_repository import SerialRepository
 from domain.errors import NotFoundError
 from domain.normalize import normalize_text
+from domain.publishers.merge import SharedTitlePair
 from domain.serials.issns import SerialIssn
 from domain.serials.serial import ManualField, OaModel, Serial, SerialType
 from infrastructure.db.rows import row_as
@@ -148,15 +146,15 @@ class PgSerialRepository(SerialRepository):
         self,
         target_publisher_id: int,
         source_publisher_id: int,
-    ) -> list[SharedTitleSerialPair]:
+    ) -> list[SharedTitlePair]:
         jt = serials.alias("jt")
         js = serials.alias("js")
         stmt = (
             select(
                 jt.c.id.label("target_serial_id"),
                 js.c.id.label("source_serial_id"),
-                jt.c.title.label("t_title"),
-                js.c.title.label("s_title"),
+                jt.c.title.label("target_title"),
+                js.c.title.label("source_title"),
             )
             .select_from(jt.join(js, js.c.title_normalized == jt.c.title_normalized))
             .where(jt.c.publisher_id == target_publisher_id)
@@ -167,15 +165,13 @@ class PgSerialRepository(SerialRepository):
             self._conn, [r.target_serial_id for r in rows] + [r.source_serial_id for r in rows]
         )
         return [
-            SharedTitleSerialPair(
+            SharedTitlePair(
                 target_serial_id=r.target_serial_id,
-                target_title=r.t_title,
+                target_title=r.target_title,
+                target_issns=issns.get(r.target_serial_id, ()),
                 source_serial_id=r.source_serial_id,
-                source_title=r.s_title,
-                t_title=r.t_title,
-                s_title=r.s_title,
-                t_issns=list(issns.get(r.target_serial_id, ())),
-                s_issns=list(issns.get(r.source_serial_id, ())),
+                source_title=r.source_title,
+                source_issns=issns.get(r.source_serial_id, ()),
             )
             for r in rows
         ]

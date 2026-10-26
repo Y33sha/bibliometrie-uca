@@ -54,6 +54,7 @@ python -m interfaces.cli.oneshot.renormalize_flattened_mathml_titles
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories; `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne); impact (citations, fwci, top10)
 * [ ] masquer de l'interface les DOI qui ne résolvent pas
+* [ ] affichage LaTeX+mml en double dans les résumés
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"

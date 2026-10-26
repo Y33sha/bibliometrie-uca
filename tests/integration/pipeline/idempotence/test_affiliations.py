@@ -87,7 +87,7 @@ def _run_populate_affiliations(conn):
     """Exécute populate_affiliations sur la Connection SA de test."""
     import logging
 
-    from infrastructure.read_models.perimeters import get_persons_structure_ids
+    from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
     from pipeline.transformation.structures.affiliations import populate
 
     populate(
@@ -157,7 +157,7 @@ class TestPopulateAffiliationsIdempotence:
 
         from sqlalchemy import text
 
-        from infrastructure.read_models.perimeters import get_persons_structure_ids
+        from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
         from pipeline.transformation.structures.affiliations import populate
 
         _setup_affiliations_test_data(sa_sync_conn)
@@ -291,8 +291,8 @@ class TestEntreeDansLePerimetre:
         _setup_affiliations_test_data(sa_sync_conn)
         group_ungrouped(sa_sync_conn)
 
-        SourceContributionPerimeterRecompute().recompute_perimeter(
-            sa_sync_conn, [80002], [80000, 80001]
+        SourceContributionPerimeterRecompute(sa_sync_conn).recompute_perimeter(
+            [80002], [80000, 80001]
         )
 
         assert sa_sync_conn.execute(
@@ -311,8 +311,8 @@ class TestEntreeDansLePerimetre:
         _setup_affiliations_test_data(sa_sync_conn)
         self._orpheline(sa_sync_conn)
 
-        SourceContributionPerimeterRecompute().recompute_perimeter(
-            sa_sync_conn, [80002], [80000, 80001]
+        SourceContributionPerimeterRecompute(sa_sync_conn).recompute_perimeter(
+            [80002], [80000, 80001]
         )
 
         assert _marked_for_reconciliation(sa_sync_conn, 80002) is True

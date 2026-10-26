@@ -1,12 +1,12 @@
-"""Router du libellé d'une entité de facette, servi par le port `EntityLabelQueries`. Sert `/api/entity-labels`."""
+"""Router du libellé d'une entité de facette, servi par `EntityLabelQueries`. Sert `/api/entity-labels`."""
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.read_models._common import EntityKind
-from application.ports.read_models.entity_labels_queries import (
-    EntityLabelQueries,
+from infrastructure.read_models._common import EntityKind
+from infrastructure.read_models.entity_labels.models import (
     EntityLabelResponse,
 )
+from infrastructure.read_models.entity_labels.queries import EntityLabelQueries
 from interfaces.api.deps import entity_label_queries
 
 router = APIRouter(prefix="/api/entity-labels", tags=["entity-labels"])

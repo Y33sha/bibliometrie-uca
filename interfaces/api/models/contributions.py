@@ -1,6 +1,8 @@
 """Modèles Pydantic du router des contributions admin : corps des requêtes entrantes et réponses composées après mutation."""
 
-from pydantic import BaseModel
+from typing import Self
+
+from pydantic import BaseModel, model_validator
 
 # ----- Corps des requêtes -----
 
@@ -22,6 +24,13 @@ class AssignOrphanContribution(BaseModel):
     person_id: int | None = None
     create_person: CreatePersonName | None = None
     force: bool = False
+
+    @model_validator(mode="after")
+    def _designe_une_personne(self) -> Self:
+        """L'attribution vise une personne : la requête la désigne, ou fournit de quoi la créer."""
+        if self.person_id is None and self.create_person is None:
+            raise ValueError("person_id ou create_person requis")
+        return self
 
 
 class BatchAssignOrphanContributions(BaseModel):

@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, Source, source_label
 from infrastructure.observability.phase_executions import get_last_daily_harvest_date
-from infrastructure.read_models.perimeters import get_extraction_structure_ids
+from infrastructure.read_models.perimeters.queries import get_extraction_structure_ids
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.harvester import HarvestWindow, run_harvest
 from pipeline.runtime.context import Phase, PhaseContext

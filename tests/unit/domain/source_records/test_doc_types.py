@@ -3,8 +3,10 @@
 import re
 from pathlib import Path
 
+import pytest
+
 from domain.publications.doc_types import DOC_TYPES_SET
-from domain.source_records.doc_types import map_doc_type
+from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCHEMA_PATH = PROJECT_ROOT / "infrastructure" / "db" / "schema.sql"
@@ -144,3 +146,43 @@ class TestMapDocTypeComposite:
 
     def test_un_composite_de_parties_inconnues_est_inconnu(self):
         assert map_doc_type("Foo; Bar", source="wos") is None
+
+
+_COMMON_TYPES = {
+    "hal": ("ART", "COMM", "OUV", "COUV", "THESE", "HDR"),
+    "openalex": (
+        "article",
+        "review",
+        "book",
+        "book-chapter",
+        "proceedings-article",
+        "preprint",
+        "dissertation",
+    ),
+    "wos": ("article", "review", "book", "book chapter", "proceedings paper", "editorial material"),
+    "crossref": (
+        "journal-article",
+        "book-chapter",
+        "book",
+        "monograph",
+        "edited-book",
+        "proceedings-article",
+        "posted-content",
+        "dissertation",
+        "peer-review",
+        "report",
+    ),
+}
+
+
+class TestNomenclaturesDesSources:
+    @pytest.mark.parametrize("source", sorted(_SOURCE_MAPS))
+    def test_chaque_traduction_est_un_type_du_referentiel(self, source):
+        assert set(_SOURCE_MAPS[source].values()) <= DOC_TYPES_SET
+
+    @pytest.mark.parametrize(
+        ("source", "raw"),
+        [(source, raw) for source, types in _COMMON_TYPES.items() for raw in types],
+    )
+    def test_les_types_courants_sont_traduits(self, source, raw):
+        assert map_doc_type(raw, source) not in (None, "other")

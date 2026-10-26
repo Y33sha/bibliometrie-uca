@@ -2,11 +2,7 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models._common import FacetOption, YesNoCount
-from application.ports.read_models.persons_queries import (
-    PersonFilters,
-    PersonsFacetsResponse,
-)
+from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.filters import (
     PERSON_HAS_PENDING_IDENTIFIERS_SQL,
     PERSON_HAS_PENDING_NAME_FORMS_SQL,
@@ -23,6 +19,10 @@ from infrastructure.read_models.filters import (
     person_in_lab_clause,
     person_role_clause,
     person_search_clause,
+)
+from infrastructure.read_models.persons.models import (
+    PersonFilters,
+    PersonsFacetsResponse,
 )
 
 _BASE_FROM = "persons p LEFT JOIN hr_records prh ON prh.person_id = p.id"

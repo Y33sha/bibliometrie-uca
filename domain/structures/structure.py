@@ -7,7 +7,7 @@ Les règles métier des structures (matching des formes de nom, hiérarchie `str
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import cast
+from typing import TypedDict, Unpack, cast
 
 from domain.errors import ValidationError
 from domain.structures.identifiers import HalCollection, RorId
@@ -70,6 +70,18 @@ def _parse_hal(raw: str | None) -> HalCollection | None:
     return parsed
 
 
+class StructureEdit(TypedDict, total=False):
+    """Mise à jour partielle d'une structure. Une clé absente désigne un champ non fourni ; `None` efface la valeur."""
+
+    name: str
+    structure_type: str
+    acronym: str | None
+    ror_id: str | None
+    rnsr_id: str | None
+    hal_collection: str | None
+    api_ids: dict[str, str | list[str]] | None
+
+
 @dataclass(slots=True)
 class Structure:
     """Structure de recherche / d'enseignement (aggregate root).
@@ -114,38 +126,20 @@ class Structure:
             api_ids=cast("dict[str, list[str]] | None", api_ids),
         )
 
-    def apply(
-        self,
-        *,
-        name: str | None = None,
-        acronym: str | None = None,
-        structure_type: str | None = None,
-        ror_id: str | None = None,
-        rnsr_id: str | None = None,
-        hal_collection: str | None = None,
-        api_ids: dict[str, str | list[str]] | None = None,
-    ) -> list[str]:
-        """Applique les champs fournis (non `None`), validés, et retourne les noms de colonnes modifiées. Une valeur `None` signifie « champ non fourni » : la mise à jour n'efface pas un champ."""
-        applied: list[str] = []
-        if name is not None:
-            self.name = name
-            applied.append("name")
-        if acronym is not None:
-            self.acronym = acronym
-            applied.append("acronym")
-        if structure_type is not None:
-            self.structure_type = _parse_type(structure_type)
-            applied.append("structure_type")
-        if ror_id is not None:
-            self.ror_id = _parse_ror(ror_id)
-            applied.append("ror_id")
-        if rnsr_id is not None:
-            self.rnsr_id = rnsr_id
-            applied.append("rnsr_id")
-        if hal_collection is not None:
-            self.hal_collection = _parse_hal(hal_collection)
-            applied.append("hal_collection")
-        if api_ids is not None:
-            self.api_ids = cast("dict[str, list[str]] | None", api_ids)
-            applied.append("api_ids")
-        return applied
+    def apply(self, **changes: Unpack[StructureEdit]) -> list[str]:
+        """Applique les champs fournis, validés, et retourne leurs noms."""
+        if "name" in changes:
+            self.name = changes["name"]
+        if "structure_type" in changes:
+            self.structure_type = _parse_type(changes["structure_type"])
+        if "acronym" in changes:
+            self.acronym = changes["acronym"]
+        if "ror_id" in changes:
+            self.ror_id = _parse_ror(changes["ror_id"])
+        if "rnsr_id" in changes:
+            self.rnsr_id = changes["rnsr_id"]
+        if "hal_collection" in changes:
+            self.hal_collection = _parse_hal(changes["hal_collection"])
+        if "api_ids" in changes:
+            self.api_ids = cast("dict[str, list[str]] | None", changes["api_ids"])
+        return list(changes)

@@ -8,15 +8,6 @@ from sqlalchemy import text
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.ports.repositories.serial_repository import SerialIssnInput, SerialUpdate
-from application.services.publishers.core import (
-    merge_publishers,
-    update_publisher,
-)
-from application.services.serials.core import (
-    merge_serials,
-    requalify_publications_for_serial,
-    update_serial,
-)
 from domain.errors import (
     NotFoundError,
     PublisherMergeBlockedError,
@@ -29,7 +20,7 @@ from infrastructure.repositories import (
     publisher_repository,
     serial_repository,
 )
-from pipeline.transformation.publishing.publication_counts import PublicationCountRecompute
+from interfaces.api import deps
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
     find_serials_to_check_in_sudoc,
@@ -88,8 +79,18 @@ def publisher_store(sa_sync_conn):
 
 
 @pytest.fixture
-def recompute():
-    return SerialRecompute()
+def recompute(sa_sync_conn):
+    return SerialRecompute(sa_sync_conn)
+
+
+@pytest.fixture
+def serial_service(sa_sync_conn):
+    return deps.serial_service(sa_sync_conn)
+
+
+@pytest.fixture
+def publisher_service(sa_sync_conn):
+    return deps.publisher_service(sa_sync_conn)
 
 
 def _fetch_one(conn, sql_text: str, **params):
@@ -158,29 +159,29 @@ class TestSerialFindById:
 
 
 class TestUpdateSerial:
-    def test_raises_not_found(self, sa_sync_conn, repo):
+    def test_raises_not_found(self, sa_sync_conn, serial_service):
         with pytest.raises(NotFoundError):
-            update_serial(999999, update=SerialUpdate(title="X"), repo=repo)
+            serial_service.update_serial(999999, update=SerialUpdate(title="X"))
 
-    def test_raises_on_empty_fields(self, sa_sync_conn, repo):
+    def test_raises_on_empty_fields(self, sa_sync_conn, serial_service):
         j = _serial(sa_sync_conn)
         with pytest.raises(ValidationError):
-            update_serial(j, update=SerialUpdate(), repo=repo)
+            serial_service.update_serial(j, update=SerialUpdate())
 
-    def test_updates_title_and_normalizes(self, sa_sync_conn, repo):
+    def test_updates_title_and_normalizes(self, sa_sync_conn, serial_service):
         j = _serial(sa_sync_conn, title="Old Title")
-        update_serial(j, update=SerialUpdate(title="Nature Medicine"), repo=repo)
+        serial_service.update_serial(j, update=SerialUpdate(title="Nature Medicine"))
         row = _fetch_one(
             sa_sync_conn, "SELECT title, title_normalized FROM serials WHERE id = :id", id=j
         )
         assert row.title == "Nature Medicine"
         assert row.title_normalized == "nature medicine"
 
-    def test_partial_update(self, sa_sync_conn, repo):
+    def test_partial_update(self, sa_sync_conn, serial_service):
         """Les ISSN fournis remplacent ceux de la revue ; un ISSN gardé conserve sa date de vérification."""
         j = _serial(sa_sync_conn, issn="0028-0836")
         mark_checked_in_sudoc(sa_sync_conn, j)
-        update_serial(
+        serial_service.update_serial(
             j,
             update=SerialUpdate(
                 issns=[
@@ -188,7 +189,6 @@ class TestUpdateSerial:
                     SerialIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC),
                 ]
             ),
-            repo=repo,
         )
         assert (
             _fetch_one(
@@ -202,22 +202,23 @@ class TestUpdateSerial:
         assert row.issn == "0028-0836"
         assert row.eissn == "1476-4687"
 
-    def test_normalizes_issn(self, sa_sync_conn, repo):
+    def test_normalizes_issn(self, sa_sync_conn, serial_service):
         j = _serial(sa_sync_conn)
-        update_serial(
+        serial_service.update_serial(
             j,
             update=SerialUpdate(
                 issns=[SerialIssnInput(issn="14764687", support=IssnSupport.ELECTRONIC)]
             ),
-            repo=repo,
         )
         row = issn_columns(sa_sync_conn, j)
         assert row.eissn == "1476-4687"
 
-    def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
+    def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(
+        self, sa_sync_conn, gateway, serial_service
+    ):
         """Un type saisi devient un champ saisi à la main : le typage des recueils d'actes ne le voit plus, et les écritures du pipeline s'abstiennent."""
         j = _serial(sa_sync_conn, title="2024 IEEE SENSORS")
-        update_serial(j, update=SerialUpdate(serial_type=SerialType.JOURNAL), repo=repo)
+        serial_service.update_serial(j, update=SerialUpdate(serial_type=SerialType.JOURNAL))
 
         assert j not in {r.id for r in find_titles_of_non_proceedings_serials(sa_sync_conn)}
         gateway.set_serial_type(j, SerialType.PROCEEDINGS)
@@ -228,11 +229,11 @@ class TestUpdateSerial:
         )
         assert (row.serial_type, row.manual_fields) == ("journal", ["serial_type"])
 
-    def test_champ_resoumis_sans_changement_non_marque(self, sa_sync_conn, repo):
+    def test_champ_resoumis_sans_changement_non_marque(self, sa_sync_conn, serial_service):
         """Le formulaire renvoie tous les champs : seul un champ modifié devient saisi à la main."""
         j = _serial(sa_sync_conn, title="Same", serial_type="journal")
-        update_serial(
-            j, update=SerialUpdate(title="Same", serial_type=SerialType.JOURNAL), repo=repo
+        serial_service.update_serial(
+            j, update=SerialUpdate(title="Same", serial_type=SerialType.JOURNAL)
         )
         assert (
             _fetch_one(
@@ -241,9 +242,11 @@ class TestUpdateSerial:
             == []
         )
 
-    def test_apc_saisi_en_euros_hors_de_portee_du_pipeline(self, sa_sync_conn, repo, gateway):
+    def test_apc_saisi_en_euros_hors_de_portee_du_pipeline(
+        self, sa_sync_conn, gateway, serial_service
+    ):
         j = _serial(sa_sync_conn, apc_amount=1000, apc_currency="USD")
-        update_serial(j, update=SerialUpdate(apc_amount=2499.99), repo=repo)
+        serial_service.update_serial(j, update=SerialUpdate(apc_amount=2499.99))
 
         update_serial_apc(sa_sync_conn, j, apc_amount=3000, apc_currency="GBP")
 
@@ -258,16 +261,17 @@ class TestUpdateSerial:
             ["apc"],
         )
 
-    def test_titre_et_issn_saisis_hors_de_portee_du_sudoc(self, sa_sync_conn, repo, gateway):
+    def test_titre_et_issn_saisis_hors_de_portee_du_sudoc(
+        self, sa_sync_conn, gateway, serial_service
+    ):
         """Des ISSN saisis à la main sortent de la vérification Sudoc et des ajouts par les notices Sudoc ; un titre saisi reste."""
         j = _serial(sa_sync_conn, title="Old", issn="0028-0836")
-        update_serial(
+        serial_service.update_serial(
             j,
             update=SerialUpdate(
                 title="New",
                 issns=[SerialIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC)],
             ),
-            repo=repo,
         )
 
         assert j not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn, also=[j])}
@@ -281,9 +285,9 @@ class TestUpdateSerial:
         assert issn_columns(sa_sync_conn, j).eissn == "1476-4687"
         assert issn_columns(sa_sync_conn, j).issn is None
 
-    def test_modele_oa_vide_a_la_main_reste_vide(self, sa_sync_conn, repo, gateway):
+    def test_modele_oa_vide_a_la_main_reste_vide(self, sa_sync_conn, gateway, serial_service):
         j = _serial(sa_sync_conn, oa_model="full_oa")
-        update_serial(j, update=SerialUpdate(oa_model=None), repo=repo)
+        serial_service.update_serial(j, update=SerialUpdate(oa_model=None))
 
         gateway.enrich_serial(j, oa_model=OaModel.SUBSCRIPTION)
 
@@ -292,29 +296,29 @@ class TestUpdateSerial:
         )
         assert (row.oa_model, row.manual_fields) == (None, ["oa_model"])
 
-    def test_rejects_invalid_issn(self, sa_sync_conn, repo):
+    def test_rejects_invalid_issn(self, sa_sync_conn, serial_service):
         j = _serial(sa_sync_conn, issn="0028-0836")
         with pytest.raises(ValidationError):
-            update_serial(
-                j, update=SerialUpdate(issns=[SerialIssnInput(issn="1234-5678")]), repo=repo
+            serial_service.update_serial(
+                j, update=SerialUpdate(issns=[SerialIssnInput(issn="1234-5678")])
             )
         row = issn_columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"
 
 
 class TestUpdatePublisher:
-    def test_raises_not_found(self, sa_sync_conn, publisher_repo):
+    def test_raises_not_found(self, sa_sync_conn, publisher_service):
         with pytest.raises(NotFoundError):
-            update_publisher(999999, update=PublisherUpdate(name="X"), repo=publisher_repo)
+            publisher_service.update_publisher(999999, update=PublisherUpdate(name="X"))
 
-    def test_raises_on_empty_fields(self, sa_sync_conn, publisher_repo):
+    def test_raises_on_empty_fields(self, sa_sync_conn, publisher_service):
         p = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError):
-            update_publisher(p, update=PublisherUpdate(), repo=publisher_repo)
+            publisher_service.update_publisher(p, update=PublisherUpdate())
 
-    def test_updates_name_and_normalizes(self, sa_sync_conn, publisher_repo):
+    def test_updates_name_and_normalizes(self, sa_sync_conn, publisher_service):
         p = insert_publisher(sa_sync_conn, "Old Name")
-        update_publisher(p, update=PublisherUpdate(name="Springer Nature"), repo=publisher_repo)
+        publisher_service.update_publisher(p, update=PublisherUpdate(name="Springer Nature"))
         row = _fetch_one(
             sa_sync_conn, "SELECT name, name_normalized FROM publishers WHERE id = :id", id=p
         )
@@ -331,26 +335,11 @@ class TestMergePublishers:
         [("unknown", "commercial", "commercial"), ("media", "commercial", "media")],
     )
     def test_unknown_type_takes_source_type(
-        self,
-        sa_sync_conn,
-        repo,
-        publisher_repo,
-        recompute,
-        target_type,
-        source_type,
-        expected,
+        self, sa_sync_conn, target_type, source_type, expected, publisher_service
     ):
         target = insert_publisher(sa_sync_conn, "Target", publisher_type=target_type)
         source = insert_publisher(sa_sync_conn, "Source", publisher_type=source_type)
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
         row = _fetch_one(
             sa_sync_conn,
             "SELECT publisher_type::text AS publisher_type FROM publishers WHERE id = :id",
@@ -359,61 +348,27 @@ class TestMergePublishers:
         assert row.publisher_type == expected
         assert redirect_of(sa_sync_conn, MergedEntity.PUBLISHER, source) == target
 
-    def test_raises_on_self_merge(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_raises_on_self_merge(self, sa_sync_conn, publisher_service):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(ValidationError, match="identiques"):
-            merge_publishers(
-                p_id,
-                p_id,
-                conn=sa_sync_conn,
-                publisher_repo=publisher_repo,
-                serial_repo=repo,
-                recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
-            )
+            publisher_service.merge_publishers(p_id, p_id)
 
-    def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_raises_on_missing_target(self, sa_sync_conn, publisher_service):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(NotFoundError, match="introuvable"):
-            merge_publishers(
-                999999,
-                p_id,
-                conn=sa_sync_conn,
-                publisher_repo=publisher_repo,
-                serial_repo=repo,
-                recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
-            )
+            publisher_service.merge_publishers(999999, p_id)
 
-    def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_raises_on_missing_source(self, sa_sync_conn, publisher_service):
         p_id = insert_publisher(sa_sync_conn, "Elsevier")
         with pytest.raises(NotFoundError, match="introuvable"):
-            merge_publishers(
-                p_id,
-                999999,
-                conn=sa_sync_conn,
-                publisher_repo=publisher_repo,
-                serial_repo=repo,
-                recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
-            )
+            publisher_service.merge_publishers(p_id, 999999)
 
-    def test_transfers_serials_and_deletes_source(
-        self, sa_sync_conn, repo, publisher_repo, recompute
-    ):
+    def test_transfers_serials_and_deletes_source(self, sa_sync_conn, publisher_service):
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         j1 = _serial(sa_sync_conn, title="Journal 1", publisher_id=source)
 
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
 
         assert (
             _fetch_one(sa_sync_conn, "SELECT id FROM publishers WHERE id = :id", id=source)
@@ -421,28 +376,20 @@ class TestMergePublishers:
         row = _fetch_one(sa_sync_conn, "SELECT publisher_id FROM serials WHERE id = :id", id=j1)
         assert row.publisher_id == target
 
-    def test_transfers_monographs(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_transfers_monographs(self, sa_sync_conn, publisher_service):
         """La monographie garde un éditeur, qui la retrouve par son titre."""
         target = insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
         source = insert_publisher(sa_sync_conn, "PUR")
         monograph = insert_monograph(sa_sync_conn, "Livre", publisher_id=source)
 
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT publisher_id FROM monographs WHERE id = :id", id=monograph
         )
         assert row.publisher_id == target
 
-    def test_transfers_doi_prefixes(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_transfers_doi_prefixes(self, sa_sync_conn, publisher_service):
         """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
         target = insert_publisher(sa_sync_conn, "Elsevier BV")
         source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
@@ -450,22 +397,14 @@ class TestMergePublishers:
             sa_sync_conn, "10.99999", ra="Crossref", publisher_id=source, checked=True
         )
 
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT publisher_id FROM doi_prefixes WHERE prefix = '10.99999'"
         )
         assert row.publisher_id == target
 
-    def test_merges_same_title_serials(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_merges_same_title_serials(self, sa_sync_conn, publisher_service):
         """Si cible et source ont un journal de même titre, ils sont fusionnés."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
@@ -473,15 +412,7 @@ class TestMergePublishers:
         js = _serial(sa_sync_conn, publisher_id=source, eissn="1476-4687")
         insert_publication(sa_sync_conn, serial_id=js)
 
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM serials WHERE id = :id", id=js)) is None
         row = issn_columns(sa_sync_conn, jt)
@@ -489,7 +420,7 @@ class TestMergePublishers:
         assert row.eissn == "1476-4687"
 
     def test_merges_same_title_serials_with_only_source_openalex_id(
-        self, sa_sync_conn, repo, publisher_repo, recompute
+        self, sa_sync_conn, publisher_service
     ):
         """Cible sans openalex_id, source avec : la fusion doit déplacer
         l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
@@ -498,38 +429,20 @@ class TestMergePublishers:
         jt = _serial(sa_sync_conn, publisher_id=target)
         js = _serial(sa_sync_conn, publisher_id=source, openalex_id="S4210225546")
 
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM serials WHERE id = :id", id=js)) is None
         row = _fetch_one(sa_sync_conn, "SELECT openalex_id FROM serials WHERE id = :id", id=jt)
         assert row.openalex_id == "S4210225546"
 
-    def test_raises_blocked_error_on_issn_conflict(
-        self, sa_sync_conn, repo, publisher_repo, recompute
-    ):
+    def test_raises_blocked_error_on_issn_conflict(self, sa_sync_conn, publisher_service):
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         jt = _serial(sa_sync_conn, publisher_id=target, issn="0028-0836")
         js = _serial(sa_sync_conn, publisher_id=source, issn="9999-9999")
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
-            merge_publishers(
-                target,
-                source,
-                conn=sa_sync_conn,
-                publisher_repo=publisher_repo,
-                serial_repo=repo,
-                recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
-            )
+            publisher_service.merge_publishers(target, source)
 
         blockers = exc_info.value.blocking_serials
         assert len(blockers) == 1
@@ -542,7 +455,7 @@ class TestMergePublishers:
         assert "0028-0836" in b["reason"] and "9999-9999" in b["reason"]
 
     def test_blocks_when_target_has_internal_duplicate_titles(
-        self, sa_sync_conn, repo, publisher_repo, recompute
+        self, sa_sync_conn, publisher_service
     ):
         """Si la cible a 2 journaux au même titre et la source en a 1, la fusion
         N→1 casserait. On flagge ces paires comme blockers."""
@@ -553,22 +466,14 @@ class TestMergePublishers:
         _serial(sa_sync_conn, publisher_id=source)
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
-            merge_publishers(
-                target,
-                source,
-                conn=sa_sync_conn,
-                publisher_repo=publisher_repo,
-                serial_repo=repo,
-                recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
-            )
+            publisher_service.merge_publishers(target, source)
 
         blockers = exc_info.value.blocking_serials
         assert len(blockers) == 2
         for b in blockers:
             assert "doublon interne" in b["reason"]
 
-    def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, repo, publisher_repo, recompute):
+    def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, publisher_service):
         """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
@@ -578,53 +483,25 @@ class TestMergePublishers:
         _serial(sa_sync_conn, title="Rev2", publisher_id=source, eissn="4444-4444")
 
         with pytest.raises(PublisherMergeBlockedError) as exc_info:
-            merge_publishers(
-                target,
-                source,
-                conn=sa_sync_conn,
-                publisher_repo=publisher_repo,
-                serial_repo=repo,
-                recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
-            )
+            publisher_service.merge_publishers(target, source)
 
         assert len(exc_info.value.blocking_serials) == 2
 
-    def test_transfers_openalex_id_when_target_has_none(
-        self, sa_sync_conn, repo, publisher_repo, recompute
-    ):
+    def test_transfers_openalex_id_when_target_has_none(self, sa_sync_conn, publisher_service):
         """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source", openalex_id="P999")
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
         )
         assert row.openalex_id == "P999"
 
-    def test_keeps_target_openalex_id_when_both_set(
-        self, sa_sync_conn, repo, publisher_repo, recompute
-    ):
+    def test_keeps_target_openalex_id_when_both_set(self, sa_sync_conn, publisher_service):
         """Si les deux ont un openalex_id, celui de la cible est conservé."""
         target = insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
         source = insert_publisher(sa_sync_conn, "Source", openalex_id="P_SOURCE")
-        merge_publishers(
-            target,
-            source,
-            conn=sa_sync_conn,
-            publisher_repo=publisher_repo,
-            serial_repo=repo,
-            recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
-        )
+        publisher_service.merge_publishers(target, source)
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
         )
@@ -635,40 +512,22 @@ class TestMergePublishers:
 
 
 class TestMergeSerials:
-    def test_raises_on_self_merge(self, sa_sync_conn, repo, recompute):
+    def test_raises_on_self_merge(self, sa_sync_conn, serial_service):
         j_id = _serial(sa_sync_conn)
         with pytest.raises(ValidationError, match="identiques"):
-            merge_serials(
-                j_id,
-                j_id,
-                conn=sa_sync_conn,
-                repo=repo,
-                recompute=recompute,
-            )
+            serial_service.merge_serials(j_id, j_id)
 
-    def test_raises_on_missing_target(self, sa_sync_conn, repo, recompute):
+    def test_raises_on_missing_target(self, sa_sync_conn, serial_service):
         j_id = _serial(sa_sync_conn)
         with pytest.raises(NotFoundError, match="introuvable"):
-            merge_serials(
-                999999,
-                j_id,
-                conn=sa_sync_conn,
-                repo=repo,
-                recompute=recompute,
-            )
+            serial_service.merge_serials(999999, j_id)
 
-    def test_raises_on_missing_source(self, sa_sync_conn, repo, recompute):
+    def test_raises_on_missing_source(self, sa_sync_conn, serial_service):
         j_id = _serial(sa_sync_conn)
         with pytest.raises(NotFoundError, match="introuvable"):
-            merge_serials(
-                j_id,
-                999999,
-                conn=sa_sync_conn,
-                repo=repo,
-                recompute=recompute,
-            )
+            serial_service.merge_serials(j_id, 999999)
 
-    def test_transfers_publications(self, sa_sync_conn, repo, recompute):
+    def test_transfers_publications(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source")
         publication_id = insert_publication(sa_sync_conn, serial_id=source)
@@ -678,13 +537,7 @@ class TestMergeSerials:
             sa_sync_conn, publication_id, source_id="W-transfer", serial_id=source
         )
 
-        merge_serials(
-            target,
-            source,
-            conn=sa_sync_conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        serial_service.merge_serials(target, source)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT serial_id FROM publications WHERE id = :id", id=publication_id
@@ -695,21 +548,12 @@ class TestMergeSerials:
         ) is None
         assert redirect_of(sa_sync_conn, MergedEntity.SERIAL, source) == target
 
-    def _merge(self, conn, repo, recompute, target, source):
-        merge_serials(
-            target,
-            source,
-            conn=conn,
-            repo=repo,
-            recompute=recompute,
-        )
-
-    def test_transfers_monographs(self, sa_sync_conn, repo, recompute):
+    def test_transfers_monographs(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source")
         monograph = insert_monograph(sa_sync_conn, serial_id=source)
 
-        self._merge(sa_sync_conn, repo, recompute, target, source)
+        serial_service.merge_serials(target, source)
 
         assert (
             _fetch_one(
@@ -718,7 +562,7 @@ class TestMergeSerials:
             == target
         )
 
-    def test_type_repris_garde_son_marqueur(self, sa_sync_conn, repo, recompute):
+    def test_type_repris_garde_son_marqueur(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source", serial_type="media")
         sa_sync_conn.execute(
@@ -726,7 +570,7 @@ class TestMergeSerials:
             {"id": source},
         )
 
-        self._merge(sa_sync_conn, repo, recompute, target, source)
+        serial_service.merge_serials(target, source)
 
         row = _fetch_one(
             sa_sync_conn,
@@ -735,12 +579,12 @@ class TestMergeSerials:
         )
         assert (row.serial_type, row.manual_fields) == ("media", ["serial_type"])
 
-    def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, repo, recompute):
+    def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, serial_service):
         """Sans APC, la cible prend le montant et la devise de la source."""
         target = _serial(sa_sync_conn, title="Target", apc_currency="EUR")
         source = _serial(sa_sync_conn, title="Source", apc_amount=100, apc_currency="USD")
 
-        self._merge(sa_sync_conn, repo, recompute, target, source)
+        serial_service.merge_serials(target, source)
 
         row = _fetch_one(
             sa_sync_conn, "SELECT apc_amount, apc_currency FROM serials WHERE id = :id", id=target
@@ -752,12 +596,12 @@ class TestMergeSerials:
         [("unknown", "media", "media"), ("journal", "media", "journal")],
     )
     def test_unknown_type_takes_source_type(
-        self, sa_sync_conn, repo, recompute, target_type, source_type, expected
+        self, sa_sync_conn, serial_service, target_type, source_type, expected
     ):
         target = _serial(sa_sync_conn, title="Target", serial_type=target_type)
         source = _serial(sa_sync_conn, title="Source", serial_type=source_type)
 
-        self._merge(sa_sync_conn, repo, recompute, target, source)
+        serial_service.merge_serials(target, source)
 
         row = _fetch_one(
             sa_sync_conn,
@@ -766,7 +610,7 @@ class TestMergeSerials:
         )
         assert row.serial_type == expected
 
-    def test_unites_malformed_issns_and_resets_sudoc_check(self, sa_sync_conn, repo, recompute):
+    def test_unites_malformed_issns_and_resets_sudoc_check(self, sa_sync_conn, serial_service):
         """La cible reçoit les valeurs mal formées de la source et redevient à vérifier dans le Sudoc."""
         target = _serial(
             sa_sync_conn, title="Target", rejected=("1234-5678",), rejected_status="malformed"
@@ -779,19 +623,13 @@ class TestMergeSerials:
             rejected_status="malformed",
         )
 
-        merge_serials(
-            target,
-            source,
-            conn=sa_sync_conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        serial_service.merge_serials(target, source)
 
         row = issn_columns(sa_sync_conn, target)
         assert row.rejected_issns == ["(Internet)", "1234-5678"]
         assert row.sudoc_checked_at is None
 
-    def test_source_issns_join_the_target(self, sa_sync_conn, repo, recompute):
+    def test_source_issns_join_the_target(self, sa_sync_conn, serial_service):
         """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint la cible, qui garde son propre ISSN."""
         target = _serial(sa_sync_conn, title="BMC Primary Care", eissn="2731-4553")
         source = _serial(
@@ -802,31 +640,19 @@ class TestMergeSerials:
             rejected_status="related_title",
         )
 
-        merge_serials(
-            target,
-            source,
-            conn=sa_sync_conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        serial_service.merge_serials(target, source)
 
         row = issn_columns(sa_sync_conn, target)
         assert row.eissn == "2731-4553"
         assert row.rejected_issns == ["1471-2296"]
 
-    def test_enriches_target_metadata(self, sa_sync_conn, repo, recompute):
+    def test_enriches_target_metadata(self, sa_sync_conn, serial_service):
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(
             sa_sync_conn, title="Source", is_in_doaj=True, issn="1234-5678", eissn="9999-0000"
         )
 
-        merge_serials(
-            target,
-            source,
-            conn=sa_sync_conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        serial_service.merge_serials(target, source)
 
         row = issn_columns(sa_sync_conn, target)
         row.is_in_doaj = _fetch_one(
@@ -836,24 +662,18 @@ class TestMergeSerials:
         assert row.eissn == "9999-0000"
         assert row.is_in_doaj is True
 
-    def test_does_not_overwrite_existing_fields(self, sa_sync_conn, repo, recompute):
+    def test_does_not_overwrite_existing_fields(self, sa_sync_conn, serial_service):
         """COALESCE : les champs renseignés dans la cible sont préservés."""
         target = _serial(sa_sync_conn, title="Target", issn="0028-0836")
         source = _serial(sa_sync_conn, title="Source", issn="1234-5678")
 
-        merge_serials(
-            target,
-            source,
-            conn=sa_sync_conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        serial_service.merge_serials(target, source)
 
         row = issn_columns(sa_sync_conn, target)
         assert row.issn == "0028-0836"
 
     def test_requalifies_absorbed_publications_against_target_type(
-        self, sa_sync_conn, repo, recompute
+        self, sa_sync_conn, serial_service
     ):
         """Fusionner une revue dans un média retype ses publications en `media`.
 
@@ -880,13 +700,7 @@ class TestMergeSerials:
             serial_id=revue,
         )
 
-        merge_serials(
-            media,
-            revue,
-            conn=sa_sync_conn,
-            repo=repo,
-            recompute=recompute,
-        )
+        serial_service.merge_serials(media, revue)
 
         row = _fetch_one(
             sa_sync_conn,
@@ -917,7 +731,7 @@ class TestRequalifyPublicationsForSerial:
         return serial, publication, source_record
 
     def test_persists_source_record_correction_and_retypes_publication(
-        self, sa_sync_conn, recompute
+        self, sa_sync_conn, serial_service
     ):
         serial, publication, source_record = self._seed(sa_sync_conn)
         # Le caller a déjà basculé le type (comme update_serial).
@@ -925,11 +739,7 @@ class TestRequalifyPublicationsForSerial:
             text("UPDATE serials SET serial_type = 'media' WHERE id = :id"), {"id": serial}
         )
 
-        count = requalify_publications_for_serial(
-            serial,
-            conn=sa_sync_conn,
-            recompute=recompute,
-        )
+        count = serial_service.requalify_publications_for_serial(serial)
         assert count == 1
 
         source_record_row = _fetch_one(
@@ -947,26 +757,18 @@ class TestRequalifyPublicationsForSerial:
         )
         assert publication_row.doc_type == "media"
 
-    def test_self_heals_when_type_reverts(self, sa_sync_conn, recompute):
+    def test_self_heals_when_type_reverts(self, sa_sync_conn, serial_service):
         serial, publication, source_record = self._seed(sa_sync_conn)
         sa_sync_conn.execute(
             text("UPDATE serials SET serial_type = 'media' WHERE id = :id"), {"id": serial}
         )
-        requalify_publications_for_serial(
-            serial,
-            conn=sa_sync_conn,
-            recompute=recompute,
-        )
+        serial_service.requalify_publications_for_serial(serial)
 
         # Le type revient à 'journal' : la correction doit être défaite, le brut restauré.
         sa_sync_conn.execute(
             text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"), {"id": serial}
         )
-        count = requalify_publications_for_serial(
-            serial,
-            conn=sa_sync_conn,
-            recompute=recompute,
-        )
+        count = serial_service.requalify_publications_for_serial(serial)
         assert count == 1
 
         source_record_row = _fetch_one(

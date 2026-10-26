@@ -18,12 +18,12 @@ class PerimeterUpdate(BaseModel):
 
 
 class PerimeterRepository(Protocol):
-    """Contrat d'accès à la table `perimeters`."""
+    """Contrat d'accès à l'agrégat Perimeter."""
 
     # ── perimeters : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
-        """Hydrate l'aggregate `Perimeter` complet (code, name, `root_structure_ids`). Retourne None si le perimeter n'existe pas. `root_structure_ids` reste sous forme d'ids (références par id à l'aggregate Structure)."""
+        """Charge l'agrégat `Perimeter`, ou `None` si le périmètre n'existe pas. Ses racines sont des ids de structures."""
         ...
 
     def add(self, perimeter: Perimeter) -> int:
@@ -31,7 +31,7 @@ class PerimeterRepository(Protocol):
         ...
 
     def save(self, perimeter: Perimeter) -> None:
-        """Persiste un périmètre chargé : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
+        """Enregistre les champs éditables d'un périmètre chargé ; le code est immuable. Lève `NotFoundError` si le périmètre n'existe pas."""
         ...
 
     # ── Liens structure ↔ perimeter ────────────────────────────────

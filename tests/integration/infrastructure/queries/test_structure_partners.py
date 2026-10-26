@@ -2,10 +2,10 @@
 
 from sqlalchemy import text
 
-from application.ports.read_models.publications_queries import PublicationFilters
-from infrastructure.read_models.entity_labels import entity_label
+from infrastructure.read_models.entity_labels.queries import entity_label
 from infrastructure.read_models.publications.list import list_publications
-from infrastructure.read_models.structures import PgStructuresQueries
+from infrastructure.read_models.publications.models import PublicationFilters
+from infrastructure.read_models.structures.queries import StructuresQueries
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
@@ -30,9 +30,7 @@ def _copublication(conn) -> tuple[int, int]:
 
 def _partners(conn, structure: int, **filters):
     params = {"years": [], "countries": [], "types": [], **filters}
-    return PgStructuresQueries(conn).get_structure_partners(
-        structure, page=1, per_page=50, **params
-    )
+    return StructuresQueries(conn).get_structure_partners(structure, page=1, per_page=50, **params)
 
 
 def test_les_partenaires_excluent_la_structure_et_ses_ancetres(sa_sync_conn):

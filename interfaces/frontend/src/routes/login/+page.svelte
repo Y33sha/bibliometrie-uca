@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { pageTitle, siteTitle } from '#lib/institution.svelte.js';
 	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { auth } from '#lib/api/index.js';
+	import { loadSession, returnPath } from '#lib/session.svelte.js';
 
 	let username = $state('');
 	let password = $state('');
@@ -15,7 +16,8 @@
 		loading = true;
 		try {
 			await auth.login(username, password);
-			goto(resolve('admin/addresses'));
+			await loadSession(true);
+			goto(returnPath(page.url.searchParams.get('redirect'), page.url.origin));
 		} catch (e) {
 			error = auth.loginErrorMessage(e);
 			loading = false;

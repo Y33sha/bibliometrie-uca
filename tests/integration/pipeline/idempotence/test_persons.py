@@ -4,7 +4,6 @@ import logging
 
 from sqlalchemy import text
 
-from application.services.persons.core import create_person
 from infrastructure.repositories import person_repository
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.groups import resolve_groups
@@ -23,9 +22,9 @@ def _setup(conn) -> dict[str, int]:
     """Deux publications HAL du périmètre. Eve Leroy (compte HAL 900001, ORCID) signe les deux, Frank Moreau (compte HAL 900002) la première, Grace Petit (sans identifiant) la seconde. Les trois personnes existent, Eve et Frank avec leur compte HAL. Rend les personnes par prénom."""
     repo = person_repository(conn)
     persons = {
-        "eve": create_person("Leroy", "Eve", repo=repo),
-        "frank": create_person("Moreau", "Frank", repo=repo),
-        "grace": create_person("Petit", "Grace", repo=repo),
+        "eve": repo.create("Leroy", "Eve"),
+        "frank": repo.create("Moreau", "Frank"),
+        "grace": repo.create("Petit", "Grace"),
     }
     for name, account in (("eve", "900001"), ("frank", "900002")):
         insert_person_identifier(

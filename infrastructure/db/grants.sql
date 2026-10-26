@@ -107,6 +107,12 @@ GRANT INSERT ON
     ops.audit_log
 TO bibliometrie_app;
 
+-- Au démarrage, l'API crée l'utilisateur `ADMIN_USER` et lui attribue le rôle admin s'ils
+-- manquent. `INSERT … ON CONFLICT DO NOTHING` n'exige que le droit d'insertion.
+GRANT INSERT ON
+    ops.users, ops.user_roles
+TO bibliometrie_app;
+
 GRANT INSERT, UPDATE ON
     persons.distinct_persons, public.merge_redirects, publications.publications_detail
 TO bibliometrie_app;
@@ -160,17 +166,20 @@ BEGIN
 END
 $$;
 
--- Deux tables sont reprises, l'accord global les ayant d'abord couvertes. Les retirer après
+-- Des tables sont reprises, l'accord global les ayant d'abord couvertes. Les retirer après
 -- coup dit ce qu'elles sont plutôt que de les oublier dans une énumération.
 --
 -- `audit_log` trace les décisions humaines prises depuis l'interface d'administration.
 -- Le pipeline n'en prend aucune : l'écriture lui permettrait d'y déposer une trace
 -- qu'aucune personne n'a produite, ce qui ôterait à la table ce qu'elle vaut.
 --
+-- `users`, `roles` et `user_roles` disent qui ouvre une session et avec quels droits. Le
+-- script `manage_users` les écrit sous le propriétaire du schéma.
+--
 -- `alembic_version` dit quelle migration la base porte. Elle appartient aux migrations,
 -- que le pipeline ne joue pas.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE
-    ON ops.audit_log, alembic_version
+    ON ops.audit_log, ops.users, ops.roles, ops.user_roles, alembic_version
     FROM bibliometrie_pipeline;
 
 -- Ce qui n'est délibérément pas accordé : la propriété des objets et `CREATE` sur les schémas,

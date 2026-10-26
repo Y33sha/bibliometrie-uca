@@ -99,6 +99,21 @@ class TestGetSubject:
         assert s_n1 in ids
         assert s_n2 in ids
 
+    def test_returns_links_between_neighbors(self, client):
+        s_main = seed_subject(uniq("MainLinks"), usage_count=10)
+        s_n1 = seed_subject(uniq("LinkedNeighbor1"), usage_count=8)
+        s_n2 = seed_subject(uniq("LinkedNeighbor2"), usage_count=5)
+        _seed_cooccurrence(s_main, s_n1, count=4)
+        _seed_cooccurrence(s_main, s_n2, count=3)
+        _seed_cooccurrence(s_n1, s_n2, count=2)
+
+        r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 1})
+        assert r.status_code == 200
+        a, b = sorted([s_n1, s_n2])
+        assert r.json()["neighbor_links"] == [
+            {"subject_a_id": a, "subject_b_id": b, "cooccurrence_count": 2}
+        ]
+
     def test_min_cooccurrence_filters(self, client):
         s_main = seed_subject(uniq("MainFilter"), usage_count=10)
         s_weak = seed_subject(uniq("WeakNeighbor"), usage_count=8)

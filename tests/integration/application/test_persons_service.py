@@ -5,21 +5,6 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from application.services.contributions.assign_orphans import (
-    assign_orphan_contribution,
-    batch_assign_orphan_contributions,
-)
-from application.services.persons.core import (
-    add_identifier,
-    create_person,
-    detach_contributions,
-    mark_distinct,
-    merge_person,
-    set_exclusion,
-    update_identifier_status,
-    update_name,
-    update_name_form_status,
-)
 from domain.errors import (
     ConflictError,
     ContributionAlreadyAssignedError,
@@ -36,9 +21,7 @@ from infrastructure.repositories import (
     person_repository,
 )
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from pipeline.transformation.publications.publication_perimeter import (
-    PublicationPerimeterRecompute,
-)
+from interfaces.api.deps import contribution_service as build_contribution_service, person_service
 from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
     insert_contribution,
@@ -74,8 +57,6 @@ _jean_dupont_source_contribution = partial(
 
 # Enregistrement source de titre « Test », d'identifiant « hal-1 » par défaut.
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
-
-_PERIMETER = PublicationPerimeterRecompute()
 
 
 def _publication_evidence(conn, publication_id):
@@ -140,6 +121,16 @@ def contribution_repo(sa_sync_conn):
     return contribution_repository(sa_sync_conn)
 
 
+@pytest.fixture
+def service(sa_sync_conn):
+    return person_service(sa_sync_conn)
+
+
+@pytest.fixture
+def contribution_service(sa_sync_conn):
+    return build_contribution_service(sa_sync_conn)
+
+
 # ── Helpers ─────────────────────────────────────────────────
 
 
@@ -151,26 +142,20 @@ def _scalar(conn, sql_text: str, **params):
 
 
 class TestAddIdentifier:
-    def test_manual_source_refuses_hal_person_id(self, sa_sync_conn, repo):
+    def test_refuses_hal_person_id(self, sa_sync_conn, service):
         """`hal_person_id` est la référence d'un compte HAL, que l'extraction observe : personne ne l'attribue à la main."""
         person_id = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="id_type"):
-            add_identifier(person_id, "hal_person_id", "12345", source="manual", repo=repo)
+            service.add_identifier(person_id, "hal_person_id", "12345")
 
-    def test_auto_source_accepts_hal_person_id(self, sa_sync_conn, repo):
-        """La promotion depuis les contributions sources reste libre de le poser."""
-        person_id = _person(sa_sync_conn)
-        result = add_identifier(person_id, "hal_person_id", "12345", repo=repo)
-        assert result.outcome is AttributionOutcome.ADDED
-
-    def test_manual_source_raises_on_unknown_person(self, repo):
+    def test_raises_on_unknown_person(self, service):
         """Sans cette garde, l'identifiant venu d'un formulaire heurterait la clé étrangère."""
         with pytest.raises(NotFoundError):
-            add_identifier(999999, "orcid", "0000-0001-2345-6789", source="manual", repo=repo)
+            service.add_identifier(999999, "orcid", "0000-0001-2345-6789")
 
-    def test_inserts_new(self, sa_sync_conn, repo):
+    def test_inserts_new(self, sa_sync_conn, service):
         person_id = _person(sa_sync_conn)
-        result = add_identifier(person_id, "orcid", "0000-0001-2345-6789", repo=repo)
+        result = service.add_identifier(person_id, "orcid", "0000-0001-2345-6789")
         assert result.outcome is AttributionOutcome.ADDED
         assert result.id_value == "0000-0001-2345-6789"
         status = _scalar(
@@ -180,17 +165,17 @@ class TestAddIdentifier:
         )
         assert status == "pending"
 
-    def test_reassigns_if_rejected(self, sa_sync_conn, repo):
+    def test_reassigns_if_rejected(self, sa_sync_conn, service):
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        add_identifier(p1, "orcid", "0000-0001-2345-6789", repo=repo)
+        service.add_identifier(p1, "orcid", "0000-0001-2345-6789")
         sa_sync_conn.execute(
             text(
                 "UPDATE person_identifiers SET status='rejected' "
                 "WHERE id_value='0000-0001-2345-6789'"
             )
         )
-        result = add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
+        result = service.add_identifier(p2, "orcid", "0000-0001-2345-6789")
         assert result.outcome is AttributionOutcome.REASSIGNED
 
         row = sa_sync_conn.execute(
@@ -202,7 +187,7 @@ class TestAddIdentifier:
         assert row.person_id == p2
         assert row.status == "pending"
 
-    def test_raises_when_pending_on_other_person(self, sa_sync_conn, repo):
+    def test_raises_when_pending_on_other_person(self, sa_sync_conn, service):
         """Si le même identifiant existe en 'pending' sur une autre personne,
         on lève `CannotAttributeConflict` (pour réattribuer, il faut d'abord
         passer le statut à 'rejected')."""
@@ -212,10 +197,10 @@ class TestAddIdentifier:
 
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        add_identifier(p1, "orcid", "0000-0001-2345-6789", repo=repo)
+        service.add_identifier(p1, "orcid", "0000-0001-2345-6789")
 
         with pytest.raises(CannotAttributeConflict):
-            add_identifier(p2, "orcid", "0000-0001-2345-6789", repo=repo)
+            service.add_identifier(p2, "orcid", "0000-0001-2345-6789")
 
         # L'identifiant reste rattaché à p1.
         assert (
@@ -226,11 +211,11 @@ class TestAddIdentifier:
             == p1
         )
 
-    def test_idempotent_on_same_person(self, sa_sync_conn, repo):
+    def test_idempotent_on_same_person(self, sa_sync_conn, service):
         """Réappliquer add_identifier sur la même personne ne change rien."""
         p = _person(sa_sync_conn)
-        add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)
-        result = add_identifier(p, "orcid", "0000-0001-2345-6789", repo=repo)  # no-op
+        service.add_identifier(p, "orcid", "0000-0001-2345-6789")
+        result = service.add_identifier(p, "orcid", "0000-0001-2345-6789")  # no-op
         assert result.outcome is AttributionOutcome.ALREADY_EXISTS
 
         row = sa_sync_conn.execute(
@@ -244,20 +229,20 @@ class TestAddIdentifier:
 
 
 class TestUpdateIdentifierStatus:
-    def test_sets_status(self, sa_sync_conn, repo):
+    def test_sets_status(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         ident_id = insert_person_identifier(
             sa_sync_conn, p, id_type="orcid", id_value="0000-0001", status="pending"
         )
 
-        result = update_identifier_status(ident_id, "confirmed", repo=repo)
+        result = service.update_identifier_status(ident_id, "confirmed")
 
         assert result.status == "confirmed"
         assert result.propagated == 0
 
-    def test_raises_not_found(self, sa_sync_conn, repo):
+    def test_raises_not_found(self, sa_sync_conn, service):
         with pytest.raises(NotFoundError):
-            update_identifier_status(999999, "confirmed", repo=repo)
+            service.update_identifier_status(999999, "confirmed")
 
 
 class TestIdentifierStatusPropagation:
@@ -281,7 +266,7 @@ class TestIdentifierStatusPropagation:
         )
         insert_person_group(conn, source_contribution, person_id=person_id)
 
-    def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, repo):
+    def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         self._source_contribution(
             sa_sync_conn, p, "hal", "hal-a", {**self.HAL_ACCOUNT, "idref": "181370662"}
@@ -307,7 +292,7 @@ class TestIdentifierStatusPropagation:
         )
         idref_scanr = insert_person_identifier(sa_sync_conn, p, id_type="idref", id_value="999")
 
-        result = update_identifier_status(orcid, "rejected", repo=repo)
+        result = service.update_identifier_status(orcid, "rejected")
 
         assert result.propagated == 3
         assert {self._status(sa_sync_conn, i) for i in (orcid, account, idhal, idhal_2)} == {
@@ -316,7 +301,7 @@ class TestIdentifierStatusPropagation:
         assert self._status(sa_sync_conn, idref_confirmed) == "confirmed"
         assert self._status(sa_sync_conn, idref_scanr) == "pending"
 
-    def test_other_persons_are_untouched(self, sa_sync_conn, repo):
+    def test_other_persons_are_untouched(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         other = _person(sa_sync_conn, last_name="Autre", first_name="Personne")
         self._source_contribution(sa_sync_conn, p, "hal", "hal-a", self.HAL_ACCOUNT)
@@ -326,11 +311,11 @@ class TestIdentifierStatusPropagation:
             sa_sync_conn, other, id_type="idhal", id_value="nina-radosevic-robin"
         )
 
-        update_identifier_status(orcid, "confirmed", repo=repo)
+        service.update_identifier_status(orcid, "confirmed")
 
         assert self._status(sa_sync_conn, other_account) == "pending"
 
-    def test_neutralized_identifier_does_not_designate_the_account(self, sa_sync_conn, repo):
+    def test_neutralized_identifier_does_not_designate_the_account(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         self._source_contribution(
             sa_sync_conn,
@@ -345,10 +330,10 @@ class TestIdentifierStatusPropagation:
             sa_sync_conn, p, id_type="hal_person_id", id_value="11581"
         )
 
-        assert update_identifier_status(orcid, "rejected", repo=repo).propagated == 0
+        assert service.update_identifier_status(orcid, "rejected").propagated == 0
         assert self._status(sa_sync_conn, account) == "pending"
 
-    def test_back_to_pending_is_not_propagated(self, sa_sync_conn, repo):
+    def test_back_to_pending_is_not_propagated(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         self._source_contribution(sa_sync_conn, p, "hal", "hal-a", self.HAL_ACCOUNT)
         orcid = insert_person_identifier(
@@ -356,7 +341,7 @@ class TestIdentifierStatusPropagation:
         )
         insert_person_identifier(sa_sync_conn, p, id_type="hal_person_id", id_value="11581")
 
-        assert update_identifier_status(orcid, "pending", repo=repo).propagated == 0
+        assert service.update_identifier_status(orcid, "pending").propagated == 0
 
 
 class TestIdentifierRejectionOnGroups:
@@ -364,7 +349,7 @@ class TestIdentifierRejectionOnGroups:
 
     ORCID = "0000-0002-1825-0097"
 
-    def test_marks_groups_resolved_by_the_identifier(self, sa_sync_conn, repo):
+    def test_marks_groups_resolved_by_the_identifier(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         identifiers = {"orcid": self.ORCID}
         by_orcid, orcid_group = _perimeter_group(
@@ -378,30 +363,30 @@ class TestIdentifierRejectionOnGroups:
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
-        update_identifier_status(orcid, "rejected", repo=repo)
+        service.update_identifier_status(orcid, "rejected")
 
         assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {orcid_group}
         assert _group_person(sa_sync_conn, orcid_group) == (p, "orcid")
 
-    def test_group_without_the_value_is_untouched(self, sa_sync_conn, repo):
+    def test_group_without_the_value_is_untouched(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         _, group = _perimeter_group(
             sa_sync_conn, p, "orcid", source_id="hal-other", identifiers={"orcid": "0000-0001"}
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
-        update_identifier_status(orcid, "rejected", repo=repo)
+        service.update_identifier_status(orcid, "rejected")
 
         assert _group_person(sa_sync_conn, group) == (p, "orcid")
 
-    def test_confirmation_leaves_groups(self, sa_sync_conn, repo):
+    def test_confirmation_leaves_groups(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         _, group = _perimeter_group(
             sa_sync_conn, p, "orcid", source_id="hal-orcid", identifiers={"orcid": self.ORCID}
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
-        update_identifier_status(orcid, "confirmed", repo=repo)
+        service.update_identifier_status(orcid, "confirmed")
 
         assert _group_person(sa_sync_conn, group) == (p, "orcid")
 
@@ -410,41 +395,23 @@ class TestSetExclusion:
     def _exclusion(self, conn, p):
         return _scalar(conn, "SELECT exclusion::text FROM persons WHERE id = :p", p=p)
 
-    def test_excludes(self, sa_sync_conn, repo):
+    def test_excludes(self, sa_sync_conn, repo, service):
         p = _person(sa_sync_conn)
-        set_exclusion(
-            p,
-            PersonExclusion.OUT_OF_PERIMETER,
-            conn=sa_sync_conn,
-            repo=repo,
-            perimeter_recompute=_PERIMETER,
-        )
+        service.set_exclusion(p, PersonExclusion.OUT_OF_PERIMETER)
         assert self._exclusion(sa_sync_conn, p) == "out_of_perimeter"
         assert repo.find_by_id(p).exclusion is PersonExclusion.OUT_OF_PERIMETER
 
-    def test_retains(self, sa_sync_conn, repo):
+    def test_retains(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
-        set_exclusion(
-            p,
-            PersonExclusion.NOT_A_PERSON,
-            conn=sa_sync_conn,
-            repo=repo,
-            perimeter_recompute=_PERIMETER,
-        )
-        set_exclusion(p, None, conn=sa_sync_conn, repo=repo, perimeter_recompute=_PERIMETER)
+        service.set_exclusion(p, PersonExclusion.NOT_A_PERSON)
+        service.set_exclusion(p, None)
         assert self._exclusion(sa_sync_conn, p) is None
 
-    def test_raises_not_found(self, sa_sync_conn, repo):
+    def test_raises_not_found(self, sa_sync_conn, service):
         with pytest.raises(NotFoundError):
-            set_exclusion(
-                999999,
-                PersonExclusion.NOT_A_PERSON,
-                conn=sa_sync_conn,
-                repo=repo,
-                perimeter_recompute=_PERIMETER,
-            )
+            service.set_exclusion(999999, PersonExclusion.NOT_A_PERSON)
 
-    def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
+    def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, service):
         excluded = _person(sa_sync_conn, last_name="Exclue", first_name="Ée")
         other = _person(sa_sync_conn, last_name="Autre", first_name="Personne")
         alone = insert_publication(sa_sync_conn, "seule")
@@ -473,25 +440,19 @@ class TestSetExclusion:
                 sa_sync_conn, "SELECT in_perimeter FROM publications WHERE id = :p", p=publication
             )
 
-        set_exclusion(
-            excluded,
-            PersonExclusion.OUT_OF_PERIMETER,
-            conn=sa_sync_conn,
-            repo=repo,
-            perimeter_recompute=_PERIMETER,
-        )
+        service.set_exclusion(excluded, PersonExclusion.OUT_OF_PERIMETER)
         assert (flag(alone), flag(shared), flag(unrelated)) == (False, True, False)
 
-        set_exclusion(excluded, None, conn=sa_sync_conn, repo=repo, perimeter_recompute=_PERIMETER)
+        service.set_exclusion(excluded, None)
         assert flag(alone) is True
 
 
 class TestUpdateName:
-    def test_updates_name_and_refreshes_forms(self, sa_sync_conn, repo):
+    def test_updates_name_and_refreshes_forms(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         insert_person_name_form(sa_sync_conn, p, name_form="dupont jean", sources=["persons"])
 
-        update_name(p, "Martin", "Sophie", repo=repo)
+        service.update_name(p, "Martin", "Sophie")
 
         row = sa_sync_conn.execute(
             text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
@@ -509,7 +470,7 @@ class TestUpdateName:
         assert row.sources == ["persons"]
 
         # L'ancienne forme 'dupont jean' n'avait que la source 'persons'
-        # pour ce pid : refresh_name_forms a dû supprimer la row entièrement.
+        # pour ce pid : le renommage a supprimé la ligne entière.
         row = sa_sync_conn.execute(
             text(
                 "SELECT 1 FROM person_name_forms "
@@ -519,37 +480,37 @@ class TestUpdateName:
         ).first()
         assert row is None
 
-    def test_raises_not_found(self, sa_sync_conn, repo):
+    def test_raises_not_found(self, sa_sync_conn, service):
         with pytest.raises(NotFoundError):
-            update_name(999999, "X", "X", repo=repo)
+            service.update_name(999999, "X", "X")
 
-    def test_strips_surrounding_space(self, sa_sync_conn, repo):
+    def test_strips_surrounding_space(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
-        update_name(p, "  Martin  ", "  Sophie  ", repo=repo)
+        service.update_name(p, "  Martin  ", "  Sophie  ")
         row = sa_sync_conn.execute(
             text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
         ).one()
         assert row.last_name == "Martin"
         assert row.first_name == "Sophie"
 
-    def test_raises_without_last_name(self, sa_sync_conn, repo):
+    def test_raises_without_last_name(self, sa_sync_conn, service):
         """Effacer le patronyme retirerait à la personne les formes que seul son nom canonique porte."""
         p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="nom est requis"):
-            update_name(p, "", "Jean", repo=repo)
+            service.update_name(p, "", "Jean")
 
-    def test_raises_on_blank_last_name(self, sa_sync_conn, repo):
+    def test_raises_on_blank_last_name(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="nom est requis"):
-            update_name(p, "   ", "Jean", repo=repo)
+            service.update_name(p, "   ", "Jean")
 
 
-# ── create_person ───────────────────────────────────────────────────
+# ── PersonRepository.create ───────────────────────────────────────────────────
 
 
 class TestCreatePerson:
     def test_creates_and_computes_name_forms(self, sa_sync_conn, repo):
-        p = create_person("Dupont", "Jean", repo=repo)
+        p = repo.create("Dupont", "Jean")
         forms = {
             r.name_form
             for r in sa_sync_conn.execute(
@@ -559,7 +520,7 @@ class TestCreatePerson:
         assert forms == {"jean dupont", "j dupont"}
 
     def test_strips_surrounding_space(self, sa_sync_conn, repo):
-        p = create_person("  Dupont  ", "  Jean  ", repo=repo)
+        p = repo.create("  Dupont  ", "  Jean  ")
         row = sa_sync_conn.execute(
             text("SELECT last_name, first_name FROM persons WHERE id = :p"), {"p": p}
         ).one()
@@ -569,56 +530,56 @@ class TestCreatePerson:
     def test_raises_without_last_name(self, sa_sync_conn, repo):
         """Sans patronyme, `compute_person_name_forms` ne rend aucune forme : la personne ne serait atteignable par aucun nom."""
         with pytest.raises(ValidationError, match="nom est requis"):
-            create_person("", "Jean", repo=repo)
+            repo.create("", "Jean")
 
 
 # ── merge_person ────────────────────────────────────────────────────
 
 
 class TestMergePerson:
-    def test_raises_on_self_merge(self, sa_sync_conn, repo):
+    def test_raises_on_self_merge(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="identiques"):
-            merge_person(p, p, repo=repo)
+            service.merge_person(p, p)
 
-    def test_raises_not_found(self, sa_sync_conn, repo):
+    def test_raises_not_found(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            merge_person(p, 999999, repo=repo)
+            service.merge_person(p, 999999)
 
-    def test_absorbed_id_redirects_to_kept(self, sa_sync_conn, repo):
+    def test_absorbed_id_redirects_to_kept(self, sa_sync_conn, service):
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
         assert redirect_of(sa_sync_conn, MergedEntity.PERSON, source) == target
 
-    def test_absorbed_verdict_kept(self, sa_sync_conn, repo):
+    def test_absorbed_verdict_kept(self, sa_sync_conn, service):
         """Le rejet d'une forme de la personne absorbée survit à la fusion."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         _hal_name_form(sa_sync_conn, source, name_form="intrus x", status="rejected")
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
         assert _name_form_status(sa_sync_conn, "intrus x", target) == "rejected"
 
-    def test_target_verdict_prevails(self, sa_sync_conn, repo):
+    def test_target_verdict_prevails(self, sa_sync_conn, service):
         """Sur une forme commune, le verdict de la personne qui absorbe l'emporte."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         _hal_name_form(sa_sync_conn, target, name_form="forme commune", status="confirmed")
         _hal_name_form(sa_sync_conn, source, name_form="forme commune", status="rejected")
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
         assert _name_form_status(sa_sync_conn, "forme commune", target) == "confirmed"
 
-    def test_pending_target_takes_absorbed_verdict(self, sa_sync_conn, repo):
+    def test_pending_target_takes_absorbed_verdict(self, sa_sync_conn, service):
         """Une forme commune en attente chez la personne qui absorbe reprend le verdict de l'autre."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         _hal_name_form(sa_sync_conn, target, name_form="forme commune")
         _hal_name_form(sa_sync_conn, source, name_form="forme commune", status="rejected")
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
         assert _name_form_status(sa_sync_conn, "forme commune", target) == "rejected"
 
-    def test_confirmed_source_contribution_transferred(self, sa_sync_conn, repo):
+    def test_confirmed_source_contribution_transferred(self, sa_sync_conn, service):
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         source_contribution_id = _jean_dupont_source_contribution(
@@ -627,7 +588,7 @@ class TestMergePerson:
         )
         insert_confirmed_source_contribution(sa_sync_conn, source_contribution_id, person_id=source)
 
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
 
         assert (
             _scalar(
@@ -638,16 +599,16 @@ class TestMergePerson:
             == target
         )
 
-    def test_distinct_persons_transferred(self, sa_sync_conn, repo):
+    def test_distinct_persons_transferred(self, sa_sync_conn, service):
         """Les non-doublons de l'absorbée passent à la conservée ; celui qui oppose les deux personnes fusionnées disparaît."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         other = _person(sa_sync_conn, last_name="Durand")
         shared = _person(sa_sync_conn, last_name="Duval")
         for a, b in ((source, other), (source, shared), (target, shared), (source, target)):
-            mark_distinct(a, b, repo=repo)
+            service.mark_distinct(a, b)
 
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
 
         pairs = sa_sync_conn.execute(
             text(
@@ -672,14 +633,14 @@ class TestMergePerson:
         ],
     )
     def test_strongest_exclusion_kept(
-        self, sa_sync_conn, repo, target_exclusion, source_exclusion, expected
+        self, sa_sync_conn, repo, target_exclusion, source_exclusion, expected, service
     ):
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         repo.set_exclusion(target, target_exclusion)
         repo.set_exclusion(source, source_exclusion)
 
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
 
         assert (
             _scalar(sa_sync_conn, "SELECT exclusion FROM persons WHERE id = :p", p=target)
@@ -691,22 +652,12 @@ class TestMergePerson:
 
 
 class TestBatchAssignOrphanContributions:
-    def test_empty_list_returns_zero(self, sa_sync_conn, repo, contribution_repo):
+    def test_empty_list_returns_zero(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
-        assert (
-            batch_assign_orphan_contributions(
-                person_id,
-                [],
-                perimeter_recompute=_PERIMETER,
-                repo=repo,
-                contribution_repo=contribution_repo,
-                conn=sa_sync_conn,
-            )
-            == 0
-        )
+        assert contribution_service.batch_assign_orphan_contributions(person_id, []) == 0
 
-    def test_attaches_groups_and_pins_all_members(self, sa_sync_conn, repo, contribution_repo):
+    def test_attaches_groups_and_pins_all_members(self, sa_sync_conn, contribution_service):
         """Chaque groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
@@ -720,13 +671,8 @@ class TestBatchAssignOrphanContributions:
         second = insert_publication(sa_sync_conn)
         second_group, second_hal = _orphan(sa_sync_conn, second, source_id="h-2")
 
-        assigned = batch_assign_orphan_contributions(
-            person_id,
-            [first_group, second_group],
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
+        assigned = contribution_service.batch_assign_orphan_contributions(
+            person_id, [first_group, second_group]
         )
 
         assert assigned == 2
@@ -736,7 +682,7 @@ class TestBatchAssignOrphanContributions:
         assert _pinned_to(sa_sync_conn, members) == [person_id] * 3
         assert _publication_evidence(sa_sync_conn, first) == ["address"]
 
-    def test_adds_name_forms_under_their_source(self, sa_sync_conn, repo, contribution_repo):
+    def test_adds_name_forms_under_their_source(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         group, _ = _orphan(
@@ -747,14 +693,7 @@ class TestBatchAssignOrphanContributions:
             author_name_normalized="j dupont",
         )
 
-        batch_assign_orphan_contributions(
-            person_id,
-            [group],
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
-        )
+        contribution_service.batch_assign_orphan_contributions(person_id, [group])
 
         assert _scalar(
             sa_sync_conn,
@@ -762,7 +701,7 @@ class TestBatchAssignOrphanContributions:
             p=person_id,
         ) == ["openalex"]
 
-    def test_skips_already_assigned(self, sa_sync_conn, repo, contribution_repo):
+    def test_skips_already_assigned(self, sa_sync_conn, contribution_service):
         """Un groupe déjà rattaché est écarté : ni épinglage, ni changement de personne ; le groupe orphelin du lot est rattaché."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
@@ -774,13 +713,8 @@ class TestBatchAssignOrphanContributions:
             sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-2"
         )
 
-        assigned = batch_assign_orphan_contributions(
-            p2,
-            [owned_group, orphan_group],
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
+        assigned = contribution_service.batch_assign_orphan_contributions(
+            p2, [owned_group, orphan_group]
         )
 
         assert assigned == 1
@@ -793,28 +727,22 @@ class TestBatchAssignOrphanContributions:
 
 
 class TestDetachContributions:
-    def test_detaches_group(self, sa_sync_conn, repo, contribution_repo):
+    def test_detaches_group(self, sa_sync_conn, service):
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
         source_contribution_id = _jean_dupont_source_contribution(sa_sync_conn, source_record_id)
 
-        result = detach_contributions(
+        result = service.detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
         )
 
         assert result["detached"] == 1
         assert _group_person(sa_sync_conn, contribution_id) == (None, None)
 
-    def test_detaches_all_sources_of_publication_from_single_ref(
-        self, sa_sync_conn, repo, contribution_repo
-    ):
+    def test_detaches_all_sources_of_publication_from_single_ref(self, sa_sync_conn, service):
         """Le rejet porte sur la publication entière : sélectionner une source
         détache le groupe de la paire et peuple le store."""
         person_id = _person(sa_sync_conn)
@@ -828,13 +756,9 @@ class TestDetachContributions:
         _jean_dupont_source_contribution(sa_sync_conn, source_record_oa, source="openalex")
 
         # Une seule source sélectionnée (la hal).
-        result = detach_contributions(
+        result = service.detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_hal}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
         )
 
         assert result["detached"] == 1
@@ -849,7 +773,7 @@ class TestDetachContributions:
             == 1
         )
 
-    def test_cleans_orphan_source_name_form(self, sa_sync_conn, repo, contribution_repo):
+    def test_cleans_orphan_source_name_form(self, sa_sync_conn, repo, service):
         """Une forme de nom attestée par une source, devenue sans aucune source
         active après détachement, est supprimée."""
         person_id = _person(sa_sync_conn)
@@ -862,13 +786,9 @@ class TestDetachContributions:
         )
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
 
-        result = detach_contributions(
+        result = service.detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
         )
         assert result["cleaned_forms"] == 1
         assert (
@@ -880,7 +800,7 @@ class TestDetachContributions:
             is None
         )
 
-    def test_preserves_rejected_orphan_name_form(self, sa_sync_conn, repo, contribution_repo):
+    def test_preserves_rejected_orphan_name_form(self, sa_sync_conn, repo, service):
         """Une forme `rejected` devenue orpheline est préservée : la supprimer
         détruirait le blocage de non-retour qu'elle matérialise."""
         person_id = _person(sa_sync_conn)
@@ -900,13 +820,9 @@ class TestDetachContributions:
             {"p": person_id},
         )
 
-        result = detach_contributions(
+        result = service.detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
         )
         assert result["cleaned_forms"] == 0
         assert (
@@ -918,19 +834,12 @@ class TestDetachContributions:
             == 1
         )
 
-    def test_preserves_computed_name_form(self, sa_sync_conn, repo, contribution_repo):
+    def test_preserves_computed_name_form(self, sa_sync_conn, repo, service):
         """Les formes calculées depuis le nom de la personne (source `persons`)
         ne dépendent d'aucune source et survivent au détachement."""
-        person_id = create_person("Dupont", "Jean", repo=repo)
+        person_id = repo.create("Dupont", "Jean")
 
-        result = detach_contributions(
-            person_id,
-            contributions=[],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        result = service.detach_contributions(person_id, contributions=[])
         assert result["cleaned_forms"] == 0
         assert (
             _scalar(
@@ -941,7 +850,7 @@ class TestDetachContributions:
             == 1
         )
 
-    def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, contribution_repo):
+    def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, service):
         """Une forme encore portée par un membre d'un groupe de la personne, dans une autre publication, reste quand on détache une seule publication."""
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
@@ -957,13 +866,8 @@ class TestDetachContributions:
         insert_person_group(sa_sync_conn, backing, person_id=person_id)
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
 
-        result = detach_contributions(
-            person_id,
-            contributions=[{"source": "hal", "source_contribution_id": sa1}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
+        result = service.detach_contributions(
+            person_id, contributions=[{"source": "hal", "source_contribution_id": sa1}]
         )
         assert result["cleaned_forms"] == 0
         assert (
@@ -977,15 +881,15 @@ class TestDetachContributions:
 
 
 class TestMarkDistinctPersons:
-    def test_raises_on_same_id(self, sa_sync_conn, repo):
+    def test_raises_on_same_id(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="elle-même"):
-            mark_distinct(p, p, repo=repo)
+            service.mark_distinct(p, p)
 
-    def test_inserts_ordered_pair(self, sa_sync_conn, repo):
+    def test_inserts_ordered_pair(self, sa_sync_conn, service):
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        mark_distinct(p2, p1, repo=repo)
+        service.mark_distinct(p2, p1)
         n = sa_sync_conn.execute(
             text(
                 "SELECT COUNT(*) AS n FROM distinct_persons "
@@ -995,11 +899,11 @@ class TestMarkDistinctPersons:
         ).scalar_one()
         assert n == 1
 
-    def test_idempotent(self, sa_sync_conn, repo):
+    def test_idempotent(self, sa_sync_conn, service):
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
-        mark_distinct(p1, p2, repo=repo)
-        mark_distinct(p1, p2, repo=repo)
+        service.mark_distinct(p1, p2)
+        service.mark_distinct(p1, p2)
         n = sa_sync_conn.execute(
             text(
                 "SELECT COUNT(*) AS n FROM distinct_persons "
@@ -1021,80 +925,44 @@ def _name_form_status(conn, form, person_id):
 
 
 class TestUpdateNameFormStatus:
-    def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, repo, contribution_repo):
+    def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, service):
         """Rejeter une forme conserve la row (tombstone du verrou de non-retour)."""
         person_id = _person(sa_sync_conn, last_name="Unique", first_name="Name")
         _hal_name_form(sa_sync_conn, person_id, name_form="intrus unique")
 
-        row = update_name_form_status(
-            person_id,
-            "intrus unique",
-            "rejected",
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        row = service.update_name_form_status(person_id, "intrus unique", "rejected")
 
         assert row["status"] == "rejected"
         assert _name_form_status(sa_sync_conn, "intrus unique", person_id) == "rejected"
 
-    def test_confirm_overrides_previous_status(self, sa_sync_conn, repo, contribution_repo):
+    def test_confirm_overrides_previous_status(self, sa_sync_conn, service):
         person_id = _person(sa_sync_conn, last_name="Alpha", first_name="Beta")
         _hal_name_form(sa_sync_conn, person_id, name_form="alpha b")
 
-        update_name_form_status(
-            person_id,
-            "alpha b",
-            "rejected",
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
-        row = update_name_form_status(
-            person_id,
-            "alpha b",
-            "confirmed",
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        service.update_name_form_status(person_id, "alpha b", "rejected")
+        row = service.update_name_form_status(person_id, "alpha b", "confirmed")
 
         assert row["status"] == "confirmed"
 
-    def test_derived_form_status_refused(self, sa_sync_conn, repo, contribution_repo):
+    def test_derived_form_status_refused(self, sa_sync_conn, repo, service):
         """Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse."""
-        person_id = create_person("Gamma", "Delta", repo=repo)
+        person_id = repo.create("Gamma", "Delta")
 
         with pytest.raises(ConflictError):
-            update_name_form_status(
-                person_id,
-                "delta gamma",
-                "rejected",
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            service.update_name_form_status(person_id, "delta gamma", "rejected")
 
-    def test_unknown_form_raises(self, sa_sync_conn, repo, contribution_repo):
-        person_id = create_person("Gamma", "Delta", repo=repo)
+    def test_unknown_form_raises(self, sa_sync_conn, repo, service):
+        person_id = repo.create("Gamma", "Delta")
 
         with pytest.raises(NotFoundError):
-            update_name_form_status(
-                person_id,
-                "inexistante xyz",
-                "rejected",
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            service.update_name_form_status(person_id, "inexistante xyz", "rejected")
 
-    def test_reject_sets_the_lock(self, sa_sync_conn, repo, contribution_repo):
+    def test_reject_sets_the_lock(self, sa_sync_conn, service):
         """Rejeter une forme pose le verrou."""
         pid = _person(sa_sync_conn, last_name="Foreign", first_name="Form")
         _hal_name_form(sa_sync_conn, pid, name_form="intrus etranger")
 
-        update_name_form_status(
-            pid,
-            "intrus etranger",
-            "rejected",
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        service.update_name_form_status(pid, "intrus etranger", "rejected")
 
         assert (
             sa_sync_conn.execute(
@@ -1111,7 +979,7 @@ class TestUpdateNameFormStatus:
 class TestNameFormRejectionOnGroups:
     """Le rejet d'une forme de nom détache de la personne les groupes rattachés par le nom dont un membre porte la forme."""
 
-    def test_marks_groups_resolved_by_name(self, sa_sync_conn, repo, contribution_repo):
+    def test_marks_groups_resolved_by_name(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         form = {"author_name_normalized": "intrus unique"}
         by_name, name_group = _perimeter_group(sa_sync_conn, p, "name", source_id="hal-n", **form)
@@ -1126,31 +994,19 @@ class TestNameFormRejectionOnGroups:
         )
         _hal_name_form(sa_sync_conn, p, name_form="intrus unique")
 
-        update_name_form_status(
-            p,
-            "intrus unique",
-            "rejected",
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        service.update_name_form_status(p, "intrus unique", "rejected")
 
         assert queued(sa_sync_conn, Queue.GROUP_RESOLUTION) == {name_group, initials_group}
         assert _group_person(sa_sync_conn, name_group) == (p, "name")
 
-    def test_group_under_another_form_is_untouched(self, sa_sync_conn, repo, contribution_repo):
+    def test_group_under_another_form_is_untouched(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         _, group = _perimeter_group(
             sa_sync_conn, p, "name", source_id="hal-n", author_name_normalized="jean dupont"
         )
         _hal_name_form(sa_sync_conn, p, name_form="intrus unique")
 
-        update_name_form_status(
-            p,
-            "intrus unique",
-            "rejected",
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        service.update_name_form_status(p, "intrus unique", "rejected")
 
         assert _group_person(sa_sync_conn, group) == (p, "name")
 
@@ -1159,7 +1015,7 @@ class TestNameFormRejectionOnGroups:
 
 
 class TestAssignOrphanContribution:
-    def test_attaches_group_and_pins_all_members(self, sa_sync_conn, repo, contribution_repo):
+    def test_attaches_group_and_pins_all_members(self, sa_sync_conn, contribution_service):
         """Le groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne et la reçoivent dans `source_contributions`."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
@@ -1173,14 +1029,7 @@ class TestAssignOrphanContribution:
         )
         add_group_member(sa_sync_conn, group, openalex, source_record_oa)
 
-        assign_orphan_contribution(
-            person_id,
-            group,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        contribution_service.assign_orphan_contribution(person_id, group)
 
         assert _group_person(sa_sync_conn, group) == (person_id, "manual")
         assert _pinned_to(sa_sync_conn, [hal, openalex]) == [person_id, person_id]
@@ -1191,7 +1040,7 @@ class TestAssignOrphanContribution:
             p=person_id,
         ) == ["hal", "openalex"]
 
-    def test_raises_if_already_assigned(self, sa_sync_conn, repo, contribution_repo):
+    def test_raises_if_already_assigned(self, sa_sync_conn, contribution_service):
         """Un groupe déjà rattaché n'est pas repris : le refus nomme la détentrice."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
@@ -1200,35 +1049,21 @@ class TestAssignOrphanContribution:
         set_perimeter_author_group(sa_sync_conn, group, person_id=other_id, mode="name")
 
         with pytest.raises(ContributionAlreadyAssignedError) as exc:
-            assign_orphan_contribution(
-                person_id,
-                group,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.assign_orphan_contribution(person_id, group)
         assert exc.value.owner_person_id == other_id
         assert _group_person(sa_sync_conn, group) == (other_id, "name")
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
 
-    def test_raises_if_group_missing(self, sa_sync_conn, repo, contribution_repo):
+    def test_raises_if_group_missing(self, sa_sync_conn, contribution_service):
         person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            assign_orphan_contribution(
-                person_id,
-                999999,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.assign_orphan_contribution(person_id, 999999)
 
 
 class TestReassignRejectedPairUnit:
     """Pré-contrôle de rejet sur les chemins de réassignation orphan-contributions."""
 
-    def test_assign_blocked_when_rejected(self, sa_sync_conn, repo, contribution_repo):
+    def test_assign_blocked_when_rejected(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
@@ -1236,14 +1071,7 @@ class TestReassignRejectedPairUnit:
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
-            assign_orphan_contribution(
-                person_id,
-                group,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.assign_orphan_contribution(person_id, group)
         pair = exc.value.rejected_pairs[0]
         assert pair["publication_id"] == publication_id
         assert pair["person_id"] == person_id
@@ -1252,24 +1080,14 @@ class TestReassignRejectedPairUnit:
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
         assert _group_person(sa_sync_conn, group) == (None, None)
 
-    def test_assign_forced_unrejects_and_attaches_group(
-        self, sa_sync_conn, repo, contribution_repo
-    ):
+    def test_assign_forced_unrejects_and_attaches_group(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         group, source_contribution_id = _orphan(sa_sync_conn, publication_id)
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
-        assign_orphan_contribution(
-            person_id,
-            group,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-            force=True,
-        )
+        contribution_service.assign_orphan_contribution(person_id, group, force=True)
 
         assert (
             _scalar(
@@ -1283,7 +1101,7 @@ class TestReassignRejectedPairUnit:
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [person_id]
         assert _group_person(sa_sync_conn, group) == (person_id, "manual")
 
-    def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, contribution_repo):
+    def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
@@ -1293,34 +1111,21 @@ class TestReassignRejectedPairUnit:
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
-            batch_assign_orphan_contributions(
-                person_id,
-                [group1, group2],
-                perimeter_recompute=_PERIMETER,
-                repo=repo,
-                contribution_repo=contribution_repo,
-                conn=sa_sync_conn,
-            )
+            contribution_service.batch_assign_orphan_contributions(person_id, [group1, group2])
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
         # Rien d'écrit : le pré-contrôle précède l'épinglage.
         assert [_group_person(sa_sync_conn, g) for g in (group1, group2)] == [(None, None)] * 2
         assert _pinned_to(sa_sync_conn, [sa1, sa2]) == [None, None]
 
-    def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, contribution_repo):
+    def test_batch_forced_unrejects_all(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         group, _ = _orphan(sa_sync_conn, pub1, source_id="h-1")
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
-        assigned = batch_assign_orphan_contributions(
-            person_id,
-            [group],
-            perimeter_recompute=_PERIMETER,
-            repo=repo,
-            contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
-            force=True,
+        assigned = contribution_service.batch_assign_orphan_contributions(
+            person_id, [group], force=True
         )
 
         assert assigned == 1
@@ -1340,7 +1145,7 @@ class TestMergePersonRejectedContributions:
     """La fusion transfère les rejets de l'absorbée vers l'absorbante (clé
     identique), avec dédoublonnage sur conflit de PK."""
 
-    def test_transfers_and_dedups(self, sa_sync_conn, repo):
+    def test_transfers_and_dedups(self, sa_sync_conn, service):
         target = _person(sa_sync_conn, last_name="Cible", first_name="T")
         source = _person(sa_sync_conn, last_name="Source", first_name="S")
         publication_shared = insert_publication(sa_sync_conn, "Shared")
@@ -1356,7 +1161,7 @@ class TestMergePersonRejectedContributions:
             sa_sync_conn, publication_source_only, person_id=source
         )  # doit migrer vers la cible
 
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
 
         rows = sa_sync_conn.execute(
             text(f"SELECT DISTINCT publication_id, person_id FROM ({REJECTED_PAIRS}) rp")
@@ -1366,7 +1171,7 @@ class TestMergePersonRejectedContributions:
             (publication_source_only, target),
         }
 
-    def test_rejection_prevails_over_merged_contribution(self, sa_sync_conn, repo):
+    def test_rejection_prevails_over_merged_contribution(self, sa_sync_conn, service):
         """L'absorbée signe une publication où l'absorbante est rejetée : après fusion, le rejet l'emporte."""
         target = _person(sa_sync_conn, last_name="Cible", first_name="T")
         source = _person(sa_sync_conn, last_name="Source", first_name="S")
@@ -1375,7 +1180,7 @@ class TestMergePersonRejectedContributions:
         insert_contribution(sa_sync_conn, publication, person_id=source)
         insert_rejected_contribution(sa_sync_conn, publication, person_id=target)
 
-        merge_person(target, source, repo=repo)
+        service.merge_person(target, source)
 
         groups_with_person = sa_sync_conn.execute(
             text(

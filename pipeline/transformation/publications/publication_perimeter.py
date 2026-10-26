@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.perimeter_evidence import PerimeterEvidence
-from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, has_author_role, source_extra
 
 
@@ -82,12 +82,15 @@ def refresh_publications_perimeter_evidence(
 class PublicationPerimeterRecompute:
     """Recalcul ciblé de `publications.perimeter_evidence`, exposé à l'API par `pipeline/public.py`."""
 
-    def refresh_publications_of_person(self, conn: Connection, person_id: int) -> int:
-        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Rend le nombre de publications changées."""
-        return refresh_publications_perimeter_evidence(conn, person_id)
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
-    def refresh_publications(self, conn: Connection, publication_ids: list[int]) -> int:
+    def refresh_publications_of_person(self, person_id: int) -> int:
+        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Rend le nombre de publications changées."""
+        return refresh_publications_perimeter_evidence(self._conn, person_id)
+
+    def refresh_publications(self, publication_ids: list[int]) -> int:
         """Recalcule `publications.perimeter_evidence` pour les publications `publication_ids`. Rend le nombre de publications changées."""
         if not publication_ids:
             return 0
-        return refresh_publications_perimeter_evidence(conn, publication_ids=publication_ids)
+        return refresh_publications_perimeter_evidence(self._conn, publication_ids=publication_ids)

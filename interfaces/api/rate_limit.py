@@ -216,19 +216,20 @@ class ExportSlot:
     """
 
     def __init__(self) -> None:
-        self._held = False
+        self._held_from: threading.BoundedSemaphore | None = None
         self.stream_owns = False
 
     def acquire(self) -> bool:
         """Prend un droit sans attendre. `False` si aucun n'est libre."""
-        self._held = _export_slots.acquire(blocking=False)
-        return self._held
+        if _export_slots.acquire(blocking=False):
+            self._held_from = _export_slots
+        return self._held_from is not None
 
     def release(self) -> None:
-        """Rend le droit, une fois. Un second appel ne fait rien."""
-        if self._held:
-            self._held = False
-            _export_slots.release()
+        """Rend le droit au jeu dont il a été pris, une fois. Un second appel ne fait rien."""
+        if self._held_from is not None:
+            self._held_from.release()
+            self._held_from = None
 
 
 def export_slot() -> Iterator[ExportSlot]:

@@ -34,7 +34,13 @@
     HAL: asset('icons/hal.ico'),
     arXiv: asset('icons/arxiv.png'),
     "PubMed Central": asset('icons/ncbi.png'),
+    Zenodo: asset('icons/zenodo.png'),
+    Figshare: asset('icons/figshare.png'),
+    "CERN Document Server": asset('icons/cds.ico'),
+    OpenEdition: asset('icons/openedition.png'),
   };
+  // Pastilles colorées des icônes claires.
+  const PLATFORM_TAG_CLASSES: Record<string, string> = { Zenodo: "tag-zenodo" };
 
   const orderedSources = $derived([
     ...sourceOrder().flatMap((src) => referencedBy.filter((s) => s.source === src)),
@@ -42,14 +48,18 @@
   ]);
 
   // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
-  const primarySources = $derived(orderedSources.filter((s) => !s.is_secondary));
+  // L'enregistrement source theses mène à la même fiche theses.fr que le NNT, identifiant de la thèse : seul le NNT est listé quand il existe.
+  const hasNnt = $derived(externalIds.some((e) => e.type === "nnt"));
+  const primarySources = $derived(
+    orderedSources.filter((s) => !s.is_secondary && !(hasNnt && s.source === "theses")),
+  );
   const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
 
   const accessState = $derived(accessTag(pub.oa_status));
 
   let labels = $state<Record<string, string>>({});
   $effect(() => {
-    if (pub.license || pub.deposit_license) licenseLabels().then((l) => (labels = l)).catch(() => {});
+    if (accessLicense) licenseLabels().then((l) => (labels = l)).catch(() => {});
   });
 
   // Le bouton d'accès mène à la meilleure copie ouverte, à défaut au DOI ; une publication fermée ou sous embargo n'en a pas.
@@ -58,71 +68,79 @@
     if (oa === "closed" || oa === "embargoed") return null;
     return bestCopyUrl ?? (pub.doi ? `https://doi.org/${pub.doi}` : null);
   });
+
+  // Plateforme de la copie donnée par le bouton : une copie listée, ou l'éditeur quand le bouton mène au DOI.
+  const accessCopy = $derived(access.find((a) => a.url === accessUrl) ?? null);
+  const viaPublisher = $derived(accessUrl != null && accessCopy == null);
+  const otherAccess = $derived(access.filter((a) => a !== accessCopy));
+  // Les plateformes du registre restent visibles ; les autres dépôts sont repliés.
+  const knownAccess = $derived(otherAccess.filter((a) => a.known));
+  const unknownAccess = $derived(otherAccess.filter((a) => !a.known));
+
+  // Licence de la copie donnée : celle de la version éditeur par le DOI, celle du dépôt par HAL ; inconnue pour les autres plateformes.
+  const accessLicense = $derived(viaPublisher ? pub.license : accessCopy?.label === "HAL" ? pub.deposit_license : null);
 </script>
 
 <aside class="detail-sidebar">
   {#if accessUrl}
     <a class="access-btn" href={accessUrl} target="_blank" rel="noopener">
-      Accéder
+      Lire le texte intégral
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M7 17L17 7M17 7H8M17 7v9" />
       </svg>
     </a>
-  {:else if accessState}
-    <div class="access-status {accessState.cls}">
+  {/if}
+
+  {#if accessUrl && accessState}
+    <div class="access-line">
+      <span class="access-state" data-access={accessState.cls}><span class="access-dot"></span>Accès ouvert</span>
+      {#if accessLicense}<span class="access-license">· {labels[accessLicense] ?? accessLicense}</span>{/if}
+      {#if accessCopy || viaPublisher}
+        <div class="access-via">via {viaPublisher ? "l'éditeur" : accessCopy?.label}</div>
+      {/if}
+    </div>
+  {:else if !accessUrl && accessState}
+    <!-- Sans copie ouverte : un bloc du même format que le bouton, non cliquable. -->
+    <div class="access-btn access-unavailable">
       {#if pub.oa_status === "embargoed"}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="10" />
-          <polyline points="12 6 12 12 16 14" />
+          <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
         </svg>
+        Sous embargo
       {:else}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
         </svg>
+        Accès fermé
       {/if}
-      {accessState.label}
     </div>
   {/if}
 
-  {#if access.length > 0}
+  {#snippet copyRow(copy: AccessLink)}
+    <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
+      <span class="source-tag {PLATFORM_TAG_CLASSES[copy.label] ?? ''}">
+        {#if PLATFORM_ICONS[copy.label]}
+          <img src={PLATFORM_ICONS[copy.label]} alt={copy.label} />
+        {/if}
+      </span>
+      <span class="row-label">{copy.label}</span>
+    </a>
+  {/snippet}
+
+  {#if otherAccess.length > 0}
     <div class="sidebar-block">
-      <div class="detail-sublabel">Accès</div>
+      <h2 class="sidebar-title">Autres accès</h2>
       <div class="sidebar-sources">
-        {#each access as copy (copy.url)}
-          <a href={copy.url} target="_blank" rel="noopener noreferrer" class="source-row" title={copy.url}>
-            <span class="source-tag">
-              {#if PLATFORM_ICONS[copy.label]}
-                <img src={PLATFORM_ICONS[copy.label]} alt={copy.label} />
-              {/if}
-            </span>
-            <span class="row-label">{copy.label}</span>
-          </a>
-        {/each}
+        {#each knownAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
       </div>
-    </div>
-  {/if}
-
-  {#if pub.doi}
-    <div class="sidebar-block">
-      <div class="detail-sublabel">DOI</div>
-      <a class="doi-link" href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a>
-    </div>
-  {/if}
-
-  {#if pub.license || pub.deposit_license}
-    <div class="sidebar-block">
-      <div class="detail-sublabel">Licence</div>
-      <dl class="licenses">
-        {#if pub.license}
-          <dt>Version éditeur</dt>
-          <dd>{labels[pub.license] ?? pub.license}</dd>
-        {/if}
-        {#if pub.deposit_license}
-          <dt>Dépôt HAL</dt>
-          <dd>{labels[pub.deposit_license] ?? pub.deposit_license}</dd>
-        {/if}
-      </dl>
+      {#if unknownAccess.length}
+        <details class="folded">
+          <summary>{unknownAccess.length} {knownAccess.length ? "autres dépôts" : unknownAccess.length > 1 ? "dépôts" : "dépôt"}</summary>
+          <div class="sidebar-sources">
+            {#each unknownAccess as copy (copy.url)}{@render copyRow(copy)}{/each}
+          </div>
+        </details>
+      {/if}
     </div>
   {/if}
 
@@ -141,7 +159,7 @@
 
   {#if orderedSources.length > 0 || externalIds.length > 0}
     <div class="sidebar-block">
-      <div class="detail-sublabel">Référencé par</div>
+      <h2 class="sidebar-title">Référencé dans</h2>
       <div class="sidebar-sources">
         {#each primarySources as s (s.source + s.source_id)}
           {@render sourceRow(s)}
@@ -164,7 +182,7 @@
         {/each}
       </div>
       {#if secondarySources.length}
-        <details class="secondary-sources">
+        <details class="folded">
           <summary>{secondarySources.length} sources secondaires (pièces, versions)</summary>
           <div class="sidebar-sources">
             {#each secondarySources as s (s.source + s.source_id)}
@@ -178,115 +196,130 @@
 </aside>
 
 <style>
+  /* Encadré d'accès, teinté, qui reste visible au défilement. */
   .detail-sidebar {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px;
     align-self: start;
     position: sticky;
-    /* Sous le menu supérieur fixe (sticky top:0) + petit écart, sinon masquée au scroll. */
-    top: calc(var(--header-height) + 12px);
+    top: calc(var(--header-height) + 16px);
+    padding: 20px;
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--accent-light) 55%, var(--bg));
   }
   .access-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 9px 12px;
+    gap: 8px;
+    height: 44px;
+    border-radius: var(--radius);
     background: var(--accent);
     color: white;
-    font-weight: 600;
-    font-size: 0.95rem;
+    font-weight: 700;
+    font-size: 1rem;
     text-decoration: none;
-    margin-bottom: 14px;
   }
-  .access-btn:hover {
-    background: #336668;
+  a.access-btn:hover {
+    background: color-mix(in srgb, var(--accent), black 20%);
+    text-decoration: none;
   }
   .access-btn svg {
-    width: 15px;
-    height: 15px;
+    width: 16px;
+    height: 16px;
   }
-  .access-status {
-    display: flex;
+  .access-line {
+    margin-top: 10px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+  }
+  .access-state {
+    display: inline-flex;
     align-items: center;
-    justify-content: center;
     gap: 6px;
-    padding: 9px 12px;
     font-weight: 600;
-    font-size: 0.95rem;
-    margin-bottom: 14px;
   }
-  .access-status svg {
-    width: 15px;
-    height: 15px;
+  .access-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-pill);
+    background: currentColor;
+  }
+  .access-state {
+    color: var(--open-text);
+  }
+  .access-unavailable {
+    background: var(--border);
+    color: var(--text-secondary);
+    font-weight: 600;
+    cursor: default;
+  }
+  .access-via {
+    color: var(--muted);
   }
   .sidebar-block {
-    margin-bottom: 14px;
+    margin-top: 22px;
   }
-  .sidebar-block:last-child {
-    margin-bottom: 0;
-  }
-  .doi-link {
-    font-size: 0.85rem;
-    word-break: break-all;
-  }
-  .licenses {
-    margin: 0;
-    font-size: 0.85rem;
-  }
-  .licenses dt {
-    color: var(--muted);
-    font-size: 0.78rem;
-  }
-  .licenses dd {
-    margin: 0 0 4px;
+  .sidebar-title {
+    margin: 0 0 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, white);
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
   }
   .sidebar-sources {
     display: flex;
     flex-direction: column;
-    gap: 4px;
   }
-  /* Rectangle neutre couvrant logo + identifiant ; seul le logo (SourceTag) garde sa teinte. */
   .source-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 8px;
+    gap: 10px;
+    margin: 0 -8px;
+    padding: 6px 8px;
     border-radius: var(--radius);
-    background: var(--surface);
     text-decoration: none;
   }
   .source-row:hover {
-    background: var(--surface-hover);
+    background: color-mix(in srgb, var(--accent-light) 60%, white);
+    text-decoration: none;
   }
-  /* Le lien couvre toute la ligne : l'icône gonfle au survol de la ligne entière, pas seulement au survol de l'icône. */
+  /* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
+  .tag-zenodo {
+    background: #0047a8;
+  }
+  /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */
+  .source-row :global(.source-tag) {
+    flex-shrink: 0;
+  }
+  /* Le lien couvre toute la ligne : l'icône grossit au survol de la ligne entière, pas seulement de l'icône. */
   .source-row:hover :global(.source-tag) {
     transform: scale(1.15);
   }
   .row-label {
-    font-size: 0.82rem;
+    font-size: 0.9rem;
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  /* Groupe replié des sources secondaires (pièces / versions convergées) : discret, fermé par défaut, mêmes lignes que les sources primaires une fois déplié. */
-  .secondary-sources {
+  /* Groupe replié, fermé par défaut : dépôts hors registre, sources secondaires. */
+  .folded {
     margin-top: 6px;
   }
-  .secondary-sources > summary {
-    font-size: 0.78rem;
+  .folded > summary {
+    font-size: 0.8rem;
     color: var(--muted);
     cursor: pointer;
-    padding: 3px 4px;
+    padding: 3px 0;
     user-select: none;
   }
-  .secondary-sources > summary:hover {
+  .folded > summary:hover {
     color: var(--text);
   }
-  .secondary-sources[open] > summary {
+  .folded[open] > summary {
     margin-bottom: 6px;
   }
 </style>

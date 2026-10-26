@@ -7,10 +7,9 @@ from sqlalchemy import text
 from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.exc import IntegrityError
 
-from application.services.persons.core import merge_person
 from domain.errors import ConflictError
 from infrastructure.db.tables import metadata
-from infrastructure.repositories import person_repository
+from interfaces.api.deps import person_service
 from pipeline.transformation.publications.consolidation import refresh_from_sources
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.persons import (
@@ -33,8 +32,8 @@ _publication = partial(insert_publication, normalize_title=False, doc_type=None)
 
 
 @pytest.fixture
-def person_repo(sa_sync_conn):
-    return person_repository(sa_sync_conn)
+def service(sa_sync_conn):
+    return person_service(sa_sync_conn)
 
 
 @pytest.fixture
@@ -152,14 +151,14 @@ class TestPgEnumsMatchDb:
 
 
 class TestMergePersons:
-    def test_merge_transfers_name_forms(self, sa_sync_conn, person_repo):
+    def test_merge_transfers_name_forms(self, sa_sync_conn, service):
         target = _person(sa_sync_conn, "Dupont", first_name="Jean")
         source = _person(sa_sync_conn, "Dupont", first_name="J.")
 
         insert_person_name_form(sa_sync_conn, target, name_form="jean dupont", sources=["persons"])
         insert_person_name_form(sa_sync_conn, source, name_form="j dupont", sources=["hal"])
 
-        merge_person(target, source, repo=person_repo)
+        service.merge_person(target, source)
 
         # Source supprimée
         assert (
@@ -188,7 +187,7 @@ class TestMergePersons:
             is None
         )
 
-    def test_merge_transfers_contributions_one_per_publication(self, sa_sync_conn, person_repo):
+    def test_merge_transfers_contributions_one_per_publication(self, sa_sync_conn, service):
         """Régression : les groupes de contributions sources référencent la personne. Dans une publication où la conservée a déjà un groupe, le groupe de l'absorbée perd sa personne et garde ses contributions sources."""
         conn = sa_sync_conn
         target = _person(conn, "Dupont", first_name="Jean")
@@ -208,21 +207,21 @@ class TestMergePersons:
                 {"p": publication, "person": person},
             ).scalar_one()
 
-        merge_person(target, source, repo=person_repo)
+        service.merge_person(target, source)
 
         persons = dict(conn.execute(text("SELECT id, person_id FROM contributions")).all())
         assert persons[groups["target"]] == target
         assert persons[groups["source_shared"]] is None
         assert persons[groups["source_alone"]] == target
 
-    def test_merge_blocked_if_both_rh(self, sa_sync_conn, person_repo):
+    def test_merge_blocked_if_both_rh(self, sa_sync_conn, service):
         target = _person(sa_sync_conn, "Dupont", first_name="Jean")
         source = _person(sa_sync_conn, "Dupont", first_name="J.")
         _rh(sa_sync_conn, target)
         _rh(sa_sync_conn, source)
 
         with pytest.raises(ConflictError, match="REFUS de fusion"):
-            merge_person(target, source, repo=person_repo)
+            service.merge_person(target, source)
 
         # Les deux personnes existent toujours
         assert (
@@ -232,12 +231,12 @@ class TestMergePersons:
             is not None
         )
 
-    def test_merge_allowed_if_only_target_has_rh(self, sa_sync_conn, person_repo):
+    def test_merge_allowed_if_only_target_has_rh(self, sa_sync_conn, service):
         target = _person(sa_sync_conn, "Dupont", first_name="Jean")
         source = _person(sa_sync_conn, "Dupont", first_name="J.")
         _rh(sa_sync_conn, target)
 
-        merge_person(target, source, repo=person_repo)
+        service.merge_person(target, source)
 
         assert (
             sa_sync_conn.execute(
@@ -246,13 +245,13 @@ class TestMergePersons:
             is None
         )
 
-    def test_person_with_rh_absorbs_when_requested_as_source(self, sa_sync_conn, person_repo):
+    def test_person_with_rh_absorbs_when_requested_as_source(self, sa_sync_conn, service):
         """La personne qui a une fiche RH est conservée, même demandée comme absorbée."""
         requested_target = _person(sa_sync_conn, "Dupont", first_name="J.")
         with_rh = _person(sa_sync_conn, "Dupont", first_name="Jean")
         _rh(sa_sync_conn, with_rh)
 
-        assert merge_person(requested_target, with_rh, repo=person_repo) == (
+        assert service.merge_person(requested_target, with_rh) == (
             with_rh,
             requested_target,
         )

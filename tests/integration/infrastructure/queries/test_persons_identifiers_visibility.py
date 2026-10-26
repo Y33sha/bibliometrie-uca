@@ -2,10 +2,10 @@
 
 L'administration voit et arbitre tous les types, `hal_person_id` compris. Le profil public rend seulement les types publics non rejetés."""
 
-from application.ports.read_models.persons_queries import PersonFilters
 from infrastructure.read_models.persons.detail import person_profile
 from infrastructure.read_models.persons.facets import persons_facets
 from infrastructure.read_models.persons.list import list_persons, person_curation
+from infrastructure.read_models.persons.models import PersonFilters
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 
 

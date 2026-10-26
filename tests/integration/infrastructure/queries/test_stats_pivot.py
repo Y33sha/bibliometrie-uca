@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from application.ports.read_models.stats_queries import StatsFilters
+from infrastructure.read_models.stats.models import StatsFilters
 from infrastructure.read_models.stats.pivot import run_pivot
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
