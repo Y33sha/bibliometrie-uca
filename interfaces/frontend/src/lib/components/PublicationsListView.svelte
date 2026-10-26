@@ -49,6 +49,7 @@
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import { paramsToQuery } from '#lib/utils.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import IconButton from '#lib/components/IconButton.svelte';
 
 	import type { components } from '#lib/api/schema.js';
 	type Publication = components['schemas']['PublicationListItem'] & {
@@ -60,14 +61,13 @@
 
 	// --- Props ---
 	// Composant de liste de publications réutilisable. Utilisé par :
-	// - `/publications` (mode autonome avec sync URL)
+	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de gestion)
 	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
 	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `serial_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
 	// - `/monographs/[id]` (filtre `monograph_id` fixe)
-	// - `/admin/publications` (un clic sur un titre ouvre le volet de l'administration)
 	interface ExternalFilters {
 		subjectId?: number;
 		subjectLabel?: string;
@@ -121,7 +121,7 @@
 		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
 		restrictToPublications?: boolean;
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
-		/** Ouvre la publication dans la page hôte au lieu de naviguer vers sa fiche. Un clic modifié (Ctrl, Cmd, Maj, Alt) garde la navigation. */
+		/** Ouvre le volet de la publication dans la page hôte. Fourni, il ajoute en tête de ligne une icône qui l'appelle ; le titre mène toujours à la fiche. */
 		onopenPublication?: (publicationId: number) => void;
 		/** Publication ouverte par la page hôte, dont la ligne est mise en évidence. */
 		activePublicationId?: number | null;
@@ -533,12 +533,6 @@
 		listing.items = listing.items.filter((item) => item.id !== p.id);
 	}
 
-	function onTitleClick(e: MouseEvent, publicationId: number) {
-		if (!onopenPublication || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-		e.preventDefault();
-		onopenPublication(publicationId);
-	}
-
 	onMount(async () => {
 		licenseLabels()
 			.then((labels) => (licenseNames = labels))
@@ -616,6 +610,7 @@
 <table class="data-table publication-table">
 	<thead>
 		<tr>
+			{#if onopenPublication}<th style="width:28px"></th>{/if}
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
@@ -646,10 +641,15 @@
 	</thead>
 	<tbody>
 		{#if listing.items.length === 0}
-			<TableStatusRow loading={listing.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} emptyText="Aucune publication trouvée" />
+			<TableStatusRow loading={listing.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (onopenPublication ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === activePublicationId}>
+					{#if onopenPublication}
+						<td class="row-actions">
+							<IconButton icon="edit" label="Ouvrir le volet de gestion" onclick={() => onopenPublication(p.id)} />
+						</td>
+					{/if}
 					{#if showAdminExclude}
 						<td class="exclude-cell row-actions">
 							{#if p.contribution_id != null}
@@ -662,7 +662,7 @@
 						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
-					<td><a href={resolve(`publications/${p.id}`)} class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
+					<td><a href={resolve(`publications/${p.id}`)} class="publication-title"><PublicationTitle titre={p.title} /></a></td>
 					{#if col('serial')}<td class="journal-cell publication-col-journal">
 						{#if p.serial_id}
 							<a href={resolve(`journals/${p.serial_id}`)}>{p.serial}</a>

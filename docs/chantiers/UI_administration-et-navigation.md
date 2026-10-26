@@ -80,7 +80,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 #### 3d. Publications
 
-- [ ] Icône de volet sur la ligne ; onglet « Fusions suspectes » selon le rôle ; suppression de `admin/publications`
+- [x] Icône de volet sur la ligne ; onglet « Fusions suspectes » selon le rôle ; suppression de `admin/publications`
 
 #### 3e. Structures
 
