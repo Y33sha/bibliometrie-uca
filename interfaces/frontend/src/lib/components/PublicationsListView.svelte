@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AccessButton from '#lib/components/AccessButton.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
@@ -568,7 +569,7 @@
 <div class="toolbar-card toolbar-sticky publication-toolbar">
 	<div class="toolbar publication-toolbar-main">
 		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-		<span class="count">{listing.total} publication{listing.total > 1 ? 's' : ''}</span>
+		<ResultCount list={listing} one="publication" many="publications" />
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
 	</div>

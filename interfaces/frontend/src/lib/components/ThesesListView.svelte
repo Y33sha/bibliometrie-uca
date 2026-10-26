@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { page } from '$app/state';
 	import { withBase } from '#lib/paths.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
@@ -209,7 +210,7 @@
 		counts={facets.sourceCounts}
 		onchange={() => onFilterChange()}
 	/>
-	<span class="count">{listing.total} thèse{listing.total > 1 ? 's' : ''}</span>
+	<ResultCount list={listing} one="thèse" many="thèses" />
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 

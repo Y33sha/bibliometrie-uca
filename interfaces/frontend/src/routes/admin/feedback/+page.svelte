@@ -1,5 +1,6 @@
 <script lang="ts">
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+  import ResultCount from '#lib/components/ResultCount.svelte';
   import { pageTitle } from '#lib/institution.svelte.js';
   import { onMount } from "svelte";
   import { replaceState } from "$app/navigation";
@@ -315,7 +316,7 @@
       <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
     <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-    <span class="count">{list.total} adresses</span>
+    <ResultCount {list} one="adresse" many="adresses" />
   </div>
 
   <!-- Table -->

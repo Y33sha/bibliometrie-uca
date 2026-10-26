@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -81,7 +82,7 @@
 			<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
 		{/each}
 	</select>
-	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
+	<ResultCount {list} one="publication" many="publications" />
 </div>
 
 {#if !labsLoaded}
@@ -125,7 +126,6 @@
 		color: var(--accent);
 		min-width: 300px;
 	}
-	.count { font-size: 0.9rem; }
 	.publication-list { display: flex; flex-direction: column; gap: 8px; }
 	.publication-card {
 		background: var(--card);

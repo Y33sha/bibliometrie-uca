@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceState } from '$app/navigation';
 	import { page } from '$app/state';
@@ -47,7 +48,7 @@
 </div>
 
 <div class="toolbar">
-	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
+	<ResultCount {list} one="publication" many="publications" />
 </div>
 
 <ListStatus {list} emptyText="Aucun conflit détecté">
@@ -77,7 +78,6 @@
 </ListStatus>
 
 <style>
-	.count { font-size: 0.9rem; }
 	.publication-list { display: flex; flex-direction: column; gap: 8px; }
 	.publication-card {
 		background: var(--card);

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { institution, loadInstitution, pageTitle } from '#lib/institution.svelte.js';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -146,9 +147,6 @@
 	let mainPanel: HTMLDivElement | undefined = $state();
 
 	const selectedCount = $derived(selectedIds.size);
-	const resultCountText = $derived(
-		`${list.total} adresse${list.total > 1 ? 's' : ''}`
-	);
 
 	// Libellé d'une structure par id (pour les tags des prédicats).
 	const structureLabelById = $derived(
@@ -472,7 +470,7 @@
 					<option value="rejected">rejeté</option>
 				</select>
 			</label>
-			<span class="count">{resultCountText}</span>
+			<ResultCount {list} one="adresse" many="adresses" />
 		</div>
 
 		<!-- Prédicats texte -->
@@ -773,11 +771,6 @@
 		display: flex;
 		align-items: center;
 		gap: 4px;
-	}
-	.count {
-		margin-left: auto;
-		font-size: 0.85rem;
-		color: var(--muted);
 	}
 	.pred-type {
 		font-size: 0.75rem;

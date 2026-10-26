@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -177,7 +178,7 @@
 			onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
 		/>
 	{/if}
-	<span class="count">{monographs.total.toLocaleString('fr-FR')} monographie{monographs.total > 1 ? 's' : ''}</span>
+	<ResultCount list={monographs} one="monographie" many="monographies" />
 </div>
 
 <div class="table-scroll">

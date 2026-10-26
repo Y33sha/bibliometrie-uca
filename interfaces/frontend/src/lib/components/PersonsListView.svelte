@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { page } from '$app/state';
 	import FacetDropdown, { type FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
@@ -252,7 +253,7 @@
 		<FacetDropdown label="Activité" options={activityOptions} bind:selected={selectedActivity} onchange={onFilterChange} />
 		<FacetDropdown label="Exclusion" options={exclusionOptions} allLabel="Toutes" bind:selected={selectedExclusions} onchange={onFilterChange} />
 	{/if}
-	<span class="count">{dir.total} personne{dir.total > 1 ? 's' : ''}</span>
+	<ResultCount list={dir} one="personne" many="personnes" />
 </div>
 
 <PersonsTable

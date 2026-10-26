@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
@@ -182,7 +183,7 @@
 			onchange={onFilterChange}
 		/>
 	{/if}
-	<span class="count">{publishers.total.toLocaleString('fr-FR')} éditeur{publishers.total > 1 ? 's' : ''}</span>
+	<ResultCount list={publishers} one="éditeur" many="éditeurs" />
 </div>
 
 <div class="table-scroll">

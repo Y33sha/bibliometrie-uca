@@ -1,5 +1,6 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
+  import ResultCount from "#lib/components/ResultCount.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { resolve } from "$app/paths";
   import { replaceState } from "$app/navigation";
@@ -43,7 +44,7 @@
 <div class="info-box">Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.</div>
 
 <div class="toolbar">
-  <span class="count">{list.total} personne{list.total > 1 ? "s" : ""}</span>
+  <ResultCount {list} one="personne" many="personnes" />
 </div>
 
 <ListStatus {list} emptyText="Aucun doublon détecté">
@@ -100,9 +101,6 @@
 </ListStatus>
 
 <style>
-  .count {
-    font-size: 0.9rem;
-  }
   .data-table td {
     font-size: 0.9rem;
   }

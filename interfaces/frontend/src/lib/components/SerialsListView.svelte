@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -226,7 +227,7 @@
 			onchange={onFilterChange}
 		/>
 	{/if}
-	<span class="count">{serials.total.toLocaleString('fr-FR')} publication{serials.total > 1 ? 's' : ''} en série</span>
+	<ResultCount list={serials} one="publication en série" many="publications en série" />
 </div>
 
 <div class="table-scroll">
