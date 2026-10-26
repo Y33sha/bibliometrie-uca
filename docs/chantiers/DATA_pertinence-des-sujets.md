@@ -8,7 +8,8 @@ Base locale au 2026-10-25 : 74 585 publications, 734 400 liens publication–suj
 - **Rejet inutilisé.** La colonne `publication_subjects.rejected` existe, mais aucun code ne l'écrit. L'ingestion conserve les liens rejetés. `usage_count` et `subject_cooccurrences` les écartent, donc les pages `/subjects` et `/subjects/[id]` aussi. Les nuages de sujets (`entity_subjects_sql`), le filtre par sujet et la fiche d'une publication les montrent.
 - **Publications sans sujet** : 1 626.
 - **Sujet incohérent avec la revue** : signal inexploité. Les sujets DOAJ sont connus pour 2 325 revues sur 10 860 (`serials.doaj_payload`).
-- **Hiérarchie.** `subjects` porte un libellé, sans parent. La chaîne domain → field → subfield → topic d'OpenAlex et le chemin des domaines HAL existent seulement dans `source_records.topics`.
+- **Hiérarchie.** `subjects` porte un libellé, sans vocabulaire ni parent. La chaîne domain → field → subfield → topic d'OpenAlex et le chemin des domaines HAL existent seulement dans `source_records.topics`. Le libellé ne suffit pas à situer un sujet OpenAlex : « Social Sciences » est domain et field ; « Biochemistry », « Genetics », « Pharmacology » sont des subfields de deux fields différents. Le normalizer OpenAlex écarte les identifiants. 3 001 libellés sont partagés entre plusieurs sources, donc fusionnés en un sujet.
+- **Besoins de l'interface.** Les graphiques de sujets demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
 
 ### Constats de l'exploration (corpus de 46 000 publications)
 
@@ -57,14 +58,18 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - **WoS est exclu des arbitres** : l'abonnement va être résilié.
 - **Un rejet automatique se recalcule. Un rejet manuel est une décision humaine durable.**
 - **Affichage des rejets.** Les liens rejetés sont exclus des décomptes et des listes : `/subjects`, `/subjects/[id]`, nuages de sujets des personnes, structures, revues et éditeurs, filtre par sujet. La fiche `/publications/[id]` les affiche barrés et grisés, pour le contrôle visuel des rejets.
-- **Pistes écartées** : seuil sur le score OpenAlex, co-occurrences rares entre topics feuille, seuil « au moins deux soutiens », identification des sujets par code.
+- **Hiérarchie des sujets stockée.** Un sujet est identifié par son vocabulaire et son code dans ce vocabulaire, à défaut son libellé. Il porte son niveau et son parent.
+- **Deux couches.** Le référentiel hiérarchique garde les sujets de chaque vocabulaire. Les sujets affichés sont dédupliqués : une publication montre une seule fois « Chemistry », quel que soit le nombre de vocabulaires qui le lui attribuent.
+- **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
+- **Les 4 domains OpenAlex sont écartés des graphiques.**
+- **Pistes écartées** : seuil sur le score OpenAlex, co-occurrences rares entre topics feuille, seuil « au moins deux soutiens ».
 
 ## Phasage
 
 ### Discipline des thèses
 
 - [x] Une seule copie de la discipline, `topics.discipline`, lue par l'extracteur de sujets et par la fiche de la thèse ; le normalizer theses.fr cesse d'écrire `source_extras.discipline`
-- [ ] Stock : renormalisation des enregistrements theses.fr depuis `staging`
+- [ ] Stock : retrait de `source_extras.discipline` des enregistrements theses.fr par un script ponctuel
 
 ### Phase 1 — Échantillon de référence
 
@@ -123,13 +128,25 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [x] Jugement au grain field : centroïdes des 26 fields (150 membres chacun), embeddings centrés ; le field le plus proche de la publication est toujours gardé ; un field rejeté entraîne ses descendants ; un domain tombe quand tous ses fields tombent. AUC des fields : rang parmi les 26, 0,78 ; écart au meilleur field, 0,75 ; typicité, 0,72. Meilleurs points, tous niveaux : typicité < 0,02, précision 75 %, rappel 18 % (domains rejetés : 5 aberrants, 1 pertinent) ; rang au-delà du 8e field, précision 58 %, rappel 32 %. Les 69 topics aberrants sous un field correct restent hors d'atteinte de ce niveau
 - [ ] Coût d'un passage sur le stock et sur chaque run
 
-### Phase 5 — Choix et mise en œuvre
+### Phase 5 — Hiérarchie des sujets
+
+- [ ] Schéma du référentiel : vocabulaire, code, libellé, niveau, parent ; unicité sur (vocabulaire, code)
+- [ ] Schéma des sujets affichés et de leur lien aux sujets du référentiel
+- [ ] Normalizer OpenAlex : `extract_topics` conserve l'identifiant de chaque niveau
+- [ ] Stock OpenAlex : script ponctuel qui complète `source_records.topics` avec les identifiants lus dans le raw store
+- [ ] Extracteurs (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent ; domaines HAL par leur code, OpenAlex par ses identifiants, vedettes sudoc de ScanR par leur PPN, discipline et vedettes RAMEAU de theses.fr par leur libellé
+- [ ] Ingestion de la phase `subjects` : référentiel, sujets affichés et liens ; `--rebuild-subjects` sur le stock
+- [ ] Rattachement des domaines de haut niveau de chaque vocabulaire à la palette commune : codes HAL, mots-clés des disciplines theses.fr (correspondances du prototype de vote)
+- [ ] Interface : couleur par domaine de haut niveau dans les graphiques de sujets ; domains OpenAlex écartés
+- [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`
+
+### Phase 6 — Choix et mise en œuvre
 
 - [ ] Choix de la piste ou de la combinaison, d'après les bilans des phases 2 à 4
 - [ ] Forme du stockage des rejets automatiques et manuels
 - [ ] Phasage de la mise en œuvre dans la phase `subjects`
 
-### Phase 6 — Rejets dans l'interface
+### Phase 7 — Rejets dans l'interface
 
 - [ ] Nuages de sujets (`entity_subjects_sql`), filtre et facette par sujet (`infrastructure/read_models/filters.py`, `entity_facet.py`) : liens rejetés écartés
 - [ ] `/publications/[id]` : `get_publication_subjects` rend le statut de rejet ; `SubjectsBlock.svelte` barre et grise les sujets rejetés
@@ -139,5 +156,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 - **Stockage des rejets.** Le booléen `rejected` confond rejet automatique et rejet manuel. Un rejet manuel accroché à `publication_id` disparaît avec la publication. Quelle forme donner aux deux ?
 - **Édition manuelle des rejets** : dans ce chantier ou dans [la gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) ?
+- **Sujets affichés** : forme de la déduplication (table ou vue), règle de fusion entre vocabulaires (libellé normalisé, équivalences entre français et anglais).
+- **Niveaux écartés des graphiques** au-delà des domains OpenAlex : fields, premier niveau HAL.
 - **Provenance des sujets ISTEX**, si les classifieurs donnent des sujets aux publications qui n'en ont pas : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
 - **Specter2** : variante du modèle (`allenai/specter2_base`, `proximity`, `classification`), exécution (locale sur CPU ou GPU, ou hébergée), persistance des vecteurs (pgvector ou fichier numpy). 74 600 publications à encoder.
