@@ -5,7 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from infrastructure.read_models._common import FacetOption, PaginatedResponse
+from infrastructure.read_models._common import FacetOption, PaginatedResponse, YesNoCount
 
 # Vocabulaire de tri de la liste des éditeurs : le champ, puis le sens.
 PublisherSort = Literal[
@@ -22,13 +22,13 @@ PublisherSort = Literal[
 class PublisherFilters:
     """Filtres que la liste des éditeurs et ses facettes honorent toutes deux.
 
-    `publisher_types` et `countries` sont multi-valués. `with_publications` restreint aux éditeurs dont le décompte de publications du périmètre est non nul.
+    `publisher_types` et `countries` sont multi-valués. `has_publications` retient les éditeurs dont le décompte de publications du périmètre est non nul (`True`) ou nul (`False`).
     """
 
     search: str = ""
     publisher_types: list[str] = field(default_factory=list)
     countries: list[str] = field(default_factory=list)
-    with_publications: bool = False
+    has_publications: bool | None = None
 
 
 class DoiPrefixInfo(BaseModel):
@@ -85,13 +85,14 @@ class OaStatusCount(BaseModel):
 
 
 class PublishersFacetsResponse(BaseModel):
-    """Facettes dynamiques pour `/api/publishers` (2 dimensions).
+    """Facettes dynamiques pour `/api/publishers`.
 
-    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
+    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
     """
 
     publisher_types: list[FacetOption]
     countries: list[FacetOption]
+    publications: YesNoCount
 
 
 class PublisherDashboardResponse(BaseModel):

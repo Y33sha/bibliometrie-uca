@@ -71,7 +71,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 #### 3b. Éditeurs
 
-- [ ] Cellule d'actions selon le rôle sur la page publique ; facette des éditeurs sans publication ; suppression de `admin/publishers`
+- [x] Cellule d'actions selon le rôle sur la page publique ; facette des éditeurs sans publication ; suppression de `admin/publishers`
 
 #### 3c. Publications en série
 

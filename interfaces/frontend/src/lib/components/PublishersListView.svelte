@@ -13,19 +13,18 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
+	import { isAdmin } from '#lib/session.svelte.js';
+	import { nextSort, sortDirection } from '#lib/sort.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Publisher = components['schemas']['PublisherListItem'];
 
-	// Composant de liste d'éditeurs réutilisable. Utilisé par :
-	// - `/publishers` (mode autonome avec sync URL)
-	// - `/admin/publishers` (snippet `actionCell` pour Modifier/Fusionner)
+	// Liste des éditeurs de la page `/publishers`. La session admin y gagne la facette « Publications » et la colonne d'actions que lui passe la page.
 	let {
 		apiKey = 'publishers-list',
 		urlSync = false,
 		basePath = '/publishers',
 		perPage = 50,
-		withPubs = false,
 		actionCell,
 		actionColumnHeader = '',
 		serialsHeader = 'Revues',
@@ -34,8 +33,6 @@
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Si true, n'expose que les éditeurs avec ≥ 1 publication rattachée (mode page publique, masque les orphelines). Défaut false = admin. */
-		withPubs?: boolean;
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). */
 		actionCell?: Snippet<[Publisher]>;
 		actionColumnHeader?: string;
@@ -48,12 +45,14 @@
 	let currentSort = $state('publications_desc');
 	let selectedPublisherTypes: string[] = $state([]);
 	let selectedCountries: string[] = $state([]);
+	// Éditeurs avec ou sans publication du périmètre. Par défaut, ceux qui en ont ; seule la session admin change ce réglage.
+	let selectedPublications: string[] = $state(['yes']);
 
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
 		if (selectedPublisherTypes.length) params.set('publisher_type', selectedPublisherTypes.join(','));
 		if (selectedCountries.length) params.set('country', selectedCountries.join(','));
-		if (withPubs) params.set('with_publications', 'true');
+		if (selectedPublications.length === 1) params.set('has_publications', selectedPublications[0]);
 		return params;
 	}
 
@@ -85,6 +84,7 @@
 		facets: {
 			publisherTypes: { type: 'labeled', apiKey: 'publisher_types' },
 			countries: { type: 'labeled', apiKey: 'countries' },
+			publications: { type: 'boolean', apiKey: 'publications', yesLabel: 'Avec', noLabel: 'Sans' },
 		},
 	});
 
@@ -93,6 +93,7 @@
 		filters: {
 			selectedPublisherTypes: { type: 'string_array', urlKey: 'publisher_type' },
 			selectedCountries: { type: 'string_array', urlKey: 'country' },
+			hasPublications: { type: 'single', urlKey: 'has_publications', defaultValue: 'yes' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
@@ -104,6 +105,7 @@
 		url.syncUrl(() => ({
 			selectedPublisherTypes,
 			selectedCountries,
+			hasPublications: selectedPublications.length === 1 ? selectedPublications[0] : 'all',
 			search,
 			currentSort,
 			currentPage: publishers.page,
@@ -124,21 +126,11 @@
 		facets.load();
 	});
 
-	function setSort(s: string) {
-		currentSort = currentSort === s ? oppositeSort(s) : s;
+	function setSort(column: 'name' | 'serials' | 'publications') {
+		currentSort = nextSort(currentSort, column, column === 'name' ? 'asc' : 'desc');
 		publishers.page = 1;
 		syncUrl();
 		publishers.load();
-	}
-
-	function oppositeSort(s: string): string {
-		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
-	}
-
-	function sortDirection(col: 'name' | 'serials' | 'publications'): 'asc' | 'desc' | null {
-		if (currentSort === `${col}_asc`) return 'asc';
-		if (currentSort === `${col}_desc`) return 'desc';
-		return null;
 	}
 
 	function publisherTypeLabel(value: string | null): string {
@@ -152,6 +144,10 @@
 			const restored = url.restoreFromUrl(page.url.searchParams);
 			if (restored.selectedPublisherTypes) selectedPublisherTypes = restored.selectedPublisherTypes as string[];
 			if (restored.selectedCountries) selectedCountries = restored.selectedCountries as string[];
+			if (restored.hasPublications != null && isAdmin()) {
+				const value = restored.hasPublications as string;
+				selectedPublications = value === 'all' ? [] : [value];
+			}
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) publishers.page = restored.currentPage as number;
@@ -183,6 +179,14 @@
 		bind:selected={selectedCountries}
 		onchange={onFilterChange}
 	/>
+	{#if isAdmin()}
+		<FacetDropdown
+			label="Publications"
+			options={facets.options.publications}
+			bind:selected={selectedPublications}
+			onchange={onFilterChange}
+		/>
+	{/if}
 	<span class="count">{publishers.total.toLocaleString('fr-FR')} éditeur{publishers.total > 1 ? 's' : ''}</span>
 </div>
 
@@ -191,16 +195,16 @@
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('name')}>
-				Nom <SortChevron direction={sortDirection('name')} />
+				Nom <SortChevron direction={sortDirection(currentSort, 'name')} />
 			</th>
 			<th>Type</th>
 			<th>Pays</th>
 			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
-				{serialsHeader} <SortChevron direction={sortDirection('serials')} />
+				{serialsHeader} <SortChevron direction={sortDirection(currentSort, 'serials')} />
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis <SortChevron direction={sortDirection('publications')} />
+				Publis <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

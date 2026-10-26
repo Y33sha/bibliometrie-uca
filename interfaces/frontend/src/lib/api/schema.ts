@@ -1873,7 +1873,7 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
-         *     `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -4672,15 +4672,16 @@ export interface components {
         };
         /**
          * PublishersFacetsResponse
-         * @description Facettes dynamiques pour `/api/publishers` (2 dimensions).
+         * @description Facettes dynamiques pour `/api/publishers`.
          *
-         *     Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
+         *     Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
          */
         PublishersFacetsResponse: {
             /** Publisher Types */
             publisher_types: components["schemas"]["FacetOption"][];
             /** Countries */
             countries: components["schemas"]["FacetOption"][];
+            publications: components["schemas"]["YesNoCount"];
         };
         /**
          * RejectedPairItem
@@ -8784,7 +8785,7 @@ export interface operations {
                 search?: string;
                 publisher_type?: string;
                 country?: string;
-                with_publications?: boolean;
+                has_publications?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -8821,7 +8822,7 @@ export interface operations {
                 search?: string;
                 publisher_type?: string;
                 country?: string;
-                with_publications?: boolean;
+                has_publications?: boolean | null;
             };
             header?: never;
             path?: never;
