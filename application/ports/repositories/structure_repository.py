@@ -55,10 +55,7 @@ class NameFormUpdate(BaseModel):
 
 
 class StructureNameFormUpdateFields(TypedDict, total=False):
-    """Partial update sur la table `structure_name_forms`.
-
-    `form_text` reçu en clair est normalisé par le service via `normalize_text` avant d'être passé au repo.
-    """
+    """Champs d'une forme de nom à écrire, `form_text` déjà normalisé."""
 
     form_text: str
     is_word_boundary: bool
@@ -82,7 +79,7 @@ class StructureTutelleDeletedRow(TypedDict):
 
 
 class StructureNameFormRow(TypedDict):
-    """Ligne `structure_name_forms` renvoyée par create / update. Alimente le DTO `NameFormOut`."""
+    """Forme de nom de structure, rendue par la création et la mise à jour."""
 
     id: int
     structure_id: int
@@ -106,7 +103,7 @@ class StructureRepository(Protocol):
     # ── structures : charger-muter-sauver l'agrégat ────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
-        """Hydrate l'aggregate `Structure` complet (champs scalaires + VOs `name_forms`). Retourne None si la structure n'existe pas. Les `structure_parents` restent un graphe externe à l'aggregate (voir `get_ancestor_ids` pour les remontées ciblées)."""
+        """Charge l'agrégat `Structure` avec ses formes de nom, ou `None` si la structure n'existe pas. Les tutelles sont hors de l'agrégat (`get_ancestor_ids`)."""
         ...
 
     def add(self, structure: Structure) -> int:
@@ -114,7 +111,7 @@ class StructureRepository(Protocol):
         ...
 
     def save(self, structure: Structure) -> None:
-        """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
+        """Enregistre les champs éditables d'une structure chargée ; le code est immuable. Lève `NotFoundError` si la structure n'existe pas."""
         ...
 
     def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:

@@ -5,7 +5,7 @@ Usage, depuis un service, après l'écriture que l'événement décrit :
 
 L'événement rejoint la file de la requête en cours. `db_conn` écrit cette file dans `audit_log` juste avant le commit de la requête (`record_pending_events`) : la trace partage le sort de l'écriture qu'elle décrit.
 
-La requête et son utilisatrice vivent dans un ContextVar, posé par le middleware d'authentification. Hors requête d'administration (pipeline, scripts, tests qui n'auditent pas), `emit_event` ne consigne rien. Chaque requête HTTP a son propre contexte. Une copie du contexte, celle d'un thread du threadpool, porte la même file.
+La requête et son utilisatrice vivent dans un ContextVar, posé par le middleware d'authentification. Hors requête d'administration (pipeline, scripts, tests qui n'auditent pas), `emit_event` ne consigne rien. Chaque requête HTTP a son propre contexte. Une copie du contexte, celle d'un thread du threadpool, contient la même file.
 """
 
 import contextvars

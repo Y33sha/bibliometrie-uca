@@ -1,4 +1,4 @@
-"""Port : lectures sur les monographies (consommé par le router monographs).
+"""Port : lectures sur les monographies.
 
 Implémenté par `infrastructure.read_models.monographs.PgMonographQueries`.
 """

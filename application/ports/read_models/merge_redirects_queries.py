@@ -1,4 +1,4 @@
-"""Port : redirection de l'identifiant d'une entité absorbée par une fusion (consommé par les routes de détail).
+"""Port : redirection de l'identifiant d'une entité absorbée par une fusion.
 
 Implémenté par `infrastructure.read_models.merge_redirects.PgMergeRedirectQueries`.
 """

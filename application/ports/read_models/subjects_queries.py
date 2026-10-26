@@ -1,4 +1,4 @@
-"""Port : lectures sur les sujets (consommé par le router subjects).
+"""Port : lectures sur les sujets.
 
 Implémenté par `infrastructure.read_models.subjects.PgSubjectsQueries`. Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subjects_queries.py`).
 

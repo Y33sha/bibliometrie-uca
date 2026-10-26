@@ -1,4 +1,4 @@
-"""Port : lectures sur les revues (consommé par le router serials).
+"""Port : lectures sur les revues.
 
 Implémenté par `infrastructure.read_models.serials.PgSerialQueries`.
 """
@@ -33,7 +33,7 @@ SerialSort = Literal[
 class SerialFilters:
     """Filtres que la liste des revues et ses facettes honorent toutes deux.
 
-    `search` porte sur le titre et sur les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_publications` restreint aux revues portant au moins une publication.
+    `search` cherche dans le titre et dans les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_publications` restreint aux revues qui ont au moins une publication.
     """
 
     search: str = ""
@@ -131,7 +131,7 @@ class SerialDashboardResponse(BaseModel):
 
     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
 
-    `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue ne porte pas la valeur correspondante, ou que celle-ci n'est pas mappée.
+    `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue n'a pas la valeur correspondante, ou que celle-ci n'est pas mappée.
     """
 
     total_publications: int

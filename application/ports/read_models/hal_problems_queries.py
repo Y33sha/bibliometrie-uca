@@ -3,8 +3,6 @@
 Implémenté par `infrastructure.read_models.hal_problems.PgHalProblemsQueries`.
 
 Placement par cas d'usage (le seul appelant est le router de diagnostics HAL), pas par table.
-
-Les modèles Pydantic que ces lectures rendent sont co-localisés ici : leur contrat appartient au port.
 """
 
 from enum import StrEnum

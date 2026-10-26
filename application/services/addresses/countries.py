@@ -68,7 +68,7 @@ def batch_set_country(
             repo=repo,
             country_recompute=country_recompute,
         )
-    # Une sélection par filtre peut couvrir toute la table : c'est le critère qui porte la
+    # Une sélection par filtre peut couvrir toute la table : c'est le critère qui exprime la
     # décision, non la liste qu'il rend. L'appel par identifiants, lui, les consigne.
     decision: dict[str, JsonValue] = {"country_code": country_code}
     if address_ids:

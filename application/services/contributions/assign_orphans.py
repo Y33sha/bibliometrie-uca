@@ -39,13 +39,9 @@ def _resolve_rejection(
 ) -> None:
     """Pré-contrôle des paires rejetées avant une réassignation.
 
-    Cherche, parmi les `publication_ids`, celles dont la paire avec
-    `person_id` figure dans `rejected_contributions`. Si au moins une est
-    rejetée :
-    - sans `force` : lève `RejectedPairError` (→ 409) listant les paires et
-      leur date de rejet, pour que l'UI demande confirmation ;
-    - avec `force` : lève le rejet de chaque paire (suppression du registre +
-      événement d'audit), ce qui laisse la réassignation recréer le lien.
+    Cherche, parmi les `publication_ids`, celles dont la paire avec `person_id` est rejetée. Si au moins une l'est :
+    - sans `force` : lève `RejectedPairError` (→ 409), qui liste les paires et leur date de rejet, pour que l'UI demande confirmation ;
+    - avec `force` : lève le rejet de chaque paire, ce qui laisse la réassignation recréer le lien.
     """
     rejected = [
         (publication_id, at)
@@ -68,7 +64,7 @@ def _resolve_rejection(
         )
     for publication_id, _ in rejected:
         contribution_repo.delete_rejected_contribution(publication_id, person_id)
-    # La levée procède d'une confirmation unique : un événement, portant les publications dont
+    # La levée procède d'une confirmation unique : un événement, qui liste les publications dont
     # le rejet tombe, plutôt qu'un par paire.
     emit_event(
         "contribution.unrejected",

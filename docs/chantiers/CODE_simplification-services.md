@@ -49,22 +49,22 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 
 ### Phase 2 — Retouches sans décision de fond
 
-- [ ] `load_merge_pair` en vérification d'existence, sans retour
-- [ ] Statuts typés `AttributionStatus` dans `persons.py` ; `logger` inutilisé retiré
-- [ ] `create_tutelle` : recalcul de la clôture seulement pour une tutelle créée
-- [ ] `set_country` sans liste artificielle en retour
-- [ ] Propagations consécutives à une écriture d'adresse réunies
+- [x] `load_merge_pair` en vérification d'existence, sans retour (`977c4bb60`)
+- [x] Statuts typés `AttributionStatus` dans `persons.py` ; `logger` inutilisé retiré
+- [x] `create_tutelle` : recalcul de la clôture seulement pour une tutelle créée
+- [x] `set_country` sans liste artificielle en retour
+- [x] Propagations consécutives à une écriture d'adresse réunies
 
 ### Phase 3 — Frontière entre service et interface
 
-- [ ] `_to_row` remplacé par la composition de `StructureOut` dans le routeur
-- [ ] `StructureCreate` et `NameFormCreate` dans le port, reçus par `create_structure` et `create_name_form`
+- [x] `_to_row` remplacé par la composition de `StructureOut` dans le routeur (`bb68f4aea`)
+- [x] `StructureCreate` et `NameFormCreate` dans le port, reçus par `create_structure` et `create_name_form`
 
 ### Phase 4 — Docstrings
 
-- [ ] Docstrings fausses des ports corrigées
-- [ ] Docstrings des ports de repositories réduites au contrat
-- [ ] Relecture de style de `application/`
+- [x] Docstrings fausses des ports corrigées
+- [x] Docstrings des ports de repositories réduites au contrat
+- [x] Relecture de style de `application/`
 
 ## Questions ouvertes
 

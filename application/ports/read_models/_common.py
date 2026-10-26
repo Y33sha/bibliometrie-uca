@@ -1,7 +1,4 @@
-"""Types Pydantic transverses retournés par plusieurs ports `application.ports.read_models.*`.
-
-Vit ici (et pas dans `interfaces/api/models/_common.py`) parce que ces shapes sont des retours de query services partagés entre plusieurs ports (persons, publications, structures). Les ports les importent directement ; `interfaces/api/models/` ne contient que les types router-only (`OkResponse`, `MergeRequest`, etc.).
-"""
+"""Types Pydantic transverses retournés par plusieurs ports `application.ports.read_models.*`."""
 
 import math
 from typing import Literal
@@ -19,7 +16,7 @@ def page_count(total: int, per_page: int) -> int:
 class PaginatedResponse(BaseModel):
     """Socle des lectures paginées : la tranche demandée et de quoi situer le reste.
 
-    `pages` se déduit de `total` et `per_page` — c'est une conséquence, pas une donnée. Les réponses qui en héritent ajoutent leur liste de résultats et ce que leur lecture porte en propre.
+    `pages` se déduit de `total` et `per_page` — c'est une conséquence, pas une donnée. Les réponses qui en héritent ajoutent leur liste de résultats et les champs propres à leur lecture.
     """
 
     total: int
@@ -49,7 +46,7 @@ def hal_links(halids: list[str] | None) -> list[SourceLink]:
 class FacetOption(BaseModel):
     """Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
 
-    `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il porte le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
+    `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il contient le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
     """
 
     value: str

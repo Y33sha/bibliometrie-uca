@@ -1,4 +1,4 @@
-"""Port : lecture du référentiel des pays (consommé par le router countries).
+"""Port : lecture du référentiel des pays.
 
 Implémenté par `infrastructure.read_models.countries.PgCountriesQueries`. Le référentiel sert les listes de choix partout où un pays s'attribue ou se filtre ; l'attribution elle-même porte sur des adresses et passe par `addresses_queries`.
 """

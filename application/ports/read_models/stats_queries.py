@@ -1,6 +1,6 @@
-"""Port : lectures stats (consommé par le router stats).
+"""Port : lectures stats.
 
-Implémenté par `infrastructure.read_models.stats.PgStatsQueries`. Co-localise les DTOs Pydantic retournés par ce port.
+Implémenté par `infrastructure.read_models.stats.PgStatsQueries`.
 """
 
 from dataclasses import dataclass, field
@@ -64,7 +64,7 @@ class PivotSchemaResponse(BaseModel):
 
 
 class PivotResponse(BaseModel):
-    """Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
+    """Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
 
     measure: str
     groups: list[str]

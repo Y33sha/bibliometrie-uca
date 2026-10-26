@@ -1,9 +1,4 @@
-"""Service Éditeurs — écritures sur l'agrégat Publisher.
-
-Agrégat distinct de Serial, servi par son propre port (`PublisherRepository`). Un appelant qui ne touche qu'aux éditeurs (ex. `update_publisher` d'un router admin) charge cette seule surface.
-
-La fusion d'éditeurs (`merge_publishers`) vit ici : c'est une opération de l'agrégat Publisher. Elle prend aussi le port `SerialRepository` pour détecter les journaux en conflit entre les deux éditeurs avant de déléguer les transferts SQL.
-"""
+"""Service Éditeurs — écritures sur l'agrégat Publisher : mise à jour, fusion."""
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
@@ -63,9 +58,7 @@ def merge_publishers(
 ) -> None:
     """Fusionne l'éditeur source dans l'éditeur cible, puis le pipeline recalcule le `publication_count` de la cible.
 
-    Deux invariants métier refusent la fusion (`ConflictError`), chacun sur un identifiant déclaré : des membres Crossref distincts de part et d'autre, ou deux journaux au titre partagé dont les ISSN diffèrent.
-
-    La détection est côté `serial_repo` (requête sur `serials`), la fusion finale côté `publisher_repo` (transferts + delete).
+    Les revues homonymes des deux éditeurs fusionnent d'abord. Des membres Crossref distincts de part et d'autre refusent la fusion (`ConflictError`). Une paire de revues homonymes aux ISSN contradictoires, ou un doublon de titre chez l'un des éditeurs, la bloque (`PublisherMergeBlockedError`).
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur un éditeur introuvable.
     """

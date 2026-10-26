@@ -11,7 +11,7 @@ from typing import Protocol
 class AddressCountryFilter:
     """Critères de sélection d'adresses par leur pays, pour la liste d'attribution et l'attribution en masse.
 
-    Combinés en AND. `search` : sous-chaîne cherchée dans `raw_text` (ILIKE, insensible à la casse et aux accents). `has_country` : True → `countries` renseigné, False → NULL, None → critère inactif. `country_code` : pays retenu."""
+    Combinés en AND. `search` : sous-chaîne cherchée dans le texte de l'adresse, insensible à la casse et aux accents. `has_country` : True → pays renseigné, False → aucun pays, None → critère inactif. `country_code` : pays retenu."""
 
     search: str | None = None
     has_country: bool | None = None
@@ -24,12 +24,12 @@ class AddressCountryFilter:
 
 
 class AddressRepository(Protocol):
-    """Contrat d'accès aux tables addresses, address_structures, et propagations vers source_records/publications.countries."""
+    """Contrat des écritures sur les adresses : liens aux structures, pays saisis à la main."""
 
     # ── Liens adresse ↔ structure ──────────────────────────────────
 
     def reset_manual_link(self, address_id: int, structure_id: int) -> None:
-        """Annule la décision manuelle sur un rattachement : supprime le lien s'il est purement manuel (`matched_form_id IS NULL` — aucune détection ne l'atteste), et repasse `is_confirmed` à NULL (pending) sur la détection qui subsiste."""
+        """Annule la décision manuelle sur un rattachement : supprime le lien qu'aucune détection n'atteste, et rend une détection à l'état non décidé."""
         ...
 
     def upsert_structure_link(
@@ -63,10 +63,7 @@ class AddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> set[int]:
-        """Sous-ensemble de `address_ids` qui contribue au calcul `in_perimeter` pour `structure_id` : lien existant avec `is_confirmed IS DISTINCT FROM FALSE` (NULL ou TRUE).
-
-        Sert aux services de validation à détecter les opérations no-op (confirmer une adresse déjà auto-détectée) et à éviter une propagation d'`in_perimeter` inutile.
-        """
+        """Sous-ensemble de `address_ids` dont le lien à `structure_id` compte pour le périmètre : lien confirmé ou non décidé."""
         ...
 
     # ── Pays ───────────────────────────────────────────────────────

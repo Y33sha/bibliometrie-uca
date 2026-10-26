@@ -1,6 +1,6 @@
-"""Port : lectures sur les publications (consommé par le router publications).
+"""Port : lectures sur les publications.
 
-Implémenté par `infrastructure.read_models.publications.PgPublicationsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
+Implémenté par `infrastructure.read_models.publications.PgPublicationsQueries`.
 
 La dataclass `PublicationFilters` fait ici référence ; l'infrastructure l'importe pour typer ses signatures.
 """
@@ -244,7 +244,7 @@ class SourceRecordOut(BaseModel):
     hal_collections: list[str] | None
     countries: list[str] | None
     # Forme secondaire convergée (pièce, version ou variante dont le DOI a été substitué par
-    # celui de l'œuvre canonique). La fiche replie ces sources sous un groupe dépliable.
+    # celui de l'œuvre principale). La fiche replie ces sources sous un groupe dépliable.
     is_secondary: bool
 
     @computed_field
@@ -370,7 +370,7 @@ class PublicationDetailResponse(BaseModel):
 class SourceRecordMetadataOut(BaseModel):
     """Métadonnées d'un enregistrement source, après normalisation.
 
-    `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+    `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
     """
 
     id: int

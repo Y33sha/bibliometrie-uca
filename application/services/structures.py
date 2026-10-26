@@ -138,7 +138,7 @@ def create_tutelle(
     row = repo.create_tutelle(parent_id=parent_id, child_id=child_id)
     if row is not None:
         perimeter_structures.refresh()
-        # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le porte.
+        # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le contient.
         emit_event(
             "structure_relation.created",
             "structure",

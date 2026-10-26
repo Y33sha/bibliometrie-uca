@@ -78,7 +78,7 @@ def update_name(
 
     Le nom est ce par quoi les contributions sources reviennent à une personne : en changer déplace des publications d'une personne à une autre, d'où l'événement d'audit.
 
-    Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom que seul son nom canonique porte. Lève `NotFoundError` si la personne n'existe pas.
+    Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom qui dérivent de son seul nom. Lève `NotFoundError` si la personne n'existe pas.
     """
     last_name, first_name = repo.rename(person_id, last_name, first_name)
     emit_event(
@@ -153,7 +153,7 @@ def update_identifier_status(
 ) -> IdentifierStatusResult:
     """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les groupes de contributions sources que ses identifiants rejetés lui rattachent (`mark_groups_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
+    Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les groupes de contributions sources que ses identifiants rejetés lui rattachent (`mark_groups_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
     """
     row = repo.update_identifier_status(ident_id, status)
     propagated = (

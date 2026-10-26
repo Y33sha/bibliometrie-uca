@@ -1,4 +1,4 @@
-"""Port : lectures du tableau de bord de qualité de la détection d'adresses (consommé par /api/feedback/*).
+"""Port : lectures du tableau de bord de qualité de la détection d'adresses.
 
 Implémenté par `infrastructure.read_models.feedback.PgFeedbackQueries`.
 """

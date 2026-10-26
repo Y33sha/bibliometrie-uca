@@ -1,4 +1,4 @@
-"""Port : lectures sur les structures (consommé par le router structures).
+"""Port : lectures sur les structures.
 
 Implémenté par `infrastructure.read_models.structures.PgStructuresQueries`.
 
@@ -108,7 +108,7 @@ class StructureAddressesResponse(PaginatedResponse):
 
 
 class StructureCollaborations(BaseModel):
-    """Articles de la structure, selon qu'ils portent ou non une affiliation étrangère."""
+    """Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère."""
 
     total_articles: int
     international: int

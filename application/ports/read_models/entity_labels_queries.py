@@ -1,4 +1,4 @@
-"""Port : résolution du libellé d'une entité de facette (consommé par le router entity_labels).
+"""Port : résolution du libellé d'une entité de facette.
 
 Implémenté par `infrastructure.read_models.entity_labels.PgEntityLabelQueries`.
 """
@@ -11,7 +11,7 @@ from application.ports.read_models._common import EntityKind
 
 
 class EntityLabelResponse(BaseModel):
-    """Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté."""
+    """Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id est transporté."""
 
     label: str | None
 

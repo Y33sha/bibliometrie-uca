@@ -1,7 +1,5 @@
 """Service des publications en série — écritures sur l'agrégat Serial.
 
-Les opérations sur l'agrégat Publisher vivent dans `application/services/publishers.py` ; les deux agrégats restent liés par `serials.publisher_id` (FK), chacun manipulé par son propre service et son propre port.
-
 Le `serial_type` d'une revue alimente des règles de correction du `doc_type` de ses publications. Après une édition ou une fusion, le pipeline rejoue ces corrections (`SerialRecompute`).
 """
 
@@ -123,8 +121,6 @@ def requalify_publications_for_serial(
     """Requalifie, par le pipeline, le `doc_type` des publications d'une revue après un changement de son `serial_type`.
 
     Précondition : l'appelant a déjà écrit le `serial_type`, dans la même transaction. Retourne le nombre de publications dont le `doc_type` change, et émet l'audit `serial.type_requalified` si ce nombre est positif.
-
-    Un appel dans un `SAVEPOINT` que l'appelant annule donne l'aperçu de la requalification.
     """
     changed = recompute.requalify_publications(serial_id)
     if changed > 0:

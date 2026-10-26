@@ -1,6 +1,6 @@
-"""Port : lectures sur les personnes (consommé par le router persons).
+"""Port : lectures sur les personnes.
 
-Implémenté par `infrastructure.read_models.persons.PgPersonsQueries`. Les modèles Pydantic que ces lectures rendent sont co-localisés avec le `Protocol` : leur contrat appartient au port.
+Implémenté par `infrastructure.read_models.persons.PgPersonsQueries`.
 """
 
 from dataclasses import dataclass, field
@@ -53,7 +53,7 @@ class PersonFilters:
     has_idhal: bool | None = None
     has_idref: bool | None = None
     has_rh: bool | None = None
-    # « À confirmer » : personnes portant ≥1 forme de nom / identifiant `pending`.
+    # « À confirmer » : personnes qui ont au moins une forme de nom ou un identifiant `pending`.
     has_pending_forms: bool | None = None
     has_pending_identifiers: bool | None = None
     exclusions: list[PersonExclusion | None] = field(default_factory=list)
@@ -259,7 +259,7 @@ class AmbiguousFormPersonOut(BaseModel):
     # Forme dérivée du nom de la personne : confirmée d'office, statut non modifiable.
     canonical: bool
     has_rh: bool
-    # Nom canonique compatible (par tokens) avec la forme : homonyme/doublon si
+    # Nom de la personne compatible (par tokens) avec la forme : homonyme/doublon si
     # vrai, erreur d'attribution probable si faux.
     compatible: bool
 
@@ -274,7 +274,7 @@ class AmbiguousNameFormsResponse(PaginatedResponse):
 
 
 class CurationPersonOut(BaseModel):
-    """Fiche personne allégée, commune aux files de curation (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer."""
+    """Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer."""
 
     person_id: int
     first_name: str
@@ -291,7 +291,7 @@ class IdentifierRef(BaseModel):
 
 
 class IdentifierConflictPairOut(BaseModel):
-    """Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution."""
+    """Deux personnes distinctes qui ont la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution."""
 
     person_a: CurationPersonOut
     person_b: CurationPersonOut

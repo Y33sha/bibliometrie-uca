@@ -1,4 +1,4 @@
-"""Port : lectures sur les adresses (consommé par le router addresses).
+"""Port : lectures sur les adresses.
 
 Implémenté par `infrastructure.read_models.addresses.PgAddressesQueries`.
 """

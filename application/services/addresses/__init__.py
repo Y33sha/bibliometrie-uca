@@ -1,6 +1,6 @@
-"""Services applicatifs de curation des adresses (écritures API).
+"""Services applicatifs des corrections à la main sur les adresses (écritures API).
 
-L'adresse n'a pas d'objet de domaine : le cluster de tables est porté par `AddressRepository`, ses règles par le SQL et par ces modules. La détection appartient au pipeline — matching des structures en phase `affiliations`, détection des pays en phase `countries` ; ces services portent la curation manuelle de ses résultats.
+L'adresse n'a pas d'objet de domaine. `AddressRepository` gère ses tables ; le SQL et ces modules appliquent ses règles. La détection appartient au pipeline — matching des structures en phase `affiliations`, détection des pays en phase `countries` ; ces services corrigent ses résultats à la main.
 
 Sous-modules :
 - `structure_links` : validation manuelle des rattachements adresse ↔ structure (confirmer / rejeter / réinitialiser), propagation vers le périmètre des contributions sources.

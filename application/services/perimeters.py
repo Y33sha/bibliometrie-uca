@@ -1,6 +1,6 @@
 """Service Périmètres — écritures sur l'agrégat Perimeter.
 
-Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le gateway pipeline. La création et la mise à jour recalculent cette clôture, que les racines commandent.
+Un périmètre a des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le pipeline. La création et la mise à jour recalculent cette clôture, que les racines commandent.
 
 `delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
@@ -55,7 +55,7 @@ def update_perimeter(
 ) -> None:
     """Charge le périmètre, applique les champs explicitement fournis (validés), persiste, puis recalcule la clôture des périmètres.
 
-    L'événement d'audit ne porte que les champs soumis : y joindre les autres laisserait croire qu'ils ont été fournis.
+    L'événement d'audit contient seulement les champs soumis.
 
     Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
     """
@@ -92,7 +92,7 @@ def delete_perimeter(
 ) -> None:
     """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
 
-    Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` s'il est référencé par la configuration pipeline — le message porte alors la liste des clés qui le référencent.
+    Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` s'il est référencé par la configuration pipeline — le message donne alors la liste des clés qui le référencent.
     """
     code = repo.get_perimeter_code(perimeter_id)
     if code is None:

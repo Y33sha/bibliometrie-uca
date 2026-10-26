@@ -55,7 +55,7 @@ def batch_review_structure_link(
 
     Retourne `(nombre d'adresses touchées, adresses dont la contribution au calcul in_perimeter a changé)`. Pour les reset, le nombre touché est le nombre de lignes mises à jour ; pour les upserts, la taille du lot. La propagation des adresses changées est lancée en tâche de fond par l'appelant.
 
-    Un lot est une décision unique : l'événement d'audit est unique lui aussi, sans identifiant d'agrégat, et porte les adresses visées et le nombre effectivement touché.
+    Un lot est une décision unique : l'événement d'audit est unique lui aussi, sans identifiant d'agrégat, et contient les adresses visées et le nombre effectivement touché.
     """
     if not address_ids:
         return 0, []

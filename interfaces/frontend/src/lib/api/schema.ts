@@ -3035,7 +3035,7 @@ export interface components {
         };
         /**
          * CurationPersonOut
-         * @description Fiche personne allégée, commune aux files de curation (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer.
+         * @description Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer.
          */
         CurationPersonOut: {
             /** Person Id */
@@ -3169,7 +3169,7 @@ export interface components {
         };
         /**
          * EntityLabelResponse
-         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id — l'état canonique — est transporté.
+         * @description Libellé d'une entité résolu par id (None si l'id est inconnu). Réaffiche une pastille de facette restaurée depuis l'URL, où seul l'id est transporté.
          */
         EntityLabelResponse: {
             /** Label */
@@ -3201,7 +3201,7 @@ export interface components {
          * FacetOption
          * @description Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte.
          *
-         *     `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il porte le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
+         *     `label` vaut `None` quand la valeur s'affiche telle quelle (année, statut) ou que le libellé est résolu côté client ; il contient le texte présentable quand seule la requête le connaît (nom de laboratoire, intitulé traduit).
          */
         FacetOption: {
             /** Value */
@@ -3497,7 +3497,7 @@ export interface components {
         };
         /**
          * IdentifierConflictPairOut
-         * @description Deux personnes distinctes portant la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
+         * @description Deux personnes distinctes qui ont la même valeur brute d'identifiant (ORCID / IdRef / hal_person_id / idHAL) : doublon probable (mêmes nom/réseau) ou erreur d'attribution.
          */
         IdentifierConflictPairOut: {
             person_a: components["schemas"]["CurationPersonOut"];
@@ -4301,7 +4301,7 @@ export interface components {
         };
         /**
          * PivotResponse
-         * @description Résultat d'une agrégation. Chaque ligne porte la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
+         * @description Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
          */
         PivotResponse: {
             /** Measure */
@@ -4660,9 +4660,7 @@ export interface components {
         PublisherType: "commercial" | "learned_society" | "academic_institution" | "repository" | "aggregator" | "media" | "unknown";
         /**
          * PublisherUpdate
-         * @description Champs éditables d'un éditeur, en modification sélective.
-         *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `name_normalized`, dérivé de `name`, est posé par le repository.
+         * @description Champs éditables d'un éditeur, en modification sélective : seuls les champs explicitement fournis sont écrits.
          */
         PublisherUpdate: {
             /** Name */
@@ -4822,7 +4820,7 @@ export interface components {
          *
          *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
          *
-         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue ne porte pas la valeur correspondante, ou que celle-ci n'est pas mappée.
+         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue n'a pas la valeur correspondante, ou que celle-ci n'est pas mappée.
          */
         SerialDashboardResponse: {
             /** Total Publications */
@@ -5001,11 +4999,7 @@ export interface components {
         };
         /**
          * SerialUpdate
-         * @description Champs éditables d'une revue, en modification sélective.
-         *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). Les champs listés sont ceux qu'un client peut fournir ; `title_normalized`, dérivé de `title`, est posé par le repository.
-         *
-         *     `serial_type` et `oa_model` ont les types du domaine, que les enums SQL des mêmes noms reprennent. Leurs valeurs se vérifient ici.
+         * @description Champs éditables d'une revue, en modification sélective : seuls les champs explicitement fournis sont écrits.
          */
         SerialUpdate: {
             /** Title */
@@ -5136,7 +5130,7 @@ export interface components {
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` portent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
          */
         SourceRecordMetadataOut: {
             /** Id */
@@ -5260,7 +5254,7 @@ export interface components {
         };
         /**
          * StructureCollaborations
-         * @description Articles de la structure, selon qu'ils portent ou non une affiliation étrangère.
+         * @description Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère.
          */
         StructureCollaborations: {
             /** Total Articles */

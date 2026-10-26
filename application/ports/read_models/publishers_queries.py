@@ -1,4 +1,4 @@
-"""Port : lectures sur les éditeurs (consommé par le router publishers).
+"""Port : lectures sur les éditeurs.
 
 Implémenté par `infrastructure.read_models.publishers.PgPublisherQueries`.
 """

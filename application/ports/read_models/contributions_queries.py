@@ -1,4 +1,4 @@
-"""Port : lectures sur les contributions (consommé par le router contributions).
+"""Port : lectures sur les contributions.
 
 Implémenté par `infrastructure.read_models.contributions.PgContributionsQueries`. La file des contributions orphelines lit les groupes de contributions sources du périmètre rattachés à aucune personne.
 """

@@ -16,7 +16,7 @@ class IdentifierStatusRow(TypedDict):
 
 
 class NameFormStatusRow(TypedDict):
-    """Ligne renvoyée par `update_name_form_status` (changement de statut d'une forme de nom). Alimente le DTO `NameFormStatusResponse`."""
+    """Ligne renvoyée par `update_name_form_status` (changement de statut d'une forme de nom)."""
 
     person_id: int
     name_form: str
@@ -73,7 +73,7 @@ class PersonRepository(Protocol):
     # ── person_identifiers ─────────────────────────────────────────
 
     def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
-        """Charge le `IdentifierAttribution` d'une paire `(id_type, id_value)` (unique dans la table), ou `None` si absent."""
+        """Charge l'attribution de l'identifiant `(id_type, id_value)`, unique, ou `None` si elle est absente."""
         ...
 
     def insert_identifier(self, ident: IdentifierAttribution) -> int:
@@ -102,7 +102,7 @@ class PersonRepository(Protocol):
         ...
 
     def mark_groups_of_rejected_identifiers(self, person_id: int) -> int:
-        """Marque pour la redécision de leur personne les groupes de contributions sources de la personne rattachés par un identifiant `rejected` : le mode de résolution du groupe est le type de l'identifiant, et l'un de ses membres porte la valeur. Les groupes `manual` et ceux d'un autre mode ne sont pas marqués. Retourne le nombre de groupes marqués. Idempotent."""
+        """Marque pour la redécision de leur personne les groupes de contributions sources de la personne rattachés par un identifiant `rejected` : le mode de résolution du groupe est le type de l'identifiant, et l'un de ses membres contient la valeur. Les groupes `manual` et ceux d'un autre mode ne sont pas marqués. Retourne le nombre de groupes marqués. Idempotent."""
         ...
 
     # ── person_name_forms ──────────────────────────────────────────
@@ -123,5 +123,5 @@ class PersonRepository(Protocol):
         ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
-        """Élague les formes de nom attestées par une source : garde celles qu'au moins une `source_contribution` active de la personne porte encore, supprime les autres. Se limite aux formes `pending` ; les formes calculées (source `'persons'`) et les verdicts `confirmed`/`rejected` sont préservés. Retourne le nombre de formes supprimées."""
+        """Élague les formes de nom attestées par une source : garde celles qu'au moins une contribution source active de la personne contient encore, supprime les autres. Se limite aux formes `pending` ; les formes calculées (source `'persons'`) et les verdicts `confirmed`/`rejected` sont préservés. Retourne le nombre de formes supprimées."""
         ...
