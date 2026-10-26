@@ -63,9 +63,7 @@
 - 2026-09-30 — [Signatures conservées à la renormalisation](archived/2026-09-30_DATA_signatures-conservees.md)
 - 2026-09-22 — [Revues : ISSN vérifiés, doublons et préfixes DOI](archived/2026-09-22_DATA_revues-issn-et-doublons.md)
 - 2026-09-22 — [Table des ISSN](archived/2026-09-22_DATA_table-issn.md)
-- 2026-09-14 — [Identifiants d'auteur mal placés dans un enregistrement source](archived/2026-09-14_DATA_identifiants-mal-places.md)
 - 2026-09-14 — [Langues : référentiel, normalisation et facette](archived/2026-09-14_DATA_langues.md)
-- 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 
 
 
