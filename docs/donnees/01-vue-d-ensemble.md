@@ -68,12 +68,12 @@ Les tables se répartissent en un schéma par domaine. Le `search_path` de la ba
 
 - [`sources`](02-sources.md) — tables sources et staging
 - [`publications`](03-publications.md) — référentiel consolidé, contributions, sujets
-- [`publishing`](04-publishing.md) — publications en série, monographies, éditeurs, plateformes, APC
+- [`publishing`](07-publishing.md) — publications en série, monographies, éditeurs, plateformes, APC
 - [`persons`](05-persons.md) — référentiel consolidé, identifiants, name forms, données RH, décisions humaines sur les contributions sources
 - [`structures`](06-structures.md) — référentiel institutionnel, périmètres, adresses
-- [`ref` et `ops`](07-ref-et-ops.md) — référentiels externes (pays, langues, ROR) et exploitation (configuration, journaux)
+- [`ref` et `ops`](08-ref-et-ops.md) — référentiels externes (pays, langues, ROR) et exploitation (configuration, journaux)
 
 Pages transverses :
 
-- [Données dérivées](08-donnees-derivees.md) — vues matérialisées, tables et colonnes dérivées, et leur fraîcheur (incrémental ou recalcul complet)
-- [Index des tables](09-index-des-tables.md) — vue macro du modèle et catalogue complet des tables et vues
+- [Données dérivées](09-donnees-derivees.md) — vues matérialisées, tables et colonnes dérivées, et leur fraîcheur (incrémental ou recalcul complet)
+- [Index des tables](10-index-des-tables.md) — vue macro du modèle et catalogue complet des tables et vues
