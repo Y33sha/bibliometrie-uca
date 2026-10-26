@@ -14,9 +14,6 @@ from sqlalchemy import Connection
 
 from application.audit_log import record_pending_events
 from application.ports.pipeline.countries import CountryRecompute as CountryRecomputePort
-from application.ports.pipeline.perimeter_structures import (
-    PerimeterStructures as PerimeterStructuresPort,
-)
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.config_queries import ConfigQueries
 from application.ports.read_models.contributions_queries import ContributionsQueries
@@ -36,16 +33,16 @@ from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.config_repository import ConfigRepository
-from application.ports.repositories.perimeter_repository import PerimeterRepository
-from application.ports.repositories.structure_repository import StructureRepository
 from application.services.addresses import (
     countries as countries_service,
     structure_links as structure_links_service,
 )
 from application.services.contributions import ContributionService
+from application.services.perimeters import PerimeterService
 from application.services.persons import PersonService
 from application.services.publishers import PublisherService
 from application.services.serials import SerialService
+from application.services.structures import StructureService
 from domain.merge import MergedEntity
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
@@ -231,8 +228,12 @@ def publisher_service(conn: DbConn) -> PublisherService:
     )
 
 
-def perimeter_repo(conn: DbConn) -> PerimeterRepository:
-    return perimeter_repository(conn)
+def perimeter_service(conn: DbConn) -> PerimeterService:
+    return PerimeterService(
+        perimeters=perimeter_repository(conn),
+        perimeter_structures=PerimeterStructures(conn),
+        config=PgConfigQueries(conn),
+    )
 
 
 def perimeters_queries(
@@ -262,8 +263,12 @@ def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], Entit
     return dependency
 
 
-def structure_repo(conn: DbConn) -> StructureRepository:
-    return structure_repository(conn)
+def structure_service(conn: DbConn) -> StructureService:
+    return StructureService(
+        structures=structure_repository(conn),
+        perimeters=perimeter_repository(conn),
+        perimeter_structures=PerimeterStructures(conn),
+    )
 
 
 def structures_queries(conn: DbConn) -> StructuresQueries:
@@ -304,11 +309,6 @@ def addresses_queries(conn: DbConn) -> AddressesQueries:
 
 
 # Recalculs du pipeline, construits comme les repositories sur la connexion de la requête.
-
-
-def get_perimeter_structures(conn: DbConn) -> PerimeterStructuresPort:
-    """Clôture des tutelles des périmètres."""
-    return PerimeterStructures(conn)
 
 
 def country_recompute(conn: DbConn) -> CountryRecomputePort:

@@ -7,7 +7,6 @@ Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe p
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.structures_queries import (
     NameFormOut,
     StructureAddressesResponse,
@@ -20,23 +19,16 @@ from application.ports.read_models.structures_queries import (
     StructuresQueries,
 )
 from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.ports.repositories.perimeter_repository import PerimeterRepository
 from application.ports.repositories.structure_repository import (
     NameFormCreate,
     NameFormUpdate,
     StructureCreate,
-    StructureRepository,
     StructureUpdate,
 )
-from application.services import structures as structures_service
+from application.services.structures import StructureService
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
-from interfaces.api.deps import (
-    get_perimeter_structures,
-    perimeter_repo,
-    structure_repo,
-    structures_queries,
-)
+from interfaces.api.deps import structure_service, structures_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (
     DeletedResponse,
@@ -71,10 +63,10 @@ def list_structures(
 @router.post("", response_model=StructureOut)
 def create_structure(
     data: StructureCreate,
-    repo: StructureRepository = Depends(structure_repo),
+    structures: StructureService = Depends(structure_service),
 ) -> StructureOut:
     """Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé."""
-    return StructureOut.from_structure(structures_service.create_structure(data, repo=repo))
+    return StructureOut.from_structure(structures.create_structure(data))
 
 
 # ── Tutelles entre structures ────────────────────────────────────
@@ -83,19 +75,13 @@ def create_structure(
 @router.post("/tutelles", response_model=StructureTutelleCreateResponse)
 def create_tutelle(
     data: TutelleCreate,
-    repo: StructureRepository = Depends(structure_repo),
-    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
+    structures: StructureService = Depends(structure_service),
 ) -> StructureTutelleCreateResponse:
     """Crée une tutelle parent-enfant entre deux structures.
 
     Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 422 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
-    row = structures_service.create_tutelle(
-        parent_id=data.parent_id,
-        child_id=data.child_id,
-        repo=repo,
-        perimeter_structures=perimeter_structures,
-    )
+    row = structures.create_tutelle(parent_id=data.parent_id, child_id=data.child_id)
     if row is None:
         return StructureTutelleCreateResponse.model_validate({"status": "already_exists"})
     return StructureTutelleCreateResponse.model_validate(row)
@@ -104,15 +90,10 @@ def create_tutelle(
 @router.delete("/tutelles/{tutelle_id}", response_model=DeletedResponse)
 def delete_tutelle(
     tutelle_id: int,
-    repo: StructureRepository = Depends(structure_repo),
-    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
+    structures: StructureService = Depends(structure_service),
 ) -> DeletedResponse:
     """Supprime une tutelle. 404 si l'id n'existe pas."""
-    structures_service.delete_tutelle(
-        tutelle_id,
-        repo=repo,
-        perimeter_structures=perimeter_structures,
-    )
+    structures.delete_tutelle(tutelle_id)
     return DeletedResponse()
 
 
@@ -124,13 +105,13 @@ def delete_tutelle(
 @router.post("/name-forms", response_model=NameFormOut)
 def create_name_form(
     data: NameFormCreate,
-    repo: StructureRepository = Depends(structure_repo),
+    structures: StructureService = Depends(structure_service),
 ) -> NameFormOut:
     """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
 
     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
     """
-    return NameFormOut.model_validate(structures_service.create_name_form(data, repo=repo))
+    return NameFormOut.model_validate(structures.create_name_form(data))
 
 
 @router.get("/name-forms/{form_id}", response_model=NameFormOut)
@@ -149,21 +130,19 @@ def get_name_form(
 def update_name_form(
     form_id: int,
     data: NameFormUpdate,
-    repo: StructureRepository = Depends(structure_repo),
+    structures: StructureService = Depends(structure_service),
 ) -> NameFormOut:
     """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
-    return NameFormOut.model_validate(
-        structures_service.update_name_form(form_id, update=data, repo=repo)
-    )
+    return NameFormOut.model_validate(structures.update_name_form(form_id, data))
 
 
 @router.delete("/name-forms/{form_id}", response_model=DeletedResponse)
 def delete_name_form(
     form_id: int,
-    repo: StructureRepository = Depends(structure_repo),
+    structures: StructureService = Depends(structure_service),
 ) -> DeletedResponse:
     """Supprime une forme de nom. 404 si inconnue."""
-    structures_service.delete_name_form(form_id, repo=repo)
+    structures.delete_name_form(form_id)
     return DeletedResponse()
 
 
@@ -252,29 +231,20 @@ def get_structure_deletion_impact(
 def update_structure(
     structure_id: int,
     data: StructureUpdate,
-    repo: StructureRepository = Depends(structure_repo),
+    structures: StructureService = Depends(structure_service),
 ) -> StructureOut:
     """Met à jour une structure, champ par champ.
 
     Seuls les champs présents dans le corps de la requête sont écrits ; `null` efface un champ facultatif. Renvoie 404 sur une structure inconnue.
     """
-    return StructureOut.from_structure(
-        structures_service.update_structure(structure_id, update=data, repo=repo)
-    )
+    return StructureOut.from_structure(structures.update_structure(structure_id, data))
 
 
 @router.delete("/{structure_id}", response_model=DeletedResponse)
 def delete_structure(
     structure_id: int,
-    repo: StructureRepository = Depends(structure_repo),
-    perimeters: PerimeterRepository = Depends(perimeter_repo),
-    perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
+    structures: StructureService = Depends(structure_service),
 ) -> DeletedResponse:
     """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue."""
-    structures_service.delete_structure(
-        structure_id,
-        repo=repo,
-        perimeter_repo=perimeters,
-        perimeter_structures=perimeter_structures,
-    )
+    structures.delete_structure(structure_id)
     return DeletedResponse()

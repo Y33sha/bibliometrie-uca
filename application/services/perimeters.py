@@ -1,8 +1,6 @@
 """Service Périmètres — écritures sur l'agrégat Perimeter.
 
 Un périmètre a des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le pipeline. La création et la mise à jour recalculent cette clôture, que les racines commandent.
-
-`delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
 from application.audit_log import emit_event
@@ -16,96 +14,93 @@ from domain.errors import ConflictError, NotFoundError, ValidationError
 from domain.perimeters.perimeter import Perimeter
 
 
-def create_perimeter(
-    *,
-    code: str,
-    name: str,
-    root_structure_ids: list[int],
-    repo: PerimeterRepository,
-    perimeter_structures: PerimeterStructures,
-) -> int:
-    """Crée un périmètre avec ses structures racines, puis recalcule la clôture des périmètres. Retourne l'id créé.
+class PerimeterService:
+    """Écritures sur les périmètres.
 
-    Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
+    `delete_perimeter` consulte la table `config` (`ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
     """
-    perimeter = Perimeter.create(code=code, name=name, root_structure_ids=root_structure_ids)
-    if repo.perimeter_code_exists(perimeter.code):
-        raise ConflictError(f"Le code '{perimeter.code}' existe déjà")
-    perimeter_id = repo.add(perimeter)
-    perimeter_structures.refresh()
-    emit_event(
-        "perimeter.created",
-        "perimeter",
-        perimeter_id,
-        {
-            "code": perimeter.code,
-            "name": perimeter.name,
-            "root_structure_ids": perimeter.root_structure_ids,
-        },
-    )
-    return perimeter_id
 
+    def __init__(
+        self,
+        *,
+        perimeters: PerimeterRepository,
+        perimeter_structures: PerimeterStructures,
+        config: ConfigQueries,
+    ) -> None:
+        self._perimeters = perimeters
+        self._perimeter_structures = perimeter_structures
+        self._config = config
 
-def update_perimeter(
-    perimeter_id: int,
-    *,
-    update: PerimeterUpdate,
-    repo: PerimeterRepository,
-    perimeter_structures: PerimeterStructures,
-) -> None:
-    """Charge le périmètre, applique les champs explicitement fournis (validés), persiste, puis recalcule la clôture des périmètres.
+    def create_perimeter(self, *, code: str, name: str, root_structure_ids: list[int]) -> int:
+        """Crée un périmètre avec ses structures racines, puis recalcule la clôture des périmètres. Retourne l'id créé.
 
-    L'événement d'audit contient seulement les champs soumis.
+        Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
+        """
+        perimeter = Perimeter.create(code=code, name=name, root_structure_ids=root_structure_ids)
+        if self._perimeters.perimeter_code_exists(perimeter.code):
+            raise ConflictError(f"Le code '{perimeter.code}' existe déjà")
+        perimeter_id = self._perimeters.add(perimeter)
+        self._perimeter_structures.refresh()
+        emit_event(
+            "perimeter.created",
+            "perimeter",
+            perimeter_id,
+            {
+                "code": perimeter.code,
+                "name": perimeter.name,
+                "root_structure_ids": perimeter.root_structure_ids,
+            },
+        )
+        return perimeter_id
 
-    Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
-    """
-    if not update.model_fields_set:
-        raise ValidationError("Aucun champ à mettre à jour")
+    def update_perimeter(self, perimeter_id: int, update: PerimeterUpdate) -> None:
+        """Charge le périmètre, applique les champs explicitement fournis (validés), persiste, puis recalcule la clôture des périmètres.
 
-    perimeter = repo.find_by_id(perimeter_id)
-    if perimeter is None:
-        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
+        L'événement d'audit contient seulement les champs soumis.
 
-    if "name" in update.model_fields_set:
-        perimeter.set_name(update.name)
-    if "root_structure_ids" in update.model_fields_set:
-        perimeter.set_root_structure_ids(update.root_structure_ids)
-    repo.save(perimeter)
-    perimeter_structures.refresh()
-    emit_event(
-        "perimeter.updated",
-        "perimeter",
-        perimeter_id,
-        {
-            champ: getattr(perimeter, champ)
-            for champ in ("name", "root_structure_ids")
-            if champ in update.model_fields_set
-        },
-    )
+        Lève `ValidationError` si aucun champ n'est fourni, `NotFoundError` si le périmètre n'existe pas.
+        """
+        if not update.model_fields_set:
+            raise ValidationError("Aucun champ à mettre à jour")
 
+        perimeter = self._perimeters.find_by_id(perimeter_id)
+        if perimeter is None:
+            raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-def delete_perimeter(
-    perimeter_id: int,
-    *,
-    repo: PerimeterRepository,
-    config: ConfigQueries,
-) -> None:
-    """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
+        if "name" in update.model_fields_set:
+            perimeter.set_name(update.name)
+        if "root_structure_ids" in update.model_fields_set:
+            perimeter.set_root_structure_ids(update.root_structure_ids)
+        self._perimeters.save(perimeter)
+        self._perimeter_structures.refresh()
+        emit_event(
+            "perimeter.updated",
+            "perimeter",
+            perimeter_id,
+            {
+                champ: getattr(perimeter, champ)
+                for champ in ("name", "root_structure_ids")
+                if champ in update.model_fields_set
+            },
+        )
 
-    Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` s'il est référencé par la configuration pipeline — le message donne alors la liste des clés qui le référencent.
-    """
-    code = repo.get_perimeter_code(perimeter_id)
-    if code is None:
-        raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
+    def delete_perimeter(self, perimeter_id: int) -> None:
+        """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
 
-    used_by = config.config_keys_referencing_perimeter(code)
-    if used_by:
-        raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
+        Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` s'il est référencé par la configuration pipeline — le message donne alors la liste des clés qui le référencent.
+        """
+        code = self._perimeters.get_perimeter_code(perimeter_id)
+        if code is None:
+            raise NotFoundError(f"Périmètre {perimeter_id} introuvable")
 
-    repo.delete_perimeter(perimeter_id)
-    emit_event(
-        "perimeter.deleted",
-        "perimeter",
-        perimeter_id,
-        {"code": code},
-    )
+        used_by = self._config.config_keys_referencing_perimeter(code)
+        if used_by:
+            raise ConflictError(f"Ce périmètre est utilisé par : {', '.join(used_by)}")
+
+        self._perimeters.delete_perimeter(perimeter_id)
+        emit_event(
+            "perimeter.deleted",
+            "perimeter",
+            perimeter_id,
+            {"code": code},
+        )
