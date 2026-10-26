@@ -46,13 +46,8 @@
 - 2026-10-14 — [Extraction par identifiant de personne](archived/2026-10-14_DATA_extraction-par-identifiant-personne.md)
 - 2026-10-13 — [Redirection des identifiants fusionnés](archived/2026-10-13_CODE_redirection-identifiants-fusionnes.md)
 - 2026-10-12 — [Benchmark des pipelines de publications d'autres établissements](archived/2026-10-12_benchmark-pipelines.md)
-- 2026-10-12 — [Recalculs ciblés et reports au run suivant](archived/2026-10-12_CODE_recalculs-cibles-et-reports.md)
 - 2026-10-12 — [Architecture cible du pipeline](archived/2026-10-12_CODE_architecture-cible-pipeline.md)
 - 2026-10-12 — [Exécution du pipeline par nœuds](archived/2026-10-12_CODE_execution-par-noeuds.md)
-- 2026-10-12 — [Scripts en ligne de commande autonomes](archived/2026-10-12_CODE_scripts-autonomes.md)
-- 2026-10-12 — [Le SQL métier partagé hors d'`infrastructure/db`](archived/2026-10-12_CODE_infrastructure-db.md)
-- 2026-10-12 — [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md)
-- 2026-10-12 — [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)
 
 
 
