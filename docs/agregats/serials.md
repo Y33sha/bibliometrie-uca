@@ -11,7 +11,7 @@ Un livre ou un volume d'actes est une monographie, rattachée à sa collection p
 | Table | Rôle | Colonnes notables |
 |---|---|---|
 | `serials` | La publication en série | `title` / `title_normalized`, `publisher_id`, `openalex_id` (unique), `serial_type`, `oa_model`, `is_in_doaj`, `doaj_payload`, `publication_count`, `manual_fields` |
-| `serial_issns` | ISSN des publications en série ; sans publication en série, ISSN vérifié d'une publication absente de la base | `issn`, `serial_id`, `support`, `linking` (ISSN-L), `status`, `replaced_by`, `sudoc_checked_at`, unicité `(issn, serial_id)` |
+| `serial_issns` | ISSN des publications en série ; sans publication en série, ISSN vérifié d'une publication absente de la base | `issn`, `serial_id`, `support`, `linking` (ISSN-L), `status`, `sudoc_checked_at`, unicité `(issn, serial_id)` |
 | `serial_name_forms` | Formes de nom permettant de reconnaître une publication en série par son titre | `serial_id`, `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
 | `serial_doi_namespaces` | Espaces de noms DOI qui désignent une publication en série, recalculés par `publishing` | `namespace` (clé), `serial_id`, `dois`, `share` (part des DOI de l'espace qui la désignent) |
 

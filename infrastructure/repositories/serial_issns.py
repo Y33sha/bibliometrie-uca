@@ -16,7 +16,6 @@ def journal_issn(row: Row[tuple[object, ...]]) -> SerialIssn:
         support=IssnSupport(row.support) if row.support else None,
         linking=bool(row.linking),
         status=IssnStatus(row.status),
-        replaced_by=str(row.replaced_by) if row.replaced_by else None,
     )
 
 
@@ -30,7 +29,6 @@ def issn_values(
         "support": row.support,
         "linking": row.linking and serial_id is not None,
         "status": row.status,
-        "replaced_by": row.replaced_by,
         "sudoc_checked_at": checked_at,
     }
 

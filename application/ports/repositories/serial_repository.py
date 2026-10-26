@@ -16,7 +16,6 @@ class SerialIssnInput(BaseModel):
     support: IssnSupport | None = None
     linking: bool = False
     status: IssnStatus = IssnStatus.ACTIVE
-    replaced_by: str | None = None
 
 
 class SerialUpdate(BaseModel):

@@ -14,12 +14,10 @@ def issns_from_columns(
     *,
     statuses: Mapping[str, IssnStatus] | None = None,
     supports: Mapping[str, IssnSupport] | None = None,
-    replaced_by: Mapping[str, str] | None = None,
 ) -> list[SerialIssn]:
     """ISSN d'une revue décrite par ses champs `issn` (papier), `eissn` (en ligne), `issnl` (drapeau ISSN-L) et ses valeurs mises de côté : `malformed` si invalides, `unverified` sinon, sauf statut fourni par `statuses`."""
     statuses = statuses or {}
     supports = supports or {}
-    replaced_by = replaced_by or {}
     rows: dict[str, SerialIssn] = {}
     for value, support in ((issn, IssnSupport.PRINT), (eissn, IssnSupport.ELECTRONIC)):
         if value and value not in rows:
@@ -32,7 +30,6 @@ def issns_from_columns(
             issn=value,
             support=supports.get(value),
             status=statuses.get(value, default),
-            replaced_by=replaced_by.get(value),
         )
     if issnl:
         row = rows.get(issnl) or SerialIssn(issn=issnl, support=supports.get(issnl))
@@ -41,6 +38,5 @@ def issns_from_columns(
             support=row.support,
             linking=True,
             status=IssnStatus.ACTIVE,
-            replaced_by=row.replaced_by,
         )
     return list(rows.values())

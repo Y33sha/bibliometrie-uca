@@ -46,7 +46,6 @@ class SerialIssnDetail(BaseModel):
     support: IssnSupport | None
     linking: bool
     status: IssnStatus
-    replaced_by: str | None
     sudoc_checked_at: datetime | None
 
 

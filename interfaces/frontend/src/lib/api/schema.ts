@@ -4894,8 +4894,6 @@ export interface components {
             /** Linking */
             linking: boolean;
             status: components["schemas"]["IssnStatus"];
-            /** Replaced By */
-            replaced_by: string | null;
             /** Sudoc Checked At */
             sudoc_checked_at: string | null;
         };
@@ -4914,8 +4912,6 @@ export interface components {
             linking: boolean;
             /** @default active */
             status: components["schemas"]["IssnStatus"];
-            /** Replaced By */
-            replaced_by?: string | null;
         };
         /**
          * SerialListItem

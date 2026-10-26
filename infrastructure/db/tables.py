@@ -475,11 +475,6 @@ serial_issns = Table(
         ),
     ),
     Column(
-        "replaced_by",
-        Text,
-        comment="ISSN successeur : titre suivant, forme corrigée d'une valeur mal formée.",
-    ),
-    Column(
         "sudoc_checked_at",
         DateTime(timezone=True),
         comment="Date de la vérification de l'ISSN au Sudoc. NULL : jamais vérifié.",

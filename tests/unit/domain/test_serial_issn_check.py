@@ -61,8 +61,6 @@ def _label(row: SerialIssn) -> str:
     label = f"{row.support or '?'}:{row.status}"
     if row.linking:
         label += "+L"
-    if row.replaced_by:
-        label += f">{row.replaced_by}"
     return label
 
 
@@ -308,7 +306,7 @@ class TestSetAside:
             },
         )
         assert _rows(check) == {
-            "1639-6073": "print:related_title>2101-0609",
+            "1639-6073": "print:related_title",
             "2101-0609": "electronic:active+L",
         }
         assert check.set_aside == (("1639-6073", SetAsideReason.RELATED_TITLE),)
@@ -375,7 +373,7 @@ class TestSetAside:
         )
         assert _rows(check) == {
             "2101-0013": "electronic:active+L",
-            "0766-5075": "?:related_title>2101-0013",
+            "0766-5075": "?:related_title",
             "2551-9603": "print:active",
         }
 
@@ -463,7 +461,7 @@ class TestSetAside:
         assert check.set_aside == (("1471-2296", SetAsideReason.RELATED_TITLE),)
         assert _rows(check) == {
             "2731-4553": "electronic:active+L",
-            "1471-2296": "electronic:related_title>2731-4553",
+            "1471-2296": "electronic:related_title",
         }
 
 
@@ -617,7 +615,7 @@ class TestCoherence:
         )
         assert not check.conflict
         assert _rows(check) == {
-            "2273-7766": "electronic:related_title>2824-3633",
+            "2273-7766": "electronic:related_title",
             "2824-3633": "electronic:active+L",
         }
         assert check.set_aside == (("2273-7766", SetAsideReason.RELATED_TITLE),)
@@ -794,8 +792,8 @@ class TestDocumentIssns:
         )
         assert _rows(check) == {
             "2824-3633": "electronic:active+L",
-            "2273-7766": "electronic:related_title>2824-3633",
-            "2273-774X": "print:related_title>2824-3633",
+            "2273-7766": "electronic:related_title",
+            "2273-774X": "print:related_title",
         }
         assert check.set_aside == (("2273-774X", SetAsideReason.RELATED_TITLE),)
 
@@ -809,7 +807,7 @@ class TestCorrection:
         )
         assert check.corrections == (("1950-2051", "1950-5051"),)
         assert _rows(check) == {
-            "1950-2051": "?:malformed>1950-5051",
+            "1950-2051": "?:malformed",
             "1950-5051": "print:active+L",
         }
 

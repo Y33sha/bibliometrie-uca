@@ -228,7 +228,6 @@ class SerialStore:
                         support=row.support,
                         linking=linking,
                         status=row.status,
-                        replaced_by=row.replaced_by,
                     )
                     .on_conflict_do_nothing()
                 )

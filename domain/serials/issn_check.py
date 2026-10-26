@@ -288,16 +288,7 @@ def check_serial_issns(serial: SerialIssns, records: Mapping[str, SudocSerialRec
         kept,
         set_aside,
         discarded={i for i, _ in discarded},
-        corrections=dict(corrections),
         issnl=issnl,
-        replaced_by={
-            i: reference
-            for i, reason in set_aside
-            if reason is SetAsideReason.RELATED_TITLE
-            and reference is not None
-            and reference != i
-            and (i in preceding or (i in records and set(records[i].succeeding_issns) & set(main)))
-        },
         without_record={i for i in kept if i not in records and i not in hints},
         support_of=support_of,
     )
@@ -342,15 +333,13 @@ def _serial_rows(
     set_aside: Sequence[tuple[str, SetAsideReason]],
     *,
     discarded: set[str],
-    corrections: Mapping[str, str],
     issnl: str | None,
-    replaced_by: Mapping[str, str],
     without_record: set[str],
     support_of: Callable[[str], IssnSupport | None],
 ) -> tuple[SerialIssn, ...]:
     """ISSN de la revue après vérification.
 
-    Un ISSN retenu est actif, avec son support. Sans notice (`without_record`), un ISSN de la revue garde son statut, un ISSN d'enregistrement devient `unverified`. Un ISSN mis de côté prend le statut de son motif. Une valeur mal formée corrigée désigne sa correction. L'ISSN-L est actif.
+    Un ISSN retenu est actif, avec son support. Sans notice (`without_record`), un ISSN de la revue garde son statut, un ISSN d'enregistrement devient `unverified`. Un ISSN mis de côté prend le statut de son motif. L'ISSN-L est actif.
     """
     previous = {r.issn: r for r in serial.issns}
     rows: dict[str, SerialIssn] = {}
@@ -362,13 +351,11 @@ def _serial_rows(
         else:
             rows[i] = SerialIssn(issn=i, support=support_of(i))
     for i, reason in set_aside:
-        rows[i] = SerialIssn(
-            issn=i, support=support_of(i), status=_STATUS[reason], replaced_by=replaced_by.get(i)
-        )
+        rows[i] = SerialIssn(issn=i, support=support_of(i), status=_STATUS[reason])
     for row in serial.issns:
         if row.issn in rows or row.issn in discarded:
             continue
-        rows[row.issn] = replace(row, replaced_by=corrections.get(row.issn, row.replaced_by))
+        rows[row.issn] = row
     if issnl is not None:
         base = rows.get(issnl) or SerialIssn(issn=issnl)
         rows[issnl] = replace(

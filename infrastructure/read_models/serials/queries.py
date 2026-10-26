@@ -441,12 +441,11 @@ class SerialQueries:
                     support=i.support,
                     linking=i.linking,
                     status=i.status,
-                    replaced_by=i.replaced_by,
                     sudoc_checked_at=i.sudoc_checked_at,
                 )
                 for i in self._conn.execute(
                     text(
-                        "SELECT issn, support, linking, status, replaced_by, sudoc_checked_at "
+                        "SELECT issn, support, linking, status, sudoc_checked_at "
                         "FROM serial_issns WHERE serial_id = :id ORDER BY id"
                     ),
                     {"id": serial_id},

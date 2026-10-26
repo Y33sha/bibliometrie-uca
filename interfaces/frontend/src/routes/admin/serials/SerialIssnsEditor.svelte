@@ -1,12 +1,11 @@
 <script lang="ts" module>
 	import IconButton from '#lib/components/IconButton.svelte';
-	/** Un ISSN de la revue dans le formulaire d'édition. `replaced_by` repart tel que lu. */
+	/** Un ISSN de la revue dans le formulaire d'édition. */
 	export type EditedIssn = {
 		issn: string;
 		support: string;
 		linking: boolean;
 		status: string;
-		replaced_by: string;
 	};
 </script>
 
@@ -26,7 +25,7 @@
 	}
 
 	function add() {
-		issns.push({ issn: '', support: '', linking: false, status: 'active', replaced_by: '' });
+		issns.push({ issn: '', support: '', linking: false, status: 'active' });
 		editing = { index: issns.length - 1, draft: { ...issns[issns.length - 1] }, added: true };
 	}
 

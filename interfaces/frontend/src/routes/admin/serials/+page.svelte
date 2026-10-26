@@ -101,7 +101,7 @@
 			id: detail.id, title: detail.title,
 			issns: detail.issn_details.map((i) => ({
 				issn: i.issn, support: i.support ?? '', linking: i.linking,
-				status: i.status, replaced_by: i.replaced_by ?? '',
+				status: i.status,
 			})),
 			oa_model: detail.oa_model || '',
 			serial_type: jt, original_serial_type: jt,
@@ -135,7 +135,7 @@
 			.filter((i) => i.issn.trim())
 			.map((i) => ({
 				issn: i.issn.trim(), support: i.support || null, linking: i.linking,
-				status: i.status, replaced_by: i.replaced_by.trim() || null,
+				status: i.status,
 			}));
 		body.oa_model = editModal.oa_model || null;
 		body.serial_type = editModal.serial_type;

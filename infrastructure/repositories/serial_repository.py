@@ -119,7 +119,6 @@ class PgSerialRepository(SerialRepository):
                 "support": row.support,
                 "linking": row.linking,
                 "status": row.status,
-                "replaced_by": row.replaced_by,
             }
             kept = self._conn.execute(
                 update(serial_issns)
