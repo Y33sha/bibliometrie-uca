@@ -135,9 +135,6 @@
 - 2026-05-28 — [Correction des métadonnées canoniques](archived/2026-05-28_METIER_metadata-correction.md)
 - 2026-05-28 — [Déduplication des publications par métadonnées](archived/2026-05-28_METIER_metadata-deduplication.md)
 - 2026-05-26 — [Pipeline : phase `publishers_journals` (référentiels enrichis)](archived/2026-05-26_METIER_pipeline-publishers-journals.md)
-- 2026-05-23 — [Documentation HTML précompilée avec sommaire scrollable](archived/2026-05-23_CODE_doc-statique-prerender.md)
-- 2026-05-21 — [Parallélisation des extractions HTTP pipeline](archived/2026-05-21_CODE_async-extractions-http.md)
-- 2026-05-21 — [Repositories → use cases (orchestration en application)](archived/2026-05-21_CODE_repositories-vers-use-cases.md)
 
 
 
