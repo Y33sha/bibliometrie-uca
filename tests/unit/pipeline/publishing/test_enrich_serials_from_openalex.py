@@ -1,4 +1,4 @@
-"""Enrichissement des revues par OpenAlex Sources : écriture de l'APC et du type."""
+"""Enrichissement des revues par OpenAlex Sources : écriture du type."""
 
 import contextlib
 from unittest.mock import MagicMock
@@ -20,16 +20,11 @@ def _bound(repo):
             "find_serials_of_unknown_type",
             lambda conn, *a, **k: repo.find_serials_of_unknown_type(*a, **k),
         )
-        mp.setattr(
-            serials_mod,
-            "update_serial_apc",
-            lambda conn, *a, **k: repo.update_serial_apc(*a, **k),
-        )
         mp.setattr(serials_mod, "SerialStore", lambda conn: repo)
         yield
 
 
-class TestSerialsApc:
+class TestSerialsType:
     def _run(self, answer):
         serial_repo = MagicMock()
         serial_repo.find_serials_of_unknown_type.return_value = [(1, "S1")]
@@ -41,15 +36,13 @@ class TestSerialsApc:
             )
         return serial_repo
 
-    def test_apc_found_is_written(self):
-        repo = self._run((1500.0, "USD", "journal"))
-        repo.update_serial_apc.assert_called_once_with(1, apc_amount=1500.0, apc_currency="USD")
+    def test_mapped_type_is_written(self):
+        repo = self._run("journal")
+        repo.set_serial_type.assert_called_once_with(1, "journal")
 
-    def test_no_apc_leaves_serial_apc_unchanged(self):
-        """Sans APC dans OpenAlex, ni montant ni devise ne sont écrits ; le type l'est."""
-        repo = self._run((None, None, "journal"))
-        repo.update_serial_apc.assert_not_called()
-        repo.set_serial_type.assert_called_once()
+    def test_type_without_signal_is_not_written(self):
+        repo = self._run("other")
+        repo.set_serial_type.assert_not_called()
 
 
 class TestSerialsWorkerStopsOnTrippedBreaker:

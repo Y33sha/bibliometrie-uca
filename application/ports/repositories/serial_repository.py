@@ -27,7 +27,6 @@ class SerialUpdate(BaseModel):
     oa_model: OaModel | None = None
     serial_type: SerialType | None = None
     is_academic: bool | None = None
-    apc_amount: float | None = None
 
 
 class SerialRepository(Protocol):

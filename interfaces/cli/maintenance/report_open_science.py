@@ -44,9 +44,6 @@ SERIAL_TYPES = (DocType.ARTICLE, DocType.REVIEW, DocType.LETTER, DocType.EDITORI
 CONFERENCE_TYPES = (DocType.CONFERENCE, DocType.CONFERENCE_PAPER, DocType.POSTER)
 OPEN_STATUSES = (OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN)
 
-# Taux de conversion vers l'euro des prix catalogue, moyenne 2025.
-EUR_RATES = {"EUR": 1.0, "USD": 0.89, "GBP": 1.17, "CHF": 1.07}
-
 DOC_TYPE_LABELS = {
     DocType.ARTICLE: "Article",
     DocType.REVIEW: "Revue de littérature (review)",
@@ -256,10 +253,9 @@ class OpenScienceReport:
             r = next((r for r in paid if r.year == year and r.open_access_fee is oa_fee), None)
             return f"{r.n} paiements pour {_num(r.amount or 0)} € HT" if r else "aucun"
 
-        catalogue = self._rows(
+        gold_hybrid = self._rows(
             f"""
-            SELECT j.apc_amount, j.apc_currency,
-                   EXISTS (
+            SELECT EXISTS (
                        SELECT 1 FROM contributions a
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    ) AS lab_corresponding
@@ -269,24 +265,18 @@ class OpenScienceReport:
             """,
             types=_values(SERIAL_TYPES),
         )
-        known = [r for r in catalogue if r.apc_amount is not None and r.apc_currency in EUR_RATES]
-        total = sum(float(r.apc_amount) * EUR_RATES[r.apc_currency] for r in known)
-        corresponding = sum(1 for r in catalogue if r.lab_corresponding)
+        corresponding = sum(1 for r in gold_hybrid if r.lab_corresponding)
         return (
             "### APC\n\n"
             f"Frais d'open access payés (Open APC, enquête APC) : {paid_line(self.year, True)} pour les publications de {self.year}, {paid_line(self.year - 1, True)} pour celles de {self.year - 1}. "
             f"Autres frais de publication : {paid_line(self.year, False)} pour {self.year}.\n\n"
-            f"Prix catalogue des revues pour les {len(catalogue)} articles gold et hybrides de {self.year} : environ {_num(round(total, -3))} €, "
-            f"après conversion des montants en devise étrangère. Le prix de {len(catalogue) - len(known)} revues est inconnu. "
-            "Ce montant est un plafond : il ignore les accords transformants et les remises. "
-            f"L'auteur correspondant appartient au laboratoire pour {corresponding} de ces {len(catalogue)} articles."
+            f"L'auteur correspondant appartient au laboratoire pour {corresponding} des {len(gold_hybrid)} articles gold et hybrides de {self.year}."
         )
 
     def serials(self) -> str:
         rows = self._rows(
             f"""
-            SELECT j.title, pb.name AS publisher, j.oa_model, {DIAMOND_JOURNAL} AS diamond,
-                   j.apc_amount, j.apc_currency, COUNT(*) AS n
+            SELECT j.title, pb.name AS publisher, j.oa_model, {DIAMOND_JOURNAL} AS diamond, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p
             JOIN publishing.serials j ON j.id = p.serial_id
             LEFT JOIN publishing.publishers pb ON pb.id = j.publisher_id
@@ -302,14 +292,11 @@ class OpenScienceReport:
             label = MODEL_LABELS.get(r.oa_model, "Inconnu")
             return f"{label} (diamant)" if r.diamond else label
 
-        def price(r: SqlRow) -> str:
-            return f"{_num(r.apc_amount)} {r.apc_currency}" if r.apc_amount is not None else "—"
-
         return (
             "## Revues\n\n"
             + _table(
-                ["Revue", "Éditeur", "Modèle", "Articles", "APC catalogue"],
-                [(r.title, r.publisher or "—", model(r), r.n, price(r)) for r in top],
+                ["Revue", "Éditeur", "Modèle", "Articles"],
+                [(r.title, r.publisher or "—", model(r), r.n) for r in top],
             )
             + (f"\n\n{others} autres revues comptent un article chacune." if others else "")
         )

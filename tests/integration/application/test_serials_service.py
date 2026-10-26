@@ -26,9 +26,6 @@ from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
     find_serials_to_check_in_sudoc,
     record_sudoc_check,
 )
-from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
-    update_serial_apc,
-)
 from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
 from pipeline.transformation.publishing.serials.store import SerialStore
 from pipeline.transformation.publishing.serials.type_proceedings_serials import (
@@ -46,8 +43,7 @@ from tests.integration.helpers.serials import (
 )
 from tests.integration.helpers.sources import insert_source_record
 
-# Revue « Nature » par défaut, sans devise d'APC.
-_serial = partial(insert_serial_with_issns, title="Nature", apc_currency=None)
+_serial = partial(insert_serial_with_issns, title="Nature")
 
 # Date de vérification Sudoc des tests.
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
@@ -128,7 +124,6 @@ class TestSerialFindById:
         assert j.id == jid
         assert j.title == "Nature"
         assert j.publisher_id is None
-        assert j.apc_currency is None
         assert j.is_in_doaj is False
 
     def test_hydrates_full(self, sa_sync_conn, repo):
@@ -140,8 +135,6 @@ class TestSerialFindById:
             openalex_id="S202381698",
             is_in_doaj=True,
             oa_model="full_oa",
-            apc_amount=1700,
-            apc_currency="USD",
             issn="1932-6203",
             eissn="1932-6203",
             issnl="1932-6203",
@@ -240,25 +233,6 @@ class TestUpdateSerial:
                 sa_sync_conn, "SELECT manual_fields FROM serials WHERE id = :id", id=j
             ).manual_fields
             == []
-        )
-
-    def test_apc_saisi_en_euros_hors_de_portee_du_pipeline(
-        self, sa_sync_conn, gateway, serial_service
-    ):
-        j = _serial(sa_sync_conn, apc_amount=1000, apc_currency="USD")
-        serial_service.update_serial(j, update=SerialUpdate(apc_amount=2499.99))
-
-        update_serial_apc(sa_sync_conn, j, apc_amount=3000, apc_currency="GBP")
-
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT apc_amount, apc_currency, manual_fields FROM serials WHERE id = :id",
-            id=j,
-        )
-        assert (float(row.apc_amount), row.apc_currency, row.manual_fields) == (
-            2499.99,
-            "EUR",
-            ["apc"],
         )
 
     def test_titre_et_issn_saisis_hors_de_portee_du_sudoc(
@@ -578,18 +552,6 @@ class TestMergeSerials:
             id=target,
         )
         assert (row.serial_type, row.manual_fields) == ("media", ["serial_type"])
-
-    def test_apc_amount_and_currency_taken_together(self, sa_sync_conn, serial_service):
-        """Sans APC, la cible prend le montant et la devise de la source."""
-        target = _serial(sa_sync_conn, title="Target", apc_currency="EUR")
-        source = _serial(sa_sync_conn, title="Source", apc_amount=100, apc_currency="USD")
-
-        serial_service.merge_serials(target, source)
-
-        row = _fetch_one(
-            sa_sync_conn, "SELECT apc_amount, apc_currency FROM serials WHERE id = :id", id=target
-        )
-        assert (row.apc_amount, row.apc_currency) == (100, "USD")
 
     @pytest.mark.parametrize(
         ("target_type", "source_type", "expected"),

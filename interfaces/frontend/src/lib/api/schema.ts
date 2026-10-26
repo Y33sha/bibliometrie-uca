@@ -4381,10 +4381,6 @@ export interface components {
             journal_title: string | null;
             /** Serial Issns */
             serial_issns: string[];
-            /** Apc Amount */
-            apc_amount: number | null;
-            /** Apc Currency */
-            apc_currency: string | null;
             /** Oa Model */
             oa_model: string | null;
             /** Monograph Id */
@@ -4835,7 +4831,7 @@ export interface components {
          * SerialDetailResponse
          * @description GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
          *
-         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
          */
         SerialDetailResponse: {
             /** Id */
@@ -4859,10 +4855,6 @@ export interface components {
             issn_details: components["schemas"]["SerialIssnDetail"][];
             /** Openalex Id */
             openalex_id: string | null;
-            /** Apc Amount */
-            apc_amount: number | null;
-            /** Apc Currency */
-            apc_currency: string | null;
             oa_model: components["schemas"]["OaModel"] | null;
             /** Is Academic */
             is_academic: boolean | null;
@@ -5007,8 +4999,6 @@ export interface components {
             serial_type?: components["schemas"]["SerialType"] | null;
             /** Is Academic */
             is_academic?: boolean | null;
-            /** Apc Amount */
-            apc_amount?: number | null;
         };
         /**
          * SerialsFacetsResponse

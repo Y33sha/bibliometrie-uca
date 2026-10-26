@@ -67,7 +67,7 @@ L'import indexe les revues par leurs ISSN valides, remet `is_in_doaj` à FALSE p
 
 Stockage : `serials.doaj_payload` (JSONB), `serials.doaj_imported_at` (timestamptz), `serials.is_in_doaj` (bool).
 
-Le payload garde les colonnes du CSV pour clés. Le frontend les lit telles quelles dans `READABLE_DOAJ_FIELDS` (`"Journal title"`, `"APC amount"`…), et l'audit des frais de publication interroge `doaj_payload->>'APC amount'`.
+Le payload garde les colonnes du CSV pour clés. Le frontend les lit telles quelles dans `READABLE_DOAJ_FIELDS` (`"Journal title"`, `"APC amount"`…).
 
 Un dump téléchargé à la main s'importe par le même chemin d'écriture :
 

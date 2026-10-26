@@ -2109,8 +2109,6 @@ CREATE TABLE publishing.serials (
     publisher_id integer,
     openalex_id text,
     is_in_doaj boolean DEFAULT false,
-    apc_amount numeric(10,2),
-    apc_currency text DEFAULT 'EUR'::text,
     oa_model public.oa_model,
     created_at timestamp with time zone DEFAULT now(),
     serial_type public.serial_type DEFAULT 'unknown'::public.serial_type,

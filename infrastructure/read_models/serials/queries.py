@@ -61,8 +61,7 @@ _SERIAL_LIST_COLUMNS = f"""
 # Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin).
 _SERIAL_DETAIL_COLUMNS = f"""
     {_SERIAL_LIST_COLUMNS},
-    j.openalex_id, j.apc_amount, j.apc_currency,
-    j.oa_model, j.is_academic
+    j.openalex_id, j.oa_model, j.is_academic
 """
 
 
@@ -454,8 +453,6 @@ class SerialQueries:
                 )
             ],
             openalex_id=row.openalex_id,
-            apc_amount=row.apc_amount,
-            apc_currency=row.apc_currency,
             oa_model=row.oa_model,
             is_academic=row.is_academic,
             doaj_payload=row.doaj_payload,

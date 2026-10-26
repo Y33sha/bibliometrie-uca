@@ -3,8 +3,6 @@
 Le `serial_type` d'une revue alimente des règles de correction du `doc_type` de ses publications. Après une édition ou une fusion, le pipeline rejoue ces corrections (`SerialRecompute`).
 """
 
-from decimal import Decimal
-
 from sqlalchemy import Connection
 
 from application.audit_log import discarded_events, emit_event
@@ -30,9 +28,6 @@ def _serial_edit(update: SerialUpdate) -> SerialEdit:
         changes["oa_model"] = update.oa_model
     if "is_academic" in provided and update.is_academic is not None:
         changes["is_academic"] = update.is_academic
-    if "apc_amount" in provided:
-        amount = update.apc_amount
-        changes["apc_amount_eur"] = None if amount is None else Decimal(str(amount))
     return changes
 
 

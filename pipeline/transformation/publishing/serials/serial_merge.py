@@ -112,9 +112,6 @@ MERGE_STEPS: dict[str, MergeStep] = {
     "publisher": untouched("serials", "publisher_id"),
     "openalex_id": fill_empty_unique("serials", "openalex_id"),
     "oa_model": _fill_empty_with_marker(ManualField.OA_MODEL, ("oa_model",), "t.oa_model IS NULL"),
-    "apc": _fill_empty_with_marker(
-        ManualField.APC, ("apc_amount", "apc_currency"), "t.apc_amount IS NULL"
-    ),
     "serial_type": _fill_empty_with_marker(
         ManualField.SERIAL_TYPE,
         ("serial_type",),

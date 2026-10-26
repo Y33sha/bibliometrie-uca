@@ -10,7 +10,7 @@ Un livre ou un volume d'actes est une monographie, rattachée à sa collection p
 
 | Table | Rôle | Colonnes notables |
 |---|---|---|
-| `serials` | La publication en série | `title` / `title_normalized`, `publisher_id`, `openalex_id` (unique), `serial_type`, `oa_model`, `is_in_doaj`, `apc_amount` / `apc_currency`, `doaj_payload`, `publication_count`, `manual_fields` |
+| `serials` | La publication en série | `title` / `title_normalized`, `publisher_id`, `openalex_id` (unique), `serial_type`, `oa_model`, `is_in_doaj`, `doaj_payload`, `publication_count`, `manual_fields` |
 | `serial_issns` | ISSN des publications en série ; sans publication en série, ISSN vérifié d'une publication absente de la base | `issn`, `serial_id`, `support`, `linking` (ISSN-L), `status`, `replaced_by`, `sudoc_checked_at`, unicité `(issn, serial_id)` |
 | `serial_name_forms` | Formes de nom permettant de reconnaître une publication en série par son titre | `serial_id`, `form_normalized`, `publisher_id`, unicité `(form_normalized, publisher_id)` |
 | `serial_doi_namespaces` | Espaces de noms DOI qui désignent une publication en série, recalculés par `publishing` | `namespace` (clé), `serial_id`, `dois`, `share` (part des DOI de l'espace qui la désignent) |
@@ -31,7 +31,7 @@ Les tables qui référencent une publication en série ont des politiques de sup
 
 ## Écriture par l'API — édition manuelle
 
-Routeur `interfaces/api/routers/serials.py`, commandes dans `application/services/serials/commands.py`, adaptateur `PgSerialRepository`. Un titre, des ISSN, un type, un modèle open access ou des frais de publication saisis à la main sont marqués dans `manual_fields`, et le pipeline les laisse en l'état.
+Routeur `interfaces/api/routers/serials.py`, commandes dans `application/services/serials/commands.py`, adaptateur `PgSerialRepository`. Un titre, des ISSN, un type ou un modèle open access saisis à la main sont marqués dans `manual_fields`, et le pipeline les laisse en l'état.
 
 **Éditer une publication en série** (`PUT /api/serials/{id}`). Le repository re-dérive `title_normalized` à l'enregistrement. Si le type change, `requalify_publications_for_serial` rejoue immédiatement le type de document de toutes ses publications et consigne un événement `serial.type_requalified`.
 

@@ -217,8 +217,6 @@ class PublicationDetailCore(BaseModel):
     journal_title: str | None
     serial_issns: list[str]
     """ISSN actifs de la revue."""
-    apc_amount: float | None
-    apc_currency: str | None
     oa_model: str | None
     monograph_id: int | None
     """Livre ou volume d'actes qui contient la publication."""

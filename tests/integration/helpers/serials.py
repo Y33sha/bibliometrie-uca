@@ -41,11 +41,9 @@ def insert_serial(
     serial_type: str | None = None,
     is_in_doaj: bool | None = None,
     oa_model: str | None = None,
-    apc_amount: float | None = None,
-    apc_currency: str | None = "EUR",
     doaj_imported_at: object = None,
 ) -> int:
-    """Insère une revue et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma. `apc_currency` vaut par défaut celle du schéma ; `None` l'écrit NULL."""
+    """Insère une revue et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules. Une colonne facultative laissée à `None` prend la valeur par défaut du schéma."""
     return insert_row(
         conn,
         "serials",
@@ -57,12 +55,9 @@ def insert_serial(
             "serial_type": serial_type,
             "is_in_doaj": is_in_doaj,
             "oa_model": oa_model,
-            "apc_amount": apc_amount,
-            "apc_currency": apc_currency,
             "doaj_imported_at": doaj_imported_at,
         },
         {"serial_type": "serial_type", "oa_model": "oa_model"},
-        nullable=("apc_currency",),
     )
 
 

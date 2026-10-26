@@ -158,12 +158,6 @@
 				<span class="entity-meta-label">OA</span>
 				<span class="entity-tag">{journal.oa_model}</span>
 			{/if}
-			{#if journal.apc_amount != null}
-				<span class="entity-meta-label">APC</span>
-				<span class="entity-tag">
-					{journal.apc_amount} {journal.apc_currency ?? ''}
-				</span>
-			{/if}
 		</div>
 	</div>
 

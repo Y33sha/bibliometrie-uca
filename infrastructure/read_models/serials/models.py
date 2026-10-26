@@ -75,13 +75,11 @@ class SerialListResponse(PaginatedResponse):
 class SerialDetailResponse(SerialListItem):
     """GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
 
-    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
     """
 
     issn_details: list[SerialIssnDetail]
     openalex_id: str | None
-    apc_amount: float | None
-    apc_currency: str | None
     oa_model: OaModel | None
     is_academic: bool | None
     doaj_payload: dict[str, str] | None

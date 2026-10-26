@@ -84,7 +84,6 @@
 		oa_model: string;
 		serial_type: string; original_serial_type: string;
 		is_academic: boolean;
-		apc_amount: string;
 	} | null = $state(null);
 
 	async function openEdit(j: Serial) {
@@ -107,7 +106,6 @@
 			oa_model: detail.oa_model || '',
 			serial_type: jt, original_serial_type: jt,
 			is_academic: detail.is_academic ?? true,
-			apc_amount: detail.apc_amount ? String(detail.apc_amount) : '',
 		};
 	}
 
@@ -142,7 +140,6 @@
 		body.oa_model = editModal.oa_model || null;
 		body.serial_type = editModal.serial_type;
 		body.is_academic = editModal.is_academic;
-		body.apc_amount = editModal.apc_amount ? parseFloat(editModal.apc_amount) : null;
 		try {
 			await serialsApi.update(editModal.id, body);
 			editModal = null;
@@ -267,7 +264,6 @@
 		<div style="display:flex;gap:12px;margin-top:8px">
 			<label class="checkbox-row"><input type="checkbox" bind:checked={editModal.is_academic} /> Académique</label>
 		</div>
-		<label>APC (€) <input bind:value={editModal.apc_amount} placeholder="ex: 2500" type="number" /></label>
 		{#snippet actions()}
 			<button class="btn" onclick={() => editModal = null}>Annuler</button>
 			<button class="btn btn-primary" onclick={saveEdit}>Enregistrer</button>

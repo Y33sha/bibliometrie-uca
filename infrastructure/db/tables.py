@@ -428,8 +428,6 @@ serials = Table(
     Column("publisher_id", Integer),
     Column("openalex_id", Text),
     Column("is_in_doaj", Boolean, server_default="false"),
-    Column("apc_amount", Numeric(10, 2)),
-    Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("serial_type", serial_type_enum, server_default="unknown"),
