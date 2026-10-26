@@ -111,7 +111,6 @@
 - 2026-06-14 — [Performance du pipeline (phase par phase)](archived/2026-06-14_CODE_perf-pipeline.md)
 - 2026-06-13 — [Performance des pages de listes (UI)](archived/2026-06-13_DATA_perf-pages-listes.md)
 - 2026-06-11 — [Publications : matching par création⇒fusion + modélisation des identifiants](archived/2026-06-11_DATA_publications-creation-fusion.md)
-- 2026-06-11 — [Fusions abusives de documents distincts par les sources](archived/2026-06-11_METIER_fusions-abusives-sources.md)
 
 
 
