@@ -61,7 +61,7 @@
 
 	// --- Props ---
 	// Composant de liste de publications réutilisable. Utilisé par :
-	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de gestion)
+	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de la publication)
 	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
 	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
@@ -647,7 +647,7 @@
 				<tr class:active-row={p.id === activePublicationId}>
 					{#if onopenPublication}
 						<td class="row-actions">
-							<IconButton icon="edit" label="Ouvrir le volet de gestion" onclick={() => onopenPublication(p.id)} />
+							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopenPublication(p.id)} />
 						</td>
 					{/if}
 					{#if showAdminExclude}
