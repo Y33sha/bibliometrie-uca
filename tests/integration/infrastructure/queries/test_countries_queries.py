@@ -1,7 +1,7 @@
-"""Tests d'intégration pour `infrastructure.read_models.countries`."""
+"""Tests d'intégration pour `infrastructure.read_models.countries.queries`."""
 
 from domain.countries import NO_COUNTRY_CODE
-from infrastructure.read_models.countries import CountriesQueries
+from infrastructure.read_models.countries.queries import CountriesQueries
 from tests.integration.helpers.addresses import ensure_country
 
 

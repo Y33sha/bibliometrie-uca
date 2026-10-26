@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from fastapi import HTTPException, Request
 
 from domain.merge import MergedEntity
-from infrastructure.read_models.merge_redirects import MergeRedirectQueries
+from infrastructure.read_models.merge_redirects.queries import MergeRedirectQueries
 
 _NOT_FOUND = {
     MergedEntity.PERSON: "Personne introuvable",

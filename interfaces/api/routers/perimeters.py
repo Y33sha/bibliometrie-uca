@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends
 
 from application.ports.repositories.perimeter_repository import PerimeterUpdate
 from application.services.perimeters import PerimeterService
-from infrastructure.read_models.perimeters import PerimetersQueries
 from infrastructure.read_models.perimeters.models import (
     PerimeterOut,
 )
+from infrastructure.read_models.perimeters.queries import PerimetersQueries
 from interfaces.api.deps import perimeter_service, perimeters_queries
 from interfaces.api.models import (
     CreatedIdResponse,

@@ -1,11 +1,11 @@
-"""Tests d'intégration pour `infrastructure.read_models.contributions`.
+"""Tests d'intégration pour `infrastructure.read_models.contributions.queries`.
 
 Une contribution orpheline est un groupe de contributions sources du périmètre, sous un rôle d'auteur, sans personne. Les tests groupent les contributions sources sans groupe et recomposent les attributs des groupes comme le pipeline (`_group`)."""
 
 from sqlalchemy import text
 
-from infrastructure.read_models.contributions import ContributionsQueries
 from infrastructure.read_models.contributions.models import OrphanFilters
+from infrastructure.read_models.contributions.queries import ContributionsQueries
 from tests.integration.helpers.groups import (
     group_of,
     group_ungrouped,

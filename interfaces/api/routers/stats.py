@@ -7,7 +7,6 @@ from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
 from infrastructure.read_models.publications.models import LICENSE_FILTER_VALUES
-from infrastructure.read_models.stats import StatsQueries
 from infrastructure.read_models.stats.models import (
     CollaborationsResponse,
     PivotResponse,
@@ -15,6 +14,7 @@ from infrastructure.read_models.stats.models import (
     StatsFacetsResponse,
     StatsFilters,
 )
+from infrastructure.read_models.stats.queries import StatsQueries
 from interfaces.api.deps import stats_queries
 from interfaces.api.filters import TOGGLE_VALUES, parse_int_csv, parse_ror_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm

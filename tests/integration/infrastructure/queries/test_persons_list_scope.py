@@ -6,8 +6,8 @@ Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contributi
 from sqlalchemy import text
 
 from domain.persons.person import PersonExclusion
-from infrastructure.read_models.persons import PersonsQueries
 from infrastructure.read_models.persons.models import PersonFilters
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import (
     insert_person,

@@ -56,7 +56,7 @@ from infrastructure.read_models.filters import (
     subject_clause,
     year_clause,
 )
-from infrastructure.read_models.perimeters import get_persons_perimeter_name
+from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
 from infrastructure.read_models.publications.list import lab_hal_collection
 from infrastructure.read_models.publications.models import (
     NO_LICENSE,

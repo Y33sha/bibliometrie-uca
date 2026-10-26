@@ -11,7 +11,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from application.services.addresses import AddressService
-from infrastructure.read_models.addresses import AddressesQueries
 from infrastructure.read_models.addresses.models import (
     AddressDetected,
     AddressesCountriesResponse,
@@ -24,6 +23,7 @@ from infrastructure.read_models.addresses.models import (
     TextPredicate,
     TextPredicateMode,
 )
+from infrastructure.read_models.addresses.queries import AddressesQueries
 from interfaces.api.deps import (
     address_service,
     addresses_queries,

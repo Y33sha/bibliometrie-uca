@@ -2,7 +2,7 @@
 
 from functools import partial
 
-from infrastructure.read_models.structures import StructuresQueries
+from infrastructure.read_models.structures.queries import StructuresQueries
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import (
     ensure_country,

@@ -1,11 +1,11 @@
-"""Tests d'intégration pour `infrastructure.read_models.hal_problems`."""
+"""Tests d'intégration pour `infrastructure.read_models.hal_problems.queries`."""
 
 from functools import partial
 
 from sqlalchemy import text
 
-from infrastructure.read_models.hal_problems import HalProblemsQueries
 from infrastructure.read_models.hal_problems.models import NoMissingCollections
+from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import insert_contribution

@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import as_mapping, as_sequence, as_str, at_path
-from infrastructure.read_models.perimeters import get_hal_collections
+from infrastructure.read_models.perimeters.queries import get_hal_collections
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,

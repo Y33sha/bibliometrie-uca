@@ -7,7 +7,6 @@ from fastapi import APIRouter, Depends, Query
 
 from domain.merge import MergedEntity
 from infrastructure.read_models._common import EntityFacetResponse
-from infrastructure.read_models.monographs import MonographQueries
 from infrastructure.read_models.monographs.models import (
     MONOGRAPH_KINDS,
     MonographEntityKind,
@@ -17,6 +16,7 @@ from infrastructure.read_models.monographs.models import (
     MonographsFacetsResponse,
     MonographSort,
 )
+from infrastructure.read_models.monographs.queries import MonographQueries
 from interfaces.api.deps import entity_detail, monograph_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_int_csv, parse_vocabulary_csv

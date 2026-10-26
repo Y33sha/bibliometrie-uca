@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import JsonValue, as_mapping, as_sequence, at_path
-from infrastructure.read_models.perimeters import get_extraction_api_ids
+from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.ingestion.api_params import SCANR_PER_PAGE
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,

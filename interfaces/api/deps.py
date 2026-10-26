@@ -25,24 +25,24 @@ from application.services.structures import StructureService
 from domain.merge import MergedEntity
 from domain.users import Role, SessionUser
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.read_models.addresses import AddressesQueries
-from infrastructure.read_models.config import ConfigQueries
-from infrastructure.read_models.contributions import ContributionsQueries
-from infrastructure.read_models.countries import CountriesQueries
-from infrastructure.read_models.entity_labels import EntityLabelQueries
-from infrastructure.read_models.feedback import FeedbackQueries
-from infrastructure.read_models.hal_problems import HalProblemsQueries
-from infrastructure.read_models.merge_redirects import MergeRedirectQueries
-from infrastructure.read_models.monographs import MonographQueries
-from infrastructure.read_models.perimeters import PerimetersQueries
-from infrastructure.read_models.persons import PersonsQueries
-from infrastructure.read_models.pipeline_runs import PipelineRunsQueries
-from infrastructure.read_models.publications import PublicationsQueries
-from infrastructure.read_models.publishers import PublisherQueries
-from infrastructure.read_models.serials import SerialQueries
-from infrastructure.read_models.stats import StatsQueries
-from infrastructure.read_models.structures import StructuresQueries
-from infrastructure.read_models.subjects import SubjectsQueries
+from infrastructure.read_models.addresses.queries import AddressesQueries
+from infrastructure.read_models.config.queries import ConfigQueries
+from infrastructure.read_models.contributions.queries import ContributionsQueries
+from infrastructure.read_models.countries.queries import CountriesQueries
+from infrastructure.read_models.entity_labels.queries import EntityLabelQueries
+from infrastructure.read_models.feedback.queries import FeedbackQueries
+from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
+from infrastructure.read_models.merge_redirects.queries import MergeRedirectQueries
+from infrastructure.read_models.monographs.queries import MonographQueries
+from infrastructure.read_models.perimeters.queries import PerimetersQueries
+from infrastructure.read_models.persons.queries import PersonsQueries
+from infrastructure.read_models.pipeline_runs.queries import PipelineRunsQueries
+from infrastructure.read_models.publications.queries import PublicationsQueries
+from infrastructure.read_models.publishers.queries import PublisherQueries
+from infrastructure.read_models.serials.queries import SerialQueries
+from infrastructure.read_models.stats.queries import StatsQueries
+from infrastructure.read_models.structures.queries import StructuresQueries
+from infrastructure.read_models.subjects.queries import SubjectsQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,

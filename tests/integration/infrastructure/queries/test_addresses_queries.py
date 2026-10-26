@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `infrastructure.read_models.addresses`."""
+"""Tests d'intégration pour `infrastructure.read_models.addresses.queries`."""
 
 from functools import partial
 
@@ -6,12 +6,12 @@ from sqlalchemy import text
 
 from application.ports.repositories.address_repository import AddressCountryFilter
 from domain.country_detection import CountryDetectionMethod
-from infrastructure.read_models.addresses import AddressesQueries
 from infrastructure.read_models.addresses.models import (
     AddressListFilters,
     StructurePredicate,
     TextPredicate,
 )
+from infrastructure.read_models.addresses.queries import AddressesQueries
 from tests.integration.helpers.addresses import (
     ensure_country,
     insert_address,

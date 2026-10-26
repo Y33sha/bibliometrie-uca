@@ -10,13 +10,13 @@ from typing import cast
 from fastapi import APIRouter, Depends, Query
 
 from application.services.contributions import ContributionService
-from infrastructure.read_models.contributions import ContributionsQueries
 from infrastructure.read_models.contributions.models import (
     OrphanContributionsFacetsResponse,
     OrphanContributionsResponse,
     OrphanCountResponse,
     OrphanFilters,
 )
+from infrastructure.read_models.contributions.queries import ContributionsQueries
 from interfaces.api.deps import contribution_service, contributions_queries
 from interfaces.api.filters import parse_lab_id
 from interfaces.api.models import (

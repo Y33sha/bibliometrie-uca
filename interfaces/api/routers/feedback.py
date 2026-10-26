@@ -5,11 +5,11 @@ Alimente le tableau de bord qui confronte la détection automatique aux arbitrag
 
 from fastapi import APIRouter, Depends, Query
 
-from infrastructure.read_models.feedback import FeedbackQueries
 from infrastructure.read_models.feedback.models import (
     FeedbackAddressesResponse,
     FeedbackStats,
 )
+from infrastructure.read_models.feedback.queries import FeedbackQueries
 from interfaces.api.deps import feedback_queries
 from interfaces.api.params import SearchTerm
 

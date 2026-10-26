@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from sqlalchemy import Connection
 
 from domain.types import as_int, as_mapping, as_sequence
-from infrastructure.read_models.perimeters import get_extraction_api_ids
+from infrastructure.read_models.perimeters.queries import get_extraction_api_ids
 from pipeline.ingestion.common.harvester import (
     HarvestConfigError,
     HarvestWindow,

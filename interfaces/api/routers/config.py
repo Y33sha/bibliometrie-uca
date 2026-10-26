@@ -9,14 +9,14 @@ from fastapi import APIRouter, Depends
 
 from application.services.config import ConfigService
 from domain.users import SessionUser
-from infrastructure.read_models.config import ConfigQueries
 from infrastructure.read_models.config.models import (
     ConfigItem,
 )
-from infrastructure.read_models.perimeters import PerimetersQueries
+from infrastructure.read_models.config.queries import ConfigQueries
 from infrastructure.read_models.perimeters.models import (
     InstitutionOut,
 )
+from infrastructure.read_models.perimeters.queries import PerimetersQueries
 from interfaces.api.deps import (
     config_queries,
     config_service,

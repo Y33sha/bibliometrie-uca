@@ -16,7 +16,6 @@ from application.ports.repositories.structure_repository import (
 from application.services.structures import StructureService
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
-from infrastructure.read_models.structures import StructuresQueries
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     StructureAddressesResponse,
@@ -27,6 +26,7 @@ from infrastructure.read_models.structures.models import (
     StructureOut,
     StructurePartnersResponse,
 )
+from infrastructure.read_models.structures.queries import StructuresQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import structure_service, structures_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv

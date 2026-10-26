@@ -4,7 +4,7 @@
 
 from sqlalchemy import Connection, text
 
-from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 
 
 class EmptyExtractionPerimeterError(RuntimeError):

@@ -11,7 +11,6 @@ from application.services.persons import PersonService
 from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
-from infrastructure.read_models.persons import PersonsQueries
 from infrastructure.read_models.persons.models import (
     AmbiguousNameFormsResponse,
     IdentifierConflictsResponse,
@@ -30,6 +29,7 @@ from infrastructure.read_models.persons.models import (
     PersonThesesResponse,
     SharingPersonOut,
 )
+from infrastructure.read_models.persons.queries import PersonsQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import entity_detail, person_service, persons_queries
 from interfaces.api.entity_detail import EntityDetail

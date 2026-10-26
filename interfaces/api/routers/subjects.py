@@ -2,11 +2,11 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from infrastructure.read_models.subjects import SubjectsQueries
 from infrastructure.read_models.subjects.models import (
     SubjectDetailResponse,
     SubjectListResponse,
 )
+from infrastructure.read_models.subjects.queries import SubjectsQueries
 from interfaces.api.deps import subjects_queries
 from interfaces.api.params import MAX_SEARCH_LENGTH
 

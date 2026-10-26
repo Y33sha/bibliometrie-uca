@@ -9,7 +9,6 @@ from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.publishers import PublisherService
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from infrastructure.read_models.publishers import PublisherQueries
 from infrastructure.read_models.publishers.models import (
     Publisher,
     PublisherDashboardResponse,
@@ -18,6 +17,7 @@ from infrastructure.read_models.publishers.models import (
     PublishersFacetsResponse,
     PublisherSort,
 )
+from infrastructure.read_models.publishers.queries import PublisherQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import entity_detail, publisher_queries, publisher_service
 from interfaces.api.entity_detail import EntityDetail

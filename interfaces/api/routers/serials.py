@@ -17,7 +17,6 @@ from domain.serials.serial import (
     SERIAL_TYPES,
 )
 from infrastructure.read_models._common import EntityFacetResponse
-from infrastructure.read_models.serials import SerialQueries
 from infrastructure.read_models.serials.models import (
     DoiNamespaceConflictsResponse,
     LikelyProceedingsResponse,
@@ -29,6 +28,7 @@ from infrastructure.read_models.serials.models import (
     SerialsFacetsResponse,
     SerialSort,
 )
+from infrastructure.read_models.serials.queries import SerialQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import entity_detail, serial_queries, serial_service
 from interfaces.api.entity_detail import EntityDetail

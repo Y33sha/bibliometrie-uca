@@ -12,7 +12,7 @@ from infrastructure.read_models.filters import (
     assemble_where,
     institution_apc_payment_sql,
 )
-from infrastructure.read_models.perimeters import get_persons_perimeter_name
+from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
 from infrastructure.read_models.publications.models import NO_LICENSE
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 from infrastructure.read_models.stats.models import StatsFacetsResponse, StatsFilters

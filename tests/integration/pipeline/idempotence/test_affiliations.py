@@ -87,7 +87,7 @@ def _run_populate_affiliations(conn):
     """Exécute populate_affiliations sur la Connection SA de test."""
     import logging
 
-    from infrastructure.read_models.perimeters import get_persons_structure_ids
+    from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
     from pipeline.transformation.structures.affiliations import populate
 
     populate(
@@ -157,7 +157,7 @@ class TestPopulateAffiliationsIdempotence:
 
         from sqlalchemy import text
 
-        from infrastructure.read_models.perimeters import get_persons_structure_ids
+        from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
         from pipeline.transformation.structures.affiliations import populate
 
         _setup_affiliations_test_data(sa_sync_conn)

@@ -3,10 +3,10 @@
 from fastapi import APIRouter, Depends, Query
 
 from infrastructure.read_models._common import EntityKind
-from infrastructure.read_models.entity_labels import EntityLabelQueries
 from infrastructure.read_models.entity_labels.models import (
     EntityLabelResponse,
 )
+from infrastructure.read_models.entity_labels.queries import EntityLabelQueries
 from interfaces.api.deps import entity_label_queries
 
 router = APIRouter(prefix="/api/entity-labels", tags=["entity-labels"])

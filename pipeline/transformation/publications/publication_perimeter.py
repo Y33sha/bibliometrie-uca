@@ -7,7 +7,7 @@ from sqlalchemy import Connection, text
 
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.perimeter_evidence import PerimeterEvidence
-from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.sql_fragments import NO_PERIMETER_EVIDENCE, has_author_role, source_extra
 
 

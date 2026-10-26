@@ -19,7 +19,6 @@ from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
 from domain.sources.hal import HAL_DEPOSIT_STATUSES
 from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
-from infrastructure.read_models.publications import PublicationsQueries
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
     LICENSE_FILTER_VALUES,
@@ -31,6 +30,7 @@ from infrastructure.read_models.publications.models import (
     PublicationSourcesResponse,
     SuspectMergesResponse,
 )
+from infrastructure.read_models.publications.queries import PublicationsQueries
 from interfaces.api.deps import entity_detail, publications_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import (

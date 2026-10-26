@@ -2,10 +2,10 @@
 
 from sqlalchemy import text
 
-from infrastructure.read_models.entity_labels import entity_label
+from infrastructure.read_models.entity_labels.queries import entity_label
 from infrastructure.read_models.publications.list import list_publications
 from infrastructure.read_models.publications.models import PublicationFilters
-from infrastructure.read_models.structures import StructuresQueries
+from infrastructure.read_models.structures.queries import StructuresQueries
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
