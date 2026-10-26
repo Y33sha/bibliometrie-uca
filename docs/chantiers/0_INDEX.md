@@ -147,28 +147,7 @@
 - 2026-05-14 — [Séparer le matching de la normalisation](archived/2026-05-14_DATA_separer-matching-normalisation.md)
 - 2026-05-14 — [Rationalisation du matching/fusion de publications](archived/2026-05-14_CODE_deduplication-fusion-publications.md)
 
-- 2026-05-13 — [Normalisation du schéma `person_name_forms`](archived/2026-05-13_DATA_person-name-forms-normalisation.md)
-
-  La table `person_name_forms` stocke les formes de nom normalisées, avec une colonne `person_ids` (personnes liées) et une colonne `sources` (sources où la forme de nom a été observée). Les deux ne sont pas corrélés: on ne sait pas de quelle source vient chaque forme pour chaque personne. Problème résolu en remplaçant les deux colonnes par une colonne JSONB `persons` au format `{ "<person_id>": ["src1", "src2"], ... }`.
-
-  *NB*. Ultérieurement, choix révisé: colonnes `person_id` INT (FK) et `sources` TEXT[]. Permet d'avoir une contrainte FK.
-
 - 2026-05-13 — [Simplification des tables sources](archived/2026-05-13_DATA_simplify-source-tables.md)
 
-- 2026-05-12 — [Pureté du domain/](archived/2026-05-12_CODE_purete-domain.md)
-
-  Des fichiers du `domain/` importaient `pydantic` pour modéliser des colonnes JSONB qui sont en réalité de l'I/O, pas du métier. Déplacement des `BaseModel` vers `infrastructure/db/jsonb_models/`. Interdiction des imports de bibliothèques tierces par `domain/`, verrouillée par `import-linter`.
-
-- 2026-05-11 — [Suppression des `conn`/`cur` fossiles](archived/2026-05-11c_CODE_conn-cur-fossiles.md)
-
-  Nettoyage post-migration SQLAlchemy. De nombreuses fonctions déclarent un argument `conn: Connection` ou `cur: Connection` qu'elles n'utilisent pas. Vestige du pattern psycopg où le curseur servait à `cur.execute(...)` directement.
-
-- 2026-05-11 — [Adoption d'Alembic](archived/2026-05-11b_CODE_alembic-adoption.md)
-
-  Remplacement du système maison (`infrastructure/db/migrate.py`) par Alembic pour la gestion des migrations.
-
-- 2026-05-11 — [Adoption SQLAlchemy Core](archived/2026-05-11a_CODE_sqlalchemy-core-adoption.md)
-
-  Adoption de SQLAlchemy Core (pas l'ORM) comme *query builder* de référence pour les queries dynamiques, en coexistence pragmatique avec du SQL brut là où c'est plus lisible (CTE complexes, opérations JSON spécifiques à PostgreSQL).
 
 
