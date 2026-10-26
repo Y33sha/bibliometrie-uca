@@ -107,7 +107,6 @@
 - 2026-06-19 — [Types de documents : enum, mappings, règles suspects](archived/2026-06-19_METIER_doc-types.md)
 - 2026-06-19 — [Matching cross-source des authorships](archived/2026-06-19_DATA_authorships-cross-source-matching.md)
 - 2026-06-19 — [Adresses → pays : détection, suggestion et performances de la cascade](archived/2026-06-19_DATA_addresses-countries.md)
-- 2026-06-16 — [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](archived/2026-06-16_DATA_publications-match-or-create.md)
 
 
 
