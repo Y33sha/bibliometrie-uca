@@ -143,7 +143,7 @@ TODO: expliquer *authenticated*
 
 > **Pourquoi un statut *rejected* ?**
 >
-> Certaines sources (OpenAlex, WOS) rattachent des PIDs à des publications de manière algorithmique, via leur propre référentiel auteurs. (Cf doc [sources](../sources/01-vue-d-ensemble.md#entités-auteurs)) Certaines attributions sont erronées (homonymes, initiale du prénom identique…)
+> Certaines sources (OpenAlex, WOS) rattachent des PIDs à des publications de manière algorithmique, via leur propre référentiel auteurs. (Cf doc [sources](../sources/01-vue-d-ensemble.md#auteurs)) Certaines attributions sont erronées (homonymes, initiale du prénom identique…)
 >
 > Conserver les PIDs rejetés garantit que s'ils réapparaissent dans les sources lors des prochains runs du pipeline, ils ne seront pas réaffectés à la même personne.
 >
