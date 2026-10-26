@@ -142,12 +142,13 @@ class MonographQueries:
         where, binds = _where(filters, skip=kind)
         table = "publishers" if kind == "publisher" else "serials"
         label = "e.name" if kind == "publisher" else "e.title"
+        foreign_key = "m.publisher_id" if kind == "publisher" else "m.serial_id"
         name_filter, name_binds = entity_name_clause(label, search)
         rows = self._conn.execute(
             text(f"""
                 SELECT e.id AS id, {label} AS label, count(*) AS n
                 FROM monographs m
-                JOIN {table} e ON e.id = m.{kind}_id
+                JOIN {table} e ON e.id = {foreign_key}
                 WHERE {where}{name_filter}
                 GROUP BY e.id, {label}
                 ORDER BY n DESC, label
