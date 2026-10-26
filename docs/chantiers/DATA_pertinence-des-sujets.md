@@ -117,6 +117,8 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
   | Typicité | 0,84 / 0,66 / 0,60 / 0,58 |
 
   Les centroïdes font mieux que les libellés au grain domain, moins bien en dessous. Règle descendante sur la typicité : précision 47 %, rappel 52 %. Un topic aberrant est textuellement plausible : OpenAlex attribue ses topics d'après le titre et le résumé, et une similarité de texte reproduit son signal. L'incohérence se voit au grain domain
+- [x] Centroïdes recalculés niveau par niveau (150 membres par domain, 20 en dessous) : à chaque niveau, retrait des membres atypiques pour un ancêtre ou pour le libellé lui-même, puis nouveau centroïde. Le nettoyage dégrade l'AUC sous le domain (topic : 0,58 sans nettoyage, 0,56 en retirant 5 % par niveau, 0,49 en retirant 10 %) : la typicité au domain écarte des publications périphériques mais légitimes, et les centroïdes restants reposent sur trop peu de membres
+- [x] Embeddings centrés (retrait du vecteur moyen) : AUC 0,86 / 0,66 / 0,63 / 0,61 ; règle descendante, précision 49 %, rappel 66 %, contre 48 % et 47 % sans centrage. Le bruit éditorial des résumés (copyright, balises) touche moins de 4 % des textes : pas de nettoyage
 - [ ] Coût d'un passage sur le stock et sur chaque run
 
 ### Phase 5 — Choix et mise en œuvre
