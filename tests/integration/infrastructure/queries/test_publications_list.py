@@ -249,6 +249,30 @@ class TestThesesExport:
         assert "scanr.enseignementsup-recherche.gouv.fr/publications/sc-1" in line
         assert "theses.fr/2024NNT" in line
 
+    def test_l_acces_donne_l_adresse_du_texte_integral(self, sa_sync_conn):
+        lab = _lab(sa_sync_conn)
+        publication = insert_publication(
+            sa_sync_conn, "Ma these", doc_type="thesis", oa_status="green"
+        )
+        sa_sync_conn.execute(
+            text(
+                "UPDATE publications SET best_copy_url = 'https://theses.hal.science/tel-1' WHERE id = :id"
+            ),
+            {"id": publication},
+        )
+        _attach(sa_sync_conn, publication, lab)
+
+        csv_text = "".join(
+            publications_queries(sa_sync_conn).export_theses_csv(
+                filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
+                sort="soutenance_desc",
+            )
+        )
+
+        header, line = csv_text.lstrip("﻿").splitlines()[:2]
+        assert header.split(",")[-1] == "Accès"
+        assert line.split(",")[-1] == "https://theses.hal.science/tel-1"
+
 
 class TestExcludedPersonLab:
     """La contribution source d'une personne exclue ne rattache pas sa publication au laboratoire de cette contribution source."""

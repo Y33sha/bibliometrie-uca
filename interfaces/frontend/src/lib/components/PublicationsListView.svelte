@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AccessButton from '#lib/components/AccessButton.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -633,7 +634,7 @@
 			{#if col('license')}<th style="width:90px">Licence</th>{/if}
 			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			{#if col('sources')}<th style="width:100px">Sources</th>{/if}
-			<th style="width:90px" class="col-menu-th">
+			<th style="width:120px" class="col-menu-th">
 				Accès
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
@@ -667,11 +668,7 @@
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
 					{#if col('doi')}<td class="doi-cell">
-						{#if p.doi}
-							<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="doi-link" title={p.doi}>
-								<img src={asset('icons/doi.svg')} alt="DOI" />
-							</a>
-						{/if}
+						{#if p.doi}<DoiLink doi={p.doi} />{/if}
 					</td>{/if}
 					<td><a href={resolve(`publications/${p.id}`)} class="publication-title"><PublicationTitle titre={p.title} /></a></td>
 					{#if col('serial')}<td class="journal-cell publication-col-journal">
@@ -806,11 +803,6 @@
 	.publication-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
 	.access-cell { white-space: nowrap; }
-
-	/* DOI : le logo seul, qui grossit au survol. */
-	.doi-link { display: inline-block; vertical-align: middle; transition: transform 0.1s; }
-	.doi-link:hover { transform: scale(1.15); }
-	.doi-link img { display: block; width: 20px; height: 20px; }
 
 	/* Statut HAL (lab) */
 	.hal-badge {

@@ -16,7 +16,6 @@ from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
 from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
-    OA_OPEN_STATUSES,
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
     access_clause,
@@ -337,8 +336,8 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
             "Titre",
             "DOI",
             "Laboratoires",
-            "Accès",
             "Sources",
+            "Accès",
         ]
     )
     for row in rows:
@@ -352,7 +351,6 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
             },
             row.oa_status,
         )
-        access = "ouvert" if row.oa_status in OA_OPEN_STATUSES else "fermé"
         yield writer.line(
             [
                 row.date_inscription or "",
@@ -362,8 +360,8 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
                 _plain_text(row.title),
                 doi_url,
                 row.labs or "",
-                access,
                 json.dumps(sources, ensure_ascii=False) if sources else "",
+                access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",
             ]
         )
 
@@ -652,7 +650,7 @@ class PublicationListQueries:
             text(f"""
                 SELECT
                     p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
-                    p.oa_status::text AS oa_status,
+                    p.oa_status::text AS oa_status, p.best_copy_url,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                     src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
