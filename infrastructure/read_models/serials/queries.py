@@ -24,6 +24,7 @@ from infrastructure.read_models._common import (
     EntityFacetItem,
     EntityFacetResponse,
     FacetOption,
+    YesNoCount,
 )
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
@@ -94,6 +95,7 @@ def _build_serial_where(
     skip_serial_types: bool = False,
     skip_doaj: bool = False,
     skip_oa_models: bool = False,
+    skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_serials` et `serials_facets`.
 
@@ -129,8 +131,10 @@ def _build_serial_where(
     if filters.oa_models and not skip_oa_models:
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = filters.oa_models
-    if filters.with_publications:
-        parts.append("j.publication_count > 0")
+    if filters.has_publications is not None and not skip_publications:
+        parts.append(
+            "j.publication_count > 0" if filters.has_publications else "j.publication_count = 0"
+        )
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -393,10 +397,22 @@ class SerialQueries:
             FacetOption(value="false", label="Non indexée", count=doaj_counts.get(False, 0)),
         ]
 
+        where_p, binds_p = _build_serial_where(filters, skip_publications=True)
+        publications_row = self._conn.execute(
+            text(f"""
+                SELECT COUNT(*) FILTER (WHERE j.publication_count > 0) AS yes,
+                       COUNT(*) FILTER (WHERE j.publication_count = 0) AS no
+                FROM serials j
+                WHERE {where_p}
+            """),
+            binds_p,
+        ).one()
+
         return SerialsFacetsResponse(
             serial_types=serial_types_facet,
             oa_models=oa_models_facet,
             doaj=doaj_facet,
+            publications=YesNoCount(yes=publications_row.yes, no=publications_row.no),
         )
 
     def serials_publisher_facet(

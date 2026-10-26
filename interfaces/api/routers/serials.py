@@ -71,7 +71,7 @@ def serial_filters(
     serial_type: str = Query(""),
     is_in_doaj: bool | None = Query(None),
     oa_model: str = Query(""),
-    with_publications: bool = Query(False),
+    has_publications: bool | None = Query(None),
 ) -> SerialFilters:
     """Filtres communs à la liste des revues et à ses facettes.
 
@@ -83,7 +83,7 @@ def serial_filters(
         serial_types=parse_vocabulary_csv(serial_type, allowed=SERIAL_TYPES, param="serial_type"),
         is_in_doaj=is_in_doaj,
         oa_models=parse_vocabulary_csv(oa_model, allowed=OA_MODELS, param="oa_model"),
-        with_publications=with_publications,
+        has_publications=has_publications,
     )
 
 
@@ -125,7 +125,7 @@ def list_serials(
 ) -> SerialListResponse:
     """Liste paginée des revues, avec le décompte de leurs publications.
 
-    `with_publications` restreint aux revues qui ont au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_serials(filters=filters, sort=sort, page=page, per_page=per_page)
 

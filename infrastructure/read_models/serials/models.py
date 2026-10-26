@@ -11,6 +11,7 @@ from domain.serials.serial import OaModel, SerialType
 from infrastructure.read_models._common import (
     FacetOption,
     PaginatedResponse,
+    YesNoCount,
 )
 
 # Vocabulaire de tri de la liste des revues : le champ, puis le sens.
@@ -28,7 +29,7 @@ SerialSort = Literal[
 class SerialFilters:
     """Filtres que la liste des revues et ses facettes honorent toutes deux.
 
-    `search` cherche dans le titre et dans les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_publications` restreint aux revues qui ont au moins une publication.
+    `search` cherche dans le titre et dans les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `has_publications` retient les revues qui ont au moins une publication (`True`) ou aucune (`False`).
     """
 
     search: str = ""
@@ -36,7 +37,7 @@ class SerialFilters:
     serial_types: list[str] = field(default_factory=list)
     is_in_doaj: bool | None = None
     oa_models: list[str] = field(default_factory=list)
-    with_publications: bool = False
+    has_publications: bool | None = None
 
 
 class SerialIssnDetail(BaseModel):
@@ -108,14 +109,15 @@ class OaStatusCount(BaseModel):
 
 
 class SerialsFacetsResponse(BaseModel):
-    """Facettes de `/api/serials` sur trois dimensions.
+    """Facettes de `/api/serials`.
 
-    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
+    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. `publications` compte les revues avec et sans publication.
     """
 
     serial_types: list[FacetOption]
     oa_models: list[FacetOption]
     doaj: list[FacetOption]
+    publications: YesNoCount
 
 
 class SerialDashboardResponse(BaseModel):

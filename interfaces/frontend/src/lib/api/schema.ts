@@ -2083,7 +2083,7 @@ export interface paths {
          * List Serials
          * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
-         *     `with_publications` restreint aux revues qui ont au moins une publication : la page publique s'en sert pour masquer les revues orphelines, que l'administration garde la possibilité de voir. `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_serials_api_serials_get"];
         put?: never;
@@ -4999,9 +4999,9 @@ export interface components {
         };
         /**
          * SerialsFacetsResponse
-         * @description Facettes de `/api/serials` sur trois dimensions.
+         * @description Facettes de `/api/serials`.
          *
-         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
+         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. `publications` compte les revues avec et sans publication.
          */
         SerialsFacetsResponse: {
             /** Serial Types */
@@ -5010,6 +5010,7 @@ export interface components {
             oa_models: components["schemas"]["FacetOption"][];
             /** Doaj */
             doaj: components["schemas"]["FacetOption"][];
+            publications: components["schemas"]["YesNoCount"];
         };
         /** SetCountry */
         SetCountry: {
@@ -9072,7 +9073,7 @@ export interface operations {
                 serial_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
-                with_publications?: boolean;
+                has_publications?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -9110,7 +9111,7 @@ export interface operations {
                 serial_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
-                with_publications?: boolean;
+                has_publications?: boolean | null;
             };
             header?: never;
             path?: never;
@@ -9149,7 +9150,7 @@ export interface operations {
                 serial_type?: string;
                 is_in_doaj?: boolean | null;
                 oa_model?: string;
-                with_publications?: boolean;
+                has_publications?: boolean | null;
             };
             header?: never;
             path?: never;

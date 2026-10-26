@@ -183,13 +183,12 @@
 		</div>
 	{/if}
 
-	<!-- Tab: Revues -->
+	<!-- Tab: Publications en série -->
 	{#if activeTab === 'serials'}
 		<div class="tab-content">
 			<SerialsListView
 				apiKey={`publisher-${publisherId}-journals`}
 				externalFilters={{ publisherId }}
-				withPubs
 			/>
 		</div>
 	{/if}

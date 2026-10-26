@@ -130,24 +130,32 @@ class TestListSerials:
         flags = {j["is_in_doaj"] for j in r.json()["serials"]}
         assert flags == {True}
 
-    def test_with_publications_excludes_orphan_serials(self, client):
-        # Revue sans publi rattachée → exclue si with_publications=true.
+    def _seed_with_and_without_publications(self) -> None:
         seed_serial("OrphanSerial")
         with_data = seed_serial("WithPubsSerial")
         _publication("p1", serial_id=with_data)
         seed_in_perimeter_contributions(with_data)
-        r = client.get("/api/serials", params={"with_publications": "true", "per_page": 200})
+
+    def _titles(self, client, **params) -> set[str]:
+        r = client.get("/api/serials", params={"per_page": 200, **params})
         assert r.status_code == 200
-        titles = {j["title"] for j in r.json()["serials"]}
+        return {j["title"] for j in r.json()["serials"]}
+
+    def test_has_publications_true_excludes_orphans(self, client):
+        self._seed_with_and_without_publications()
+        titles = self._titles(client, has_publications="true")
         assert "WithPubsSerial" in titles
         assert "OrphanSerial" not in titles
 
-    def test_with_publications_default_false_includes_orphans(self, client):
-        seed_serial("OrphanDefaultSerial")
-        r = client.get("/api/serials", params={"per_page": 200})
-        assert r.status_code == 200
-        titles = {j["title"] for j in r.json()["serials"]}
-        assert "OrphanDefaultSerial" in titles
+    def test_has_publications_false_keeps_orphans_only(self, client):
+        self._seed_with_and_without_publications()
+        titles = self._titles(client, has_publications="false")
+        assert "OrphanSerial" in titles
+        assert "WithPubsSerial" not in titles
+
+    def test_has_publications_absent_lists_all(self, client):
+        self._seed_with_and_without_publications()
+        assert {"OrphanSerial", "WithPubsSerial"} <= self._titles(client)
 
     def test_filter_by_oa_model(self, client):
         matching = seed_serial()
@@ -660,7 +668,7 @@ class TestSerialsFacets:
         r = client.get("/api/serials/facets")
         assert r.status_code == 200
         body = r.json()
-        assert {"serial_types", "oa_models", "doaj"} <= set(body)
+        assert {"serial_types", "oa_models", "doaj", "publications"} <= set(body)
 
     def test_honours_search_and_publisher(self, client):
         r = client.get("/api/serials/facets", params={"search": "nature", "publisher_id": 1})
@@ -673,10 +681,22 @@ class TestSerialsFacets:
                 "serial_type": "journal,proceedings",
                 "oa_model": "full_oa",
                 "is_in_doaj": "true",
-                "with_publications": "true",
+                "has_publications": "true",
             },
         )
         assert r.status_code == 200
+
+    def test_publications_counts_ignore_their_own_filter(self, client):
+        publisher = seed_publisher()
+        seed_serial(publisher_id=publisher)
+        with_data = seed_serial(publisher_id=publisher)
+        _publication("p1", serial_id=with_data)
+        seed_in_perimeter_contributions(with_data)
+        r = client.get(
+            "/api/serials/facets", params={"publisher_id": publisher, "has_publications": "true"}
+        )
+        assert r.status_code == 200
+        assert r.json()["publications"] == {"yes": 1, "no": 1}
 
 
 class TestSerialsPublisherFacet:

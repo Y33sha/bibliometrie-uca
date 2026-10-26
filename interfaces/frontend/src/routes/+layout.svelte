@@ -83,7 +83,8 @@
           <span class="nav-dropdown-group">Référentiels</span>
           <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
           <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
-          <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>          <span class="nav-dropdown-group">Adresses</span>
+          <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>
+          <span class="nav-dropdown-group">Adresses</span>
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
         </div>

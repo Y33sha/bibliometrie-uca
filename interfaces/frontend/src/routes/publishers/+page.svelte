@@ -137,7 +137,7 @@
 		</div>
 		<p class="blocking-detail">{blockingDetail}</p>
 		<p class="muted">
-			Fusionner d'abord ces paires de publications en série dans l'<a href={resolve('admin/serials')}>administration des publications en série</a>,
+			Fusionner d'abord ces paires de publications en série dans la <a href={resolve('journals')}>liste des publications en série</a>,
 			puis relancer la fusion des éditeurs.
 		</p>
 		<table class="blocking-table">

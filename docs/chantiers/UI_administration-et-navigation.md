@@ -76,7 +76,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 #### 3c. Publications en série
 
-- [ ] Cellule d'actions selon le rôle sur la page publique ; facette des publications en série sans publication ; files de triage en onglets ; suppression de `admin/serials`
+- [x] Cellule d'actions selon le rôle sur la page publique ; facette des publications en série sans publication ; files de triage en onglets ; suppression de `admin/serials`
 
 #### 3d. Publications
 
