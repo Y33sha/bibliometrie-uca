@@ -4,14 +4,14 @@ from functools import partial
 
 from sqlalchemy import text
 
-from application.ports.read_models.addresses_queries import (
+from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.country_detection import CountryDetectionMethod
+from infrastructure.read_models.addresses import AddressesQueries
+from infrastructure.read_models.addresses.models import (
     AddressListFilters,
     StructurePredicate,
     TextPredicate,
 )
-from application.ports.repositories.address_repository import AddressCountryFilter
-from domain.country_detection import CountryDetectionMethod
-from infrastructure.read_models.addresses import PgAddressesQueries
 from tests.integration.helpers.addresses import (
     ensure_country,
     insert_address,
@@ -29,8 +29,8 @@ from tests.integration.helpers.structures import insert_structure, insert_struct
 _f_form = partial(insert_structure_name_form, form_text="f")
 
 
-def _q(conn) -> PgAddressesQueries:
-    return PgAddressesQueries(conn)
+def _q(conn) -> AddressesQueries:
+    return AddressesQueries(conn)
 
 
 class TestListAddresses:

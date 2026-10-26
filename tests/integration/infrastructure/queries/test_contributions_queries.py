@@ -4,8 +4,8 @@ Une contribution orpheline est un groupe de contributions sources du périmètre
 
 from sqlalchemy import text
 
-from application.ports.read_models.contributions_queries import OrphanFilters
-from infrastructure.read_models.contributions import PgContributionsQueries
+from infrastructure.read_models.contributions import ContributionsQueries
+from infrastructure.read_models.contributions.models import OrphanFilters
 from tests.integration.helpers.groups import (
     group_of,
     group_ungrouped,
@@ -37,14 +37,14 @@ class TestOrphanContributionsCount:
         )
         _group(sa_sync_conn)
 
-        assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total >= 1
+        assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total >= 1
 
     def test_excludes_out_of_perimeter(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
         source_record = insert_source_record(sa_sync_conn, publication)
         insert_source_contribution(sa_sync_conn, source_record, in_perimeter=False)
         _group(sa_sync_conn)
-        assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
+        assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
     def test_excludes_groups_with_person(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
@@ -59,13 +59,13 @@ class TestOrphanContributionsCount:
             person_id=insert_person(sa_sync_conn),
             mode="name",
         )
-        assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
+        assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
     def test_excludes_source_contributions_outside_groups(self, sa_sync_conn):
         """Une contribution source hors groupe (enregistrement source écarté de l'alignement, doublon d'auteur) reste sans personne : elle n'est pas à rattacher."""
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))
         insert_source_contribution(sa_sync_conn, source_record, in_perimeter=True)
-        assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
+        assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
     def test_excludes_non_author_roles(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
@@ -88,13 +88,13 @@ class TestOrphanContributionsCount:
             in_perimeter=True,
         )
         _group(sa_sync_conn)
-        assert PgContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
+        assert ContributionsQueries(sa_sync_conn).orphan_contributions_count().total == 0
 
 
 def _list(conn, **filters):
     """File des orphelines, après avoir groupé les contributions sources sans groupe."""
     _group(conn)
-    return PgContributionsQueries(conn).list_orphan_contributions(
+    return ContributionsQueries(conn).list_orphan_contributions(
         filters=OrphanFilters(**filters), page=1, per_page=50
     )
 
@@ -240,7 +240,7 @@ class TestListOrphanContributions:
     def test_lab_facet_ignores_the_lab_filter(self, sa_sync_conn):
         ids = self._labs_setup(sa_sync_conn)
 
-        facets = PgContributionsQueries(sa_sync_conn).orphan_contributions_facets(
+        facets = ContributionsQueries(sa_sync_conn).orphan_contributions_facets(
             filters=OrphanFilters(search="Zzorph", lab_ids=[ids["lab"]])
         )
         assert [(o.value, o.label, o.count) for o in facets.labs] == [
@@ -262,7 +262,7 @@ class TestListOrphanContributions:
         add_source_contribution_ror(sa_sync_conn, ids["sa"], ids["lab"])
 
         (row,) = _list(sa_sync_conn, search="Zzorph Avec").contributions
-        facets = PgContributionsQueries(sa_sync_conn).orphan_contributions_facets(
+        facets = ContributionsQueries(sa_sync_conn).orphan_contributions_facets(
             filters=OrphanFilters(search="Zzorph")
         )
 

@@ -1,6 +1,5 @@
 """Helpers partagés par les agrégats stats : périmètre de base, assemblage des filtres."""
 
-from application.ports.read_models.stats_queries import StatsFilters
 from infrastructure.read_models.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
@@ -12,6 +11,7 @@ from infrastructure.read_models.filters import (
     partner_clause,
     year_clause,
 )
+from infrastructure.read_models.stats.models import StatsFilters
 
 # Périmètre commun aux agrégats stats : les publications du périmètre. Le type de document est un filtre comme un autre (`doc_type_clause`).
 STATS_BASE = PUBLICATION_IS_IN_PERIMETER

@@ -4,7 +4,11 @@ from collections import defaultdict
 
 from sqlalchemy import Connection, bindparam, text
 
-from application.ports.read_models.persons_queries import (
+from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
+from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
+from domain.persons.name_matching import names_compatible
+from domain.structures.structure import StructureType
+from infrastructure.read_models.persons.models import (
     AmbiguousFormPersonOut,
     AmbiguousNameFormOut,
     AmbiguousNameFormsResponse,
@@ -20,10 +24,6 @@ from application.ports.read_models.persons_queries import (
     OverlapCountsOut,
     SharingPersonOut,
 )
-from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
-from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
-from domain.persons.name_matching import names_compatible
-from domain.structures.structure import StructureType
 from infrastructure.read_models.sql_fragments import (
     name_form_holder,
     other_name_form_holders,

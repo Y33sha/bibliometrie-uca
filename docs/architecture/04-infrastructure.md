@@ -17,7 +17,7 @@
 
 Les adaptateurs de `repositories/` construisent des objets du domaine : ils hydratent un agrégat, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_doi`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
 
-`read_models/` rend des lignes, sans hydratation : des projections plates que les routers passent à leur modèle Pydantic.
+`read_models/` contient les lectures de l'API, sans hydratation : un paquet par lecture, avec ses requêtes et ses modèles de réponse (`models.py`). Les routers les reçoivent directement, sans port.
 
 ## Transactions
 

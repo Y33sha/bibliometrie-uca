@@ -154,32 +154,26 @@ name = "Routers : pas d'import direct de infrastructure"
 type = "forbidden"
 source_modules = ["interfaces.api.routers"]
 forbidden_modules = ["infrastructure"]
-# Les routers FastAPI pilotent des use-cases applicatifs et reçoivent
-# leurs dépendances via `Depends(...)` (factories dans
-# `interfaces.api.deps`, composition root). La construction des
-# adapters et l'accès direct à l'infra (queries, repos, pool, engine)
-# y sont interdits. Cf. docs/architecture/01-vue-d-ensemble.md.
+# Les routers reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans
+# `interfaces.api.deps` (composition root). Une écriture passe par un service d'`application/`.
+# Une lecture importe son adaptateur de `infrastructure.read_models`, pour en typer la
+# dépendance et en lire les modèles de réponse. Cf. docs/architecture/01-vue-d-ensemble.md.
 #
-# Imports transitifs autorisés : `routers → deps → infrastructure` est
-# le chemin attendu (composition root), donc on n'interdit que les
-# imports directs.
+# Imports transitifs autorisés : `routers → deps → infrastructure` est le chemin attendu
+# (composition root), donc on n'interdit que les imports directs.
 allow_indirect_imports = "true"
+ignore_imports = ["interfaces.api.routers.** -> infrastructure.read_models.**"]
 
 [[tool.importlinter.contracts]]
-name = "Composition root : Pg* concrets uniquement dans app et deps"
+name = "Composition root : repositories concrets uniquement dans deps"
 type = "forbidden"
 source_modules = ["interfaces.api"]
-forbidden_modules = [
-    "infrastructure.repositories",
-    "infrastructure.read_models",
-]
-# Verrouillage d'une règle de docs/architecture/01-vue-d-ensemble.md :
-# seul `interfaces/api/deps.py` instancie les `Pg*` concrets ; les routers et autres modules
-# sous `interfaces.api/` passent par un port via `Depends(...)`. L'interface publique du
+forbidden_modules = ["infrastructure.repositories"]
+# Seul `interfaces/api/deps.py` instancie les repositories concrets, qu'il remet aux services
+# d'écriture ; les routers reçoivent ces services par `Depends(...)`. L'interface publique du
 # pipeline relève de son propre contrat.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
-    "interfaces.api.deps -> infrastructure.read_models.**",
     "interfaces.api.** -> pipeline.public",
 ]
 
@@ -506,12 +500,12 @@ unannotated-return = "error"
 # `schema.ts` dérive du contrat. Les trois premiers modules en relèvent ; `facets` appelle une
 # facette par son nom (`getattr`).
 [[tool.pyrefly.sub-config]]
-matches = "application/ports/read_models/config_queries.py"
+matches = "infrastructure/read_models/config/models.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
 [[tool.pyrefly.sub-config]]
-matches = "application/ports/read_models/pipeline_runs_queries.py"
+matches = "infrastructure/read_models/pipeline_runs/models.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 

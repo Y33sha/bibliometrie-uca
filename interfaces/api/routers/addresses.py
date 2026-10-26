@@ -1,6 +1,6 @@
 """Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par le port `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
+Les lectures passent par `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
 
 Les routes sont groupées par sujet, et dans chaque groupe les chemins littéraux précèdent ceux qui portent un identifiant — un chemin littéral déclaré après `/{addr_id}` s'y ferait absorber.
 """
@@ -9,10 +9,12 @@ from typing import Annotated, cast
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 
-from application.ports.read_models.addresses_queries import (
+from application.ports.repositories.address_repository import AddressCountryFilter
+from application.services.addresses import AddressService
+from infrastructure.read_models.addresses import AddressesQueries
+from infrastructure.read_models.addresses.models import (
     AddressDetected,
     AddressesCountriesResponse,
-    AddressesQueries,
     AddressListFilters,
     AddressListResponse,
     AddressStatsResponse,
@@ -22,8 +24,6 @@ from application.ports.read_models.addresses_queries import (
     TextPredicate,
     TextPredicateMode,
 )
-from application.ports.repositories.address_repository import AddressCountryFilter
-from application.services.addresses import AddressService
 from interfaces.api.deps import (
     address_service,
     addresses_queries,

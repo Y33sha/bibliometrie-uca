@@ -5,20 +5,20 @@ Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.read_models.publishers_queries import (
-    Publisher,
-    PublisherDashboardResponse,
-    PublisherFilters,
-    PublisherListResponse,
-    PublisherQueries,
-    PublishersFacetsResponse,
-    PublisherSort,
-)
-from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.publishers import PublisherService
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
+from infrastructure.read_models.publishers import PublisherQueries
+from infrastructure.read_models.publishers.models import (
+    Publisher,
+    PublisherDashboardResponse,
+    PublisherFilters,
+    PublisherListResponse,
+    PublishersFacetsResponse,
+    PublisherSort,
+)
+from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import entity_detail, publisher_queries, publisher_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv

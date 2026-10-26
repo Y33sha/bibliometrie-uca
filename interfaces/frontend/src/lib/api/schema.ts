@@ -4606,9 +4606,9 @@ export interface components {
             /** Serial Types */
             serial_types: components["schemas"]["SerialTypeCount"][];
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__read_models__publishers_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["infrastructure__read_models__publishers__models__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__read_models__publishers_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["infrastructure__read_models__publishers__models__OaStatusCount"][];
         };
         /**
          * PublisherListItem
@@ -4823,9 +4823,9 @@ export interface components {
             /** Total Publications */
             total_publications: number;
             /** Doc Types */
-            doc_types: components["schemas"]["application__ports__read_models__serials_queries__DocTypeCount"][];
+            doc_types: components["schemas"]["infrastructure__read_models__serials__models__DocTypeCount"][];
             /** Oa Statuses */
-            oa_statuses: components["schemas"]["application__ports__read_models__serials_queries__OaStatusCount"][];
+            oa_statuses: components["schemas"]["infrastructure__read_models__serials__models__OaStatusCount"][];
             /** Expected Doc Types */
             expected_doc_types: string[];
             /** Expected Oa Statuses */
@@ -5718,7 +5718,7 @@ export interface components {
          * DocTypeCount
          * @description Compteur de publications par `doc_type` pour un éditeur.
          */
-        application__ports__read_models__publishers_queries__DocTypeCount: {
+        infrastructure__read_models__publishers__models__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
@@ -5728,7 +5728,7 @@ export interface components {
          * OaStatusCount
          * @description Compteur de publications par `oa_status` pour un éditeur.
          */
-        application__ports__read_models__publishers_queries__OaStatusCount: {
+        infrastructure__read_models__publishers__models__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */
@@ -5740,7 +5740,7 @@ export interface components {
          *
          *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `serial_type` de la revue (`domain.serials.expected`), ce qui laisse le frontend signaler les autres.
          */
-        application__ports__read_models__serials_queries__DocTypeCount: {
+        infrastructure__read_models__serials__models__DocTypeCount: {
             /** Doc Type */
             doc_type: string | null;
             /** Count */
@@ -5754,7 +5754,7 @@ export interface components {
          *
          *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.serials.expected`).
          */
-        application__ports__read_models__serials_queries__OaStatusCount: {
+        infrastructure__read_models__serials__models__OaStatusCount: {
             /** Oa Status */
             oa_status: string | null;
             /** Count */

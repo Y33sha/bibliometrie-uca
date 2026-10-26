@@ -1,20 +1,20 @@
-"""Router des agrégats des tableaux de bord, servis par le port `StatsQueries`. Sert `/api/stats/*`."""
+"""Router des agrégats des tableaux de bord, servis par `StatsQueries`. Sert `/api/stats/*`."""
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.read_models._common import EntityFacetResponse, EntityKind
-from application.ports.read_models.publications_queries import LICENSE_FILTER_VALUES
-from application.ports.read_models.stats_queries import (
+from domain.errors import ValidationError
+from domain.publications.doc_types import DOC_TYPES
+from domain.publications.metadata import OA_STATUSES
+from infrastructure.read_models._common import EntityFacetResponse, EntityKind
+from infrastructure.read_models.publications.models import LICENSE_FILTER_VALUES
+from infrastructure.read_models.stats import StatsQueries
+from infrastructure.read_models.stats.models import (
     CollaborationsResponse,
     PivotResponse,
     PivotSchemaResponse,
     StatsFacetsResponse,
     StatsFilters,
-    StatsQueries,
 )
-from domain.errors import ValidationError
-from domain.publications.doc_types import DOC_TYPES
-from domain.publications.metadata import OA_STATUSES
 from interfaces.api.deps import stats_queries
 from interfaces.api.filters import TOGGLE_VALUES, parse_int_csv, parse_ror_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm

@@ -2,12 +2,12 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models.publications_queries import (
+from domain.publications.contribution_roles import ContributionRole
+from infrastructure.read_models.publications.models import (
     SuspectMergeOut,
     SuspectMergeSourceRecordOut,
     SuspectMergesResponse,
 )
-from domain.publications.contribution_roles import ContributionRole
 
 # Moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source.
 _SUSPECT = "2 * pa.matched_source_contributions < pa.source_contributions"

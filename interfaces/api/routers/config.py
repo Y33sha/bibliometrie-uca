@@ -7,10 +7,16 @@ from typing import cast
 
 from fastapi import APIRouter, Depends
 
-from application.ports.read_models.config_queries import ConfigItem, ConfigQueries
-from application.ports.read_models.perimeters_queries import InstitutionOut, PerimetersQueries
 from application.services.config import ConfigService
 from domain.users import SessionUser
+from infrastructure.read_models.config import ConfigQueries
+from infrastructure.read_models.config.models import (
+    ConfigItem,
+)
+from infrastructure.read_models.perimeters import PerimetersQueries
+from infrastructure.read_models.perimeters.models import (
+    InstitutionOut,
+)
 from interfaces.api.deps import (
     config_queries,
     config_service,

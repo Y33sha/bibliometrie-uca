@@ -7,18 +7,6 @@ Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe p
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.read_models.structures_queries import (
-    NameFormOut,
-    StructureAddressesResponse,
-    StructureDashboardResponse,
-    StructureDeletionImpact,
-    StructureDetailResponse,
-    StructureListItem,
-    StructureOut,
-    StructurePartnersResponse,
-    StructuresQueries,
-)
-from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.structure_repository import (
     NameFormCreate,
     NameFormUpdate,
@@ -28,6 +16,18 @@ from application.ports.repositories.structure_repository import (
 from application.services.structures import StructureService
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
+from infrastructure.read_models.structures import StructuresQueries
+from infrastructure.read_models.structures.models import (
+    NameFormOut,
+    StructureAddressesResponse,
+    StructureDashboardResponse,
+    StructureDeletionImpact,
+    StructureDetailResponse,
+    StructureListItem,
+    StructureOut,
+    StructurePartnersResponse,
+)
+from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import structure_service, structures_queries
 from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
 from interfaces.api.models import (

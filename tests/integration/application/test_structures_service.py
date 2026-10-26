@@ -7,7 +7,6 @@ structure_name_forms.
 import pytest
 from sqlalchemy import text
 
-from application.ports.read_models.structures_queries import StructureOut
 from application.ports.repositories.structure_repository import (
     NameFormCreate,
     NameFormUpdate,
@@ -17,6 +16,7 @@ from application.ports.repositories.structure_repository import (
 from domain.errors import NotFoundError, ValidationError
 from domain.structures.identifiers import HalCollection, RorId
 from domain.structures.structure import StructureType
+from infrastructure.read_models.structures.models import StructureOut
 from infrastructure.repositories import structure_repository
 from interfaces.api.deps import structure_service
 

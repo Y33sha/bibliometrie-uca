@@ -1,7 +1,7 @@
 """Tests d'intégration pour `infrastructure.read_models.countries`."""
 
 from domain.countries import NO_COUNTRY_CODE
-from infrastructure.read_models.countries import PgCountriesQueries
+from infrastructure.read_models.countries import CountriesQueries
 from tests.integration.helpers.addresses import ensure_country
 
 
@@ -11,7 +11,7 @@ class TestListCountries:
         ensure_country(sa_sync_conn, "FR", name="France")
         ensure_country(sa_sync_conn, NO_COUNTRY_CODE, name="Non applicable")
 
-        codes = [r.code.strip() for r in PgCountriesQueries(sa_sync_conn).list_countries()]
+        codes = [r.code.strip() for r in CountriesQueries(sa_sync_conn).list_countries()]
         assert codes[0] == NO_COUNTRY_CODE
         assert "FR" in codes
 
@@ -21,7 +21,7 @@ class TestListCountries:
 
         names = [
             r.name
-            for r in PgCountriesQueries(sa_sync_conn).list_countries()
+            for r in CountriesQueries(sa_sync_conn).list_countries()
             if r.code.strip() != NO_COUNTRY_CODE
         ]
         assert names == sorted(names)

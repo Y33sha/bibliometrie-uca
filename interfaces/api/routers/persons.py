@@ -1,13 +1,18 @@
 """Router des personnes : annuaire, profil, files de triage et gestes de curation. Sert `/api/persons/*`.
 
-Les lectures passent par le port `PersonsQueries`, les écritures par le service `PersonService`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
+Les lectures passent par `PersonsQueries`, les écritures par le service `PersonService`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
 
 L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.read_models.persons_queries import (
+from application.services.persons import PersonService
+from domain.merge import MergedEntity
+from domain.persons.identifier_attribution import AttributionOutcome
+from domain.persons.person import PersonExclusion
+from infrastructure.read_models.persons import PersonsQueries
+from infrastructure.read_models.persons.models import (
     AmbiguousNameFormsResponse,
     IdentifierConflictsResponse,
     NameDuplicatesResponse,
@@ -22,15 +27,10 @@ from application.ports.read_models.persons_queries import (
     PersonSearchResult,
     PersonsFacetsResponse,
     PersonSort,
-    PersonsQueries,
     PersonThesesResponse,
     SharingPersonOut,
 )
-from application.ports.read_models.subjects_queries import SubjectFrequency
-from application.services.persons import PersonService
-from domain.merge import MergedEntity
-from domain.persons.identifier_attribution import AttributionOutcome
-from domain.persons.person import PersonExclusion
+from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import entity_detail, person_service, persons_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv

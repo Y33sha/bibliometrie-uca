@@ -7,7 +7,7 @@ Le package est organisé par thème :
 - `source_records` : `get_publication_sources`
 - `suspect_merges` : `suspect_merges`, `suspect_merges_count`
 
-`PgPublicationsQueries` agrège ces lectures sous le port `application.ports.read_models.publications_queries.PublicationsQueries`.
+`PublicationsQueries` délègue à ces fonctions.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module `.list` (le `from .list import …` ci-dessous l'attache au package, et le namespace global du __init__ shadow le builtin `list`).
@@ -17,18 +17,9 @@ from collections.abc import Callable, Iterator
 
 from sqlalchemy import Connection
 
-from application.ports.read_models._common import (
+from infrastructure.read_models._common import (
     EntityFacetResponse,
     EntityKind,
-)
-from application.ports.read_models.publications_queries import (
-    PublicationDetailResponse,
-    PublicationFilters,
-    PublicationListResponse,
-    PublicationsFacetsResponse,
-    PublicationSourcesResponse,
-    PublicationsQueries,
-    SuspectMergesResponse,
 )
 from infrastructure.read_models.perimeters import get_persons_structure_ids_list
 from infrastructure.read_models.publications.detail import (
@@ -43,6 +34,14 @@ from infrastructure.read_models.publications.list import (
     export_theses_csv as _export_theses_csv,
     list_publications as _list_publications,
 )
+from infrastructure.read_models.publications.models import (
+    PublicationDetailResponse,
+    PublicationFilters,
+    PublicationListResponse,
+    PublicationsFacetsResponse,
+    PublicationSourcesResponse,
+    SuspectMergesResponse,
+)
 from infrastructure.read_models.publications.source_records import (
     get_publication_sources as _get_publication_sources,
 )
@@ -52,10 +51,10 @@ from infrastructure.read_models.publications.suspect_merges import (
 )
 
 
-class PgPublicationsQueries(PublicationsQueries):
-    """Adapter SA pour `application.ports.read_models.publications_queries.PublicationsQueries`.
+class PublicationsQueries:
+    """Lectures sur les publications.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour lister des publications.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour lister des publications.
     """
 
     def __init__(self, conn: Connection, *, open_connection: Callable[[], Connection]) -> None:
@@ -132,13 +131,15 @@ class PgPublicationsQueries(PublicationsQueries):
         return _get_publication_detail(self._conn, publication_id)
 
     def get_publication_sources(self, publication_id: int) -> PublicationSourcesResponse | None:
+        """Métadonnées de chaque enregistrement source de la publication ; `None` si la publication n'existe pas."""
         return _get_publication_sources(self._conn, publication_id)
 
     def suspect_merges_count(self) -> int:
         return _suspect_merges_count(self._conn)
 
     def suspect_merges(self, *, page: int, per_page: int) -> SuspectMergesResponse:
+        """Fusions suspectes, la plus faible part de contributions sources d'auteur avec correspondant d'abord."""
         return _suspect_merges(self._conn, page=page, per_page=per_page)
 
 
-__all__ = ["PgPublicationsQueries"]
+__all__ = ["PublicationsQueries"]

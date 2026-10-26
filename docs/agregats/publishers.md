@@ -46,7 +46,7 @@ L'opération est refusée quand deux revues de même titre, une chez chaque édi
 
 ## Lecture par l'API
 
-Port `application/ports/read_models/publishers_queries.py`, adaptateur `PgPublisherQueries`.
+Lecture `infrastructure/read_models/publishers/`, classe `PublisherQueries`.
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|

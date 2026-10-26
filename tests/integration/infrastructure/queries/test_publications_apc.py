@@ -1,7 +1,7 @@
 """Lignes APC de la liste des publications : `in_perimeter` suit la règle du filtre `has_apc`."""
 
-from application.ports.read_models.publications_queries import PublicationFilters
 from infrastructure.read_models.publications.list import list_publications
+from infrastructure.read_models.publications.models import PublicationFilters
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.structures import insert_structure
 

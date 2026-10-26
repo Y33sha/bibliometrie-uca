@@ -1,6 +1,6 @@
 """Router des publications : listes, facettes, détail, enregistrements sources et export. Sert `/api/publications/*`.
 
-Les lectures passent par le port `PublicationsQueries`.
+Les lectures passent par `PublicationsQueries`.
 
 Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
 """
@@ -12,8 +12,15 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from application.ports.read_models._common import EntityFacetResponse, EntityKind
-from application.ports.read_models.publications_queries import (
+from domain.merge import MergedEntity
+from domain.publications.doc_types import DOC_TYPES
+from domain.publications.licenses import LICENSE_LABELS, License
+from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
+from domain.sources.hal import HAL_DEPOSIT_STATUSES
+from domain.sources.registry import SOURCE_FILTER_VALUES
+from infrastructure.read_models._common import EntityFacetResponse, EntityKind
+from infrastructure.read_models.publications import PublicationsQueries
+from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
     LICENSE_FILTER_VALUES,
     PublicationDetailResponse,
@@ -22,15 +29,8 @@ from application.ports.read_models.publications_queries import (
     PublicationsFacetsResponse,
     PublicationSort,
     PublicationSourcesResponse,
-    PublicationsQueries,
     SuspectMergesResponse,
 )
-from domain.merge import MergedEntity
-from domain.publications.doc_types import DOC_TYPES
-from domain.publications.licenses import LICENSE_LABELS, License
-from domain.publications.metadata import ACCESS_LEVELS, OA_STATUSES
-from domain.sources.hal import HAL_DEPOSIT_STATUSES
-from domain.sources.registry import SOURCE_FILTER_VALUES
 from interfaces.api.deps import entity_detail, publications_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import (
@@ -83,7 +83,7 @@ class PublicationFilterParams:
     partner_ror: Annotated[str, Query()] = ""
 
     def to_filters(self) -> PublicationFilters:
-        """Traduit la query string en filtres du port."""
+        """Traduit la query string en filtres de la lecture."""
         lab_ids, lab_none = parse_lab_id(self.lab_id)
         return PublicationFilters(
             search=self.search,

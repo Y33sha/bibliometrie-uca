@@ -1,6 +1,6 @@
 """Modèles Pydantic propres au routeur des revues.
 
-Le contrat d'édition `SerialUpdate` vit dans le port `application/ports/repositories/serial_repository.py` ; les DTOs de retour des query services dans `application/ports/api/serials_queries.py`.
+Le contrat d'édition `SerialUpdate` vit dans le port `application/ports/repositories/serial_repository.py` ; les modèles de réponse des lectures dans `infrastructure/read_models/serials/models.py`.
 """
 
 from pydantic import BaseModel

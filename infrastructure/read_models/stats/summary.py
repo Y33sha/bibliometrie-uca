@@ -4,18 +4,18 @@ from collections.abc import Sequence
 
 from sqlalchemy import Connection, Row, text
 
-from application.ports.read_models._common import FacetOption
-from application.ports.read_models.publications_queries import NO_LICENSE
-from application.ports.read_models.stats_queries import StatsFacetsResponse, StatsFilters
 from domain.publications.licenses import license_label
 from domain.structures.structure import StructureType
+from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
     institution_apc_payment_sql,
 )
 from infrastructure.read_models.perimeters import get_persons_perimeter_name
+from infrastructure.read_models.publications.models import NO_LICENSE
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
+from infrastructure.read_models.stats.models import StatsFacetsResponse, StatsFilters
 
 
 def _facets_sqls(

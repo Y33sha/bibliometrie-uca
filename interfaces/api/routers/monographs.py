@@ -5,18 +5,18 @@ Les chemins littéraux `/facets` et `/facets/entities` précèdent `/{monograph_
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.read_models._common import EntityFacetResponse
-from application.ports.read_models.monographs_queries import (
+from domain.merge import MergedEntity
+from infrastructure.read_models._common import EntityFacetResponse
+from infrastructure.read_models.monographs import MonographQueries
+from infrastructure.read_models.monographs.models import (
     MONOGRAPH_KINDS,
     MonographEntityKind,
     MonographFilters,
     MonographListItem,
     MonographListResponse,
-    MonographQueries,
     MonographsFacetsResponse,
     MonographSort,
 )
-from domain.merge import MergedEntity
 from interfaces.api.deps import entity_detail, monograph_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_int_csv, parse_vocabulary_csv

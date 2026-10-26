@@ -4,8 +4,8 @@ from functools import partial
 
 from sqlalchemy import text
 
-from application.ports.read_models.hal_problems_queries import NoMissingCollections
-from infrastructure.read_models.hal_problems import PgHalProblemsQueries
+from infrastructure.read_models.hal_problems import HalProblemsQueries
+from infrastructure.read_models.hal_problems.models import NoMissingCollections
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import insert_contribution
@@ -27,8 +27,8 @@ from tests.integration.helpers.structures import (
 _source_record = partial(insert_source_record, title="T", publication_year=2024)
 
 
-def _q(conn) -> PgHalProblemsQueries:
-    return PgHalProblemsQueries(conn)
+def _q(conn) -> HalProblemsQueries:
+    return HalProblemsQueries(conn)
 
 
 def _create_lab(conn, code="LAB", hal_collection=None):

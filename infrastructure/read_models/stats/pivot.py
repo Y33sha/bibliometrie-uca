@@ -18,8 +18,6 @@ from typing import Literal
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models.publications_queries import NO_LICENSE
-from application.ports.read_models.stats_queries import PivotResponse, StatsFilters
 from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.metadata import OaStatus
@@ -30,7 +28,9 @@ from infrastructure.read_models.filters import (
     assemble_where,
     own_structure_ids,
 )
+from infrastructure.read_models.publications.models import NO_LICENSE
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
+from infrastructure.read_models.stats.models import PivotResponse, StatsFilters
 
 Cardinality = Literal["low", "high"]
 

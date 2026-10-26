@@ -7,13 +7,13 @@ Réutilise le périmètre de base et les filtres communs des agrégats stats (cf
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models.stats_queries import (
+from infrastructure.read_models.filters import assemble_where
+from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
+from infrastructure.read_models.stats.models import (
     CollaborationsResponse,
     CountryCollaboration,
     StatsFilters,
 )
-from infrastructure.read_models.filters import assemble_where
-from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 
 # Pays de rattachement du périmètre (France), exclu du décompte des collaborations internationales. Codes pays en ISO 3166-1 alpha-2 minuscule, comme stockés dans `publications.countries`.
 _DOMESTIC_COUNTRY = "fr"

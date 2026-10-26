@@ -38,7 +38,7 @@ Aucun filtre de périmètre n'est appliqué, et il n'en faut pas : la phase `fin
 
 ## Lecture par l'API
 
-Port `application/ports/read_models/subjects_queries.py`, adaptateur `PgSubjectsQueries`.
+Lecture `infrastructure/read_models/subjects/`, classe `SubjectsQueries`.
 
 | Point d'entrée | Ce qu'il sert |
 |---|---|

@@ -8,10 +8,7 @@ Le package est organisé par thème :
   `person_dashboard`, `person_subjects`
 - `admin` : contributions par forme de nom, files de triage des formes et des identifiants
 
-`PgPersonsQueries` agrège l'ensemble des fonctions de lecture + admin
-sous le port `application.ports.read_models.persons_queries.PersonsQueries` et se
-contente de déléguer : chaque fonction libre construit et retourne
-directement les DTO Pydantic déclarés par le port.
+`PersonsQueries` délègue à ces fonctions, qui construisent les modèles de réponse de `models.py`.
 """
 
 # Annotations différées : sinon `list[int]` est résolu comme le sous-module
@@ -21,25 +18,6 @@ from __future__ import annotations
 
 from sqlalchemy import Connection
 
-from application.ports.read_models.persons_queries import (
-    AmbiguousNameFormsResponse,
-    IdentifierConflictsResponse,
-    NameDuplicatesResponse,
-    NameFormContributionsResponse,
-    NameFormSummaryOut,
-    PersonAddressesResponse,
-    PersonDashboardResponse,
-    PersonFilters,
-    PersonListResponse,
-    PersonOut,
-    PersonProfileResponse,
-    PersonSearchResult,
-    PersonsFacetsResponse,
-    PersonsQueries,
-    PersonThesesResponse,
-    SharingPersonOut,
-)
-from application.ports.read_models.subjects_queries import SubjectFrequency
 from infrastructure.read_models.persons.admin import (
     ambiguous_name_forms as _ambiguous_name_forms,
     ambiguous_name_forms_count as _ambiguous_name_forms_count,
@@ -66,10 +44,28 @@ from infrastructure.read_models.persons.list import (
     person_name_forms as _person_name_forms,
     search_persons as _search_persons,
 )
+from infrastructure.read_models.persons.models import (
+    AmbiguousNameFormsResponse,
+    IdentifierConflictsResponse,
+    NameDuplicatesResponse,
+    NameFormContributionsResponse,
+    NameFormSummaryOut,
+    PersonAddressesResponse,
+    PersonDashboardResponse,
+    PersonFilters,
+    PersonListResponse,
+    PersonOut,
+    PersonProfileResponse,
+    PersonSearchResult,
+    PersonsFacetsResponse,
+    PersonThesesResponse,
+    SharingPersonOut,
+)
+from infrastructure.read_models.subjects.models import SubjectFrequency
 
 
-class PgPersonsQueries(PersonsQueries):
-    """Adapter SA pour `application.ports.read_models.persons_queries.PersonsQueries`."""
+class PersonsQueries:
+    """Lectures sur les personnes."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -143,4 +139,4 @@ class PgPersonsQueries(PersonsQueries):
         return _persons_sharing_name_form(self._conn, person_id)
 
 
-__all__ = ["PgPersonsQueries"]
+__all__ = ["PersonsQueries"]

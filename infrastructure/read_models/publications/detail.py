@@ -2,7 +2,15 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models.publications_queries import (
+from domain.platforms.registry import HAL
+from domain.publications.access import Access, Copy, access
+from domain.publications.doc_types import DocType
+from domain.publications.relations import RelationType, inverse_relation
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
+from domain.source_records.source_extras import SourceExtra
+from domain.sources.registry import Source
+from infrastructure.read_models.publications.models import (
     AccessLinkOut,
     ConsolidatedContributionOut,
     ExternalIdentifierOut,
@@ -14,19 +22,11 @@ from application.ports.read_models.publications_queries import (
     ThesesContributionOut,
     ThesisMeta,
 )
-from application.ports.read_models.subjects_queries import SubjectOut
-from domain.platforms.registry import HAL
-from domain.publications.access import Access, Copy, access
-from domain.publications.doc_types import DocType
-from domain.publications.relations import RelationType, inverse_relation
-from domain.source_records.external_ids import ExternalIdType
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
-from domain.source_records.source_extras import SourceExtra
-from domain.sources.registry import Source
 from infrastructure.read_models.sql_fragments import (
     contribution_has_source,
     contributor_display_name,
 )
+from infrastructure.read_models.subjects.models import SubjectOut
 from infrastructure.sql_fragments import active_issns, corrected_by
 
 

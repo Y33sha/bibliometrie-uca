@@ -10,23 +10,18 @@ from typing import Any
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models._common import (
-    EntityFacetItem,
-    EntityKind,
-    FacetOption,
-    YesNoCount,
-)
-from application.ports.read_models.publications_queries import (
-    NO_LICENSE,
-    PublicationFilters,
-    PublicationsFacetsResponse,
-)
 from domain.countries import NO_COUNTRY_CODE
 from domain.publications.licenses import license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.structures.structure import StructureType
 from infrastructure.db.rows import rows_as
+from infrastructure.read_models._common import (
+    EntityFacetItem,
+    EntityKind,
+    FacetOption,
+    YesNoCount,
+)
 from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import (
     OA_CLOSED_SQL,
@@ -63,6 +58,11 @@ from infrastructure.read_models.filters import (
 )
 from infrastructure.read_models.perimeters import get_persons_perimeter_name
 from infrastructure.read_models.publications.list import lab_hal_collection
+from infrastructure.read_models.publications.models import (
+    NO_LICENSE,
+    PublicationFilters,
+    PublicationsFacetsResponse,
+)
 
 
 class _PublicationFacetsBuilder:

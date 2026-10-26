@@ -7,16 +7,21 @@ Le package est organisé par thème d'agrégat :
 - `summary` : `stats_facets`
 - `_shared` : périmètre de base, assemblage des filtres et filtre APC partagés par les agrégats.
 
-`PgStatsQueries` agrège ces fonctions sous le port `application.ports.read_models.stats_queries.StatsQueries`. Les fonctions libres retournent des dicts conformes au shape des DTOs ; la conversion vers Pydantic est faite ici à la sortie, pour garder les fonctions libres réutilisables hors API.
+`StatsQueries` délègue à ces fonctions, qui rendent des dicts ; la conversion en modèles de réponse se fait à la sortie.
 """
 
 from sqlalchemy import Connection
 
-from application.ports.read_models._common import (
+from infrastructure.read_models._common import (
     EntityFacetResponse,
     EntityKind,
 )
-from application.ports.read_models.stats_queries import (
+from infrastructure.read_models.perimeters import get_persons_structure_ids_list
+from infrastructure.read_models.stats.collaborations import (
+    run_collaborations as _run_collaborations,
+)
+from infrastructure.read_models.stats.entity_facets import stats_entity_facet as _stats_entity_facet
+from infrastructure.read_models.stats.models import (
     CollaborationsResponse,
     PivotDimensionOut,
     PivotMeasureOut,
@@ -24,23 +29,17 @@ from application.ports.read_models.stats_queries import (
     PivotSchemaResponse,
     StatsFacetsResponse,
     StatsFilters,
-    StatsQueries,
 )
-from infrastructure.read_models.perimeters import get_persons_structure_ids_list
-from infrastructure.read_models.stats.collaborations import (
-    run_collaborations as _run_collaborations,
-)
-from infrastructure.read_models.stats.entity_facets import stats_entity_facet as _stats_entity_facet
 from infrastructure.read_models.stats.pivot import DIMENSIONS, MEASURES, run_pivot as _run_pivot
 from infrastructure.read_models.stats.summary import (
     stats_facets as _stats_facets,
 )
 
 
-class PgStatsQueries(StatsQueries):
-    """Adapter SA pour `application.ports.read_models.stats_queries.StatsQueries`.
+class StatsQueries:
+    """Agrégats des tableaux de bord.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. L'adapter résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour demander des statistiques.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour demander des statistiques.
     """
 
     def __init__(self, conn: Connection) -> None:
@@ -106,4 +105,4 @@ class PgStatsQueries(StatsQueries):
         )
 
 
-__all__ = ["PgStatsQueries"]
+__all__ = ["StatsQueries"]

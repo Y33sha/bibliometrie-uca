@@ -7,11 +7,11 @@ from dataclasses import replace
 
 from sqlalchemy import Connection
 
-from application.ports.read_models._common import EntityFacetItem, EntityKind
-from application.ports.read_models.stats_queries import StatsFilters
+from infrastructure.read_models._common import EntityFacetItem, EntityKind
 from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import assemble_where, own_structure_ids
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
+from infrastructure.read_models.stats.models import StatsFilters
 
 
 def stats_entity_facet(

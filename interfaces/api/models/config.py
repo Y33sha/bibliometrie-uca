@@ -10,5 +10,5 @@ class ConfigValueUpdate(BaseModel):
 
     # `Any` plutôt que `JsonValue` (récursif PEP 695) : le schéma JSON
     # généré contient une self-référence que `openapi-typescript` n'arrive
-    # pas à instancier côté TS (cf. `application/ports/api/config_queries.py`).
+    # pas à instancier côté TS (cf. `infrastructure/read_models/config/models.py`).
     value: Any

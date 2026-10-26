@@ -13,23 +13,6 @@ from fastapi import Depends, Request
 from sqlalchemy import Connection
 
 from application.audit_log import record_pending_events
-from application.ports.read_models.addresses_queries import AddressesQueries
-from application.ports.read_models.config_queries import ConfigQueries
-from application.ports.read_models.contributions_queries import ContributionsQueries
-from application.ports.read_models.countries_queries import CountriesQueries
-from application.ports.read_models.entity_labels_queries import EntityLabelQueries
-from application.ports.read_models.feedback_queries import FeedbackQueries
-from application.ports.read_models.hal_problems_queries import HalProblemsQueries
-from application.ports.read_models.monographs_queries import MonographQueries
-from application.ports.read_models.perimeters_queries import PerimetersQueries
-from application.ports.read_models.persons_queries import PersonsQueries
-from application.ports.read_models.pipeline_runs_queries import PipelineRunsQueries
-from application.ports.read_models.publications_queries import PublicationsQueries
-from application.ports.read_models.publishers_queries import PublisherQueries
-from application.ports.read_models.serials_queries import SerialQueries
-from application.ports.read_models.stats_queries import StatsQueries
-from application.ports.read_models.structures_queries import StructuresQueries
-from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.user_repository import UserRepository
 from application.services.addresses import AddressService
 from application.services.config import ConfigService
@@ -42,24 +25,24 @@ from application.services.structures import StructureService
 from domain.merge import MergedEntity
 from domain.users import Role, SessionUser
 from infrastructure.db.engine import get_sync_engine
-from infrastructure.read_models.addresses import PgAddressesQueries
-from infrastructure.read_models.config import PgConfigQueries
-from infrastructure.read_models.contributions import PgContributionsQueries
-from infrastructure.read_models.countries import PgCountriesQueries
-from infrastructure.read_models.entity_labels import PgEntityLabelQueries
-from infrastructure.read_models.feedback import PgFeedbackQueries
-from infrastructure.read_models.hal_problems import PgHalProblemsQueries
-from infrastructure.read_models.merge_redirects import PgMergeRedirectQueries
-from infrastructure.read_models.monographs import PgMonographQueries
-from infrastructure.read_models.perimeters import PgPerimetersQueries
-from infrastructure.read_models.persons import PgPersonsQueries
-from infrastructure.read_models.pipeline_runs import PgPipelineRunsQueries
-from infrastructure.read_models.publications import PgPublicationsQueries
-from infrastructure.read_models.publishers import PgPublisherQueries
-from infrastructure.read_models.serials import PgSerialQueries
-from infrastructure.read_models.stats import PgStatsQueries
-from infrastructure.read_models.structures import PgStructuresQueries
-from infrastructure.read_models.subjects import PgSubjectsQueries
+from infrastructure.read_models.addresses import AddressesQueries
+from infrastructure.read_models.config import ConfigQueries
+from infrastructure.read_models.contributions import ContributionsQueries
+from infrastructure.read_models.countries import CountriesQueries
+from infrastructure.read_models.entity_labels import EntityLabelQueries
+from infrastructure.read_models.feedback import FeedbackQueries
+from infrastructure.read_models.hal_problems import HalProblemsQueries
+from infrastructure.read_models.merge_redirects import MergeRedirectQueries
+from infrastructure.read_models.monographs import MonographQueries
+from infrastructure.read_models.perimeters import PerimetersQueries
+from infrastructure.read_models.persons import PersonsQueries
+from infrastructure.read_models.pipeline_runs import PipelineRunsQueries
+from infrastructure.read_models.publications import PublicationsQueries
+from infrastructure.read_models.publishers import PublisherQueries
+from infrastructure.read_models.serials import SerialQueries
+from infrastructure.read_models.stats import StatsQueries
+from infrastructure.read_models.structures import StructuresQueries
+from infrastructure.read_models.subjects import SubjectsQueries
 from infrastructure.repositories import (
     address_repository,
     audit_repository,
@@ -197,83 +180,83 @@ def user_repo(conn: DbConn) -> UserRepository:
 
 
 def addresses_queries(conn: DbConn) -> AddressesQueries:
-    return PgAddressesQueries(conn)
+    return AddressesQueries(conn)
 
 
 def config_queries(conn: DbConn) -> ConfigQueries:
-    return PgConfigQueries(conn)
+    return ConfigQueries(conn)
 
 
 def contributions_queries(conn: DbConn) -> ContributionsQueries:
-    return PgContributionsQueries(conn)
+    return ContributionsQueries(conn)
 
 
 def countries_queries(conn: DbConn) -> CountriesQueries:
-    return PgCountriesQueries(conn)
+    return CountriesQueries(conn)
 
 
 def entity_label_queries(conn: DbConn) -> EntityLabelQueries:
-    return PgEntityLabelQueries(conn)
+    return EntityLabelQueries(conn)
 
 
 def entity_detail(entity: MergedEntity) -> Callable[[Request, Connection], EntityDetail]:
     """Dépendance d'une route de détail de `entity` (`interfaces.api.entity_detail`)."""
 
     def dependency(request: Request, conn: DbConn) -> EntityDetail:
-        return EntityDetail(entity, request, PgMergeRedirectQueries(conn))
+        return EntityDetail(entity, request, MergeRedirectQueries(conn))
 
     return dependency
 
 
 def feedback_queries(conn: DbConn) -> FeedbackQueries:
-    return PgFeedbackQueries(conn)
+    return FeedbackQueries(conn)
 
 
 def hal_problems_queries(conn: DbConn) -> HalProblemsQueries:
-    return PgHalProblemsQueries(conn)
+    return HalProblemsQueries(conn)
 
 
 def monograph_queries(conn: DbConn) -> MonographQueries:
-    return PgMonographQueries(conn)
+    return MonographQueries(conn)
 
 
 def perimeters_queries(conn: DbConn) -> PerimetersQueries:
-    return PgPerimetersQueries(conn)
+    return PerimetersQueries(conn)
 
 
 def persons_queries(conn: DbConn) -> PersonsQueries:
-    return PgPersonsQueries(conn)
+    return PersonsQueries(conn)
 
 
 def pipeline_runs_queries(conn: DbConn) -> PipelineRunsQueries:
-    return PgPipelineRunsQueries(conn)
+    return PipelineRunsQueries(conn)
 
 
 def publications_queries(
     conn: DbConn,
     open_connection: Callable[[], Connection] = Depends(connection_factory),
 ) -> PublicationsQueries:
-    return PgPublicationsQueries(conn, open_connection=open_connection)
+    return PublicationsQueries(conn, open_connection=open_connection)
 
 
 def publisher_queries(conn: DbConn) -> PublisherQueries:
-    return PgPublisherQueries(conn)
+    return PublisherQueries(conn)
 
 
 def serial_queries(conn: DbConn) -> SerialQueries:
-    return PgSerialQueries(conn)
+    return SerialQueries(conn)
 
 
 def stats_queries(conn: DbConn) -> StatsQueries:
-    return PgStatsQueries(conn)
+    return StatsQueries(conn)
 
 
 def structures_queries(conn: DbConn) -> StructuresQueries:
-    return PgStructuresQueries(conn)
+    return StructuresQueries(conn)
 
 
 def subjects_queries(conn: DbConn) -> SubjectsQueries:
-    return PgSubjectsQueries(conn)
+    return SubjectsQueries(conn)
 
 
 # ----- Écritures -----

@@ -7,20 +7,6 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from application.ports.read_models._common import EntityFacetResponse
-from application.ports.read_models.serials_queries import (
-    DoiNamespaceConflictsResponse,
-    LikelyProceedingsResponse,
-    SerialDashboardResponse,
-    SerialDetailResponse,
-    SerialDuplicatesResponse,
-    SerialFilters,
-    SerialListResponse,
-    SerialQueries,
-    SerialsFacetsResponse,
-    SerialSort,
-)
-from application.ports.read_models.subjects_queries import SubjectFrequency
 from application.ports.repositories.serial_repository import SerialUpdate
 from application.services.serials import SerialService
 from domain.merge import MergedEntity
@@ -30,6 +16,20 @@ from domain.serials.serial import (
     SERIAL_TYPE_LABELS_FR,
     SERIAL_TYPES,
 )
+from infrastructure.read_models._common import EntityFacetResponse
+from infrastructure.read_models.serials import SerialQueries
+from infrastructure.read_models.serials.models import (
+    DoiNamespaceConflictsResponse,
+    LikelyProceedingsResponse,
+    SerialDashboardResponse,
+    SerialDetailResponse,
+    SerialDuplicatesResponse,
+    SerialFilters,
+    SerialListResponse,
+    SerialsFacetsResponse,
+    SerialSort,
+)
+from infrastructure.read_models.subjects.models import SubjectFrequency
 from interfaces.api.deps import entity_detail, serial_queries, serial_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_vocabulary_csv

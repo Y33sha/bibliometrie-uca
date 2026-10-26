@@ -2,8 +2,8 @@
 
 from sqlalchemy import Connection, text
 
-from application.ports.read_models.persons_queries import PersonIdentifierOut
 from domain.persons.identifiers import PUBLIC_PERSON_IDENTIFIER_TYPES, AttributionStatus
+from infrastructure.read_models.persons.models import PersonIdentifierOut
 
 
 def person_identifiers(
