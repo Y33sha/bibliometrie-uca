@@ -1,6 +1,6 @@
 """Facettes dynamiques pour /api/publications/facets.
 
-Chaque facette exclut son propre filtre mais applique tous les autres. Les facettes sont indépendantes et s'exécutent en parallèle, chacune sur sa propre connexion (cf. `publications_facets`).
+Chaque facette exclut son propre filtre mais applique tous les autres. Les facettes sont indépendantes et s'exécutent en parallèle, chacune sur sa propre connexion (cf. `PublicationFacetQueries.publications_facets`).
 """
 
 from collections.abc import Callable
@@ -17,7 +17,7 @@ from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.structures.structure import StructureType
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models._common import (
-    EntityFacetItem,
+    EntityFacetResponse,
     EntityKind,
     FacetOption,
     YesNoCount,
@@ -56,7 +56,10 @@ from infrastructure.read_models.filters import (
     subject_clause,
     year_clause,
 )
-from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
+from infrastructure.read_models.perimeters.queries import (
+    get_persons_perimeter_name,
+    get_persons_structure_ids_list,
+)
 from infrastructure.read_models.publications.list import lab_hal_collection
 from infrastructure.read_models.publications.models import (
     NO_LICENSE,
@@ -66,7 +69,7 @@ from infrastructure.read_models.publications.models import (
 
 
 class _PublicationFacetsBuilder:
-    """Construit les facettes dynamiques pour /api/publications/facets : une méthode privée `_facet_*` par facette, orchestrées par la fonction `publications_facets`.
+    """Construit les facettes dynamiques pour /api/publications/facets : une méthode privée `_facet_*` par facette, orchestrées par `PublicationFacetQueries.publications_facets`.
 
     Chaque facette exclut son propre filtre mais applique tous les autres.
     """
@@ -426,93 +429,91 @@ class _PublicationFacetsBuilder:
         ]
 
 
-def publications_facets(
-    conn: Connection,
-    *,
-    filters: PublicationFilters,
-    perimeter_structure_ids: list[int],
-    open_connection: Callable[[], Connection],
-) -> PublicationsFacetsResponse:
-    """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
+_ENTITY_FACET_LIMIT = 20
 
-    Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé.
 
-    `open_connection` ouvre ces connexions supplémentaires. Elle vient de l'appelant, qui la construit avec les caractéristiques valant pour la requête en cours — la lecture seule, quand c'est une lecture qui est servie. Aller chercher l'engine ici ouvrirait des connexions hors de cette règle.
-    """
-    pre = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
-    pre._preload_lab_hal_col()
-    lab_hal_col = pre.lab_hal_col
+class PublicationFacetQueries:
+    _conn: Connection
+    _open_connection: Callable[[], Connection]
 
-    def run(method_name: str) -> Any:
-        with open_connection() as facet_conn:
-            facet_conn.execute(text("SET LOCAL jit = off"))
-            builder = _PublicationFacetsBuilder(facet_conn, filters, perimeter_structure_ids)
-            builder.lab_hal_col = lab_hal_col
-            return getattr(builder, method_name)()
+    def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
+        """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
 
-    facet_methods = {
-        "years": "_facet_years",
-        "labs": "_facet_labs",
-        "doc_types": "_facet_doc_types",
-        "access": "_facet_access",
-        "oa_statuses": "_facet_oa_statuses",
-        "licenses": "_facet_licenses",
-        "corresponding": "_facet_corresponding",
-        "source_counts": "_facet_source_counts",
-        "apc": "_facet_apc",
-        "countries": "_facet_countries",
-        "languages": "_facet_languages",
-        "hal_status": "_facet_hal_status",
-        "in_perimeter": "_facet_in_perimeter",
-    }
-    # Chaque tâche emporte sa copie du contexte de la requête : ce qu'un contexte porte — la
-    # déclaration de requête de lecture, sur laquelle veille le garde-fou des connexions — ne
-    # traverse pas seul la frontière d'un thread. Une copie par tâche, un contexte ne pouvant
-    # pas être entré par deux threads à la fois.
-    with ThreadPoolExecutor(max_workers=len(facet_methods)) as pool:
-        futures = {
-            key: pool.submit(copy_context().run, run, name) for key, name in facet_methods.items()
+        Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion ouverte par `_open_connection` (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé.
+        """
+        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
+        pre = _PublicationFacetsBuilder(self._conn, filters, perimeter_structure_ids)
+        pre._preload_lab_hal_col()
+        lab_hal_col = pre.lab_hal_col
+
+        def run(method_name: str) -> Any:
+            with self._open_connection() as facet_conn:
+                facet_conn.execute(text("SET LOCAL jit = off"))
+                builder = _PublicationFacetsBuilder(facet_conn, filters, perimeter_structure_ids)
+                builder.lab_hal_col = lab_hal_col
+                return getattr(builder, method_name)()
+
+        facet_methods = {
+            "years": "_facet_years",
+            "labs": "_facet_labs",
+            "doc_types": "_facet_doc_types",
+            "access": "_facet_access",
+            "oa_statuses": "_facet_oa_statuses",
+            "licenses": "_facet_licenses",
+            "corresponding": "_facet_corresponding",
+            "source_counts": "_facet_source_counts",
+            "apc": "_facet_apc",
+            "countries": "_facet_countries",
+            "languages": "_facet_languages",
+            "hal_status": "_facet_hal_status",
+            "in_perimeter": "_facet_in_perimeter",
         }
-        results = {key: future.result() for key, future in futures.items()}
+        # Chaque tâche entre dans sa propre copie du contexte de la requête, qui contient la déclaration de lecture.
+        with ThreadPoolExecutor(max_workers=len(facet_methods)) as pool:
+            futures = {
+                key: pool.submit(copy_context().run, run, name)
+                for key, name in facet_methods.items()
+            }
+            results = {key: future.result() for key, future in futures.items()}
 
-    labs, no_lab_count = results.pop("labs")
-    return PublicationsFacetsResponse(
-        years=results["years"],
-        labs=labs,
-        no_lab_count=no_lab_count,
-        doc_types=results["doc_types"],
-        access=results["access"],
-        oa_statuses=results["oa_statuses"],
-        licenses=results["licenses"],
-        corresponding=results["corresponding"],
-        source_counts=results["source_counts"],
-        apc=results["apc"],
-        countries=results["countries"],
-        languages=results["languages"],
-        hal_status=results["hal_status"],
-        in_perimeter=results["in_perimeter"],
-    )
+        labs, no_lab_count = results.pop("labs")
+        return PublicationsFacetsResponse(
+            years=results["years"],
+            labs=labs,
+            no_lab_count=no_lab_count,
+            doc_types=results["doc_types"],
+            access=results["access"],
+            oa_statuses=results["oa_statuses"],
+            licenses=results["licenses"],
+            corresponding=results["corresponding"],
+            source_counts=results["source_counts"],
+            apc=results["apc"],
+            countries=results["countries"],
+            languages=results["languages"],
+            hal_status=results["hal_status"],
+            in_perimeter=results["in_perimeter"],
+        )
 
-
-def publications_entity_facet(
-    conn: Connection,
-    *,
-    kind: EntityKind,
-    search: str,
-    filters: PublicationFilters,
-    perimeter_structure_ids: list[int],
-    limit: int = 20,
-) -> list[EntityFacetItem]:
-    """Facette éditeur, revue, auteur ou sujet contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
-    builder = _PublicationFacetsBuilder(conn, filters, perimeter_structure_ids)
-    builder._preload_lab_hal_col()
-    where_sql, binds = builder._clauses_skipping(kind)
-    return entity_facet_rows(
-        conn,
-        kind=kind,
-        where_sql=where_sql,
-        binds=binds,
-        search=search,
-        limit=limit,
-        own_structure_ids=own_structure_ids(filters.lab_ids, perimeter_structure_ids),
-    )
+    def publications_entity_facet(
+        self,
+        *,
+        kind: EntityKind,
+        search: str,
+        filters: PublicationFilters,
+    ) -> EntityFacetResponse:
+        """Facette éditeur, revue, auteur ou sujet contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
+        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
+        builder = _PublicationFacetsBuilder(self._conn, filters, perimeter_structure_ids)
+        builder._preload_lab_hal_col()
+        where_sql, binds = builder._clauses_skipping(kind)
+        return EntityFacetResponse(
+            entities=entity_facet_rows(
+                self._conn,
+                kind=kind,
+                where_sql=where_sql,
+                binds=binds,
+                search=search,
+                limit=_ENTITY_FACET_LIMIT,
+                own_structure_ids=own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+            )
+        )

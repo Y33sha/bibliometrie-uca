@@ -97,211 +97,6 @@ def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo
     return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
 
 
-def get_publication_detail(
-    conn: Connection, publication_id: int
-) -> PublicationDetailResponse | None:
-    """Détail complet d'une publication : métadonnées, sources, contributions.
-
-    Retourne None si la publication n'existe pas (caller = 404).
-    """
-    publication_row = conn.execute(
-        text(f"""
-            SELECT p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
-                   p.oa_status::text AS oa_status,
-                   p.license::text AS license, p.deposit_license::text AS deposit_license,
-                   p.language, p.container_title, d.abstract, d.keywords,
-                   j.id AS serial_id, j.title AS journal_title,
-                   CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
-                   j.apc_amount, j.apc_currency,
-                   j.oa_model,
-                   m.id AS monograph_id, m.title AS monograph_title,
-                   pub.id AS publisher_id, pub.name AS publisher_name,
-                   dp.ra AS doi_ra
-            FROM publications p
-            LEFT JOIN publications_detail d ON d.publication_id = p.id
-            LEFT JOIN serials j ON j.id = p.serial_id
-            LEFT JOIN monographs m ON m.id = p.monograph_id
-            LEFT JOIN publishers pub ON pub.id = p.publisher_id
-            LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
-            WHERE p.id = :pid
-        """),
-        {"pid": publication_id},
-    ).one_or_none()
-    if not publication_row:
-        return None
-    # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, retournés à part.
-    keywords = publication_row.keywords or []
-
-    sources_rows = conn.execute(
-        text(f"""
-            SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries,
-                   COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
-                       AS is_secondary
-            FROM source_records sr
-            WHERE sr.publication_id = :pid
-            ORDER BY sr.created_at DESC
-        """),
-        {"pid": publication_id, "convergence_cases": list(CONVERGENCE_CASES)},
-    ).all()
-    sources = [
-        SourceRecordOut(
-            source=r.source,
-            source_id=r.source_id,
-            oa_status=r.oa_status,
-            doi=r.doi,
-            hal_collections=r.hal_collections,
-            countries=r.countries,
-            is_secondary=r.is_secondary,
-        )
-        for r in sources_rows
-    ]
-
-    auth_rows = conn.execute(
-        text(f"""
-            SELECT a.reference_position AS author_position, a.in_perimeter, a.is_corresponding,
-                   (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
-                    FROM contribution_structures aus
-                    WHERE aus.contribution_id = a.id) AS structure_ids,
-                   {contribution_has_source(Source.HAL.value)} AS source_hal,
-                   {contribution_has_source(Source.OPENALEX.value)} AS source_openalex,
-                   {contribution_has_source(Source.WOS.value)} AS source_wos,
-                   {contribution_has_source(Source.SCANR.value)} AS source_scanr,
-                   pe.id AS person_id, pe.last_name, pe.first_name,
-                   EXISTS (SELECT 1 FROM hr_records pr WHERE pr.person_id = pe.id) AS has_rh
-            FROM contributions a
-            JOIN persons pe ON pe.id = a.person_id
-            WHERE a.publication_id = :pid
-            ORDER BY a.reference_position
-        """),
-        {"pid": publication_id},
-    ).all()
-    contributions = [
-        ConsolidatedContributionOut(
-            author_position=r.author_position,
-            in_perimeter=r.in_perimeter,
-            is_corresponding=r.is_corresponding,
-            structure_ids=r.structure_ids,
-            source_hal=r.source_hal,
-            source_openalex=r.source_openalex,
-            source_wos=r.source_wos,
-            source_scanr=r.source_scanr,
-            person_id=r.person_id,
-            last_name=r.last_name,
-            first_name=r.first_name,
-            has_rh=r.has_rh,
-        )
-        for r in auth_rows
-    ]
-
-    theses_rows = conn.execute(
-        text(f"""
-            SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, g.person_id,
-                   sc.roles, sc.in_perimeter
-            FROM source_contributions sc
-            LEFT JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc.id
-            LEFT JOIN contributions g ON g.id = gm.contribution_id
-            WHERE sc.source_record_id = (
-                SELECT id FROM source_records
-                WHERE source = '{Source.THESES.value}' AND publication_id = :pid
-                ORDER BY created_at DESC
-                LIMIT 1
-            )
-            ORDER BY sc.author_position NULLS LAST, full_name
-        """),
-        {"pid": publication_id},
-    ).all()
-    theses_contributions = [
-        ThesesContributionOut(
-            id=r.id,
-            author_position=r.author_position,
-            full_name=r.full_name,
-            person_id=r.person_id,
-            roles=r.roles,
-            in_perimeter=r.in_perimeter,
-        )
-        for r in theses_rows
-    ]
-
-    thesis_meta: ThesisMeta | None = None
-    if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
-        extras_row = conn.execute(
-            text(f"""
-                SELECT sr.source_extras AS source_record_extras, sr.topics->>'discipline' AS discipline,
-                       p.source_extras AS publication_extras
-                FROM publications p
-                LEFT JOIN source_records sr
-                       ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
-                WHERE p.id = :pid
-                LIMIT 1
-            """),
-            {"pid": publication_id},
-        ).one_or_none()
-        if extras_row:
-            source_record_extras = extras_row.source_record_extras or {}
-            publication_extras = extras_row.publication_extras or {}
-            thesis_meta = ThesisMeta(
-                discipline=extras_row.discipline,
-                ecoles_doctorales=source_record_extras.get(SourceExtra.ECOLES_DOCTORALES),
-                partenaires=source_record_extras.get(SourceExtra.PARTENAIRES),
-                date_soutenance=source_record_extras.get(SourceExtra.DATE_SOUTENANCE)
-                or publication_extras.get(SourceExtra.DATE_SOUTENANCE),
-                date_inscription=source_record_extras.get(SourceExtra.DATE_INSCRIPTION)
-                or publication_extras.get(SourceExtra.DATE_INSCRIPTION),
-            )
-
-    subjects = get_publication_subjects(conn, publication_id)
-    relations = get_publication_relations(conn, publication_id)
-    external_identifiers = get_publication_external_identifiers(conn, publication_id)
-    publication_access = access(
-        get_publication_copies(conn, publication_id), doi=publication_row.doi
-    )
-
-    structures = structures_by_id(
-        conn, {sid for a in contributions for sid in a.structure_ids or []}
-    )
-
-    return PublicationDetailResponse(
-        publication=PublicationDetailCore(
-            id=publication_row.id,
-            title=publication_row.title,
-            publication_year=publication_row.publication_year,
-            doi=publication_row.doi,
-            doi_ra=publication_row.doi_ra,
-            doc_type=publication_row.doc_type,
-            oa_status=publication_row.oa_status,
-            license=publication_row.license,
-            deposit_license=publication_row.deposit_license,
-            language=publication_row.language,
-            container_title=publication_row.container_title,
-            abstract=publication_row.abstract,
-            serial_id=publication_row.serial_id,
-            journal_title=publication_row.journal_title,
-            serial_issns=list(publication_row.serial_issns or []),
-            apc_amount=publication_row.apc_amount,
-            apc_currency=publication_row.apc_currency,
-            oa_model=publication_row.oa_model,
-            monograph_id=publication_row.monograph_id,
-            monograph_title=publication_row.monograph_title,
-            publisher_id=publication_row.publisher_id,
-            publisher_name=publication_row.publisher_name,
-        ),
-        sources=sources,
-        contributions=contributions,
-        theses_contributions=theses_contributions,
-        thesis_meta=thesis_meta,
-        structures=structures,
-        subjects=subjects,
-        keywords=keywords,
-        relations=relations,
-        access_url=publication_access.url,
-        access=[
-            AccessLinkOut(label=a.label, url=a.url, known=a.known) for a in publication_access.links
-        ],
-        referenced_by=_referenced_by(sources, publication_access),
-        external_identifiers=external_identifiers,
-    )
-
-
 # Identifiants de bases qui référencent la publication, exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher). arXiv et PMCID désignent des copies, qui sont des localisations.
 _EXTERNAL_IDENTIFIER_KEYS = (
     ("pmid", ExternalIdType.PMID),
@@ -406,3 +201,207 @@ def get_publication_subjects(conn: Connection, publication_id: int) -> list[Subj
     return [
         SubjectOut(id=r.id, label=r.label, language=r.language, sources=r.sources) for r in rows
     ]
+
+
+class PublicationDetailQueries:
+    _conn: Connection
+
+    def get_publication_detail(self, publication_id: int) -> PublicationDetailResponse | None:
+        """Détail complet d'une publication : métadonnées, sources, contributions. `None` si la publication n'existe pas."""
+        publication_row = self._conn.execute(
+            text(f"""
+                SELECT p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
+                       p.oa_status::text AS oa_status,
+                       p.license::text AS license, p.deposit_license::text AS deposit_license,
+                       p.language, p.container_title, d.abstract, d.keywords,
+                       j.id AS serial_id, j.title AS journal_title,
+                       CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
+                       j.apc_amount, j.apc_currency,
+                       j.oa_model,
+                       m.id AS monograph_id, m.title AS monograph_title,
+                       pub.id AS publisher_id, pub.name AS publisher_name,
+                       dp.ra AS doi_ra
+                FROM publications p
+                LEFT JOIN publications_detail d ON d.publication_id = p.id
+                LEFT JOIN serials j ON j.id = p.serial_id
+                LEFT JOIN monographs m ON m.id = p.monograph_id
+                LEFT JOIN publishers pub ON pub.id = p.publisher_id
+                LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(p.doi, '/', 1)
+                WHERE p.id = :pid
+            """),
+            {"pid": publication_id},
+        ).one_or_none()
+        if not publication_row:
+            return None
+        # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, retournés à part.
+        keywords = publication_row.keywords or []
+
+        sources_rows = self._conn.execute(
+            text(f"""
+                SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries,
+                       COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
+                           AS is_secondary
+                FROM source_records sr
+                WHERE sr.publication_id = :pid
+                ORDER BY sr.created_at DESC
+            """),
+            {"pid": publication_id, "convergence_cases": list(CONVERGENCE_CASES)},
+        ).all()
+        sources = [
+            SourceRecordOut(
+                source=r.source,
+                source_id=r.source_id,
+                oa_status=r.oa_status,
+                doi=r.doi,
+                hal_collections=r.hal_collections,
+                countries=r.countries,
+                is_secondary=r.is_secondary,
+            )
+            for r in sources_rows
+        ]
+
+        auth_rows = self._conn.execute(
+            text(f"""
+                SELECT a.reference_position AS author_position, a.in_perimeter, a.is_corresponding,
+                       (SELECT array_agg(aus.structure_id ORDER BY aus.structure_id)
+                        FROM contribution_structures aus
+                        WHERE aus.contribution_id = a.id) AS structure_ids,
+                       {contribution_has_source(Source.HAL.value)} AS source_hal,
+                       {contribution_has_source(Source.OPENALEX.value)} AS source_openalex,
+                       {contribution_has_source(Source.WOS.value)} AS source_wos,
+                       {contribution_has_source(Source.SCANR.value)} AS source_scanr,
+                       pe.id AS person_id, pe.last_name, pe.first_name,
+                       EXISTS (SELECT 1 FROM hr_records pr WHERE pr.person_id = pe.id) AS has_rh
+                FROM contributions a
+                JOIN persons pe ON pe.id = a.person_id
+                WHERE a.publication_id = :pid
+                ORDER BY a.reference_position
+            """),
+            {"pid": publication_id},
+        ).all()
+        contributions = [
+            ConsolidatedContributionOut(
+                author_position=r.author_position,
+                in_perimeter=r.in_perimeter,
+                is_corresponding=r.is_corresponding,
+                structure_ids=r.structure_ids,
+                source_hal=r.source_hal,
+                source_openalex=r.source_openalex,
+                source_wos=r.source_wos,
+                source_scanr=r.source_scanr,
+                person_id=r.person_id,
+                last_name=r.last_name,
+                first_name=r.first_name,
+                has_rh=r.has_rh,
+            )
+            for r in auth_rows
+        ]
+
+        theses_rows = self._conn.execute(
+            text(f"""
+                SELECT sc.id, sc.author_position, {contributor_display_name()} AS full_name, g.person_id,
+                       sc.roles, sc.in_perimeter
+                FROM source_contributions sc
+                LEFT JOIN aligned_source_contributions gm ON gm.source_contribution_id = sc.id
+                LEFT JOIN contributions g ON g.id = gm.contribution_id
+                WHERE sc.source_record_id = (
+                    SELECT id FROM source_records
+                    WHERE source = '{Source.THESES.value}' AND publication_id = :pid
+                    ORDER BY created_at DESC
+                    LIMIT 1
+                )
+                ORDER BY sc.author_position NULLS LAST, full_name
+            """),
+            {"pid": publication_id},
+        ).all()
+        theses_contributions = [
+            ThesesContributionOut(
+                id=r.id,
+                author_position=r.author_position,
+                full_name=r.full_name,
+                person_id=r.person_id,
+                roles=r.roles,
+                in_perimeter=r.in_perimeter,
+            )
+            for r in theses_rows
+        ]
+
+        thesis_meta: ThesisMeta | None = None
+        if publication_row.doc_type in (DocType.THESIS, DocType.ONGOING_THESIS):
+            extras_row = self._conn.execute(
+                text(f"""
+                    SELECT sr.source_extras AS source_record_extras, sr.topics->>'discipline' AS discipline,
+                           p.source_extras AS publication_extras
+                    FROM publications p
+                    LEFT JOIN source_records sr
+                           ON sr.publication_id = p.id AND sr.source = '{Source.THESES.value}'
+                    WHERE p.id = :pid
+                    LIMIT 1
+                """),
+                {"pid": publication_id},
+            ).one_or_none()
+            if extras_row:
+                source_record_extras = extras_row.source_record_extras or {}
+                publication_extras = extras_row.publication_extras or {}
+                thesis_meta = ThesisMeta(
+                    discipline=extras_row.discipline,
+                    ecoles_doctorales=source_record_extras.get(SourceExtra.ECOLES_DOCTORALES),
+                    partenaires=source_record_extras.get(SourceExtra.PARTENAIRES),
+                    date_soutenance=source_record_extras.get(SourceExtra.DATE_SOUTENANCE)
+                    or publication_extras.get(SourceExtra.DATE_SOUTENANCE),
+                    date_inscription=source_record_extras.get(SourceExtra.DATE_INSCRIPTION)
+                    or publication_extras.get(SourceExtra.DATE_INSCRIPTION),
+                )
+
+        subjects = get_publication_subjects(self._conn, publication_id)
+        relations = get_publication_relations(self._conn, publication_id)
+        external_identifiers = get_publication_external_identifiers(self._conn, publication_id)
+        publication_access = access(
+            get_publication_copies(self._conn, publication_id), doi=publication_row.doi
+        )
+
+        structures = structures_by_id(
+            self._conn, {sid for a in contributions for sid in a.structure_ids or []}
+        )
+
+        return PublicationDetailResponse(
+            publication=PublicationDetailCore(
+                id=publication_row.id,
+                title=publication_row.title,
+                publication_year=publication_row.publication_year,
+                doi=publication_row.doi,
+                doi_ra=publication_row.doi_ra,
+                doc_type=publication_row.doc_type,
+                oa_status=publication_row.oa_status,
+                license=publication_row.license,
+                deposit_license=publication_row.deposit_license,
+                language=publication_row.language,
+                container_title=publication_row.container_title,
+                abstract=publication_row.abstract,
+                serial_id=publication_row.serial_id,
+                journal_title=publication_row.journal_title,
+                serial_issns=list(publication_row.serial_issns or []),
+                apc_amount=publication_row.apc_amount,
+                apc_currency=publication_row.apc_currency,
+                oa_model=publication_row.oa_model,
+                monograph_id=publication_row.monograph_id,
+                monograph_title=publication_row.monograph_title,
+                publisher_id=publication_row.publisher_id,
+                publisher_name=publication_row.publisher_name,
+            ),
+            sources=sources,
+            contributions=contributions,
+            theses_contributions=theses_contributions,
+            thesis_meta=thesis_meta,
+            structures=structures,
+            subjects=subjects,
+            keywords=keywords,
+            relations=relations,
+            access_url=publication_access.url,
+            access=[
+                AccessLinkOut(label=a.label, url=a.url, known=a.known)
+                for a in publication_access.links
+            ],
+            referenced_by=_referenced_by(sources, publication_access),
+            external_identifiers=external_identifiers,
+        )

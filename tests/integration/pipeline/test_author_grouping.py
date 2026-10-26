@@ -6,10 +6,6 @@ import pytest
 from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
-from infrastructure.read_models.publications.suspect_merges import (
-    suspect_merges,
-    suspect_merges_count,
-)
 from pipeline.transformation.publications.author_grouping import author_grouping
 from pipeline.transformation.publications.author_grouping.author_grouping import build_groups
 from pipeline.transformation.publications.author_grouping.store import SourceContributionGroupStore
@@ -17,6 +13,7 @@ from tests.integration.helpers.contributions import upsert_split_contributor_inf
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import mark, queued
+from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
 logger = logging.getLogger("test_author_grouping")
@@ -297,8 +294,9 @@ def test_la_file_des_fusions_suspectes_retient_les_listes_disjointes(conn):
 
     _run(conn)
 
-    assert suspect_merges_count(conn) == 1
-    [suspect] = suspect_merges(conn, page=1, per_page=10).publications
+    queries = publications_queries(conn)
+    assert queries.suspect_merges_count() == 1
+    [suspect] = queries.suspect_merges(page=1, per_page=10).publications
     assert (
         suspect.publication_id,
         suspect.source_contributions,

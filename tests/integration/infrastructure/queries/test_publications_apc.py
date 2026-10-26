@@ -1,9 +1,9 @@
 """Lignes APC de la liste des publications : `in_perimeter` suit la règle du filtre `has_apc`."""
 
-from infrastructure.read_models.publications.list import list_publications
 from infrastructure.read_models.publications.models import PublicationFilters
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
-from tests.integration.helpers.structures import insert_structure
+from tests.integration.helpers.read_models import publications_queries
+from tests.integration.helpers.structures import insert_persons_perimeter, insert_structure
 
 
 def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
@@ -21,10 +21,10 @@ def test_apc_in_perimeter_follows_budget_structure(sa_sync_conn):
             open_access_fee=True,
         )
 
-    response = list_publications(
-        sa_sync_conn,
+    insert_persons_perimeter(sa_sync_conn, extra_root_ids=[inside], materialize=True)
+
+    response = publications_queries(sa_sync_conn).list_publications(
         filters=PublicationFilters(),
-        perimeter_structure_ids=[inside],
         page=1,
         per_page=10,
         sort="year_desc",
