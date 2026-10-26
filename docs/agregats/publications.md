@@ -16,7 +16,7 @@ Une publication est la référence unifiée d'un document : plusieurs enregistre
 | `apc_payments` | Frais de publication, importés puis corrigés à la main | `publication_id`, `doi`, `amount_eur_ht`, `billing_year` |
 | `publications_detail` | Complément de métadonnées servi au détail | `publication_id`, recalculé à chaque `refresh_from_sources` |
 
-En amont se trouvent les [enregistrements sources](source_records.md). La construction des `contributions` relève de la fiche [contributions](contributions.md) ; ils apparaissent ici comme le lien vers les [personnes](persons.md).
+En amont se trouvent les [enregistrements sources](source_records.md). La construction des `contributions` relève de la fiche [contributions](contributions.md) ; ils apparaissent ici comme le lien vers les [personnes](../donnees/05-persons.md).
 
 ## Écriture par le pipeline
 

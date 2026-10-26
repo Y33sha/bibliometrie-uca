@@ -30,7 +30,7 @@ Les informations du contributeur (`contributor_information_id`) — nom normalis
 
 ## Écriture par l'API — édition manuelle
 
-Aucune colonne de `source_contributions` n'est écrite par l'API. L'édition manuelle est décrite côté [personnes](persons.md) et [contributions](contributions.md).
+Aucune colonne de `source_contributions` n'est écrite par l'API. L'édition manuelle est décrite côté [personnes](../donnees/05-persons.md) et [contributions](contributions.md).
 
 **Épingler une contribution source** l'inscrit dans `confirmed_source_contributions`. La décision porte sur cette contribution source précisément ; la phase `persons` donne la personne épinglée à la contribution qui l'aligne, à chaque passage.
 
