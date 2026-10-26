@@ -122,6 +122,8 @@
 	<title>{pageTitle("Éditeurs")}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Éditeurs</h1>
+
 {#if blockingSerials}
 	<div class="blocking-panel" role="alert">
 		<div class="blocking-header">

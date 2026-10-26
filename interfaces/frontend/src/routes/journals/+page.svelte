@@ -190,6 +190,8 @@
 	<title>{pageTitle("Publications en série")}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Publications en série</h1>
+
 {#if isAdmin()}
 	<HubTabs
 		tabs={[

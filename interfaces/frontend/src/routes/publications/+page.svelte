@@ -37,6 +37,8 @@
 	<title>{pageTitle("Publications")}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Publications</h1>
+
 {#if isAdmin()}
 	<HubTabs
 		tabs={[

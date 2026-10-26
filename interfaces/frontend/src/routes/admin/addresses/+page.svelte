@@ -412,6 +412,8 @@
 	<title>{pageTitle("Admin - Adresses")}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Affiliations</h1>
+
 <div class="page-addresses">
 	<!-- Structure selection + feedback button -->
 	<div class="structure-bar">

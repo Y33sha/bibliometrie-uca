@@ -257,7 +257,7 @@
     trail={[{ label: "Affiliations", path: currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses" }]}
     current="Qualité de la détection"
   />
-  <h2>Qualité de la détection</h2>
+  <h1>Qualité de la détection</h1>
 
   <!-- Stats row -->
   {#if stats}
@@ -401,7 +401,7 @@
 </div>
 
 <style>
-  h2 {
+  h1 {
     font-size: 1.2rem;
     font-weight: 600;
     margin: 0 0 16px;

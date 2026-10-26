@@ -23,10 +23,30 @@
   const isPublicReferentiels = $derived(isActive("/theses") || isActive("/publishers") || isActive("/journals") || isActive("/monographs") || isActive("/subjects"));
 
   let mobileNavOpen = $state(false);
-  // Referme le menu mobile après chaque navigation.
+  type NavMenu = "referentiels" | "hal-problems" | "admin" | "account";
+  let openMenu = $state<NavMenu | null>(null);
+  // Referme le menu mobile et le sous-menu ouvert après chaque navigation.
   afterNavigate(() => {
     mobileNavOpen = false;
+    openMenu = null;
   });
+
+  function toggleMenu(menu: NavMenu) {
+    openMenu = openMenu === menu ? null : menu;
+  }
+
+  // Un sous-menu se referme quand le focus le quitte, sur Échap (le focus revient à son bouton) et sur un clic hors des sous-menus.
+  function closeOnFocusLeave(e: FocusEvent) {
+    if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) openMenu = null;
+  }
+  function closeOnEscape(e: KeyboardEvent) {
+    if (e.key !== "Escape" || !openMenu) return;
+    document.getElementById(`nav-button-${openMenu}`)?.focus();
+    openMenu = null;
+  }
+  function closeOnClickOutside(e: MouseEvent) {
+    if (openMenu && !(e.target as Element).closest(".nav-dropdown")) openMenu = null;
+  }
 
   // Compare l'identifiant de la route courante, sans le préfixe de déploiement.
   function isActive(routeId: string): boolean {
@@ -44,70 +64,81 @@
   }
 </script>
 
-<div class="site-header" class:admin={isAdmin()}>
+<svelte:window onkeydown={closeOnEscape} onclick={closeOnClickOutside} />
+
+<!-- Sous-menu de la navigation : ouvert au clic et au clavier, ou au survol sur un écran à pointeur. -->
+{#snippet dropdown(menu: NavMenu, label: Snippet, items: Snippet, { active = false, right = false, switchLink = false } = {})}
+  <div class="nav-dropdown" class:active onfocusout={closeOnFocusLeave}>
+    <button id="nav-button-{menu}" class="nav-link" class:active class:nav-switch-link={switchLink} aria-expanded={openMenu === menu} aria-controls="nav-menu-{menu}" onclick={() => toggleMenu(menu)}>{@render label()} <span class="chevron" aria-hidden="true"></span></button>
+    <div id="nav-menu-{menu}" class="nav-dropdown-menu" class:nav-dropdown-menu-right={right} class:open={openMenu === menu}>
+      {@render items()}
+    </div>
+  </div>
+{/snippet}
+
+{#snippet referentielsLabel()}Référentiels{/snippet}
+{#snippet referentielsItems()}
+  <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
+  <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
+  <a href={resolve('journals')} class:active={isActive("/journals")}>Publications en série</a>
+  <a href={resolve('monographs')} class:active={isActive("/monographs")}>Monographies</a>
+  <a href={resolve('subjects')} class:active={isActive("/subjects")}>Sujets</a>
+{/snippet}
+{#snippet halProblemsLabel()}Problèmes HAL{/snippet}
+{#snippet halProblemsItems()}
+  <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
+  <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
+  <a href={resolve('hal-problems/missing-collections')} class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
+  <a href={resolve('hal-problems/affiliation-conflicts')} class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
+{/snippet}
+{#snippet adminLabel()}Administration{/snippet}
+{#snippet adminItems()}
+  <span class="nav-dropdown-group">Pipeline</span>
+  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
+  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
+  <span class="nav-dropdown-group">Adresses</span>
+  <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
+  <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
+{/snippet}
+{#snippet accountLabel()}<i class="fi fi-rr-user nav-icon" aria-hidden="true"></i>{session.login}{/snippet}
+{#snippet accountItems()}
+  <button class="nav-dropdown-action" onclick={logout}>Déconnexion</button>
+{/snippet}
+
+<a class="skip-link" href="#contenu">Aller au contenu</a>
+
+<header class="site-header" class:admin={isAdmin()}>
   <div class="site-brand">
     <img src={asset(isAdmin() ? "connectome.png" : "favicon.png")} alt="" class="site-icon" />
-    <h1 class="site-title">{siteTitle()}</h1>
+    <span class="site-title">{siteTitle()}</span>
   </div>
-  <nav class="site-nav" class:open={mobileNavOpen}>
+  <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
     <a href={resolve('stats')} class="nav-link" class:active={isActive("/stats")}><i class="fi fi-rr-chart-histogram nav-icon" aria-hidden="true"></i>Stats</a>
     <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
     <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
     <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
-    <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
-      <button class="nav-link" class:active={isPublicReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
-      <div class="nav-dropdown-menu">
-        <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
-        <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
-        <a href={resolve('journals')} class:active={isActive("/journals")}>Publications en série</a>
-        <a href={resolve('monographs')} class:active={isActive("/monographs")}>Monographies</a>
-        <a href={resolve('subjects')} class:active={isActive("/subjects")}>Sujets</a>
-      </div>
-    </div>
-    <div class="nav-dropdown" role="navigation" class:active={isHalProblems}>
-      <button class="nav-link" class:active={isHalProblems}>Problèmes HAL <span class="chevron" aria-hidden="true"></span></button>
-      <div class="nav-dropdown-menu">
-        <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
-        <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
-        <a href={resolve('hal-problems/missing-collections')} class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
-        <a href={resolve('hal-problems/affiliation-conflicts')} class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
-      </div>
-    </div>
+    {@render dropdown("referentiels", referentielsLabel, referentielsItems, { active: isPublicReferentiels })}
+    {@render dropdown("hal-problems", halProblemsLabel, halProblemsItems, { active: isHalProblems })}
     {#if isAdmin()}
-      <div class="nav-dropdown" role="navigation" class:active={isAdminSection}>
-        <button class="nav-link" class:active={isAdminSection}>Administration <span class="chevron" aria-hidden="true"></span></button>
-        <div class="nav-dropdown-menu nav-dropdown-menu-right">
-          <span class="nav-dropdown-group">Pipeline</span>
-          <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
-          <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
-          <span class="nav-dropdown-group">Adresses</span>
-          <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
-          <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
-        </div>
-      </div>
+      {@render dropdown("admin", adminLabel, adminItems, { active: isAdminSection, right: true })}
     {/if}
     {#if session.login}
-      <div class="nav-dropdown" role="navigation">
-        <button class="nav-link nav-switch-link"><i class="fi fi-rr-user nav-icon" aria-hidden="true"></i>{session.login} <span class="chevron" aria-hidden="true"></span></button>
-        <div class="nav-dropdown-menu nav-dropdown-menu-right">
-          <button class="nav-dropdown-action" onclick={logout}>Déconnexion</button>
-        </div>
-      </div>
+      {@render dropdown("account", accountLabel, accountItems, { right: true, switchLink: true })}
     {:else if session.loaded && !isActive("/login")}
       <a href={loginUrl(page.url)} class="nav-link nav-switch-link">Connexion</a>
     {/if}
   </nav>
-  <button class="nav-toggle" aria-label="Menu" aria-expanded={mobileNavOpen} onclick={() => (mobileNavOpen = !mobileNavOpen)}>&#9776;</button>
-</div>
+  <button class="nav-toggle" aria-label="Menu" aria-expanded={mobileNavOpen} aria-controls="site-nav" onclick={() => (mobileNavOpen = !mobileNavOpen)}>&#9776;</button>
+</header>
 
-<div class="container">
+<main id="contenu" class="container" tabindex="-1">
   <!-- Une page se monte une fois la session lue, pour un identifiant et un rôle : ses fonctions d'administration et ses filtres par défaut dépendent du rôle. Naviguer vers un autre identifiant de la même route, ou changer de rôle, la remonte avec ses chargements au montage. -->
   {#if session.loaded}
     {#key `${page.params.id}|${isAdmin()}`}
       {@render children()}
     {/key}
   {/if}
-</div>
+</main>
 
 <DialogHost />
 
@@ -230,10 +261,10 @@
   .nav-link.active,
   .nav-dropdown.active > .nav-link {
     color: white;
-    background: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.14);
   }
   .nav-switch-link {
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.85);
     font-size: 0.85rem;
     margin-left: 12px;
   }
@@ -246,11 +277,19 @@
     display: flex;
     align-items: center;
   }
-  .nav-dropdown:hover > .nav-dropdown-menu {
+  .nav-dropdown-menu.open {
     display: block;
   }
-  .nav-dropdown:hover > .nav-link .chevron {
+  .nav-link[aria-expanded="true"] .chevron {
     transform: rotate(180deg);
+  }
+  @media (hover: hover) {
+    .nav-dropdown:hover > .nav-dropdown-menu {
+      display: block;
+    }
+    .nav-dropdown:hover > .nav-link .chevron {
+      transform: rotate(180deg);
+    }
   }
   .nav-dropdown-menu {
     display: none;
@@ -286,7 +325,7 @@
   .nav-dropdown-group {
     display: block;
     padding: 8px 16px 2px;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.8);
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 1px;
@@ -313,6 +352,26 @@
     max-width: 1400px;
     margin: 0 auto;
     padding: 24px;
+  }
+  /* Cible du lien d'évitement : le focus s'y pose sans contour, la zone n'étant pas un contrôle. */
+  .container:focus {
+    outline: none;
+  }
+  /* Lien d'évitement : hors de l'écran, affiché à la prise de focus. */
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 8px;
+    z-index: 1000;
+    padding: 8px 14px;
+    background: var(--card);
+    color: var(--accent);
+    font-weight: 600;
+    border-radius: var(--radius);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  }
+  .skip-link:focus {
+    top: 8px;
   }
 
   /* ── Largeur intermédiaire : rubriques sans icône, plus serrées, pour tenir sur une ligne ── */

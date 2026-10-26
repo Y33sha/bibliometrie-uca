@@ -555,6 +555,8 @@
 	<title>{pageTitle("Statistiques")}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Statistiques</h1>
+
 <div class="stats-page">
 <!-- Ligne 1 : contrôles du pivot + onglets -->
 <div class="toolbar controls-row">

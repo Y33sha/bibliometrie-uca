@@ -185,6 +185,8 @@
 	<title>{pageTitle('Structures')}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Structures</h1>
+
 <div class="toolbar toolbar-card">
 	<input
 		type="search"

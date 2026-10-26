@@ -7,4 +7,6 @@
 	<title>{pageTitle("Monographies")}</title>
 </svelte:head>
 
+<h1 class="visually-hidden">Monographies</h1>
+
 <MonographsListView apiKey="monographs-list" urlSync />

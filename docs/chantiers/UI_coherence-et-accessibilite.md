@@ -121,10 +121,10 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 1. Navigation et structure de page
 
-- [ ] Sous-menus au clic et au clavier, `aria-expanded`, fermeture par Échap et clic extérieur ; suppression des `role="navigation"` internes
-- [ ] `<main>`, lien d'évitement, nom du site hors des titres, H1 des listes réservé aux lecteurs d'écran
+- [x] Sous-menus au clic et au clavier, `aria-expanded`, fermeture par Échap, clic extérieur et sortie du focus ; suppression des `role="navigation"` internes
+- [x] `<main>`, lien d'évitement, nom du site hors des titres, H1 des listes, de Statistiques et d'Affiliations réservé aux lecteurs d'écran ; titres de Configuration, Pipeline et Qualité de la détection en H1
 - [x] Focus automatique retiré des recherches de page ; sur Affiliations, le champ d'un filtre texte ajouté prend le focus
-- [ ] Contraste des liens de navigation, du lien actif et du lien « Connexion »
+- [x] Contraste des liens de navigation, du lien actif et du lien « Connexion » : barre publique en `#246868`
 
 ### 2. API de navigation SvelteKit
 
