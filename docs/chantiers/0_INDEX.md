@@ -183,7 +183,3 @@
 
   18 routers sur 20 importaient depuis `/infrastructure`, malgré l'interdiction documentée mais non enforcée. Mise en conformité et règle verrouillée par `import-linter`.
 
-- 2026-05-05 — [DRY publications tables](archived/2026-05-05_CODE_dry-publications-tables.md)
-
-  Le composant `<PublicationsListView>` sert désormais pour 4 pages partageant le même tableau de publications avec filtres à facettes.
-
