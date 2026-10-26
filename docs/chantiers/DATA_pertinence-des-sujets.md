@@ -59,7 +59,8 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - **Un rejet automatique se recalcule. Un rejet manuel est une décision humaine durable.**
 - **Affichage des rejets.** Les liens rejetés sont exclus des décomptes et des listes : `/subjects`, `/subjects/[id]`, nuages de sujets des personnes, structures, revues et éditeurs, filtre par sujet. La fiche `/publications/[id]` les affiche barrés et grisés, pour le contrôle visuel des rejets.
 - **Hiérarchie des sujets stockée.** Un sujet est identifié par son vocabulaire et son code dans ce vocabulaire, à défaut son libellé. Il porte son niveau et son parent.
-- **Deux couches.** Le référentiel hiérarchique garde les sujets de chaque vocabulaire. Les sujets affichés sont dédupliqués : une publication montre une seule fois « Chemistry », quel que soit le nombre de vocabulaires qui le lui attribuent.
+- **Une seule table de sujets.** `subjects` porte le vocabulaire, le code, le niveau et le parent ; `publication_subjects` relie les publications à ces sujets. Les vedettes RAMEAU, identifiées par leur PPN chez ScanR comme chez theses.fr, forment un seul sujet quelle que soit la source.
+- **Sujets WoS abandonnés.** Ils sont les seuls sujets de 558 publications (0,7 %), presque toutes présentes seulement dans le WoS : résumés de congrès, articles sans enregistrement OpenAlex.
 - **Couleurs.** Les domaines de haut niveau de tous les vocabulaires partagent une palette commune.
 - **Les 4 domains OpenAlex sont écartés des graphiques.**
 - **Pistes écartées** : seuil sur le score OpenAlex, co-occurrences rares entre topics feuille, seuil « au moins deux soutiens ».
@@ -132,12 +133,12 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 ### Phase 5 — Hiérarchie des sujets
 
-- [ ] Schéma du référentiel : vocabulaire, code, libellé, niveau, parent ; unicité sur (vocabulaire, code)
-- [ ] Schéma des sujets affichés et de leur lien aux sujets du référentiel
+- [ ] Schéma : `subjects` porte vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé
 - [ ] Normalizer OpenAlex : `extract_topics` conserve l'identifiant de chaque niveau
-- [ ] Stock OpenAlex : script ponctuel qui complète `source_records.topics` avec les identifiants lus dans le raw store
-- [ ] Extracteurs (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent ; domaines HAL par leur code, OpenAlex par ses identifiants, vedettes sudoc de ScanR par leur PPN, discipline et vedettes RAMEAU de theses.fr par leur libellé
-- [ ] Ingestion de la phase `subjects` : référentiel, sujets affichés et liens ; `--rebuild-subjects` sur le stock
+- [ ] Normalizer theses.fr : les vedettes RAMEAU gardent leur PPN
+- [ ] Stock OpenAlex et theses.fr : réhydratation depuis le raw store, puis normalisation
+- [ ] Extracteurs (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent ; domaines HAL par leur code, OpenAlex par ses identifiants, vedettes RAMEAU de ScanR et de theses.fr par leur PPN, discipline de theses.fr par son libellé ; extracteur WoS retiré
+- [ ] Ingestion de la phase `subjects` par (vocabulaire, code) ; reconstruction du stock
 - [ ] Rattachement des domaines de haut niveau de chaque vocabulaire à la palette commune : codes HAL, mots-clés des disciplines theses.fr (correspondances du prototype de vote)
 - [ ] Interface : couleur par domaine de haut niveau dans les graphiques de sujets ; domains OpenAlex écartés
 - [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`
@@ -158,7 +159,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 
 - **Stockage des rejets.** Le booléen `rejected` confond rejet automatique et rejet manuel. Un rejet manuel accroché à `publication_id` disparaît avec la publication. Quelle forme donner aux deux ?
 - **Édition manuelle des rejets** : dans ce chantier ou dans [la gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md) ?
-- **Sujets affichés** : forme de la déduplication (table ou vue), règle de fusion entre vocabulaires (libellé normalisé, équivalences entre français et anglais).
+- **Doublons à l'affichage** : une cinquantaine de libellés communs à deux vocabulaires (« Informatique », domaine HAL et discipline de thèse), et des homonymes internes à OpenAlex (« Biochemistry », subfield de deux fields). À regrouper à l'affichage s'ils gênent.
 - **Niveaux écartés des graphiques** au-delà des domains OpenAlex : fields, premier niveau HAL.
 - **Provenance des sujets ISTEX**, si les classifieurs donnent des sujets aux publications qui n'en ont pas : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
 - **Specter2** : variante du modèle (`allenai/specter2_base`, `proximity`, `classification`), exécution (locale sur CPU ou GPU, ou hébergée), persistance des vecteurs (pgvector ou fichier numpy). 74 600 publications à encoder.
