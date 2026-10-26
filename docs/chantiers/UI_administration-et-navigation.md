@@ -84,7 +84,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 #### 3e. Structures
 
-- [ ] Route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
+- [x] Route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
 - [ ] Liste unique sous `structures`, facette de type, création de structure selon le rôle ; suppression de `admin/structures` et de `laboratories`
 
 #### 3f. Personnes

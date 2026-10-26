@@ -143,12 +143,12 @@
 		{#each filtered as lab (lab.id)}
 			<tr>
 				<td class="acronym-cell">
-					<a href={resolve(`laboratories/${lab.id}`)} class="lab-link">
+					<a href={resolve(`structures/${lab.id}`)} class="lab-link">
 						<span class="lab-acronym">{lab.acronym}</span>
 					</a>
 				</td>
 				<td>
-					<a href={resolve(`laboratories/${lab.id}`)} class="lab-link">
+					<a href={resolve(`structures/${lab.id}`)} class="lab-link">
 						<span class="lab-name">{lab.name}</span>
 					</a>
 				</td>

@@ -73,7 +73,7 @@
 					<td>{p.country_name ?? p.country_code ?? ''}</td>
 					<td class="muted">{p.types.map((t) => typeLabels.get(t) ?? t).join(', ')}</td>
 					<td class="num">
-						<a href={resolve(`laboratories/${labId}?tab=publications&partner_ror=${p.ror_id}`)}>{p.publications.toLocaleString('fr-FR')}</a>
+						<a href={resolve(`structures/${labId}?tab=publications&partner_ror=${p.ror_id}`)}>{p.publications.toLocaleString('fr-FR')}</a>
 					</td>
 				</tr>
 			{/each}

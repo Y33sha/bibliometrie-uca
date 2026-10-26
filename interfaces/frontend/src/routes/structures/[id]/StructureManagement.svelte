@@ -1,20 +1,16 @@
 <script lang="ts">
-  import Breadcrumb from "#lib/components/Breadcrumb.svelte";
+  // Onglet « Gestion » de la fiche d'une structure, réservé à la session admin : identifiants, tutelles et formes de nom.
   import IconButton from "#lib/components/IconButton.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
   import { goto } from "$app/navigation";
-  import { page } from "$app/state";
   import { api, ApiError, nameForms, structures as structuresApi } from "#lib/api/index.js";
-  import { rorFullUrl, rorShortId } from "#lib/utils.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import {
     API_SOURCES,
     ROR_FORMAT_ERROR,
     SHORT_FORM_MAX_LENGTH,
     buildApiIds,
-    halCollectionUrl,
     normalizeRorId,
     type EditFormState,
     type NameForm,
@@ -29,9 +25,16 @@
 
   type StructureDeletionImpact = components["schemas"]["StructureDeletionImpact"];
 
-  /* ── State ── */
+  let {
+    id,
+    onupdated,
+  }: {
+    id: number;
+    /** Appelé après une modification de la structure, pour rafraîchir l'en-tête de la fiche. */
+    onupdated: () => void;
+  } = $props();
 
-  const id = $derived(parseInt(page.params.id ?? ""));
+  /* ── State ── */
 
   let allStructuresCache: Structure[] = $state([]);
   let detail = $state<StructureDetail | null>(null);
@@ -178,7 +181,7 @@
   }
 
   function selectRelatedStructure(otherId: number) {
-    goto(resolve(`admin/structures/${otherId}`));
+    goto(resolve(`structures/${otherId}?tab=management`));
   }
 
   /* ── Forms ── */
@@ -372,6 +375,7 @@
       editModalOpen = false;
       await loadDetail();
       refreshCache();
+      onupdated();
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
       toast("Erreur: " + msg, "error");
@@ -412,53 +416,19 @@
   });
 </script>
 
-<svelte:head>
-  <title>{pageTitle("Admin - Structure")}</title>
-</svelte:head>
-
-<Breadcrumb trail={[{ label: "Structures", path: "admin/structures" }]} current={detail?.structure.acronym || detail?.structure.name} />
-
 {#if !detail}
   <p class="loading">Chargement…</p>
 {:else}
   {@const s = detail.structure}
   <div>
-    <div class="detail-header">
+    <div class="management-header">
       <span class="structure-type structure-type-{s.type}">{s.type}</span>
-      <h2>
-        {#if s.acronym}<strong>{s.acronym}</strong> <span class="name-separator">·</span> {s.name}{:else}{s.name}{/if}
-      </h2>
+      <span class="detail-item">
+        <span class="field-label">Code</span>
+        <span>{s.code}</span>
+      </span>
       <IconButton icon="edit" label="Modifier la structure" onclick={openEditModal} />
       <IconButton icon="delete" label="Supprimer la structure" onclick={deleteStructure} />
-    </div>
-
-    <h3 class="section-title">Détails</h3>
-    <div class="details-inline">
-      {#if s.ror_id}
-        <span class="detail-item">
-          <span class="field-label">ROR</span>
-          <a href={rorFullUrl(s.ror_id)} target="_blank" rel="noopener" class="id-badge"
-            >{rorShortId(s.ror_id)}</a
-          >
-        </span>
-      {/if}
-      {#if s.rnsr_id}
-        <span class="detail-item">
-          <span class="field-label">RNSR</span>
-          <span>{s.rnsr_id}</span>
-        </span>
-      {/if}
-      {#if s.hal_collection}
-        <span class="detail-item">
-          <span class="field-label">Collection HAL</span>
-          <a
-            href={halCollectionUrl(s.hal_collection)}
-            target="_blank"
-            rel="noopener"
-            class="id-badge">{s.hal_collection}</a
-          >
-        </span>
-      {/if}
     </div>
     {#if s.api_ids && Object.keys(s.api_ids).length}
       <div class="api-ids-display">
@@ -544,10 +514,10 @@
     color: var(--muted);
   }
 
-  .details-inline {
+  .management-header {
     display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
+    align-items: center;
+    gap: 10px;
     margin-bottom: 8px;
     font-size: 0.9rem;
   }
@@ -555,33 +525,12 @@
     display: flex;
     align-items: center;
     gap: 5px;
+    margin-right: auto;
   }
   .field-label {
     color: var(--muted);
     font-weight: 500;
     font-size: 0.8rem;
-  }
-
-
-  .detail-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  .detail-header h2 {
-    flex: 1;
-    margin: 0;
-    font-size: 1.6rem;
-    font-weight: 500;
-    line-height: 1.25;
-    letter-spacing: -0.01em;
-  }
-  .detail-header h2 strong {
-    font-weight: 700;
-  }
-  .name-separator {
-    color: var(--muted);
   }
 
   .api-ids-display {

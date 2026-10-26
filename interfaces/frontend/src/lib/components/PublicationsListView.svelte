@@ -63,7 +63,7 @@
 	// Composant de liste de publications réutilisable. Utilisé par :
 	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de la publication)
 	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
-	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
+	// - `/structures/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `serial_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
@@ -679,7 +679,7 @@
 					</td>{/if}
 					{#if !hasFixedLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
-							<a href={resolve(`laboratories/${lab.id}`)} class="lab-tag">{lab.label}</a>
+							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>{/if}
 					{#if showCorrespondingColumn && col('corr')}<td class="corr-cell">

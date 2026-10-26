@@ -261,7 +261,7 @@
 								<tr>
 									<td>{#if t.author_person_id}<a href={resolve(`persons/${t.author_person_id}`)}>{titleCase(t.author_name)}</a>{:else}{t.author_name ? titleCase(t.author_name) : ''}{/if}</td>
 									<td><a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a></td>
-									<td>{#each t.structure_ids as sid}<a href={resolve(`laboratories/${sid}`)} class="structure-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
+									<td>{#each t.structure_ids as sid}<a href={resolve(`structures/${sid}`)} class="structure-tag">{thesesStructures[String(sid)]?.acronym || thesesStructures[String(sid)]?.name || `#${sid}`}</a>{/each}</td>
 									<td>{t.publication_year ?? ''}</td>
 								</tr>
 							{/each}

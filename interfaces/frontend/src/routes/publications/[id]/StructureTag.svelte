@@ -16,7 +16,7 @@
 </script>
 
 {#if structIsLabo(structures, sid)}
-  <a href={resolve(`laboratories/${sid}${tab ? `?tab=${tab}` : ''}`)} class="structure-tag"
+  <a href={resolve(`structures/${sid}${tab ? `?tab=${tab}` : ''}`)} class="structure-tag"
     >{structLabelById(structures, sid)}</a
   >
 {:else}

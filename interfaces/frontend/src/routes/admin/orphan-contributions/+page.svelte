@@ -317,7 +317,7 @@
 					</td>
 					<td>
 						{#each o.labs as lab (lab.id)}
-							<a href={resolve(`laboratories/${lab.id}`)} class="lab-tag">{lab.label}</a>
+							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>
 					<td>

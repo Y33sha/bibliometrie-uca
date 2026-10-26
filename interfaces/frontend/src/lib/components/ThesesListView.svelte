@@ -16,7 +16,7 @@
 
 	// Vue-liste des thèses réutilisable. Utilisée par :
 	// - `/theses` (mode autonome avec sync URL)
-	// - `/laboratories/[id]?tab=theses` (labo fixe via `labId`, sans sync URL)
+	// - `/structures/[id]?tab=theses` (labo fixe via `labId`, sans sync URL)
 	let {
 		apiKey = 'theses-list',
 		labId,

@@ -21,6 +21,8 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PartnersTab from './PartnersTab.svelte';
+	import StructureManagement from './StructureManagement.svelte';
+	import { isAdmin } from '#lib/session.svelte.js';
 
 	const labId = $derived(page.params.id);
 	// --- Types ---
@@ -37,7 +39,8 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', 'addresses'];
+	// L'onglet « Gestion » est réservé à la session admin.
+	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', 'addresses', ...(isAdmin() ? ['management'] : [])];
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
@@ -73,7 +76,7 @@
 
 	// `useUrlFilters` ne gère ici que les keys cross-onglets (tab, addresses). Les filtres publications/thèses/personnes sont gérés par leurs ListView.
 	const url = useUrlFilters({
-		basePath: () => `/laboratories/${labId}`,
+		basePath: () => `/structures/${labId}`,
 		filters: {
 			tab:              { type: 'single', urlKey: 'tab', defaultValue: 'dashboard' },
 			addrPage:         { type: 'page',   urlKey: 'apage' },
@@ -108,6 +111,21 @@
 		dashboardLoaded = true;
 	}
 
+	// En-tête de la fiche : la structure, ses tutelles et son nombre de thèses. Relu après une modification depuis l'onglet « Gestion ».
+	async function loadProfile(): Promise<boolean> {
+		try {
+			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
+			lab = profileData.structure;
+			parents = profileData.parents;
+			children = profileData.children;
+			thesesCount = profileData.theses_count;
+			return true;
+		} catch {
+			error = true;
+			return false;
+		}
+	}
+
 	function onTabSwitch(tab: string) {
 		// Les onglets "publications" et "theses" sont gérés par leurs ListView respectives, qui chargent leurs données dans leur propre onMount.
 		if (tab === 'dashboard') loadDashboard();
@@ -119,16 +137,7 @@
 		const restored = url.restoreFromUrl(page.url.searchParams);
 		if (restored.addrPage) addresses.page = restored.addrPage as number;
 
-		try {
-			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
-			lab = profileData.structure;
-			parents = profileData.parents;
-			children = profileData.children;
-			thesesCount = profileData.theses_count;
-		} catch {
-			error = true;
-			return;
-		}
+		if (!(await loadProfile())) return;
 		// Load data for the active tab (publications est auto-géré).
 		if (activeTab === 'dashboard') {
 			loadDashboard();
@@ -139,13 +148,13 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle(lab ? structureLabel(lab) : 'Laboratoire')}</title>
+	<title>{pageTitle(lab ? structureLabel(lab) : 'Structure')}</title>
 </svelte:head>
 
 <Breadcrumb trail={[{ label: 'Labos', path: 'laboratories' }]} current={lab?.acronym || lab?.name} />
 
 {#if error}
-	<div class="no-results">Laboratoire introuvable</div>
+	<div class="no-results">Structure introuvable</div>
 {:else if !lab}
 	<div class="loading">Chargement…</div>
 {:else}
@@ -197,6 +206,7 @@
 			{ id: 'persons', label: 'Personnes' },
 			{ id: 'collaborations', label: 'Collaborations' },
 			{ id: 'addresses', label: 'Adresses' },
+			...(isAdmin() ? [{ id: 'management', label: 'Gestion' }] : []),
 		]}
 		onswitch={onTabSwitch}
 		afterNavigate={syncUrl}
@@ -264,7 +274,7 @@
 					labLabel: structureLabel(lab),
 					halCollection: lab.hal_collection ?? undefined,
 				}}
-				basePath={`/laboratories/${labId}`}
+				basePath={`/structures/${labId}`}
 				showFilterBanner={false}
 				showHalStatusColumn
 				perPage={50}
@@ -327,6 +337,13 @@
 				</tbody>
 			</table>
 			<Pagination page={addresses.page} pages={addresses.pages} onchange={(p) => { addresses.page = p; syncUrl(); addresses.load(); }} />
+		</div>
+	{/if}
+
+	<!-- Tab: Gestion -->
+	{#if activeTab === 'management'}
+		<div class="tab-content">
+			<StructureManagement id={lab.id} onupdated={loadProfile} />
 		</div>
 	{/if}
 {/if}

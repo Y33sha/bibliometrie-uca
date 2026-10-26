@@ -13,10 +13,10 @@
     normalizeRorId,
     type StructureListItem,
     type Perimeter,
-  } from "./types";
+  } from "../../structures/types";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
   import { compareStructureLabels } from "#lib/structureLabels.js";
-  import StructureFormModal from "./StructureFormModal.svelte";
+  import StructureFormModal from "../../structures/StructureFormModal.svelte";
 
   let structures: StructureListItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);
@@ -102,7 +102,7 @@
     try {
       const created = (await structuresApi.create(data)) as { id: number };
       createModalOpen = false;
-      goto(resolve(`admin/structures/${created.id}`));
+      goto(resolve(`structures/${created.id}?tab=management`));
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
       toast("Erreur: " + msg, "error");
@@ -148,7 +148,7 @@
       <a
         class="struct-item"
         class:orphan={s.perimeter_ids.length === 0}
-        href={resolve(`admin/structures/${s.id}`)}
+        href={resolve(`structures/${s.id}?tab=management`)}
       >
         <span class="structure-type structure-type-{s.type}">{s.type}</span>
         <span class="name">

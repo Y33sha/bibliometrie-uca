@@ -16,7 +16,7 @@
 
 	// Vue-liste des personnes réutilisable. Utilisée par :
 	// - `/persons` (annuaire autonome avec sync URL)
-	// - `/laboratories/[id]?tab=persons` (labo fixe via `labId`, sans sync URL)
+	// - `/structures/[id]?tab=persons` (labo fixe via `labId`, sans sync URL)
 	let {
 		apiKey = 'persons-dir',
 		labId,

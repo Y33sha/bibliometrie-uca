@@ -1,5 +1,5 @@
 /**
- * Types et helpers partagés par la page `admin/structures` et ses sous-composants.
+ * Types et helpers partagés par la liste des structures, l'onglet « Gestion » de leur fiche et ses sous-composants.
  *
  * Les types de réponses API proviennent du schéma OpenAPI généré (`#lib/api/schema.ts`) ; seuls les états d'UI locaux et helpers restent ici.
  */
