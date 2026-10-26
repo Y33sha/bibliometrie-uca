@@ -138,9 +138,6 @@
 - 2026-05-23 — [Documentation HTML précompilée avec sommaire scrollable](archived/2026-05-23_CODE_doc-statique-prerender.md)
 - 2026-05-21 — [Parallélisation des extractions HTTP pipeline](archived/2026-05-21_CODE_async-extractions-http.md)
 - 2026-05-21 — [Repositories → use cases (orchestration en application)](archived/2026-05-21_CODE_repositories-vers-use-cases.md)
-- 2026-05-18 — [Couverture de tests : viser 80 %](archived/2026-05-18_CODE_couverture-tests.md)
-- 2026-05-18 — [Typage strict des projections et DTOs](archived/2026-05-18_CODE_typage-projections-strict.md)
-- 2026-05-17 — [Audit « DSI qui reprend le projet »](archived/2026-05-17_CODE_audit-cto.md)
 
 
 
