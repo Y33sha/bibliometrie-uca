@@ -3,13 +3,14 @@
 from sqlalchemy import Connection, text
 
 from domain.platforms.registry import HAL
-from domain.publications.access import Access, Copy, access
+from domain.publications.access import Access, access, access_url
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
+from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
     ConsolidatedContributionOut,
@@ -110,39 +111,6 @@ _DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
 _SOURCE_PLATFORMS: dict[str, str] = {Source.HAL: HAL.name}
 
 
-def get_publication_copies(conn: Connection, publication_id: int) -> list[Copy]:
-    """Localisations des enregistrements sources de la publication, hors formes secondaires. La copie qu'un enregistrement HAL donne de HAL est décrite par sa plateforme."""
-    rows = conn.execute(
-        text(f"""
-            SELECT l.url, l.version, l.is_oa, pl.name AS platform, pl.openalex_id AS platform_openalex_id,
-                   (sr.source = 'hal' AND pl.openalex_id = ANY(:hal_ids)) AS described_by_platform,
-                   sr.id AS arrival
-            FROM source_record_locations l
-            JOIN source_records sr ON sr.id = l.source_record_id
-            LEFT JOIN platforms pl ON pl.id = l.platform_id
-            WHERE sr.publication_id = :pid
-              AND NOT COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
-        """),
-        {
-            "pid": publication_id,
-            "hal_ids": list(HAL.openalex_ids),
-            "convergence_cases": list(CONVERGENCE_CASES),
-        },
-    ).all()
-    return [
-        Copy(
-            url=r.url,
-            version=r.version,
-            is_oa=r.is_oa,
-            platform=r.platform,
-            platform_openalex_id=r.platform_openalex_id,
-            described_by_platform=r.described_by_platform,
-            arrival=r.arrival,
-        )
-        for r in rows
-    ]
-
-
 def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[SourceRecordOut]:
     """Sources qui référencent la publication sans en donner de copie : une source dont la plateforme figure parmi les liens d'accès en est retirée."""
     platforms = {link.label for link in access.links}
@@ -213,6 +181,7 @@ class PublicationDetailQueries:
                 SELECT p.id, p.title, p.publication_year, p.doi, p.doc_type::text AS doc_type,
                        p.oa_status::text AS oa_status,
                        p.license::text AS license, p.deposit_license::text AS deposit_license,
+                       p.best_copy_url,
                        p.language, p.container_title, d.abstract, d.keywords,
                        j.id AS serial_id, j.title AS journal_title,
                        CASE WHEN j.id IS NOT NULL THEN {active_issns("j.id")} END AS serial_issns,
@@ -356,7 +325,8 @@ class PublicationDetailQueries:
         relations = get_publication_relations(self._conn, publication_id)
         external_identifiers = get_publication_external_identifiers(self._conn, publication_id)
         publication_access = access(
-            get_publication_copies(self._conn, publication_id), doi=publication_row.doi
+            publication_copies(self._conn, [publication_id]).get(publication_id, []),
+            doi=publication_row.doi,
         )
 
         structures = structures_by_id(
@@ -394,7 +364,11 @@ class PublicationDetailQueries:
             subjects=subjects,
             keywords=keywords,
             relations=relations,
-            access_url=publication_access.url,
+            access_url=access_url(
+                publication_row.best_copy_url,
+                oa_status=publication_row.oa_status,
+                doi=publication_row.doi,
+            ),
             access=[
                 AccessLinkOut(label=a.label, url=a.url, known=a.known)
                 for a in publication_access.links

@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import text
 
 from domain.normalize import normalize_text
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from pipeline.transformation.publications.consolidation import RefreshVerdict, refresh_from_sources
 from pipeline.transformation.publications.lifecycle import refresh
 from pipeline.transformation.publications.store import PublicationStore
@@ -209,6 +210,27 @@ class TestRefreshFromSources:
 
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "gold"
+
+    def test_la_meilleure_copie_ouverte_des_sources(self, sa_sync_conn):
+        """La copie de la version éditeur l'emporte sur un dépôt, quelle que soit sa source ; une copie fermée est écartée."""
+        id1 = _insert_publication(sa_sync_conn)
+        store = LocationStore(sa_sync_conn)
+        hal = _source_record(sa_sync_conn, id1, source="hal", source_id=f"hal-{id1}")
+        store.replace_locations(
+            hal, [LocationFacts("https://hal.science/hal-1", version="acceptedVersion", is_oa=True)]
+        )
+        openalex = _source_record(sa_sync_conn, id1, source="openalex", source_id=f"W{id1}")
+        store.replace_locations(
+            openalex,
+            [
+                LocationFacts("https://closed.org/1", version="publishedVersion", is_oa=False),
+                LocationFacts("https://open.org/1", version="publishedVersion", is_oa=True),
+            ],
+        )
+        refresh_from_sources(sa_sync_conn, id1)
+
+        url = _scalar(sa_sync_conn, "SELECT best_copy_url FROM publications WHERE id = :id", id=id1)
+        assert url == "https://open.org/1"
 
     def test_source_priority_hal_over_openalex(self, sa_sync_conn):
         """HAL est prioritaire sur OpenAlex pour les champs scalaires."""

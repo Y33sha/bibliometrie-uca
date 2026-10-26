@@ -855,6 +855,10 @@ TASKS: tuple[Task, ...] = (
             "source_records",
             "source_record_keys_queue",
             "source_contributions.in_perimeter",
+            # Copies des enregistrements sources, dont la publication retient la meilleure.
+            "source_record_locations",
+            "platforms.name",
+            "platforms.openalex_id",
             "publications",
             "apc_payments",
             "serials.serial_type",

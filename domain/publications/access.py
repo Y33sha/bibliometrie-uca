@@ -5,6 +5,8 @@ Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), pui
 Une plateforme du registre (`domain.platforms.registry`) se reconnaît par sa source OpenAlex et porte le nom du registre. Une autre plateforme porte le nom que lui donne la source.
 
 Seule une copie à adresse `http` ou `https` compte : l'adresse vient des sources, et alimente un lien. La meilleure copie est l'adresse d'accès. Une copie désignée par le DOI de la publication peut l'être, mais ne figure pas parmi les liens : le DOI est affiché à part. Une copie désignée par un autre DOI figure parmi les liens seulement si une plateforme l'héberge.
+
+Le lien d'accès affiché (`access_url`) mène à la meilleure copie, à défaut à la page du DOI d'une publication ouverte.
 """
 
 from collections.abc import Iterable
@@ -12,6 +14,7 @@ from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
 from domain.platforms.registry import KnownPlatform, known_platform_of_source
+from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
 _WEB_SCHEMES = frozenset({"http", "https"})
@@ -103,3 +106,14 @@ def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
             for label, copy in best.items()
         ],
     )
+
+
+def access_url(best_copy_url: str | None, *, oa_status: str | None, doi: str | None) -> str | None:
+    """Lien d'accès d'une publication. Une publication fermée ou sous embargo n'en a pas."""
+    if oa_status in (OaStatus.CLOSED, OaStatus.EMBARGOED):
+        return None
+    if best_copy_url:
+        return best_copy_url
+    if oa_status in OA_OPEN_STATUSES and doi:
+        return f"https://doi.org/{doi}"
+    return None

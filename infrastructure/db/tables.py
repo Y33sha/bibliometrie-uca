@@ -1134,6 +1134,11 @@ publications = Table(
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
     Column("license", license_type_enum),
     Column("deposit_license", license_type_enum),
+    Column(
+        "best_copy_url",
+        Text,
+        comment="Adresse de la meilleure copie ouverte, parmi les localisations des enregistrements sources.",
+    ),
     Column("serial_id", Integer),
     Column("monograph_id", Integer),
     Column(

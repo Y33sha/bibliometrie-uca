@@ -349,7 +349,7 @@ class PublicationDetailResponse(BaseModel):
     keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
     relations: list[RelatedPublicationOut]
     access_url: str | None
-    """Adresse de la meilleure copie ouverte."""
+    """Lien d'accès (`domain.publications.access.access_url`)."""
     access: list[AccessLinkOut]
     """Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI."""
     referenced_by: list[SourceRecordOut]
