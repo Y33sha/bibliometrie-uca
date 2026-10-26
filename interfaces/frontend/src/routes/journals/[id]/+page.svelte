@@ -58,6 +58,7 @@
 	let showRawDoaj = $state(false);
 
 	let serialTypeLabels: Record<string, string> = $state({});
+	let oaModelLabels: Record<string, string> = $state({});
 
 	// Sélection des champs DOAJ « lisibles ». Le payload complet est exposé via le toggle (« Voir payload brut ») pour permettre l'exploration au-delà de cette sélection.
 	const READABLE_DOAJ_FIELDS: { key: string; label: string }[] = [
@@ -98,10 +99,14 @@
 	}
 
 	onMount(async () => {
-		const labelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
-			serialTypeLabels = Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+		const labelMap = (opts: EnumOption[]) => Object.fromEntries(opts.map((o) => [o.value, o.label_fr]));
+		const typeLabelsP = api<EnumOption[]>('/api/serials/types').then((opts) => {
+			serialTypeLabels = labelMap(opts);
 		});
-		await Promise.all([loadSerial(), labelsP]);
+		const oaModelLabelsP = api<EnumOption[]>('/api/serials/oa-models').then((opts) => {
+			oaModelLabels = labelMap(opts);
+		});
+		await Promise.all([loadSerial(), typeLabelsP, oaModelLabelsP]);
 		if (activeTab === 'dashboard') loadDashboard();
 		await tick();
 	});
@@ -156,7 +161,7 @@
 			{/if}
 			{#if journal.oa_model}
 				<span class="entity-meta-label">OA</span>
-				<span class="entity-tag">{journal.oa_model}</span>
+				<span class="entity-tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
 			{/if}
 		</div>
 	</div>
