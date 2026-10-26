@@ -163,8 +163,8 @@ def create_tutelle(
         ancestors_of_parent=repo.get_ancestor_ids(parent_id),
     )
     row = repo.create_tutelle(parent_id=parent_id, child_id=child_id)
-    perimeter_structures.refresh()
     if row is not None:
+        perimeter_structures.refresh()
         # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le porte.
         emit_event(
             "structure_relation.created",

@@ -42,10 +42,10 @@ Une écriture de l'API est une fonction de `application/services/`, sans commit 
 
 ### Phase 1 — Ports de recalcul liés à la connexion
 
-- [ ] Ports de `application/ports/pipeline/` sans paramètre `conn`
-- [ ] Adaptateurs exposés par `pipeline/public.py` construits sur une connexion. Seuls l'API et les scripts les instancient ; le pipeline appelle les fonctions qu'ils enveloppent
-- [ ] Fabriques de `deps.py` sur `DbConn` ; tâches de fond sur leur propre connexion
-- [ ] `conn` retiré des services et des routes, sauf l'aperçu du changement de type de revue (savepoint)
+- [x] Ports de `application/ports/pipeline/` sans paramètre `conn` (`2ec48058f`)
+- [x] Adaptateurs exposés par `pipeline/public.py` construits sur une connexion. Seuls l'API et les scripts les instancient ; le pipeline appelle les fonctions qu'ils enveloppent
+- [x] Fabriques de `deps.py` sur `DbConn` ; tâches de fond sur leur propre connexion
+- [x] `conn` retiré des services et des routes, sauf l'aperçu du changement de type de revue (savepoint)
 
 ### Phase 2 — Retouches sans décision de fond
 

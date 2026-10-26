@@ -30,16 +30,15 @@ def set_country(
     *,
     repo: AddressRepository,
     country_recompute: CountryRecompute,
-) -> list[int]:
+) -> None:
     """Saisit à la main les pays d'une adresse, puis résout l'adresse. `countries=None` ou `[]` rend l'adresse aux moyens automatiques.
 
-    Retourne `[address_id]`. Lève `ValidationError` sur un code absent du référentiel, `NotFoundError` sur une adresse introuvable.
+    Lève `ValidationError` sur un code absent du référentiel, `NotFoundError` sur une adresse introuvable.
     """
     _require_known_countries(countries or [], repo=repo)
     repo.set_manual_countries(address_id, countries)
     country_recompute.resolve_address_countries([address_id])
     emit_event("address.country_set", "address", address_id, {"countries": countries or []})
-    return [address_id]
 
 
 def batch_set_country(

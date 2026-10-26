@@ -49,8 +49,10 @@ from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.serial_repository import SerialRepository
 from application.ports.repositories.structure_repository import StructureRepository
-from application.services.addresses import countries as countries_service
-from application.services.contributions.core import propagate_in_perimeter_for_addresses
+from application.services.addresses import (
+    countries as countries_service,
+    structure_links as structure_links_service,
+)
 from domain.merge import MergedEntity
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.read_models.addresses import PgAddressesQueries
@@ -355,7 +357,7 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
     """
     _run_detached(
         "propagation d'in_perimeter",
-        lambda conn: propagate_in_perimeter_for_addresses(
+        lambda conn: structure_links_service.propagate_in_perimeter_for_addresses(
             address_ids,
             repo=contribution_repository(conn),
             perimeter_structures=PerimeterStructures(conn),

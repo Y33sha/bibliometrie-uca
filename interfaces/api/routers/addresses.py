@@ -259,11 +259,11 @@ def set_address_country(
 
     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
-    affected = countries_service.set_country(
+    countries_service.set_country(
         addr_id,
         body.countries,
         repo=addr_repo,
         country_recompute=recompute,
     )
-    bg.add_task(bg_propagate_countries, affected)
+    bg.add_task(bg_propagate_countries, [addr_id])
     return OkResponse()

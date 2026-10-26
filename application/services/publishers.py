@@ -13,7 +13,7 @@ from application.ports.repositories.publisher_repository import (
     PublisherUpdate,
 )
 from application.ports.repositories.serial_repository import SerialRepository
-from application.services._merge import load_merge_pair
+from application.services._merge import check_merge_pair
 from application.services.serials import merge_serials
 from domain.errors import (
     ConflictError,
@@ -69,7 +69,7 @@ def merge_publishers(
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur un éditeur introuvable.
     """
-    load_merge_pair(target_id, source_id, publisher_repo.find_by_id, label="Éditeur")
+    check_merge_pair(target_id, source_id, publisher_repo.find_by_id, label="Éditeur")
 
     # 1. Deux membres Crossref distincts désignent deux éditeurs : la fusion s'arrête là.
     if conflict := crossref_member_conflict(

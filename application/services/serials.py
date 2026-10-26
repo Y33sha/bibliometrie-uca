@@ -12,7 +12,7 @@ from sqlalchemy import Connection
 from application.audit_log import discarded_events, emit_event
 from application.ports.pipeline.serial_recompute import SerialRecompute
 from application.ports.repositories.serial_repository import SerialRepository, SerialUpdate
-from application.services._merge import load_merge_pair
+from application.services._merge import check_merge_pair
 from domain.errors import NotFoundError, ValidationError
 from domain.serials.issns import SerialIssn
 from domain.serials.serial import ManualField, SerialEdit, SerialType
@@ -107,7 +107,7 @@ def merge_serials(
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur une revue introuvable.
     """
-    load_merge_pair(target_id, source_id, repo.find_by_id, label="Revue")
+    check_merge_pair(target_id, source_id, repo.find_by_id, label="Revue")
     recompute.merge_serials(target_id, source_id)
     emit_event("serial.merged", "serial", target_id, {"source_id": source_id})
 

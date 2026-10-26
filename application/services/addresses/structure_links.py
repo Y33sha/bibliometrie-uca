@@ -1,10 +1,15 @@
 """Validation manuelle des rattachements adresse ↔ structure (table `address_structures`) : confirmer, rejeter ou réinitialiser une détection de la phase `affiliations`.
 
-Ces opérations écrivent le lien et **retournent les adresses dont la contribution au calcul `in_perimeter` a changé**. La propagation (`propagate_in_perimeter_for_addresses`, potentiellement massive — jusqu'à des dizaines de milliers de source_contributions) est lancée en tâche de fond par l'appelant (`bg_propagate_in_perimeter`), jamais synchrone dans la requête.
+Ces opérations écrivent le lien et rendent les adresses dont la contribution au calcul `in_perimeter` a changé. Leur propagation (`propagate_in_perimeter_for_addresses`) peut toucher des dizaines de milliers de contributions sources : l'appelant la lance en tâche de fond.
 """
 
 from application.audit_log import emit_event
+from application.ports.pipeline.perimeter_structures import PerimeterStructures
+from application.ports.pipeline.source_contribution_perimeter import (
+    SourceContributionPerimeterRecompute,
+)
 from application.ports.repositories.address_repository import AddressRepository
+from application.ports.repositories.contribution_repository import ContributionRepository
 
 
 def review_structure_link(
@@ -76,3 +81,25 @@ def batch_review_structure_link(
         },
     )
     return updated, list(before ^ after)
+
+
+def propagate_in_perimeter_for_addresses(
+    address_ids: list[int],
+    *,
+    repo: ContributionRepository,
+    perimeter_structures: PerimeterStructures,
+    perimeter_recompute: SourceContributionPerimeterRecompute,
+) -> None:
+    """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs groupes et de leurs publications."""
+    if not address_ids:
+        return
+
+    perimeter_ids = perimeter_structures.persons_structure_ids()
+    if not perimeter_ids:
+        return
+
+    affected_source_contribution_ids = repo.find_source_contributions_by_addresses(address_ids)
+    if not affected_source_contribution_ids:
+        return
+
+    perimeter_recompute.recompute_perimeter(affected_source_contribution_ids, perimeter_ids)

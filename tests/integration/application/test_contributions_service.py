@@ -9,15 +9,12 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
+from application.services.addresses.structure_links import propagate_in_perimeter_for_addresses
 from application.services.contributions.assign_orphans import (
     assign_orphan_contribution,
     batch_assign_orphan_contributions,
 )
-from application.services.contributions.core import (
-    exclude_contribution,
-    propagate_in_perimeter_for_addresses,
-    reject_pair,
-)
+from application.services.contributions.core import exclude_contribution, reject_pair
 from domain.errors import NotFoundError
 from infrastructure.repositories import contribution_repository, person_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS

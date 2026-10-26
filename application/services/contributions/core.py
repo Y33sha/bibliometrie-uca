@@ -1,16 +1,12 @@
 """Service Contributions — écritures sur l'agrégat Contribution.
 
-Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`). Les opérations servent des actions utilisateur : rejeter une contribution, propager un changement de périmètre. Elles traitent une paire ou une contribution source à la fois.
+Couvre les contributions (`contributions`) et les contributions sources (`source_contributions`). Les opérations rejettent une contribution, une paire (publication, personne) à la fois.
 
 La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les groupes et la phase `persons` les rattache aux personnes.
 """
 
 from application.audit_log import emit_event
-from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
-from application.ports.pipeline.source_contribution_perimeter import (
-    SourceContributionPerimeterRecompute,
-)
 from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.person_repository import PersonRepository
 from domain.errors import NotFoundError
@@ -71,28 +67,3 @@ def exclude_contribution(
         perimeter_recompute=perimeter_recompute,
     )
     person_repo.delete_orphan_name_forms_for_person(person_id)
-
-
-def propagate_in_perimeter_for_addresses(
-    address_ids: list[int],
-    *,
-    repo: ContributionRepository,
-    perimeter_structures: PerimeterStructures,
-    perimeter_recompute: SourceContributionPerimeterRecompute,
-) -> None:
-    """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs groupes et de leurs publications.
-
-    Appelé en tâche de fond après chaque review/assign/unassign d'adresse.
-    """
-    if not address_ids:
-        return
-
-    perimeter_ids = perimeter_structures.persons_structure_ids()
-    if not perimeter_ids:
-        return
-
-    affected_source_contribution_ids = repo.find_source_contributions_by_addresses(address_ids)
-    if not affected_source_contribution_ids:
-        return
-
-    perimeter_recompute.recompute_perimeter(affected_source_contribution_ids, perimeter_ids)

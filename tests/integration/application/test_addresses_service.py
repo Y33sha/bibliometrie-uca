@@ -187,10 +187,7 @@ class TestSetCountry:
     def test_assigns_countries(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        affected = set_country(
-            addr, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
-        )
-        assert affected == [addr]
+        set_country(addr, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
     def test_manual_country_wins_over_automatic_candidates(self, sa_sync_conn, repo):

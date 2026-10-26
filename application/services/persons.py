@@ -3,7 +3,6 @@
 Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`contributions`). Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
 
-import logging
 from typing import NamedTuple, TypedDict
 
 from application.audit_log import emit_event
@@ -13,7 +12,7 @@ from application.ports.repositories.person_repository import (
     NameFormStatusRow,
     PersonRepository,
 )
-from application.services._merge import load_merge_pair
+from application.services._merge import check_merge_pair
 from application.services.contributions.core import reject_pair
 from domain.errors import NotFoundError, ValidationError
 from domain.persons.identifier_attribution import (
@@ -28,8 +27,6 @@ from domain.persons.identifiers import (
 from domain.persons.merge import merge_roles
 from domain.persons.person import PersonExclusion
 from domain.sources.registry import require_known_source
-
-logger = logging.getLogger(__name__)
 
 
 class ContributionRef(TypedDict):
@@ -145,14 +142,12 @@ class IdentifierStatusResult(NamedTuple):
 
 
 # Statuts qu'une décision sur un identifiant étend aux identifiants de ses comptes HAL.
-_PROPAGATED_STATUSES = frozenset(
-    {AttributionStatus.CONFIRMED.value, AttributionStatus.REJECTED.value}
-)
+_PROPAGATED_STATUSES = frozenset({AttributionStatus.CONFIRMED, AttributionStatus.REJECTED})
 
 
 def update_identifier_status(
     ident_id: int,
-    status: str,
+    status: AttributionStatus,
     *,
     repo: PersonRepository,
 ) -> IdentifierStatusResult:
@@ -166,7 +161,7 @@ def update_identifier_status(
         if status in _PROPAGATED_STATUSES
         else 0
     )
-    if status == AttributionStatus.REJECTED.value:
+    if status == AttributionStatus.REJECTED:
         repo.mark_groups_of_rejected_identifiers(row["person_id"])
     emit_event(
         "person_identifier.status_changed",
@@ -183,7 +178,7 @@ def update_identifier_status(
 def update_name_form_status(
     person_id: int,
     name_form: str,
-    status: str,
+    status: AttributionStatus,
     *,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
@@ -195,7 +190,7 @@ def update_name_form_status(
     Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
     """
     row = repo.update_name_form_status(person_id, name_form, status)
-    if status == "rejected":
+    if status == AttributionStatus.REJECTED:
         contribution_repo.mark_groups_for_name_form(person_id, name_form)
     emit_event(
         "person_name_form.status_changed",
@@ -283,7 +278,7 @@ def merge_person(
 
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si les deux ont une fiche RH. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
     """
-    load_merge_pair(target_id, source_id, repo.find_by_id, label="Personne")
+    check_merge_pair(target_id, source_id, repo.find_by_id, label="Personne")
     target_id, source_id = merge_roles(
         target_id, source_id, with_rh=repo.ids_with_rh([target_id, source_id])
     )
