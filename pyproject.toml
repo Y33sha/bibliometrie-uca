@@ -64,8 +64,8 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipelin
 # ----------------------------------------------------------------------
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
-# `scripts/` outille le dépôt sans être distribué : ses imports relèvent de l'environnement de
-# développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
+# `scripts/` et les hooks de `.claude/` outillent le dépôt sans être distribués : leurs imports
+# relèvent de l'environnement de développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
 # hors du dépôt. L'estimation des poids du modèle des groupes d'auteurs tourne sur le poste de
 # développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement.
 extend_exclude = [
@@ -73,6 +73,7 @@ extend_exclude = [
     ".venv",
     "venv",
     "scripts",
+    ".claude",
     "data",
     "interfaces/cli/dev/estimate_residual_weights.py",
 ]
