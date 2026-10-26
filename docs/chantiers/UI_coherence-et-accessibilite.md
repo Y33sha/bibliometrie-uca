@@ -57,7 +57,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 - Sous-menus de navigation (Référentiels, Problèmes HAL, Administration, compte) ouverts par `:hover` seulement. Entrée sur le bouton laisse le menu fermé. Boutons sans `aria-expanded` ni `aria-haspopup`.
 - Aucun `<main>`. `role="navigation"` sur les `div` des sous-menus, à l'intérieur du `<nav>` : repères en double.
-- Aucun lien d'évitement. Sur les publications, le focus initial dans la recherche fait sauter la navigation.
+- Aucun lien d'évitement. Le focus initial de chaque liste est dans la recherche, après la navigation.
 - Le nom du site est un H1 : chaque page a deux H1. Sur les fiches, les titres de section passent de H1 à H3.
 - Contrastes sous 4,5:1 :
 
@@ -108,7 +108,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - **Aucun défilement horizontal de la page**, à toutes les largeurs. Un tableau trop large défile dans son conteneur, avec un indice visuel au bord.
 - **Navigation SvelteKit** : `goto(url, { replace: true })`, à la place de `replaceState`.
 - **Sous-menus de navigation** ouverts au clic, au clavier et au survol ; fermés par Échap et par un clic extérieur.
-- **Structure de page** : un `<main>`, un lien d'évitement, un seul H1 par page (le nom du site sort des titres), titres de section en H2 sur les fiches.
+- **Structure de page** : un `<main>`, un lien d'évitement, un seul H1 par page, titres de section en H2 sur les fiches. Le nom du site est hors des titres. Le H1 des listes est réservé aux lecteurs d'écran.
 - **Contraste de 4,5:1 au minimum** pour tout texte, navigation comprise.
 - **Nombres au format français** : séparateur de milliers, virgule décimale, espace avant « % ».
 - **Un style d'encart par niveau** : information, avertissement.
@@ -120,7 +120,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 1. Navigation et structure de page
 
 - [ ] Sous-menus au clic et au clavier, `aria-expanded`, fermeture par Échap et clic extérieur ; suppression des `role="navigation"` internes
-- [ ] `<main>`, lien d'évitement, nom du site hors des titres
+- [ ] `<main>`, lien d'évitement, nom du site hors des titres, H1 des listes réservé aux lecteurs d'écran
 - [ ] Contraste des liens de navigation, du lien actif et du lien « Connexion »
 
 ### 2. API de navigation SvelteKit
@@ -180,8 +180,11 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [ ] Fil d'Ariane et ligne revue / éditeur de la fiche publication
 - [ ] Libellé « Tutelles » solidaire de ses valeurs ; compteurs d'Affiliations
 
+### 10. Audit final
+
+- [ ] Audit axe-core des pages publiques et d'administration
+
 ## Questions ouvertes
 
-- **Titre des listes.** Les listes s'ouvrent sur la barre d'outils. Le RGAA (critère 9.1) exige une hiérarchie de titres pertinente, sans imposer de H1. Pistes : aucun titre, ou un H1 réservé aux lecteurs d'écran.
-- **Focus initial dans la recherche** des publications : le garder avec le lien d'évitement, ou le retirer.
+- **Focus initial dans la recherche des listes.** Il permet de saisir une recherche dès l'ouverture. Il place le clavier après la navigation. Le lecteur d'écran commence à la recherche, sans annoncer le titre de la page.
 - **Dashboards d'éditeur et de publication en série** sans chiffres clés : à traiter avec le [contenu des dashboards](METIER_dashboards.md).
