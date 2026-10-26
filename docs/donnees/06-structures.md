@@ -1,70 +1,55 @@
-# Schéma `structures`
+# Structures, périmètres et adresses
 
-*À jour le 2026-10-12.*
+*À jour le 2026-10-26.*
 
-Référentiel de structures maintenu manuellement, périmètres et adresses.
+Une structure est un établissement, une composante, un laboratoire, une équipe ou un partenaire. Les structures forment un référentiel saisi à la main. Un périmètre est un ensemble de structures, désigné par ses racines. Une adresse est le texte d'affiliation qu'une source donne pour une contribution source. Le pipeline reconnaît des structures dans les adresses, et en déduit l'appartenance des contributions sources au périmètre.
 
-Colonnes notables de `structures` :
+Schéma PostgreSQL `structures`.
 
-- `code` : identifiant court stable (`uca`, `cnrs`, `lpc`, `ip`)
-- `structure_type` : `universite`, `onr`, `chu`, `ecole`, `labo`, `equipe`, `site`, `admin`, `autre`
-- `ror_id` : identifiant [ROR](../glossaire.md#ror)
-- `rnsr_id` : identifiant RNSR
-- `hal_collection` : collection HAL associée
-- `api_ids` : identifiants dans les sources API (OpenAlex, etc.)
+## Structures
 
-```mermaid
-flowchart LR
-    structure_name_forms --- structures
-    structure_parents --- structures
-    perimeters---structures
-    structures --- contributions
-    contributions --- publications
-    contributions --- persons
-    structures ---|labo, financeur| apc_payments
-    apc_payments ---|DOI| publications
-    structures --- address_structures
-    address_structures --- addresses
-
-    classDef manuel  fill:#8e5,stroke:#5a3
-    class structures,structure_name_forms,perimeters,structure_parents manuel;
-    classDef csv fill:#fa5
-    class apc_payments csv
-    classDef auto fill:#adf,stroke:#58c
-    class address_structures,addresses,contributions,persons,publications auto
-    classDef main stroke-width:4px,font-weight:bold
-    class structures,publications,persons,contributions main
-```
-
-Légende :
-- **vert** : tables peuplées manuellement
-- **orange** : imports CSV
-- **bleu** : tables peuplées automatiquement par le pipeline à partir des imports API
-
-## Tables associées
-
-- **`perimeters`** : un périmètre est un ensemble de structures, incluant récursivement les sous-structures. Les périmètres se saisissent en admin, et le pipeline lit dans `config` celui qui vaut à chaque étape. Un périmètre décide :
-  - des critères d'affiliation utilisés en paramètre des requêtes API lors du moissonnage ;
-  - des `source_contributions` qui fournissent les candidats à la résolution des `publications` et des `persons`.
-- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive des tutelles. Cf. [données dérivées](09-donnees-derivees.md).
-- **`structure_parents`** : tutelles, rattachement hiérarchique d'une structure à une autre. C'est la seule relation entre structures du modèle, et sa clôture récursive décide des **structures incluses ou non dans un périmètre**. Le graphe reste sans cycle : une structure ne peut se rattacher à elle-même ni à l'un de ses descendants.
-- **`structure_name_forms`** : formes de noms pour la détection automatique des structures dans les adresses liées aux publications. Le champ `requires_context_of` (= liste d'id structures) permet de rendre une forme de nom *conditionnellement* valide. Cette table est utilisée dans la phase `affiliations` du [pipeline](../pipeline/04-affiliations.md) pour peupler la table de liaison `address_structures`.
-- **`address_structures`** : table de liaison. Les adresses proviennent des contributions sources (peuplées via `source_contribution_addresses` lors de la phase `normalize`, exploitées lors de la phase `affiliations`). Les structures identifiées sont ensuite propagées aux contributions sources.
-
-## Pages admin associées
-
-- [**admin/structures**](../guide-utilisateur/02-pages-admin.md#structures) : CRUD des structures, de leurs tutelles et de leurs formes de nom.
-- [**admin/config**](../guide-utilisateur/02-pages-admin.md#configuration) : CRUD des périmètres et choix du périmètre actif aux différentes étapes du pipeline.
-
-## Propriété des tables
-
-| Table | Auteur | Écrit par |
+| Table | Contenu | Contrainte |
 |---|---|---|
-| `structures` | admin | `application/services/structures.py` |
-| `structure_parents` | admin | `application/services/structures.py` |
-| `structure_name_forms` | admin | `application/services/structures.py` |
-| `perimeters` | admin | `application/services/perimeters.py` |
-| `perimeter_structures` | pipeline | `refresh_perimeter_structures`, jamais saisie |
-| `addresses` | pipeline | créées par `normalize` (`pipeline/ingestion/common/source_contributions.py`) ; `countries` composé par la phase `countries` |
-| `address_country_candidates` | mixte | pays trouvés par le pipeline (phases `normalize` et `countries`) ; candidats `manual` saisis en admin (`addresses/commands.py`) |
-| `address_structures` | mixte | liens posés par le pipeline (`pipeline/transformation/structures/address_resolution.py`) ; colonne `is_confirmed` posée en admin (`addresses/commands.py`) |
+| `structures` | Code court (`uca`, `cnrs`), nom, acronyme, type, identifiants [ROR](../glossaire.md#ror) et RNSR, collection HAL, identifiants dans les sources (`api_ids`) | Code unique, ROR unique |
+| `structure_parents` | Tutelle : rattachement d'une structure à une structure parente | Le graphe des tutelles est sans cycle |
+| `structure_name_forms` | Formes de nom qui désignent la structure dans une adresse | Une forme de six caractères ou moins exige une frontière de mot |
+| `idref_structures` | Structure d'un laboratoire partenaire de thèse, désigné par son PPN IdRef | |
+
+Trois options règlent la reconnaissance d'une forme de nom. `is_word_boundary` exige une frontière de mot de part et d'autre de la forme. `is_excluding` fait de la forme un motif de rejet. `requires_context_of` exige la présence d'autres structures dans la même adresse.
+
+## Périmètres
+
+| Table | Contenu | Contrainte |
+|---|---|---|
+| `perimeters` | Code, nom, structures racines (`root_structure_ids`) | Code unique |
+| `perimeter_structures` | Racines du périmètre et tous leurs descendants par les tutelles | |
+
+Deux clés de la [configuration](08-ref-et-ops.md) désignent les périmètres en service. `perimeter_extraction` désigne les structures interrogées au moissonnage et l'appartenance des contributions sources au périmètre. `perimeter_persons` désigne le périmètre de création des personnes.
+
+`root_structure_ids` est un tableau sans clé étrangère. La suppression d'une structure la retire des racines de chaque périmètre.
+
+## Adresses
+
+| Table | Contenu | Contrainte |
+|---|---|---|
+| `addresses` | Texte brut et texte normalisé, pays retenus (`countries`), nombre de publications | Une adresse par texte normalisé |
+| `address_structures` | Rattachement d'une adresse à une structure. `matched_form_id` : forme de nom détectée, vide pour un rattachement saisi à la main. `is_confirmed` : vide en attente, vrai si confirmé, faux si rejeté | Un rattachement par adresse et structure |
+| `address_country_candidates` | Pays proposé pour une adresse par un moyen de détection : source, nom de pays, institution, ville, saisie manuelle | Un pays par adresse et par moyen |
+
+Les contributions sources sont reliées à leurs adresses par `source_contribution_addresses` ([enregistrements sources](02-sources.md)).
+
+## Écriture
+
+**Administration :**
+
+- Structures, tutelles et formes de nom (`application/services/structures.py`). Une suppression de structure ou un changement de tutelle recalcule `perimeter_structures`.
+- Périmètres (`application/services/perimeters.py`). Une création ou une modification recalcule `perimeter_structures`. La suppression d'un périmètre désigné par la configuration est refusée.
+- Rattachements des adresses et pays saisis à la main (`application/services/addresses.py`). Le périmètre des contributions sources, des contributions et des publications concernées est recalculé aussitôt. La vue `contribution_structures` est recalculée à l'exécution suivante de la phase `finalize`.
+
+**Pipeline :**
+
+- Le pipeline recalcule `perimeter_structures` avant sa première phase.
+- La phase [`normalize`](../pipeline/03-normalize.md) crée les adresses et les pays qu'en donnent les sources.
+- La phase [`affiliations`](../pipeline/04-affiliations.md) écrit les rattachements détectés et `idref_structures`. Elle conserve les rattachements confirmés ou saisis à la main.
+- La phase `publications` compte les publications des adresses.
+- La phase [`countries`](../pipeline/11-enrichissements.md#pays-des-adresses-countries) détecte et retient les pays des adresses.
