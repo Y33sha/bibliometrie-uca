@@ -117,10 +117,6 @@
 - 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
 - 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
 - 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](archived/2026-06-07_CODE_filtres-adresses-composables.md)
-- 2026-06-06 — [Background jobs pour les endpoints longs : matview pipeline-only, garde-fou batch_set_country, propagation des reviews en tâche de fond](archived/2026-06-06_CODE_background-jobs.md)
-- 2026-06-05 — [Stratégie de tests : dé-fictionnaliser, factoriser, parcimonie](archived/2026-06-05_CODE_strategie-tests.md)
-- 2026-06-04 — [Matérialiser le périmètre (`perimeter_structures`) — audit `in_perimeter` : conservé](archived/2026-06-04_DATA_perimeter-materialise.md)
-- 2026-06-04 — [Rejet durable d'une paire (publication, personne) : garde matching, détachement, réassignation](archived/2026-06-04_METIER_detachement-rejet-durable.md)
 
 
 
