@@ -7,40 +7,47 @@ from dataclasses import replace
 
 from sqlalchemy import Connection
 
-from infrastructure.read_models._common import EntityFacetItem, EntityKind
+from infrastructure.read_models._common import EntityFacetResponse, EntityKind
 from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import assemble_where, own_structure_ids
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 from infrastructure.read_models.stats.models import StatsFilters
 
+_LIMIT = 20
 
-def stats_entity_facet(
-    conn: Connection,
-    *,
-    kind: EntityKind,
-    search: str,
-    perimeter_structure_ids: list[int],
-    filters: StatsFilters,
-    limit: int = 20,
-) -> list[EntityFacetItem]:
-    # On saute le filtre de la dimension demandée (sinon une sélection réduit ses propres options).
-    filters_for_facet = replace(
-        filters,
-        publisher_ids=[] if kind == "publisher" else filters.publisher_ids,
-        serial_ids=[] if kind == "serial" else filters.serial_ids,
-        partner_rors=[] if kind == "partner" else filters.partner_rors,
-    )
-    where, binds = assemble_where(
-        stats_filter_clauses(
-            perimeter_structure_ids=perimeter_structure_ids, filters=filters_for_facet
+
+class StatsEntityFacetQueries:
+    _conn: Connection
+
+    def stats_entity_facet(
+        self,
+        *,
+        kind: EntityKind,
+        search: str,
+        filters: StatsFilters,
+    ) -> EntityFacetResponse:
+        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
+        # On saute le filtre de la dimension demandée (sinon une sélection réduit ses propres options).
+        filters_for_facet = replace(
+            filters,
+            publisher_ids=[] if kind == "publisher" else filters.publisher_ids,
+            serial_ids=[] if kind == "serial" else filters.serial_ids,
+            partner_rors=[] if kind == "partner" else filters.partner_rors,
         )
-    )
-    return entity_facet_rows(
-        conn,
-        kind=kind,
-        where_sql=f"{STATS_BASE} AND {where}",
-        binds=binds,
-        search=search,
-        limit=limit,
-        own_structure_ids=own_structure_ids(filters.lab_ids, perimeter_structure_ids),
-    )
+        where, binds = assemble_where(
+            stats_filter_clauses(
+                perimeter_structure_ids=perimeter_structure_ids, filters=filters_for_facet
+            )
+        )
+        return EntityFacetResponse(
+            entities=entity_facet_rows(
+                self._conn,
+                kind=kind,
+                where_sql=f"{STATS_BASE} AND {where}",
+                binds=binds,
+                search=search,
+                limit=_LIMIT,
+                own_structure_ids=own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+            )
+        )

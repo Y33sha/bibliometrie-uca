@@ -133,10 +133,18 @@ def add_to_perimeter(conn: Connection, structure_id: int, *, code: str, name: st
     return perimeter_id
 
 
-def insert_persons_perimeter(conn: Connection, code: str = "uca", *, extra_root_ids=()) -> int:
-    """Pose l'université de code `code` en majuscules, racine du périmètre `code` avec `extra_root_ids`, et désigne ce périmètre comme celui des personnes. Renvoie l'`id` de l'université."""
+def insert_persons_perimeter(
+    conn: Connection, code: str = "uca", *, extra_root_ids=(), materialize: bool = False
+) -> int:
+    """Pose l'université de code `code` en majuscules, racine du périmètre `code` avec `extra_root_ids`, et désigne ce périmètre comme celui des personnes. Renvoie l'`id` de l'université. `materialize` calcule la clôture du périmètre."""
     root = insert_structure(conn, code.upper(), structure_type="universite")
-    insert_perimeter(conn, code, root_structure_ids=[root, *extra_root_ids], name=code.upper())
+    insert_perimeter(
+        conn,
+        code,
+        root_structure_ids=[root, *extra_root_ids],
+        name=code.upper(),
+        materialize=materialize,
+    )
     set_config(conn, "perimeter_persons", code)
     return root
 
