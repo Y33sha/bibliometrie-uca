@@ -750,7 +750,7 @@
 							<span class="source-tag source-placeholder"></span>
 						{/if}
 					</td>{/if}
-					<td class="access-cell"><AccessButton url={p.access_url} oaStatus={p.oa_status} compact /></td>
+					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></td>
 				</tr>
 			{/each}
 		{/if}

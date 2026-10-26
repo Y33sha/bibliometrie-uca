@@ -76,7 +76,7 @@
 </script>
 
 <aside class="detail-sidebar">
-  <AccessButton url={accessUrl} oaStatus={pub.oa_status} />
+  <AccessButton {accessUrl} oaStatus={pub.oa_status} />
 
   {#if accessUrl && accessState}
     <div class="access-line">

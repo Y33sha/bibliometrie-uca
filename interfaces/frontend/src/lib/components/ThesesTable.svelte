@@ -216,7 +216,7 @@
 						<span class="source-tag source-placeholder"></span>
 					{/if}
 				</td>{/if}
-				<td class="col-access"><AccessButton url={t.access_url} oaStatus={t.oa_status} compact /></td>
+				<td class="col-access"><AccessButton accessUrl={t.access_url} oaStatus={t.oa_status} compact /></td>
 			</tr>
 		{/each}
 	</tbody>
