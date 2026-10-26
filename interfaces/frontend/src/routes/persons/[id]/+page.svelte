@@ -4,7 +4,8 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
-	import { api, apiDetail, auth, contributions } from '#lib/api/index.js';
+	import { api, apiDetail, contributions } from '#lib/api/index.js';
+	import { isAdmin } from '#lib/session.svelte.js';
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import OaBar from '#lib/components/charts/OaBar.svelte';
@@ -35,7 +36,6 @@
 	let identifiers = $state<Identifier[]>([]);
 	let thesesCount = $state(0);
 	let error = $state(false);
-	let isAdmin = $state(false);
 
 	const activeTab = $derived(
 		(() => {
@@ -133,7 +133,6 @@
 	}
 
 	onMount(async () => {
-		auth.check().then(d => { isAdmin = !!d.authenticated; }).catch(() => {});
 		if (personId) await loadProfile(personId);
 	});
 
@@ -230,7 +229,7 @@
 				showFilterBanner={false}
 				showCorrespondingColumn
 				showPerimeterFacet
-				showAdminExclude={isAdmin}
+				showAdminExclude={isAdmin()}
 				onExcludeContribution={excludeContribution}
 				apcMode="person"
 				perPage={50}
