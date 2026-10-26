@@ -5,8 +5,6 @@ Agrégat distinct de Serial, servi par son propre port (`PublisherRepository`). 
 La fusion d'éditeurs (`merge_publishers`) vit ici : c'est une opération de l'agrégat Publisher. Elle prend aussi le port `SerialRepository` pour détecter les journaux en conflit entre les deux éditeurs avant de déléguer les transferts SQL.
 """
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
 from application.ports.pipeline.serial_recompute import SerialRecompute
@@ -58,7 +56,6 @@ def merge_publishers(
     target_id: int,
     source_id: int,
     *,
-    conn: Connection,
     publisher_repo: PublisherRepository,
     serial_repo: SerialRepository,
     recompute: SerialRecompute,
@@ -93,13 +90,12 @@ def merge_publishers(
         merge_serials(
             pair.target_serial_id,
             pair.source_serial_id,
-            conn=conn,
             repo=serial_repo,
             recompute=recompute,
         )
 
     # 3. Les données de l'éditeur absorbé, selon leur règle de fusion.
     publisher_repo.merge_publisher_into(target_id, source_id)
-    publication_count_recompute.refresh_publisher_publication_count(conn, target_id)
+    publication_count_recompute.refresh_publisher_publication_count(target_id)
 
     emit_event("publisher.merged", "publisher", target_id, {"source_id": source_id})

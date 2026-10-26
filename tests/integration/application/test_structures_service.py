@@ -24,8 +24,6 @@ from domain.structures.structure import StructureType
 from infrastructure.repositories import perimeter_repository, structure_repository
 from pipeline.transformation.structures.perimeter import PerimeterStructures
 
-_PERIMETER_STRUCTURES = PerimeterStructures()
-
 
 @pytest.fixture
 def repo(sa_sync_conn):
@@ -240,8 +238,7 @@ class TestDeleteStructure:
             delete_structure(
                 999999,
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
                 perimeter_repo=perimeter_repository(sa_sync_conn),
             )
 
@@ -250,8 +247,7 @@ class TestDeleteStructure:
         delete_structure(
             row["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
             perimeter_repo=perimeter_repository(sa_sync_conn),
         )
         result = sa_sync_conn.execute(
@@ -271,8 +267,7 @@ class TestCreateTutelle:
             parent_id=parent["id"],
             child_id=child["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         assert rel is not None
         assert rel["parent_id"] == parent["id"]
@@ -286,15 +281,13 @@ class TestCreateTutelle:
             parent_id=parent["id"],
             child_id=child["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         again = create_tutelle(
             parent_id=parent["id"],
             child_id=child["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         assert again is None
 
@@ -305,8 +298,7 @@ class TestCreateTutelle:
                 parent_id=s["id"],
                 child_id=s["id"],
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
     def test_rejects_cycle(self, sa_sync_conn, repo):
@@ -317,16 +309,14 @@ class TestCreateTutelle:
             parent_id=a["id"],
             child_id=b["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         with pytest.raises(ValidationError, match="Cycle"):
             create_tutelle(
                 parent_id=b["id"],
                 child_id=a["id"],
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
     def test_rejects_indirect_cycle(self, sa_sync_conn, repo):
@@ -338,23 +328,20 @@ class TestCreateTutelle:
             parent_id=a["id"],
             child_id=b["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         create_tutelle(
             parent_id=b["id"],
             child_id=c["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         with pytest.raises(ValidationError, match="Cycle"):
             create_tutelle(
                 parent_id=c["id"],
                 child_id=a["id"],
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
 
@@ -362,7 +349,7 @@ class TestDeleteTutelle:
     def test_raises_not_found(self, sa_sync_conn, repo):
         with pytest.raises(NotFoundError):
             delete_tutelle(
-                999999, repo=repo, conn=sa_sync_conn, perimeter_structures=_PERIMETER_STRUCTURES
+                999999, repo=repo, perimeter_structures=PerimeterStructures(sa_sync_conn)
             )
 
     def test_deletes_existing(self, sa_sync_conn, repo):
@@ -372,12 +359,9 @@ class TestDeleteTutelle:
             parent_id=parent["id"],
             child_id=child["id"],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
-        delete_tutelle(
-            rel["id"], repo=repo, conn=sa_sync_conn, perimeter_structures=_PERIMETER_STRUCTURES
-        )
+        delete_tutelle(rel["id"], repo=repo, perimeter_structures=PerimeterStructures(sa_sync_conn))
         result = sa_sync_conn.execute(
             text("SELECT id FROM structure_parents WHERE id = :id"), {"id": rel["id"]}
         )

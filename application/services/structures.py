@@ -5,8 +5,6 @@ Couvre les tables `structures`, `structure_parents` et `structure_name_forms`. L
 
 from typing import cast
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.repositories.perimeter_repository import PerimeterRepository
@@ -128,7 +126,6 @@ def _structure_edit(update: StructureUpdate) -> StructureEdit:
 def delete_structure(
     structure_id: int,
     *,
-    conn: Connection,
     repo: StructureRepository,
     perimeter_repo: PerimeterRepository,
     perimeter_structures: PerimeterStructures,
@@ -141,7 +138,7 @@ def delete_structure(
     if snapshot is None:
         raise NotFoundError(f"Structure {structure_id} introuvable")
     perimeter_repo.remove_structure_from_all_perimeters(structure_id)
-    perimeter_structures.refresh(conn)
+    perimeter_structures.refresh()
     # L'instantané garde ce que la cascade emporte : une suppression par erreur reste réparable à la main.
     emit_event("structure.deleted", "structure", structure_id, snapshot)
 
@@ -153,7 +150,6 @@ def create_tutelle(
     *,
     parent_id: int,
     child_id: int,
-    conn: Connection,
     repo: StructureRepository,
     perimeter_structures: PerimeterStructures,
 ) -> StructureTutelleRow | None:
@@ -167,7 +163,7 @@ def create_tutelle(
         ancestors_of_parent=repo.get_ancestor_ids(parent_id),
     )
     row = repo.create_tutelle(parent_id=parent_id, child_id=child_id)
-    perimeter_structures.refresh(conn)
+    perimeter_structures.refresh()
     if row is not None:
         # Nom d'événement conservé : il est écrit dans `audit_log`, où l'historique le porte.
         emit_event(
@@ -182,7 +178,6 @@ def create_tutelle(
 def delete_tutelle(
     tutelle_id: int,
     *,
-    conn: Connection,
     repo: StructureRepository,
     perimeter_structures: PerimeterStructures,
 ) -> None:
@@ -190,7 +185,7 @@ def delete_tutelle(
     row = repo.delete_tutelle(tutelle_id)
     if not row:
         raise NotFoundError(f"Tutelle {tutelle_id} introuvable")
-    perimeter_structures.refresh(conn)
+    perimeter_structures.refresh()
     emit_event(
         "structure_relation.deleted",
         "structure",

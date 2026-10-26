@@ -88,8 +88,8 @@ def publisher_store(sa_sync_conn):
 
 
 @pytest.fixture
-def recompute():
-    return SerialRecompute()
+def recompute(sa_sync_conn):
+    return SerialRecompute(sa_sync_conn)
 
 
 def _fetch_one(conn, sql_text: str, **params):
@@ -164,15 +164,14 @@ class TestUpdateSerial:
                 999999,
                 update=SerialUpdate(title="X"),
                 repo=repo,
-                conn=sa_sync_conn,
-                recompute=SerialRecompute(),
+                recompute=SerialRecompute(sa_sync_conn),
             )
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
         j = _serial(sa_sync_conn)
         with pytest.raises(ValidationError):
             update_serial(
-                j, update=SerialUpdate(), repo=repo, conn=sa_sync_conn, recompute=SerialRecompute()
+                j, update=SerialUpdate(), repo=repo, recompute=SerialRecompute(sa_sync_conn)
             )
 
     def test_updates_title_and_normalizes(self, sa_sync_conn, repo):
@@ -181,8 +180,7 @@ class TestUpdateSerial:
             j,
             update=SerialUpdate(title="Nature Medicine"),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT title, title_normalized FROM serials WHERE id = :id", id=j
@@ -203,8 +201,7 @@ class TestUpdateSerial:
                 ]
             ),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
         assert (
             _fetch_one(
@@ -226,8 +223,7 @@ class TestUpdateSerial:
                 issns=[SerialIssnInput(issn="14764687", support=IssnSupport.ELECTRONIC)]
             ),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
         row = issn_columns(sa_sync_conn, j)
         assert row.eissn == "1476-4687"
@@ -239,8 +235,7 @@ class TestUpdateSerial:
             j,
             update=SerialUpdate(serial_type=SerialType.JOURNAL),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
 
         assert j not in {r.id for r in find_titles_of_non_proceedings_serials(sa_sync_conn)}
@@ -259,8 +254,7 @@ class TestUpdateSerial:
             j,
             update=SerialUpdate(title="Same", serial_type=SerialType.JOURNAL),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
         assert (
             _fetch_one(
@@ -275,8 +269,7 @@ class TestUpdateSerial:
             j,
             update=SerialUpdate(apc_amount=2499.99),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
 
         update_serial_apc(sa_sync_conn, j, apc_amount=3000, apc_currency="GBP")
@@ -302,8 +295,7 @@ class TestUpdateSerial:
                 issns=[SerialIssnInput(issn="1476-4687", support=IssnSupport.ELECTRONIC)],
             ),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
 
         assert j not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn, also=[j])}
@@ -323,8 +315,7 @@ class TestUpdateSerial:
             j,
             update=SerialUpdate(oa_model=None),
             repo=repo,
-            conn=sa_sync_conn,
-            recompute=SerialRecompute(),
+            recompute=SerialRecompute(sa_sync_conn),
         )
 
         gateway.enrich_serial(j, oa_model=OaModel.SUBSCRIPTION)
@@ -341,8 +332,7 @@ class TestUpdateSerial:
                 j,
                 update=SerialUpdate(issns=[SerialIssnInput(issn="1234-5678")]),
                 repo=repo,
-                conn=sa_sync_conn,
-                recompute=SerialRecompute(),
+                recompute=SerialRecompute(sa_sync_conn),
             )
         row = issn_columns(sa_sync_conn, j)
         assert row.issn == "0028-0836"
@@ -391,11 +381,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
         row = _fetch_one(
             sa_sync_conn,
@@ -411,11 +400,10 @@ class TestMergePublishers:
             merge_publishers(
                 p_id,
                 p_id,
-                conn=sa_sync_conn,
                 publisher_repo=publisher_repo,
                 serial_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
             )
 
     def test_raises_on_missing_target(self, sa_sync_conn, repo, publisher_repo, recompute):
@@ -424,11 +412,10 @@ class TestMergePublishers:
             merge_publishers(
                 999999,
                 p_id,
-                conn=sa_sync_conn,
                 publisher_repo=publisher_repo,
                 serial_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
             )
 
     def test_raises_on_missing_source(self, sa_sync_conn, repo, publisher_repo, recompute):
@@ -437,11 +424,10 @@ class TestMergePublishers:
             merge_publishers(
                 p_id,
                 999999,
-                conn=sa_sync_conn,
                 publisher_repo=publisher_repo,
                 serial_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
             )
 
     def test_transfers_serials_and_deletes_source(
@@ -454,11 +440,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
 
         assert (
@@ -476,11 +461,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
 
         row = _fetch_one(
@@ -499,11 +483,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
 
         row = _fetch_one(
@@ -522,11 +505,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM serials WHERE id = :id", id=js)) is None
@@ -547,11 +529,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
 
         assert (_fetch_one(sa_sync_conn, "SELECT id FROM serials WHERE id = :id", id=js)) is None
@@ -570,11 +551,10 @@ class TestMergePublishers:
             merge_publishers(
                 target,
                 source,
-                conn=sa_sync_conn,
                 publisher_repo=publisher_repo,
                 serial_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
             )
 
         blockers = exc_info.value.blocking_serials
@@ -602,11 +582,10 @@ class TestMergePublishers:
             merge_publishers(
                 target,
                 source,
-                conn=sa_sync_conn,
                 publisher_repo=publisher_repo,
                 serial_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
             )
 
         blockers = exc_info.value.blocking_serials
@@ -627,11 +606,10 @@ class TestMergePublishers:
             merge_publishers(
                 target,
                 source,
-                conn=sa_sync_conn,
                 publisher_repo=publisher_repo,
                 serial_repo=repo,
                 recompute=recompute,
-                publication_count_recompute=PublicationCountRecompute(),
+                publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
             )
 
         assert len(exc_info.value.blocking_serials) == 2
@@ -645,11 +623,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -665,11 +642,10 @@ class TestMergePublishers:
         merge_publishers(
             target,
             source,
-            conn=sa_sync_conn,
             publisher_repo=publisher_repo,
             serial_repo=repo,
             recompute=recompute,
-            publication_count_recompute=PublicationCountRecompute(),
+            publication_count_recompute=PublicationCountRecompute(sa_sync_conn),
         )
         row = _fetch_one(
             sa_sync_conn, "SELECT openalex_id FROM publishers WHERE id = :id", id=target
@@ -687,7 +663,6 @@ class TestMergeSerials:
             merge_serials(
                 j_id,
                 j_id,
-                conn=sa_sync_conn,
                 repo=repo,
                 recompute=recompute,
             )
@@ -698,7 +673,6 @@ class TestMergeSerials:
             merge_serials(
                 999999,
                 j_id,
-                conn=sa_sync_conn,
                 repo=repo,
                 recompute=recompute,
             )
@@ -709,7 +683,6 @@ class TestMergeSerials:
             merge_serials(
                 j_id,
                 999999,
-                conn=sa_sync_conn,
                 repo=repo,
                 recompute=recompute,
             )
@@ -727,7 +700,6 @@ class TestMergeSerials:
         merge_serials(
             target,
             source,
-            conn=sa_sync_conn,
             repo=repo,
             recompute=recompute,
         )
@@ -745,7 +717,6 @@ class TestMergeSerials:
         merge_serials(
             target,
             source,
-            conn=conn,
             repo=repo,
             recompute=recompute,
         )
@@ -828,7 +799,6 @@ class TestMergeSerials:
         merge_serials(
             target,
             source,
-            conn=sa_sync_conn,
             repo=repo,
             recompute=recompute,
         )
@@ -851,7 +821,6 @@ class TestMergeSerials:
         merge_serials(
             target,
             source,
-            conn=sa_sync_conn,
             repo=repo,
             recompute=recompute,
         )
@@ -869,7 +838,6 @@ class TestMergeSerials:
         merge_serials(
             target,
             source,
-            conn=sa_sync_conn,
             repo=repo,
             recompute=recompute,
         )
@@ -890,7 +858,6 @@ class TestMergeSerials:
         merge_serials(
             target,
             source,
-            conn=sa_sync_conn,
             repo=repo,
             recompute=recompute,
         )
@@ -929,7 +896,6 @@ class TestMergeSerials:
         merge_serials(
             media,
             revue,
-            conn=sa_sync_conn,
             repo=repo,
             recompute=recompute,
         )
@@ -973,7 +939,6 @@ class TestRequalifyPublicationsForSerial:
 
         count = requalify_publications_for_serial(
             serial,
-            conn=sa_sync_conn,
             recompute=recompute,
         )
         assert count == 1
@@ -1000,7 +965,6 @@ class TestRequalifyPublicationsForSerial:
         )
         requalify_publications_for_serial(
             serial,
-            conn=sa_sync_conn,
             recompute=recompute,
         )
 
@@ -1010,7 +974,6 @@ class TestRequalifyPublicationsForSerial:
         )
         count = requalify_publications_for_serial(
             serial,
-            conn=sa_sync_conn,
             recompute=recompute,
         )
         assert count == 1

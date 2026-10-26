@@ -5,8 +5,6 @@ Un périmètre porte des structures **racines** (`perimeters.root_structure_ids`
 `delete_perimeter` consulte la table `config` (via `ConfigQueries`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
 """
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.read_models.config_queries import ConfigQueries
@@ -23,7 +21,6 @@ def create_perimeter(
     code: str,
     name: str,
     root_structure_ids: list[int],
-    conn: Connection,
     repo: PerimeterRepository,
     perimeter_structures: PerimeterStructures,
 ) -> int:
@@ -35,7 +32,7 @@ def create_perimeter(
     if repo.perimeter_code_exists(perimeter.code):
         raise ConflictError(f"Le code '{perimeter.code}' existe déjà")
     perimeter_id = repo.add(perimeter)
-    perimeter_structures.refresh(conn)
+    perimeter_structures.refresh()
     emit_event(
         "perimeter.created",
         "perimeter",
@@ -53,7 +50,6 @@ def update_perimeter(
     perimeter_id: int,
     *,
     update: PerimeterUpdate,
-    conn: Connection,
     repo: PerimeterRepository,
     perimeter_structures: PerimeterStructures,
 ) -> None:
@@ -75,7 +71,7 @@ def update_perimeter(
     if "root_structure_ids" in update.model_fields_set:
         perimeter.set_root_structure_ids(update.root_structure_ids)
     repo.save(perimeter)
-    perimeter_structures.refresh(conn)
+    perimeter_structures.refresh()
     emit_event(
         "perimeter.updated",
         "perimeter",

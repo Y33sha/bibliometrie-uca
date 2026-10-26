@@ -114,11 +114,10 @@ def merge_aliases(conn: Connection, *, apply: bool) -> Counter[str]:
                 publishers_service.merge_publishers(
                     targets[0],
                     source_id,
-                    conn=conn,
                     publisher_repo=PgPublisherRepository(conn),
                     serial_repo=PgSerialRepository(conn),
-                    recompute=SerialRecompute(),
-                    publication_count_recompute=PublicationCountRecompute(),
+                    recompute=SerialRecompute(conn),
+                    publication_count_recompute=PublicationCountRecompute(conn),
                 )
             except ConflictError as e:
                 conn.rollback()

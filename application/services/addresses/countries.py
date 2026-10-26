@@ -5,8 +5,6 @@ Une saisie manuelle s'écrit en candidats `manual` par `AddressRepository`, qui 
 
 import logging
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.countries import CountryRecompute
 from application.ports.repositories.address_repository import (
@@ -27,7 +25,6 @@ def _require_known_countries(codes: list[str], *, repo: AddressRepository) -> No
 
 
 def set_country(
-    conn: Connection,
     address_id: int,
     countries: list[str] | None,
     *,
@@ -40,13 +37,12 @@ def set_country(
     """
     _require_known_countries(countries or [], repo=repo)
     repo.set_manual_countries(address_id, countries)
-    country_recompute.resolve_address_countries(conn, [address_id])
+    country_recompute.resolve_address_countries([address_id])
     emit_event("address.country_set", "address", address_id, {"countries": countries or []})
     return [address_id]
 
 
 def batch_set_country(
-    conn: Connection,
     country_code: str,
     *,
     address_ids: list[int] | None,
@@ -62,11 +58,10 @@ def batch_set_country(
     """
     if address_ids:
         modified_ids = batch_set_country_by_ids(
-            conn, country_code, address_ids, repo=repo, country_recompute=country_recompute
+            country_code, address_ids, repo=repo, country_recompute=country_recompute
         )
     else:
         modified_ids = batch_set_country_by_filter(
-            conn,
             country_code,
             search=search,
             has_country=has_country,
@@ -95,7 +90,6 @@ def batch_set_country(
 
 
 def batch_set_country_by_ids(
-    conn: Connection,
     country_code: str,
     address_ids: list[int],
     *,
@@ -108,12 +102,11 @@ def batch_set_country_by_ids(
     """
     _require_known_countries([country_code], repo=repo)
     ids = repo.add_manual_country_by_ids(country_code, address_ids)
-    country_recompute.resolve_address_countries(conn, ids)
+    country_recompute.resolve_address_countries(ids)
     return ids
 
 
 def batch_set_country_by_filter(
-    conn: Connection,
     country_code: str,
     *,
     search: str | None = None,
@@ -141,12 +134,12 @@ def batch_set_country_by_filter(
             "refus d'appliquer un pays à toutes les adresses."
         )
     ids = repo.add_manual_country_by_filter(country_code, criteria)
-    country_recompute.resolve_address_countries(conn, ids)
+    country_recompute.resolve_address_countries(ids)
     return ids
 
 
 def propagate_countries_to_publications(
-    conn: Connection, address_ids: list[int], *, country_recompute: CountryRecompute
+    address_ids: list[int], *, country_recompute: CountryRecompute
 ) -> None:
     """Propage addresses.countries → source_records.countries → publications.countries.
 
@@ -155,8 +148,8 @@ def propagate_countries_to_publications(
     if not address_ids:
         return
 
-    docs = country_recompute.refresh_source_records_countries_for_addresses(conn, address_ids)
-    publications = country_recompute.refresh_publications_countries_for_addresses(conn, address_ids)
+    docs = country_recompute.refresh_source_records_countries_for_addresses(address_ids)
+    publications = country_recompute.refresh_publications_countries_for_addresses(address_ids)
 
     if docs or publications:
         logger.info("Propagation pays : %s docs source, %s publications", docs, publications)

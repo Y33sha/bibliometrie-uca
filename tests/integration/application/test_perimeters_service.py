@@ -16,8 +16,6 @@ from pipeline.transformation.structures.perimeter import PerimeterStructures
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.structures import insert_perimeter
 
-_PERIMETER_STRUCTURES = PerimeterStructures()
-
 
 @pytest.fixture
 def repo(sa_sync_conn):
@@ -65,8 +63,7 @@ class TestCreatePerimeter:
             name="New Perimeter",
             root_structure_ids=[],
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         assert pid is not None
         result = sa_sync_conn.execute(
@@ -84,8 +81,7 @@ class TestCreatePerimeter:
                 name="X",
                 root_structure_ids=[],
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
     def test_raises_on_empty_code_or_name(self, sa_sync_conn, repo):
@@ -95,8 +91,7 @@ class TestCreatePerimeter:
                 name="X",
                 root_structure_ids=[],
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
         with pytest.raises(ValidationError):
             create_perimeter(
@@ -104,8 +99,7 @@ class TestCreatePerimeter:
                 name="",
                 root_structure_ids=[],
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
 
@@ -119,8 +113,7 @@ class TestUpdatePerimeter:
                 999999,
                 update=PerimeterUpdate(name="X"),
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
     def test_raises_on_empty_fields(self, sa_sync_conn, repo):
@@ -130,8 +123,7 @@ class TestUpdatePerimeter:
                 p,
                 update=PerimeterUpdate(),
                 repo=repo,
-                conn=sa_sync_conn,
-                perimeter_structures=_PERIMETER_STRUCTURES,
+                perimeter_structures=PerimeterStructures(sa_sync_conn),
             )
 
     def test_updates_name(self, sa_sync_conn, repo):
@@ -140,8 +132,7 @@ class TestUpdatePerimeter:
             p,
             update=PerimeterUpdate(name="New"),
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         result = sa_sync_conn.execute(text("SELECT name FROM perimeters WHERE id = :p"), {"p": p})
         assert result.scalar_one() == "New"
@@ -152,8 +143,7 @@ class TestUpdatePerimeter:
             p,
             update=PerimeterUpdate(root_structure_ids=[4, 5, 6]),
             repo=repo,
-            conn=sa_sync_conn,
-            perimeter_structures=_PERIMETER_STRUCTURES,
+            perimeter_structures=PerimeterStructures(sa_sync_conn),
         )
         result = sa_sync_conn.execute(
             text("SELECT root_structure_ids FROM perimeters WHERE id = :p"), {"p": p}

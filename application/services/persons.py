@@ -6,8 +6,6 @@ Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le 
 import logging
 from typing import NamedTuple, TypedDict
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.contribution_repository import ContributionRepository
@@ -55,7 +53,6 @@ def set_exclusion(
     person_id: int,
     exclusion: PersonExclusion | None,
     *,
-    conn: Connection,
     repo: PersonRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
 ) -> None:
@@ -64,7 +61,7 @@ def set_exclusion(
     L'exclusion fait basculer l'appartenance au périmètre de ses publications : le pipeline la recalcule. Lève NotFoundError si la personne n'existe pas.
     """
     repo.set_exclusion(person_id, exclusion)
-    perimeter_recompute.refresh_publications_of_person(conn, person_id)
+    perimeter_recompute.refresh_publications_of_person(person_id)
     emit_event(
         "person.exclusion",
         "person",
@@ -213,7 +210,6 @@ def detach_contributions(
     person_id: int,
     contributions: list[ContributionRef],
     *,
-    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
@@ -238,7 +234,6 @@ def detach_contributions(
         detached += reject_pair(
             publication_id,
             person_id,
-            conn=conn,
             repo=contribution_repo,
             perimeter_recompute=perimeter_recompute,
         )

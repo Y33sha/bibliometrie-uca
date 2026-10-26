@@ -5,16 +5,14 @@ Implémenté par `pipeline.transformation.structures.perimeter.PerimeterStructur
 
 from typing import Protocol
 
-from sqlalchemy import Connection
-
 
 class PerimeterStructures(Protocol):
     """Clôture des tutelles des périmètres : rematérialisation et lecture."""
 
-    def refresh(self, conn: Connection) -> None:
+    def refresh(self) -> None:
         """Recompute la table matérialisée `perimeter_structures` (clôture des tutelles). Idempotent. Commit laissé au caller."""
         ...
 
-    def persons_structure_ids(self, conn: Connection) -> list[int]:
+    def persons_structure_ids(self) -> list[int]:
         """Structures du périmètre personnes, en liste — forme attendue d'un paramètre lié `ANY(:ids)`."""
         ...

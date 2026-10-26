@@ -5,8 +5,6 @@ Couvre les contributions (`contributions`) et les contributions sources (`source
 La construction du stock relève du pipeline, qui écrit en SQL ensembliste : les phases `normalize`, `affiliations`, `countries` et `persons` alimentent les contributions sources, la phase `author_grouping` forme les groupes et la phase `persons` les rattache aux personnes.
 """
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.perimeter_structures import PerimeterStructures
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
@@ -22,7 +20,6 @@ def reject_pair(
     publication_id: int,
     person_id: int,
     *,
-    conn: Connection,
     repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
 ) -> int:
@@ -38,7 +35,7 @@ def reject_pair(
     """
     repo.reject_contribution(publication_id, person_id)
     detached = repo.detach_rejected_pair(publication_id, person_id)
-    perimeter_recompute.refresh_publications(conn, [publication_id])
+    perimeter_recompute.refresh_publications([publication_id])
 
     emit_event(
         "contribution.rejected",
@@ -52,7 +49,6 @@ def reject_pair(
 def exclude_contribution(
     contribution_id: int,
     *,
-    conn: Connection,
     repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
     person_repo: PersonRepository,
@@ -71,7 +67,6 @@ def exclude_contribution(
     reject_pair(
         group["publication_id"],
         person_id,
-        conn=conn,
         repo=repo,
         perimeter_recompute=perimeter_recompute,
     )
@@ -79,7 +74,6 @@ def exclude_contribution(
 
 
 def propagate_in_perimeter_for_addresses(
-    conn: Connection,
     address_ids: list[int],
     *,
     repo: ContributionRepository,
@@ -93,7 +87,7 @@ def propagate_in_perimeter_for_addresses(
     if not address_ids:
         return
 
-    perimeter_ids = perimeter_structures.persons_structure_ids(conn)
+    perimeter_ids = perimeter_structures.persons_structure_ids()
     if not perimeter_ids:
         return
 
@@ -101,4 +95,4 @@ def propagate_in_perimeter_for_addresses(
     if not affected_source_contribution_ids:
         return
 
-    perimeter_recompute.recompute_perimeter(conn, affected_source_contribution_ids, perimeter_ids)
+    perimeter_recompute.recompute_perimeter(affected_source_contribution_ids, perimeter_ids)

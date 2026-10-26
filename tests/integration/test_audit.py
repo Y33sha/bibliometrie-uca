@@ -166,9 +166,8 @@ class TestEndToEndServiceIntegration:
             set_exclusion(
                 person_id,
                 PersonExclusion.OUT_OF_PERIMETER,
-                conn=sa_sync_conn,
                 repo=person_repository(sa_sync_conn),
-                perimeter_recompute=PublicationPerimeterRecompute(),
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             )
 
         row = _last_event(sa_sync_conn)
@@ -187,9 +186,8 @@ class TestEndToEndServiceIntegration:
         set_exclusion(
             person_id,
             PersonExclusion.NOT_A_PERSON,
-            conn=sa_sync_conn,
             repo=person_repository(sa_sync_conn),
-            perimeter_recompute=PublicationPerimeterRecompute(),
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         )
         record_pending_events(audit_repository(sa_sync_conn))
         assert _count(sa_sync_conn) == 0
@@ -262,8 +260,7 @@ class TestEndToEndServiceIntegration:
             reject_pair(
                 publication_id,
                 person_id,
-                conn=sa_sync_conn,
-                perimeter_recompute=PublicationPerimeterRecompute(),
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=contribution_repository(sa_sync_conn),
             )
 
@@ -288,6 +285,6 @@ class TestEndToEndServiceIntegration:
                 serial_type=SerialType.MEDIA,
                 conn=sa_sync_conn,
                 repo=serial_repository(sa_sync_conn),
-                recompute=SerialRecompute(),
+                recompute=SerialRecompute(sa_sync_conn),
             )
         assert _count(sa_sync_conn) == 0

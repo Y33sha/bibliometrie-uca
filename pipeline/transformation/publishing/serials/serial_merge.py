@@ -156,10 +156,13 @@ def merge_serials(conn: Connection, target_id: int, source_id: int) -> None:
 class SerialRecompute:
     """Recalculs ciblés d'une revue, exposés à l'API par `pipeline/public.py`."""
 
-    def requalify_publications(self, conn: Connection, serial_id: int) -> int:
-        """Requalifie les publications de la revue. Retourne le nombre de publications dont le `doc_type` change."""
-        return requalify_serial_publications(conn, serial_id)
+    def __init__(self, conn: Connection) -> None:
+        self._conn = conn
 
-    def merge_serials(self, conn: Connection, target_id: int, source_id: int) -> None:
+    def requalify_publications(self, serial_id: int) -> int:
+        """Requalifie les publications de la revue. Retourne le nombre de publications dont le `doc_type` change."""
+        return requalify_serial_publications(self._conn, serial_id)
+
+    def merge_serials(self, target_id: int, source_id: int) -> None:
         """Fusionne la revue `source_id` dans `target_id` et requalifie les publications absorbées."""
-        merge_serials(conn, target_id, source_id)
+        merge_serials(self._conn, target_id, source_id)

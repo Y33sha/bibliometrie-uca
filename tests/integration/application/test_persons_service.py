@@ -74,8 +74,6 @@ _jean_dupont_source_contribution = partial(
 # Enregistrement source de titre « Test », d'identifiant « hal-1 » par défaut.
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
-_PERIMETER = PublicationPerimeterRecompute()
-
 
 def _publication_evidence(conn, publication_id):
     return _scalar(
@@ -408,9 +406,8 @@ class TestSetExclusion:
         set_exclusion(
             p,
             PersonExclusion.OUT_OF_PERIMETER,
-            conn=sa_sync_conn,
             repo=repo,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         )
         assert self._exclusion(sa_sync_conn, p) == "out_of_perimeter"
         assert repo.find_by_id(p).exclusion is PersonExclusion.OUT_OF_PERIMETER
@@ -420,11 +417,12 @@ class TestSetExclusion:
         set_exclusion(
             p,
             PersonExclusion.NOT_A_PERSON,
-            conn=sa_sync_conn,
             repo=repo,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         )
-        set_exclusion(p, None, conn=sa_sync_conn, repo=repo, perimeter_recompute=_PERIMETER)
+        set_exclusion(
+            p, None, repo=repo, perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn)
+        )
         assert self._exclusion(sa_sync_conn, p) is None
 
     def test_raises_not_found(self, sa_sync_conn, repo):
@@ -432,9 +430,8 @@ class TestSetExclusion:
             set_exclusion(
                 999999,
                 PersonExclusion.NOT_A_PERSON,
-                conn=sa_sync_conn,
                 repo=repo,
-                perimeter_recompute=_PERIMETER,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             )
 
     def test_refreshes_in_perimeter_of_own_publications_only(self, sa_sync_conn, repo):
@@ -469,13 +466,17 @@ class TestSetExclusion:
         set_exclusion(
             excluded,
             PersonExclusion.OUT_OF_PERIMETER,
-            conn=sa_sync_conn,
             repo=repo,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         )
         assert (flag(alone), flag(shared), flag(unrelated)) == (False, True, False)
 
-        set_exclusion(excluded, None, conn=sa_sync_conn, repo=repo, perimeter_recompute=_PERIMETER)
+        set_exclusion(
+            excluded,
+            None,
+            repo=repo,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
+        )
         assert flag(alone) is True
 
 
@@ -691,10 +692,9 @@ class TestBatchAssignOrphanContributions:
             batch_assign_orphan_contributions(
                 person_id,
                 [],
-                perimeter_recompute=_PERIMETER,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 contribution_repo=contribution_repo,
-                conn=sa_sync_conn,
             )
             == 0
         )
@@ -716,10 +716,9 @@ class TestBatchAssignOrphanContributions:
         assigned = batch_assign_orphan_contributions(
             person_id,
             [first_group, second_group],
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
         )
 
         assert assigned == 2
@@ -743,10 +742,9 @@ class TestBatchAssignOrphanContributions:
         batch_assign_orphan_contributions(
             person_id,
             [group],
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
         )
 
         assert _scalar(
@@ -770,10 +768,9 @@ class TestBatchAssignOrphanContributions:
         assigned = batch_assign_orphan_contributions(
             p2,
             [owned_group, orphan_group],
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
         )
 
         assert assigned == 1
@@ -796,8 +793,7 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -824,8 +820,7 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_hal}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -858,8 +853,7 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -896,8 +890,7 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_id}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -919,8 +912,7 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -953,8 +945,7 @@ class TestDetachContributions:
         result = detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": sa1}],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -1169,8 +1160,7 @@ class TestAssignOrphanContribution:
         assign_orphan_contribution(
             person_id,
             group,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
         )
@@ -1196,8 +1186,7 @@ class TestAssignOrphanContribution:
             assign_orphan_contribution(
                 person_id,
                 group,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
@@ -1211,8 +1200,7 @@ class TestAssignOrphanContribution:
             assign_orphan_contribution(
                 person_id,
                 999999,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
@@ -1232,8 +1220,7 @@ class TestReassignRejectedPairUnit:
             assign_orphan_contribution(
                 person_id,
                 group,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PERIMETER,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 contribution_repo=contribution_repo,
             )
@@ -1257,8 +1244,7 @@ class TestReassignRejectedPairUnit:
         assign_orphan_contribution(
             person_id,
             group,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
             force=True,
@@ -1289,10 +1275,9 @@ class TestReassignRejectedPairUnit:
             batch_assign_orphan_contributions(
                 person_id,
                 [group1, group2],
-                perimeter_recompute=_PERIMETER,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 contribution_repo=contribution_repo,
-                conn=sa_sync_conn,
             )
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
         # Rien d'écrit : le pré-contrôle précède l'épinglage.
@@ -1309,10 +1294,9 @@ class TestReassignRejectedPairUnit:
         assigned = batch_assign_orphan_contributions(
             person_id,
             [group],
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             contribution_repo=contribution_repo,
-            conn=sa_sync_conn,
             force=True,
         )
 

@@ -22,7 +22,6 @@ def update_serial(
     serial_id: int,
     *,
     update: SerialUpdate,
-    conn: Connection,
     repo: SerialRepository,
     recompute: SerialRecompute,
 ) -> int:
@@ -49,7 +48,7 @@ def update_serial(
     )
     if not changed & {ManualField.SERIAL_TYPE, ManualField.OA_MODEL}:
         return 0
-    return requalify_publications_for_serial(serial_id, conn=conn, recompute=recompute)
+    return requalify_publications_for_serial(serial_id, recompute=recompute)
 
 
 def preview_type_change_impact(
@@ -70,7 +69,6 @@ def preview_type_change_impact(
             return update_serial(
                 serial_id,
                 update=SerialUpdate(serial_type=serial_type),
-                conn=conn,
                 repo=repo,
                 recompute=recompute,
             )
@@ -102,7 +100,6 @@ def merge_serials(
     target_id: int,
     source_id: int,
     *,
-    conn: Connection,
     repo: SerialRepository,
     recompute: SerialRecompute,
 ) -> None:
@@ -111,7 +108,7 @@ def merge_serials(
     Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` sur une revue introuvable.
     """
     load_merge_pair(target_id, source_id, repo.find_by_id, label="Revue")
-    recompute.merge_serials(conn, target_id, source_id)
+    recompute.merge_serials(target_id, source_id)
     emit_event("serial.merged", "serial", target_id, {"source_id": source_id})
 
 
@@ -121,7 +118,6 @@ def merge_serials(
 def requalify_publications_for_serial(
     serial_id: int,
     *,
-    conn: Connection,
     recompute: SerialRecompute,
 ) -> int:
     """Requalifie, par le pipeline, le `doc_type` des publications d'une revue après un changement de son `serial_type`.
@@ -130,7 +126,7 @@ def requalify_publications_for_serial(
 
     Un appel dans un `SAVEPOINT` que l'appelant annule donne l'aperçu de la requalification.
     """
-    changed = recompute.requalify_publications(conn, serial_id)
+    changed = recompute.requalify_publications(serial_id)
     if changed > 0:
         emit_event(
             "serial.type_requalified",

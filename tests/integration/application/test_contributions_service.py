@@ -56,13 +56,10 @@ _publication = partial(
 # Enregistrement source de titre « Test », d'identifiant « hal-1 » par défaut.
 _source_record = partial(insert_source_record, source_id="hal-1", title="Test")
 
-_PERIMETER_RECOMPUTE = SourceContributionPerimeterRecompute()
-_PUBLICATION_PERIMETER_RECOMPUTE = PublicationPerimeterRecompute()
-
 
 @pytest.fixture
-def perimeter_structures():
-    return PerimeterStructures()
+def perimeter_structures(sa_sync_conn):
+    return PerimeterStructures(sa_sync_conn)
 
 
 @pytest.fixture
@@ -94,8 +91,7 @@ class TestExcludeContribution:
 
         exclude_contribution(
             contribution_id,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             person_repo=person_repository(sa_sync_conn),
         )
@@ -117,8 +113,7 @@ class TestExcludeContribution:
         with pytest.raises(NotFoundError):
             exclude_contribution(
                 999999,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 person_repo=person_repository(sa_sync_conn),
             )
@@ -135,8 +130,7 @@ class TestExcludeContribution:
         with pytest.raises(NotFoundError):
             exclude_contribution(
                 contribution_id,
-                conn=sa_sync_conn,
-                perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
                 repo=repo,
                 person_repo=person_repository(sa_sync_conn),
             )
@@ -153,8 +147,7 @@ class TestExcludeContribution:
 
         exclude_contribution(
             group_id_of(sa_sync_conn, publication_id, p1),
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
             person_repo=person_repository(sa_sync_conn),
         )
@@ -179,8 +172,7 @@ class TestRejectPair:
         result = reject_pair(
             publication_id,
             person_id,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
         )
 
@@ -209,8 +201,7 @@ class TestRejectPair:
         reject_pair(
             publication_id,
             p1,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
         )
 
@@ -242,11 +233,10 @@ class TestPropagateUcaForAddresses:
     def test_noop_on_empty_address_ids(self, sa_sync_conn, repo, perimeter_structures):
         self._setup_uca(sa_sync_conn)
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn,
             [],
             repo=repo,
             perimeter_structures=perimeter_structures,
-            perimeter_recompute=_PERIMETER_RECOMPUTE,
+            perimeter_recompute=SourceContributionPerimeterRecompute(sa_sync_conn),
         )
         # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
 
@@ -255,11 +245,10 @@ class TestPropagateUcaForAddresses:
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         # Aucun set_config perimeter_persons
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn,
             [addr_id],
             repo=repo,
             perimeter_structures=perimeter_structures,
-            perimeter_recompute=_PERIMETER_RECOMPUTE,
+            perimeter_recompute=SourceContributionPerimeterRecompute(sa_sync_conn),
         )
 
     def test_sets_in_perimeter_when_address_confirmed(
@@ -282,11 +271,10 @@ class TestPropagateUcaForAddresses:
         insert_source_contribution_address(sa_sync_conn, source_contribution_id, address_id=addr_id)
 
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn,
             [addr_id],
             repo=repo,
             perimeter_structures=perimeter_structures,
-            perimeter_recompute=_PERIMETER_RECOMPUTE,
+            perimeter_recompute=SourceContributionPerimeterRecompute(sa_sync_conn),
         )
         refresh_structure_matviews(sa_sync_conn)
 
@@ -338,11 +326,10 @@ class TestPropagateUcaForAddresses:
         insert_source_contribution_address(sa_sync_conn, source_contribution_id, address_id=addr_id)
 
         propagate_in_perimeter_for_addresses(
-            sa_sync_conn,
             [addr_id],
             repo=repo,
             perimeter_structures=perimeter_structures,
-            perimeter_recompute=_PERIMETER_RECOMPUTE,
+            perimeter_recompute=SourceContributionPerimeterRecompute(sa_sync_conn),
         )
         refresh_structure_matviews(sa_sync_conn)
 
@@ -409,8 +396,7 @@ class TestHumanDecisionsOnGroups:
         reject_pair(
             publication_id,
             person_id,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
         )
 
@@ -466,8 +452,7 @@ class TestHumanDecisionsOnPublicationPerimeter:
         reject_pair(
             publication_id,
             person_id,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=repo,
         )
 
@@ -493,8 +478,7 @@ class TestHumanDecisionsOnPublicationPerimeter:
         assign_orphan_contribution(
             person_id,
             contribution_id,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=person_repository(sa_sync_conn),
             contribution_repo=repo,
         )
@@ -509,8 +493,7 @@ class TestHumanDecisionsOnPublicationPerimeter:
         batch_assign_orphan_contributions(
             person_id,
             [first_group, second_group],
-            conn=sa_sync_conn,
-            perimeter_recompute=_PUBLICATION_PERIMETER_RECOMPUTE,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=person_repository(sa_sync_conn),
             contribution_repo=repo,
         )

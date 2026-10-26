@@ -279,7 +279,6 @@ def get_type_change_impact(
 def update_serial(
     serial_id: int,
     body: SerialUpdate,
-    conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
 ) -> OkResponse:
@@ -292,7 +291,6 @@ def update_serial(
     serials_service.update_serial(
         serial_id,
         update=body,
-        conn=conn,
         repo=repo,
         recompute=recompute,
     )
@@ -303,7 +301,6 @@ def update_serial(
 def merge(
     serial_id: int,
     body: MergeRequest,
-    conn: DbConn,
     repo: SerialRepository = Depends(serial_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
 ) -> MergeResponse:
@@ -314,7 +311,6 @@ def merge(
     serials_service.merge_serials(
         serial_id,
         body.source_id,
-        conn=conn,
         recompute=recompute,
         repo=repo,
     )

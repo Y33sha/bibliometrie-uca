@@ -30,7 +30,6 @@ from application.services import structures as structures_service
 from domain.structures.ror import RorType
 from domain.structures.structure import StructureType
 from interfaces.api.deps import (
-    DbConn,
     get_perimeter_structures,
     perimeter_repo,
     structure_repo,
@@ -96,7 +95,6 @@ def create_structure(
 @router.post("/tutelles", response_model=StructureTutelleCreateResponse)
 def create_tutelle(
     data: TutelleCreate,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
 ) -> StructureTutelleCreateResponse:
@@ -107,7 +105,6 @@ def create_tutelle(
     row = structures_service.create_tutelle(
         parent_id=data.parent_id,
         child_id=data.child_id,
-        conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
     )
@@ -119,14 +116,12 @@ def create_tutelle(
 @router.delete("/tutelles/{tutelle_id}", response_model=DeletedResponse)
 def delete_tutelle(
     tutelle_id: int,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
 ) -> DeletedResponse:
     """Supprime une tutelle. 404 si l'id n'existe pas."""
     structures_service.delete_tutelle(
         tutelle_id,
-        conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
     )
@@ -292,7 +287,6 @@ def update_structure(
 @router.delete("/{structure_id}", response_model=DeletedResponse)
 def delete_structure(
     structure_id: int,
-    conn: DbConn,
     repo: StructureRepository = Depends(structure_repo),
     perimeters: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
@@ -300,7 +294,6 @@ def delete_structure(
     """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue."""
     structures_service.delete_structure(
         structure_id,
-        conn=conn,
         repo=repo,
         perimeter_repo=perimeters,
         perimeter_structures=perimeter_structures,

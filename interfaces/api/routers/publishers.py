@@ -26,7 +26,6 @@ from application.services import publishers as publishers_service
 from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from interfaces.api.deps import (
-    DbConn,
     entity_detail,
     publication_count_recompute,
     publisher_queries,
@@ -167,7 +166,6 @@ def update_publisher(
 def merge(
     publisher_id: int,
     body: MergeRequest,
-    conn: DbConn,
     publishers: PublisherRepository = Depends(publisher_repo),
     serials: SerialRepository = Depends(serial_repo),
     recompute: SerialRecompute = Depends(serial_recompute),
@@ -184,7 +182,6 @@ def merge(
     publishers_service.merge_publishers(
         publisher_id,
         body.source_id,
-        conn=conn,
         recompute=recompute,
         publication_count_recompute=publication_count_recompute,
         publisher_repo=publishers,

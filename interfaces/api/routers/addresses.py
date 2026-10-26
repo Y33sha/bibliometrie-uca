@@ -32,7 +32,6 @@ from application.services.addresses import (
     structure_links as structure_links_service,
 )
 from interfaces.api.deps import (
-    DbConn,
     address_repo,
     addresses_queries,
     bg_propagate_countries,
@@ -228,7 +227,6 @@ def list_addresses_countries(
 def batch_set_country(
     body: BatchSetCountry,
     bg: BackgroundTasks,
-    conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     recompute: CountryRecompute = Depends(country_recompute),
 ) -> BatchCountryResponse:
@@ -237,7 +235,6 @@ def batch_set_country(
     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
     """
     modified_ids = countries_service.batch_set_country(
-        conn,
         body.country_code,
         address_ids=body.address_ids,
         search=body.search,
@@ -255,7 +252,6 @@ def set_address_country(
     addr_id: int,
     body: SetCountry,
     bg: BackgroundTasks,
-    conn: DbConn,
     addr_repo: AddressRepository = Depends(address_repo),
     recompute: CountryRecompute = Depends(country_recompute),
 ) -> OkResponse:
@@ -264,7 +260,6 @@ def set_address_country(
     Renvoie 422 sur un code pays absent du référentiel, 404 sur une adresse introuvable (`set_country`).
     """
     affected = countries_service.set_country(
-        conn,
         addr_id,
         body.countries,
         repo=addr_repo,

@@ -293,47 +293,32 @@ def addresses_queries(conn: DbConn) -> AddressesQueries:
     return PgAddressesQueries(conn)
 
 
-# `PerimeterStructures` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_perimeter_structures_singleton: PerimeterStructuresPort = PerimeterStructures()
+# Recalculs du pipeline, construits comme les repositories sur la connexion de la requête.
 
 
-def get_perimeter_structures() -> PerimeterStructuresPort:
-    return _perimeter_structures_singleton
+def get_perimeter_structures(conn: DbConn) -> PerimeterStructuresPort:
+    """Clôture des tutelles des périmètres."""
+    return PerimeterStructures(conn)
 
 
-# `SerialRecompute` est sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_serial_recompute_singleton: SerialRecomputePort = SerialRecompute()
-
-
-def serial_recompute() -> SerialRecomputePort:
+def serial_recompute(conn: DbConn) -> SerialRecomputePort:
     """Requalification des publications d'une revue après son édition ou sa fusion."""
-    return _serial_recompute_singleton
+    return SerialRecompute(conn)
 
 
-# Recalculs sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_publication_perimeter_recompute_singleton: PublicationPerimeterRecomputePort = (
-    PublicationPerimeterRecompute()
-)
-_publication_count_recompute_singleton: PublicationCountRecomputePort = PublicationCountRecompute()
-
-
-def publication_perimeter_recompute() -> PublicationPerimeterRecomputePort:
+def publication_perimeter_recompute(conn: DbConn) -> PublicationPerimeterRecomputePort:
     """Appartenance au périmètre des publications, après une décision sur une personne ou sur ses contributions."""
-    return _publication_perimeter_recompute_singleton
+    return PublicationPerimeterRecompute(conn)
 
 
-def publication_count_recompute() -> PublicationCountRecomputePort:
+def publication_count_recompute(conn: DbConn) -> PublicationCountRecomputePort:
     """`publication_count` d'un éditeur, après une fusion d'éditeurs."""
-    return _publication_count_recompute_singleton
+    return PublicationCountRecompute(conn)
 
 
-# Recalcul des pays exposé par le pipeline, sans état (la connexion est passée aux méthodes) : un singleton par processus suffit.
-_country_recompute_singleton: CountryRecomputePort = CountryRecompute()
-
-
-def country_recompute() -> CountryRecomputePort:
+def country_recompute(conn: DbConn) -> CountryRecomputePort:
     """Résolution des pays d'adresses et recalcul ciblé des pays des publications, exposés par le pipeline."""
-    return _country_recompute_singleton
+    return CountryRecompute(conn)
 
 
 # ----- Tâches de fond (BackgroundTasks) -----
@@ -358,7 +343,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
     _run_detached(
         "propagation des pays",
         lambda conn: countries_service.propagate_countries_to_publications(
-            conn, address_ids, country_recompute=_country_recompute_singleton
+            address_ids, country_recompute=CountryRecompute(conn)
         ),
     )
 
@@ -371,10 +356,9 @@ def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
     _run_detached(
         "propagation d'in_perimeter",
         lambda conn: propagate_in_perimeter_for_addresses(
-            conn,
             address_ids,
             repo=contribution_repository(conn),
-            perimeter_structures=get_perimeter_structures(),
-            perimeter_recompute=SourceContributionPerimeterRecompute(),
+            perimeter_structures=PerimeterStructures(conn),
+            perimeter_recompute=SourceContributionPerimeterRecompute(conn),
         ),
     )

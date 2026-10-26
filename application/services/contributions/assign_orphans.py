@@ -7,8 +7,6 @@ Elles vérifient l'existence de la personne cible : elles écrivent des lignes q
 
 import logging
 
-from sqlalchemy import Connection
-
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.repositories.contribution_repository import (
@@ -84,7 +82,6 @@ def _attach_groups(
     person_id: int,
     groups: list[GroupRow],
     *,
-    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
@@ -99,14 +96,13 @@ def _attach_groups(
         {(m["author_name_normalized"], m["source"]) for m in members if m["author_name_normalized"]}
     ):
         repo.add_name_form(person_id, name_form, source=source)
-    perimeter_recompute.refresh_publications(conn, sorted({g["publication_id"] for g in groups}))
+    perimeter_recompute.refresh_publications(sorted({g["publication_id"] for g in groups}))
 
 
 def assign_orphan_contribution(
     person_id: int,
     contribution_id: int,
     *,
-    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
@@ -141,7 +137,6 @@ def assign_orphan_contribution(
     _attach_groups(
         person_id,
         [group],
-        conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
         perimeter_recompute=perimeter_recompute,
@@ -160,7 +155,6 @@ def assign_orphan_contribution_to_new_person(
     last_name: str,
     first_name: str,
     *,
-    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
@@ -174,7 +168,6 @@ def assign_orphan_contribution_to_new_person(
     assign_orphan_contribution(
         person_id,
         contribution_id,
-        conn=conn,
         repo=repo,
         contribution_repo=contribution_repo,
         perimeter_recompute=perimeter_recompute,
@@ -187,7 +180,6 @@ def batch_assign_orphan_contributions(
     person_id: int,
     group_ids: list[int],
     *,
-    conn: Connection,
     repo: PersonRepository,
     contribution_repo: ContributionRepository,
     perimeter_recompute: PublicationPerimeterRecompute,
@@ -226,7 +218,6 @@ def batch_assign_orphan_contributions(
         _attach_groups(
             person_id,
             groups,
-            conn=conn,
             repo=repo,
             contribution_repo=contribution_repo,
             perimeter_recompute=perimeter_recompute,

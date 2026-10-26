@@ -38,8 +38,6 @@ from tests.integration.helpers.structures import (
     insert_structure_name_form,
 )
 
-_GATEWAY = CountryRecompute()
-
 
 @pytest.fixture
 def repo(sa_sync_conn):
@@ -47,8 +45,8 @@ def repo(sa_sync_conn):
 
 
 @pytest.fixture
-def perimeter_structures():
-    return PerimeterStructures()
+def perimeter_structures(sa_sync_conn):
+    return PerimeterStructures(sa_sync_conn)
 
 
 @pytest.fixture
@@ -189,7 +187,9 @@ class TestSetCountry:
     def test_assigns_countries(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        affected = set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_recompute=_GATEWAY)
+        affected = set_country(
+            addr, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
+        )
         assert affected == [addr]
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
@@ -203,27 +203,29 @@ class TestSetCountry:
             CountryDetectionMethod.COUNTRY_NAME, [(addr, ["FR"])]
         )
 
-        set_country(sa_sync_conn, addr, ["DE"], repo=repo, country_recompute=_GATEWAY)
+        set_country(addr, ["DE"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
 
         assert _get_countries(sa_sync_conn, addr) == ["DE"]
 
     def test_raises_on_unknown_country(self, sa_sync_conn, repo):
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
-            set_country(sa_sync_conn, addr, ["ZZ"], repo=repo, country_recompute=_GATEWAY)
+            set_country(addr, ["ZZ"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_raises_on_unknown_address(self, sa_sync_conn, repo):
         """L'`UPDATE` n'apparie aucune ligne : sans cette garde, l'API répondrait 200 sans rien faire."""
         ensure_country(sa_sync_conn, "FR")
         with pytest.raises(NotFoundError):
-            set_country(sa_sync_conn, 999999, ["FR"], repo=repo, country_recompute=_GATEWAY)
+            set_country(999999, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
 
     def test_raises_on_one_unknown_among_known(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="ZZ"):
-            set_country(sa_sync_conn, addr, ["FR", "ZZ"], repo=repo, country_recompute=_GATEWAY)
+            set_country(
+                addr, ["FR", "ZZ"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
+            )
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_none_returns_the_address_to_automatic_candidates(self, sa_sync_conn, repo):
@@ -233,9 +235,9 @@ class TestSetCountry:
         CountryCandidatesStore(sa_sync_conn).add(
             CountryDetectionMethod.COUNTRY_NAME, [(addr, ["FR"])]
         )
-        set_country(sa_sync_conn, addr, ["DE"], repo=repo, country_recompute=_GATEWAY)
+        set_country(addr, ["DE"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
 
-        set_country(sa_sync_conn, addr, None, repo=repo, country_recompute=_GATEWAY)
+        set_country(addr, None, repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
 
         assert _get_countries(sa_sync_conn, addr) == ["FR"]
 
@@ -248,7 +250,7 @@ class TestBatchSetCountryByIds:
         ensure_country(sa_sync_conn, "FR")
         addrs = [insert_address(sa_sync_conn, f"a{i}") for i in range(3)]
         modified = batch_set_country_by_ids(
-            sa_sync_conn, "FR", addrs, repo=repo, country_recompute=_GATEWAY
+            "FR", addrs, repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
         )
         assert set(modified) == set(addrs)
         for a in addrs:
@@ -258,7 +260,7 @@ class TestBatchSetCountryByIds:
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             batch_set_country_by_ids(
-                sa_sync_conn, "ZZ", [addr], repo=repo, country_recompute=_GATEWAY
+                "ZZ", [addr], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
             )
 
     def test_raises_on_empty_country_code(self, sa_sync_conn, repo):
@@ -266,22 +268,26 @@ class TestBatchSetCountryByIds:
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             batch_set_country_by_ids(
-                sa_sync_conn, "", [addr], repo=repo, country_recompute=_GATEWAY
+                "", [addr], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
             )
 
     def test_appends_to_existing_countries(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
         ensure_country(sa_sync_conn, "US")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_recompute=_GATEWAY)
-        batch_set_country_by_ids(sa_sync_conn, "US", [addr], repo=repo, country_recompute=_GATEWAY)
+        set_country(addr, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
+        batch_set_country_by_ids(
+            "US", [addr], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
+        )
         assert _get_countries(sa_sync_conn, addr) == ["FR", "US"]
 
     def test_idempotent_if_already_present(self, sa_sync_conn, repo):
         ensure_country(sa_sync_conn, "FR")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_recompute=_GATEWAY)
-        batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo, country_recompute=_GATEWAY)
+        set_country(addr, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
+        batch_set_country_by_ids(
+            "FR", [addr], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
+        )
         assert _get_countries(sa_sync_conn, addr) == ["FR"]  # pas de doublon
 
 
@@ -294,7 +300,7 @@ class TestBatchSetCountryByFilter:
         match = insert_address(sa_sync_conn, "Université Clermont")
         other = insert_address(sa_sync_conn, "MIT Boston")
         modified = batch_set_country_by_filter(
-            sa_sync_conn, "FR", search="Clermont", repo=repo, country_recompute=_GATEWAY
+            "FR", search="Clermont", repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
         )
         assert match in modified
         assert other not in modified
@@ -303,7 +309,7 @@ class TestBatchSetCountryByFilter:
         insert_address(sa_sync_conn, "Université Clermont")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             batch_set_country_by_filter(
-                sa_sync_conn, "ZZ", search="Clermont", repo=repo, country_recompute=_GATEWAY
+                "ZZ", search="Clermont", repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
             )
 
     def test_filter_has_country_no(self, sa_sync_conn, repo):
@@ -311,9 +317,9 @@ class TestBatchSetCountryByFilter:
         ensure_country(sa_sync_conn, "US")
         addr_no = insert_address(sa_sync_conn, "sans pays")
         addr_yes = insert_address(sa_sync_conn, "avec pays")
-        set_country(sa_sync_conn, addr_yes, ["US"], repo=repo, country_recompute=_GATEWAY)
+        set_country(addr_yes, ["US"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
         modified = batch_set_country_by_filter(
-            sa_sync_conn, "FR", has_country=False, repo=repo, country_recompute=_GATEWAY
+            "FR", has_country=False, repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
         )
         assert addr_no in modified
         assert addr_yes not in modified
@@ -321,7 +327,9 @@ class TestBatchSetCountryByFilter:
     def test_empty_filter_raises(self, sa_sync_conn, repo):
         """Aucun filtre → refus (garde-fou : ne pas viser toutes les adresses)."""
         with pytest.raises(ValidationError):
-            batch_set_country_by_filter(sa_sync_conn, "FR", repo=repo, country_recompute=_GATEWAY)
+            batch_set_country_by_filter(
+                "FR", repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
+            )
 
 
 def _marked(conn, address_id):
@@ -335,7 +343,7 @@ class TestAddressCountriesQueue:
         ensure_country(sa_sync_conn, "FR")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
-        set_country(sa_sync_conn, addr, ["FR"], repo=repo, country_recompute=_GATEWAY)
+        set_country(addr, ["FR"], repo=repo, country_recompute=CountryRecompute(sa_sync_conn))
 
         assert _marked(sa_sync_conn, addr)
 
@@ -343,7 +351,9 @@ class TestAddressCountriesQueue:
         ensure_country(sa_sync_conn, "FR")
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
-        batch_set_country_by_ids(sa_sync_conn, "FR", [addr], repo=repo, country_recompute=_GATEWAY)
+        batch_set_country_by_ids(
+            "FR", [addr], repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
+        )
 
         assert _marked(sa_sync_conn, addr)
 
@@ -352,7 +362,7 @@ class TestAddressCountriesQueue:
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         batch_set_country_by_filter(
-            sa_sync_conn, "FR", search="Clermont", repo=repo, country_recompute=_GATEWAY
+            "FR", search="Clermont", repo=repo, country_recompute=CountryRecompute(sa_sync_conn)
         )
 
         assert _marked(sa_sync_conn, addr)
@@ -364,7 +374,7 @@ class TestAddressCountriesQueue:
 class TestPropagateCountriesToPublications:
     def test_empty_is_noop(self, sa_sync_conn, repo):
         propagate_countries_to_publications(
-            sa_sync_conn, [], country_recompute=_GATEWAY
+            [], country_recompute=CountryRecompute(sa_sync_conn)
         )  # pas d'exception
 
     def test_propagates_to_source_record_and_publication(self, sa_sync_conn, repo):
@@ -385,7 +395,9 @@ class TestPropagateCountriesToPublications:
         )
         insert_source_contribution_address(sa_sync_conn, source_contribution_id, address_id=addr)
 
-        propagate_countries_to_publications(sa_sync_conn, [addr], country_recompute=_GATEWAY)
+        propagate_countries_to_publications(
+            [addr], country_recompute=CountryRecompute(sa_sync_conn)
+        )
 
         # source_records.countries mis à jour
         source_record_countries = sa_sync_conn.execute(

@@ -19,8 +19,6 @@ from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 
-_PERIMETER = PublicationPerimeterRecompute()
-
 
 def _orphan_source_contribution(conn):
     """Publication + source_record + source_contribution orpheline, seul membre d'un groupe d'auteur du périmètre sans personne. Retourne (source_contribution_id, groupe, publication_id)."""
@@ -55,8 +53,7 @@ def test_attach_pins(sa_sync_conn):
     assign_orphan_contribution(
         pid,
         group,
-        conn=sa_sync_conn,
-        perimeter_recompute=_PERIMETER,
+        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         repo=person_repository(sa_sync_conn),
         contribution_repo=contribution_repository(sa_sync_conn),
     )
@@ -70,8 +67,7 @@ def test_detach_unpins(sa_sync_conn):
     assign_orphan_contribution(
         pid,
         group,
-        conn=sa_sync_conn,
-        perimeter_recompute=_PERIMETER,
+        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         repo=person_repository(sa_sync_conn),
         contribution_repo=contribution_repository(sa_sync_conn),
     )
@@ -80,8 +76,7 @@ def test_detach_unpins(sa_sync_conn):
     reject_pair(
         publication,
         pid,
-        conn=sa_sync_conn,
-        perimeter_recompute=_PERIMETER,
+        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         repo=contribution_repository(sa_sync_conn),
     )
     assert _pin(sa_sync_conn, sa) is None
@@ -97,8 +92,7 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
     assign_orphan_contribution(
         pid,
         pinned_group,
-        conn=sa_sync_conn,
-        perimeter_recompute=_PERIMETER,
+        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
         repo=persons,
         contribution_repo=contributions,
     )
@@ -136,8 +130,7 @@ def test_attach_refuse_quand_la_personne_a_un_groupe_manuel_dans_la_publication(
         assign_orphan_contribution(
             pid,
             group,
-            conn=sa_sync_conn,
-            perimeter_recompute=_PERIMETER,
+            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
             repo=person_repository(sa_sync_conn),
             contribution_repo=contribution_repository(sa_sync_conn),
         )

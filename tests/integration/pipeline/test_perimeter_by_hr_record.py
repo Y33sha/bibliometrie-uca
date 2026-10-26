@@ -126,8 +126,8 @@ def test_identifiant_en_attente_ignore(sa_sync_conn):
 def test_le_recalcul_apres_edition_d_adresse_garde_l_identite(sa_sync_conn, rh_person):
     source_contribution = _source_contribution(sa_sync_conn, publication_year=2021)
 
-    SourceContributionPerimeterRecompute().recompute_perimeter(
-        sa_sync_conn, [source_contribution], []
+    SourceContributionPerimeterRecompute(sa_sync_conn).recompute_perimeter(
+        [source_contribution], []
     )
 
     assert _in_perimeter(sa_sync_conn, source_contribution)

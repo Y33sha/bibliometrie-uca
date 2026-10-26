@@ -21,7 +21,6 @@ from application.ports.repositories.contribution_repository import ContributionR
 from application.ports.repositories.person_repository import PersonRepository
 from application.services.contributions import assign_orphans, core as contributions_service
 from interfaces.api.deps import (
-    DbConn,
     contribution_repo,
     contributions_queries,
     person_repo,
@@ -85,7 +84,6 @@ def orphan_contributions_facets(
 )
 def assign_orphan_contribution(
     body: AssignOrphanContribution,
-    conn: DbConn,
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -99,7 +97,6 @@ def assign_orphan_contribution(
             body.contribution_id,
             body.create_person.last_name,
             body.create_person.first_name,
-            conn=conn,
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
@@ -110,7 +107,6 @@ def assign_orphan_contribution(
         assign_orphans.assign_orphan_contribution(
             person_id,
             body.contribution_id,
-            conn=conn,
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
@@ -126,7 +122,6 @@ def assign_orphan_contribution(
 )
 def batch_assign_orphan_contributions(
     body: BatchAssignOrphanContributions,
-    conn: DbConn,
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -141,7 +136,6 @@ def batch_assign_orphan_contributions(
     assigned = assign_orphans.batch_assign_orphan_contributions(
         body.person_id,
         body.group_ids,
-        conn=conn,
         repo=persons,
         contribution_repo=contributions,
         perimeter_recompute=perimeter_recompute,
@@ -156,7 +150,6 @@ def batch_assign_orphan_contributions(
 @router.patch("/{contribution_id}/exclude", response_model=OkResponse)
 def exclude_contribution(
     contribution_id: int,
-    conn: DbConn,
     repo: ContributionRepository = Depends(contribution_repo),
     persons: PersonRepository = Depends(person_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -167,7 +160,6 @@ def exclude_contribution(
     """
     contributions_service.exclude_contribution(
         contribution_id,
-        conn=conn,
         repo=repo,
         person_repo=persons,
         perimeter_recompute=perimeter_recompute,

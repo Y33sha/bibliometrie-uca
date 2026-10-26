@@ -14,7 +14,6 @@ from application.ports.repositories.perimeter_repository import (
 )
 from application.services import perimeters as perimeters_service
 from interfaces.api.deps import (
-    DbConn,
     config_queries,
     get_perimeter_structures,
     perimeter_repo,
@@ -43,7 +42,6 @@ def list_perimeters(
 @router.post("", response_model=CreatedIdResponse)
 def create_perimeter(
     body: PerimeterCreate,
-    conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
 ) -> CreatedIdResponse:
@@ -55,7 +53,6 @@ def create_perimeter(
         code=body.code,
         name=body.name,
         root_structure_ids=body.root_structure_ids,
-        conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
     )
@@ -66,7 +63,6 @@ def create_perimeter(
 def update_perimeter(
     perimeter_id: int,
     body: PerimeterUpdate,
-    conn: DbConn,
     repo: PerimeterRepository = Depends(perimeter_repo),
     perimeter_structures: PerimeterStructures = Depends(get_perimeter_structures),
 ) -> OkResponse:
@@ -77,7 +73,6 @@ def update_perimeter(
     perimeters_service.update_perimeter(
         perimeter_id,
         update=body,
-        conn=conn,
         repo=repo,
         perimeter_structures=perimeter_structures,
     )

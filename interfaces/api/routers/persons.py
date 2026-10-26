@@ -35,7 +35,6 @@ from domain.merge import MergedEntity
 from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from interfaces.api.deps import (
-    DbConn,
     contribution_repo,
     entity_detail,
     person_repo,
@@ -387,7 +386,6 @@ def add_person_identifier(
 def set_person_exclusion(
     person_id: int,
     body: SetPersonExclusion,
-    conn: DbConn,
     repo: PersonRepository = Depends(person_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
 ) -> OkResponse:
@@ -398,7 +396,6 @@ def set_person_exclusion(
     persons_service.set_exclusion(
         person_id,
         body.exclusion,
-        conn=conn,
         repo=repo,
         perimeter_recompute=perimeter_recompute,
     )
@@ -437,7 +434,6 @@ def merge_persons(
 def detach_contributions(
     person_id: int,
     body: DetachContributions,
-    conn: DbConn,
     persons: PersonRepository = Depends(person_repo),
     contributions: ContributionRepository = Depends(contribution_repo),
     perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
@@ -450,7 +446,6 @@ def detach_contributions(
                 {"source": a.source, "source_contribution_id": a.source_contribution_id}
                 for a in body.contributions
             ],
-            conn=conn,
             repo=persons,
             contribution_repo=contributions,
             perimeter_recompute=perimeter_recompute,
