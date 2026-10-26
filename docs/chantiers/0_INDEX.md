@@ -110,7 +110,6 @@
 - 2026-06-16 — [Publications : retour à match_or_create, corrections a priori, fusion réparatrice](archived/2026-06-16_DATA_publications-match-or-create.md)
 - 2026-06-14 — [Performance du pipeline (phase par phase)](archived/2026-06-14_CODE_perf-pipeline.md)
 - 2026-06-13 — [Performance des pages de listes (UI)](archived/2026-06-13_DATA_perf-pages-listes.md)
-- 2026-06-11 — [Publications : matching par création⇒fusion + modélisation des identifiants](archived/2026-06-11_DATA_publications-creation-fusion.md)
 
 
 

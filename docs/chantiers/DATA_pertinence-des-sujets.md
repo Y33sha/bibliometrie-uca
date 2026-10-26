@@ -156,6 +156,7 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [ ] Nuages de sujets (`entity_subjects_sql`), filtre et facette par sujet (`infrastructure/read_models/filters.py`, `entity_facet.py`) : liens rejetés écartés
 - [ ] `/publications/[id]` : `get_publication_subjects` rend le statut de rejet ; `SubjectsBlock.svelte` barre et grise les sujets rejetés
 - [ ] Guide utilisateur : sens d'un sujet barré
+- [ ] Décomptes de sujets restreints au périmètre : `usage_count` et `subject_cooccurrences` comptent seulement les publications `in_perimeter`
 
 ## Questions ouvertes
 
