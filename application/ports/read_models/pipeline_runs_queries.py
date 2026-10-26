@@ -10,11 +10,7 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from application.ports.pipeline.phase_executions import (
-    PhaseMetricsPayload,
-    PhaseStatus,
-    Signal,
-)
+from domain.pipeline_runs import PhaseMetricsPayload, PhaseStatus, Signal
 
 
 class PhaseBrief(BaseModel):

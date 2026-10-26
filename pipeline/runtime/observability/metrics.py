@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from application.ports.pipeline.phase_executions import PhaseMetricsPayload, Signal
+from domain.pipeline_runs import PhaseMetricsPayload, Signal
 from pipeline.runtime.observability.log_format import inflect
 
 EXTRA_LABELS: dict[str, str | tuple[str, str]] = {

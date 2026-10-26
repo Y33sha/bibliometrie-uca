@@ -10,18 +10,31 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+from dataclasses import dataclass, field
 
 from sqlalchemy import Connection, text
 
-from application.ports.pipeline.phase_executions import (
-    PhaseExecution,
-    PhaseMetricsPayload,
-    PhaseStatus,
-    Signal,
-)
+from domain.pipeline_runs import PhaseMetricsPayload, PhaseStatus, Signal
 from infrastructure.db.engine import get_sync_engine
 
 log = logging.getLogger(__name__)
+
+
+@dataclass
+class PhaseExecution:
+    """Une exécution de phase, prête à persister."""
+
+    run_id: int
+    phase: str
+    started_at: datetime.datetime
+    ended_at: datetime.datetime
+    mode: str
+    sources: list[str]
+    status: PhaseStatus
+    metrics: PhaseMetricsPayload
+    signals: list[Signal] = field(default_factory=list)
+    # Indicateurs sur-mesure remontés par la phase (conventions `summary`, `table`, `lines`, `matrix` ; cf. `interfaces/frontend/.../phase-views.ts`).
+    details: dict[str, object] = field(default_factory=dict)
 
 
 def next_run_id(conn: Connection) -> int:
