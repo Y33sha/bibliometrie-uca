@@ -53,10 +53,6 @@
 - 2026-10-12 — [Le SQL métier partagé hors d'`infrastructure/db`](archived/2026-10-12_CODE_infrastructure-db.md)
 - 2026-10-12 — [Un schéma PostgreSQL par domaine](archived/2026-10-12_CODE_schemas-par-domaine.md)
 - 2026-10-12 — [Le pipeline en paquet racine](archived/2026-10-12_CODE_pipeline-package-racine.md)
-- 2026-10-11 — [Graphe de dépendances du pipeline](archived/2026-10-11_CODE_pipeline-dag.md)
-- 2026-10-11 — [Décisions humaines durables](archived/2026-10-11_DATA_decisions-humaines-durables.md)
-- 2026-10-10 — [Clients HTTP des sources : gestion d'erreur commune](archived/2026-10-10_CODE_clients-http-dry.md)
-- 2026-10-09 — [Duplications dans les tests](archived/2026-10-09_CODE_duplications-tests.md)
 
 
 
