@@ -87,7 +87,6 @@
 - 2026-07-11 — [Countries : caches pays intermédiaires](archived/2026-07-11_CODE_countries-caches-intermediaires.md)
 - 2026-07-10 — [run_pipeline : réduire à la coquille CLI](archived/2026-07-10_CODE_run-pipeline-coquille-cli.md)
 - 2026-07-09 — [Hors périmètre : ne pas matérialiser plutôt que masquer](archived/2026-07-09_DATA_hors-perimetre-non-materialise.md)
-- 2026-07-08 — [Personnes : résolution d'identité ordre-indépendante](archived/2026-07-08_DATA_persons-cascade-ordre-independante.md)
 
 
 
