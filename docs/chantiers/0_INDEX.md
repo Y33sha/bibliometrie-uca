@@ -187,6 +187,3 @@
 
   Le composant `<PublicationsListView>` sert désormais pour 4 pages partageant le même tableau de publications avec filtres à facettes.
 
-- 2026-04-30 — [Sujets / mots-clés](archived/2026-04-30_METIER_sujets-mots-cles.md)
-
-  Les sujets et mots-clés étaient stockés dans `source_publications`mais pas exploités. Création des tables `subjects` et `subject_cooccurrences`. Création de la page sujets, création du nuage de mots dans les dashboards personne et labo.

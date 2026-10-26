@@ -136,7 +136,8 @@ Les trois pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [ ] Schéma : `subjects` porte vocabulaire, code, niveau et parent ; unicité sur (vocabulaire, code) à la place de l'unicité sur le libellé
 - [ ] Normalizer OpenAlex : `extract_topics` conserve l'identifiant de chaque niveau
 - [ ] Normalizer theses.fr : les vedettes RAMEAU gardent leur PPN
-- [ ] Stock OpenAlex et theses.fr : réhydratation depuis le raw store, puis normalisation
+- [ ] Normalizer HAL : mots-clés lus dans les `<term>` du TEI (`label_xml`), `keyword_s` à défaut. `keyword_s` perd les parenthèses : « eau destinée à la consommation humaine (EDCH) » devient « Eau destinée à la consommation humaine EDCH »
+- [ ] Stock OpenAlex, theses.fr et HAL : réhydratation depuis le raw store, puis normalisation
 - [ ] Extracteurs (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent ; domaines HAL par leur code, OpenAlex par ses identifiants, vedettes RAMEAU de ScanR et de theses.fr par leur PPN, discipline de theses.fr par son libellé ; extracteur WoS retiré
 - [ ] Ingestion de la phase `subjects` par (vocabulaire, code) ; reconstruction du stock
 - [ ] Rattachement des domaines de haut niveau de chaque vocabulaire à la palette commune : codes HAL, mots-clés des disciplines theses.fr (correspondances du prototype de vote)
