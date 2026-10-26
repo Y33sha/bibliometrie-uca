@@ -126,6 +126,14 @@ class TestHalDuplicatePublicationsByDoi:
         res = _q(sa_sync_conn).hal_duplicate_publications_by_doi(page=1, per_page=50)
         assert res.total == 0
 
+    def test_ignores_deposits_without_publication(self, sa_sync_conn):
+        """Des dépôts hors périmètre, sans publication, partagent un DOI."""
+        _source_record(sa_sync_conn, None, source_id="h-out-1", doi="10.1/out")
+        _source_record(sa_sync_conn, None, source_id="h-out-2", doi="10.1/out")
+        res = _q(sa_sync_conn).hal_duplicate_publications_by_doi(page=1, per_page=50)
+        assert res.total == 0
+        assert res.pairs == []
+
 
 class TestHalDuplicatePublicationsByMetadata:
     def test_detects_pair_with_same_title_and_year(self, sa_sync_conn):

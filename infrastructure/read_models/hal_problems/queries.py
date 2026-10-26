@@ -185,10 +185,11 @@ class HalProblemsQueries:
         self, *, page: int, per_page: int
     ) -> HalDoiDuplicatesResponse:
         offset = (page - 1) * per_page
-        # Un même DOI (insensible à la casse) déposé sur au moins deux enregistrements sources HAL de la même publication.
+        # Un même DOI (insensible à la casse) déposé sur au moins deux enregistrements sources HAL de la même publication. Les enregistrements sans publication sont hors périmètre.
         dup_query = """
             FROM source_records sr
-            WHERE sr.source = 'hal' AND sr.doi IS NOT NULL AND sr.doi != ''
+            WHERE sr.source = 'hal' AND sr.publication_id IS NOT NULL
+              AND sr.doi IS NOT NULL AND sr.doi != ''
             GROUP BY sr.publication_id, LOWER(sr.doi)
             HAVING COUNT(*) >= 2
         """
