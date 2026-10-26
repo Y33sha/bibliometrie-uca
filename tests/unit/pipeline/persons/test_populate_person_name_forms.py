@@ -73,7 +73,7 @@ def test_rend_le_bilan_de_la_synchronisation(queries):
 
 
 def test_empty_persons_still_creates_temp_and_syncs(queries):
-    """Pas de personnes : pas d'insert batch, mais le sync SQL est appelé (cas pertinent : il agrège aussi en SQL les formes des membres des groupes, donc peut produire des lignes)."""
+    """Pas de personnes : pas d'insert batch, mais le sync SQL est appelé (cas pertinent : il agrège aussi en SQL les formes des contributions sources des contributions, donc peut produire des lignes)."""
     populate(_FakeConn())
 
     assert queries.create_temp_called is True

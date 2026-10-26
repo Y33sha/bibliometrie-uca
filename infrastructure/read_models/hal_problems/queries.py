@@ -39,7 +39,7 @@ _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
 _IDREF = usable_identifier("'idref'")
 
-# Contributions sources HAL membres d'un groupe rattaché à une personne `g.person_id`, avec la référence d'un compte HAL.
+# Contributions sources HAL alignées dans une contribution rattachée à une personne `g.person_id`, avec la référence d'un compte HAL.
 _HAL_ACCOUNT_SOURCE_CONTRIBUTIONS = f"""
     FROM contributions g
     JOIN aligned_source_contributions m ON m.contribution_id = g.id

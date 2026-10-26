@@ -28,7 +28,7 @@ class EntitySql(NamedTuple):
     publication_count: str = "COUNT(*)"
 
 
-# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les groupes de contributions sources rattachés à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
+# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les contributions rattachées à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",

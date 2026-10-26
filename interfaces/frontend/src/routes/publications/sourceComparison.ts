@@ -195,7 +195,7 @@ export function otherRoles(s: SourceContribution): string[] {
 	return (s.roles ?? []).filter((r) => r !== 'author').sort((a, b) => rank(a) - rank(b));
 }
 
-/** Lignes des listes d'auteurs, pour des enregistrements déjà ordonnés : une ligne par groupe de contributions sources, une par contribution source hors des groupes, dans l'ordre de la liste de référence. Les lignes sans position viennent en dernier, par nom. */
+/** Lignes des listes d'auteurs, pour des enregistrements déjà ordonnés : une ligne par contribution, une par contribution source hors des contributions, dans l'ordre de la liste de référence. Les lignes sans position viennent en dernier, par nom. */
 export function authorRows(records: SourceRecord[], contributions: SourceContribution[]): AuthorRow[] {
 	const column = new Map(records.map((r, i) => [r.id, i]));
 	const members = new Map<string, SourceContribution[]>();

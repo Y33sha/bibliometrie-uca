@@ -23,7 +23,7 @@ dependencies = [
     "defusedxml==0.7.1",         # lecture du TEI joint aux notices HAL : refuse les déclarations d'entités, que l'analyseur standard développe
     "orjson>=3.13.0",
     "xxhash>=4.0.2",
-    "scipy==1.18.1",             # affectation optimale (algorithme hongrois) des signatures aux groupes d'auteurs
+    "scipy==1.18.1",             # affectation optimale (algorithme hongrois) des contributions sources aux contributions
 ]
 
 [project.scripts]
@@ -47,7 +47,7 @@ dev = [
     "import-linter==2.15",
     "pyyaml==6.0.3",           # lecture des descriptions de déploiement par les tests
     "tqdm==4.70.1",            # barres de progression du pipeline, importées sous `try` (cf. pipeline/runtime/observability/progression.py)
-    "splink==5.0.0",           # record linkage probabiliste (Fellegi-Sunter) : estimation des poids du modèle des groupes d'auteurs
+    "splink==5.0.0",           # record linkage probabiliste (Fellegi-Sunter) : estimation des poids du modèle de l'alignement des auteurs
     "duckdb==2.0.0",           # moteur de Splink, et lecture des fichiers Parquet de l'estimation des poids
     "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
     "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
@@ -68,7 +68,7 @@ include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipelin
 known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
 # `scripts/` et les hooks de `.claude/` outillent le dépôt sans être distribués : leurs imports
 # relèvent de l'environnement de développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
-# hors du dépôt. L'estimation des poids du modèle des groupes d'auteurs tourne sur le poste de
+# hors du dépôt. L'estimation des poids du modèle de l'alignement des auteurs tourne sur le poste de
 # développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement.
 extend_exclude = [
     "frontend",
