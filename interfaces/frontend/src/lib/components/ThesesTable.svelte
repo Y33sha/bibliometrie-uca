@@ -1,9 +1,14 @@
 <script lang="ts">
+	import AccessButton from '#lib/components/AccessButton.svelte';
+	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { asset, resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
+	import { sortDirection } from '#lib/sort.js';
 	import type { components, operations } from '#lib/api/schema.js';
 
 	// Ligne servie par `/api/publications` (mode thèses) : le sous-ensemble de `PublicationListItem` que ce tableau consomme.
@@ -11,8 +16,10 @@
 		components['schemas']['PublicationListItem'],
 		| 'id'
 		| 'title'
+		| 'doi'
 		| 'doc_type'
 		| 'oa_status'
+		| 'access_url'
 		| 'hal_id'
 		| 'openalex_id'
 		| 'scanr_id'
@@ -30,6 +37,8 @@
 		NonNullable<operations['list_publications_api_publications_get']['parameters']['query']>['sort']
 	>;
 
+	export type ThesisSortColumn = 'inscription' | 'soutenance' | 'title';
+
 	let {
 		items,
 		loading = false,
@@ -40,7 +49,7 @@
 		items: ThesisRow[];
 		loading?: boolean;
 		sort: PublicationSort;
-		onToggleSort: (asc: PublicationSort, desc: PublicationSort) => void;
+		onToggleSort: (column: ThesisSortColumn) => void;
 		showLabsColumn?: boolean;
 	} = $props();
 
@@ -55,19 +64,25 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	function sortDirection(asc: PublicationSort, desc: PublicationSort): 'asc' | 'desc' | null {
-		return sort === asc ? 'asc' : sort === desc ? 'desc' : null;
-	}
-	function sortActive(asc: PublicationSort, desc: PublicationSort): boolean {
-		return sort === asc || sort === desc;
-	}
+	// La visibilité des colonnes est partagée avec la liste des publications : seules DOI et Sources sont optionnelles.
+	const columnDefs = [
+		{ key: 'inscription', label: 'Inscription', fixed: true },
+		{ key: 'soutenance',  label: 'Soutenance',  fixed: true },
+		{ key: 'author',      label: 'Auteur',      fixed: true },
+		{ key: 'doi',         label: 'DOI' },
+		{ key: 'title',       label: 'Titre',       fixed: true },
+		{ key: 'status',      label: 'Statut',      fixed: true },
+		// svelte-ignore state_referenced_locally
+		...(showLabsColumn ? [{ key: 'labs', label: 'Laboratoire(s)', fixed: true }] : []),
+		{ key: 'sources',     label: 'Sources' },
+		{ key: 'access',      label: 'Accès',       fixed: true },
+	];
+	const cv = useColumnVisibility(columnDefs, ['sources']);
+	const col = cv.col;
 
-	const inscrSort = $derived(sortDirection('inscription_asc', 'inscription_desc'));
-	const inscrActive = $derived(sortActive('inscription_asc', 'inscription_desc'));
-	const soutSort = $derived(sortDirection('soutenance_asc', 'soutenance_desc'));
-	const soutActive = $derived(sortActive('soutenance_asc', 'soutenance_desc'));
-	const titleSort = $derived(sortDirection('title_asc', 'title_desc'));
-	const titleActive = $derived(sortActive('title_asc', 'title_desc'));
+	const inscrSort = $derived(sortDirection(sort, 'inscription'));
+	const soutSort = $derived(sortDirection(sort, 'soutenance'));
+	const titleSort = $derived(sortDirection(sort, 'title'));
 </script>
 
 <div class="table-scroll">
@@ -76,31 +91,39 @@
 		<tr>
 			<th
 				class="col-date sortable"
-				class:active={inscrActive}
-				onclick={() => onToggleSort('inscription_asc', 'inscription_desc')}
+				class:active={inscrSort !== null}
+				onclick={() => onToggleSort('inscription')}
 			>Inscription <SortChevron direction={inscrSort} /></th>
 			<th
 				class="col-date sortable"
-				class:active={soutActive}
-				onclick={() => onToggleSort('soutenance_asc', 'soutenance_desc')}
+				class:active={soutSort !== null}
+				onclick={() => onToggleSort('soutenance')}
 			>Soutenance <SortChevron direction={soutSort} /></th>
 			<th class="col-author">Auteur</th>
+			{#if col('doi')}<th class="col-doi">DOI</th>{/if}
 			<th
 				class="col-title sortable"
-				class:active={titleActive}
-				onclick={() => onToggleSort('title_asc', 'title_desc')}
+				class:active={titleSort !== null}
+				onclick={() => onToggleSort('title')}
 			>Titre <SortChevron direction={titleSort} /></th>
 			<th class="col-status">Statut</th>
 			{#if showLabsColumn}
 				<th class="col-labs">Laboratoire(s)</th>
 			{/if}
-			<th class="col-oa">OA</th>
-			<th class="col-sources">Sources</th>
+			{#if col('sources')}<th class="col-sources">Sources</th>{/if}
+			<th class="col-access col-menu-th">
+				Accès
+				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
+					showMenu={cv.showMenu}
+					onToggle={cv.toggle}
+					onClose={() => cv.showMenu = false}
+					onOpen={() => cv.showMenu = !cv.showMenu} />
+			</th>
 		</tr>
 	</thead>
 	<tbody>
 		{#if items.length === 0}
-			<TableStatusRow {loading} colspan={showLabsColumn ? 8 : 7} emptyText="Aucune thèse" />
+			<TableStatusRow {loading} colspan={cv.visibleColumns.length} emptyText="Aucune thèse" />
 		{/if}
 		{#each items as t (t.id)}
 			{@const insc = formatDate(t.date_inscription)}
@@ -119,6 +142,9 @@
 						{titleCase(t.thesis_author_name)}
 					{/if}
 				</td>
+				{#if col('doi')}<td class="col-doi">
+					{#if t.doi}<DoiLink doi={t.doi} />{/if}
+				</td>{/if}
 				<td class="col-title">
 					<a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a>
 				</td>
@@ -132,29 +158,11 @@
 				{#if showLabsColumn}
 					<td class="col-labs">
 						{#each t.lab_items || [] as lab}
-							<a href={resolve(`laboratories/${lab.id}?tab=theses`)} class="lab-tag">{lab.label}</a>
+							<a href={resolve(`structures/${lab.id}?tab=theses`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>
 				{/if}
-				<td class="oa-lock-cell">
-					{#if t.doc_type === 'ongoing_thesis'}
-						<span class="oa-lock-badge oa-lock-ongoing">
-							<img src={asset('hourglass.svg')} alt="En cours" class="oa-lock" title="Thèse en cours" />
-							<span class="oa-lock-label">en cours</span>
-						</span>
-					{:else if t.oa_status && !['unknown', 'closed'].includes(t.oa_status)}
-						<span class="oa-lock-badge oa-lock-open">
-							<img src={asset('lock-open.svg')} alt="Open Access" class="oa-lock" title="Open Access ({t.oa_status})" />
-							<span class="oa-lock-label">ouvert</span>
-						</span>
-					{:else}
-						<span class="oa-lock-badge oa-lock-closed">
-							<img src={asset('lock-closed.svg')} alt="Closed" class="oa-lock" title="Accès fermé" />
-							<span class="oa-lock-label">fermé</span>
-						</span>
-					{/if}
-				</td>
-				<td class="links-cell">
+				{#if col('sources')}<td class="links-cell">
 					{#if t.hal_id}
 						<a
 							href={t.record_urls.hal}
@@ -207,7 +215,8 @@
 					{:else}
 						<span class="source-tag source-placeholder"></span>
 					{/if}
-				</td>
+				</td>{/if}
+				<td class="col-access"><AccessButton accessUrl={t.access_url} oaStatus={t.oa_status} compact /></td>
 			</tr>
 		{/each}
 	</tbody>
@@ -249,12 +258,19 @@
 	.col-labs {
 		width: 180px;
 	}
-	.col-oa {
-		width: 75px;
-	}
 	.col-sources {
 		width: 120px;
 		text-align: center;
+	}
+	.col-doi {
+		width: 28px;
+	}
+	.col-access {
+		width: 120px;
+		white-space: nowrap;
+	}
+	.col-menu-th {
+		position: relative;
 	}
 
 	.status-badge {

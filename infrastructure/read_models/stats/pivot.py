@@ -28,9 +28,16 @@ from infrastructure.read_models.filters import (
     assemble_where,
     own_structure_ids,
 )
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.publications.models import NO_LICENSE
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
-from infrastructure.read_models.stats.models import PivotResponse, StatsFilters
+from infrastructure.read_models.stats.models import (
+    PivotDimensionOut,
+    PivotMeasureOut,
+    PivotResponse,
+    PivotSchemaResponse,
+    StatsFilters,
+)
 
 Cardinality = Literal["low", "high"]
 
@@ -251,48 +258,64 @@ def _order_by(dims: list[Dimension]) -> str:
     return ", ".join(parts)
 
 
-def run_pivot(
-    conn: Connection,
-    *,
-    measure: str,
-    groups: list[str],
-    perimeter_structure_ids: list[int],
-    filters: StatsFilters,
-) -> PivotResponse:
-    """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
-    m, dims = validate_pivot(measure, groups)
-    where, binds = assemble_where(
-        stats_filter_clauses(
-            perimeter_structure_ids=perimeter_structure_ids,
-            filters=filters,
-        )
-    )
-    joins = " ".join(dict.fromkeys(d.join_sql for d in dims if d.join_sql))
-    inner_select = ", ".join(
-        [*[f"{d.group_sql} AS {d.key}" for d in dims], "p.id AS publication_id"]
-    )
-    inner = (
-        f"SELECT DISTINCT {inner_select} FROM publications p "
-        f"LEFT JOIN serials j ON j.id = p.serial_id {joins} "
-        f"WHERE {STATS_BASE} AND {where}"
-    )
-    keys = [d.key for d in dims]
-    select = ", ".join([*keys, f"{m.agg_sql} AS value"])
-    sql = f"SELECT {select} FROM ({inner}) g {m.join_sql}"
-    if dims:
-        sql += f" GROUP BY {', '.join(keys)} ORDER BY {_order_by(dims)}"
+class StatsPivotQueries:
+    _conn: Connection
 
-    conn.execute(text("SET LOCAL jit = off"))
-    rows = conn.execute(
-        text(sql),
-        {
-            **binds,
-            "measure_apc_root_ids": perimeter_structure_ids,
-            "own_structure_ids": own_structure_ids(filters.lab_ids, perimeter_structure_ids),
-        },
-    ).all()
-    return PivotResponse(
-        measure=m.key,
-        groups=[d.key for d in dims],
-        rows=[dict(r._mapping) for r in rows],
-    )
+    def pivot_schema(self) -> PivotSchemaResponse:
+        return PivotSchemaResponse(
+            dimensions=[
+                PivotDimensionOut(
+                    key=d.key,
+                    label=d.label,
+                    cardinality=d.cardinality,
+                    ordinal=d.ordinal,
+                    groupable=d.groupable,
+                    comparable=d.comparable,
+                    filterable=d.filterable,
+                )
+                for d in DIMENSIONS.values()
+            ],
+            measures=[
+                PivotMeasureOut(key=m.key, label=m.label, unit=m.unit) for m in MEASURES.values()
+            ],
+        )
+
+    def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse:
+        """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
+        m, dims = validate_pivot(measure, groups)
+        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
+        where, binds = assemble_where(
+            stats_filter_clauses(
+                perimeter_structure_ids=perimeter_structure_ids,
+                filters=filters,
+            )
+        )
+        joins = " ".join(dict.fromkeys(d.join_sql for d in dims if d.join_sql))
+        inner_select = ", ".join(
+            [*[f"{d.group_sql} AS {d.key}" for d in dims], "p.id AS publication_id"]
+        )
+        inner = (
+            f"SELECT DISTINCT {inner_select} FROM publications p "
+            f"LEFT JOIN serials j ON j.id = p.serial_id {joins} "
+            f"WHERE {STATS_BASE} AND {where}"
+        )
+        keys = [d.key for d in dims]
+        select = ", ".join([*keys, f"{m.agg_sql} AS value"])
+        sql = f"SELECT {select} FROM ({inner}) g {m.join_sql}"
+        if dims:
+            sql += f" GROUP BY {', '.join(keys)} ORDER BY {_order_by(dims)}"
+
+        self._conn.execute(text("SET LOCAL jit = off"))
+        rows = self._conn.execute(
+            text(sql),
+            {
+                **binds,
+                "measure_apc_root_ids": perimeter_structure_ids,
+                "own_structure_ids": own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+            },
+        ).all()
+        return PivotResponse(
+            measure=m.key,
+            groups=[d.key for d in dims],
+            rows=[dict(r._mapping) for r in rows],
+        )

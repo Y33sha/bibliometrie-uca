@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Un preprint forme une publication distincte, reliée à l'article par `is_preprint_of`. Une version converge avec l'article seulement sous un même préfixe DOI : une copie déposée de la version publiée rejoint l'article, un preprint arXiv reste à part (chantier archivé [Preprints fusionnés avec leur article par substitution de DOI](archived/2026-09-30_DATA_fusions-preprints-par-doi.md)).
+Un preprint forme une publication distincte, reliée à l'article par `is_preprint_of`. Une version converge avec l'article seulement sous un même préfixe DOI : une copie déposée de la version publiée rejoint l'article, un preprint arXiv reste à part.
 
 OpenAlex suit un autre modèle : un work réunit le preprint et l'article, le preprint y est une localisation `submittedVersion`. Les localisations OpenAlex (`source_record_locations`) suivent ce modèle : la copie arXiv figure parmi les localisations de l'article, alors que l'enregistrement DataCite arXiv forme sa propre publication.
 

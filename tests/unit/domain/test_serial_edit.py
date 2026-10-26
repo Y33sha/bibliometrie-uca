@@ -1,7 +1,5 @@
 """Saisie de l'administration sur une revue : champs appliqués et champs saisis à la main."""
 
-from decimal import Decimal
-
 import pytest
 
 from domain.errors import ValidationError
@@ -15,8 +13,6 @@ def _serial() -> Serial:
         title="Nature",
         serial_type=SerialType.JOURNAL,
         oa_model=OaModel.FULL_OA,
-        apc_amount=Decimal("1000.00"),
-        apc_currency="USD",
     )
 
 
@@ -33,16 +29,6 @@ class TestSerialEdit:
         assert changed == {ManualField.TITLE, ManualField.OA_MODEL}
         assert (serial.title, serial.oa_model) == ("Nature Medicine", None)
         assert serial.manual_fields == changed
-
-    def test_apc_is_in_euros_rounded_to_the_cent(self):
-        serial = _serial()
-        assert serial.edit(apc_amount_eur=Decimal("2499.994")) == {ManualField.APC}
-        assert (serial.apc_amount, serial.apc_currency) == (Decimal("2499.99"), "EUR")
-
-    def test_cleared_apc_has_no_currency(self):
-        serial = _serial()
-        serial.edit(apc_amount_eur=None)
-        assert (serial.apc_amount, serial.apc_currency) == (None, None)
 
     def test_issns_are_normalized(self):
         serial = _serial()

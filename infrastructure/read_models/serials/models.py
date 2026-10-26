@@ -11,6 +11,7 @@ from domain.serials.serial import OaModel, SerialType
 from infrastructure.read_models._common import (
     FacetOption,
     PaginatedResponse,
+    YesNoCount,
 )
 
 # Vocabulaire de tri de la liste des revues : le champ, puis le sens.
@@ -28,7 +29,7 @@ SerialSort = Literal[
 class SerialFilters:
     """Filtres que la liste des revues et ses facettes honorent toutes deux.
 
-    `search` cherche dans le titre et dans les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `with_publications` restreint aux revues qui ont au moins une publication.
+    `search` cherche dans le titre et dans les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `has_publications` retient les revues qui ont au moins une publication (`True`) ou aucune (`False`).
     """
 
     search: str = ""
@@ -36,7 +37,7 @@ class SerialFilters:
     serial_types: list[str] = field(default_factory=list)
     is_in_doaj: bool | None = None
     oa_models: list[str] = field(default_factory=list)
-    with_publications: bool = False
+    has_publications: bool | None = None
 
 
 class SerialIssnDetail(BaseModel):
@@ -46,7 +47,6 @@ class SerialIssnDetail(BaseModel):
     support: IssnSupport | None
     linking: bool
     status: IssnStatus
-    replaced_by: str | None
     sudoc_checked_at: datetime | None
 
 
@@ -75,13 +75,11 @@ class SerialListResponse(PaginatedResponse):
 class SerialDetailResponse(SerialListItem):
     """GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
 
-    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, APC, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
     """
 
     issn_details: list[SerialIssnDetail]
     openalex_id: str | None
-    apc_amount: float | None
-    apc_currency: str | None
     oa_model: OaModel | None
     is_academic: bool | None
     doaj_payload: dict[str, str] | None
@@ -111,14 +109,15 @@ class OaStatusCount(BaseModel):
 
 
 class SerialsFacetsResponse(BaseModel):
-    """Facettes de `/api/serials` sur trois dimensions.
+    """Facettes de `/api/serials`.
 
-    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`.
+    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. `publications` compte les revues avec et sans publication.
     """
 
     serial_types: list[FacetOption]
     oa_models: list[FacetOption]
     doaj: list[FacetOption]
+    publications: YesNoCount
 
 
 class SerialDashboardResponse(BaseModel):

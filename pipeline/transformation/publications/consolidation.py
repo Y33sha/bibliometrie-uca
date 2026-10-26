@@ -6,6 +6,7 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, text
 
+from domain.publications.access import access
 from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
@@ -23,6 +24,7 @@ from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
 from infrastructure.db.rows import rows_as
+from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.sql_fragments import corrected_by
 from pipeline.transformation.publications.store import PublicationStore
 
@@ -192,7 +194,7 @@ class RefreshVerdict(StrEnum):
 def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
     """Recalcule les métadonnées canoniques d'une publication depuis ses `source_records`.
 
-    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
+    Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, retient la meilleure copie ouverte (`domain.publications.access`), pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
     Une publication sans source rattachée (`NO_SOURCE`), ou dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
@@ -225,6 +227,10 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         if publication.serial_id is not None
         else None,
     )
+    publication.best_copy_url = access(
+        publication_copies(conn, [publication_id]).get(publication_id, []),
+        doi=str(publication.doi) if publication.doi else None,
+    ).url
     prefixes = [publication.doi.prefix.value] if publication.doi else []
     assign_publisher(
         publication,

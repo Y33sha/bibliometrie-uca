@@ -138,7 +138,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'serials', label: 'Revues' },
+			{ id: 'serials', label: 'Publications en série' },
 			{ id: 'monographs', label: 'Monographies' },
 			{ id: 'publications', label: 'Publications' }
 		]}
@@ -183,13 +183,12 @@
 		</div>
 	{/if}
 
-	<!-- Tab: Revues -->
+	<!-- Tab: Publications en série -->
 	{#if activeTab === 'serials'}
 		<div class="tab-content">
 			<SerialsListView
 				apiKey={`publisher-${publisherId}-journals`}
 				externalFilters={{ publisherId }}
-				withPubs
 			/>
 		</div>
 	{/if}

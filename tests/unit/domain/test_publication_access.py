@@ -1,7 +1,7 @@
 """Liens d'accès d'une publication (`domain.publications.access`)."""
 
 from domain.platforms.registry import ARXIV, HAL, ZENODO
-from domain.publications.access import Access, AccessLink, Copy, access
+from domain.publications.access import Access, AccessLink, Copy, access, access_url
 
 _OPENALEX_IDS = {p.name: p.openalex_ids[0] for p in (ARXIV, HAL, ZENODO)}
 _DOI = "10.1/x"
@@ -107,3 +107,21 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         arrival=1,
     )
     assert _access([copy]).links == [AccessLink("Zenodo", copy.url, known=True)]
+
+
+def test_le_lien_d_acces_mene_a_la_meilleure_copie():
+    url = "https://hal.science/hal-1"
+    assert access_url(url, oa_status="green", doi=_DOI) == url
+
+
+def test_le_lien_d_acces_d_une_publication_ouverte_sans_copie_mene_au_doi():
+    assert access_url(None, oa_status="gold", doi=_DOI) == "https://doi.org/10.1/x"
+
+
+def test_une_publication_de_statut_inconnu_sans_copie_n_a_pas_de_lien_d_acces():
+    assert access_url(None, oa_status="unknown", doi=_DOI) is None
+
+
+def test_une_publication_fermee_ou_sous_embargo_n_a_pas_de_lien_d_acces():
+    assert access_url("https://hal.science/hal-1", oa_status="closed", doi=_DOI) is None
+    assert access_url("https://hal.science/hal-1", oa_status="embargoed", doi=_DOI) is None

@@ -7,7 +7,8 @@
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import ThesesTable from '#lib/components/ThesesTable.svelte';
-	import type { PublicationSort, ThesisRow } from '#lib/components/ThesesTable.svelte';
+	import type { PublicationSort, ThesisRow, ThesisSortColumn } from '#lib/components/ThesesTable.svelte';
+	import { nextSort } from '#lib/sort.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
@@ -15,7 +16,7 @@
 
 	// Vue-liste des thèses réutilisable. Utilisée par :
 	// - `/theses` (mode autonome avec sync URL)
-	// - `/laboratories/[id]?tab=theses` (labo fixe via `labId`, sans sync URL)
+	// - `/structures/[id]?tab=theses` (labo fixe via `labId`, sans sync URL)
 	let {
 		apiKey = 'theses-list',
 		labId,
@@ -147,8 +148,8 @@
 		facets.load();
 	});
 
-	function toggleSort(asc: PublicationSort, desc: PublicationSort) {
-		currentSort = currentSort === desc ? asc : desc;
+	function toggleSort(column: ThesisSortColumn) {
+		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
 		onFilterChange();
 	}
 

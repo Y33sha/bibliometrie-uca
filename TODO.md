@@ -4,13 +4,14 @@
 ## Extraction
 * [ ] bioRxiv, medRxiv: voir si on moissonne ces identifiants; possibilité de récupérer les DOI à partir des identifiants comme dans ArXiv? (ex. publi 2757)
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
+* [ ] API de détail des thèses (https://theses.fr/api/v1/theses/these/{nnt}): utiliser le champ cas (cas1 à cas6) pour distinguer les thèses sous embargo vs fermées sur décision du déposant. (+ récupérer champ langue)
 ## Suite du traitement
 * [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] documents ScanR qui portent plusieurs DOI: comment stocker l'autre?
-* [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer)
+* [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer) / annoter un corpus et trouver une bonne fonction de décision
 
 # Données
 * [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
@@ -23,6 +24,8 @@
 * [ ] récupérer date de publication complète au lieu de l'année seule
 * [ ] doublons dans journal_name_forms.form_normalized
 * [ ] "Additional file" sur figshare: comment regrouper les pièces liées à un même article?
+* [ ] doublons d'éditeurs
+* [ ] posters et communications réunis sous un même DOI
 ## Corrections
 * [ ] détection d'incohérences `doi_prefix`/`publisher_id`/`journal_id`: auditer d'abord, classifier les cas de divergence selon leur cause
 * [ ] créer circuit pour correction automatisée du `journal_type` (titre terminé par ` eBooks` => plateforme d'ebooks; titre contenant `International Conference` ou `International Symposium` => proceedings)
@@ -40,6 +43,7 @@
 * [ ] journals/expected.py: faire quelque chose de ça, ou supprimer
 * [ ] distinct_persons: créer circuit DELETE
 * [ ] volet latéral pour Editeurs et Revues
+* [ ] fusionner structures
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis + problème de perf
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories; `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne); impact (citations, fwci, top10)

@@ -15,6 +15,7 @@ from functools import partial
 
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
+    seed_country,
     seed_doi_prefix,
     seed_in_perimeter_contributions,
     seed_publication,
@@ -118,27 +119,33 @@ class TestListPublishers:
         countries = {p["country"] for p in r.json()["publishers"]}
         assert countries == {country}
 
-    def test_with_publications_excludes_orphan_publishers(self, client):
-        # Éditeur sans aucune publi rattachée → exclu si with_publications=true.
+    def _seed_with_and_without_publications(self) -> None:
         seed_publisher("OrphanPub")
-        # Éditeur avec une revue et une publi → inclus.
         with_data = seed_publisher("WithPubsPub")
         jid = seed_serial(publisher_id=with_data)
         _publication("p1", serial_id=jid)
         seed_in_perimeter_contributions(jid)
-        r = client.get("/api/publishers", params={"with_publications": "true", "per_page": 200})
+
+    def _names(self, client, **params) -> set[str]:
+        r = client.get("/api/publishers", params={"per_page": 200, **params})
         assert r.status_code == 200
-        names = {p["name"] for p in r.json()["publishers"]}
+        return {p["name"] for p in r.json()["publishers"]}
+
+    def test_has_publications_true_excludes_orphans(self, client):
+        self._seed_with_and_without_publications()
+        names = self._names(client, has_publications="true")
         assert "WithPubsPub" in names
         assert "OrphanPub" not in names
 
-    def test_with_publications_default_false_includes_orphans(self, client):
-        # Sans le flag, on liste tout comme avant.
-        seed_publisher("OrphanDefault")
-        r = client.get("/api/publishers", params={"per_page": 200})
-        assert r.status_code == 200
-        names = {p["name"] for p in r.json()["publishers"]}
-        assert "OrphanDefault" in names
+    def test_has_publications_false_keeps_orphans_only(self, client):
+        self._seed_with_and_without_publications()
+        names = self._names(client, has_publications="false")
+        assert "OrphanPub" in names
+        assert "WithPubsPub" not in names
+
+    def test_has_publications_absent_lists_all(self, client):
+        self._seed_with_and_without_publications()
+        assert {"OrphanPub", "WithPubsPub"} <= self._names(client)
 
 
 # ── GET /api/publishers/facets ───────────────────────────────────
@@ -153,9 +160,46 @@ class TestPublishersFacets:
         r = client.get("/api/publishers/facets")
         assert r.status_code == 200
         body = r.json()
-        assert set(body) == {"publisher_types", "countries"}
+        assert set(body) == {"publisher_types", "countries", "publications"}
         # Le pays seedé doit apparaître dans la facette countries.
         assert any(opt["value"] == country for opt in body["countries"])
+
+    def test_country_label_is_the_country_name(self, client):
+        seed_country("fr", "France")
+        with owner_pool() as cur:
+            cur.execute("UPDATE publishers SET country = 'fr' WHERE id = %s", (seed_publisher(),))
+        r = client.get("/api/publishers/facets")
+        assert r.status_code == 200
+        labels = {opt["value"]: opt["label"] for opt in r.json()["countries"]}
+        assert labels["fr"] == "France"
+
+    def test_country_label_falls_back_to_the_code(self, client):
+        country = uniq("QQ")[:5]
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE publishers SET country = %s WHERE id = %s", (country, seed_publisher())
+            )
+        r = client.get("/api/publishers/facets")
+        labels = {opt["value"]: opt["label"] for opt in r.json()["countries"]}
+        assert labels[country] == country.upper()
+
+    def test_publications_counts_ignore_their_own_filter(self, client):
+        country = uniq("YY")[:5]
+        orphan = seed_publisher()
+        with_data = seed_publisher()
+        jid = seed_serial(publisher_id=with_data)
+        _publication("p1", serial_id=jid)
+        seed_in_perimeter_contributions(jid)
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE publishers SET country = %s WHERE id = ANY(%s)",
+                (country, [orphan, with_data]),
+            )
+        r = client.get(
+            "/api/publishers/facets", params={"country": country, "has_publications": "true"}
+        )
+        assert r.status_code == 200
+        assert r.json()["publications"] == {"yes": 1, "no": 1}
 
 
 # ── GET /api/publishers/{id} ────────────────────────────────────

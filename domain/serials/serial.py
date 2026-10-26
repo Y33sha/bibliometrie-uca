@@ -7,7 +7,6 @@ Clé surrogate : `id`. Identifiant naturel : `title`, via la normalisation de `s
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from decimal import Decimal
 from enum import StrEnum
 from typing import TypedDict, Unpack
 
@@ -68,8 +67,6 @@ class ManualField(StrEnum):
     TITLE = "title"
     SERIAL_TYPE = "serial_type"
     OA_MODEL = "oa_model"
-    # Montant et devise.
-    APC = "apc"
     # La liste des ISSN, avec leur support, leur statut et l'ISSN de liaison.
     ISSNS = "issns"
 
@@ -82,7 +79,6 @@ class SerialEdit(TypedDict, total=False):
     serial_type: SerialType
     oa_model: OaModel | None
     is_academic: bool
-    apc_amount_eur: Decimal | None
 
 
 @dataclass(slots=True)
@@ -95,8 +91,6 @@ class Serial:
     publisher_id: int | None = None
     openalex_id: str | None = None
     is_in_doaj: bool = False
-    apc_amount: Decimal | None = None
-    apc_currency: str | None = None
     oa_model: OaModel | None = None
     serial_type: SerialType = SerialType.UNKNOWN
     is_academic: bool = True
@@ -105,7 +99,7 @@ class Serial:
     def edit(self, **changes: Unpack[SerialEdit]) -> frozenset[ManualField]:
         """Applique une saisie de l'administration. Rend les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`.
 
-        Les ISSN sont normalisés et validés (`validate_serial_issns`). L'APC est saisi en euros et arrondi au centime, comme la colonne.
+        Les ISSN sont normalisés et validés (`validate_serial_issns`).
         """
         before = self._manual_values()
         if "title" in changes:
@@ -118,13 +112,8 @@ class Serial:
             self.oa_model = changes["oa_model"]
         if "is_academic" in changes:
             self.is_academic = changes["is_academic"]
-        if "apc_amount_eur" in changes:
-            amount = changes["apc_amount_eur"]
-            self.apc_amount = None if amount is None else amount.quantize(Decimal("0.01"))
         after = self._manual_values()
         changed = frozenset(name for name in before if before[name] != after[name])
-        if ManualField.APC in changed:
-            self.apc_currency = None if self.apc_amount is None else "EUR"
         self.manual_fields |= changed
         return changed
 
@@ -135,5 +124,4 @@ class Serial:
             ManualField.ISSNS: list(self.issns),
             ManualField.SERIAL_TYPE: self.serial_type,
             ManualField.OA_MODEL: self.oa_model,
-            ManualField.APC: self.apc_amount,
         }

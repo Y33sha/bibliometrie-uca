@@ -113,13 +113,13 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle(journal?.title ?? 'Revue')}</title>
+	<title>{pageTitle(journal?.title ?? 'Publication en série')}</title>
 </svelte:head>
 
-	<Breadcrumb trail={[{ label: 'Revues', path: 'journals' }]} current={journal?.title} />
+	<Breadcrumb trail={[{ label: 'Publications en série', path: 'journals' }]} current={journal?.title} />
 
 {#if error}
-	<div class="no-results">Revue introuvable</div>
+	<div class="no-results">Publication en série introuvable</div>
 {:else if !journal}
 	<div class="loading">Chargement…</div>
 {:else}
@@ -157,12 +157,6 @@
 			{#if journal.oa_model}
 				<span class="entity-meta-label">OA</span>
 				<span class="entity-tag">{journal.oa_model}</span>
-			{/if}
-			{#if journal.apc_amount != null}
-				<span class="entity-meta-label">APC</span>
-				<span class="entity-tag">
-					{journal.apc_amount} {journal.apc_currency ?? ''}
-				</span>
 			{/if}
 		</div>
 	</div>

@@ -122,40 +122,41 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
     ]
 
 
-def get_publication_sources(
-    conn: Connection, publication_id: int
-) -> PublicationSourcesResponse | None:
-    """Métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
-    title = conn.execute(
-        text("SELECT title FROM publications WHERE id = :pid"), {"pid": publication_id}
-    ).scalar_one_or_none()
-    if title is None:
-        return None
-    rows = conn.execute(
-        text("""
-            SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi, sr.external_ids,
-                   sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
-                   lang.name AS language_name,
-                   CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
-                        THEN sr.raw_language END AS language_raw,
-                   sr.oa_status, sr.container_title, sr.biblio,
-                   j.id AS serial_id, j.title AS journal_title,
-                   pub.id AS publisher_id, pub.name AS publisher_name
-            FROM source_records sr
-            LEFT JOIN serials j ON j.id = sr.serial_id
-            LEFT JOIN publishers pub ON pub.id = sr.publisher_id
-            LEFT JOIN languages lang ON lang.code = sr.language
-            WHERE sr.publication_id = :pid
-            ORDER BY sr.source, sr.source_id
-        """),
-        {"pid": publication_id},
-    ).all()
-    source_contributions = _source_contributions(conn, publication_id)
-    return PublicationSourcesResponse(
-        title=title,
-        source_records=[_record(r) for r in rows],
-        source_contributions=source_contributions,
-        structures=structures_by_id(
-            conn, {sid for s in source_contributions for sid in s.structure_ids or []}
-        ),
-    )
+class PublicationSourceRecordQueries:
+    _conn: Connection
+
+    def get_publication_sources(self, publication_id: int) -> PublicationSourcesResponse | None:
+        """Métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
+        title = self._conn.execute(
+            text("SELECT title FROM publications WHERE id = :pid"), {"pid": publication_id}
+        ).scalar_one_or_none()
+        if title is None:
+            return None
+        rows = self._conn.execute(
+            text("""
+                SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi, sr.external_ids,
+                       sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
+                       lang.name AS language_name,
+                       CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
+                            THEN sr.raw_language END AS language_raw,
+                       sr.oa_status, sr.container_title, sr.biblio,
+                       j.id AS serial_id, j.title AS journal_title,
+                       pub.id AS publisher_id, pub.name AS publisher_name
+                FROM source_records sr
+                LEFT JOIN serials j ON j.id = sr.serial_id
+                LEFT JOIN publishers pub ON pub.id = sr.publisher_id
+                LEFT JOIN languages lang ON lang.code = sr.language
+                WHERE sr.publication_id = :pid
+                ORDER BY sr.source, sr.source_id
+            """),
+            {"pid": publication_id},
+        ).all()
+        source_contributions = _source_contributions(self._conn, publication_id)
+        return PublicationSourcesResponse(
+            title=title,
+            source_records=[_record(r) for r in rows],
+            source_contributions=source_contributions,
+            structures=structures_by_id(
+                self._conn, {sid for s in source_contributions for sid in s.structure_ids or []}
+            ),
+        )

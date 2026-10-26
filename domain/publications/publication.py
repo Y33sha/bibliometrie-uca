@@ -30,6 +30,8 @@ class Publication:
     # Licence de la version éditeur, et licence du fichier déposé dans HAL (valeurs de `License`).
     license: str | None = None
     deposit_license: str | None = None
+    # Adresse de la meilleure copie ouverte (`domain.publications.access`).
+    best_copy_url: str | None = None
     serial_id: int | None = None
     monograph_id: int | None = None
     # Éditeur à la date de publication (`domain.publishers.attribution`).

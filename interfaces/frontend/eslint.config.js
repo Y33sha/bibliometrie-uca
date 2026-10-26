@@ -47,8 +47,7 @@ const TITRE_AFFICHE_BRUT = {
 const TITRES_HORS_PUBLICATIONS = [
 	'src/lib/components/DialogHost.svelte',
 	'src/lib/components/SerialsListView.svelte',
-	'src/routes/journals/[[]id]/+page.svelte',
-	'src/routes/admin/serials/**',
+	'src/routes/journals/**',
 	'src/routes/admin/feedback/+page.svelte'
 ];
 

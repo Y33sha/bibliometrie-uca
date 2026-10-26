@@ -5,8 +5,8 @@ n'acceptait qu'une valeur. La page cochant plusieurs options, ses compteurs de f
 reflétaient la sélection pendant que la liste montrait tout le monde.
 """
 
-from infrastructure.read_models.persons.list import list_persons
 from infrastructure.read_models.persons.models import PersonFilters
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.persons import insert_hr_record, insert_person
 
 
@@ -25,8 +25,8 @@ def _create_person(conn, last, department=None, role=None):
 
 
 def _listed(conn, **filter_kwargs):
-    result = list_persons(
-        conn, filters=PersonFilters(**filter_kwargs), page=1, per_page=200, sort="name_asc"
+    result = PersonsQueries(conn).list_persons(
+        filters=PersonFilters(**filter_kwargs), page=1, per_page=200, sort="name_asc"
     )
     return {p.id for p in result.persons}
 

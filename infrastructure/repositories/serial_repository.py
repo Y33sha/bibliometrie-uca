@@ -6,7 +6,6 @@ Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestr
 """
 
 from collections.abc import Sequence
-from decimal import Decimal
 from typing import NamedTuple, cast
 
 from sqlalchemy import Connection, delete, select, update
@@ -30,8 +29,6 @@ class _SerialRow(NamedTuple):
     publisher_id: int | None
     openalex_id: str | None
     is_in_doaj: bool
-    apc_amount: Decimal | None
-    apc_currency: str | None
     oa_model: str | None
     serial_type: str | None
     is_academic: bool | None
@@ -50,8 +47,6 @@ def _serial_from_row(row: _SerialRow, issns: Sequence[SerialIssn]) -> Serial:
         publisher_id=row.publisher_id,
         openalex_id=row.openalex_id,
         is_in_doaj=row.is_in_doaj,
-        apc_amount=row.apc_amount,
-        apc_currency=row.apc_currency,
         oa_model=cast(OaModel | None, row.oa_model),
         serial_type=cast(SerialType, row.serial_type)
         if row.serial_type is not None
@@ -77,8 +72,6 @@ class PgSerialRepository(SerialRepository):
                 serials.c.publisher_id,
                 serials.c.openalex_id,
                 serials.c.is_in_doaj,
-                serials.c.apc_amount,
-                serials.c.apc_currency,
                 serials.c.oa_model,
                 serials.c.serial_type,
                 serials.c.is_academic,
@@ -103,8 +96,6 @@ class PgSerialRepository(SerialRepository):
                 oa_model=serial.oa_model,
                 serial_type=serial.serial_type,
                 is_academic=serial.is_academic,
-                apc_amount=serial.apc_amount,
-                apc_currency=serial.apc_currency,
                 manual_fields=sorted(serial.manual_fields),
             )
         )
@@ -128,7 +119,6 @@ class PgSerialRepository(SerialRepository):
                 "support": row.support,
                 "linking": row.linking,
                 "status": row.status,
-                "replaced_by": row.replaced_by,
             }
             kept = self._conn.execute(
                 update(serial_issns)

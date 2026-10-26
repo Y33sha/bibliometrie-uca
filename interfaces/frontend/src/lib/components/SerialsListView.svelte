@@ -13,14 +13,16 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { isAdmin } from '#lib/session.svelte.js';
+	import { nextSort, sortDirection } from '#lib/sort.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
 
-	// Composant de liste de revues réutilisable. Utilisé par :
-	// - `/journals` (mode autonome avec sync URL)
-	// - `/admin/serials` (snippet `actionCell` pour Modifier/Fusionner)
+	// Composant de liste de publications en série réutilisable. Utilisé par :
+	// - `/journals` (mode autonome avec sync URL ; la session admin y reçoit le snippet `actionCell` pour Modifier/Fusionner)
 	// - `/publishers/[id]?tab=journals` (filtre `publisherId` fixe)
+	// La session admin y gagne la facette « Publications ».
 	interface ExternalFilters {
 		publisherId?: number;
 	}
@@ -31,24 +33,18 @@
 		urlSync = false,
 		basePath = '/journals',
 		perPage = 50,
-		withPubs = false,
 		actionCell,
 		actionColumnHeader = '',
-		nouns = ['revue', 'revues'],
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Si true, n'expose que les revues avec ≥ 1 publication rattachée (mode page publique, masque les orphelines). Défaut false = admin. */
-		withPubs?: boolean;
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). Si fourni, une colonne Actions est ajoutée à droite du tableau. */
 		actionCell?: Snippet<[Serial]>;
 		/** En-tête de la colonne actions (vide par défaut, comme admin). */
 		actionColumnHeader?: string;
-		/** Nom des lignes au singulier et au pluriel : « revue » sur les pages publiques, le nom exact en administration. */
-		nouns?: [string, string];
 	} = $props();
 
 	// Éditeur imposé par le contexte : la facette et la colonne Éditeur portent alors la même valeur sur toutes les lignes, et sont masquées.
@@ -61,6 +57,8 @@
 	let selectedSerialTypes: string[] = $state([]);
 	let selectedOaModels: string[] = $state([]);
 	let selectedDoaj: string[] = $state([]); // 'true' / 'false'
+	// Publications en série avec ou sans publication. Par défaut, celles qui en ont ; seule la session admin change ce réglage.
+	let selectedPublications: string[] = $state(['yes']);
 
 	// --- Params builder partagé entre la liste et ses facettes ---
 	// Le terme de recherche en fait partie : les décomptes des facettes suivent ainsi le champ de recherche, comme la liste.
@@ -74,7 +72,7 @@
 		if (selectedOaModels.length) params.set('oa_model', selectedOaModels.join(','));
 		// DOAJ : un seul ['true'] / ['false'] est interprétable côté API (bool unique). Les autres cas (vide, ou les 2) = pas de filtre.
 		if (selectedDoaj.length === 1) params.set('is_in_doaj', selectedDoaj[0]);
-		if (withPubs) params.set('with_publications', 'true');
+		if (selectedPublications.length === 1) params.set('has_publications', selectedPublications[0]);
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
@@ -101,6 +99,7 @@
 			serialTypes: { type: 'labeled', apiKey: 'serial_types' },
 			oaModels: { type: 'labeled', apiKey: 'oa_models' },
 			doaj: { type: 'labeled', apiKey: 'doaj' },
+			publications: { type: 'boolean', apiKey: 'publications', yesLabel: 'Avec', noLabel: 'Sans' },
 		},
 	});
 
@@ -111,6 +110,7 @@
 			selectedSerialTypes: { type: 'string_array', urlKey: 'serial_type' },
 			selectedOaModels: { type: 'string_array', urlKey: 'oa_model' },
 			selectedDoaj: { type: 'string_array', urlKey: 'is_in_doaj' },
+			hasPublications: { type: 'single', urlKey: 'has_publications', defaultValue: 'yes' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'publications_desc' },
 			currentPage: { type: 'page', urlKey: 'page' },
@@ -125,6 +125,7 @@
 			selectedSerialTypes,
 			selectedOaModels,
 			selectedDoaj,
+			hasPublications: selectedPublications.length === 1 ? selectedPublications[0] : 'all',
 			search,
 			currentSort,
 			currentPage: serials.page,
@@ -145,21 +146,11 @@
 		facets.load();
 	});
 
-	function setSort(s: string) {
-		currentSort = currentSort === s ? oppositeSort(s) : s;
+	function setSort(column: 'title' | 'publisher' | 'publications') {
+		currentSort = nextSort(currentSort, column, column === 'publications' ? 'desc' : 'asc');
 		serials.page = 1;
 		syncUrl();
 		serials.load();
-	}
-
-	function oppositeSort(s: string): string {
-		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
-	}
-
-	function sortDirection(col: 'title' | 'publisher' | 'publications'): 'asc' | 'desc' | null {
-		if (currentSort === col) return 'asc';
-		if (currentSort === '-' + col) return 'desc';
-		return null;
 	}
 
 	function formatIssns(j: Serial): string {
@@ -179,6 +170,10 @@
 			if (restored.selectedSerialTypes) selectedSerialTypes = restored.selectedSerialTypes as string[];
 			if (restored.selectedOaModels) selectedOaModels = restored.selectedOaModels as string[];
 			if (restored.selectedDoaj) selectedDoaj = restored.selectedDoaj as string[];
+			if (restored.hasPublications != null && isAdmin()) {
+				const value = restored.hasPublications as string;
+				selectedPublications = value === 'all' ? [] : [value];
+			}
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) serials.page = restored.currentPage as number;
@@ -225,7 +220,15 @@
 		bind:selected={selectedOaModels}
 		onchange={onFilterChange}
 	/>
-	<span class="count">{serials.total.toLocaleString('fr-FR')} {serials.total > 1 ? nouns[1] : nouns[0]}</span>
+	{#if isAdmin()}
+		<FacetDropdown
+			label="Publications"
+			options={facets.options.publications}
+			bind:selected={selectedPublications}
+			onchange={onFilterChange}
+		/>
+	{/if}
+	<span class="count">{serials.total.toLocaleString('fr-FR')} publication{serials.total > 1 ? 's' : ''} en série</span>
 </div>
 
 <div class="table-scroll">
@@ -233,17 +236,17 @@
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('title')}>
-				Titre <SortChevron direction={sortDirection('title')} />
+				Titre <SortChevron direction={sortDirection(currentSort, 'title')} />
 			</th>
 			<th>ISSN</th>
 			{#if !publisherFixed}
 				<th class="sortable" onclick={() => setSort('publisher')}>
-					Éditeur <SortChevron direction={sortDirection('publisher')} />
+					Éditeur <SortChevron direction={sortDirection(currentSort, 'publisher')} />
 				</th>
 			{/if}
 			<th>Type</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis <SortChevron direction={sortDirection('publications')} />
+				Publis <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>
@@ -278,7 +281,7 @@
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}
-			<TableStatusRow loading={serials.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune {nouns[0]} ne correspond aux filtres." />
+			<TableStatusRow loading={serials.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>

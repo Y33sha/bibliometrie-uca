@@ -4,7 +4,7 @@ from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
-from infrastructure.read_models._common import FacetOption
+from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.read_models.publishers.models import (
     DocTypeCount,
@@ -27,6 +27,7 @@ def _build_publisher_where(
     *,
     skip_publisher_types: bool = False,
     skip_countries: bool = False,
+    skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
 
@@ -46,8 +47,10 @@ def _build_publisher_where(
     if filters.countries and not skip_countries:
         parts.append("p.country = ANY(:countries)")
         binds["countries"] = filters.countries
-    if filters.with_publications:
-        parts.append("p.publication_count > 0")
+    if filters.has_publications is not None and not skip_publications:
+        parts.append(
+            "p.publication_count > 0" if filters.has_publications else "p.publication_count = 0"
+        )
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -164,22 +167,35 @@ class PublisherQueries:
         where_c, binds_c = _build_publisher_where(filters, skip_countries=True)
         country_rows = self._conn.execute(
             text(f"""
-                SELECT p.country AS value, COUNT(*) AS n
+                SELECT p.country AS value, COALESCE(co.name, upper(p.country)) AS label, COUNT(*) AS n
                 FROM publishers p
+                LEFT JOIN countries co ON co.code = p.country
                 WHERE {where_c} AND p.country IS NOT NULL
-                GROUP BY p.country
-                ORDER BY n DESC, p.country
+                GROUP BY p.country, co.name
+                ORDER BY n DESC, label
             """),
             binds_c,
         ).all()
-        # Pays : pas d'enum, on expose ce qui est observé (code pays ISO en pratique). `value` = code minuscule canonique (pour le filtre) ; `label` en majuscule (présentation).
+        # `value` est le code observé sur l'éditeur ; `label` est le nom du référentiel des pays, ou le code en majuscules s'il en est absent.
         countries_facet = [
-            FacetOption(value=r.value, label=r.value.upper(), count=r.n) for r in country_rows
+            FacetOption(value=r.value, label=r.label, count=r.n) for r in country_rows
         ]
+
+        where_p, binds_p = _build_publisher_where(filters, skip_publications=True)
+        publications_row = self._conn.execute(
+            text(f"""
+                SELECT COUNT(*) FILTER (WHERE p.publication_count > 0) AS yes,
+                       COUNT(*) FILTER (WHERE p.publication_count = 0) AS no
+                FROM publishers p
+                WHERE {where_p}
+            """),
+            binds_p,
+        ).one()
 
         return PublishersFacetsResponse(
             publisher_types=publisher_types_facet,
             countries=countries_facet,
+            publications=YesNoCount(yes=publications_row.yes, no=publications_row.no),
         )
 
     def get_publisher_detail(self, publisher_id: int) -> Publisher | None:

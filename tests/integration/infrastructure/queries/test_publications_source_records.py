@@ -4,9 +4,9 @@ from functools import partial
 
 from sqlalchemy import text
 
-from infrastructure.read_models.publications.source_records import get_publication_sources
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import (
@@ -24,18 +24,18 @@ def _create_serial(conn, title, publisher_name):
 
 
 def _records(conn, publication_id):
-    result = get_publication_sources(conn, publication_id)
+    result = publications_queries(conn).get_publication_sources(publication_id)
     assert result is not None
     return result.source_records
 
 
 class TestGetPublicationSources:
     def test_returns_none_for_missing_publication(self, sa_sync_conn):
-        assert get_publication_sources(sa_sync_conn, 999_999) is None
+        assert publications_queries(sa_sync_conn).get_publication_sources(999_999) is None
 
     def test_publication_without_source_record(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn, title="Seule")
-        result = get_publication_sources(sa_sync_conn, publication)
+        result = publications_queries(sa_sync_conn).get_publication_sources(publication)
         assert result is not None
         assert result.title == "Seule"
         assert result.source_records == []
@@ -167,7 +167,7 @@ class TestSourceContributions:
         )
         group = insert_group(conn, publication, [(hal_martin, hal), (openalex_martin, openalex)])
 
-        result = get_publication_sources(conn, publication)
+        result = publications_queries(conn).get_publication_sources(publication)
 
         assert result is not None
         by_id = {s.id: s for s in result.source_contributions}
@@ -191,7 +191,7 @@ class TestSourceContributions:
         add_source_contribution_structure(conn, source_contribution, lab)
         add_source_contribution_ror(conn, source_contribution, lab)
 
-        result = get_publication_sources(conn, publication)
+        result = publications_queries(conn).get_publication_sources(publication)
 
         assert result is not None
         (contribution,) = result.source_contributions

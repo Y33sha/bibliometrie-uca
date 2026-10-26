@@ -2,16 +2,13 @@
 
 L'administration voit et arbitre tous les types, `hal_person_id` compris. Le profil public rend seulement les types publics non rejetés."""
 
-from infrastructure.read_models.persons.detail import person_profile
-from infrastructure.read_models.persons.facets import persons_facets
-from infrastructure.read_models.persons.list import list_persons, person_curation
 from infrastructure.read_models.persons.models import PersonFilters
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 
 
 def _pending_identifier_person_ids(conn):
-    result = list_persons(
-        conn,
+    result = PersonsQueries(conn).list_persons(
         filters=PersonFilters(has_pending_identifiers=True),
         page=1,
         per_page=1000,
@@ -28,7 +25,7 @@ class TestHalPersonIdVisibility:
             sa_sync_conn, person, id_type="hal_person_id", id_value="12345", status="pending"
         )
 
-        out = person_curation(sa_sync_conn, person)
+        out = PersonsQueries(sa_sync_conn).person_curation(person)
 
         assert [(i.id_type, i.id_value, i.status) for i in out.identifiers] == [
             ("hal_person_id", "12345", "pending")
@@ -47,7 +44,7 @@ class TestHalPersonIdVisibility:
             sa_sync_conn, person, id_type="idref", id_value="123456789", status="rejected"
         )
 
-        profile = person_profile(sa_sync_conn, person)
+        profile = PersonsQueries(sa_sync_conn).person_profile(person)
 
         assert [i.id_type for i in profile.identifiers] == ["orcid"]
 
@@ -64,14 +61,22 @@ class TestPendingIdentifiersQueue:
 
     def test_facet_counts_pending_hal_person_id(self, sa_sync_conn):
         """Le compteur `pending_identifiers.yes` compte un `hal_person_id` en attente."""
-        before = persons_facets(sa_sync_conn, filters=PersonFilters()).pending_identifiers.yes
+        before = (
+            PersonsQueries(sa_sync_conn)
+            .persons_facets(filters=PersonFilters())
+            .pending_identifiers.yes
+        )
 
         person = insert_person(sa_sync_conn, "HalCount")
         insert_person_identifier(
             sa_sync_conn, person, id_type="hal_person_id", id_value="67890", status="pending"
         )
 
-        after = persons_facets(sa_sync_conn, filters=PersonFilters()).pending_identifiers.yes
+        after = (
+            PersonsQueries(sa_sync_conn)
+            .persons_facets(filters=PersonFilters())
+            .pending_identifiers.yes
+        )
         assert after == before + 1
 
     def test_settled_identifiers_not_pending(self, sa_sync_conn):

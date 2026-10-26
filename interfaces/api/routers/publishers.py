@@ -47,7 +47,7 @@ def publisher_filters(
     search: SearchTerm = "",
     publisher_type: str = Query(""),
     country: str = Query(""),
-    with_publications: bool = Query(False),
+    has_publications: bool | None = Query(None),
 ) -> PublisherFilters:
     """Filtres communs à la liste des éditeurs et à ses facettes.
 
@@ -59,7 +59,7 @@ def publisher_filters(
             publisher_type, allowed=PUBLISHER_TYPES, param="publisher_type"
         ),
         countries=parse_str_csv(country),
-        with_publications=with_publications,
+        has_publications=has_publications,
     )
 
 
@@ -85,7 +85,7 @@ def list_publishers(
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    `with_publications` restreint aux éditeurs dont le décompte de publications est non nul. Ce compteur ne retient que les publications du périmètre, atteintes par les revues de l'éditeur : un éditeur dont toutes les publications sont hors périmètre est donc « orphelin », et la page publique le masque. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 

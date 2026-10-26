@@ -44,7 +44,6 @@ class SerialIssn:
     support: IssnSupport | None = None
     linking: bool = False
     status: IssnStatus = IssnStatus.ACTIVE
-    replaced_by: str | None = None
 
 
 def received_issns(issns: Iterable[SerialIssn]) -> tuple[SerialIssn, ...]:
@@ -67,7 +66,6 @@ def received_issns(issns: Iterable[SerialIssn]) -> tuple[SerialIssn, ...]:
                 support=known.support or row.support,
                 linking=known.linking or row.linking,
                 status=known.status,
-                replaced_by=known.replaced_by,
             )
         else:
             rows[value] = SerialIssn(
@@ -75,7 +73,6 @@ def received_issns(issns: Iterable[SerialIssn]) -> tuple[SerialIssn, ...]:
                 support=row.support,
                 linking=row.linking and issn is not None,
                 status=status,
-                replaced_by=row.replaced_by,
             )
     return tuple(rows.values())
 
@@ -113,15 +110,8 @@ def validate_serial_issns(issns: Iterable[SerialIssn]) -> list[SerialIssn]:
             value = str(ISSN(value))
         if any(r.issn == value for r in rows):
             raise ValidationError(f"ISSN en double : {value}")
-        replaced_by = str(ISSN(row.replaced_by)) if row.replaced_by else None
         rows.append(
-            SerialIssn(
-                issn=value,
-                support=row.support,
-                linking=row.linking,
-                status=row.status,
-                replaced_by=replaced_by,
-            )
+            SerialIssn(issn=value, support=row.support, linking=row.linking, status=row.status)
         )
     if sum(r.linking for r in rows) > 1:
         raise ValidationError("Une revue a au plus un ISSN-L")

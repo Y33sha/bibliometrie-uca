@@ -428,8 +428,6 @@ serials = Table(
     Column("publisher_id", Integer),
     Column("openalex_id", Text),
     Column("is_in_doaj", Boolean, server_default="false"),
-    Column("apc_amount", Numeric(10, 2)),
-    Column("apc_currency", Text, server_default="EUR"),
     Column("oa_model", oa_model_enum),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("serial_type", serial_type_enum, server_default="unknown"),
@@ -475,11 +473,6 @@ serial_issns = Table(
             "active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre "
             "précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu)."
         ),
-    ),
-    Column(
-        "replaced_by",
-        Text,
-        comment="ISSN successeur : titre suivant, forme corrigée d'une valeur mal formée.",
     ),
     Column(
         "sudoc_checked_at",
@@ -1141,6 +1134,11 @@ publications = Table(
     # Licence de la version éditeur, et licence du fichier déposé dans HAL.
     Column("license", license_type_enum),
     Column("deposit_license", license_type_enum),
+    Column(
+        "best_copy_url",
+        Text,
+        comment="Adresse de la meilleure copie ouverte, parmi les localisations des enregistrements sources.",
+    ),
     Column("serial_id", Integer),
     Column("monograph_id", Integer),
     Column(

@@ -52,14 +52,14 @@
   <nav class="site-nav" class:open={mobileNavOpen}>
     <a href={resolve('stats')} class="nav-link" class:active={isActive("/stats")}><i class="fi fi-rr-chart-histogram nav-icon" aria-hidden="true"></i>Stats</a>
     <a href={resolve('publications')} class="nav-link" class:active={isActive("/publications")}><i class="fi fi-rr-book-open-cover nav-icon" aria-hidden="true"></i>Publications</a>
-    <a href={resolve('laboratories')} class="nav-link" class:active={isActive("/laboratories")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
+    <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
     <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
     <div class="nav-dropdown" role="navigation" class:active={isPublicReferentiels}>
       <button class="nav-link" class:active={isPublicReferentiels}>Référentiels <span class="chevron" aria-hidden="true"></span></button>
       <div class="nav-dropdown-menu">
         <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
         <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
-        <a href={resolve('journals')} class:active={isActive("/journals")}>Revues</a>
+        <a href={resolve('journals')} class:active={isActive("/journals")}>Publications en série</a>
         <a href={resolve('monographs')} class:active={isActive("/monographs")}>Monographies</a>
         <a href={resolve('subjects')} class:active={isActive("/subjects")}>Sujets</a>
       </div>
@@ -80,13 +80,6 @@
           <span class="nav-dropdown-group">Pipeline</span>
           <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
           <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
-          <span class="nav-dropdown-group">Référentiels</span>
-          <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
-          <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
-          <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>
-          <a href={resolve('admin/publishers')} class:active={isActive("/admin/publishers")}>Éditeurs</a>
-          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>
-          <a href={resolve('admin/monographs')} class:active={isActive("/admin/monographs")}>Monographies</a>
           <span class="nav-dropdown-group">Adresses</span>
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
@@ -108,10 +101,12 @@
 </div>
 
 <div class="container">
-  <!-- Une page de détail se monte pour un identifiant : naviguer vers un autre identifiant de la même route la remonte, avec ses chargements au montage. -->
-  {#key page.params.id}
-    {@render children()}
-  {/key}
+  <!-- Une page se monte une fois la session lue, pour un identifiant et un rôle : ses fonctions d'administration et ses filtres par défaut dépendent du rôle. Naviguer vers un autre identifiant de la même route, ou changer de rôle, la remonte avec ses chargements au montage. -->
+  {#if session.loaded}
+    {#key `${page.params.id}|${isAdmin()}`}
+      {@render children()}
+    {/key}
+  {/if}
 </div>
 
 <DialogHost />

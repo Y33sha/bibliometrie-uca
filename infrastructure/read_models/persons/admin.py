@@ -1,4 +1,4 @@
-"""Query services admin pour les personnes : contributions par forme de nom, files de triage des formes et des identifiants."""
+"""Lectures d'administration des personnes : contributions par forme de nom, files de triage des formes et des identifiants."""
 
 from collections import defaultdict
 
@@ -30,65 +30,9 @@ from infrastructure.read_models.sql_fragments import (
 )
 from infrastructure.sql_fragments import GROUP_MEMBERS, has_author_role, identifier_neutralized
 
-# ── Name-form contributions ────────────────────────────────────────
-
-
-def name_form_contributions(
-    conn: Connection, person_id: int, name_form: str
-) -> NameFormContributionsResponse:
-    """Contributions sources d'une personne sous une forme de nom donnée : membres de ses groupes. S'y ajoutent les autres personnes qui portent cette forme sans l'avoir rejetée."""
-    auth_rows = conn.execute(
-        text(f"""
-            SELECT sc.source, sc.id AS source_contribution_id,
-                   sr.publication_id, sr.title, sr.publication_year, sr.doi
-            FROM {GROUP_MEMBERS}
-            JOIN source_records sr ON sr.id = sc.source_record_id
-            WHERE g.person_id = :pid AND ci.author_name_normalized = :nf
-            ORDER BY sr.publication_year DESC, sr.title
-        """),
-        {"pid": person_id, "nf": name_form},
-    ).all()
-
-    other_rows = conn.execute(
-        text(f"""
-            SELECT p.id AS person_id, p.first_name, p.last_name,
-                   pr.department_name,
-                   EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
-            FROM persons p
-            LEFT JOIN hr_records pr ON pr.person_id = p.id
-            WHERE p.id IN ({other_name_form_holders(":nf", ":pid")})
-            ORDER BY p.last_name, p.first_name
-        """),
-        {"nf": name_form, "pid": person_id},
-    ).all()
-    return NameFormContributionsResponse(
-        contributions=[
-            NameFormContributionRef(
-                source=r.source,
-                source_contribution_id=r.source_contribution_id,
-                publication_id=r.publication_id,
-                title=r.title,
-                publication_year=r.publication_year,
-                doi=r.doi,
-            )
-            for r in auth_rows
-        ],
-        other_persons=[
-            OtherPersonOut(
-                person_id=r.person_id,
-                first_name=r.first_name,
-                last_name=r.last_name,
-                department_name=r.department_name,
-                has_rh=r.has_rh,
-            )
-            for r in other_rows
-        ],
-    )
-
-
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Formes portées par ≥2 personnes au sens de `name_form_holder`, dont au moins une en attente. Les formes dérivées du nom de la personne, confirmées d'office, ne comptent pas comme en attente.
+# Formes de ≥2 personnes au sens de `name_form_holder`, dont au moins une en attente. Les formes dérivées du nom de la personne, confirmées d'office, ne comptent pas comme en attente.
 _AMBIGUOUS_FORMS_SQL = f"""
     SELECT pnf.name_form
     FROM person_name_forms pnf
@@ -99,64 +43,6 @@ _AMBIGUOUS_FORMS_SQL = f"""
        AND bool_or(pnf.status = '{AttributionStatus.PENDING.value}'
                    AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)))
 """
-
-
-def ambiguous_name_forms_count(conn: Connection) -> int:
-    """Nombre de formes de nom ambiguës restant à trancher (badge de l'onglet)."""
-    row = conn.execute(text(f"SELECT count(*) AS total FROM ({_AMBIGUOUS_FORMS_SQL}) t")).one()
-    return int(row.total)
-
-
-def ambiguous_name_forms(
-    conn: Connection, *, page: int, per_page: int
-) -> AmbiguousNameFormsResponse:
-    """Formes de nom ambiguës paginées, avec les personnes qui les portent au sens de `name_form_holder`.
-
-    Chaque personne porte son statut (pending/confirmed) pour cette forme et un drapeau `compatible` (nom de la personne compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible). Une forme dérivée du nom de la personne porte le drapeau `canonical` et le statut `confirmed`.
-    """
-    total = ambiguous_name_forms_count(conn)
-    offset = (page - 1) * per_page
-    form_rows = conn.execute(
-        text(f"{_AMBIGUOUS_FORMS_SQL} ORDER BY name_form LIMIT :lim OFFSET :off"),
-        {"lim": per_page, "off": offset},
-    ).all()
-    forms = [r.name_form for r in form_rows]
-
-    persons_by_form: dict[str, list[AmbiguousFormPersonOut]] = {f: [] for f in forms}
-    if forms:
-        rows = conn.execute(
-            text(f"""
-                SELECT pnf.name_form, pnf.person_id, pnf.status::text AS status,
-                       ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)) AS canonical,
-                       p.first_name, p.last_name,
-                       p.last_name_normalized AS ln, p.first_name_normalized AS fn,
-                       EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
-                FROM person_name_forms pnf
-                JOIN persons p ON p.id = pnf.person_id
-                WHERE pnf.name_form = ANY(:forms) AND {name_form_holder("pnf", "p")}
-                ORDER BY pnf.name_form, p.last_name, p.first_name
-            """).bindparams(bindparam("forms")),
-            {"forms": forms},
-        ).all()
-        for r in rows:
-            persons_by_form[r.name_form].append(
-                AmbiguousFormPersonOut(
-                    person_id=r.person_id,
-                    first_name=r.first_name,
-                    last_name=r.last_name,
-                    status=AttributionStatus.CONFIRMED if r.canonical else r.status,
-                    canonical=r.canonical,
-                    has_rh=r.has_rh,
-                    compatible=names_compatible(r.name_form, "", r.ln or "", r.fn or ""),
-                )
-            )
-
-    return AmbiguousNameFormsResponse(
-        total=total,
-        page=page,
-        per_page=per_page,
-        forms=[AmbiguousNameFormOut(name_form=f, persons=persons_by_form[f]) for f in forms],
-    )
 
 
 # ── Conflits d'identifiant (file de triage du hub) ───────────────
@@ -206,14 +92,6 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
 """
 
 
-def identifier_conflicts_count(conn: Connection) -> int:
-    """Nombre de paires de personnes au même identifiant brut en attente de validation (badge de l'onglet)."""
-    row = conn.execute(
-        text(f"SELECT count(*) AS total FROM ({_IDENTIFIER_CONFLICT_PAIRS}) sub")
-    ).one()
-    return int(row.total)
-
-
 def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPersonOut]:
     """Vue allégée par personne (nom, RH, nb publications, labos) pour la file de triage."""
     if not ids:
@@ -251,31 +129,6 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
         )
         for r in rows
     }
-
-
-def identifier_conflicts(
-    conn: Connection, *, page: int, per_page: int
-) -> IdentifierConflictsResponse:
-    """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
-    # Les paires sont peu nombreuses : une seule exécution de la requête donne le total et la page.
-    all_rows = conn.execute(text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b")).all()
-    total = len(all_rows)
-    offset = (page - 1) * per_page
-    rows = all_rows[offset : offset + per_page]
-    ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
-    persons = _curation_persons(conn, ids)
-    pairs = [
-        IdentifierConflictPairOut(
-            person_a=persons[r.id_a],
-            person_b=persons[r.id_b],
-            shared_identifiers=[
-                IdentifierRef(id_type=s["id_type"], id_value=s["id_value"]) for s in r.shared
-            ],
-        )
-        for r in rows
-        if r.id_a in persons and r.id_b in persons
-    ]
-    return IdentifierConflictsResponse(total=total, page=page, per_page=per_page, pairs=pairs)
 
 
 # ── Doublons par nom (file de triage du hub) ─────────────────────
@@ -445,63 +298,203 @@ def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, in
     return pairs
 
 
-def name_duplicates_count(conn: Connection) -> int:
-    """Nombre de paires candidates par nom (badge de l'onglet)."""
-    return len(_name_duplicate_candidates(conn))
+class PersonAdminQueries:
+    _conn: Connection
 
+    def name_form_contributions(
+        self, person_id: int, name_form: str
+    ) -> NameFormContributionsResponse:
+        """Contributions sources d'une personne sous une forme de nom donnée : membres de ses groupes. S'y ajoutent les autres personnes qui ont cette forme sans l'avoir rejetée."""
+        auth_rows = self._conn.execute(
+            text(f"""
+                SELECT sc.source, sc.id AS source_contribution_id,
+                       sr.publication_id, sr.title, sr.publication_year, sr.doi
+                FROM {GROUP_MEMBERS}
+                JOIN source_records sr ON sr.id = sc.source_record_id
+                WHERE g.person_id = :pid AND ci.author_name_normalized = :nf
+                ORDER BY sr.publication_year DESC, sr.title
+            """),
+            {"pid": person_id, "nf": name_form},
+        ).all()
 
-def name_duplicates(conn: Connection, *, page: int, per_page: int) -> NameDuplicatesResponse:
-    """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
-    pairs = _name_duplicate_pairs(conn)
-    total = len(pairs)
-    offset = (page - 1) * per_page
-    page_pairs = pairs[offset : offset + per_page]
-
-    persons = _curation_persons(
-        conn, sorted({pid for id_a, id_b, _ in page_pairs for pid in (id_a, id_b)})
-    )
-    items = [
-        NameDuplicatePairOut(
-            person_a=persons[id_a],
-            person_b=persons[id_b],
-            overlaps=OverlapCountsOut(
-                coauthors=overlaps["coauthors"],
-                shared_publications=overlaps["shared_publications"],
-                labs=overlaps["labs"],
-                serials=overlaps["serials"],
-            ),
+        other_rows = self._conn.execute(
+            text(f"""
+                SELECT p.id AS person_id, p.first_name, p.last_name,
+                       pr.department_name,
+                       EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
+                FROM persons p
+                LEFT JOIN hr_records pr ON pr.person_id = p.id
+                WHERE p.id IN ({other_name_form_holders(":nf", ":pid")})
+                ORDER BY p.last_name, p.first_name
+            """),
+            {"nf": name_form, "pid": person_id},
+        ).all()
+        return NameFormContributionsResponse(
+            contributions=[
+                NameFormContributionRef(
+                    source=r.source,
+                    source_contribution_id=r.source_contribution_id,
+                    publication_id=r.publication_id,
+                    title=r.title,
+                    publication_year=r.publication_year,
+                    doi=r.doi,
+                )
+                for r in auth_rows
+            ],
+            other_persons=[
+                OtherPersonOut(
+                    person_id=r.person_id,
+                    first_name=r.first_name,
+                    last_name=r.last_name,
+                    department_name=r.department_name,
+                    has_rh=r.has_rh,
+                )
+                for r in other_rows
+            ],
         )
-        for id_a, id_b, overlaps in page_pairs
-        if id_a in persons and id_b in persons
-    ]
-    return NameDuplicatesResponse(total=total, page=page, per_page=per_page, pairs=items)
 
+    def ambiguous_name_forms_count(self) -> int:
+        """Nombre de formes de nom ambiguës restant à trancher (badge de l'onglet)."""
+        row = self._conn.execute(
+            text(f"SELECT count(*) AS total FROM ({_AMBIGUOUS_FORMS_SQL}) t")
+        ).one()
+        return int(row.total)
 
-def persons_sharing_name_form(conn: Connection, person_id: int) -> list[SharingPersonOut]:
-    """Autres personnes qui portent au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.
+    def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse:
+        """Formes de nom ambiguës paginées, avec les personnes qui les ont au sens de `name_form_holder`.
 
-    Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
-    rows = conn.execute(
-        text(f"""
-            SELECT p2.id AS person_id, p2.first_name, p2.last_name,
-                   EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p2.id) AS has_rh,
-                   array_agg(DISTINCT pnf1.name_form ORDER BY pnf1.name_form) AS shared_forms
-            FROM person_name_forms pnf1
-            JOIN LATERAL ({other_name_form_holders("pnf1.name_form", "pnf1.person_id")}) holders ON TRUE
-            JOIN persons p2 ON p2.id = holders.person_id
-            WHERE pnf1.person_id = :id AND pnf1.status <> 'rejected'
-            GROUP BY p2.id, p2.first_name, p2.last_name
-            ORDER BY p2.last_name, p2.first_name
-        """),
-        {"id": person_id},
-    ).all()
-    return [
-        SharingPersonOut(
-            person_id=r.person_id,
-            first_name=r.first_name,
-            last_name=r.last_name,
-            has_rh=r.has_rh,
-            shared_forms=list(r.shared_forms or []),
+        Chaque personne a son statut (pending/confirmed) pour cette forme et un drapeau `compatible` (nom de la personne compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible). Une forme dérivée du nom de la personne a le drapeau `canonical` et le statut `confirmed`.
+        """
+        total = self.ambiguous_name_forms_count()
+        offset = (page - 1) * per_page
+        form_rows = self._conn.execute(
+            text(f"{_AMBIGUOUS_FORMS_SQL} ORDER BY name_form LIMIT :lim OFFSET :off"),
+            {"lim": per_page, "off": offset},
+        ).all()
+        forms = [r.name_form for r in form_rows]
+
+        persons_by_form: dict[str, list[AmbiguousFormPersonOut]] = {f: [] for f in forms}
+        if forms:
+            rows = self._conn.execute(
+                text(f"""
+                    SELECT pnf.name_form, pnf.person_id, pnf.status::text AS status,
+                           ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)) AS canonical,
+                           p.first_name, p.last_name,
+                           p.last_name_normalized AS ln, p.first_name_normalized AS fn,
+                           EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
+                    FROM person_name_forms pnf
+                    JOIN persons p ON p.id = pnf.person_id
+                    WHERE pnf.name_form = ANY(:forms) AND {name_form_holder("pnf", "p")}
+                    ORDER BY pnf.name_form, p.last_name, p.first_name
+                """).bindparams(bindparam("forms")),
+                {"forms": forms},
+            ).all()
+            for r in rows:
+                persons_by_form[r.name_form].append(
+                    AmbiguousFormPersonOut(
+                        person_id=r.person_id,
+                        first_name=r.first_name,
+                        last_name=r.last_name,
+                        status=AttributionStatus.CONFIRMED if r.canonical else r.status,
+                        canonical=r.canonical,
+                        has_rh=r.has_rh,
+                        compatible=names_compatible(r.name_form, "", r.ln or "", r.fn or ""),
+                    )
+                )
+
+        return AmbiguousNameFormsResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            forms=[AmbiguousNameFormOut(name_form=f, persons=persons_by_form[f]) for f in forms],
         )
-        for r in rows
-    ]
+
+    def identifier_conflicts_count(self) -> int:
+        """Nombre de paires de personnes au même identifiant brut en attente de validation (badge de l'onglet)."""
+        row = self._conn.execute(
+            text(f"SELECT count(*) AS total FROM ({_IDENTIFIER_CONFLICT_PAIRS}) sub")
+        ).one()
+        return int(row.total)
+
+    def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
+        """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
+        # Les paires sont peu nombreuses : une seule exécution de la requête donne le total et la page.
+        all_rows = self._conn.execute(
+            text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b")
+        ).all()
+        total = len(all_rows)
+        offset = (page - 1) * per_page
+        rows = all_rows[offset : offset + per_page]
+        ids = sorted({r.id_a for r in rows} | {r.id_b for r in rows})
+        persons = _curation_persons(self._conn, ids)
+        pairs = [
+            IdentifierConflictPairOut(
+                person_a=persons[r.id_a],
+                person_b=persons[r.id_b],
+                shared_identifiers=[
+                    IdentifierRef(id_type=s["id_type"], id_value=s["id_value"]) for s in r.shared
+                ],
+            )
+            for r in rows
+            if r.id_a in persons and r.id_b in persons
+        ]
+        return IdentifierConflictsResponse(total=total, page=page, per_page=per_page, pairs=pairs)
+
+    def name_duplicates_count(self) -> int:
+        """Nombre de paires candidates par nom (badge de l'onglet)."""
+        return len(_name_duplicate_candidates(self._conn))
+
+    def name_duplicates(self, *, page: int, per_page: int) -> NameDuplicatesResponse:
+        """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
+        pairs = _name_duplicate_pairs(self._conn)
+        total = len(pairs)
+        offset = (page - 1) * per_page
+        page_pairs = pairs[offset : offset + per_page]
+
+        persons = _curation_persons(
+            self._conn, sorted({pid for id_a, id_b, _ in page_pairs for pid in (id_a, id_b)})
+        )
+        items = [
+            NameDuplicatePairOut(
+                person_a=persons[id_a],
+                person_b=persons[id_b],
+                overlaps=OverlapCountsOut(
+                    coauthors=overlaps["coauthors"],
+                    shared_publications=overlaps["shared_publications"],
+                    labs=overlaps["labs"],
+                    serials=overlaps["serials"],
+                ),
+            )
+            for id_a, id_b, overlaps in page_pairs
+            if id_a in persons and id_b in persons
+        ]
+        return NameDuplicatesResponse(total=total, page=page, per_page=per_page, pairs=items)
+
+    def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
+        """Autres personnes qui ont au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.
+
+        Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
+        rows = self._conn.execute(
+            text(f"""
+                SELECT p2.id AS person_id, p2.first_name, p2.last_name,
+                       EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p2.id) AS has_rh,
+                       array_agg(DISTINCT pnf1.name_form ORDER BY pnf1.name_form) AS shared_forms
+                FROM person_name_forms pnf1
+                JOIN LATERAL ({other_name_form_holders("pnf1.name_form", "pnf1.person_id")}) holders ON TRUE
+                JOIN persons p2 ON p2.id = holders.person_id
+                WHERE pnf1.person_id = :id AND pnf1.status <> 'rejected'
+                GROUP BY p2.id, p2.first_name, p2.last_name
+                ORDER BY p2.last_name, p2.first_name
+            """),
+            {"id": person_id},
+        ).all()
+        return [
+            SharingPersonOut(
+                person_id=r.person_id,
+                first_name=r.first_name,
+                last_name=r.last_name,
+                has_rh=r.has_rh,
+                shared_forms=list(r.shared_forms or []),
+            )
+            for r in rows
+        ]

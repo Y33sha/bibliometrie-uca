@@ -42,11 +42,12 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "labs",
         "corr",
         "apc",
-        "oa",
+        "doi",
         "oa_status",
         "license",
         "hal_status",
-        "links",
+        "sources",
+        "access",
     }
 )
 
@@ -123,6 +124,8 @@ class PublicationListItem(BaseModel):
     doi: str | None
     doc_type: str
     oa_status: str
+    access_url: str | None
+    """Lien d'accès (`domain.publications.access.access_url`)."""
     license: str | None  # licence de la version éditeur
     serial: str | None
     serial_id: int | None
@@ -217,8 +220,6 @@ class PublicationDetailCore(BaseModel):
     journal_title: str | None
     serial_issns: list[str]
     """ISSN actifs de la revue."""
-    apc_amount: float | None
-    apc_currency: str | None
     oa_model: str | None
     monograph_id: int | None
     """Livre ou volume d'actes qui contient la publication."""
@@ -351,7 +352,7 @@ class PublicationDetailResponse(BaseModel):
     keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
     relations: list[RelatedPublicationOut]
     access_url: str | None
-    """Adresse de la meilleure copie ouverte."""
+    """Lien d'accès (`domain.publications.access.access_url`)."""
     access: list[AccessLinkOut]
     """Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI."""
     referenced_by: list[SourceRecordOut]

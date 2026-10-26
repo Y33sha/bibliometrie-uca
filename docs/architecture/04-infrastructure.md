@@ -1,6 +1,6 @@
 # Infrastructure — adaptateurs sortants
 
-*À jour le 2026-10-25.*
+*À jour le 2026-10-26.*
 
 `infrastructure/` implémente les [ports](03-application.md#ports) : SQL, journalisation. Seuls les composition roots et le pipeline l'importent.
 
@@ -17,7 +17,7 @@
 
 Les adaptateurs de `repositories/` construisent des objets du domaine : ils hydratent un agrégat, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_doi`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
 
-`read_models/` contient les lectures de l'API, sans hydratation : un paquet par lecture, avec ses requêtes et ses modèles de réponse (`models.py`). Les routers les reçoivent directement, sans port.
+`read_models/` contient les lectures de l'API, sans hydratation : un paquet par lecture, avec sa classe (`queries.py`) et ses modèles de réponse (`models.py`). Chaque méthode de la classe contient sa requête. Un paquet découpé par thème déclare une classe par module, que `queries.py` réunit par héritage. Les routers reçoivent la classe directement, sans port.
 
 ## Transactions
 

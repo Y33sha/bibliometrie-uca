@@ -5,16 +5,12 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
-from infrastructure.read_models.publications.list import (
-    export_publications_csv,
-    export_theses_csv,
-    list_publications,
-)
 from infrastructure.read_models.publications.models import PublicationFilters
 from tests.integration.helpers.contributions import group_id_of, insert_contribution
 from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
@@ -42,10 +38,8 @@ class TestSearch:
         _attach(sa_sync_conn, match, lab)
         _attach(sa_sync_conn, other, lab)
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(search="quantum", lab_ids=[lab]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -65,10 +59,8 @@ class TestSearch:
         sid = insert_subject(sa_sync_conn, "Quantum mechanics")
         insert_publication_subject(sa_sync_conn, publication, subject_id=sid)
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(search="quantum", lab_ids=[lab]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -89,10 +81,8 @@ class TestSearch:
         sid = insert_subject(sa_sync_conn, "Quantum mechanics")
         insert_publication_subject(sa_sync_conn, subject_match, subject_id=sid)
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(search="quantum", lab_ids=[lab]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -108,10 +98,8 @@ class TestSearch:
         sid = insert_subject(sa_sync_conn, "Économétrie")
         insert_publication_subject(sa_sync_conn, publication, subject_id=sid)
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(search="econometrie", lab_ids=[lab]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -164,10 +152,8 @@ class TestHalStatusMultipleHalEntries:
             {"id": publication},
         )
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -187,10 +173,8 @@ class TestHalStatusMultipleHalEntries:
             sa_sync_conn, publication, source_id="hal-PAU", hal_collections=["UPPA-DROIT"]
         )
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(lab_ids=[lab]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -208,10 +192,8 @@ class TestHalStatusMultipleHalEntries:
             sa_sync_conn, publication, source_id="hal-PAU", hal_collections=["UPPA-DROIT"]
         )
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(lab_ids=[lab], hal_status_values=["hors_collection"]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -230,10 +212,8 @@ class TestHalStatusMultipleHalEntries:
             {"id": publication},
         )
 
-        res = list_publications(
-            sa_sync_conn,
+        res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(lab_ids=[lab], hal_status_values=["ok"]),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -257,10 +237,8 @@ class TestThesesExport:
             _source_record(sa_sync_conn, publication, source=src, source_id=sid)
 
         csv_text = "".join(
-            export_theses_csv(
-                sa_sync_conn,
+            publications_queries(sa_sync_conn).export_theses_csv(
                 filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
-                perimeter_structure_ids=[],
                 sort="soutenance_desc",
             )
         )
@@ -270,6 +248,30 @@ class TestThesesExport:
         assert "openalex.org/W1" in line
         assert "scanr.enseignementsup-recherche.gouv.fr/publications/sc-1" in line
         assert "theses.fr/2024NNT" in line
+
+    def test_l_acces_donne_l_adresse_du_texte_integral(self, sa_sync_conn):
+        lab = _lab(sa_sync_conn)
+        publication = insert_publication(
+            sa_sync_conn, "Ma these", doc_type="thesis", oa_status="green"
+        )
+        sa_sync_conn.execute(
+            text(
+                "UPDATE publications SET best_copy_url = 'https://theses.hal.science/tel-1' WHERE id = :id"
+            ),
+            {"id": publication},
+        )
+        _attach(sa_sync_conn, publication, lab)
+
+        csv_text = "".join(
+            publications_queries(sa_sync_conn).export_theses_csv(
+                filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
+                sort="soutenance_desc",
+            )
+        )
+
+        header, line = csv_text.lstrip("﻿").splitlines()[:2]
+        assert header.split(",")[-1] == "Accès"
+        assert line.split(",")[-1] == "https://theses.hal.science/tel-1"
 
 
 class TestExcludedPersonLab:
@@ -290,10 +292,8 @@ class TestExcludedPersonLab:
             add_contribution_structure(sa_sync_conn, aid, lab)
 
         def listed(lab):
-            res = list_publications(
-                sa_sync_conn,
+            res = publications_queries(sa_sync_conn).list_publications(
                 filters=PublicationFilters(lab_ids=[lab]),
-                perimeter_structure_ids=[],
                 page=1,
                 per_page=50,
                 sort="year_desc",
@@ -329,14 +329,16 @@ class TestPersonView:
         return person, lab, publication
 
     def _list(self, conn, **filters):
-        return list_publications(
-            conn,
-            filters=PublicationFilters(**filters),
-            perimeter_structure_ids=[],
-            page=1,
-            per_page=50,
-            sort="year_desc",
-        ).publications
+        return (
+            publications_queries(conn)
+            .list_publications(
+                filters=PublicationFilters(**filters),
+                page=1,
+                per_page=50,
+                sort="year_desc",
+            )
+            .publications
+        )
 
     def test_item_reads_the_group_of_the_person(self, sa_sync_conn):
         person, lab, publication = self._seed(sa_sync_conn)
@@ -393,27 +395,23 @@ class TestPersonView:
 class TestExportsRunTheirQueryBeforeStreaming:
     """Les exports rendent des blocs, mais interrogent la base à l'appel.
 
-    Non-régression sur une subtilité qui casserait en production sans faire échouer un test naïf : FastAPI referme la connexion de la requête *avant* d'envoyer le corps de la réponse. Si ces fonctions devenaient des générateurs, la requête ne partirait qu'à la première itération, c'est-à-dire une fois la connexion fermée. Le contenu doit donc rester lisible après la fermeture.
+    Non-régression sur une subtilité qui casserait en production sans faire échouer un test naïf : FastAPI referme la connexion de la requête *avant* d'envoyer le corps de la réponse. Si ces méthodes devenaient des générateurs, la requête ne partirait qu'à la première itération, c'est-à-dire une fois la connexion fermée. Le contenu doit donc rester lisible après la fermeture.
 
     Chaque test ouvre sa propre connexion sur le même engine, et la ferme : celle du fixture porte la transaction des autres tests.
     """
 
     def test_theses_export_survives_a_closed_connection(self, sa_sync_conn):
         with sa_sync_conn.engine.connect() as conn:
-            chunks = export_theses_csv(
-                conn,
+            chunks = publications_queries(conn).export_theses_csv(
                 filters=PublicationFilters(doc_types=["thesis"]),
-                perimeter_structure_ids=[],
                 sort="soutenance_desc",
             )
         assert "Soutenance" in "".join(chunks)
 
     def test_publications_export_survives_a_closed_connection(self, sa_sync_conn):
         with sa_sync_conn.engine.connect() as conn:
-            chunks = export_publications_csv(
-                conn,
+            chunks = publications_queries(conn).export_publications_csv(
                 filters=PublicationFilters(),
-                perimeter_structure_ids=[],
                 sort="year_desc",
                 columns=[],
             )
@@ -435,10 +433,8 @@ class TestLicense:
         return lab, cc_by, unlicensed
 
     def _ids(self, conn, lab, license):  # noqa: A002
-        res = list_publications(
-            conn,
+        res = publications_queries(conn).list_publications(
             filters=PublicationFilters(lab_ids=[lab], license=license),
-            perimeter_structure_ids=[],
             page=1,
             per_page=50,
             sort="year_desc",
@@ -460,3 +456,28 @@ class TestLicense:
         )
         facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
         assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}
+
+
+def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):
+    lab = _lab(sa_sync_conn)
+    deposited = insert_publication(sa_sync_conn, "Deposited", oa_status="green")
+    gold = insert_publication(sa_sync_conn, "Gold", oa_status="gold", doi="10.1/gold")
+    embargoed = insert_publication(sa_sync_conn, "Embargoed", oa_status="embargoed")
+    sa_sync_conn.execute(
+        text(
+            "UPDATE publications SET best_copy_url = 'https://hal.science/hal-1' WHERE id = ANY(:ids)"
+        ),
+        {"ids": [deposited, embargoed]},
+    )
+    for publication in (deposited, gold, embargoed):
+        _attach(sa_sync_conn, publication, lab)
+
+    res = publications_queries(sa_sync_conn).list_publications(
+        filters=PublicationFilters(lab_ids=[lab]), page=1, per_page=50, sort="year_desc"
+    )
+
+    assert {p.id: p.access_url for p in res.publications} == {
+        deposited: "https://hal.science/hal-1",
+        gold: "https://doi.org/10.1/gold",
+        embargoed: None,
+    }

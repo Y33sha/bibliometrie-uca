@@ -1,4 +1,6 @@
 <script lang="ts">
+	import AccessButton from '#lib/components/AccessButton.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -48,6 +50,8 @@
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import { paramsToQuery } from '#lib/utils.js';
+	import { nextSort, sortDirection } from '#lib/sort.js';
+	import IconButton from '#lib/components/IconButton.svelte';
 
 	import type { components } from '#lib/api/schema.js';
 	type Publication = components['schemas']['PublicationListItem'] & {
@@ -59,14 +63,13 @@
 
 	// --- Props ---
 	// Composant de liste de publications réutilisable. Utilisé par :
-	// - `/publications` (mode autonome avec sync URL)
+	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de la publication)
 	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
-	// - `/laboratories/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
+	// - `/structures/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
 	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `serial_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
 	// - `/monographs/[id]` (filtre `monograph_id` fixe)
-	// - `/admin/publications` (un clic sur un titre ouvre le volet de l'administration)
 	interface ExternalFilters {
 		subjectId?: number;
 		subjectLabel?: string;
@@ -120,7 +123,7 @@
 		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
 		restrictToPublications?: boolean;
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
-		/** Ouvre la publication dans la page hôte au lieu de naviguer vers sa fiche. Un clic modifié (Ctrl, Cmd, Maj, Alt) garde la navigation. */
+		/** Ouvre le volet de la publication dans la page hôte. Fourni, il ajoute en tête de ligne une icône qui l'appelle ; le titre mène toujours à la fiche. */
 		onopenPublication?: (publicationId: number) => void;
 		/** Publication ouverte par la page hôte, dont la ligne est mise en évidence. */
 		activePublicationId?: number | null;
@@ -149,6 +152,7 @@
 	const columnDefs = [
 		{ key: 'type',       label: 'Type' },
 		{ key: 'year',       label: 'Année' },
+		{ key: 'doi',        label: 'DOI' },
 		{ key: 'title',      label: 'Titre',      fixed: true },
 		{ key: 'serial',    label: 'Revue' },
 		{ key: 'publisher',  label: 'Éditeur' },
@@ -157,14 +161,14 @@
 		// svelte-ignore state_referenced_locally
 		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Corresp.' }] : []),
 		{ key: 'apc',        label: 'APC' },
-		{ key: 'oa',         label: 'OA' },
-		{ key: 'oa_status',    label: 'Voie OA' },
+		{ key: 'oa_status',  label: 'Voie OA' },
 		{ key: 'license',    label: 'Licence' },
 		// svelte-ignore state_referenced_locally
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
-		{ key: 'links',      label: 'Liens',      fixed: true },
+		{ key: 'sources',    label: 'Sources' },
+		{ key: 'access',     label: 'Accès',      fixed: true },
 	];
-	const initialHidden = ['apc', 'oa_status', 'license', 'publisher'];
+	const initialHidden = ['apc', 'oa_status', 'license', 'publisher', 'sources'];
 	// Libellés de la colonne Licence, servis par l'API.
 	let licenseNames = $state<Record<string, string>>({});
 	// svelte-ignore state_referenced_locally
@@ -221,7 +225,6 @@
 			label: 'Accès',
 			param: 'access',
 			facet: { type: 'labeled', apiKey: 'access' },
-			showColumns: ['oa', 'oa_status'],
 		},
 		{
 			key: 'halStatus',
@@ -269,7 +272,7 @@
 			param: 'oa_status',
 			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
 			group: 'Revue et éditeur',
-			showColumns: ['oa', 'oa_status'],
+			showColumns: ['oa_status'],
 		},
 		{
 			key: 'license',
@@ -359,6 +362,7 @@
 			param: 'source_filter',
 			group: 'Détails',
 			items: SOURCE_ITEMS,
+			showColumns: ['sources'],
 		},
 	];
 	const sections = filterSections(FILTERS);
@@ -402,12 +406,9 @@
 	});
 
 	// Sort display
-	const yearSort = $derived(currentSort === 'year_asc' ? 'asc' : currentSort === 'year_desc' ? 'desc' : null);
-	const titleSort = $derived(currentSort === 'title_asc' ? 'asc' : currentSort === 'title_desc' ? 'desc' : null);
-	const apcSort = $derived(currentSort === 'apc_asc' ? 'asc' : currentSort === 'apc_desc' ? 'desc' : null);
-	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
-	const titleSortActive = $derived(currentSort === 'title_asc' || currentSort === 'title_desc');
-	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');
+	const yearSort = $derived(sortDirection(currentSort, 'year'));
+	const titleSort = $derived(sortDirection(currentSort, 'title'));
+	const apcSort = $derived(sortDirection(currentSort, 'apc'));
 
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
@@ -512,18 +513,8 @@
 		facets.load();
 	});
 
-	function toggleSortYear() {
-		currentSort = currentSort === 'year_desc' ? 'year_asc' : 'year_desc';
-		onFilterChange();
-	}
-
-	function toggleSortTitle() {
-		currentSort = currentSort === 'title_asc' ? 'title_desc' : 'title_asc';
-		onFilterChange();
-	}
-
-	function toggleSortApc() {
-		currentSort = currentSort === 'apc_desc' ? 'apc_asc' : 'apc_desc';
+	function toggleSort(column: 'year' | 'title' | 'apc') {
+		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
 		onFilterChange();
 	}
 
@@ -543,12 +534,6 @@
 		// `false` = annulé par le parent (ex. l'utilisatrice a cliqué Annuler) ; `true` ou `undefined` = succès → on retire la ligne du tableau.
 		if (result === false) return;
 		listing.items = listing.items.filter((item) => item.id !== p.id);
-	}
-
-	function onTitleClick(e: MouseEvent, publicationId: number) {
-		if (!onopenPublication || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-		e.preventDefault();
-		onopenPublication(publicationId);
 	}
 
 	onMount(async () => {
@@ -628,26 +613,29 @@
 <table class="data-table publication-table">
 	<thead>
 		<tr>
+			{#if onopenPublication}<th style="width:28px"></th>{/if}
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
-			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
+			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
 				An. <SortChevron direction={yearSort} />
 			</th>{/if}
-			<th class="sortable publication-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
+			{#if col('doi')}<th style="width:28px">DOI</th>{/if}
+			<th class="sortable publication-col-title" class:active={titleSort !== null} onclick={() => toggleSort('title')}>
 				Titre <SortChevron direction={titleSort} />
 			</th>
 			{#if col('serial')}<th class="publication-col-journal">Revue</th>{/if}
 			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
-			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
+			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				APC <SortChevron direction={apcSort} />
 			</th>{/if}
-			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
 			{#if col('license')}<th style="width:90px">Licence</th>{/if}
 			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
-			<th style="width:80px" class="col-menu-th">
+			{#if col('sources')}<th style="width:100px">Sources</th>{/if}
+			<th style="width:120px" class="col-menu-th">
+				Accès
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}
@@ -658,10 +646,15 @@
 	</thead>
 	<tbody>
 		{#if listing.items.length === 0}
-			<TableStatusRow loading={listing.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0)} emptyText="Aucune publication trouvée" />
+			<TableStatusRow loading={listing.loading} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (onopenPublication ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === activePublicationId}>
+					{#if onopenPublication}
+						<td class="row-actions">
+							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopenPublication(p.id)} />
+						</td>
+					{/if}
 					{#if showAdminExclude}
 						<td class="exclude-cell row-actions">
 							{#if p.contribution_id != null}
@@ -674,7 +667,10 @@
 						{#if p.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(p.doc_type)}">{docTypeSingular[p.doc_type] || p.doc_type}</span>{/if}
 					</td>{/if}
 					{#if col('year')}<td>{p.publication_year || ''}</td>{/if}
-					<td><a href={resolve(`publications/${p.id}`)} class="publication-title" onclick={(e) => onTitleClick(e, p.id)}><PublicationTitle titre={p.title} /></a></td>
+					{#if col('doi')}<td class="doi-cell">
+						{#if p.doi}<DoiLink doi={p.doi} />{/if}
+					</td>{/if}
+					<td><a href={resolve(`publications/${p.id}`)} class="publication-title"><PublicationTitle titre={p.title} /></a></td>
 					{#if col('serial')}<td class="journal-cell publication-col-journal">
 						{#if p.serial_id}
 							<a href={resolve(`journals/${p.serial_id}`)}>{p.serial}</a>
@@ -691,7 +687,7 @@
 					</td>{/if}
 					{#if !hasFixedLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
-							<a href={resolve(`laboratories/${lab.id}`)} class="lab-tag">{lab.label}</a>
+							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>{/if}
 					{#if showCorrespondingColumn && col('corr')}<td class="corr-cell">
@@ -713,24 +709,6 @@
 							{/if}
 						{/if}
 					</td>{/if}
-					{#if col('oa')}<td class="oa-lock-cell">
-						{#if p.oa_status === 'embargoed'}
-							<span class="oa-lock-badge oa-lock-embargo">
-								<img src={asset('hourglass.svg')} alt="Sous embargo" class="oa-lock" title="Sous embargo : dépôt existant, accès différé" />
-								<span class="oa-lock-label">embargo</span>
-							</span>
-						{:else if p.oa_status && !['unknown', 'closed'].includes(p.oa_status)}
-							<span class="oa-lock-badge oa-lock-open">
-								<img src={asset('lock-open.svg')} alt="Open Access" class="oa-lock" title="Open Access ({p.oa_status})" />
-								<span class="oa-lock-label">ouvert</span>
-							</span>
-						{:else}
-							<span class="oa-lock-badge oa-lock-closed">
-								<img src={asset('lock-closed.svg')} alt="Closed" class="oa-lock" title="Accès fermé" />
-								<span class="oa-lock-label">fermé</span>
-							</span>
-						{/if}
-					</td>{/if}
 					{#if col('oa_status')}<td>
 						{#if p.oa_status && p.oa_status !== 'unknown'}
 							<span class="oa-tag oa-{p.oa_status}">{p.oa_status}</span>
@@ -742,7 +720,7 @@
 						{@const meta = HAL_STATUS_META[hs]}
 						<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
 					{/if}
-					<td class="links-cell">
+					{#if col('sources')}<td class="links-cell">
 						{#if p.hal_id}
 							<a href={p.record_urls.hal} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
 								<img src={asset('icons/hal.ico')} alt="HAL" />
@@ -771,18 +749,8 @@
 						{:else}
 							<span class="source-tag source-placeholder"></span>
 						{/if}
-						{#if p.doi}
-							<a href="https://doi.org/{p.doi}" target="_blank" rel="noopener" class="source-tag source-doi" title={p.doi}>
-								<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-									<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-									<polyline points="15 3 21 3 21 9"/>
-									<line x1="10" y1="14" x2="21" y2="3"/>
-								</svg>
-							</a>
-						{:else}
-							<span class="source-tag source-placeholder"></span>
-						{/if}
-					</td>
+					</td>{/if}
+					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></td>
 				</tr>
 			{/each}
 		{/if}
@@ -834,6 +802,7 @@
 	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
 	.col-menu-th { position: relative; }
+	.access-cell { white-space: nowrap; }
 
 	/* Statut HAL (lab) */
 	.hal-badge {

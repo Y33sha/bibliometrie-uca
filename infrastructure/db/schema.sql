@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict azLjXsbKaH5XmcItVIhFpcmDMeAaDFxxHqtrUbZezifLkZv3vzCznRSr41n9NmZ
+\restrict bAFCqnO8EqiN3V070440VwNl5gVXQfKPwfhEvbi5XEDXvjBb6AZRZT9L2eaTyzq
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -59,13 +59,6 @@ CREATE SCHEMA queues;
 --
 
 CREATE SCHEMA ref;
-
-
---
--- Name: snapshot_20261024_gel; Type: SCHEMA; Schema: -; Owner: -
---
-
-CREATE SCHEMA snapshot_20261024_gel;
 
 
 --
@@ -677,6 +670,79 @@ CREATE TABLE ops.pipeline_phase_executions (
 
 ALTER TABLE ops.pipeline_phase_executions ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
     SEQUENCE NAME ops.pipeline_phase_executions_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
+-- Name: roles; Type: TABLE; Schema: ops; Owner: -
+--
+
+CREATE TABLE ops.roles (
+    code text NOT NULL,
+    label text NOT NULL
+);
+
+
+--
+-- Name: TABLE roles; Type: COMMENT; Schema: ops; Owner: -
+--
+
+COMMENT ON TABLE ops.roles IS 'Rôles que le code connaît (domain.users.Role).';
+
+
+--
+-- Name: user_roles; Type: TABLE; Schema: ops; Owner: -
+--
+
+CREATE TABLE ops.user_roles (
+    user_id integer NOT NULL,
+    role_code text NOT NULL
+);
+
+
+--
+-- Name: TABLE user_roles; Type: COMMENT; Schema: ops; Owner: -
+--
+
+COMMENT ON TABLE ops.user_roles IS 'Rôles attribués à chaque utilisateur.';
+
+
+--
+-- Name: users; Type: TABLE; Schema: ops; Owner: -
+--
+
+CREATE TABLE ops.users (
+    id integer NOT NULL,
+    login text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE users; Type: COMMENT; Schema: ops; Owner: -
+--
+
+COMMENT ON TABLE ops.users IS 'Utilisateurs autorisés à ouvrir une session.';
+
+
+--
+-- Name: COLUMN users.login; Type: COMMENT; Schema: ops; Owner: -
+--
+
+COMMENT ON COLUMN ops.users.login IS 'Identifiant de connexion : identifiant CAS, ou ADMIN_USER pour la connexion par mot de passe.';
+
+
+--
+-- Name: users_id_seq; Type: SEQUENCE; Schema: ops; Owner: -
+--
+
+ALTER TABLE ops.users ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME ops.users_id_seq
     START WITH 1
     INCREMENT BY 1
     NO MINVALUE
@@ -1609,6 +1675,7 @@ CREATE TABLE publications.publications (
     corrections jsonb DEFAULT '{}'::jsonb NOT NULL,
     publisher_id integer,
     doi_prefix text GENERATED ALWAYS AS (split_part(doi, '/'::text, 1)) STORED,
+    best_copy_url text,
     CONSTRAINT publications_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text))
 );
 
@@ -1625,6 +1692,13 @@ COMMENT ON COLUMN publications.publications.publisher_id IS 'Éditeur à la date
 --
 
 COMMENT ON COLUMN publications.publications.doi_prefix IS 'Préfixe du DOI, pour les jointures sur doi_prefixes.';
+
+
+--
+-- Name: COLUMN publications.best_copy_url; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON COLUMN publications.publications.best_copy_url IS 'Adresse de la meilleure copie ouverte, parmi les localisations des enregistrements sources.';
 
 
 --
@@ -1991,7 +2065,6 @@ CREATE TABLE publishing.serial_issns (
     support public.issn_support,
     linking boolean DEFAULT false NOT NULL,
     status public.issn_status DEFAULT 'active'::public.issn_status NOT NULL,
-    replaced_by text,
     sudoc_checked_at timestamp with time zone
 );
 
@@ -2029,13 +2102,6 @@ COMMENT ON COLUMN publishing.serial_issns.linking IS 'Vrai pour l''ISSN-L de la 
 --
 
 COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
-
-
---
--- Name: COLUMN serial_issns.replaced_by; Type: COMMENT; Schema: publishing; Owner: -
---
-
-COMMENT ON COLUMN publishing.serial_issns.replaced_by IS 'ISSN successeur : titre suivant, forme corrigée d''une valeur mal formée.';
 
 
 --
@@ -2109,8 +2175,6 @@ CREATE TABLE publishing.serials (
     publisher_id integer,
     openalex_id text,
     is_in_doaj boolean DEFAULT false,
-    apc_amount numeric(10,2),
-    apc_currency text DEFAULT 'EUR'::text,
     oa_model public.oa_model,
     created_at timestamp with time zone DEFAULT now(),
     serial_type public.serial_type DEFAULT 'unknown'::public.serial_type,
@@ -2423,104 +2487,6 @@ CREATE TABLE ref.ror_organizations (
 --
 
 COMMENT ON TABLE ref.ror_organizations IS 'Organisations du Research Organization Registry, chargées depuis son dump. Référentiel externe en lecture seule : structures.ror_id le relie au référentiel interne.';
-
-
---
--- Name: contributions; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.contributions (
-    id integer,
-    publication_id integer,
-    person_id integer,
-    author_position smallint,
-    created_at timestamp with time zone,
-    is_corresponding boolean,
-    roles text[],
-    perimeter_evidence public.perimeter_evidence[],
-    in_perimeter boolean
-);
-
-
---
--- Name: group_members; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.group_members (
-    source_contribution_id integer,
-    group_id integer
-);
-
-
---
--- Name: groups; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.groups (
-    group_id integer,
-    publication_id integer,
-    person_id integer,
-    resolution_mode text,
-    in_perimeter boolean,
-    roles text[]
-);
-
-
---
--- Name: person_identifiers; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.person_identifiers (
-    id integer,
-    person_id integer,
-    id_type text,
-    id_value text,
-    source public.identifier_origin,
-    created_at timestamp with time zone,
-    status public.identifier_status
-);
-
-
---
--- Name: person_name_forms; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.person_name_forms (
-    name_form text,
-    person_id integer,
-    sources text[],
-    created_at timestamp with time zone,
-    status public.identifier_status
-);
-
-
---
--- Name: persons; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.persons (
-    id integer,
-    last_name text,
-    first_name text,
-    last_name_normalized text,
-    first_name_normalized text,
-    created_at timestamp with time zone,
-    exclusion public.person_exclusion
-);
-
-
---
--- Name: source_contribution_persons; Type: TABLE; Schema: snapshot_20261024_gel; Owner: -
---
-
-CREATE TABLE snapshot_20261024_gel.source_contribution_persons (
-    source_contribution_id integer,
-    source_record_id integer,
-    publication_id integer,
-    person_id integer,
-    resolution_mode text,
-    in_perimeter boolean
-);
 
 
 --
@@ -3211,6 +3177,38 @@ ALTER TABLE ONLY ops.config
 
 ALTER TABLE ONLY ops.pipeline_phase_executions
     ADD CONSTRAINT pipeline_phase_executions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: roles roles_pkey; Type: CONSTRAINT; Schema: ops; Owner: -
+--
+
+ALTER TABLE ONLY ops.roles
+    ADD CONSTRAINT roles_pkey PRIMARY KEY (code);
+
+
+--
+-- Name: user_roles user_roles_pkey; Type: CONSTRAINT; Schema: ops; Owner: -
+--
+
+ALTER TABLE ONLY ops.user_roles
+    ADD CONSTRAINT user_roles_pkey PRIMARY KEY (user_id, role_code);
+
+
+--
+-- Name: users users_login_key; Type: CONSTRAINT; Schema: ops; Owner: -
+--
+
+ALTER TABLE ONLY ops.users
+    ADD CONSTRAINT users_login_key UNIQUE (login);
+
+
+--
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: ops; Owner: -
+--
+
+ALTER TABLE ONLY ops.users
+    ADD CONSTRAINT users_pkey PRIMARY KEY (id);
 
 
 --
@@ -4048,7 +4046,7 @@ CREATE INDEX contributions_orphans_idx ON publications.contributions USING btree
 -- Name: contributions_person_id_idx; Type: INDEX; Schema: publications; Owner: -
 --
 
-CREATE INDEX contributions_person_id_idx ON publications.contributions USING btree (person_id);
+CREATE INDEX contributions_person_id_idx ON publications.contributions USING btree (person_id) INCLUDE (publication_id, roles) WHERE (person_id IS NOT NULL);
 
 
 --
@@ -4794,6 +4792,22 @@ CREATE TRIGGER trg_regroup_on_identifier_update AFTER UPDATE OF status, person_i
 
 
 --
+-- Name: user_roles user_roles_role_code_fkey; Type: FK CONSTRAINT; Schema: ops; Owner: -
+--
+
+ALTER TABLE ONLY ops.user_roles
+    ADD CONSTRAINT user_roles_role_code_fkey FOREIGN KEY (role_code) REFERENCES ops.roles(code);
+
+
+--
+-- Name: user_roles user_roles_user_id_fkey; Type: FK CONSTRAINT; Schema: ops; Owner: -
+--
+
+ALTER TABLE ONLY ops.user_roles
+    ADD CONSTRAINT user_roles_user_id_fkey FOREIGN KEY (user_id) REFERENCES ops.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: confirmed_source_contributions confirmed_source_contributions_person_id_fkey; Type: FK CONSTRAINT; Schema: persons; Owner: -
 --
 
@@ -5365,5 +5379,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict azLjXsbKaH5XmcItVIhFpcmDMeAaDFxxHqtrUbZezifLkZv3vzCznRSr41n9NmZ
+\unrestrict bAFCqnO8EqiN3V070440VwNl5gVXQfKPwfhEvbi5XEDXvjBb6AZRZT9L2eaTyzq
 

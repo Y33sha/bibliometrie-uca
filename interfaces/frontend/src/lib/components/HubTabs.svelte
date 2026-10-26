@@ -18,7 +18,7 @@
   } = $props();
 </script>
 
-<nav class="tabs">
+<nav class="tabs hub-tabs">
   {#each tabs as t (t.key)}
     <button class="tab" class:active={active === t.key} onclick={() => onselect(t.key)}>
       {t.label}
@@ -26,3 +26,10 @@
     </button>
   {/each}
 </nav>
+
+<style>
+  /* Les onglets d'une liste ouvrent la page : la marge haute des onglets de fiche, qui les sépare de l'en-tête de l'entité, est superflue. */
+  .hub-tabs {
+    margin-top: 0;
+  }
+</style>

@@ -24,6 +24,7 @@ from infrastructure.read_models._common import (
     EntityFacetItem,
     EntityFacetResponse,
     FacetOption,
+    YesNoCount,
 )
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
@@ -61,8 +62,7 @@ _SERIAL_LIST_COLUMNS = f"""
 # Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin).
 _SERIAL_DETAIL_COLUMNS = f"""
     {_SERIAL_LIST_COLUMNS},
-    j.openalex_id, j.apc_amount, j.apc_currency,
-    j.oa_model, j.is_academic
+    j.openalex_id, j.oa_model, j.is_academic
 """
 
 
@@ -95,6 +95,7 @@ def _build_serial_where(
     skip_serial_types: bool = False,
     skip_doaj: bool = False,
     skip_oa_models: bool = False,
+    skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
     """Construit la clause WHERE pour `list_serials` et `serials_facets`.
 
@@ -130,8 +131,10 @@ def _build_serial_where(
     if filters.oa_models and not skip_oa_models:
         parts.append("j.oa_model = ANY(:oa_models)")
         binds["oa_models"] = filters.oa_models
-    if filters.with_publications:
-        parts.append("j.publication_count > 0")
+    if filters.has_publications is not None and not skip_publications:
+        parts.append(
+            "j.publication_count > 0" if filters.has_publications else "j.publication_count = 0"
+        )
     return (" AND ".join(parts) if parts else "TRUE", binds)
 
 
@@ -394,10 +397,22 @@ class SerialQueries:
             FacetOption(value="false", label="Non indexée", count=doaj_counts.get(False, 0)),
         ]
 
+        where_p, binds_p = _build_serial_where(filters, skip_publications=True)
+        publications_row = self._conn.execute(
+            text(f"""
+                SELECT COUNT(*) FILTER (WHERE j.publication_count > 0) AS yes,
+                       COUNT(*) FILTER (WHERE j.publication_count = 0) AS no
+                FROM serials j
+                WHERE {where_p}
+            """),
+            binds_p,
+        ).one()
+
         return SerialsFacetsResponse(
             serial_types=serial_types_facet,
             oa_models=oa_models_facet,
             doaj=doaj_facet,
+            publications=YesNoCount(yes=publications_row.yes, no=publications_row.no),
         )
 
     def serials_publisher_facet(
@@ -442,20 +457,17 @@ class SerialQueries:
                     support=i.support,
                     linking=i.linking,
                     status=i.status,
-                    replaced_by=i.replaced_by,
                     sudoc_checked_at=i.sudoc_checked_at,
                 )
                 for i in self._conn.execute(
                     text(
-                        "SELECT issn, support, linking, status, replaced_by, sudoc_checked_at "
+                        "SELECT issn, support, linking, status, sudoc_checked_at "
                         "FROM serial_issns WHERE serial_id = :id ORDER BY id"
                     ),
                     {"id": serial_id},
                 )
             ],
             openalex_id=row.openalex_id,
-            apc_amount=row.apc_amount,
-            apc_currency=row.apc_currency,
             oa_model=row.oa_model,
             is_academic=row.is_academic,
             doaj_payload=row.doaj_payload,

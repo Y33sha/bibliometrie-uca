@@ -4,11 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from infrastructure.read_models.persons.detail import (
-    person_addresses,
-    person_profile,
-    person_theses,
-)
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.addresses import insert_address
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.persons import insert_person
@@ -55,7 +51,9 @@ def _join_group(conn, source_contribution, *, publication_id, person_id):
 
 def _theses(conn, person_id):
     return [
-        thesis for section in person_theses(conn, person_id).sections for thesis in section.theses
+        thesis
+        for section in PersonsQueries(conn).person_theses(person_id).sections
+        for thesis in section.theses
     ]
 
 
@@ -103,7 +101,7 @@ class TestMemberReads:
         )
         _join_group(sa_sync_conn, member, publication_id=thesis, person_id=person)
 
-        profile = person_profile(sa_sync_conn, person)
+        profile = PersonsQueries(sa_sync_conn).person_profile(person)
 
         assert profile is not None
         assert profile.theses_count == 1
@@ -123,6 +121,6 @@ class TestMemberReads:
             sa_sync_conn, outsider, address_id=insert_address(sa_sync_conn, "Hors groupe")
         )
 
-        response = person_addresses(sa_sync_conn, person, page=1, per_page=50)
+        response = PersonsQueries(sa_sync_conn).person_addresses(person, page=1, per_page=50)
 
         assert [address.id for address in response.addresses] == [member_address]

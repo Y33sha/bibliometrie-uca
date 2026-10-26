@@ -12,9 +12,6 @@ from pipeline.transformation.publishing.find_or_create import (
     find_or_create_serial,
 )
 from pipeline.transformation.publishing.publishers.store import PublisherStore
-from pipeline.transformation.publishing.serials.enrich_serials_from_openalex import (
-    update_serial_apc,
-)
 from pipeline.transformation.publishing.serials.store import SerialStore
 from tests.integration.helpers.serials import (
     insert_publisher,
@@ -23,8 +20,7 @@ from tests.integration.helpers.serials import (
     mark_checked_in_sudoc,
 )
 
-# Revue « Nature » par défaut, sans devise d'APC.
-_serial = partial(insert_serial_with_issns, title="Nature", apc_currency=None)
+_serial = partial(insert_serial_with_issns, title="Nature")
 
 
 @pytest.fixture
@@ -273,33 +269,3 @@ class TestFindOrCreateSerial:
         row = issn_columns(sa_sync_conn, j_id)
         assert row.rejected_issns == ["1476-4688"]
         assert row.sudoc_checked_at is None
-
-
-# ── SerialStore.update_serial_apc ─────────────────────────────────────────────
-
-
-class TestUpdateSerialApc:
-    def test_updates_fields(self, sa_sync_conn, gateway):
-        j_id = _serial(sa_sync_conn)
-        update_serial_apc(sa_sync_conn, j_id, apc_amount=3000.0, apc_currency="EUR")
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT apc_amount, apc_currency FROM serials WHERE id = :id",
-            id=j_id,
-        )
-        assert float(row.apc_amount) == 3000.0
-        assert row.apc_currency == "EUR"
-
-    def test_coalesce_preserves_existing_and_leaves_is_in_doaj(self, sa_sync_conn, gateway):
-        """Sans nouvelle valeur, l'APC existant est conservé ; `is_in_doaj` (autorité
-        DOAJ) n'est jamais touché par l'enrichissement APC."""
-        j_id = _serial(sa_sync_conn, is_in_doaj=True, apc_amount=2000.0, apc_currency="USD")
-        update_serial_apc(sa_sync_conn, j_id, apc_currency="EUR")
-        row = _fetch_one(
-            sa_sync_conn,
-            "SELECT apc_amount, apc_currency, is_in_doaj FROM serials WHERE id = :id",
-            id=j_id,
-        )
-        assert float(row.apc_amount) == 2000.0
-        assert row.apc_currency == "EUR"
-        assert row.is_in_doaj is True

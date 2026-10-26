@@ -6,7 +6,6 @@ from sqlalchemy import text
 
 from domain.platforms.registry import ARXIV, HAL
 from infrastructure.read_models.publications.detail import (
-    get_publication_detail,
     get_publication_external_identifiers,
     get_publication_subjects,
 )
@@ -15,6 +14,7 @@ from tests.integration.helpers.contributions import group_id_of, insert_contribu
 from tests.integration.helpers.groups import add_group_member, insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.serials import insert_doi_prefix, insert_monograph, insert_publisher
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
@@ -23,7 +23,7 @@ from tests.integration.helpers.subjects import insert_publication_subject, inser
 
 class TestGetPublicationDetail:
     def test_returns_none_for_missing(self, sa_sync_conn):
-        assert get_publication_detail(sa_sync_conn, 999_999) is None
+        assert publications_queries(sa_sync_conn).get_publication_detail(999_999) is None
 
     def test_monographie_et_l_editeur_de_la_publication(self, sa_sync_conn):
         """Le détail donne la monographie et l'éditeur de la publication."""
@@ -36,7 +36,7 @@ class TestGetPublicationDetail:
             text("UPDATE publications SET monograph_id = :m, publisher_id = :p WHERE id = :id"),
             {"m": monograph, "p": publisher, "id": publication},
         )
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         core = detail.publication
         assert (core.monograph_id, core.monograph_title) == (monograph, "Diplomacy")
@@ -57,7 +57,7 @@ class TestGetPublicationDetail:
             source_record,
         )
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert detail.publication.id == publication
         assert detail.publication.doi == "10.1/abc"
@@ -93,7 +93,7 @@ class TestGetPublicationDetail:
         orphan = insert_source_contribution(sa_sync_conn, hal_record, author_position=3)
         insert_group(sa_sync_conn, publication, [(orphan, hal_record)])
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert [(c.person_id, c.author_position) for c in detail.contributions] == [
             (first, 1),
@@ -120,7 +120,7 @@ class TestGetPublicationDetail:
                 source_id=source_id,
                 corrections={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
             )
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         secondary_by_id = {s.source_id: s.is_secondary for s in detail.sources}
         assert secondary_by_id == {
@@ -144,7 +144,7 @@ class TestGetPublicationDetail:
             topics={"discipline": "Informatique"},
         )
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert detail.thesis_meta is not None
         assert detail.thesis_meta.discipline == "Informatique"
@@ -152,7 +152,7 @@ class TestGetPublicationDetail:
 
     def test_thesis_meta_none_for_article(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn, doc_type="article")
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert detail.thesis_meta is None
 
@@ -161,13 +161,13 @@ class TestGetPublicationDetail:
         DataCite (Zenodo/figshare/arXiv) pour le choix du lien d'accès."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         publication = insert_publication(sa_sync_conn, doi="10.5281/zenodo.99")
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert detail.publication.doi_ra == "DataCite"
 
     def test_doi_ra_none_when_prefix_unknown(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn, doi="10.9999/unresolved")
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert detail.publication.doi_ra is None
 
@@ -197,7 +197,7 @@ class TestGetPublicationDetail:
             sa_sync_conn, source_record_new, source="openalex", raw_author_name="Bob"
         )
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         oa_sources = [s for s in detail.sources if s.source == "openalex"]
         assert [s.source_id for s in oa_sources] == ["W2-NEW", "W1-OLD"]
@@ -210,7 +210,7 @@ class TestGetPublicationDetail:
         aid = insert_contribution(sa_sync_conn, publication, person_id=pid)
         add_contribution_structure(sa_sync_conn, aid, lab_id)
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert str(lab_id) in detail.structures
         assert detail.structures[str(lab_id)].acronym is None
@@ -247,7 +247,7 @@ class TestAccessAndReferences:
             ],
         )
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert [(a.label, a.url) for a in detail.access] == [
             ("arXiv", "https://arxiv.org/abs/2401.001"),
@@ -325,7 +325,7 @@ class TestGetPublicationSubjects:
         sid = insert_subject(sa_sync_conn, "genomics")
         insert_publication_subject(sa_sync_conn, publication, subject_id=sid, source="wos")
 
-        detail = get_publication_detail(sa_sync_conn, publication)
+        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
         assert detail is not None
         assert len(detail.subjects) == 1
         assert detail.subjects[0].label == "genomics"

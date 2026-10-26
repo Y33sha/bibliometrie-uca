@@ -1,20 +1,22 @@
-"""Tests d'intégration du moteur de pivot (`infrastructure.read_models.stats.pivot`)."""
+"""Tests d'intégration du moteur de pivot (`StatsQueries.pivot`)."""
 
 from sqlalchemy import text
 
 from infrastructure.read_models.stats.models import StatsFilters
-from infrastructure.read_models.stats.pivot import run_pivot
+from infrastructure.read_models.stats.queries import StatsQueries
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
-from tests.integration.helpers.structures import insert_structure, insert_tutelle
+from tests.integration.helpers.structures import (
+    insert_persons_perimeter,
+    insert_structure,
+    insert_tutelle,
+)
 
 
 def _piv(conn, measure, groups, doc_types=("article", "review")):
-    return run_pivot(
-        conn,
+    return StatsQueries(conn).pivot(
         measure=measure,
         groups=list(groups),
-        perimeter_structure_ids=[],
         filters=StatsFilters(doc_types=list(doc_types)),
     )
 
@@ -104,11 +106,9 @@ class TestLicense:
         res = _piv(sa_sync_conn, "publication_count", ["license"], doc_types=())
         assert {r["license"]: r["value"] for r in res.rows} == {"cc-by": 1, "none": 1}
 
-        filtered = run_pivot(
-            sa_sync_conn,
+        filtered = StatsQueries(sa_sync_conn).pivot(
             measure="publication_count",
             groups=[],
-            perimeter_structure_ids=[],
             filters=StatsFilters(license=["none"]),
         )
         assert filtered.rows == [{"value": 1}]
@@ -144,36 +144,30 @@ class TestApcAmount:
             open_access_fee=True,
         )
         insert_publication(conn, in_perimeter=True, oa_status="gold", publication_year=2023)
-        return inside
+        insert_persons_perimeter(conn, extra_root_ids=[inside], materialize=True)
 
-    def _pivot(self, conn, inside, groups):
-        return run_pivot(
-            conn,
-            measure="apc_amount",
-            groups=list(groups),
-            perimeter_structure_ids=[inside],
-            filters=StatsFilters(),
+    def _pivot(self, conn, groups):
+        return StatsQueries(conn).pivot(
+            measure="apc_amount", groups=list(groups), filters=StatsFilters()
         )
 
     def test_sums_only_institution_payments(self, sa_sync_conn):
-        inside = self._seed(sa_sync_conn)
+        self._seed(sa_sync_conn)
 
-        assert self._pivot(sa_sync_conn, inside, []).rows == [{"value": 150.0}]
+        assert self._pivot(sa_sync_conn, []).rows == [{"value": 150.0}]
 
     def test_grouped_by_year(self, sa_sync_conn):
-        inside = self._seed(sa_sync_conn)
+        self._seed(sa_sync_conn)
 
-        rows = self._pivot(sa_sync_conn, inside, ["year"]).rows
+        rows = self._pivot(sa_sync_conn, ["year"]).rows
         assert {r["year"]: r["value"] for r in rows} == {2023: 0.0, 2024: 150.0}
 
     def test_apc_filter_keeps_institution_paid_publications(self, sa_sync_conn):
-        inside = self._seed(sa_sync_conn)
+        self._seed(sa_sync_conn)
 
-        res = run_pivot(
-            sa_sync_conn,
+        res = StatsQueries(sa_sync_conn).pivot(
             measure="publication_count",
             groups=[],
-            perimeter_structure_ids=[inside],
             filters=StatsFilters(has_apc=["yes"]),
         )
         assert res.rows == [{"value": 1}]
@@ -195,11 +189,9 @@ class TestPartner:
             "Laboratoire": 1,
             "Labor": 1,
         }
-        filtered = run_pivot(
-            sa_sync_conn,
+        filtered = StatsQueries(sa_sync_conn).pivot(
             measure="publication_count",
             groups=[],
-            perimeter_structure_ids=[],
             filters=StatsFilters(partner_rors=["0univ0001"]),
         )
         assert filtered.rows == [{"value": 1}]
@@ -215,14 +207,11 @@ class TestPartner:
         insert_author(sa_sync_conn, publication, "W1", "0lab00001")
         insert_author(sa_sync_conn, publication, "W2", "0ger00001")
         refresh_publication_rors(sa_sync_conn)
+        insert_persons_perimeter(sa_sync_conn, extra_root_ids=[lab], materialize=True)
 
         def partners() -> dict[str, int]:
-            res = run_pivot(
-                sa_sync_conn,
-                measure="publication_count",
-                groups=["partner"],
-                perimeter_structure_ids=[lab],
-                filters=StatsFilters(),
+            res = StatsQueries(sa_sync_conn).pivot(
+                measure="publication_count", groups=["partner"], filters=StatsFilters()
             )
             return {r["partner"]: r["value"] for r in res.rows}
 
