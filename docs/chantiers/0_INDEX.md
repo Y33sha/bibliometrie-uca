@@ -112,11 +112,6 @@
 - 2026-06-13 — [Performance des pages de listes (UI)](archived/2026-06-13_DATA_perf-pages-listes.md)
 - 2026-06-11 — [Publications : matching par création⇒fusion + modélisation des identifiants](archived/2026-06-11_DATA_publications-creation-fusion.md)
 - 2026-06-11 — [Fusions abusives de documents distincts par les sources](archived/2026-06-11_METIER_fusions-abusives-sources.md)
-- 2026-06-09 — [Complétude des identifiants externes & clés de déduplication](archived/2026-06-09_METIER_completude-identifiants.md)
-- 2026-06-08 — [Export CSV fidèle à l'affichage (filtres + colonnes + titres nettoyés)](archived/2026-06-08_CODE_export-csv-fidele.md)
-- 2026-06-08 — [Peaufinage UI (cohérence, responsivité, ergonomie)](archived/2026-06-08_CODE_peaufinage-ui.md)
-- 2026-06-07 — [Barres à facettes homogènes + extraction des ListView (thèses, personnes) + alignement endpoint personnes](archived/2026-06-07_CODE_listviews-facettes-homogenes.md)
-- 2026-06-07 — [Filtres composables pour le repérage des adresses (admin)](archived/2026-06-07_CODE_filtres-adresses-composables.md)
 
 
 
