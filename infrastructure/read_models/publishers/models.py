@@ -87,7 +87,7 @@ class OaStatusCount(BaseModel):
 class PublishersFacetsResponse(BaseModel):
     """Facettes dynamiques pour `/api/publishers`.
 
-    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le code en majuscules. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
+    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le nom du pays. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
     """
 
     publisher_types: list[FacetOption]

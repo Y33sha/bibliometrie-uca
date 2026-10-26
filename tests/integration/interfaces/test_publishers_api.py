@@ -15,6 +15,7 @@ from functools import partial
 
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
+    seed_country,
     seed_doi_prefix,
     seed_in_perimeter_contributions,
     seed_publication,
@@ -162,6 +163,25 @@ class TestPublishersFacets:
         assert set(body) == {"publisher_types", "countries", "publications"}
         # Le pays seedé doit apparaître dans la facette countries.
         assert any(opt["value"] == country for opt in body["countries"])
+
+    def test_country_label_is_the_country_name(self, client):
+        seed_country("fr", "France")
+        with owner_pool() as cur:
+            cur.execute("UPDATE publishers SET country = 'fr' WHERE id = %s", (seed_publisher(),))
+        r = client.get("/api/publishers/facets")
+        assert r.status_code == 200
+        labels = {opt["value"]: opt["label"] for opt in r.json()["countries"]}
+        assert labels["fr"] == "France"
+
+    def test_country_label_falls_back_to_the_code(self, client):
+        country = uniq("QQ")[:5]
+        with owner_pool() as cur:
+            cur.execute(
+                "UPDATE publishers SET country = %s WHERE id = %s", (country, seed_publisher())
+            )
+        r = client.get("/api/publishers/facets")
+        labels = {opt["value"]: opt["label"] for opt in r.json()["countries"]}
+        assert labels[country] == country.upper()
 
     def test_publications_counts_ignore_their_own_filter(self, client):
         country = uniq("YY")[:5]

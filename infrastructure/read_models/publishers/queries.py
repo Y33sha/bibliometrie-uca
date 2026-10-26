@@ -167,17 +167,18 @@ class PublisherQueries:
         where_c, binds_c = _build_publisher_where(filters, skip_countries=True)
         country_rows = self._conn.execute(
             text(f"""
-                SELECT p.country AS value, COUNT(*) AS n
+                SELECT p.country AS value, COALESCE(co.name, upper(p.country)) AS label, COUNT(*) AS n
                 FROM publishers p
+                LEFT JOIN countries co ON co.code = p.country
                 WHERE {where_c} AND p.country IS NOT NULL
-                GROUP BY p.country
-                ORDER BY n DESC, p.country
+                GROUP BY p.country, co.name
+                ORDER BY n DESC, label
             """),
             binds_c,
         ).all()
-        # Pays : pas d'enum, on expose ce qui est observé (code pays ISO en pratique). `value` = code minuscule canonique (pour le filtre) ; `label` en majuscule (présentation).
+        # `value` est le code observé sur l'éditeur ; `label` est le nom du référentiel des pays, ou le code en majuscules s'il en est absent.
         countries_facet = [
-            FacetOption(value=r.value, label=r.value.upper(), count=r.n) for r in country_rows
+            FacetOption(value=r.value, label=r.label, count=r.n) for r in country_rows
         ]
 
         where_p, binds_p = _build_publisher_where(filters, skip_publications=True)
