@@ -17,10 +17,10 @@
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
-- [Simplification des services applicatifs et de leurs ports](CODE_simplification-services.md)
 
 ## Chantiers archivés
 
+- 2026-10-26 — [Simplification des services applicatifs et de leurs ports](archived/2026-10-26_CODE_simplification-services.md)
 - 2026-10-25 — [Refonte visuelle du frontend](archived/2026-10-25_UI_refonte-visuelle.md)
 - 2026-10-25 — [Collaborations entre structures](archived/2026-10-25_DATA_collaborations-structures.md)
 - 2026-10-25 — [Monographies](archived/2026-10-25_DATA_monographies.md)
