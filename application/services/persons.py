@@ -13,7 +13,7 @@ from application.ports.repositories.person_repository import (
     PersonRepository,
 )
 from application.services._merge import check_merge_pair
-from application.services.contributions.core import reject_pair
+from application.services.contributions import reject_pair
 from domain.errors import NotFoundError, ValidationError
 from domain.persons.identifier_attribution import (
     AttributionOutcome,

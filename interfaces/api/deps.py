@@ -20,9 +20,6 @@ from application.ports.pipeline.perimeter_structures import (
 from application.ports.pipeline.publication_count import (
     PublicationCountRecompute as PublicationCountRecomputePort,
 )
-from application.ports.pipeline.publication_perimeter import (
-    PublicationPerimeterRecompute as PublicationPerimeterRecomputePort,
-)
 from application.ports.pipeline.serial_recompute import SerialRecompute as SerialRecomputePort
 from application.ports.read_models.addresses_queries import AddressesQueries
 from application.ports.read_models.config_queries import ConfigQueries
@@ -43,9 +40,7 @@ from application.ports.read_models.structures_queries import StructuresQueries
 from application.ports.read_models.subjects_queries import SubjectsQueries
 from application.ports.repositories.address_repository import AddressRepository
 from application.ports.repositories.config_repository import ConfigRepository
-from application.ports.repositories.contribution_repository import ContributionRepository
 from application.ports.repositories.perimeter_repository import PerimeterRepository
-from application.ports.repositories.person_repository import PersonRepository
 from application.ports.repositories.publisher_repository import PublisherRepository
 from application.ports.repositories.serial_repository import SerialRepository
 from application.ports.repositories.structure_repository import StructureRepository
@@ -53,6 +48,7 @@ from application.services.addresses import (
     countries as countries_service,
     structure_links as structure_links_service,
 )
+from application.services.contributions import ContributionService
 from application.services.persons import PersonService
 from domain.merge import MergedEntity
 from infrastructure.db.engine import get_sync_engine
@@ -204,10 +200,6 @@ def hal_problems_queries(
     return PgHalProblemsQueries(conn)
 
 
-def person_repo(conn: DbConn) -> PersonRepository:
-    return person_repository(conn)
-
-
 def person_service(conn: DbConn) -> PersonService:
     return PersonService(
         persons=person_repository(conn),
@@ -282,8 +274,12 @@ def publications_queries(
     return PgPublicationsQueries(conn, open_connection=open_connection)
 
 
-def contribution_repo(conn: DbConn) -> ContributionRepository:
-    return contribution_repository(conn)
+def contribution_service(conn: DbConn) -> ContributionService:
+    return ContributionService(
+        persons=person_repository(conn),
+        contributions=contribution_repository(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
 
 
 def address_repo(conn: DbConn) -> AddressRepository:
@@ -315,11 +311,6 @@ def get_perimeter_structures(conn: DbConn) -> PerimeterStructuresPort:
 def serial_recompute(conn: DbConn) -> SerialRecomputePort:
     """Requalification des publications d'une revue après son édition ou sa fusion."""
     return SerialRecompute(conn)
-
-
-def publication_perimeter_recompute(conn: DbConn) -> PublicationPerimeterRecomputePort:
-    """Appartenance au périmètre des publications, après une décision sur une personne ou sur ses contributions."""
-    return PublicationPerimeterRecompute(conn)
 
 
 def publication_count_recompute(conn: DbConn) -> PublicationCountRecomputePort:

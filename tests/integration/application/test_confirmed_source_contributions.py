@@ -3,12 +3,11 @@
 import pytest
 from sqlalchemy import text
 
-from application.services.contributions.assign_orphans import assign_orphan_contribution
-from application.services.contributions.core import reject_pair
+from application.services.contributions import reject_pair
 from domain.errors import PersonAlreadyInPublicationError
 from infrastructure.db.queues import Queue
-from infrastructure.repositories import contribution_repository, person_repository
-from interfaces.api.deps import person_service
+from infrastructure.repositories import contribution_repository
+from interfaces.api.deps import contribution_service, person_service
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
@@ -50,13 +49,7 @@ def _pin(conn, source_contribution_id):
 def test_attach_pins(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
     sa, group, _publication = _orphan_source_contribution(sa_sync_conn)
-    assign_orphan_contribution(
-        pid,
-        group,
-        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-        repo=person_repository(sa_sync_conn),
-        contribution_repo=contribution_repository(sa_sync_conn),
-    )
+    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, group)
     assert group_person(sa_sync_conn, group) == (pid, "manual")
     assert _pin(sa_sync_conn, sa) == pid
 
@@ -64,13 +57,7 @@ def test_attach_pins(sa_sync_conn):
 def test_detach_unpins(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Martin", first_name="Jean")
     sa, group, publication = _orphan_source_contribution(sa_sync_conn)
-    assign_orphan_contribution(
-        pid,
-        group,
-        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-        repo=person_repository(sa_sync_conn),
-        contribution_repo=contribution_repository(sa_sync_conn),
-    )
+    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, group)
     assert _pin(sa_sync_conn, sa) == pid
 
     reject_pair(
@@ -88,14 +75,7 @@ def test_name_form_rejection_spares_pinned_groups(sa_sync_conn):
     pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
     pinned, pinned_group, _ = _orphan_source_contribution(sa_sync_conn)
     _, matched_group, _ = _orphan_source_contribution(sa_sync_conn)
-    persons, contributions = person_repository(sa_sync_conn), contribution_repository(sa_sync_conn)
-    assign_orphan_contribution(
-        pid,
-        pinned_group,
-        perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-        repo=persons,
-        contribution_repo=contributions,
-    )
+    contribution_service(sa_sync_conn).assign_orphan_contribution(pid, pinned_group)
     set_perimeter_author_group(sa_sync_conn, matched_group, person_id=pid, mode="name")
     insert_person_name_form(
         sa_sync_conn,
@@ -121,11 +101,5 @@ def test_attach_refuse_quand_la_personne_a_un_groupe_manuel_dans_la_publication(
     manual = insert_contribution(sa_sync_conn, publication, person_id=pid)
 
     with pytest.raises(PersonAlreadyInPublicationError) as error:
-        assign_orphan_contribution(
-            pid,
-            group,
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=person_repository(sa_sync_conn),
-            contribution_repo=contribution_repository(sa_sync_conn),
-        )
+        contribution_service(sa_sync_conn).assign_orphan_contribution(pid, group)
     assert error.value.contribution_id == manual

@@ -5,10 +5,6 @@ from functools import partial
 import pytest
 from sqlalchemy import text
 
-from application.services.contributions.assign_orphans import (
-    assign_orphan_contribution,
-    batch_assign_orphan_contributions,
-)
 from domain.errors import (
     ConflictError,
     ContributionAlreadyAssignedError,
@@ -25,10 +21,7 @@ from infrastructure.repositories import (
     person_repository,
 )
 from infrastructure.sql_fragments import REJECTED_PAIRS
-from interfaces.api.deps import person_service
-from pipeline.transformation.publications.publication_perimeter import (
-    PublicationPerimeterRecompute,
-)
+from interfaces.api.deps import contribution_service as build_contribution_service, person_service
 from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
     insert_contribution,
@@ -131,6 +124,11 @@ def contribution_repo(sa_sync_conn):
 @pytest.fixture
 def service(sa_sync_conn):
     return person_service(sa_sync_conn)
+
+
+@pytest.fixture
+def contribution_service(sa_sync_conn):
+    return build_contribution_service(sa_sync_conn)
 
 
 # ── Helpers ─────────────────────────────────────────────────
@@ -654,21 +652,12 @@ class TestMergePerson:
 
 
 class TestBatchAssignOrphanContributions:
-    def test_empty_list_returns_zero(self, sa_sync_conn, repo, contribution_repo):
+    def test_empty_list_returns_zero(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
-        assert (
-            batch_assign_orphan_contributions(
-                person_id,
-                [],
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
-            == 0
-        )
+        assert contribution_service.batch_assign_orphan_contributions(person_id, []) == 0
 
-    def test_attaches_groups_and_pins_all_members(self, sa_sync_conn, repo, contribution_repo):
+    def test_attaches_groups_and_pins_all_members(self, sa_sync_conn, contribution_service):
         """Chaque groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
@@ -682,12 +671,8 @@ class TestBatchAssignOrphanContributions:
         second = insert_publication(sa_sync_conn)
         second_group, second_hal = _orphan(sa_sync_conn, second, source_id="h-2")
 
-        assigned = batch_assign_orphan_contributions(
-            person_id,
-            [first_group, second_group],
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            contribution_repo=contribution_repo,
+        assigned = contribution_service.batch_assign_orphan_contributions(
+            person_id, [first_group, second_group]
         )
 
         assert assigned == 2
@@ -697,7 +682,7 @@ class TestBatchAssignOrphanContributions:
         assert _pinned_to(sa_sync_conn, members) == [person_id] * 3
         assert _publication_evidence(sa_sync_conn, first) == ["address"]
 
-    def test_adds_name_forms_under_their_source(self, sa_sync_conn, repo, contribution_repo):
+    def test_adds_name_forms_under_their_source(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         group, _ = _orphan(
@@ -708,13 +693,7 @@ class TestBatchAssignOrphanContributions:
             author_name_normalized="j dupont",
         )
 
-        batch_assign_orphan_contributions(
-            person_id,
-            [group],
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        contribution_service.batch_assign_orphan_contributions(person_id, [group])
 
         assert _scalar(
             sa_sync_conn,
@@ -722,7 +701,7 @@ class TestBatchAssignOrphanContributions:
             p=person_id,
         ) == ["openalex"]
 
-    def test_skips_already_assigned(self, sa_sync_conn, repo, contribution_repo):
+    def test_skips_already_assigned(self, sa_sync_conn, contribution_service):
         """Un groupe déjà rattaché est écarté : ni épinglage, ni changement de personne ; le groupe orphelin du lot est rattaché."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
@@ -734,12 +713,8 @@ class TestBatchAssignOrphanContributions:
             sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-2"
         )
 
-        assigned = batch_assign_orphan_contributions(
-            p2,
-            [owned_group, orphan_group],
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            contribution_repo=contribution_repo,
+        assigned = contribution_service.batch_assign_orphan_contributions(
+            p2, [owned_group, orphan_group]
         )
 
         assert assigned == 1
@@ -1040,7 +1015,7 @@ class TestNameFormRejectionOnGroups:
 
 
 class TestAssignOrphanContribution:
-    def test_attaches_group_and_pins_all_members(self, sa_sync_conn, repo, contribution_repo):
+    def test_attaches_group_and_pins_all_members(self, sa_sync_conn, contribution_service):
         """Le groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne et la reçoivent dans `source_contributions`."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
@@ -1054,13 +1029,7 @@ class TestAssignOrphanContribution:
         )
         add_group_member(sa_sync_conn, group, openalex, source_record_oa)
 
-        assign_orphan_contribution(
-            person_id,
-            group,
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            contribution_repo=contribution_repo,
-        )
+        contribution_service.assign_orphan_contribution(person_id, group)
 
         assert _group_person(sa_sync_conn, group) == (person_id, "manual")
         assert _pinned_to(sa_sync_conn, [hal, openalex]) == [person_id, person_id]
@@ -1071,7 +1040,7 @@ class TestAssignOrphanContribution:
             p=person_id,
         ) == ["hal", "openalex"]
 
-    def test_raises_if_already_assigned(self, sa_sync_conn, repo, contribution_repo):
+    def test_raises_if_already_assigned(self, sa_sync_conn, contribution_service):
         """Un groupe déjà rattaché n'est pas repris : le refus nomme la détentrice."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
@@ -1080,33 +1049,21 @@ class TestAssignOrphanContribution:
         set_perimeter_author_group(sa_sync_conn, group, person_id=other_id, mode="name")
 
         with pytest.raises(ContributionAlreadyAssignedError) as exc:
-            assign_orphan_contribution(
-                person_id,
-                group,
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.assign_orphan_contribution(person_id, group)
         assert exc.value.owner_person_id == other_id
         assert _group_person(sa_sync_conn, group) == (other_id, "name")
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
 
-    def test_raises_if_group_missing(self, sa_sync_conn, repo, contribution_repo):
+    def test_raises_if_group_missing(self, sa_sync_conn, contribution_service):
         person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
-            assign_orphan_contribution(
-                person_id,
-                999999,
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.assign_orphan_contribution(person_id, 999999)
 
 
 class TestReassignRejectedPairUnit:
     """Pré-contrôle de rejet sur les chemins de réassignation orphan-contributions."""
 
-    def test_assign_blocked_when_rejected(self, sa_sync_conn, repo, contribution_repo):
+    def test_assign_blocked_when_rejected(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
@@ -1114,13 +1071,7 @@ class TestReassignRejectedPairUnit:
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
-            assign_orphan_contribution(
-                person_id,
-                group,
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.assign_orphan_contribution(person_id, group)
         pair = exc.value.rejected_pairs[0]
         assert pair["publication_id"] == publication_id
         assert pair["person_id"] == person_id
@@ -1129,23 +1080,14 @@ class TestReassignRejectedPairUnit:
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
         assert _group_person(sa_sync_conn, group) == (None, None)
 
-    def test_assign_forced_unrejects_and_attaches_group(
-        self, sa_sync_conn, repo, contribution_repo
-    ):
+    def test_assign_forced_unrejects_and_attaches_group(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         group, source_contribution_id = _orphan(sa_sync_conn, publication_id)
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
-        assign_orphan_contribution(
-            person_id,
-            group,
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            contribution_repo=contribution_repo,
-            force=True,
-        )
+        contribution_service.assign_orphan_contribution(person_id, group, force=True)
 
         assert (
             _scalar(
@@ -1159,7 +1101,7 @@ class TestReassignRejectedPairUnit:
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [person_id]
         assert _group_person(sa_sync_conn, group) == (person_id, "manual")
 
-    def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, repo, contribution_repo):
+    def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
@@ -1169,32 +1111,21 @@ class TestReassignRejectedPairUnit:
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
-            batch_assign_orphan_contributions(
-                person_id,
-                [group1, group2],
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                contribution_repo=contribution_repo,
-            )
+            contribution_service.batch_assign_orphan_contributions(person_id, [group1, group2])
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
         # Rien d'écrit : le pré-contrôle précède l'épinglage.
         assert [_group_person(sa_sync_conn, g) for g in (group1, group2)] == [(None, None)] * 2
         assert _pinned_to(sa_sync_conn, [sa1, sa2]) == [None, None]
 
-    def test_batch_forced_unrejects_all(self, sa_sync_conn, repo, contribution_repo):
+    def test_batch_forced_unrejects_all(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         group, _ = _orphan(sa_sync_conn, pub1, source_id="h-1")
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
-        assigned = batch_assign_orphan_contributions(
-            person_id,
-            [group],
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            contribution_repo=contribution_repo,
-            force=True,
+        assigned = contribution_service.batch_assign_orphan_contributions(
+            person_id, [group], force=True
         )
 
         assert assigned == 1

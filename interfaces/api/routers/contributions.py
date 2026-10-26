@@ -9,7 +9,6 @@ from typing import cast
 
 from fastapi import APIRouter, Depends, Query
 
-from application.ports.pipeline.publication_perimeter import PublicationPerimeterRecompute
 from application.ports.read_models.contributions_queries import (
     ContributionsQueries,
     OrphanContributionsFacetsResponse,
@@ -17,15 +16,8 @@ from application.ports.read_models.contributions_queries import (
     OrphanCountResponse,
     OrphanFilters,
 )
-from application.ports.repositories.contribution_repository import ContributionRepository
-from application.ports.repositories.person_repository import PersonRepository
-from application.services.contributions import assign_orphans, core as contributions_service
-from interfaces.api.deps import (
-    contribution_repo,
-    contributions_queries,
-    person_repo,
-    publication_perimeter_recompute,
-)
+from application.services.contributions import ContributionService
+from interfaces.api.deps import contribution_service, contributions_queries
 from interfaces.api.filters import parse_lab_id
 from interfaces.api.models import (
     AssignOrphanContribution,
@@ -84,34 +76,22 @@ def orphan_contributions_facets(
 )
 def assign_orphan_contribution(
     body: AssignOrphanContribution,
-    persons: PersonRepository = Depends(person_repo),
-    contributions: ContributionRepository = Depends(contribution_repo),
-    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
+    contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanAssignResponse:
     """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
 
     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou un groupe introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur un groupe déjà rattaché à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà un groupe manuel dans la publication (`PersonAlreadyInPublicationError`).
     """
     if body.create_person is not None:
-        person_id = assign_orphans.assign_orphan_contribution_to_new_person(
+        person_id = contributions.assign_orphan_contribution_to_new_person(
             body.contribution_id,
             body.create_person.last_name,
             body.create_person.first_name,
-            repo=persons,
-            contribution_repo=contributions,
-            perimeter_recompute=perimeter_recompute,
             force=body.force,
         )
     else:
         person_id = cast(int, body.person_id)
-        assign_orphans.assign_orphan_contribution(
-            person_id,
-            body.contribution_id,
-            repo=persons,
-            contribution_repo=contributions,
-            perimeter_recompute=perimeter_recompute,
-            force=body.force,
-        )
+        contributions.assign_orphan_contribution(person_id, body.contribution_id, force=body.force)
     return OrphanAssignResponse(person_id=person_id)
 
 
@@ -122,9 +102,7 @@ def assign_orphan_contribution(
 )
 def batch_assign_orphan_contributions(
     body: BatchAssignOrphanContributions,
-    persons: PersonRepository = Depends(person_repo),
-    contributions: ContributionRepository = Depends(contribution_repo),
-    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
+    contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs contributions orphelines à une personne existante.
 
@@ -133,13 +111,8 @@ def batch_assign_orphan_contributions(
     if not body.group_ids:
         return OrphanBatchAssignResponse(assigned=0)
 
-    assigned = assign_orphans.batch_assign_orphan_contributions(
-        body.person_id,
-        body.group_ids,
-        repo=persons,
-        contribution_repo=contributions,
-        perimeter_recompute=perimeter_recompute,
-        force=body.force,
+    assigned = contributions.batch_assign_orphan_contributions(
+        body.person_id, body.group_ids, force=body.force
     )
     return OrphanBatchAssignResponse(assigned=assigned)
 
@@ -150,18 +123,11 @@ def batch_assign_orphan_contributions(
 @router.patch("/{contribution_id}/exclude", response_model=OkResponse)
 def exclude_contribution(
     contribution_id: int,
-    repo: ContributionRepository = Depends(contribution_repo),
-    persons: PersonRepository = Depends(person_repo),
-    perimeter_recompute: PublicationPerimeterRecompute = Depends(publication_perimeter_recompute),
+    contributions: ContributionService = Depends(contribution_service),
 ) -> OkResponse:
     """Rejette une contribution : cette personne n'a pas signé cette publication.
 
     `contribution_id` désigne le groupe de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache le groupe et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
     """
-    contributions_service.exclude_contribution(
-        contribution_id,
-        repo=repo,
-        person_repo=persons,
-        perimeter_recompute=perimeter_recompute,
-    )
+    contributions.exclude_contribution(contribution_id)
     return OkResponse()

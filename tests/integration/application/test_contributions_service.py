@@ -10,14 +10,11 @@ import pytest
 from sqlalchemy import text
 
 from application.services.addresses.structure_links import propagate_in_perimeter_for_addresses
-from application.services.contributions.assign_orphans import (
-    assign_orphan_contribution,
-    batch_assign_orphan_contributions,
-)
-from application.services.contributions.core import exclude_contribution, reject_pair
+from application.services.contributions import reject_pair
 from domain.errors import NotFoundError
-from infrastructure.repositories import contribution_repository, person_repository
+from infrastructure.repositories import contribution_repository
 from infrastructure.sql_fragments import REJECTED_PAIRS
+from interfaces.api.deps import contribution_service
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
@@ -64,6 +61,11 @@ def repo(sa_sync_conn):
     return contribution_repository(sa_sync_conn)
 
 
+@pytest.fixture
+def service(sa_sync_conn):
+    return contribution_service(sa_sync_conn)
+
+
 # ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
 
 
@@ -80,18 +82,13 @@ def _group_person(conn, contribution_id):
 class TestExcludeContribution:
     """exclude_contribution enregistre le rejet dans `rejected_contributions`, puis détache le groupe de la paire (cœur partagé `reject_pair`)."""
 
-    def test_rejects_and_detaches_group(self, sa_sync_conn, repo):
+    def test_rejects_and_detaches_group(self, sa_sync_conn, service):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication_id)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
-        exclude_contribution(
-            contribution_id,
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            person_repo=person_repository(sa_sync_conn),
-        )
+        service.exclude_contribution(contribution_id)
 
         assert _group_person(sa_sync_conn, contribution_id) == (None, None)
         # Rejet enregistré dans le sidecar
@@ -106,16 +103,11 @@ class TestExcludeContribution:
             is not None
         )
 
-    def test_raises_not_found(self, sa_sync_conn, repo):
+    def test_raises_not_found(self, sa_sync_conn, service):
         with pytest.raises(NotFoundError):
-            exclude_contribution(
-                999999,
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                person_repo=person_repository(sa_sync_conn),
-            )
+            service.exclude_contribution(999999)
 
-    def test_raises_not_found_for_group_without_person(self, sa_sync_conn, repo):
+    def test_raises_not_found_for_group_without_person(self, sa_sync_conn, service):
         """Un groupe sans personne n'est pas une contribution."""
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
@@ -125,14 +117,9 @@ class TestExcludeContribution:
         )
 
         with pytest.raises(NotFoundError):
-            exclude_contribution(
-                contribution_id,
-                perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-                repo=repo,
-                person_repo=person_repository(sa_sync_conn),
-            )
+            service.exclude_contribution(contribution_id)
 
-    def test_does_not_touch_other_contributions(self, sa_sync_conn, repo):
+    def test_does_not_touch_other_contributions(self, sa_sync_conn, service):
         """Rejeter une contribution ne touche pas les autres paires."""
         publication_id = _publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication_id)
@@ -142,12 +129,7 @@ class TestExcludeContribution:
         insert_contribution(sa_sync_conn, publication_id, person_id=p1)
         a2 = insert_contribution(sa_sync_conn, publication_id, person_id=p2)
 
-        exclude_contribution(
-            group_id_of(sa_sync_conn, publication_id, p1),
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=repo,
-            person_repo=person_repository(sa_sync_conn),
-        )
+        service.exclude_contribution(group_id_of(sa_sync_conn, publication_id, p1))
 
         assert _group_person(sa_sync_conn, a2) == (p2, "manual")
 
@@ -468,32 +450,20 @@ class TestHumanDecisionsOnPublicationPerimeter:
         set_perimeter_author_group(conn, contribution_id)
         return publication_id, contribution_id
 
-    def test_l_attribution_fait_entrer_la_publication(self, sa_sync_conn, repo):
+    def test_l_attribution_fait_entrer_la_publication(self, sa_sync_conn, service):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id, contribution_id = self._orphan(sa_sync_conn, "hal-orphan")
 
-        assign_orphan_contribution(
-            person_id,
-            contribution_id,
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=person_repository(sa_sync_conn),
-            contribution_repo=repo,
-        )
+        service.assign_orphan_contribution(person_id, contribution_id)
 
         assert _publication_evidence(sa_sync_conn, publication_id) == ["address"]
 
-    def test_l_attribution_en_lot_fait_entrer_les_publications(self, sa_sync_conn, repo):
+    def test_l_attribution_en_lot_fait_entrer_les_publications(self, sa_sync_conn, service):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         first, first_group = self._orphan(sa_sync_conn, "hal-a")
         second, second_group = self._orphan(sa_sync_conn, "hal-b")
 
-        batch_assign_orphan_contributions(
-            person_id,
-            [first_group, second_group],
-            perimeter_recompute=PublicationPerimeterRecompute(sa_sync_conn),
-            repo=person_repository(sa_sync_conn),
-            contribution_repo=repo,
-        )
+        service.batch_assign_orphan_contributions(person_id, [first_group, second_group])
 
         assert _publication_evidence(sa_sync_conn, first) == ["address"]
         assert _publication_evidence(sa_sync_conn, second) == ["address"]

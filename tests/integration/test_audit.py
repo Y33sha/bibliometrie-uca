@@ -223,7 +223,7 @@ class TestEndToEndServiceIntegration:
 
     def test_reject_pair_emits_event(self, sa_sync_conn):
         """Le détachement d'une paire (publication, personne) émet l'événement."""
-        from application.services.contributions.core import reject_pair
+        from application.services.contributions import reject_pair
         from infrastructure.repositories import contribution_repository
 
         person_id = _person(sa_sync_conn)
