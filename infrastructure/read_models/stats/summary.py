@@ -117,28 +117,22 @@ class StatsFacetQueries:
 
     def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse:
         """Décomptes de chaque facette, sa propre dimension écartée de la clause WHERE."""
-        conn = self._conn
-        conn.execute(text("SET LOCAL jit = off"))
+        self._conn.execute(text("SET LOCAL jit = off"))
         sqls = _facets_sqls(
-            perimeter_structure_ids=get_persons_structure_ids_list(conn),
+            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
             filters=filters,
         )
-
-        year_rows = conn.execute(text(sqls["year"][0]), sqls["year"][1]).all()
-        lab_rows = conn.execute(text(sqls["lab"][0]), sqls["lab"][1]).all()
-        oa_rows = conn.execute(text(sqls["oa"][0]), sqls["oa"][1]).all()
-        apc_row = conn.execute(text(sqls["apc"][0]), sqls["apc"][1]).one()
-        doc_type_rows = conn.execute(text(sqls["doc_type"][0]), sqls["doc_type"][1]).all()
-        license_rows = conn.execute(text(sqls["license"][0]), sqls["license"][1]).all()
-
+        rows = {
+            name: self._conn.execute(text(sql), binds).all() for name, (sql, binds) in sqls.items()
+        }
         return _build_facets_result(
-            year_rows,
-            lab_rows,
-            oa_rows,
-            apc_row,
-            doc_type_rows,
-            license_rows=license_rows,
-            institution=get_persons_perimeter_name(conn),
+            rows["year"],
+            rows["lab"],
+            rows["oa"],
+            rows["apc"][0],
+            rows["doc_type"],
+            license_rows=rows["license"],
+            institution=get_persons_perimeter_name(self._conn),
         )
 
 
