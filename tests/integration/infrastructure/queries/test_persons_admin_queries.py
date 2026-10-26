@@ -1,20 +1,11 @@
-"""Tests d'intégration pour `infrastructure.read_models.persons.admin`."""
+"""Tests d'intégration des lectures d'administration des personnes (`infrastructure.read_models.persons.admin`)."""
 
 from functools import partial
 
 import pytest
 from sqlalchemy import text
 
-from infrastructure.read_models.persons.admin import (
-    ambiguous_name_forms,
-    identifier_conflicts,
-    identifier_conflicts_count,
-    name_duplicates,
-    name_duplicates_count,
-    name_form_contributions,
-    persons_sharing_name_form,
-)
-from infrastructure.read_models.persons.list import person_name_forms
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.contributions import insert_contribution
 from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import (
@@ -60,7 +51,7 @@ class TestNameFormContributions:
         _hal_name_form(sa_sync_conn, pid, name_form="dupond j")
         _hal_name_form(sa_sync_conn, other, name_form="dupond j")
 
-        res = name_form_contributions(sa_sync_conn, pid, "dupond j")
+        res = PersonsQueries(sa_sync_conn).name_form_contributions(pid, "dupond j")
         assert len(res.contributions) >= 1
         other_ids = [p.person_id for p in res.other_persons]
         assert other in other_ids
@@ -71,7 +62,7 @@ class TestNameFormContributions:
         _hal_name_form(sa_sync_conn, pid, name_form="dupond j", status="pending")
         _hal_name_form(sa_sync_conn, rejetee, name_form="dupond j", status="rejected")
 
-        res = name_form_contributions(sa_sync_conn, pid, "dupond j")
+        res = PersonsQueries(sa_sync_conn).name_form_contributions(pid, "dupond j")
 
         assert res.other_persons == []
 
@@ -90,9 +81,9 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
     ):
         _hal_name_form(sa_sync_conn, person, name_form="dupond j", status=status)
 
-    (forme,) = person_name_forms(sa_sync_conn, pid)
-    modale = name_form_contributions(sa_sync_conn, pid, "dupond j").other_persons
-    panneau = persons_sharing_name_form(sa_sync_conn, pid)
+    (forme,) = PersonsQueries(sa_sync_conn).person_name_forms(pid)
+    modale = PersonsQueries(sa_sync_conn).name_form_contributions(pid, "dupond j").other_persons
+    panneau = PersonsQueries(sa_sync_conn).persons_sharing_name_form(pid)
 
     assert forme.shared_count == 1
     assert [p.person_id for p in modale] == [porteur]
@@ -120,8 +111,12 @@ def test_une_forme_compte_les_publications_des_groupes_de_la_personne(sa_sync_co
         author_name_normalized="dupond j",
     )
 
-    (forme,) = [f for f in person_name_forms(sa_sync_conn, pid) if f.name_form == "dupond j"]
-    contributions = name_form_contributions(sa_sync_conn, pid, "dupond j").contributions
+    (forme,) = [
+        f for f in PersonsQueries(sa_sync_conn).person_name_forms(pid) if f.name_form == "dupond j"
+    ]
+    contributions = (
+        PersonsQueries(sa_sync_conn).name_form_contributions(pid, "dupond j").contributions
+    )
 
     assert forme.publication_count == 2
     assert len(contributions) == 2
@@ -158,8 +153,8 @@ class TestIdentifierConflicts:
             person_id=p2,
         )
 
-        assert identifier_conflicts_count(sa_sync_conn) == 1
-        res = identifier_conflicts(sa_sync_conn, page=1, per_page=50)
+        assert PersonsQueries(sa_sync_conn).identifier_conflicts_count() == 1
+        res = PersonsQueries(sa_sync_conn).identifier_conflicts(page=1, per_page=50)
         assert res.total == 1
         pair = res.pairs[0]
         assert {pair.person_a.person_id, pair.person_b.person_id} == {p1, p2}
@@ -183,7 +178,7 @@ class TestIdentifierConflicts:
                 neutralized_identifiers={"orcid": "shared"},
             )
 
-        assert identifier_conflicts_count(sa_sync_conn) == 0
+        assert PersonsQueries(sa_sync_conn).identifier_conflicts_count() == 0
 
     @pytest.mark.parametrize("status", ["confirmed", "rejected", "authenticated"])
     def test_settled_attribution_excluded(self, sa_sync_conn, status):
@@ -203,7 +198,7 @@ class TestIdentifierConflicts:
             person_id=p2,
         )
 
-        assert identifier_conflicts_count(sa_sync_conn) == 0
+        assert PersonsQueries(sa_sync_conn).identifier_conflicts_count() == 0
 
     def test_unattributed_value_excluded(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
@@ -220,7 +215,7 @@ class TestIdentifierConflicts:
             person_id=p2,
         )
 
-        assert identifier_conflicts_count(sa_sync_conn) == 0
+        assert PersonsQueries(sa_sync_conn).identifier_conflicts_count() == 0
 
     def test_excluded_person_excluded(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Lee", first_name="Anna")
@@ -238,7 +233,7 @@ class TestIdentifierConflicts:
             person_id=p2,
         )
 
-        assert identifier_conflicts_count(sa_sync_conn) == 0
+        assert PersonsQueries(sa_sync_conn).identifier_conflicts_count() == 0
 
 
 class TestNameDuplicates:
@@ -257,8 +252,8 @@ class TestNameDuplicates:
         _author(sa_sync_conn, pub2, person_id=b)
         _author(sa_sync_conn, pub2, person_id=coauthor)
 
-        assert name_duplicates_count(sa_sync_conn) >= 1
-        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        assert PersonsQueries(sa_sync_conn).name_duplicates_count() >= 1
+        pair = self._pair(PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50), a, b)
         assert pair.overlaps.coauthors == 1
 
     def test_shared_lab_counts_and_lists_the_lab(self, sa_sync_conn):
@@ -270,7 +265,7 @@ class TestNameDuplicates:
             contribution = _author(sa_sync_conn, insert_publication(sa_sync_conn), person_id=person)
             add_contribution_structure(sa_sync_conn, contribution, lab)
 
-        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        pair = self._pair(PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50), a, b)
         assert pair.overlaps.labs == 1
         for curated in (pair.person_a, pair.person_b):
             assert curated.labs == ["LABDUP"]
@@ -280,7 +275,7 @@ class TestNameDuplicates:
         a = insert_person(sa_sync_conn, "Bernard", first_name="M")
         b = insert_person(sa_sync_conn, "Bernard", first_name="Marie")
 
-        pair = self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        pair = self._pair(PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50), a, b)
         assert (
             pair.overlaps.coauthors,
             pair.overlaps.shared_publications,
@@ -292,13 +287,13 @@ class TestNameDuplicates:
         a = insert_person(sa_sync_conn, "Ferrand", first_name="Ludovic")
         b = insert_person(sa_sync_conn, "Ferrand", first_name="Ludovic S.")
 
-        self._pair(name_duplicates(sa_sync_conn, page=1, per_page=50), a, b)
+        self._pair(PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50), a, b)
 
     def test_excluded_person_excluded(self, sa_sync_conn):
         a = insert_person(sa_sync_conn, "Bekono", first_name="Nina")
         b = insert_person(sa_sync_conn, "Bekono", first_name="N", exclusion="not_a_person")
 
-        res = name_duplicates(sa_sync_conn, page=1, per_page=50)
+        res = PersonsQueries(sa_sync_conn).name_duplicates(page=1, per_page=50)
         assert all({p.person_a.person_id, p.person_b.person_id} != {a, b} for p in res.pairs)
 
 
@@ -306,7 +301,10 @@ class TestAmbiguousNameForms:
     """Formes portées par plusieurs personnes, avec au moins un lien à trancher."""
 
     def _forms(self, conn):
-        return {f.name_form: f for f in ambiguous_name_forms(conn, page=1, per_page=500).forms}
+        return {
+            f.name_form: f
+            for f in PersonsQueries(conn).ambiguous_name_forms(page=1, per_page=500).forms
+        }
 
     def test_forme_derivee_du_nom_hors_de_la_file(self, sa_sync_conn):
         """Une forme partagée seulement comme forme dérivée du nom de chaque personne n'attend aucune décision."""

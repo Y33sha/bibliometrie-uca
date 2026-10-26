@@ -4,20 +4,20 @@ L'annuaire et l'autocomplétion appliquent la même règle : prénom et nom se s
 
 import pytest
 
-from infrastructure.read_models.persons.list import list_persons, search_persons
 from infrastructure.read_models.persons.models import PersonFilters
+from infrastructure.read_models.persons.queries import PersonsQueries
 from tests.integration.helpers.persons import insert_person
 
 
 def _directory_ids(conn, search):
-    result = list_persons(
-        conn, filters=PersonFilters(search=search), page=1, per_page=1000, sort="name_asc"
+    result = PersonsQueries(conn).list_persons(
+        filters=PersonFilters(search=search), page=1, per_page=1000, sort="name_asc"
     )
     return {p.id for p in result.persons}
 
 
 def _autocomplete_ids(conn, search):
-    return {p.id for p in search_persons(conn, search=search, limit=30)}
+    return {p.id for p in PersonsQueries(conn).search_persons(search=search, limit=30)}
 
 
 @pytest.fixture
