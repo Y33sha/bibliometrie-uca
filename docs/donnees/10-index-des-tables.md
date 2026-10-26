@@ -1,125 +1,82 @@
 # Index des tables
 
-*À jour le 2026-10-25.*
+*À jour le 2026-10-26.*
 
-## Vue macro
-
-Vue globale du modèle : l'ingestion par source en haut, les référentiels consolidés au centre, et les satellites rattachés à leur entité-pivot. Seules les tables principales y figurent ; l'index ci-dessous est exhaustif.
-
-```mermaid
-flowchart TB
-    subgraph ingestion["Ingestion — tables sources (par source)"]
-        staging --> source_records --> source_contributions
-        source_contributions --> source_contribution_addresses --> addresses
-    end
-
-    subgraph publishing["Édition"]
-        serials --> publishers
-        monographs --> serials
-        platforms
-    end
-
-    subgraph canon["Référentiel consolidé"]
-        publications
-        contributions
-        structures
-        persons
-    end
-
-    source_records -->|match / create| publications
-    source_contributions -->|match / create| persons
-    source_contributions --> contributions
-    contributions --> publications
-    contributions --> persons
-    contributions -.->|via matview contribution_structures| structures
-    addresses --> address_structures --> structures
-    source_records --- publishing
-    publications --- publishing
-
-    subgraph satP["Satellites publication"]
-        publications_detail
-        subjects
-        publication_relations
-    end
-    subgraph satS["Structures & périmètre"]
-        structure_name_forms
-        structure_parents
-        perimeters --> perimeter_structures
-    end
-    subgraph satN["Satellites personne"]
-        person_identifiers
-        person_name_forms
-        hr_records
-    end
-
-    publications --- satP
-    structures --- satS
-    persons --- satN
-```
-
-## Index alphabétique
-
-Les vues et vues matérialisées sont signalées comme telles.
-
-| Objet | Description | Schéma |
+| Objet | Schéma | Page |
 |---|---|---|
-| `address_country_candidates` | pays proposés pour une adresse par chaque moyen de détection | [structures](06-structures.md) |
-| `address_structures` | liaison adresse ↔ structure (avec confirmation) | [structures](06-structures.md) |
-| `addresses` | adresses normalisées issues des contributions sources | [structures](06-structures.md) |
-| `alembic_version` | révision de schéma appliquée — technique | `public` |
-| `apc_payments` | frais de publication (import CSV) | [publishing](07-publishing.md) |
-| `audit_log` | journal des événements (actions admin, fusions) — technique | [ops](08-ref-et-ops.md) |
-| `contributor_information` | informations du contributeur d'une contribution source (nom normalisé, identifiants), partagés via `contributor_information_id` | [sources](02-sources.md) |
-| `contribution_structures` | *vue matérialisée* : structures liées à une contribution | [publications](03-publications.md) |
-| `contributions` | contribution d'un auteur à une publication, avec sa personne | [publications](03-publications.md) |
-| `candidate_dois` | *vue* : DOI des publications du périmètre, lus par le rattrapage par DOI et la résolution des agences d'enregistrement | [sources](02-sources.md) |
-| `config` | réglages d'exploitation du pipeline (périmètres actifs, années couvertes…) | [ops](08-ref-et-ops.md) |
-| `aligned_source_contributions` | contribution source alignée dans une contribution | [publications](03-publications.md) |
-| `confirmed_source_contributions` | épinglages admin (must-link) contribution source ↔ personne, réappliqués à chaque exécution | [persons](05-persons.md) |
-| `countries` | référentiel des pays | [ref](08-ref-et-ops.md) |
-| `distinct_persons` | paires marquées distinctes malgré un nom commun | [persons](05-persons.md) |
-| `doi_prefixes` | cache préfixe DOI → agence + éditeur | [publishing](07-publishing.md) |
-| `failed_lookups` | identifiants cherchés en vain dans une source, avec la date de l'échec | [sources](02-sources.md) |
-| `serial_doi_namespaces` | espaces de noms DOI qui désignent une publication en série | [publishing](07-publishing.md) |
-| `serial_issns` | ISSN des publications en série | [publishing](07-publishing.md) |
-| `serial_name_forms` | formes de noms pour reconnaître une publication en série | [publishing](07-publishing.md) |
-| `serials` | référentiel des publications en série | [publishing](07-publishing.md) |
-| `language_forms` | formes sous lesquelles les sources désignent une langue | [ref](08-ref-et-ops.md) |
-| `languages` | référentiel des langues | [ref](08-ref-et-ops.md) |
-| `monographs` | livres et volumes d'actes de congrès | [publishing](07-publishing.md) |
-| `perimeter_structures` | appartenance au périmètre, recalculée par le pipeline | [structures](06-structures.md) |
-| `perimeters` | définition des périmètres | [structures](06-structures.md) |
-| `person_identifiers` | identifiants persistants (ORCID, idHAL, IdRef) | [persons](05-persons.md) |
-| `person_name_forms` | formes de noms pour reconnaître une personne | [persons](05-persons.md) |
-| `persons` | référentiel des personnes du périmètre | [persons](05-persons.md) |
-| `hr_records` | satellite des données RH (import CSV) | [persons](05-persons.md) |
-| `pipeline_phase_executions` | historique d'exécution des phases — technique | [ops](08-ref-et-ops.md) |
-| `place_name_forms` | formes de noms pour la détection des pays | [ref](08-ref-et-ops.md) |
-| `platforms` | lieux qui hébergent des publications | [publishing](07-publishing.md) |
-| `publication_relations` | relations sémantiques entre publications | [publications](03-publications.md) |
-| `publication_rors` | *vue matérialisée* : ROR des auteurs d'une publication, ancêtres compris | [données dérivées](09-donnees-derivees.md) |
-| `publication_structures` | *vue matérialisée* : structures d'une publication | [publications](03-publications.md) |
-| `publication_subjects` | liaison publication ↔ sujet | [publications](03-publications.md) |
-| `publications` | référentiel consolidé des productions | [publications](03-publications.md) |
-| `publications_detail` | satellite 1:1 (abstract, keywords, topics, biblio) | [publications](03-publications.md) |
-| `publisher_name_forms` | formes de noms pour reconnaître un éditeur | [publishing](07-publishing.md) |
-| `publishers` | référentiel des éditeurs | [publishing](07-publishing.md) |
-| `rejected_contributions` | rejets manuels de paires personne × publication | [persons](05-persons.md) |
-| `roles` | rôles d'utilisateur que le code connaît | [ops](08-ref-et-ops.md) |
-| `ror_dump_imports` | imports du dump ROR | [ref](08-ref-et-ops.md) |
-| `ror_organizations` | organisations du Research Organization Registry | [ref](08-ref-et-ops.md) |
-| `ror_relations` | relations parent/enfant entre organisations ROR | [ref](08-ref-et-ops.md) |
-| `source_contribution_addresses` | liaison contribution source ↔ adresse | [sources](02-sources.md) |
-| `source_contribution_rors` | ROR attribués par la source à une contribution source, rattachés à l'adresse de leur affiliation | [sources](02-sources.md) |
-| `source_contribution_structures` | *vue matérialisée* : affiliations résolues d'une contribution source | [sources](02-sources.md) |
-| `source_contributions` | contribution d'un auteur source à un document source | [sources](02-sources.md) |
-| `source_record_locations` | localisations d'un enregistrement source | [sources](02-sources.md) |
-| `source_records` | un enregistrement par document par source | [sources](02-sources.md) |
-| `staging` | ingestion brute par source, payload vidé après normalisation | [sources](02-sources.md) |
-| `structure_name_forms` | formes de noms pour la détection des structures | [structures](06-structures.md) |
-| `structure_parents` | rattachement hiérarchique entre structures | [structures](06-structures.md) |
-| `structures` | référentiel institutionnel | [structures](06-structures.md) |
-| `subject_cooccurrences` | *vue matérialisée* : paires de sujets co-présents | [publications](03-publications.md) |
-| `subjects` | référentiel des sujets / mots-clés | [publications](03-publications.md) |
-| `user_roles` | rôles attribués à chaque utilisateur | [ops](08-ref-et-ops.md) |
-| `users` | utilisateurs autorisés à ouvrir une session | [ops](08-ref-et-ops.md) |
+| `address_candidates_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `address_countries_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `address_country_candidates` | `structures` | [Structures](06-structures.md#adresses) |
+| `address_structures` | `structures` | [Structures](06-structures.md#adresses) |
+| `addresses` | `structures` | [Structures](06-structures.md#adresses) |
+| `alembic_version` | `public` | [Schéma public](08-ref-et-ops.md#schéma-public) |
+| `aligned_source_contributions` | `publications` | [Contributions](04-contributions.md) |
+| `apc_payments` | `publishing` | [Édition](07-publishing.md#frais-de-publication) |
+| `audit_log` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
+| `candidate_dois` (vue) | `sources` | [Enregistrements sources](02-sources.md) |
+| `config` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
+| `confirmed_source_contributions` | `persons` | [Personnes](05-persons.md#décisions-humaines) |
+| `contribution_attributes_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `contribution_resolution_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `contribution_structures` (vue matérialisée) | `publications` | [Données dérivées](09-donnees-derivees.md) |
+| `contributions` | `publications` | [Contributions](04-contributions.md) |
+| `contributor_information` | `sources` | [Enregistrements sources](02-sources.md) |
+| `countries` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `distinct_persons` | `persons` | [Personnes](05-persons.md) |
+| `doi_prefixes` | `publishing` | [Édition](07-publishing.md#éditeurs) |
+| `failed_lookups` | `sources` | [Enregistrements sources](02-sources.md) |
+| `hal_structure_aliases` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `hal_structure_relations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `hal_structures` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `hr_records` | `persons` | [Personnes](05-persons.md) |
+| `idref_structures` | `structures` | [Structures](06-structures.md) |
+| `known_dois` (vue) | `sources` | [Enregistrements sources](02-sources.md) |
+| `language_forms` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `languages` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `merge_redirects` | `public` | [Schéma public](08-ref-et-ops.md#schéma-public) |
+| `monographs` | `publishing` | [Édition](07-publishing.md#monographies) |
+| `perimeter_structures` | `structures` | [Structures](06-structures.md#périmètres) |
+| `perimeters` | `structures` | [Structures](06-structures.md#périmètres) |
+| `person_identifiers` | `persons` | [Personnes](05-persons.md) |
+| `person_name_forms` | `persons` | [Personnes](05-persons.md) |
+| `persons` | `persons` | [Personnes](05-persons.md) |
+| `pipeline_phase_executions` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
+| `place_name_forms` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `platforms` | `publishing` | [Édition](07-publishing.md#plateformes) |
+| `publication_author_alignment` (vue matérialisée) | `publications` | [Alignement des auteurs](../pipeline/08-author-grouping.md) |
+| `publication_contributions_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `publication_relations` | `publications` | [Publications](03-publications.md) |
+| `publication_rors` (vue matérialisée) | `publications` | [Données dérivées](09-donnees-derivees.md) |
+| `publication_structures` (vue matérialisée) | `publications` | [Données dérivées](09-donnees-derivees.md) |
+| `publication_subjects` | `publications` | [Publications](03-publications.md#sujets) |
+| `publications` | `publications` | [Publications](03-publications.md) |
+| `publications_detail` | `publications` | [Publications](03-publications.md) |
+| `publisher_name_forms` | `publishing` | [Édition](07-publishing.md#éditeurs) |
+| `publishers` | `publishing` | [Édition](07-publishing.md#éditeurs) |
+| `rejected_contributions` | `persons` | [Personnes](05-persons.md#décisions-humaines) |
+| `roles` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
+| `ror_dump_imports` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `ror_organizations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `ror_relations` | `ref` | [Référentiels externes](08-ref-et-ops.md) |
+| `serial_doi_namespaces` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `serial_issns` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `serial_name_forms` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `serials` | `publishing` | [Édition](07-publishing.md#publications-en-série) |
+| `source_contribution_addresses` | `sources` | [Enregistrements sources](02-sources.md) |
+| `source_contribution_countries_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `source_contribution_hal_structures` | `sources` | [Enregistrements sources](02-sources.md) |
+| `source_contribution_rors` | `sources` | [Enregistrements sources](02-sources.md) |
+| `source_contribution_structures` (vue matérialisée) | `sources` | [Données dérivées](09-donnees-derivees.md) |
+| `source_contributions` | `sources` | [Enregistrements sources](02-sources.md) |
+| `source_record_keys_queue` | `queues` | [Données dérivées](09-donnees-derivees.md#incrémental-ou-recalcul-complet) |
+| `source_record_locations` | `sources` | [Enregistrements sources](02-sources.md) |
+| `source_records` | `sources` | [Enregistrements sources](02-sources.md) |
+| `staging` | `sources` | [Enregistrements sources](02-sources.md) |
+| `structure_name_forms` | `structures` | [Structures](06-structures.md) |
+| `structure_parents` | `structures` | [Structures](06-structures.md) |
+| `structures` | `structures` | [Structures](06-structures.md) |
+| `subject_cooccurrences` (vue matérialisée) | `publications` | [Publications](03-publications.md#sujets) |
+| `subjects` | `publications` | [Publications](03-publications.md#sujets) |
+| `unpaywall` | `sources` | [Enregistrements sources](02-sources.md) |
+| `user_roles` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |
+| `users` | `ops` | [Exploitation](08-ref-et-ops.md#exploitation) |

@@ -1,32 +1,42 @@
-# Schémas `ref` et `ops`
+# Référentiels externes et exploitation
 
-*À jour le 2026-10-12.*
+*À jour le 2026-10-26.*
 
-## `ref` : référentiels externes
+## Référentiels externes
 
-- **`countries`** : référentiel des pays.
-- **`place_name_forms`** : formes de noms pour la détection des pays.
-- **`languages`** : référentiel des langues, avec leur code ISO 639-1, ou ISO 639-3 à défaut, et leur nom français.
-- **`language_forms`** : formes sous lesquelles les sources désignent une langue, en minuscules : codes à deux et trois lettres, nom anglais.
-- **`ror_organizations`** : organisations du Research Organization Registry, chargées depuis son dump. `structures.ror_id` les relie au référentiel interne.
-- **`ror_relations`** : relations parent/enfant entre organisations ROR. `interfaces.cli.maintenance.report_ror_coherence` les compare à `structure_parents`.
-- **`ror_dump_imports`** : imports du dump ROR, avec la date de chaque import.
+Schéma PostgreSQL `ref`.
 
-## `ops` : exploitation
-
-- **`config`** : réglages d'exploitation du pipeline (périmètres actifs, années couvertes…).
-- **`audit_log`** : journal des événements (actions admin, fusions).
-- **`pipeline_phase_executions`** : historique d'exécution des phases.
-- **`users`** : utilisateurs autorisés à ouvrir une session, par leur identifiant de connexion.
-- **`roles`** : rôles que le code connaît (`domain.users.Role`).
-- **`user_roles`** : rôles attribués à chaque utilisateur.
-
-## Propriété des tables
-
-| Table | Auteur | Écrit par |
+| Table | Contenu | Écrit par |
 |---|---|---|
-| `countries`, `place_name_forms` | seed | `seed.sql` |
-| `languages`, `language_forms` | seed | `seed.sql` |
-| `config` | admin | `application/services/config/commands.py` |
-| `roles` | migrations | `alembic/versions/` |
-| `users`, `user_roles` | admin | `interfaces/cli/maintenance/manage_users.py` ; l'API crée `ADMIN_USER` au démarrage |
+| `countries` | Pays | `infrastructure/db/seed.sql` |
+| `place_name_forms` | Noms de pays, d'institutions et de villes, avec le pays qu'ils désignent | `infrastructure/db/seed.sql` |
+| `languages` | Langues, avec leur code ISO 639-1, à défaut ISO 639-3, et leur nom français | `infrastructure/db/seed.sql` |
+| `language_forms` | Formes sous lesquelles les sources désignent une langue : codes à deux et trois lettres, nom anglais | `infrastructure/db/seed.sql` |
+| `ror_organizations` | Organisations du Research Organization Registry. `structures.ror_id` les relie aux structures | `interfaces/cli/imports/import_ror_dump.py` |
+| `ror_relations` | Relations parent-enfant entre organisations ROR | `interfaces/cli/imports/import_ror_dump.py` |
+| `ror_dump_imports` | Imports du fichier ROR, avec leur date | `interfaces/cli/imports/import_ror_dump.py` |
+| `hal_structures` | Structures du référentiel HAL citées par les contributions sources | phase [`affiliations`](../pipeline/04-affiliations.md) |
+| `hal_structure_relations` | Relations parent-enfant entre structures HAL | phase `affiliations` |
+| `hal_structure_aliases` | Fiches en double du référentiel HAL, avec la structure conservée | phase `affiliations` |
+
+## Exploitation
+
+Schéma PostgreSQL `ops`.
+
+| Table | Contenu | Écrit par |
+|---|---|---|
+| `config` | Réglages du pipeline : périmètres en service, années couvertes… | administration (`application/services/config.py`) |
+| `audit_log` | Journal des actions d'administration et des fusions | administration |
+| `pipeline_phase_executions` | Historique d'exécution des phases | pipeline |
+| `users` | Utilisateurs autorisés à ouvrir une session | `interfaces/cli/maintenance/manage_users.py`. L'API crée `ADMIN_USER` au démarrage |
+| `roles` | Rôles que le code connaît (`domain.users.Role`) | migrations |
+| `user_roles` | Rôles attribués à chaque utilisateur | `interfaces/cli/maintenance/manage_users.py` |
+
+## Schéma `public`
+
+| Table | Contenu |
+|---|---|
+| `merge_redirects` | Identifiant d'une personne, publication, publication en série, monographie ou éditeur absorbé par une fusion, et identifiant de l'entité conservée |
+| `alembic_version` | Révision du schéma appliquée |
+
+Le schéma `public` contient aussi les types énumérés et les extensions.

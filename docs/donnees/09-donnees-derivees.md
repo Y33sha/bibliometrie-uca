@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-25.*
 
-Certaines données sont des **dérivés** recalculés à partir d'autres tables — vues matérialisées, tables satellites, colonnes dénormalisées. Ils existent pour accélérer la lecture (éviter à chaque requête des jointures ou des agrégations coûteuses) au prix d'une duplication qu'il faut tenir à jour. Cette page recense ces artefacts et la façon dont leur fraîcheur est maintenue.
+Les données dérivées sont recalculées à partir d'autres tables : vues matérialisées, tables satellites, colonnes dénormalisées. Elles évitent aux lectures des jointures et des agrégations coûteuses.
 
 ## Vues matérialisées
 
@@ -11,7 +11,7 @@ Le pipeline les rafraîchit, la plupart en `REFRESH … CONCURRENTLY`, qui suppo
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
 | `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
-| `contribution_structures` | `source_contribution_structures` ⋈ `source_contributions` | phase `finalize` |
+| `contribution_structures` | `source_contribution_structures` ⋈ `aligned_source_contributions`, pour les contributions d'une personne non exclue | phase `finalize` |
 | `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `finalize` |
 | `publication_rors` | ROR des contributions sources alignées des auteurs (`source_contribution_rors`) et des structures de `publication_structures`, avec leurs ancêtres de `ror_relations` ; `cited` distingue les ROR cités | phase `finalize` |
 | `subject_cooccurrences` | paires de sujets co-présents sur une même publication (`publication_subjects`) | phase `subjects` |
