@@ -14,6 +14,7 @@
 	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
@@ -59,8 +60,6 @@
 		buildParams: () => new URLSearchParams(),
 		pageParam: null,
 	});
-	// Remis à `false` à chaque changement de personne.
-	let addrLoaded = $state(false);
 
 	// Dashboard tab
 	type DashboardResponse = components['schemas']['PersonDashboardResponse'];
@@ -86,11 +85,6 @@
 		thesesLoaded = true;
 	}
 
-	async function loadAddresses() {
-		await addresses.load();
-		addrLoaded = true;
-	}
-
 	async function loadDashboard() {
 		const [data, subjects] = await Promise.all([
 			api<DashboardResponse>(`/api/persons/${personId}/dashboard`, { key: 'person-detail-dashboard' }),
@@ -114,7 +108,7 @@
 		// L'onglet "publications" est géré par <PublicationsListView> qui charge ses données dans son propre onMount à chaque (re)montage.
 		if (tab === 'dashboard' && !dashboardLoaded) loadDashboard();
 		if (tab === 'theses' && !thesesLoaded) loadTheses();
-		if (tab === 'addresses' && !addrLoaded) loadAddresses();
+		if (tab === 'addresses' && !addresses.loaded) addresses.load();
 	}
 
 	async function loadProfile(id: string) {
@@ -128,7 +122,7 @@
 			return;
 		}
 		if (activeTab === 'dashboard') loadDashboard();
-		else if (activeTab === 'addresses') loadAddresses();
+		else if (activeTab === 'addresses') addresses.load();
 		else if (activeTab === 'theses') loadTheses();
 		// publications : géré par <PublicationsListView> qui charge tout seul.
 	}
@@ -276,11 +270,7 @@
 	<!-- Tab: Adresses -->
 	{#if activeTab === 'addresses'}
 		<div class="tab-content">
-			{#if !addrLoaded}
-				<div class="loading">Chargement…</div>
-			{:else if addresses.items.length === 0}
-				<div class="no-results">Aucune adresse</div>
-			{:else}
+			<ListStatus list={addresses} emptyText="Aucune adresse">
 				<table class="data-table">
 					<thead>
 						<tr>
@@ -304,7 +294,7 @@
 					</tbody>
 				</table>
 				<Pagination page={addresses.page} pages={addresses.pages} onchange={(p) => { addresses.page = p; addresses.load(); }} />
-			{/if}
+			</ListStatus>
 		</div>
 	{/if}
 {/if}

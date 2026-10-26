@@ -215,7 +215,7 @@
 	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 </div>
 
-<ThesesTable items={listing.items} loading={listing.loading} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
+<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
 <Pagination
 	page={listing.page}
 	pages={listing.pages}

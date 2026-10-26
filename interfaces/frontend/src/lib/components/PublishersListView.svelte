@@ -236,7 +236,7 @@
 			</tr>
 		{/each}
 		{#if publishers.items.length === 0}
-			<TableStatusRow loading={publishers.loading} colspan={actionCell ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
+			<TableStatusRow loading={publishers.loading} error={publishers.error} colspan={actionCell ? 7 : 6} emptyText="Aucun éditeur ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>

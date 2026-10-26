@@ -259,6 +259,7 @@
 <PersonsTable
 	persons={dir.items}
 	loading={dir.loading}
+	error={dir.error}
 	sort={currentSort}
 	{onSortChange}
 	perimeterCount={isAdmin()}

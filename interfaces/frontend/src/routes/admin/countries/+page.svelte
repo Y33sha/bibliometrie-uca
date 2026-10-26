@@ -5,6 +5,7 @@
 	import { replaceState } from '$app/navigation';
 	import { addresses as addressesApi, api } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
+	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
@@ -269,6 +270,9 @@
 				</td>
 			</tr>
 		{/each}
+		{#if addresses.length === 0}
+			<TableStatusRow loading={list.loading} error={list.error} colspan={4} emptyText="Aucune adresse trouvée." />
+		{/if}
 	</tbody>
 </table>
 

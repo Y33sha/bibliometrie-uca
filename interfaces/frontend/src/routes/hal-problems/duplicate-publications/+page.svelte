@@ -7,6 +7,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -82,11 +83,7 @@
 </div>
 
 {#if activeTab === 'doi'}
-	{#if doi.loading}
-		<div class="loading">Chargement…</div>
-	{:else if doi.items.length === 0}
-		<div class="no-results">Aucun doublon par DOI</div>
-	{:else}
+	<ListStatus list={doi} emptyText="Aucun doublon par DOI">
 		<div class="doi-list">
 			{#each doi.items as pair}
 				<div class="doi-card">
@@ -110,14 +107,10 @@
 			{/each}
 		</div>
 		<Pagination page={doi.page} pages={doi.pages} onchange={(p) => { doi.goToPage(p); syncUrl(); }} />
-	{/if}
+	</ListStatus>
 
 {:else}
-	{#if meta.loading}
-		<div class="loading">Chargement…</div>
-	{:else if meta.items.length === 0}
-		<div class="no-results">Aucun doublon par métadonnées</div>
-	{:else}
+	<ListStatus list={meta} emptyText="Aucun doublon par métadonnées">
 		<table class="data-table meta-table">
 			<thead>
 				<tr>
@@ -156,7 +149,7 @@
 			</tbody>
 		</table>
 		<Pagination page={meta.page} pages={meta.pages} onchange={(p) => { meta.goToPage(p); syncUrl(); }} />
-	{/if}
+	</ListStatus>
 {/if}
 
 <style>

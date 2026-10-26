@@ -7,6 +7,7 @@
 	import { addresses as addressesApi, api, ApiError, structures as structuresApi } from '#lib/api/index.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import { toast } from '#lib/dialogs.svelte.js';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { autofocus } from '#lib/actions/focus.js';
@@ -551,107 +552,105 @@
 
 	<!-- Address list -->
 	<div class="main-panel" bind:this={mainPanel}>
-		{#if list.loading}
-			<div class="loading-msg">Chargement…</div>
-		{:else if requiresSearch}
+		{#if requiresSearch && !list.loading}
 			<div class="loading-msg">Ajoutez un filtre (texte ou structure) pour afficher les résultats.</div>
-		{:else if addresses.length === 0}
-			<div class="loading-msg">Aucune adresse trouvée.</div>
 		{:else}
-			<div class="select-all-row">
-				<label class="select-all-label">
-					<input
-						type="checkbox"
-						checked={selectAll}
-						onchange={(e) => toggleSelectAll((e.target as HTMLInputElement).checked)}
-					/>
-					Tout sélectionner
-				</label>
-			</div>
-			{#each addresses as addr (addr.id)}
-				<div class={cardClass(addr)}>
-					<div
-						class="addr-header"
-						onclick={() => toggleDetail(addr.id)}
-						role="button"
-						tabindex="0"
-						onkeydown={(e) => {
-							if (e.key === 'Enter' || e.key === ' ') toggleDetail(addr.id);
-						}}
-					>
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
+			<ListStatus {list} emptyText="Aucune adresse trouvée.">
+				<div class="select-all-row">
+					<label class="select-all-label">
 						<input
 							type="checkbox"
-							checked={selectedIds.has(addr.id)}
-							onclick={(e) => {
-								e.stopPropagation();
-								toggleSelect(addr.id);
-							}}
+							checked={selectAll}
+							onchange={(e) => toggleSelectAll((e.target as HTMLInputElement).checked)}
 						/>
-						<div>
-							<div class="addr-text">{addr.raw_text}</div>
-							<div class="addr-meta">
-								<span class="publication-count-tag"
-									>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
-								>
-								{#each addr.structures || [] as s}
-									<span class={structTagClass(s)}>{structureLabel(s)}</span>
-								{/each}
+						Tout sélectionner
+					</label>
+				</div>
+				{#each addresses as addr (addr.id)}
+					<div class={cardClass(addr)}>
+						<div
+							class="addr-header"
+							onclick={() => toggleDetail(addr.id)}
+							role="button"
+							tabindex="0"
+							onkeydown={(e) => {
+								if (e.key === 'Enter' || e.key === ' ') toggleDetail(addr.id);
+							}}
+						>
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<input
+								type="checkbox"
+								checked={selectedIds.has(addr.id)}
+								onclick={(e) => {
+									e.stopPropagation();
+									toggleSelect(addr.id);
+								}}
+							/>
+							<div>
+								<div class="addr-text">{addr.raw_text}</div>
+								<div class="addr-meta">
+									<span class="publication-count-tag"
+										>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
+									>
+									{#each addr.structures || [] as s}
+										<span class={structTagClass(s)}>{structureLabel(s)}</span>
+									{/each}
+								</div>
+							</div>
+							<!-- svelte-ignore a11y_click_events_have_key_events -->
+							<div
+								class="addr-actions"
+								onclick={(e) => e.stopPropagation()}
+								role="group"
+							>
+								{#if addr.is_confirmed !== false}
+									<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
+								{/if}
+								{#if addr.is_confirmed !== true}
+									<button class="btn btn-sm btn-confirm-outline" title="Relier à la structure" onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button>
+								{/if}
+								{#if addr.is_confirmed !== null}
+									<button class="btn btn-sm btn-reset" title="Reset" onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button>
+								{/if}
 							</div>
 						</div>
-						<!-- svelte-ignore a11y_click_events_have_key_events -->
-						<div
-							class="addr-actions"
-							onclick={(e) => e.stopPropagation()}
-							role="group"
-						>
-							{#if addr.is_confirmed !== false}
-								<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
-							{/if}
-							{#if addr.is_confirmed !== true}
-								<button class="btn btn-sm btn-confirm-outline" title="Relier à la structure" onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button>
-							{/if}
-							{#if addr.is_confirmed !== null}
-								<button class="btn btn-sm btn-reset" title="Reset" onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button>
-							{/if}
-						</div>
-					</div>
 
-					{#if expandedId === addr.id}
-						<div class="addr-detail">
-							{#if pubsLoading}
-								<div class="detail-loading">Chargement…</div>
-							{:else if publications.length === 0}
-								<div class="detail-loading">Aucune publication liée.</div>
-							{:else}
-								<div class="detail-title">
-									Publications ({publications.length})
-								</div>
-								{#each publications as p}
-									<div class="publication-row">
-										<div class="publication-title-link">
-											<PublicationTitle titre={p.title || '(sans titre)'} />
-										</div>
-										<div class="publication-meta-inline">
-											{p.publication_year}
-											{#if p.doc_type}&middot; {p.doc_type}{/if}
-											{#if p.author_name}&middot; {p.author_name}{/if}
-											{#if p.journal_title}&middot; {p.journal_title}{/if}
-											{#if p.doi}
-												<a
-													href="https://doi.org/{encodeURIComponent(p.doi)}"
-													target="_blank"
-													rel="noopener noreferrer">DOI</a
-												>
-											{/if}
-										</div>
+						{#if expandedId === addr.id}
+							<div class="addr-detail">
+								{#if pubsLoading}
+									<div class="detail-loading">Chargement…</div>
+								{:else if publications.length === 0}
+									<div class="detail-loading">Aucune publication liée.</div>
+								{:else}
+									<div class="detail-title">
+										Publications ({publications.length})
 									</div>
-								{/each}
-							{/if}
-						</div>
-					{/if}
-				</div>
-			{/each}
+									{#each publications as p}
+										<div class="publication-row">
+											<div class="publication-title-link">
+												<PublicationTitle titre={p.title || '(sans titre)'} />
+											</div>
+											<div class="publication-meta-inline">
+												{p.publication_year}
+												{#if p.doc_type}&middot; {p.doc_type}{/if}
+												{#if p.author_name}&middot; {p.author_name}{/if}
+												{#if p.journal_title}&middot; {p.journal_title}{/if}
+												{#if p.doi}
+													<a
+														href="https://doi.org/{encodeURIComponent(p.doi)}"
+														target="_blank"
+														rel="noopener noreferrer">DOI</a
+													>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								{/if}
+							</div>
+						{/if}
+					</div>
+				{/each}
+			</ListStatus>
 		{/if}
 
 		<Pagination page={list.page} pages={list.pages} onchange={goToPage} />

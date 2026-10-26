@@ -8,6 +8,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -83,34 +84,34 @@
 	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
 </div>
 
-{#if !labsLoaded || (selectedLabId && list.loading)}
+{#if !labsLoaded}
 	<div class="loading">Chargement…</div>
-{:else if list.items.length === 0 && selectedLabId}
-	<div class="no-results">Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})</div>
-{:else}
-	<div class="publication-list">
-		{#each list.items as pub}
-			<div class="publication-card">
-				<div class="publication-meta-line">
-					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
-					{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
+{:else if selectedLabId}
+	<ListStatus {list} emptyText="Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})">
+		<div class="publication-list">
+			{#each list.items as pub}
+				<div class="publication-card">
+					<div class="publication-meta-line">
+						{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
+						{#if pub.doc_type}<span class="type-pill" style="--type-color: {docTypeColor(pub.doc_type)}">{docTypeSingular[pub.doc_type] || pub.doc_type}</span>{/if}
+						{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
+						<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
+					</div>
+					<div class="hal-list">
+						{#if pub.hal_links.length}
+							{#each pub.hal_links as link (link.source_id)}
+								<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
+							{/each}
+						{/if}
+						{#if pub.doi}
+							<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
+						{/if}
+					</div>
 				</div>
-				<div class="hal-list">
-					{#if pub.hal_links.length}
-						{#each pub.hal_links as link (link.source_id)}
-							<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
-						{/each}
-					{/if}
-					{#if pub.doi}
-						<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
-					{/if}
-				</div>
-			</div>
-		{/each}
-	</div>
-	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
+			{/each}
+		</div>
+		<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
+	</ListStatus>
 {/if}
 
 <style>

@@ -448,10 +448,15 @@
 .no-results,
 .empty,
 .loading,
-.loading-msg {
+.loading-msg,
+.load-error {
 	text-align: center;
 	padding: 40px;
 	color: var(--muted);
+}
+
+.load-error {
+	color: var(--danger);
 }
 
 /* ── Subtitle ── */

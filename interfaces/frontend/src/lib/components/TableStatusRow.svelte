@@ -1,18 +1,22 @@
 <script lang="ts">
-	// Ligne d'état d'un tableau quand il n'a aucune donnée à afficher : message de chargement tant que la requête est en vol, message « vide » une fois chargé. Mutualise le libellé et le markup entre tous les tableaux paginés.
+	import { emptyListStatus } from '#lib/listStatus.js';
+
+	// Ligne d'état d'un tableau quand il n'a aucune donnée à afficher : erreur de chargement, chargement en cours ou message « vide ». Mutualise le libellé et le markup entre tous les tableaux paginés.
 	let {
 		loading = false,
+		error = null,
 		colspan,
 		emptyText,
 	}: {
 		loading?: boolean;
+		error?: string | null;
 		colspan: number;
 		emptyText: string;
 	} = $props();
+
+	const status = $derived(emptyListStatus(loading, error, emptyText));
 </script>
 
 <tr>
-	<td {colspan} class={loading ? 'loading-msg' : 'no-results'}>
-		{loading ? 'Chargement des résultats en cours…' : emptyText}
-	</td>
+	<td {colspan} class={status.cls}>{status.text}</td>
 </tr>

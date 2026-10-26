@@ -216,7 +216,7 @@
 				</tr>
 			{/each}
 			{#if monographs.items.length === 0}
-				<TableStatusRow loading={monographs.loading} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
+				<TableStatusRow loading={monographs.loading} error={monographs.error} colspan={columnCount} emptyText="Aucune monographie ne correspond aux filtres." />
 			{/if}
 		</tbody>
 	</table>

@@ -4,6 +4,7 @@
   import { autofocus } from "#lib/actions/focus.js";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import type { components } from "#lib/api/schema.js";
 
@@ -70,37 +71,31 @@
     </label>
   </div>
 
-  {#if !list.loaded}
-    <p class="loading">Chargement…</p>
-  {:else}
-    <p class="total" class:loading-overlay={list.loading}>
+  <ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
+    <p class="total">
       {list.total.toLocaleString("fr-FR")} sujets
     </p>
-    {#if list.items.length === 0}
-      <p class="empty">Aucun sujet ne correspond à ces critères.</p>
-    {:else}
-      <table class="data-table">
-        <thead>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Libellé</th>
+          <th class="num">Occurrences</th>
+        </tr>
+      </thead>
+      <tbody>
+        {#each list.items as s (s.id)}
           <tr>
-            <th>Libellé</th>
-            <th class="num">Occurrences</th>
+            <td>
+              <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
+            </td>
+            <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
           </tr>
-        </thead>
-        <tbody>
-          {#each list.items as s (s.id)}
-            <tr>
-              <td>
-                <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
-              </td>
-              <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
-            </tr>
-          {/each}
-        </tbody>
-      </table>
+        {/each}
+      </tbody>
+    </table>
 
-      <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
-    {/if}
-  {/if}
+    <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
+  </ListStatus>
 
 <style>
   h1 {
@@ -132,15 +127,5 @@
     color: var(--muted);
     margin: 0 0 8px;
     font-size: 0.9rem;
-  }
-  .loading-overlay {
-    opacity: 0.6;
-  }
-  .empty {
-    color: var(--muted);
-    font-style: italic;
-  }
-  .loading {
-    color: var(--muted);
   }
 </style>

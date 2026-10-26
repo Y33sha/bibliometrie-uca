@@ -78,7 +78,7 @@
 				</tr>
 			{/each}
 			{#if partners.items.length === 0}
-				<TableStatusRow loading={partners.loading} colspan={4} emptyText="Aucune organisation partenaire ne correspond aux filtres." />
+				<TableStatusRow loading={partners.loading} error={partners.error} colspan={4} emptyText="Aucune organisation partenaire ne correspond aux filtres." />
 			{/if}
 		</tbody>
 	</table>

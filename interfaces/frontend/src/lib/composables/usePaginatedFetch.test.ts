@@ -7,14 +7,16 @@ let apiResponse: Record<string, unknown> = {};
 // `(..._args: unknown[])` plutôt que `()` : permet à TS de typer `apiSpy.mock.calls[0][0]` lors des assertions.
 const apiSpy = vi.fn(async (..._args: unknown[]) => apiResponse);
 const cancelSpy = vi.fn((_key: string) => {});
-vi.mock('#lib/api/index.js', () => ({
+vi.mock('#lib/api/index.js', async () => ({
 	api: (...args: unknown[]) => apiSpy(...args),
 	cancel: (key: string) => cancelSpy(key),
+	ApiError: (await import('../api/client')).ApiError,
 }));
 const gotoSpy = vi.fn(async (..._args: unknown[]) => {});
 vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => gotoSpy(...args) }));
 
 const { usePaginatedFetch } = await import('./usePaginatedFetch.svelte');
+const { ApiError } = await import('../api/client');
 
 // `usePaginatedFetch` utilise `$effect` (rechargement réactif sur changement de clé) : il doit être instancié dans un scope d'effet, sinon `effect_orphan`. `mount` enveloppe la création ; les scopes sont disposés après chaque test.
 const cleanups: Array<() => void> = [];
@@ -214,6 +216,60 @@ describe('usePaginatedFetch', () => {
 		await f.load();
 		expect(apiSpy).toHaveBeenCalledTimes(1);
 		expect(f.page).toBe(1);
+	});
+
+	it('un chargement en échec vide la liste et expose le message', async () => {
+		apiSpy
+			.mockImplementationOnce(async () => ({ items: [1, 2], total: 2, page: 1, pages: 1 }))
+			.mockImplementationOnce(async () => {
+				throw new ApiError(500, 'Internal Server Error');
+			});
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+		});
+		await f.load();
+		expect(f.error).toBeNull();
+		await f.load();
+		expect(f.items).toEqual([]);
+		expect(f.total).toBe(0);
+		expect(f.data).toBeNull();
+		expect(f.loading).toBe(false);
+		expect(f.error).toBe('Chargement impossible : erreur 500');
+	});
+
+	it('le message reprend le detail de la réponse en erreur', async () => {
+		apiSpy.mockImplementationOnce(async () => {
+			throw new ApiError(422, { detail: 'Paramètre invalide' });
+		});
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+		});
+		await f.load();
+		expect(f.error).toBe('Chargement impossible : Paramètre invalide');
+	});
+
+	it('un chargement réussi efface le message d’échec', async () => {
+		apiSpy
+			.mockImplementationOnce(async () => {
+				throw new ApiError(500, null);
+			})
+			.mockImplementationOnce(async () => ({ items: [1], total: 1, page: 1, pages: 1 }));
+		const f = mount<number>({
+			endpoint: '/api/x',
+			itemsKey: 'items',
+			apiKey: 'k',
+			buildParams: () => new URLSearchParams(),
+		});
+		await f.load();
+		await f.load();
+		expect(f.error).toBeNull();
+		expect(f.items).toEqual([1]);
 	});
 
 	it('page est mutable (set externe possible avant load)', async () => {

@@ -10,6 +10,7 @@
 	import { titleCase } from '#lib/utils.js';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { anchored } from '#lib/actions/anchored.js';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Modal from '#lib/components/Modal.svelte';
@@ -282,13 +283,7 @@
 	</div>
 {/if}
 
-{#if orphans.length === 0}
-	{#if list.loading}
-		<p class="loading-msg">Chargement des résultats en cours…</p>
-	{:else}
-		<p class="empty">Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.</p>
-	{/if}
-{:else}
+<ListStatus {list} emptyText="Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.">
 	<table class="data-table">
 		<thead>
 			<tr>
@@ -358,7 +353,7 @@
 	</table>
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
-{/if}
+</ListStatus>
 
 {#if createModal}
 	<Modal

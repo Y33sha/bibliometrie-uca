@@ -8,6 +8,7 @@
 	import { docTypeSingular, docTypeColor } from '#lib/labels.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
+	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -49,11 +50,7 @@
 	<span class="count">{list.total} publication{list.total > 1 ? 's' : ''}</span>
 </div>
 
-{#if list.loading}
-	<div class="loading">Chargement…</div>
-{:else if list.items.length === 0}
-	<div class="no-results">Aucun conflit détecté</div>
-{:else}
+<ListStatus {list} emptyText="Aucun conflit détecté">
 	<div class="publication-list">
 		{#each list.items as pub}
 			<div class="publication-card">
@@ -77,7 +74,7 @@
 		{/each}
 	</div>
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
-{/if}
+</ListStatus>
 
 <style>
 	.count { font-size: 0.9rem; }

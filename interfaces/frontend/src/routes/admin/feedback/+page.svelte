@@ -8,6 +8,7 @@
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
   import { structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { autofocus } from "#lib/actions/focus.js";
@@ -318,9 +319,7 @@
   </div>
 
   <!-- Table -->
-  {#if addresses.length === 0}
-    <div class="empty">Aucune adresse trouvée &mdash; la détection est parfaite pour ce cas !</div>
-  {:else}
+  <ListStatus {list} emptyText="Aucune adresse trouvée — la détection est parfaite pour ce cas !">
     <table class="data-table">
       <thead>
         <tr>
@@ -377,7 +376,7 @@
     </table>
 
     <Pagination page={list.page} pages={list.pages} onchange={onPageChange} />
-  {/if}
+  </ListStatus>
 
   <!-- Context picker -->
   {#if ctxPicker}

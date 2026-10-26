@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { halPersonUrl, titleCase } from "#lib/utils.js";
+  import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
 
   import type { components } from "#lib/api/schema.js";
@@ -45,11 +46,7 @@
   <span class="count">{list.total} personne{list.total > 1 ? "s" : ""}</span>
 </div>
 
-{#if list.loading}
-  <div class="loading">Chargement…</div>
-{:else if list.items.length === 0}
-  <div class="no-results">Aucun doublon détecté</div>
-{:else}
+<ListStatus {list} emptyText="Aucun doublon détecté">
   <table class="data-table">
     <thead>
       <tr>
@@ -100,7 +97,7 @@
       syncUrl();
     }}
   />
-{/if}
+</ListStatus>
 
 <style>
   .count {

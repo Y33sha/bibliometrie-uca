@@ -281,7 +281,7 @@
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}
-			<TableStatusRow loading={serials.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
+			<TableStatusRow loading={serials.loading} error={serials.error} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
