@@ -48,10 +48,10 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 ### 1. Comptes et rôles
 
-- [ ] Tables `users`, `roles`, `user_roles` ; premier utilisateur admin déclaré dans les réglages
+- [x] Tables `users`, `roles`, `user_roles` ; premier utilisateur admin déclaré dans les réglages (c74e9350c)
 - [ ] Connexion par le CAS ; refus d'un identifiant absent de `users`
-- [ ] Session contenant l'identifiant de l'utilisateur ; dépendance d'API qui exige un rôle
-- [ ] `/api/auth/check` rend l'utilisateur et ses rôles
+- [x] Session contenant l'identifiant de l'utilisateur ; garde des écritures qui exige le rôle admin (c74e9350c)
+- [x] `/api/auth/check` rend l'utilisateur et ses rôles (c74e9350c)
 
 ### 2. Session et navigation
 
