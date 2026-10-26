@@ -22,15 +22,15 @@ from infrastructure.repositories import (
 )
 from infrastructure.sql_fragments import REJECTED_PAIRS
 from interfaces.api.deps import contribution_service as build_contribution_service, person_service
+from tests.integration.helpers.alignment import (
+    add_aligned_source_contribution,
+    align_source_contributions,
+    insert_person_contribution,
+    set_perimeter_author_contribution,
+)
 from tests.integration.helpers.contributions import (
     insert_confirmed_source_contribution,
     insert_contribution,
-)
-from tests.integration.helpers.groups import (
-    add_group_member,
-    insert_group,
-    insert_person_group,
-    set_perimeter_author_group,
 )
 from tests.integration.helpers.persons import (
     insert_person,
@@ -67,7 +67,7 @@ def _publication_evidence(conn, publication_id):
     )
 
 
-def _group_person(conn, contribution_id):
+def _contribution_person(conn, contribution_id):
     return tuple(
         conn.execute(
             text("SELECT person_id, resolution_mode::text FROM contributions WHERE id = :g"),
@@ -76,25 +76,29 @@ def _group_person(conn, contribution_id):
     )
 
 
-def _perimeter_group(conn, person_id, mode, *, source_id, **source_contribution):
-    """Publication du périmètre dont le seul groupe d'auteur, rattaché à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Rend (publication, groupe)."""
+def _perimeter_contribution(conn, person_id, mode, *, source_id, **source_contribution):
+    """Publication du périmètre dont le seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Rend (publication, contribution)."""
     publication = insert_publication(conn, in_perimeter=True)
     source_record = _source_record(conn, publication, source_id=source_id)
     source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
-    group = insert_group(conn, publication, [(source_contribution_id, source_record)])
-    set_perimeter_author_group(conn, group, person_id=person_id, mode=mode)
-    return publication, group
+    contribution = align_source_contributions(
+        conn, publication, [(source_contribution_id, source_record)]
+    )
+    set_perimeter_author_contribution(conn, contribution, person_id=person_id, mode=mode)
+    return publication, contribution
 
 
 def _orphan(conn, publication_id, *, source_id="hal-1", source="hal", **source_contribution):
-    """Contribution orpheline : groupe d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Rend (groupe, contribution source)."""
+    """Contribution orpheline : contribution d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Rend (contribution, contribution source)."""
     source_record = _source_record(conn, publication_id, source=source, source_id=source_id)
     source_contribution_id = _jean_dupont_source_contribution(
         conn, source_record, source=source, **source_contribution
     )
-    group = insert_group(conn, publication_id, [(source_contribution_id, source_record)])
-    set_perimeter_author_group(conn, group)
-    return group, source_contribution_id
+    contribution = align_source_contributions(
+        conn, publication_id, [(source_contribution_id, source_record)]
+    )
+    set_perimeter_author_contribution(conn, contribution)
+    return contribution, source_contribution_id
 
 
 def _pinned_to(conn, source_contribution_ids):
@@ -257,14 +261,14 @@ class TestIdentifierStatusPropagation:
         )
 
     def _source_contribution(self, conn, person_id, source, source_id, identifiers, **kw):
-        """Contribution source seule dans un groupe rattaché à la personne `person_id`."""
+        """Contribution source seule dans une contribution rattachée à la personne `person_id`."""
         source_record = _source_record(
             conn, insert_publication(conn), source=source, source_id=source_id
         )
         source_contribution = _jean_dupont_source_contribution(
             conn, source_record, source=source, identifiers=identifiers, **kw
         )
-        insert_person_group(conn, source_contribution, person_id=person_id)
+        insert_person_contribution(conn, source_contribution, person_id=person_id)
 
     def test_rejecting_an_orcid_rejects_its_hal_account(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
@@ -275,7 +279,7 @@ class TestIdentifierStatusPropagation:
         self._source_contribution(
             sa_sync_conn, p, "hal", "hal-b", {"hal_person_id": 11581, "idhal": "nr2"}
         )
-        # ScanR associe l'ORCID à un autre IdRef : cette association n'entre pas dans le groupe.
+        # ScanR associe l'ORCID à un autre IdRef : cette association n'entre pas dans la contribution.
         self._source_contribution(
             sa_sync_conn, p, "scanr", "scanr-a", {"orcid": self.ORCID, "idref": "999"}
         )
@@ -344,51 +348,51 @@ class TestIdentifierStatusPropagation:
         assert service.update_identifier_status(orcid, "pending").propagated == 0
 
 
-class TestIdentifierRejectionOnGroups:
-    """Le rejet d'un identifiant détache de la personne les groupes que cet identifiant lui rattache."""
+class TestIdentifierRejectionOnContributions:
+    """Le rejet d'un identifiant détache de la personne les contributions que cet identifiant lui rattache."""
 
     ORCID = "0000-0002-1825-0097"
 
-    def test_marks_groups_resolved_by_the_identifier(self, sa_sync_conn, service):
+    def test_marks_contributions_resolved_by_the_identifier(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         identifiers = {"orcid": self.ORCID}
-        by_orcid, orcid_group = _perimeter_group(
+        by_orcid, orcid_contribution = _perimeter_contribution(
             sa_sync_conn, p, "orcid", source_id="hal-orcid", identifiers=identifiers
         )
-        by_name, name_group = _perimeter_group(
+        by_name, name_contribution = _perimeter_contribution(
             sa_sync_conn, p, "name", source_id="hal-name", identifiers=identifiers
         )
-        manual, manual_group = _perimeter_group(
+        manual, manual_contribution = _perimeter_contribution(
             sa_sync_conn, p, "manual", source_id="hal-manual", identifiers=identifiers
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
         service.update_identifier_status(orcid, "rejected")
 
-        assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {orcid_group}
-        assert _group_person(sa_sync_conn, orcid_group) == (p, "orcid")
+        assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {orcid_contribution}
+        assert _contribution_person(sa_sync_conn, orcid_contribution) == (p, "orcid")
 
-    def test_group_without_the_value_is_untouched(self, sa_sync_conn, service):
+    def test_contribution_without_the_value_is_untouched(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
-        _, group = _perimeter_group(
+        _, contribution = _perimeter_contribution(
             sa_sync_conn, p, "orcid", source_id="hal-other", identifiers={"orcid": "0000-0001"}
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
         service.update_identifier_status(orcid, "rejected")
 
-        assert _group_person(sa_sync_conn, group) == (p, "orcid")
+        assert _contribution_person(sa_sync_conn, contribution) == (p, "orcid")
 
-    def test_confirmation_leaves_groups(self, sa_sync_conn, service):
+    def test_confirmation_leaves_contributions(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
-        _, group = _perimeter_group(
+        _, contribution = _perimeter_contribution(
             sa_sync_conn, p, "orcid", source_id="hal-orcid", identifiers={"orcid": self.ORCID}
         )
         orcid = insert_person_identifier(sa_sync_conn, p, id_type="orcid", id_value=self.ORCID)
 
         service.update_identifier_status(orcid, "confirmed")
 
-        assert _group_person(sa_sync_conn, group) == (p, "orcid")
+        assert _contribution_person(sa_sync_conn, contribution) == (p, "orcid")
 
 
 class TestSetExclusion:
@@ -657,27 +661,31 @@ class TestBatchAssignOrphanContributions:
         person_id = _person(sa_sync_conn)
         assert contribution_service.batch_assign_orphan_contributions(person_id, []) == 0
 
-    def test_attaches_groups_and_pins_all_members(self, sa_sync_conn, contribution_service):
-        """Chaque groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne."""
+    def test_attaches_contributions_and_pins_all_their_source_contributions(
+        self, sa_sync_conn, contribution_service
+    ):
+        """Chaque contribution passe à la personne en mode `manual` ; toutes ses contributions sources sont épinglées à la personne."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         first = insert_publication(sa_sync_conn)
-        first_group, first_hal = _orphan(sa_sync_conn, first, source_id="h-1")
+        first_contribution, first_hal = _orphan(sa_sync_conn, first, source_id="h-1")
         source_record_oa = _source_record(sa_sync_conn, first, source="openalex", source_id="W1")
         first_oa = _jean_dupont_source_contribution(
             sa_sync_conn, source_record_oa, source="openalex"
         )
-        add_group_member(sa_sync_conn, first_group, first_oa, source_record_oa)
+        add_aligned_source_contribution(
+            sa_sync_conn, first_contribution, first_oa, source_record_oa
+        )
         second = insert_publication(sa_sync_conn)
-        second_group, second_hal = _orphan(sa_sync_conn, second, source_id="h-2")
+        second_contribution, second_hal = _orphan(sa_sync_conn, second, source_id="h-2")
 
         assigned = contribution_service.batch_assign_orphan_contributions(
-            person_id, [first_group, second_group]
+            person_id, [first_contribution, second_contribution]
         )
 
         assert assigned == 2
-        assert _group_person(sa_sync_conn, first_group) == (person_id, "manual")
-        assert _group_person(sa_sync_conn, second_group) == (person_id, "manual")
+        assert _contribution_person(sa_sync_conn, first_contribution) == (person_id, "manual")
+        assert _contribution_person(sa_sync_conn, second_contribution) == (person_id, "manual")
         members = [first_hal, first_oa, second_hal]
         assert _pinned_to(sa_sync_conn, members) == [person_id] * 3
         assert _publication_evidence(sa_sync_conn, first) == ["address"]
@@ -685,7 +693,7 @@ class TestBatchAssignOrphanContributions:
     def test_adds_name_forms_under_their_source(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
-        group, _ = _orphan(
+        contribution, _ = _orphan(
             sa_sync_conn,
             insert_publication(sa_sync_conn),
             source="openalex",
@@ -693,7 +701,7 @@ class TestBatchAssignOrphanContributions:
             author_name_normalized="j dupont",
         )
 
-        contribution_service.batch_assign_orphan_contributions(person_id, [group])
+        contribution_service.batch_assign_orphan_contributions(person_id, [contribution])
 
         assert _scalar(
             sa_sync_conn,
@@ -702,32 +710,34 @@ class TestBatchAssignOrphanContributions:
         ) == ["openalex"]
 
     def test_skips_already_assigned(self, sa_sync_conn, contribution_service):
-        """Un groupe déjà rattaché est écarté : ni épinglage, ni changement de personne ; le groupe orphelin du lot est rattaché."""
+        """Une contribution déjà rattachée est écartée : ni épinglage, ni changement de personne ; la contribution orphelin du lot est rattaché."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         owned_publication = insert_publication(sa_sync_conn)
-        owned_group, owned = _orphan(sa_sync_conn, owned_publication)
-        set_perimeter_author_group(sa_sync_conn, owned_group, person_id=p1, mode="name")
-        orphan_group, orphan = _orphan(
+        owned_contribution, owned = _orphan(sa_sync_conn, owned_publication)
+        set_perimeter_author_contribution(
+            sa_sync_conn, owned_contribution, person_id=p1, mode="name"
+        )
+        orphan_contribution, orphan = _orphan(
             sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-2"
         )
 
         assigned = contribution_service.batch_assign_orphan_contributions(
-            p2, [owned_group, orphan_group]
+            p2, [owned_contribution, orphan_contribution]
         )
 
         assert assigned == 1
-        assert _group_person(sa_sync_conn, owned_group) == (p1, "name")
+        assert _contribution_person(sa_sync_conn, owned_contribution) == (p1, "name")
         assert _pinned_to(sa_sync_conn, [owned, orphan]) == [None, p2]
-        assert _group_person(sa_sync_conn, orphan_group) == (p2, "manual")
+        assert _contribution_person(sa_sync_conn, orphan_contribution) == (p2, "manual")
 
 
 # ── detach_contributions ─────────────────────────────────────────────
 
 
 class TestDetachContributions:
-    def test_detaches_group(self, sa_sync_conn, service):
+    def test_detaches_contribution(self, sa_sync_conn, service):
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
@@ -740,11 +750,11 @@ class TestDetachContributions:
         )
 
         assert result["detached"] == 1
-        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
+        assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
 
     def test_detaches_all_sources_of_publication_from_single_ref(self, sa_sync_conn, service):
         """Le rejet porte sur la publication entière : sélectionner une source
-        détache le groupe de la paire et peuple le store."""
+        détache la contribution de la paire et peuple le store."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
@@ -762,7 +772,7 @@ class TestDetachContributions:
         )
 
         assert result["detached"] == 1
-        assert _group_person(sa_sync_conn, contribution_id) == (None, None)
+        assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
         assert (
             _scalar(
                 sa_sync_conn,
@@ -851,7 +861,7 @@ class TestDetachContributions:
         )
 
     def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, service):
-        """Une forme encore portée par un membre d'un groupe de la personne, dans une autre publication, reste quand on détache une seule publication."""
+        """Une forme encore portée par une contribution source d'une contribution de la personne, dans une autre publication, reste quand on détache une seule publication."""
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
@@ -863,7 +873,7 @@ class TestDetachContributions:
         backing = _jean_dupont_source_contribution(
             sa_sync_conn, sp2, author_name_normalized="dupont jean"
         )
-        insert_person_group(sa_sync_conn, backing, person_id=person_id)
+        insert_person_contribution(sa_sync_conn, backing, person_id=person_id)
         repo.add_name_form(person_id, "Dupont Jean", source="hal")
 
         result = service.detach_contributions(
@@ -976,62 +986,69 @@ class TestUpdateNameFormStatus:
         )
 
 
-class TestNameFormRejectionOnGroups:
-    """Le rejet d'une forme de nom détache de la personne les groupes rattachés par le nom dont un membre porte la forme."""
+class TestNameFormRejectionOnContributions:
+    """Le rejet d'une forme de nom détache de la personne les contributions rattachées par le nom dont une contribution source porte la forme."""
 
-    def test_marks_groups_resolved_by_name(self, sa_sync_conn, service):
+    def test_marks_contributions_resolved_by_name(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
         form = {"author_name_normalized": "intrus unique"}
-        by_name, name_group = _perimeter_group(sa_sync_conn, p, "name", source_id="hal-n", **form)
-        by_initials, initials_group = _perimeter_group(
+        by_name, name_contribution = _perimeter_contribution(
+            sa_sync_conn, p, "name", source_id="hal-n", **form
+        )
+        by_initials, initials_contribution = _perimeter_contribution(
             sa_sync_conn, p, "compatible_name", source_id="hal-c", **form
         )
-        by_orcid, orcid_group = _perimeter_group(
+        by_orcid, orcid_contribution = _perimeter_contribution(
             sa_sync_conn, p, "orcid", source_id="hal-o", **form
         )
-        manual, manual_group = _perimeter_group(
+        manual, manual_contribution = _perimeter_contribution(
             sa_sync_conn, p, "manual", source_id="hal-m", **form
         )
         _hal_name_form(sa_sync_conn, p, name_form="intrus unique")
 
         service.update_name_form_status(p, "intrus unique", "rejected")
 
-        assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {name_group, initials_group}
-        assert _group_person(sa_sync_conn, name_group) == (p, "name")
+        assert queued(sa_sync_conn, Queue.CONTRIBUTION_RESOLUTION) == {
+            name_contribution,
+            initials_contribution,
+        }
+        assert _contribution_person(sa_sync_conn, name_contribution) == (p, "name")
 
-    def test_group_under_another_form_is_untouched(self, sa_sync_conn, service):
+    def test_contribution_under_another_form_is_untouched(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
-        _, group = _perimeter_group(
+        _, contribution = _perimeter_contribution(
             sa_sync_conn, p, "name", source_id="hal-n", author_name_normalized="jean dupont"
         )
         _hal_name_form(sa_sync_conn, p, name_form="intrus unique")
 
         service.update_name_form_status(p, "intrus unique", "rejected")
 
-        assert _group_person(sa_sync_conn, group) == (p, "name")
+        assert _contribution_person(sa_sync_conn, contribution) == (p, "name")
 
 
 # ── assign_orphan_contribution ───────────────────────────────────────
 
 
 class TestAssignOrphanContribution:
-    def test_attaches_group_and_pins_all_members(self, sa_sync_conn, contribution_service):
-        """Le groupe passe à la personne en mode `manual` ; tous ses membres sont épinglés à la personne et la reçoivent dans `source_contributions`."""
+    def test_attaches_contribution_and_pins_all_its_source_contributions(
+        self, sa_sync_conn, contribution_service
+    ):
+        """La contribution passe à la personne en mode `manual` ; toutes ses contributions sources sont épinglées à la personne et la reçoivent dans `source_contributions`."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        group, hal = _orphan(sa_sync_conn, publication_id)
+        contribution, hal = _orphan(sa_sync_conn, publication_id)
         source_record_oa = _source_record(
             sa_sync_conn, publication_id, source="openalex", source_id="W1"
         )
         openalex = _jean_dupont_source_contribution(
             sa_sync_conn, source_record_oa, source="openalex"
         )
-        add_group_member(sa_sync_conn, group, openalex, source_record_oa)
+        add_aligned_source_contribution(sa_sync_conn, contribution, openalex, source_record_oa)
 
-        contribution_service.assign_orphan_contribution(person_id, group)
+        contribution_service.assign_orphan_contribution(person_id, contribution)
 
-        assert _group_person(sa_sync_conn, group) == (person_id, "manual")
+        assert _contribution_person(sa_sync_conn, contribution) == (person_id, "manual")
         assert _pinned_to(sa_sync_conn, [hal, openalex]) == [person_id, person_id]
         assert _publication_evidence(sa_sync_conn, publication_id) == ["address"]
         assert _scalar(
@@ -1041,20 +1058,24 @@ class TestAssignOrphanContribution:
         ) == ["hal", "openalex"]
 
     def test_raises_if_already_assigned(self, sa_sync_conn, contribution_service):
-        """Un groupe déjà rattaché n'est pas repris : le refus nomme la détentrice."""
+        """Une contribution déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         other_id = _person(sa_sync_conn, last_name="Other", first_name="Author")
-        group, source_contribution_id = _orphan(sa_sync_conn, insert_publication(sa_sync_conn))
-        set_perimeter_author_group(sa_sync_conn, group, person_id=other_id, mode="name")
+        contribution, source_contribution_id = _orphan(
+            sa_sync_conn, insert_publication(sa_sync_conn)
+        )
+        set_perimeter_author_contribution(
+            sa_sync_conn, contribution, person_id=other_id, mode="name"
+        )
 
         with pytest.raises(ContributionAlreadyAssignedError) as exc:
-            contribution_service.assign_orphan_contribution(person_id, group)
+            contribution_service.assign_orphan_contribution(person_id, contribution)
         assert exc.value.owner_person_id == other_id
-        assert _group_person(sa_sync_conn, group) == (other_id, "name")
+        assert _contribution_person(sa_sync_conn, contribution) == (other_id, "name")
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
 
-    def test_raises_if_group_missing(self, sa_sync_conn, contribution_service):
+    def test_raises_if_contribution_missing(self, sa_sync_conn, contribution_service):
         person_id = _person(sa_sync_conn)
         with pytest.raises(NotFoundError):
             contribution_service.assign_orphan_contribution(person_id, 999999)
@@ -1067,27 +1088,29 @@ class TestReassignRejectedPairUnit:
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        group, source_contribution_id = _orphan(sa_sync_conn, publication_id)
+        contribution, source_contribution_id = _orphan(sa_sync_conn, publication_id)
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
         with pytest.raises(RejectedPairError) as exc:
-            contribution_service.assign_orphan_contribution(person_id, group)
+            contribution_service.assign_orphan_contribution(person_id, contribution)
         pair = exc.value.rejected_pairs[0]
         assert pair["publication_id"] == publication_id
         assert pair["person_id"] == person_id
         assert pair["rejected_at"]
         # Rien d'écrit : le pré-contrôle précède l'épinglage.
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [None]
-        assert _group_person(sa_sync_conn, group) == (None, None)
+        assert _contribution_person(sa_sync_conn, contribution) == (None, None)
 
-    def test_assign_forced_unrejects_and_attaches_group(self, sa_sync_conn, contribution_service):
+    def test_assign_forced_unrejects_and_attaches_contribution(
+        self, sa_sync_conn, contribution_service
+    ):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
-        group, source_contribution_id = _orphan(sa_sync_conn, publication_id)
+        contribution, source_contribution_id = _orphan(sa_sync_conn, publication_id)
         insert_rejected_contribution(sa_sync_conn, publication_id, person_id=person_id)
 
-        contribution_service.assign_orphan_contribution(person_id, group, force=True)
+        contribution_service.assign_orphan_contribution(person_id, contribution, force=True)
 
         assert (
             _scalar(
@@ -1099,7 +1122,7 @@ class TestReassignRejectedPairUnit:
             is None
         )
         assert _pinned_to(sa_sync_conn, [source_contribution_id]) == [person_id]
-        assert _group_person(sa_sync_conn, group) == (person_id, "manual")
+        assert _contribution_person(sa_sync_conn, contribution) == (person_id, "manual")
 
     def test_batch_blocked_lists_all_rejected(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
@@ -1114,18 +1137,20 @@ class TestReassignRejectedPairUnit:
             contribution_service.batch_assign_orphan_contributions(person_id, [group1, group2])
         assert {p["publication_id"] for p in exc.value.rejected_pairs} == {pub1}
         # Rien d'écrit : le pré-contrôle précède l'épinglage.
-        assert [_group_person(sa_sync_conn, g) for g in (group1, group2)] == [(None, None)] * 2
+        assert [_contribution_person(sa_sync_conn, g) for g in (group1, group2)] == [
+            (None, None)
+        ] * 2
         assert _pinned_to(sa_sync_conn, [sa1, sa2]) == [None, None]
 
     def test_batch_forced_unrejects_all(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
-        group, _ = _orphan(sa_sync_conn, pub1, source_id="h-1")
+        contribution, _ = _orphan(sa_sync_conn, pub1, source_id="h-1")
         insert_rejected_contribution(sa_sync_conn, pub1, person_id=person_id)
 
         assigned = contribution_service.batch_assign_orphan_contributions(
-            person_id, [group], force=True
+            person_id, [contribution], force=True
         )
 
         assert assigned == 1
@@ -1138,7 +1163,7 @@ class TestReassignRejectedPairUnit:
             )
             is None
         )
-        assert _group_person(sa_sync_conn, group) == (person_id, "manual")
+        assert _contribution_person(sa_sync_conn, contribution) == (person_id, "manual")
 
 
 class TestMergePersonRejectedContributions:
@@ -1182,11 +1207,11 @@ class TestMergePersonRejectedContributions:
 
         service.merge_person(target, source)
 
-        groups_with_person = sa_sync_conn.execute(
+        contributions_with_person = sa_sync_conn.execute(
             text(
                 "SELECT count(*) FROM contributions"
                 " WHERE publication_id = :publication AND person_id IS NOT NULL"
             ),
             {"publication": publication},
         ).scalar_one()
-        assert groups_with_person == 0
+        assert contributions_with_person == 0

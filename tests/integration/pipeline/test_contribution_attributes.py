@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.author_grouping.store import AuthorGroupingStore
-from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -32,9 +32,9 @@ def _member(conn, publication, source, *, corresponding, roles, evidence):
     return source_contribution, source_record
 
 
-def _group_of_two(conn) -> int:
+def _contribution_of_two(conn) -> int:
     publication = insert_publication(conn)
-    return insert_group(
+    return align_source_contributions(
         conn,
         publication,
         [
@@ -58,13 +58,13 @@ def _group_of_two(conn) -> int:
     )
 
 
-def _attributes(conn, group):
+def _attributes(conn, contribution):
     return conn.execute(
         text(
             "SELECT is_corresponding, roles, perimeter_evidence::text[] AS evidence, in_perimeter"
             " FROM contributions WHERE id = :g"
         ),
-        {"g": group},
+        {"g": contribution},
     ).one()
 
 
@@ -72,12 +72,12 @@ def test_les_attributs_de_la_contribution_reunissent_ceux_de_ses_contributions_s
     sa_sync_conn,
 ):
     conn = sa_sync_conn
-    group = _group_of_two(conn)
+    contribution = _contribution_of_two(conn)
     store = AuthorGroupingStore(conn)
 
     assert store.propagate_attributes() == (1, 1)
 
-    row = _attributes(conn, group)
+    row = _attributes(conn, contribution)
     assert (row.is_corresponding, row.roles, row.evidence, row.in_perimeter) == (
         True,
         ["author", "editor"],
@@ -90,9 +90,9 @@ def test_les_attributs_de_la_contribution_reunissent_ceux_de_ses_contributions_s
 
 def test_une_contribution_hors_file_garde_ses_attributs(sa_sync_conn):
     conn = sa_sync_conn
-    group = _group_of_two(conn)
+    contribution = _contribution_of_two(conn)
     clear(conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
     assert AuthorGroupingStore(conn).propagate_attributes() == (0, 0)
 
-    assert _attributes(conn, group).roles is None
+    assert _attributes(conn, contribution).roles is None

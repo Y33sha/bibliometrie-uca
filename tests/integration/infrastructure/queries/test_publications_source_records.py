@@ -4,7 +4,7 @@ from functools import partial
 
 from sqlalchemy import text
 
-from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.serials import insert_publisher, insert_serial
@@ -144,7 +144,7 @@ class TestGetPublicationSources:
 
 
 class TestSourceContributions:
-    def test_contributions_sources_de_chaque_enregistrement_source_avec_leur_groupe(
+    def test_contributions_sources_de_chaque_enregistrement_source_avec_leur_contribution(
         self, sa_sync_conn
     ):
         conn = sa_sync_conn
@@ -165,16 +165,21 @@ class TestSourceContributions:
             author_position=1,
             collective=True,
         )
-        group = insert_group(conn, publication, [(hal_martin, hal), (openalex_martin, openalex)])
+        contribution = align_source_contributions(
+            conn, publication, [(hal_martin, hal), (openalex_martin, openalex)]
+        )
 
         result = publications_queries(conn).get_publication_sources(publication)
 
         assert result is not None
         by_id = {s.id: s for s in result.source_contributions}
         assert set(by_id) == {hal_martin, openalex_martin, collective}
-        assert (by_id[hal_martin].contribution_id, by_id[hal_martin].method) == (group, "reference")
+        assert (by_id[hal_martin].contribution_id, by_id[hal_martin].method) == (
+            contribution,
+            "reference",
+        )
         assert (by_id[openalex_martin].contribution_id, by_id[openalex_martin].method) == (
-            group,
+            contribution,
             "name",
         )
         assert by_id[openalex_martin].source_record_id == openalex

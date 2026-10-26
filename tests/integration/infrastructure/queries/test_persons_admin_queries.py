@@ -6,8 +6,11 @@ import pytest
 from sqlalchemy import text
 
 from infrastructure.read_models.persons.queries import PersonsQueries
+from tests.integration.helpers.alignment import (
+    align_source_contributions,
+    set_perimeter_author_contribution,
+)
 from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.groups import insert_group, set_perimeter_author_group
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -25,13 +28,15 @@ _author = partial(insert_contribution, roles=["author"])
 
 
 def _person_source_contribution(conn, source_record, *, person_id, **source_contribution):
-    """Contribution source décrite par `source_contribution`, seul membre d'un groupe rattaché à la personne `person_id`. Rend l'`id` de la contribution source."""
+    """Contribution source décrite par `source_contribution`, seule contribution source d'une contribution rattachée à la personne `person_id`. Rend l'`id` de la contribution source."""
     source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
     publication = conn.execute(
         text("SELECT publication_id FROM source_records WHERE id = :s"), {"s": source_record}
     ).scalar_one()
-    group = insert_group(conn, publication, [(source_contribution_id, source_record)])
-    set_perimeter_author_group(conn, group, person_id=person_id, mode="name")
+    contribution = align_source_contributions(
+        conn, publication, [(source_contribution_id, source_record)]
+    )
+    set_perimeter_author_contribution(conn, contribution, person_id=person_id, mode="name")
     return source_contribution_id
 
 
@@ -90,8 +95,8 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
     assert [p.person_id for p in panneau] == [porteur]
 
 
-def test_une_forme_compte_les_publications_des_groupes_de_la_personne(sa_sync_conn):
-    """Seuls comptent les membres des groupes de la personne : une contribution source rattachée à la personne hors de ses groupes ne compte pas."""
+def test_une_forme_compte_les_publications_des_contributions_de_la_personne(sa_sync_conn):
+    """Seuls comptent les contributions sources des contributions de la personne : une contribution source rattachée à la personne hors de ses contributions ne compte pas."""
     pid = insert_person(sa_sync_conn, "Dupond")
     _hal_name_form(sa_sync_conn, pid, name_form="dupond j")
     for rank in range(2):
@@ -106,7 +111,7 @@ def test_une_forme_compte_les_publications_des_groupes_de_la_personne(sa_sync_co
     insert_source_contribution(
         sa_sync_conn,
         insert_source_record(
-            sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-forme-hors-groupe"
+            sa_sync_conn, insert_publication(sa_sync_conn), source_id="h-forme-hors-contribution"
         ),
         author_name_normalized="dupond j",
     )
@@ -135,7 +140,7 @@ def _attribute(conn, person_id, id_type, id_value, status):
 
 
 class TestIdentifierConflicts:
-    """La détection projette `(person_id, id_type, id_value)` à la volée depuis les membres des groupes des personnes ⋈ `contributor_information` : rien à rafraîchir, la lecture voit directement le seed de la transaction rollbackée du fixture."""
+    """La détection projette `(person_id, id_type, id_value)` à la volée depuis les contributions sources des contributions des personnes ⋈ `contributor_information` : rien à rafraîchir, la lecture voit directement le seed de la transaction rollbackée du fixture."""
 
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
@@ -257,7 +262,7 @@ class TestNameDuplicates:
         assert pair.overlaps.coauthors == 1
 
     def test_shared_lab_counts_and_lists_the_lab(self, sa_sync_conn):
-        """Un laboratoire atteint par les membres des groupes des deux personnes compte comme recouvrement et figure dans leur fiche allégée."""
+        """Un laboratoire atteint par les contributions sources des contributions des deux personnes compte comme recouvrement et figure dans leur fiche allégée."""
         lab = insert_structure(sa_sync_conn, "LAB-DUP", acronym="LABDUP")
         a = insert_person(sa_sync_conn, "Lacombe", first_name="R")
         b = insert_person(sa_sync_conn, "Lacombe", first_name="Rémi")

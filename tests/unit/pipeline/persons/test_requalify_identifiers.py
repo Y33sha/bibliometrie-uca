@@ -29,7 +29,7 @@ def test_consensus_retient_la_majorite_stricte(monkeypatch):
     assert compute_identifier_consensus(MagicMock()) == {("orcid", "X"): "s dahbi"}
 
 
-def test_identite_contredisant_le_consensus_neutralisee_et_groupes_liberes(monkeypatch):
+def test_identite_contredisant_le_consensus_neutralisee_et_contributions_liberees(monkeypatch):
     information = {
         "orcid": [
             ContributorInformationIdentifier(1, "dahbi s", "X"),

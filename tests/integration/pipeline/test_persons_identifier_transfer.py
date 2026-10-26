@@ -1,4 +1,4 @@
-"""Arbitrage des identifiants de personne au niveau des groupes, sur vraie base : vote des groupes sur les conflits d'attribution, libération des groupes après un transfert ou une neutralisation `misplaced`."""
+"""Arbitrage des identifiants de personne au niveau des contributions, sur vraie base : vote des contributions sur les conflits d'attribution, libération des contributions après un transfert ou une neutralisation `misplaced`."""
 
 import logging
 
@@ -7,7 +7,7 @@ from sqlalchemy import text
 from infrastructure.db.queues import Queue
 from infrastructure.repositories.person_repository import PgPersonRepository
 from pipeline.transformation.persons.identifier_arbitration import arbitrate_identifier_conflicts
-from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.persons import insert_person, insert_person_identifier
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import queued
@@ -17,8 +17,8 @@ _LOG = logging.getLogger("test")
 _ORCID = "0000-0002-1825-0097"
 
 
-def _group(conn, person, mode, *, name="jean martin", source="crossref", orcid=_ORCID):
-    """Groupe d'une contribution source, seul auteur d'une publication, rattaché à `person` par `mode`. La contribution source contient l'ORCID `orcid`."""
+def _contribution(conn, person, mode, *, name="jean martin", source="crossref", orcid=_ORCID):
+    """Contribution formée d'une seule contribution source, seul auteur d'une publication, rattachée à `person` par `mode`. La contribution source contient l'ORCID `orcid`."""
     publication = insert_publication(conn)
     source_record = insert_source_record(
         conn, publication, source=source, source_id=f"{source}-{publication}"
@@ -31,19 +31,21 @@ def _group(conn, person, mode, *, name="jean martin", source="crossref", orcid=_
         author_name_normalized=name,
         identifiers={"orcid": orcid},
     )
-    group = insert_group(conn, publication, [(source_contribution, source_record)])
+    contribution = align_source_contributions(
+        conn, publication, [(source_contribution, source_record)]
+    )
     conn.execute(
         text(
             "UPDATE contributions"
             " SET person_id = :p, resolution_mode = CAST(:m AS resolution_mode) WHERE id = :g"
         ),
-        {"p": person, "g": group, "m": mode},
+        {"p": person, "g": contribution, "m": mode},
     )
-    return group
+    return contribution
 
 
-def _groups(conn, count, person, mode, **kwargs):
-    return [_group(conn, person, mode, **kwargs) for _ in range(count)]
+def _contributions(conn, count, person, mode, **kwargs):
+    return [_contribution(conn, person, mode, **kwargs) for _ in range(count)]
 
 
 def _arbitrate(conn):
@@ -57,11 +59,11 @@ def _orcid_owner(conn):
     ).scalar_one()
 
 
-def _person_of(conn, group):
+def _person_of(conn, contribution):
     return tuple(
         conn.execute(
             text("SELECT person_id, resolution_mode FROM contributions WHERE id = :g"),
-            {"g": group},
+            {"g": contribution},
         ).one()
     )
 
@@ -75,14 +77,16 @@ def _persons(conn, owner_name=("Martin", "Jean"), other_name=("Martin", "Jeanne"
 
 
 class TestConflicts:
-    def test_la_majorite_des_voix_transfere_et_marque_les_groupes_du_titulaire(self, sa_sync_conn):
-        """Le titulaire a quatre voix (deux groupes rattachés par l'ORCID, un groupe manuel, un groupe rattaché par IdRef), l'autre personne cinq : l'ORCID passe à l'autre personne. Seuls les groupes du titulaire rattachés par l'ORCID sont marqués pour la redécision de leur personne."""
+    def test_la_majorite_des_voix_transfere_et_marque_les_contributions_du_titulaire(
+        self, sa_sync_conn
+    ):
+        """Le titulaire a quatre voix (deux contributions rattachées par l'ORCID, une contribution manuel, une contribution rattachée par IdRef), l'autre personne cinq : l'ORCID passe à l'autre personne. Seuls les contributions du titulaire rattachées par l'ORCID sont marqués pour la redécision de leur personne."""
         conn = sa_sync_conn
         owner, other = _persons(conn)
-        by_orcid = _groups(conn, 2, owner, "orcid")
-        _group(conn, owner, "manual")
-        _group(conn, owner, "idref")
-        _groups(conn, 5, other, "name")
+        by_orcid = _contributions(conn, 2, owner, "orcid")
+        _contribution(conn, owner, "manual")
+        _contribution(conn, owner, "idref")
+        _contributions(conn, 5, other, "name")
 
         assert _arbitrate(conn)["transferred"] == 1
 
@@ -90,12 +94,12 @@ class TestConflicts:
         assert queued(conn, Queue.CONTRIBUTION_RESOLUTION) == set(by_orcid)
         assert _person_of(conn, by_orcid[0]) == (owner, "orcid")
 
-    def test_les_groupes_rattaches_par_l_identifiant_votent(self, sa_sync_conn):
-        """Trois groupes du titulaire rattachés par l'ORCID contre un groupe de l'autre personne rattaché par le nom : le titulaire garde l'ORCID. Un rattachement par identifiant suppose que le nom corrobore la personne."""
+    def test_les_contributions_rattachees_par_l_identifiant_votent(self, sa_sync_conn):
+        """Trois contributions du titulaire rattachées par l'ORCID contre une contribution de l'autre personne rattaché par le nom : le titulaire garde l'ORCID. Un rattachement par identifiant suppose que le nom corrobore la personne."""
         conn = sa_sync_conn
         owner, other = _persons(conn)
-        _groups(conn, 3, owner, "orcid")
-        _group(conn, other, "name")
+        _contributions(conn, 3, owner, "orcid")
+        _contribution(conn, other, "name")
 
         assert _arbitrate(conn)["transferred"] == 0
 
@@ -104,9 +108,9 @@ class TestConflicts:
     def test_la_majorite_du_titulaire_garde_l_identifiant(self, sa_sync_conn):
         conn = sa_sync_conn
         owner, other = _persons(conn)
-        _groups(conn, 2, owner, "name")
-        by_orcid = _group(conn, owner, "orcid")
-        _group(conn, other, "name")
+        _contributions(conn, 2, owner, "name")
+        by_orcid = _contribution(conn, owner, "orcid")
+        _contribution(conn, other, "name")
 
         assert _arbitrate(conn)["transferred"] == 0
 
@@ -116,22 +120,22 @@ class TestConflicts:
     def test_un_orcid_d_une_source_non_fiable_ne_vote_pas(self, sa_sync_conn):
         conn = sa_sync_conn
         owner, other = _persons(conn)
-        _groups(conn, 3, other, "name", source="wos")
+        _contributions(conn, 3, other, "name", source="wos")
 
         assert _arbitrate(conn)["transferred"] == 0
 
         assert _orcid_owner(conn) == owner
 
 
-def test_un_groupe_rattache_par_un_identifiant_mal_place_est_marque(sa_sync_conn, caplog):
-    """Quatre « jean martin » portent l'ORCID, trois « pierre dupont » aussi : leur ORCID est mal placé. Le groupe de « pierre dupont » rattaché par l'ORCID est marqué pour la redécision de sa personne ; les groupes manuel et rattaché par le nom ne le sont pas."""
+def test_une_contribution_rattachee_par_un_identifiant_mal_place_est_marquee(sa_sync_conn, caplog):
+    """Quatre « jean martin » portent l'ORCID, trois « pierre dupont » aussi : leur ORCID est mal placé. La contribution de « pierre dupont » rattachée par l'ORCID est marquée pour la redécision de sa personne ; les contributions manuelle et rattachée par le nom restent en l'état."""
     conn = sa_sync_conn
     martin = insert_person(conn, "Martin", first_name="Jean")
     dupont = insert_person(conn, "Dupont", first_name="Pierre")
-    _groups(conn, 4, martin, "name")
-    by_orcid = _group(conn, dupont, "orcid", name="pierre dupont")
-    _group(conn, dupont, "manual", name="pierre dupont")
-    _group(conn, dupont, "name", name="pierre dupont")
+    _contributions(conn, 4, martin, "name")
+    by_orcid = _contribution(conn, dupont, "orcid", name="pierre dupont")
+    _contribution(conn, dupont, "manual", name="pierre dupont")
+    _contribution(conn, dupont, "name", name="pierre dupont")
 
     with caplog.at_level(logging.INFO):
         result = _arbitrate(conn)

@@ -1,4 +1,4 @@
-"""Le rattachement des groupes ignore les identifiants qu'une contribution source neutralise, et la requalification réécrit les neutralisations `misplaced`."""
+"""Le rattachement des contributions ignore les identifiants qu'une contribution source neutralise, et la requalification réécrit les neutralisations `misplaced`."""
 
 from sqlalchemy import text
 
@@ -8,8 +8,8 @@ from pipeline.transformation.persons.identifier_arbitration import (
     fetch_identifier_votes,
     write_misplaced_neutralizations,
 )
+from tests.integration.helpers.alignment import align_unaligned
 from tests.integration.helpers.contributions import upsert_contributor_information
-from tests.integration.helpers.groups import group_ungrouped
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -43,11 +43,11 @@ def _carte(conn, source_contribution_id):
 
 
 def _orcid_projete(conn):
-    group_ungrouped(conn)
+    align_unaligned(conn)
     [member] = [
         m
-        for by_group in load_candidate_contributions(conn).values()
-        for members in by_group.values()
+        for by_contribution in load_candidate_contributions(conn).values()
+        for members in by_contribution.values()
         for m in members
         if m.name.display() == "Jean Neutralisation"
     ]
@@ -73,7 +73,7 @@ def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_c
     _source_contribution(
         sa_sync_conn, {"orcid": "misplaced"}, name="durand paul", source_id="c-vote-3"
     )
-    group_ungrouped(sa_sync_conn)
+    align_unaligned(sa_sync_conn)
     votes = fetch_identifier_votes(sa_sync_conn, "orcid")
     assert votes[_ORCID] == {"dupont jean": 1, "durand paul": 1}
 
@@ -93,10 +93,10 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
     assert _carte(sa_sync_conn, source_contribution_id) is None
 
 
-def test_requalification_marque_la_publication_a_regrouper(sa_sync_conn):
-    """Les groupes d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change les remet à calculer."""
+def test_requalification_marque_la_publication_a_realigner(sa_sync_conn):
+    """Les contributions d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change les remet à calculer."""
     source_contribution_id, contributor_information_id = _source_contribution(
-        sa_sync_conn, None, source_id="c-regroupe"
+        sa_sync_conn, None, source_id="c-réaligne"
     )
     publication_id = sa_sync_conn.execute(
         text(

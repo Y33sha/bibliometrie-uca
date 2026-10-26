@@ -7,9 +7,9 @@ from sqlalchemy import text
 from infrastructure.read_models.hal_problems.models import NoMissingCollections
 from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
 from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import insert_contribution
-from tests.integration.helpers.groups import insert_group
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.sources import (
@@ -43,7 +43,7 @@ def _create_lab(conn, code="LAB", hal_collection=None):
 def _create_hal_source_contribution_with_hal_id(
     conn, *, person_id, hal_person_id, source_id="h-acc", raw_author_name="X"
 ):
-    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur, membre d'un groupe rattaché à `person_id`."""
+    """Crée une contribution source HAL avec `hal_person_id` dans ses informations du contributeur, contribution source d'une contribution rattachée à `person_id`."""
     publication = insert_publication(
         conn, title=f"P-{source_id}", title_normalized=f"p-{source_id}"
     )
@@ -54,12 +54,14 @@ def _create_hal_source_contribution_with_hal_id(
         raw_author_name=raw_author_name,
         identifiers={"hal_person_id": hal_person_id},
     )
-    group = insert_group(conn, publication, [(source_contribution, source_record)])
+    contribution = align_source_contributions(
+        conn, publication, [(source_contribution, source_record)]
+    )
     conn.execute(
         text(
             "UPDATE contributions SET person_id = :person, resolution_mode = 'manual' WHERE id = :g"
         ),
-        {"person": person_id, "g": group},
+        {"person": person_id, "g": contribution},
     )
 
 

@@ -6,8 +6,8 @@ from sqlalchemy import text
 
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.models import PublicationFilters
-from tests.integration.helpers.contributions import group_id_of, insert_contribution
-from tests.integration.helpers.groups import insert_group
+from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
@@ -305,7 +305,7 @@ class TestExcludedPersonLab:
 
 
 class TestPersonView:
-    """Page personne : les contributions sont les groupes de contributions sources rattachés à une personne."""
+    """Page personne : les contributions sont les contributions rattachées à une personne."""
 
     def _seed(self, conn):
         person, coauthor = (
@@ -340,16 +340,16 @@ class TestPersonView:
             .publications
         )
 
-    def test_item_reads_the_group_of_the_person(self, sa_sync_conn):
+    def test_item_reads_the_contribution_of_the_person(self, sa_sync_conn):
         person, lab, publication = self._seed(sa_sync_conn)
 
         [item] = self._list(sa_sync_conn, person_id=person)
 
-        assert item.contribution_id == group_id_of(sa_sync_conn, publication, person)
+        assert item.contribution_id == contribution_id_of(sa_sync_conn, publication, person)
         assert item.is_corresponding is True
         assert [i.id for i in item.lab_items or []] == [lab]
 
-    def test_corresponding_and_perimeter_filters_read_the_group(self, sa_sync_conn):
+    def test_corresponding_and_perimeter_filters_read_the_contribution(self, sa_sync_conn):
         person, _, publication = self._seed(sa_sync_conn)
 
         assert [
@@ -370,14 +370,14 @@ class TestPersonView:
             ("no", 0),
         }
 
-    def test_thesis_author_is_a_group_with_person(self, sa_sync_conn):
-        """Un groupe d'auteur sans personne n'est pas l'auteur de la thèse."""
+    def test_thesis_author_is_a_contribution_with_person(self, sa_sync_conn):
+        """Une contribution d'auteur sans personne n'est pas l'auteur de la thèse."""
         author = insert_person(sa_sync_conn, "Doctorant", first_name="Y", normalizer="lower")
         lab = _lab(sa_sync_conn)
         thesis = insert_publication(sa_sync_conn, "These", doc_type="thesis")
         source_record = _source_record(sa_sync_conn, thesis, source="theses", source_id="2024X")
         orphan = insert_source_contribution(sa_sync_conn, source_record, roles=["author"])
-        insert_group(sa_sync_conn, thesis, [(orphan, source_record)])
+        align_source_contributions(sa_sync_conn, thesis, [(orphan, source_record)])
         sa_sync_conn.execute(
             text("UPDATE contributions SET roles = ARRAY['author'] WHERE publication_id = :p"),
             {"p": thesis},
