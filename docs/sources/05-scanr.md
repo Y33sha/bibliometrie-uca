@@ -132,4 +132,4 @@ L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publi
 
 ### Statut OA dérivé plutôt que pris brut
 
-`isOa` n'est qu'un booléen oui/non. Pour obtenir un `oa_status` nuancé (green / gold / hybrid / bronze / closed / diamond), on dérive depuis le couple `(isOa, oaEvidence)` via `derive_scanr_oa_status` : `oaEvidence` porte l'information sur la voie d'accès OA (repository, publisher, license, etc.) qui permet de classer le statut.
+`isOa` n'est qu'un booléen oui/non. Pour obtenir un `oa_status` nuancé (green / gold / hybrid / bronze / closed / diamond), on dérive depuis le couple `(isOa, oaEvidence)` via `derive_scanr_oa_status` : `oaEvidence` contient la voie d'accès OA (repository, publisher, license, etc.) qui permet de classer le statut.
