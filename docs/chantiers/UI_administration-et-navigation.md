@@ -43,6 +43,11 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Une page par structure**, sous la route `structures/[id]`. Un onglet « Gestion », réservé à l'admin, comporte l'édition, les tutelles et les formes de nom. Les libellés publics (« Laboratoires », « Chercheurs ») sont indépendants des routes.
 - **Volet d'édition ouvert par une icône** sur la ligne. Le titre ou le nom mène à la fiche.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
+- **Files de triage en onglets de la liste publique**, affichés selon le rôle. Le bandeau des contributions orphelines suit la même règle.
+- **Restrictions publiques en facettes.** Chaque restriction de la liste publique devient une facette réglée par défaut, que la session admin peut retirer : éditeurs et publications en série sans publication, personnes exclues, inactives ou absentes de la base RH.
+- **Une seule liste des structures**, sous la route `structures`, avec une facette de type réglée par défaut sur les laboratoires.
+- **Éditeurs et publications en série** : les actions Modifier et Fusionner restent dans la cellule d'actions, affichée selon le rôle.
+- Pas de redirection des routes supprimées.
 
 ## Phasage
 
@@ -60,9 +65,30 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 ### 3. Référentiels communs
 
-- [ ] Structures : route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
-- [ ] Personnes : facettes d'administration et icône de volet dans `PersonsListView` ; suppression de la réécriture de `admin/persons`
-- [ ] Publications, éditeurs, publications en série, monographies : actions et volet sur la page publique ; suppression des routes d'administration correspondantes
+#### 3a. Monographies
+
+- [ ] Suppression de `admin/monographs`, doublon de la page publique
+
+#### 3b. Éditeurs
+
+- [ ] Cellule d'actions selon le rôle sur la page publique ; facette des éditeurs sans publication ; suppression de `admin/publishers`
+
+#### 3c. Publications en série
+
+- [ ] Cellule d'actions selon le rôle sur la page publique ; facette des publications en série sans publication ; files de triage en onglets ; suppression de `admin/serials`
+
+#### 3d. Publications
+
+- [ ] Icône de volet sur la ligne ; onglet « Fusions suspectes » selon le rôle ; suppression de `admin/publications`
+
+#### 3e. Structures
+
+- [ ] Route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
+- [ ] Liste unique sous `structures`, facette de type, création de structure selon le rôle ; suppression de `admin/structures` et de `laboratories`
+
+#### 3f. Personnes
+
+- [ ] `PersonsListView` : facettes d'administration, colonne du périmètre, icône de volet, onglets de triage, bandeau des contributions orphelines ; suppression de la réécriture de `admin/persons`
 
 ### 4. Listes d'entités liées
 
@@ -71,8 +97,6 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 ## Questions ouvertes
 
 - **Listes d'entités liées.** Piste : la fiche garde ce qui caractérise l'entité (en-tête, dashboard, graphe des sujets, collaborations, adresses). Les listes liées deviennent des liens vers la liste générale filtrée, filtre visible et supprimable. La liste générale propose les fonctions liées à un contexte quand ce contexte est seul sélectionné : statut HAL pour un seul laboratoire, correspondance, périmètre et exclusion pour une seule personne. La même règle dirait quels filtres la page Statistiques reçoit de la liste ([Statistiques](METIER_statistiques.md)). Coût : la liste générale affiche l'en-tête de la liste, et l'en-tête de l'entité disparaît ; un bandeau de contexte peut le remplacer.
-- **Files de triage** : onglets de la liste du référentiel, affichés selon le rôle, ou rubrique « À traiter » qui les regroupe toutes, contributions orphelines comprises.
-- **Liste des structures.** La liste publique montre les laboratoires, celle de l'administration toutes les structures. Une seule liste, avec une facette de type réglée par défaut sur les laboratoires ?
 - **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
 - **Repère visuel du mode admin.** La barre d'administration a sa couleur (`--nav-admin`). La garder pour la session ouverte, ou signaler la session autrement.
 - **Vocabulaire des listes.** Un libellé par liste, session ouverte ou non : « Revues » ou « Publications en série » (la liste comporte des actes, des médias et des serveurs de preprints), « Labos » ou « Structures », « Chercheurs » ou « Personnes ».
