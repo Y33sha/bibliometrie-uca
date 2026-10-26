@@ -1,6 +1,6 @@
 <script lang="ts">
 	import IconButton from '#lib/components/IconButton.svelte';
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { replaceState } from '$app/navigation';
 	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
@@ -190,12 +190,6 @@
 	<title>{pageTitle("Publications en série")}</title>
 </svelte:head>
 
-<p class="hint">
-	Liste des publications en série observées sur les publications du périmètre {institution.name}. Cliquer
-	sur une publication en série pour explorer ses publications, sa répartition par type/OA
-	et ses données DOAJ.
-</p>
-
 {#if isAdmin()}
 	<HubTabs
 		tabs={[
@@ -284,7 +278,6 @@
 {/if}
 
 <style>
-	.hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
 
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }

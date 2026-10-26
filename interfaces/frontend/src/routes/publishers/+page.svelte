@@ -1,6 +1,6 @@
 <script lang="ts">
 	import IconButton from '#lib/components/IconButton.svelte';
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, ApiError, publishers as publishersApi } from '#lib/api/index.js';
@@ -122,12 +122,6 @@
 	<title>{pageTitle("Éditeurs")}</title>
 </svelte:head>
 
-<p class="hint">
-	Liste des éditeurs des publications en série observées sur les publications du périmètre
-	{institution.name}. Cliquer sur un éditeur pour explorer ses publications en série et ses
-	publications.
-</p>
-
 {#if blockingSerials}
 	<div class="blocking-panel" role="alert">
 		<div class="blocking-header">
@@ -222,7 +216,6 @@
 {/if}
 
 <style>
-	.hint { color: var(--muted); font-size: 0.9rem; margin: 0 0 16px; }
 
 	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
 	.btn-merge:hover { background: var(--accent-light); }
