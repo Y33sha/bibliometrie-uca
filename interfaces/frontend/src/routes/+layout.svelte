@@ -83,9 +83,7 @@
           <span class="nav-dropdown-group">Référentiels</span>
           <a href={resolve('admin/structures')} class:active={isActive("/admin/structures")}>Structures</a>
           <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
-          <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>
-          <a href={resolve('admin/publishers')} class:active={isActive("/admin/publishers")}>Éditeurs</a>
-          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>          <span class="nav-dropdown-group">Adresses</span>
+          <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>          <span class="nav-dropdown-group">Adresses</span>
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
         </div>
@@ -106,10 +104,12 @@
 </div>
 
 <div class="container">
-  <!-- Une page de détail se monte pour un identifiant : naviguer vers un autre identifiant de la même route la remonte, avec ses chargements au montage. -->
-  {#key page.params.id}
-    {@render children()}
-  {/key}
+  <!-- Une page se monte une fois la session lue, pour un identifiant et un rôle : ses fonctions d'administration et ses filtres par défaut dépendent du rôle. Naviguer vers un autre identifiant de la même route, ou changer de rôle, la remonte avec ses chargements au montage. -->
+  {#if session.loaded}
+    {#key `${page.params.id}|${isAdmin()}`}
+      {@render children()}
+    {/key}
+  {/if}
 </div>
 
 <DialogHost />
