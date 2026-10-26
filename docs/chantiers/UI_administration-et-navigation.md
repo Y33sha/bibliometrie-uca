@@ -67,7 +67,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 #### 3a. Monographies
 
-- [ ] Suppression de `admin/monographs`, doublon de la page publique
+- [x] Suppression de `admin/monographs`, doublon de la page publique
 
 #### 3b. Éditeurs
 

@@ -17,7 +17,7 @@
 	type Monograph = components['schemas']['MonographListItem'];
 
 	// Liste de monographies réutilisable. Utilisée par :
-	// - `/monographs` et `/admin/monographs` (filtres reportés dans l'URL)
+	// - `/monographs` (filtres reportés dans l'URL)
 	// - `/publishers/[id]?tab=monographs` (filtre `publisherId` fixe)
 	// - `/journals/[id]?tab=monographs` (filtre `serialId` fixe)
 	interface ExternalFilters {

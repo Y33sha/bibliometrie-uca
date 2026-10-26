@@ -85,9 +85,7 @@
           <a href={resolve('admin/persons')} class:active={isActive("/admin/persons")}>Personnes</a>
           <a href={resolve('admin/publications')} class:active={isActive("/admin/publications")}>Publications</a>
           <a href={resolve('admin/publishers')} class:active={isActive("/admin/publishers")}>Éditeurs</a>
-          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>
-          <a href={resolve('admin/monographs')} class:active={isActive("/admin/monographs")}>Monographies</a>
-          <span class="nav-dropdown-group">Adresses</span>
+          <a href={resolve('admin/serials')} class:active={isActive("/admin/serials")}>Publications en série</a>          <span class="nav-dropdown-group">Adresses</span>
           <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
           <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
         </div>
