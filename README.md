@@ -2,14 +2,14 @@
 
 Suivi de la production scientifique de l'Université Clermont Auvergne.
 
-Le pipeline collecte auprès de sources en ligne les métadonnées de publications scientifiques rattachées à l'université, les dédoublonne et les relie à leurs auteurs et structures de rattachement. — L'application web les restitue sous forme de listes et de tableaux de bord.
+Le pipeline collecte auprès de sources en ligne les métadonnées de publications scientifiques rattachées à l'université, les dédoublonne et les relie à leurs auteurs et structures de rattachement. L'application web les restitue sous forme de listes et de tableaux de bord.
 
 ## Stack technique
 
 - **Frontend** : SvelteKit (Svelte 5) — `interfaces/frontend/`
 - **Backend** : FastAPI + PostgreSQL 18 (SQLAlchemy) — `interfaces/api/`
 - **Pipeline** : Python — paquet `pipeline/` (orchestrateur `pipeline/run.py`, commande `run_pipeline`)
-- **Architecture** : DDD en 4 couches (`domain/`, `application/`, `infrastructure/`, `interfaces/`)
+- **Architecture** : DDD en 4 couches (`domain/`, `application/`, `infrastructure/`, `interfaces/`), pipeline hors des couches
 
 ## Démarrer
 
@@ -34,8 +34,8 @@ L'application a besoin d'une base initialisée : la marche à suivre, du `.env` 
 ```
 bibliometrie-uca/
 ├── domain/              Entités, value objects, règles pures (zéro I/O)
-├── application/         Orchestration métier
-│   ├── services/        Cas d'usage appelés par l'API
+├── application/         Écritures de l'administration
+│   ├── services/        Services d'écriture appelés par l'API
 │   └── ports/           Interfaces que l'infrastructure implémente
 ├── infrastructure/      Adaptateurs sortants
 │   ├── db/              Schéma SQL, MetaData SA, engine
@@ -47,7 +47,7 @@ bibliometrie-uca/
 │   ├── frontend/        SvelteKit
 │   └── cli/             Imports, maintenance
 ├── pipeline/            Pipeline (orchestrateur run.py)
-│   ├── ingestion/       Extraction et normalisation par source (hal, openalex, wos, scanr, theses…)
+│   ├── ingestion/       Moissonnage et normalisation par source (hal, openalex, wos, scanr, theses…)
 │   ├── transformation/  Transformation par domaine (structures, publishing, publications, persons)
 │   └── runtime/         Contexte d'exécution des phases, observabilité
 ├── alembic/             Migrations
@@ -59,8 +59,10 @@ bibliometrie-uca/
 
 - [Guide d'exploitation](docs/exploitation/) — développement local, production, pipeline
 - [Architecture](docs/architecture/) — couches DDD, ports/adaptateurs, règles d'import
-- [Modèle de données](docs/donnees/) — schéma, domaines fonctionnels, relations
+- [Modèle de données](docs/donnees/) — une page par entité, index des tables
 - [Pipeline](docs/pipeline/) — les phases de traitement
 - [Sources de données](docs/sources/) — API, imports manuels, particularités par source
 - [Guide utilisateur](docs/guide-utilisateur/) — pages publiques, pages admin, workflows
 - [Glossaire](docs/glossaire.md) — définitions des termes métier
+
+La documentation se lit aussi comme un site, avec la référence du code générée depuis les docstrings : `uv run zensical serve`.
