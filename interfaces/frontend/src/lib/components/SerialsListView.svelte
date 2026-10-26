@@ -13,6 +13,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { nextSort, sortDirection } from '#lib/sort.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
@@ -145,21 +146,11 @@
 		facets.load();
 	});
 
-	function setSort(s: string) {
-		currentSort = currentSort === s ? oppositeSort(s) : s;
+	function setSort(column: 'title' | 'publisher' | 'publications') {
+		currentSort = nextSort(currentSort, column, column === 'publications' ? 'desc' : 'asc');
 		serials.page = 1;
 		syncUrl();
 		serials.load();
-	}
-
-	function oppositeSort(s: string): string {
-		return s.endsWith('_desc') ? s.replace(/_desc$/, '_asc') : s.replace(/_asc$/, '_desc');
-	}
-
-	function sortDirection(col: 'title' | 'publisher' | 'publications'): 'asc' | 'desc' | null {
-		if (currentSort === col) return 'asc';
-		if (currentSort === '-' + col) return 'desc';
-		return null;
 	}
 
 	function formatIssns(j: Serial): string {
@@ -233,17 +224,17 @@
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('title')}>
-				Titre <SortChevron direction={sortDirection('title')} />
+				Titre <SortChevron direction={sortDirection(currentSort, 'title')} />
 			</th>
 			<th>ISSN</th>
 			{#if !publisherFixed}
 				<th class="sortable" onclick={() => setSort('publisher')}>
-					Éditeur <SortChevron direction={sortDirection('publisher')} />
+					Éditeur <SortChevron direction={sortDirection(currentSort, 'publisher')} />
 				</th>
 			{/if}
 			<th>Type</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis <SortChevron direction={sortDirection('publications')} />
+				Publis <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

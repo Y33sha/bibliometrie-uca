@@ -6,6 +6,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import IdentifiersCell from './IdentifiersCell.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { nextSort, sortDirection, type SortDirection } from '#lib/sort.js';
 	import type { components } from '#lib/api/schema.js';
 
 	export type PersonRow = components['schemas']['PersonOut'];
@@ -44,14 +45,9 @@
 			: [])
 	]);
 
-	function toggleSort(col: string) {
-		onSortChange(sort === `${col}_asc` ? `${col}_desc` : `${col}_asc`);
-	}
-
-	function sortDirection(col: string): 'asc' | 'desc' | null {
-		if (sort === `${col}_asc`) return 'asc';
-		if (sort === `${col}_desc`) return 'desc';
-		return null;
+	// Les colonnes de texte se trient d'abord dans l'ordre alphabétique, les décomptes d'abord du plus grand au plus petit.
+	function toggleSort(col: string, first: SortDirection = 'asc') {
+		onSortChange(nextSort(sort, col, first));
 	}
 </script>
 
@@ -62,26 +58,26 @@
 			<th class="rh-col" title="Présente dans le SI RH">RH</th>
 			<th
 				class="sortable"
-				class:active={sort === 'name_asc' || sort === 'name_desc'}
-				onclick={() => toggleSort('name')}>Nom<SortChevron direction={sortDirection('name')} /></th
+				class:active={sortDirection(sort, 'name') !== null}
+				onclick={() => toggleSort('name')}>Nom<SortChevron direction={sortDirection(sort, 'name')} /></th
 			>
 			<th>Identifiants</th>
 			<th
 				class="sortable"
-				class:active={sort === 'role_asc' || sort === 'role_desc'}
-				onclick={() => toggleSort('role')}>Fonction<SortChevron direction={sortDirection('role')} /></th
+				class:active={sortDirection(sort, 'role') !== null}
+				onclick={() => toggleSort('role')}>Fonction<SortChevron direction={sortDirection(sort, 'role')} /></th
 			>
 			<th
 				class="sortable"
-				class:active={sort === 'dept_asc' || sort === 'dept_desc'}
-				onclick={() => toggleSort('dept')}>Département<SortChevron direction={sortDirection('dept')} /></th
+				class:active={sortDirection(sort, 'dept') !== null}
+				onclick={() => toggleSort('dept')}>Département<SortChevron direction={sortDirection(sort, 'dept')} /></th
 			>
 			{#each countColumns as col (col.sortKey)}
 				<th
 					class="sortable num"
 					style="width:80px"
-					class:active={sort === `${col.sortKey}_asc` || sort === `${col.sortKey}_desc`}
-					onclick={() => toggleSort(col.sortKey)}>{col.label}<SortChevron direction={sortDirection(col.sortKey)} /></th
+					class:active={sortDirection(sort, col.sortKey) !== null}
+					onclick={() => toggleSort(col.sortKey, 'desc')}>{col.label}<SortChevron direction={sortDirection(sort, col.sortKey)} /></th
 				>
 			{/each}
 		</tr>

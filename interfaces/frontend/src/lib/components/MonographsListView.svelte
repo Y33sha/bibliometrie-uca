@@ -12,6 +12,7 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
+	import { nextSort, sortDirection } from '#lib/sort.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Monograph = components['schemas']['MonographListItem'];
@@ -124,16 +125,10 @@
 	const onSearchInput = url.debouncedSearch(onFilterChange);
 
 	function setSort(column: 'title' | 'year' | 'publications') {
-		currentSort = currentSort === `${column}_desc` ? `${column}_asc` : `${column}_desc`;
+		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
 		monographs.page = 1;
 		syncUrl();
 		monographs.load();
-	}
-
-	function sortDirection(column: 'title' | 'year' | 'publications'): 'asc' | 'desc' | null {
-		if (currentSort === `${column}_asc`) return 'asc';
-		if (currentSort === `${column}_desc`) return 'desc';
-		return null;
 	}
 
 	onMount(() => {
@@ -191,13 +186,13 @@
 	<table class="data-table monographs-table">
 		<thead>
 			<tr>
-				<th class="sortable" onclick={() => setSort('title')}>Titre <SortChevron direction={sortDirection('title')} /></th>
+				<th class="sortable" onclick={() => setSort('title')}>Titre <SortChevron direction={sortDirection(currentSort, 'title')} /></th>
 				<th>Type</th>
-				<th class="num sortable" onclick={() => setSort('year')}>Année <SortChevron direction={sortDirection('year')} /></th>
+				<th class="num sortable" onclick={() => setSort('year')}>Année <SortChevron direction={sortDirection(currentSort, 'year')} /></th>
 				<th>ISBN</th>
 				{#if !publisherFixed}<th>Éditeur</th>{/if}
 				{#if !serialFixed}<th>Collection</th>{/if}
-				<th class="num sortable" onclick={() => setSort('publications')}>Publis <SortChevron direction={sortDirection('publications')} /></th>
+				<th class="num sortable" onclick={() => setSort('publications')}>Publis <SortChevron direction={sortDirection(currentSort, 'publications')} /></th>
 			</tr>
 		</thead>
 		<tbody>

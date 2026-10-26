@@ -4,6 +4,7 @@
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
+	import { sortDirection } from '#lib/sort.js';
 	import type { components, operations } from '#lib/api/schema.js';
 
 	// Ligne servie par `/api/publications` (mode thèses) : le sous-ensemble de `PublicationListItem` que ce tableau consomme.
@@ -30,6 +31,8 @@
 		NonNullable<operations['list_publications_api_publications_get']['parameters']['query']>['sort']
 	>;
 
+	export type ThesisSortColumn = 'inscription' | 'soutenance' | 'title';
+
 	let {
 		items,
 		loading = false,
@@ -40,7 +43,7 @@
 		items: ThesisRow[];
 		loading?: boolean;
 		sort: PublicationSort;
-		onToggleSort: (asc: PublicationSort, desc: PublicationSort) => void;
+		onToggleSort: (column: ThesisSortColumn) => void;
 		showLabsColumn?: boolean;
 	} = $props();
 
@@ -55,19 +58,9 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	function sortDirection(asc: PublicationSort, desc: PublicationSort): 'asc' | 'desc' | null {
-		return sort === asc ? 'asc' : sort === desc ? 'desc' : null;
-	}
-	function sortActive(asc: PublicationSort, desc: PublicationSort): boolean {
-		return sort === asc || sort === desc;
-	}
-
-	const inscrSort = $derived(sortDirection('inscription_asc', 'inscription_desc'));
-	const inscrActive = $derived(sortActive('inscription_asc', 'inscription_desc'));
-	const soutSort = $derived(sortDirection('soutenance_asc', 'soutenance_desc'));
-	const soutActive = $derived(sortActive('soutenance_asc', 'soutenance_desc'));
-	const titleSort = $derived(sortDirection('title_asc', 'title_desc'));
-	const titleActive = $derived(sortActive('title_asc', 'title_desc'));
+	const inscrSort = $derived(sortDirection(sort, 'inscription'));
+	const soutSort = $derived(sortDirection(sort, 'soutenance'));
+	const titleSort = $derived(sortDirection(sort, 'title'));
 </script>
 
 <div class="table-scroll">
@@ -76,19 +69,19 @@
 		<tr>
 			<th
 				class="col-date sortable"
-				class:active={inscrActive}
-				onclick={() => onToggleSort('inscription_asc', 'inscription_desc')}
+				class:active={inscrSort !== null}
+				onclick={() => onToggleSort('inscription')}
 			>Inscription <SortChevron direction={inscrSort} /></th>
 			<th
 				class="col-date sortable"
-				class:active={soutActive}
-				onclick={() => onToggleSort('soutenance_asc', 'soutenance_desc')}
+				class:active={soutSort !== null}
+				onclick={() => onToggleSort('soutenance')}
 			>Soutenance <SortChevron direction={soutSort} /></th>
 			<th class="col-author">Auteur</th>
 			<th
 				class="col-title sortable"
-				class:active={titleActive}
-				onclick={() => onToggleSort('title_asc', 'title_desc')}
+				class:active={titleSort !== null}
+				onclick={() => onToggleSort('title')}
 			>Titre <SortChevron direction={titleSort} /></th>
 			<th class="col-status">Statut</th>
 			{#if showLabsColumn}

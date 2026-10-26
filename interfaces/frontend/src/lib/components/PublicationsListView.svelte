@@ -48,6 +48,7 @@
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import { paramsToQuery } from '#lib/utils.js';
+	import { nextSort, sortDirection } from '#lib/sort.js';
 
 	import type { components } from '#lib/api/schema.js';
 	type Publication = components['schemas']['PublicationListItem'] & {
@@ -402,12 +403,9 @@
 	});
 
 	// Sort display
-	const yearSort = $derived(currentSort === 'year_asc' ? 'asc' : currentSort === 'year_desc' ? 'desc' : null);
-	const titleSort = $derived(currentSort === 'title_asc' ? 'asc' : currentSort === 'title_desc' ? 'desc' : null);
-	const apcSort = $derived(currentSort === 'apc_asc' ? 'asc' : currentSort === 'apc_desc' ? 'desc' : null);
-	const yearSortActive = $derived(currentSort === 'year_desc' || currentSort === 'year_asc');
-	const titleSortActive = $derived(currentSort === 'title_asc' || currentSort === 'title_desc');
-	const apcSortActive = $derived(currentSort === 'apc_desc' || currentSort === 'apc_asc');
+	const yearSort = $derived(sortDirection(currentSort, 'year'));
+	const titleSort = $derived(sortDirection(currentSort, 'title'));
+	const apcSort = $derived(sortDirection(currentSort, 'apc'));
 
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
@@ -512,18 +510,8 @@
 		facets.load();
 	});
 
-	function toggleSortYear() {
-		currentSort = currentSort === 'year_desc' ? 'year_asc' : 'year_desc';
-		onFilterChange();
-	}
-
-	function toggleSortTitle() {
-		currentSort = currentSort === 'title_asc' ? 'title_desc' : 'title_asc';
-		onFilterChange();
-	}
-
-	function toggleSortApc() {
-		currentSort = currentSort === 'apc_desc' ? 'apc_asc' : 'apc_desc';
+	function toggleSort(column: 'year' | 'title' | 'apc') {
+		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
 		onFilterChange();
 	}
 
@@ -630,17 +618,17 @@
 		<tr>
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">Type</th>{/if}
-			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSortActive} onclick={toggleSortYear}>
+			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
 				An. <SortChevron direction={yearSort} />
 			</th>{/if}
-			<th class="sortable publication-col-title" class:active={titleSortActive} onclick={toggleSortTitle}>
+			<th class="sortable publication-col-title" class:active={titleSort !== null} onclick={() => toggleSort('title')}>
 				Titre <SortChevron direction={titleSort} />
 			</th>
 			{#if col('serial')}<th class="publication-col-journal">Revue</th>{/if}
 			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
 			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
-			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSortActive} onclick={toggleSortApc}>
+			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				APC <SortChevron direction={apcSort} />
 			</th>{/if}
 			{#if col('oa')}<th style="width:75px" title="Open Access">OA</th>{/if}
