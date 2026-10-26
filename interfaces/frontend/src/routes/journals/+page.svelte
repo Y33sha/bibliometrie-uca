@@ -4,13 +4,13 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle("Revues")}</title>
+	<title>{pageTitle("Publications en série")}</title>
 </svelte:head>
 
-<h1>Revues</h1>
+<h1>Publications en série</h1>
 <p class="hint">
-	Liste des revues observées sur les publications du périmètre {institution.name}. Cliquer
-	sur une revue pour explorer ses publications, sa répartition par type/OA
+	Liste des publications en série observées sur les publications du périmètre {institution.name}. Cliquer
+	sur une publication en série pour explorer ses publications, sa répartition par type/OA
 	et ses données DOAJ.
 </p>
 

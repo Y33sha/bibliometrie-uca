@@ -27,7 +27,6 @@
 		perPage = 50,
 		actionCell,
 		actionColumnHeader = '',
-		serialsHeader = 'Revues',
 	}: {
 		apiKey?: string;
 		urlSync?: boolean;
@@ -36,8 +35,6 @@
 		/** Snippet rendu dans la colonne actions (1 row → 1 cell). */
 		actionCell?: Snippet<[Publisher]>;
 		actionColumnHeader?: string;
-		/** En-tête de la colonne des publications en série : « Revues » sur la page publique, le nom exact en administration. */
-		serialsHeader?: string;
 	} = $props();
 
 	// --- Filter state ---
@@ -201,7 +198,7 @@
 			<th>Pays</th>
 			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
-				{serialsHeader} <SortChevron direction={sortDirection(currentSort, 'serials')} />
+				Publications en série <SortChevron direction={sortDirection(currentSort, 'serials')} />
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
 				Publis <SortChevron direction={sortDirection(currentSort, 'publications')} />

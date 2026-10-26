@@ -59,7 +59,7 @@
       <div class="nav-dropdown-menu">
         <a href={resolve('theses')} class:active={isActive("/theses")}>Thèses</a>
         <a href={resolve('publishers')} class:active={isActive("/publishers")}>Éditeurs</a>
-        <a href={resolve('journals')} class:active={isActive("/journals")}>Revues</a>
+        <a href={resolve('journals')} class:active={isActive("/journals")}>Publications en série</a>
         <a href={resolve('monographs')} class:active={isActive("/monographs")}>Monographies</a>
         <a href={resolve('subjects')} class:active={isActive("/subjects")}>Sujets</a>
       </div>

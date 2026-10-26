@@ -124,8 +124,8 @@
 
 <h1>Éditeurs</h1>
 <p class="hint">
-	Liste des éditeurs des revues observées sur les publications du périmètre
-	{institution.name}. Cliquer sur un éditeur pour explorer son portfolio de revues et ses
+	Liste des éditeurs des publications en série observées sur les publications du périmètre
+	{institution.name}. Cliquer sur un éditeur pour explorer ses publications en série et ses
 	publications.
 </p>
 
@@ -198,7 +198,6 @@
 <PublishersListView
 	{apiKey}
 	urlSync
-	serialsHeader={isAdmin() ? 'Publications en série' : 'Revues'}
 	actionCell={isAdmin() ? actionCell : undefined}
 />
 

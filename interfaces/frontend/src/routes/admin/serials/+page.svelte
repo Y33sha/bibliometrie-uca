@@ -211,7 +211,7 @@
 {:else if tab === 'doi-namespace-conflicts'}
 <DoiNamespaceConflictsList onchange={loadQueueCounts} />
 {:else}
-<SerialsListView {apiKey} nouns={['publication en série', 'publications en série']}>
+<SerialsListView {apiKey}>
 	{#snippet actionCell(j: Serial)}
 		{#if mergeTargetId === j.id}
 			<Picker

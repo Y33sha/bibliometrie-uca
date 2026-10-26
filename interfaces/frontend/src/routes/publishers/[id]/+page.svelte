@@ -138,7 +138,7 @@
 	<TabNav
 		tabs={[
 			{ id: 'dashboard', label: 'Dashboard' },
-			{ id: 'serials', label: 'Revues' },
+			{ id: 'serials', label: 'Publications en série' },
 			{ id: 'monographs', label: 'Monographies' },
 			{ id: 'publications', label: 'Publications' }
 		]}

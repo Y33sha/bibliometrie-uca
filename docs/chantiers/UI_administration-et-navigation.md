@@ -48,6 +48,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Une seule liste des structures**, sous la route `structures`, avec une facette de type réglée par défaut sur les laboratoires.
 - **Éditeurs et publications en série** : les actions Modifier et Fusionner restent dans la cellule d'actions, affichée selon le rôle.
 - Pas de redirection des routes supprimées.
+- **« Publications en série »** est le libellé de la liste et de la fiche, session ouverte ou non. La liste comporte des actes, des médias et des serveurs de preprints.
 
 ## Phasage
 
@@ -99,5 +100,5 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Listes d'entités liées.** Piste : la fiche garde ce qui caractérise l'entité (en-tête, dashboard, graphe des sujets, collaborations, adresses). Les listes liées deviennent des liens vers la liste générale filtrée, filtre visible et supprimable. La liste générale propose les fonctions liées à un contexte quand ce contexte est seul sélectionné : statut HAL pour un seul laboratoire, correspondance, périmètre et exclusion pour une seule personne. La même règle dirait quels filtres la page Statistiques reçoit de la liste ([Statistiques](METIER_statistiques.md)). Coût : la liste générale affiche l'en-tête de la liste, et l'en-tête de l'entité disparaît ; un bandeau de contexte peut le remplacer.
 - **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
 - **Repère visuel du mode admin.** La barre d'administration a sa couleur (`--nav-admin`). La garder pour la session ouverte, ou signaler la session autrement.
-- **Vocabulaire des listes.** Un libellé par liste, session ouverte ou non : « Revues » ou « Publications en série » (la liste comporte des actes, des médias et des serveurs de preprints), « Labos » ou « Structures », « Chercheurs » ou « Personnes ».
+- **Vocabulaire des listes.** Un libellé par liste, session ouverte ou non : « Labos » ou « Structures », « Chercheurs » ou « Personnes ».
 - **Comptes** : page de gestion des utilisateurs, rôles autres qu'admin.

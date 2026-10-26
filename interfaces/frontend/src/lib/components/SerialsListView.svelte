@@ -35,7 +35,6 @@
 		withPubs = false,
 		actionCell,
 		actionColumnHeader = '',
-		nouns = ['revue', 'revues'],
 	}: {
 		apiKey?: string;
 		externalFilters?: ExternalFilters;
@@ -48,8 +47,6 @@
 		actionCell?: Snippet<[Serial]>;
 		/** En-tête de la colonne actions (vide par défaut, comme admin). */
 		actionColumnHeader?: string;
-		/** Nom des lignes au singulier et au pluriel : « revue » sur les pages publiques, le nom exact en administration. */
-		nouns?: [string, string];
 	} = $props();
 
 	// Éditeur imposé par le contexte : la facette et la colonne Éditeur portent alors la même valeur sur toutes les lignes, et sont masquées.
@@ -216,7 +213,7 @@
 		bind:selected={selectedOaModels}
 		onchange={onFilterChange}
 	/>
-	<span class="count">{serials.total.toLocaleString('fr-FR')} {serials.total > 1 ? nouns[1] : nouns[0]}</span>
+	<span class="count">{serials.total.toLocaleString('fr-FR')} publication{serials.total > 1 ? 's' : ''} en série</span>
 </div>
 
 <div class="table-scroll">
@@ -269,7 +266,7 @@
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}
-			<TableStatusRow loading={serials.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune {nouns[0]} ne correspond aux filtres." />
+			<TableStatusRow loading={serials.loading} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
