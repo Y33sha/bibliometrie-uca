@@ -51,6 +51,8 @@ class TestDOIConstruction:
             ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
             ("10.1234/test/pdf", "10.1234/test"),  # suffixe /pdf
             ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF + strip url
+            ("10.3389/fnut.2026.1714437/full", "10.3389/fnut.2026.1714437"),  # suffixe /full
+            ("10.3389/feart.2020.00279/abstract", "10.3389/feart.2020.00279"),  # suffixe /abstract
             (
                 "10.1234/test/pdf.v1",
                 "10.1234/test",
