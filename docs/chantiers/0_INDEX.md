@@ -68,10 +68,6 @@
 - 2026-09-11 — [Journal du pipeline](archived/2026-09-11_CODE_logs-du-pipeline.md)
 - 2026-09-07 — [Durcissement pour l'hébergement universitaire](archived/2026-09-07_CODE_securite.md)
 - 2026-08-25 — [Lisibilité](archived/2026-08-25_CODE_lisibilite.md)
-- 2026-07-29 — [Rationaliser les couches d'accès aux données](archived/2026-07-29_CODE_couches-acces-donnees.md)
-- 2026-07-27 — [Recentrer `infrastructure/sources` sur le dialogue avec les API](archived/2026-07-27_CODE_perimetre-infrastructure-sources.md)
-- 2026-07-25 — [Vocabulaires fermés : StrEnum plutôt que Literal / chaînes](archived/2026-07-25_CODE_vocabulaires-fermes-strenum.md)
-- 2026-07-23 — [Conversion des adapters de lecture vers des DTO typés](archived/2026-07-23_CODE_adapters-dto-typés.md)
 
 
 
