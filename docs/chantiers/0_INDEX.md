@@ -89,10 +89,6 @@
 - 2026-07-09 — [Hors périmètre : ne pas matérialiser plutôt que masquer](archived/2026-07-09_DATA_hors-perimetre-non-materialise.md)
 - 2026-07-08 — [Personnes : résolution d'identité ordre-indépendante](archived/2026-07-08_DATA_persons-cascade-ordre-independante.md)
 - 2026-07-08 — [Supprimer le dossier `interfaces/cli/pipeline/`](archived/2026-07-08_CODE_supprimer-cli-pipeline.md)
-- 2026-07-03 — [Scinder `source_authorships` (identité ⊥ liaison)](archived/2026-07-03_DATA_scinder-source-authorships.md)
-- 2026-07-02 — [Refresh stale par identifiants natifs](archived/2026-07-02_DATA_refresh-stale-identifiants-natifs.md)
-- 2026-07-01 — [Skip propre des sources d'API tierces non configurées](archived/2026-07-01_CODE_extract-sources-non-configurees.md)
-- 2026-07-01 — [Observabilité du pipeline](archived/2026-07-01_CODE_observabilite-pipeline.md)
 
 
 
