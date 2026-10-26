@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-Une personne est un chercheur unifié à travers les sources. La phase `persons` rattache chaque [contribution](03-publications.md#contributions--contributions-des-auteurs-aux-publications) à une personne, et crée les personnes des contributions du périmètre. L'import du référentiel RH crée aussi des personnes. L'administration corrige le résultat, et le pipeline conserve ses décisions.
+Une personne est un chercheur unifié à travers les sources. La phase `persons` rattache chaque [contribution](04-contributions.md) à une personne, et crée les personnes des contributions du périmètre. L'import du référentiel RH crée aussi des personnes. L'administration corrige le résultat, et le pipeline conserve ses décisions.
 
 Une personne a au moins une contribution du périmètre, une fiche RH ou une décision humaine. La phase `persons` supprime les autres. Les co-auteurs extérieurs au périmètre n'ont donc pas de personne.
 
