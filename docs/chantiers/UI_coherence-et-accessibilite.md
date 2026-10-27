@@ -147,7 +147,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 5. Composants
 
 - [x] Style d'identifiant unique (ISSN, ISBN, HAL)
-- [ ] Rendu des barres des dashboards (voir Questions ouvertes)
+- [x] Barres des dashboards : Chart.js (`BarChart`, `StackedBarChart`), données lisibles par les lecteurs d'écran dans un tableau masqué
 - [x] Libellés de l'anneau lisibles sur toutes les parts
 - [x] Liste des publications : en-tête « Accès / Liens », poids du bouton « Texte intégral », en-tête de tableau collant
 - [x] Liste des éditeurs : filets de la colonne des préfixes, valeur absente en cellule vide
@@ -191,5 +191,4 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ## Questions ouvertes
 
-- **Rendu des barres des dashboards.** Les graphiques passent par Chart.js (`BarChart`, `StackedBarChart`, page Statistiques, carte) ; le nuage de sujets est en SVG, chaque mot un lien. Dans un canvas, les libellés d'axe sont du texte peint, inaccessible au clavier et aux lecteurs d'écran ; seules les barres répondent au clic.
 - **Colonnes de la liste des publications sur mobile.** À 390 px, le type, l'année et le DOI occupent le premier écran ; le titre commence au bord droit. Masquer ces colonnes sous 600 px laisserait la place au titre.

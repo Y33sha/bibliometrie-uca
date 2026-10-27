@@ -57,9 +57,26 @@
 	});
 </script>
 
+<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
 <div class="chart-wrap" style="height: {height}px">
-	<canvas bind:this={canvas}></canvas>
+	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
+<table class="visually-hidden">
+	<thead>
+		<tr>
+			<td></td>
+			{#each series as s (s.label)}<th scope="col">{s.label}</th>{/each}
+		</tr>
+	</thead>
+	<tbody>
+		{#each labels as label, i (i)}
+			<tr>
+				<th scope="row">{label}</th>
+				{#each series as s (s.label)}<td>{s.values[i]}</td>{/each}
+			</tr>
+		{/each}
+	</tbody>
+</table>
 
 <style>
 	.chart-wrap {

@@ -72,9 +72,20 @@
 	});
 </script>
 
+<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
 <div class="chart-wrap" style="height: {height}px">
-	<canvas bind:this={canvas}></canvas>
+	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
+<table class="visually-hidden">
+	<thead>
+		<tr><td></td><th scope="col">{datasetLabel || 'Nombre'}</th></tr>
+	</thead>
+	<tbody>
+		{#each labels as label, i (i)}
+			<tr><th scope="row">{label}</th><td>{values[i]}</td></tr>
+		{/each}
+	</tbody>
+</table>
 
 <style>
 	.chart-wrap {
