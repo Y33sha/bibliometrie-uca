@@ -4,7 +4,7 @@ Recalcule les composantes connexes du voisinage 1-hop des `source_records` de la
 
 - **groupes** : les enregistrements sources de chaque groupe sont rattachés à son ancre (publication existante conservée), ou à une publication créée quand la partition est sans ancre existante (split) ;
 - **publications dissoutes** (vidées de tous leurs enregistrements sources par un merge) : `lifecycle.dissolve` redirige leurs paiements APC et leur identifiant vers le successeur, puis les supprime ;
-- **rafraîchissement** : `lifecycle.refresh` recalcule les métadonnées consolidées de chaque publication touchée, et supprime celles restées sans source.
+- **rafraîchissement** : `lifecycle.refresh` recalcule les métadonnées consolidées de chaque publication d'un enregistrement source relevé, avant comme après la réconciliation, et de chaque publication cible d'un groupe. Il supprime celles restées sans source.
 
 Les `contributions` sont laissées à la phase `contributions` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des enregistrements sources et les métadonnées des publications, et laisse les contributions.
 
@@ -462,6 +462,26 @@ def _refresh(conn: Connection, publication_id: int) -> None:
         lifecycle.refresh(conn, publication_id)
 
 
+def _snapshot_publications(conn: Connection) -> set[int]:
+    """Publications des enregistrements sources relevés."""
+    return set(
+        conn.execute(
+            text(
+                f"SELECT DISTINCT sr.publication_id FROM {_SNAPSHOT} m"  # noqa: S608
+                " JOIN source_records sr ON sr.id = m.id WHERE sr.publication_id IS NOT NULL"
+            )
+        ).scalars()
+    )
+
+
+def _publications_to_refresh(
+    conn: Connection, plan: ReconcilePlan, applied: AppliedReconciliation, before: set[int]
+) -> list[int]:
+    """Publications à recalculer : celles des enregistrements sources relevés, avant (`before`) comme après la réconciliation, et les cibles des groupes. Les publications dissoutes en sortent."""
+    dissolved = {d.publication_id for d in plan.dissolved}
+    return sorted((before | _snapshot_publications(conn) | applied.survivors) - dissolved)
+
+
 def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False) -> ReconcileStats:
     """Planifie et applique la réconciliation du voisinage des enregistrements sources en file, puis supprime les marquages traités. Rend un bilan à zéro si la file est vide. Le commit est à la charge de l'appelant.
 
@@ -494,16 +514,17 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
             f"{quantity(len(plan.dissolved), 'doublon')} à fusionner)"
         )
 
+    before = _snapshot_publications(conn)
     t0 = time.perf_counter()
     with waiting(f"{LAST_BRANCH}application", logger) as line:
         applied = _apply(conn, plan, rows_by_source_record)
         line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
-    # 4. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
-    survivor_ids = sorted(applied.survivors)
+    # 4. Recalcul des métadonnées consolidées depuis les sources.
+    to_refresh = _publications_to_refresh(conn, plan, applied, before)
     step(logger, "Recalcul des métadonnées consolidées")
-    with track_progress(len(survivor_ids), LAST_BRANCH.rstrip(), logger) as progress:
-        for publication_id in survivor_ids:
+    with track_progress(len(to_refresh), LAST_BRANCH.rstrip(), logger) as progress:
+        for publication_id in to_refresh:
             progress.advance()
             _refresh(conn, publication_id)
 
@@ -524,14 +545,15 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
 def reconcile_source_records(
     conn: Connection, source_record_ids: Sequence[int]
 ) -> AppliedReconciliation:
-    """Réconcilie le voisinage des enregistrements sources `source_record_ids`, hors de la file, et recalcule les métadonnées consolidées des publications conservées. Le commit est à la charge de l'appelant.
+    """Réconcilie le voisinage des enregistrements sources `source_record_ids`, hors de la file, et recalcule les métadonnées consolidées des publications touchées (`_publications_to_refresh`). Le commit est à la charge de l'appelant.
 
     Les publications qui gagnent ou perdent un enregistrement source sont marquées pour le groupement des auteurs.
     """
     snapshot_source_records(conn, source_record_ids)
     plan, rows_by_source_record = _plan(conn)
+    before = _snapshot_publications(conn)
     applied = _apply(conn, plan, rows_by_source_record)
-    for publication_id in sorted(applied.survivors):
+    for publication_id in _publications_to_refresh(conn, plan, applied, before):
         _refresh(conn, publication_id)
     mark_publications_for_grouping(conn, sorted(applied.changed))
     conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))

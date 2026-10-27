@@ -347,6 +347,38 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_a)[1] is False
         assert _source_record_state(conn, source_record_b)[1] is False
 
+    def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
+        """Régression : l'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, qui gardait le DOI qu'il avait perdu."""
+        conn = sa_sync_conn
+        hal_id = {"hal_id": ["hal-01234567"]}
+        stale = _seed_publication(conn, doi="10.9/retire")
+        residual = _source_record(conn, stale, source_id="a", external_ids=hal_id)
+        for source_id, doi in (("b", "10.1/x"), ("c", "10.2/y")):
+            _source_record(
+                conn,
+                _seed_publication(conn, doi=doi),
+                source_id=source_id,
+                doi=doi,
+                marked=False,
+                external_ids=hal_id,
+            )
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": stale}
+            ).scalar()
+            == "10.9/retire"
+        )
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, residual) == (stale, False)
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": stale}
+            ).scalar()
+            is None
+        )
+
 
 class TestManualMerge:
     def test_publications_without_shared_key_merged_into_doi_carrier(self, sa_sync_conn_owner):
