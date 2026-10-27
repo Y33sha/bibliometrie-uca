@@ -25,12 +25,22 @@ from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 
+# Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
+MANUAL_MERGE_KEY = "manual_merge"
+
+
+def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str, str]]:
+    """Jetons des fusions manuelles d'un enregistrement source. Le clustering les traite comme des clés de confirmation."""
+    return frozenset(
+        (MANUAL_MERGE_KEY, str(manual_merge_id)) for manual_merge_id in manual_merge_ids
+    )
+
 
 @dataclass(frozen=True, slots=True)
 class ReconcileMember:
     """Un enregistrement source du voisinage de réconciliation.
 
-    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de l'enregistrement source, **`None` s'il est orphelin** (pas encore matérialisé) ; `publication_doi` = DOI de cette publication courante (`None` s'il est orphelin) ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre ; `title_normalized` / `publication_year` = métadonnées minimales requises pour matérialiser une publication neuve ; `doc_type` = type de l'enregistrement source.
+    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) et jetons de fusion manuelle (`manual_merge_tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de l'enregistrement source, **`None` s'il est orphelin** (pas encore matérialisé) ; `publication_doi` = DOI de cette publication courante (`None` s'il est orphelin) ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre ; `title_normalized` / `publication_year` = métadonnées minimales requises pour matérialiser une publication neuve ; `doc_type` = type de l'enregistrement source.
 
     `in_perimeter`, `title_normalized`, `publication_year` et `doc_type` n'ont de rôle que pour la **création** : ils décident create vs skip pour une partition d'orphelins ; l'année décide create vs détachement pour une partition qui perd sa publication.
     """

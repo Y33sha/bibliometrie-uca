@@ -19,7 +19,12 @@ from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
+from domain.publications.reconciliation import (
+    ReconcileMember,
+    WorkGroup,
+    manual_merge_tokens,
+    plan_reconciliation,
+)
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -48,7 +53,7 @@ class ReconcileRow(NamedTuple):
     """Projection d'une `source_record` du voisinage : clés + publication courante.
 
     `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
-    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve)."""
+    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve) ; `manual_merge_ids` = fusions manuelles qui désignent l'enregistrement source."""
 
     id: int
     doi: str | None
@@ -59,6 +64,7 @@ class ReconcileRow(NamedTuple):
     publication_year: int | None
     publication_doi: str | None
     in_perimeter: bool
+    manual_merge_ids: list[int]
 
 
 # Relevé de la file `source_record_keys_queue`.
@@ -72,7 +78,10 @@ _COLS = (
     "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
-    "WHERE sc.source_record_id = {a}.id AND sc.in_perimeter) AS in_perimeter"
+    "WHERE sc.source_record_id = {a}.id AND sc.in_perimeter) AS in_perimeter, "
+    "ARRAY(SELECT mm.manual_merge_id FROM manual_merge_source_records mm "
+    "WHERE mm.source = {a}.source AND mm.source_id = {a}.source_id "
+    "ORDER BY mm.manual_merge_id) AS manual_merge_ids"
 )
 
 # Premier identifiant HAL que liste une `source_record` : sa clé de fusion HAL.
@@ -98,7 +107,7 @@ _UNIVERSE_SQL = text(f"""
         LEFT JOIN publications p ON p.id = sr.publication_id
     )
     SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, publication_year,
-           publication_doi, in_perimeter
+           publication_doi, in_perimeter, manual_merge_ids
     FROM dirty
     UNION
     -- DOI : égalité directe (la colonne est toujours normalisée minuscule par `clean_doi` à
@@ -129,6 +138,14 @@ _UNIVERSE_SQL = text(f"""
     WHERE d.doc_type IS NOT NULL
       AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
       AND d.publication_year IS NOT NULL
+    UNION
+    -- Fusion manuelle : les enregistrements sources désignés par une même fusion manuelle.
+    SELECT {_COLS.format(a="o")}
+    FROM dirty d
+    JOIN manual_merge_source_records m ON m.manual_merge_id = ANY(d.manual_merge_ids)
+    JOIN source_records o ON o.source = m.source AND o.source_id = m.source_id
+    LEFT JOIN publications p ON p.id = o.publication_id
+    WHERE cardinality(d.manual_merge_ids) > 0
 """)
 
 
@@ -193,7 +210,7 @@ def delete_processed_marks(conn: Connection) -> None:
 
 
 def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
-    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
+    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) ou une fusion manuelle avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
     rows = conn.execute(_UNIVERSE_SQL).all()
     return [
         ReconcileRow(
@@ -206,6 +223,7 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
             r.publication_year,
             r.publication_doi,
             r.in_perimeter,
+            r.manual_merge_ids,
         )
         for r in rows
     ]
@@ -280,7 +298,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
         publication_id=row.publication_id,
         publication_doi=row.publication_doi,
         effective_doi=keys.doi,
-        tokens=keys.tokens(),
+        tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
         publication_year=row.publication_year,
