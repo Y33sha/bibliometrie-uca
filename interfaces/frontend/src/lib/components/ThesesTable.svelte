@@ -116,8 +116,7 @@
 			{/if}
 			{#if col('sources')}<th class="col-sources">{columnLabels.sources}</th>{/if}
 			<th class="col-access col-menu-th">
-				{columnLabels.access}
-				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
+				<ColumnMenu label={columnLabels.access} columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}
 					onClose={() => cv.showMenu = false}

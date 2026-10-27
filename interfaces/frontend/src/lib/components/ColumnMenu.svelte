@@ -2,7 +2,10 @@
 	import type { ColumnDef } from '#lib/composables/useColumnVisibility.svelte.js';
 	import { anchored } from '#lib/actions/anchored.js';
 
+	// En-tête de la dernière colonne d'un tableau : son libellé, puis le bouton du menu des colonnes affichées.
 	interface Props {
+		/** Libellé de la colonne qui accueille le menu. */
+		label: string;
 		columns: ColumnDef[];
 		visibleColumns: string[];
 		showMenu: boolean;
@@ -11,11 +14,11 @@
 		onOpen: () => void;
 	}
 
-	let { columns, visibleColumns, showMenu, onToggle, onClose, onOpen }: Props = $props();
+	let { label, columns, visibleColumns, showMenu, onToggle, onClose, onOpen }: Props = $props();
 </script>
 
 <div class="col-menu-inner">
-	<span>Liens</span>
+	<span class="col-menu-label">{label}</span>
 	<div class="column-menu-wrapper">
 		<button class="column-menu-btn" onclick={onOpen} title="Colonnes affichées">⋯</button>
 		{#if showMenu}
@@ -37,6 +40,7 @@
 
 <style>
 	.col-menu-inner { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+	.col-menu-label { white-space: nowrap; }
 	.column-menu-wrapper { position: relative; }
 	.column-menu-btn {
 		background: none; border: 1px solid var(--border); border-radius: var(--radius);

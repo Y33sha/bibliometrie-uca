@@ -300,8 +300,7 @@
 			{#if isLab && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			{#if col('sources')}<th style="width:100px">{columnLabels.sources}</th>{/if}
 			<th style="width:120px" class="col-menu-th">
-				{columnLabels.access}
-				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
+				<ColumnMenu label={columnLabels.access} columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}
 					onClose={() => cv.showMenu = false}
