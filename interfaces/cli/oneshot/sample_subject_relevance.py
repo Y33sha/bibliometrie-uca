@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-25)
 """Audit (lecture seule) : échantillon de référence pour évaluer la pertinence des sujets OpenAlex.
 
-Tire des publications par strate, sans remise, dans cet ordre :
+Tire des publications sans remise : d'abord `--random` publications au hasard, puis par strate, dans cet ordre :
 
 1. revues généralistes : revues d'au moins 20 publications, réparties sur au moins 3 domains OpenAlex, sans domain au-dessus de 60 % ;
 2. sans arbitre : publications sans domaine HAL ni discipline theses.fr ;
@@ -9,12 +9,13 @@ Tire des publications par strate, sans remise, dans cet ordre :
 4. Health × Life : exactement ces deux domains ;
 5. un seul domain.
 
-Le domain d'une publication, pour la répartition d'une revue, est celui de son premier topic OpenAlex.
+Le domain d'une publication, pour la répartition d'une revue, est celui de son premier topic OpenAlex. `--scale` multiplie l'effectif de chaque strate. `--exclude` écarte les publications d'un échantillon déjà tiré.
 
 Écrit un fichier JSON : une entrée par publication, avec titre, résumé, revue et l'arbre des libellés OpenAlex (domain, field, subfield, topic), chaque libellé avec un identifiant, son parent et le score maximal des topics qui le portent. Les sujets des autres sources sont exclus : la qualification se fait sur le titre, le résumé et la revue.
 
 Usage :
     python -m interfaces.cli.oneshot.sample_subject_relevance --output sample.json
+    python -m interfaces.cli.oneshot.sample_subject_relevance --output annotation.json         --random 175 --scale 1.75 --exclude sample.json --seed 20261027
 """
 
 from __future__ import annotations
@@ -93,7 +94,7 @@ def _first_domains(topic_lists: list[list[dict]]) -> list[str]:
     return [t[0]["domain"] for t in topic_lists if t and isinstance(t[0].get("domain"), str)]
 
 
-def sample(output: Path, seed: int) -> int:
+def sample(output: Path, seed: int, random_size: int, scale: float, excluded: set[int]) -> int:
     with get_sync_engine().connect() as conn:
         topics_by_publication: dict[int, list[list[dict]]] = defaultdict(list)
         serial_by_publication: dict[int, int | None] = {}
@@ -134,11 +135,14 @@ def sample(output: Path, seed: int) -> int:
         }
 
         rng = random.Random(seed)  # noqa: S311 — tirage reproductible, sans usage cryptographique
-        pool = sorted(topics_by_publication)
+        pool = sorted(set(topics_by_publication) - excluded)
         drawn: dict[int, str] = {}
+        for pid in rng.sample(pool, min(random_size, len(pool))):
+            drawn[pid] = "random"
+        log.info("random : %d tirées sur %d candidates", min(random_size, len(pool)), len(pool))
         for stratum, size in _STRATA:
             candidates = [pid for pid in pool if pid not in drawn and predicates[stratum](pid)]
-            chosen = rng.sample(candidates, min(size, len(candidates)))
+            chosen = rng.sample(candidates, min(round(size * scale), len(candidates)))
             for pid in chosen:
                 drawn[pid] = stratum
             log.info("%s : %d tirées sur %d candidates", stratum, len(chosen), len(candidates))
@@ -177,8 +181,18 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True, help="Fichier JSON écrit.")
     parser.add_argument("--seed", type=int, default=20261025, help="Graine du tirage.")
+    parser.add_argument("--random", type=int, default=0, help="Publications tirées au hasard.")
+    parser.add_argument("--scale", type=float, default=1.0, help="Facteur appliqué aux strates.")
+    parser.add_argument(
+        "--exclude", type=Path, help="Échantillon (JSON) dont les publications sont écartées."
+    )
     args = parser.parse_args()
-    return sample(args.output, args.seed)
+    excluded = (
+        {p["id"] for p in json.loads(args.exclude.read_text(encoding="utf-8"))}
+        if args.exclude
+        else set()
+    )
+    return sample(args.output, args.seed, args.random, args.scale, excluded)
 
 
 if __name__ == "__main__":
