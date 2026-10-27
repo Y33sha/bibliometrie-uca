@@ -15,6 +15,7 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import type { components } from '#lib/api/schema.js';
 
@@ -247,11 +248,11 @@
 </div>
 
 <div class="toolbar">
-	<input type="search" placeholder="Filtrer par nom…" bind:value={search}
+	<input type="search" placeholder="Rechercher par nom" bind:value={search}
  onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput} autocomplete="off" />
 	<FacetDropdown
-		label="Laboratoires"
+		label={filterLabels.labs}
 		options={labOptions}
 		searchable
 		bind:selected={selectedLabs}
@@ -262,7 +263,7 @@
 {#if selectedIds.size > 0}
 	<div class="batch-bar">
 		<span>{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
-		<input type="search" placeholder="Attribuer à une personne existante…" value={batchSearch.query}
+		<input type="search" placeholder="Attribuer à une personne existante" value={batchSearch.query}
 			onkeydown={(e) => { if (e.key === 'Escape') { batchSearch.setQuery(''); } }}
 			oninput={(e) => batchSearch.setQuery((e.target as HTMLInputElement).value)} autocomplete="off" />
 		<button class="btn btn-sm btn-create" onclick={openCreateModal}>Créer une personne</button>
@@ -287,10 +288,10 @@
 		<thead>
 			<tr>
 				<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
-				<th>Source</th>
+				<th>{columnLabels.sources}</th>
 				<th>Nom</th>
 				<th>Publication</th>
-				<th>Labo(s)</th>
+				<th>{columnLabels.labs}</th>
 				<th>Action</th>
 			</tr>
 		</thead>
@@ -318,7 +319,7 @@
 						{#if activeAssignIdx === i}
 							<div class="assign-panel">
 								<div class="assign-row">
-									<input type="search" placeholder="Nom de la personne…" value={assignSearch.query}
+									<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
 											use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
 										oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
 									<button class="btn btn-sm" onclick={closeAssign}>&times;</button>

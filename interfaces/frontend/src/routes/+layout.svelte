@@ -86,10 +86,10 @@
 {/snippet}
 {#snippet halProblemsLabel()}Problèmes HAL{/snippet}
 {#snippet halProblemsItems()}
-  <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Doublons auteurs</a>
-  <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Doublons publis</a>
-  <a href={resolve('hal-problems/missing-collections')} class:active={isActive("/hal-problems/missing-collections")}>Manques collections</a>
-  <a href={resolve('hal-problems/affiliation-conflicts')} class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations suspectes</a>
+  <a href={resolve('hal-problems/duplicate-accounts')} class:active={isActive("/hal-problems/duplicate-accounts")}>Comptes auteur en double</a>
+  <a href={resolve('hal-problems/duplicate-publications')} class:active={isActive("/hal-problems/duplicate-publications")}>Dépôts en double</a>
+  <a href={resolve('hal-problems/missing-collections')} class:active={isActive("/hal-problems/missing-collections")}>Publications absentes des collections</a>
+  <a href={resolve('hal-problems/affiliation-conflicts')} class:active={isActive("/hal-problems/affiliation-conflicts")}>Affiliations divergentes</a>
 {/snippet}
 {#snippet adminLabel()}Administration{/snippet}
 {#snippet adminItems()}
@@ -118,7 +118,7 @@
     <a href={resolve('structures')} class="nav-link" class:active={isActive("/structures")}><i class="fi fi-rr-school nav-icon" aria-hidden="true"></i>Labos</a>
     <a href={resolve('persons')} class="nav-link" class:active={isActive("/persons")}><i class="fi fi-rr-users nav-icon" aria-hidden="true"></i>Chercheurs</a>
     {@render dropdown("referentiels", referentielsLabel, referentielsItems, { active: isPublicReferentiels })}
-    {@render dropdown("hal-problems", halProblemsLabel, halProblemsItems, { active: isHalProblems })}
+    {@render dropdown("hal-problems", halProblemsLabel, halProblemsItems, { active: isHalProblems, right: true })}
     {#if isAdmin()}
       {@render dropdown("admin", adminLabel, adminItems, { active: isAdminSection, right: true })}
     {/if}
@@ -305,6 +305,7 @@
   }
   .nav-dropdown-menu a {
     display: block;
+    white-space: nowrap;
     padding: 8px 16px;
     color: rgba(255, 255, 255, 0.85);
     text-decoration: none;

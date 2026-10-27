@@ -35,10 +35,10 @@
 </script>
 
 <svelte:head>
-  <title>{pageTitle("Doublons comptes HAL")}</title>
+  <title>{pageTitle("Comptes auteur HAL en double")}</title>
 </svelte:head>
 
-<h1>Doublons d'auteurs HAL</h1>
+<h1>Comptes auteur HAL en double</h1>
 
 <div class="info-box">Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.</div>
 

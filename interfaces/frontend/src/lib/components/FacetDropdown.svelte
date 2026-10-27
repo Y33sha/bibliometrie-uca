@@ -136,7 +136,7 @@
 				<input
 					type="text"
 					class="facet-search"
-					placeholder="Filtrer..."
+					placeholder="Filtrer"
 					bind:value={filterText}
 				/>
 			{/if}

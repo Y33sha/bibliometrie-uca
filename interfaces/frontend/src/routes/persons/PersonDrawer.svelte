@@ -248,7 +248,7 @@
         <Picker
           floating
           minLength={2}
-          placeholder="Nom à absorber…"
+          placeholder="Nom à absorber"
           search={mergeSearch.query}
           onsearch={mergeSearch.setQuery}
           loading={mergeSearch.loading}

@@ -4,6 +4,7 @@
 	import { page } from '$app/state';
 	import { withBase } from '#lib/paths.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import { filterLabels } from '#lib/labels.js';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import ThesesTable from '#lib/components/ThesesTable.svelte';
@@ -178,7 +179,7 @@
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input
 		type="search"
-		placeholder="Rechercher par titre ou sujet..."
+		placeholder="Rechercher par titre ou sujet"
 		bind:value={search}
 		oninput={onSearchInput}
 		onkeydown={(e: KeyboardEvent) => {
@@ -192,14 +193,14 @@
 			}
 		}}
 	/>
-	<FacetDropdown label="Année" options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
+	<FacetDropdown label={filterLabels.years} options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
 	{#if !hasFixedLab}
-		<FacetDropdown label="Laboratoire" options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
+		<FacetDropdown label={filterLabels.labs} options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
 	{/if}
-	<FacetDropdown label="Statut" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
-	<FacetDropdown label="Accès" options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
+	<FacetDropdown label="Statuts" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
+	<FacetDropdown label={filterLabels.access} options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
 	<PresenceFilterToggle
-		label="Sources"
+		label={filterLabels.sources}
 		items={[
 			{ key: 'hal', label: 'HAL' },
 			{ key: 'oa', label: 'OpenAlex' },

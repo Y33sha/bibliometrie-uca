@@ -278,10 +278,10 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle('Personnes')}</title>
+	<title>{pageTitle('Chercheurs')}</title>
 </svelte:head>
 
-<h1 class="visually-hidden">Personnes</h1>
+<h1 class="visually-hidden">Chercheurs</h1>
 
 {#if isAdmin()}
 	<HubTabs

@@ -68,7 +68,7 @@
         bind:element={relationPickerEl}
         onpick={(rs) => onpickStructure(rs.id)}
         onclose={onclosePicker}
-        placeholder="Rechercher une structure…"
+        placeholder="Rechercher une structure"
       >
         {#snippet item(rs)}
           <span class="structure-type structure-type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>

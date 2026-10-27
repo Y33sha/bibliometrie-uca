@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -193,7 +194,7 @@
 	/>
 	{#if !publisherFixed}
 		<EntityFilter
-			label="Éditeur"
+			label={filterLabels.publisher}
 			endpoint="/api/serials/facets"
 			kind="publisher"
 			buildParams={buildFilterParams}
@@ -202,7 +203,7 @@
 		/>
 	{/if}
 	<FacetDropdown
-		label="Types"
+		label={filterLabels.types}
 		options={facets.options.serialTypes}
 		bind:selected={selectedSerialTypes}
 		onchange={onFilterChange}
@@ -235,17 +236,17 @@
 	<thead>
 		<tr>
 			<th class="sortable" onclick={() => setSort('title')}>
-				Titre <SortChevron direction={sortDirection(currentSort, 'title')} />
+				{columnLabels.title} <SortChevron direction={sortDirection(currentSort, 'title')} />
 			</th>
 			<th>ISSN</th>
 			{#if !publisherFixed}
 				<th class="sortable" onclick={() => setSort('publisher')}>
-					Éditeur <SortChevron direction={sortDirection(currentSort, 'publisher')} />
+					{columnLabels.publisher} <SortChevron direction={sortDirection(currentSort, 'publisher')} />
 				</th>
 			{/if}
-			<th>Type</th>
+			<th>{columnLabels.type}</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis <SortChevron direction={sortDirection(currentSort, 'publications')} />
+				{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

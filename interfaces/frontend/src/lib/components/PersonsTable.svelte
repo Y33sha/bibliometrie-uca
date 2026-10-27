@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import { columnLabels } from '#lib/labels.js';
 	import RhCheck from '#lib/components/RhCheck.svelte';
 	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
@@ -38,7 +39,7 @@
 
 	// Colonnes numériques triables, placées après les colonnes descriptives.
 	const countColumns = $derived([
-		{ label: 'Publications', sortKey: 'contributions', value: (p: PersonRow) => p.contribution_count },
+		{ label: columnLabels.publications, sortKey: 'contributions', value: (p: PersonRow) => p.contribution_count },
 		...(perimeterCount
 			? [
 					{

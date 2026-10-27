@@ -60,10 +60,10 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle("Doublons publis HAL")}</title>
+	<title>{pageTitle("Dépôts HAL en double")}</title>
 </svelte:head>
 
-<h1>Doublons de publications HAL</h1>
+<h1>Dépôts HAL en double</h1>
 
 <div class="info-box">
 	{#if activeTab === 'doi'}

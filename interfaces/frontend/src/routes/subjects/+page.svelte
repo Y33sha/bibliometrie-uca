@@ -58,7 +58,7 @@
   <div class="filters">
     <input
       type="search"
-      placeholder="Rechercher dans les libellés…"
+      placeholder="Rechercher dans les libellés"
       bind:value={search}
       onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
       oninput={onSearchInput}

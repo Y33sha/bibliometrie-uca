@@ -151,7 +151,7 @@ Vue détaillée d'un éditeur. Onglets : Dashboard, Revues, Publications.
 
 Pages dédiées à relever les problèmes de qualité spécifiques à HAL :
 
-- **Comptes en double** : auteurs HAL ayant plusieurs comptes
-- **Publications en double** : documents HAL doublonnés
-- **Manques dans les collections** : affiliations manquantes: publications HAL qui devraient être dans une collection HAL mais n'y sont pas
-- **Conflits d'affiliation** : publications HAL avec une affiliation UCA suspecte, en contradiction avec les autres sources
+- **Comptes auteur en double** : auteurs HAL ayant plusieurs comptes
+- **Dépôts en double** : dépôts HAL d'une même publication
+- **Publications absentes des collections** : publications HAL absentes de la collection HAL de leur laboratoire
+- **Affiliations divergentes** : publications affiliées à l'établissement dans HAL, sans cette affiliation dans les autres sources

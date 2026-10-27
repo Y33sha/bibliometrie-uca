@@ -37,10 +37,10 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle("Conflits d'affiliations HAL")}</title>
+	<title>{pageTitle("Affiliations HAL divergentes")}</title>
 </svelte:head>
 
-<h1>Conflits d'affiliations HAL</h1>
+<h1>Affiliations HAL divergentes</h1>
 
 <div class="info-box">
 	Publications affiliées à {institution.name} dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature {institution.name} à la même position d'auteur.

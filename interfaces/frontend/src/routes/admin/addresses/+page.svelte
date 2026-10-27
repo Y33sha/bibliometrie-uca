@@ -483,7 +483,7 @@
 				<input
 					type="search"
 					class="pred-text"
-					placeholder="texte recherché…"
+					placeholder="texte recherché"
 					autocomplete="off"
 					value={tp.term}
 					bind:this={textPredicateInputs[i]}

@@ -183,7 +183,7 @@
 			{:else}
 				<div class="dash-grid">
 					<div class="dash-card dash-card-wide">
-						<h3>Sujets dominants</h3>
+						<h3>Sujets principaux</h3>
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}

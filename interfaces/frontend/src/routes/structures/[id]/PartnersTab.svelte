@@ -3,6 +3,7 @@
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
@@ -51,9 +52,9 @@
 </script>
 
 <div class="toolbar toolbar-card toolbar-sticky">
-	<FacetDropdown label="Années" allLabel="Toutes" options={facetOptions(partners.data?.years)} searchable bind:selected={selectedYears} onchange={onFilterChange} />
-	<FacetDropdown label="Pays" options={facetOptions(partners.data?.countries)} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
-	<FacetDropdown label="Types" options={facetOptions(partners.data?.types)} bind:selected={selectedTypes} onchange={onFilterChange} />
+	<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facetOptions(partners.data?.years)} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+	<FacetDropdown label={filterLabels.countries} options={facetOptions(partners.data?.countries)} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
+	<FacetDropdown label={filterLabels.types} options={facetOptions(partners.data?.types)} bind:selected={selectedTypes} onchange={onFilterChange} />
 	<ResultCount list={partners} one="organisation partenaire" many="organisations partenaires" />
 </div>
 
@@ -62,8 +63,8 @@
 		<thead>
 			<tr>
 				<th>Organisation</th>
-				<th>Pays</th>
-				<th>Type</th>
+				<th>{columnLabels.country}</th>
+				<th>{columnLabels.type}</th>
 				<th class="num">Copublications</th>
 			</tr>
 		</thead>

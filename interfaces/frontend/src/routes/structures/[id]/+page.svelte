@@ -69,7 +69,7 @@
 
 	const collabSegments = $derived([
 		{ label: 'International', value: dashCollab.international, color: cssVar('accent-mid') },
-		{ label: 'Domestique', value: dashCollab.domestic, color: cssVar('border') }
+		{ label: 'National', value: dashCollab.domestic, color: cssVar('border') }
 	]);
 
 	const tutelles = $derived(parents);
