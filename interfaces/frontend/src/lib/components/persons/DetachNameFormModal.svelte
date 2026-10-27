@@ -3,6 +3,7 @@
   import Modal from "#lib/components/Modal.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import { sourceLabel } from "#lib/sources.svelte.js";
+  import { titleText } from "#lib/utils.js";
   import type { DetachModalState } from "./types";
 
   let {
@@ -71,7 +72,7 @@
         <div class="detach-list">
           {#each state.publications as p, i}
             <div class="detach-item">
-              <input type="checkbox" aria-label="Détacher : {p.title}" bind:checked={state.publications[i].checked} />
+              <input type="checkbox" aria-label="Détacher : {titleText(p.title)}" bind:checked={state.publications[i].checked} />
               <span class="detach-year">{p.publication_year ?? "?"}</span>
               <a
                 class="detach-title"
