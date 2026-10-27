@@ -225,53 +225,55 @@
 	{/if}
 </div>
 
-<table class="data-table addr-table">
-	<thead>
-		<tr>
-			<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
-			<th style="width:55%">{columnLabels.address}</th>
-			<th style="width:110px">{columnLabels.publications}</th>
-			<th>{columnLabels.country}</th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each addresses as a (a.id)}
+<div class="table-scroll">
+	<table class="data-table addr-table">
+		<thead>
 			<tr>
-				<td><input type="checkbox" aria-label="Sélectionner l'adresse" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
-				<td class="addr-cell">{a.raw_text}</td>
-				<td class="num-cell">{a.publication_count}</td>
-				<td>
-					<div class="country-cell">
-					{#each a.countries ?? [] as c}
-						{@const found = a.found_countries.find(f => f.country_code === c)}
-						<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
-							{countryLabel(c)}
-							<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
-						</span>
-					{/each}
-					<span class="country-actions">
-						{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
-							<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
-								{countryLabel(p.country_code)} ?
-								<span class="proposal-methods">{methodsLabel(p.methods)}</span>
-							</button>
-						{/each}
-						<select class="select add-country" aria-label="Ajouter un pays" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
-							<option value="">+ Pays</option>
-							{#each countries as c}
-								<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
-							{/each}
-						</select>
-					</span>
-					</div>
-				</td>
+				<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
+				<th style="width:55%">{columnLabels.address}</th>
+				<th style="width:110px">{columnLabels.publications}</th>
+				<th>{columnLabels.country}</th>
 			</tr>
-		{/each}
-		{#if addresses.length === 0}
-			<TableStatusRow loading={list.loading} error={list.error} colspan={4} emptyText="Aucune adresse trouvée." />
-		{/if}
-	</tbody>
-</table>
+		</thead>
+		<tbody>
+			{#each addresses as a (a.id)}
+				<tr>
+					<td><input type="checkbox" aria-label="Sélectionner l'adresse" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
+					<td class="addr-cell">{a.raw_text}</td>
+					<td class="num-cell">{a.publication_count}</td>
+					<td>
+						<div class="country-cell">
+						{#each a.countries ?? [] as c}
+							{@const found = a.found_countries.find(f => f.country_code === c)}
+							<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+								{countryLabel(c)}
+								<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
+							</span>
+						{/each}
+						<span class="country-actions">
+							{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
+								<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+									{countryLabel(p.country_code)} ?
+									<span class="proposal-methods">{methodsLabel(p.methods)}</span>
+								</button>
+							{/each}
+							<select class="select add-country" aria-label="Ajouter un pays" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
+								<option value="">+ Pays</option>
+								{#each countries as c}
+									<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
+								{/each}
+							</select>
+						</span>
+						</div>
+					</td>
+				</tr>
+			{/each}
+			{#if addresses.length === 0}
+				<TableStatusRow loading={list.loading} error={list.error} colspan={4} emptyText="Aucune adresse trouvée." />
+			{/if}
+		</tbody>
+	</table>
+</div>
 
 <Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 
@@ -291,7 +293,7 @@
 	}
 	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
-	.addr-table { table-layout: fixed; }
+	.addr-table { table-layout: fixed; min-width: 640px; }
 	.addr-table td { font-size: 0.9rem; vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }

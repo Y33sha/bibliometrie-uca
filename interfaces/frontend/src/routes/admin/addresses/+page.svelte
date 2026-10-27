@@ -662,9 +662,10 @@
 	}
 	.stats-bar {
 		display: flex;
+		flex-wrap: wrap;
 		gap: 8px;
 		font-size: 0.85rem;
-		flex: 1;
+		flex: 1 1 auto;
 	}
 	.feedback-btn {
 		margin-left: auto;
@@ -674,6 +675,7 @@
 		padding: 3px 10px;
 		border-radius: var(--radius-pill);
 		font-weight: 500;
+		white-space: nowrap;
 	}
 	.stat-total {
 		background: var(--surface);

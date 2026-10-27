@@ -179,7 +179,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 9. Responsivité
 
-- [ ] Aucun défilement horizontal de la page : `/structures`, `/subjects`, `/subjects/[id]`, Configuration, Pipeline, Affiliations, Pays, Contributions orphelines
+- [x] Aucun défilement horizontal de la page : `/structures`, `/subjects`, `/subjects/[id]`, Configuration, Pipeline, Affiliations, Pays, Contributions orphelines
 - [ ] Indice de défilement au bord des tableaux et des onglets
 - [ ] Barre d'outils des publications, séparateurs de la page Statistiques
 - [ ] Fil d'Ariane et ligne revue / éditeur de la fiche publication

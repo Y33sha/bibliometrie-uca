@@ -111,42 +111,44 @@
           {/key}
 
           <h2 class="section-title">Sujets associés</h2>
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Sujet</th>
-                <th class="num sortable" class:active={neighborSort === "common"} onclick={() => (neighborSort = "common")}>
-                  En commun <SortChevron direction={neighborSort === "common" ? "desc" : null} />
-                </th>
-                <th
-                  class="num sortable"
-                  class:active={neighborSort === "specificity"}
-                  onclick={() => (neighborSort = "specificity")}
-                  title="Part des publications du sujet associé qui portent aussi « {data.subject.label} »"
-                >
-                  Spécificité <SortChevron direction={neighborSort === "specificity" ? "desc" : null} />
-                </th>
-                <th class="num sortable" class:active={neighborSort === "total"} onclick={() => (neighborSort = "total")}>
-                  Total <SortChevron direction={neighborSort === "total" ? "desc" : null} />
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {#each sortedNeighbors as n (n.id)}
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
                 <tr>
-                  <td><a class="entity-link" href={resolve(`subjects/${n.id}`)}>{n.label}</a></td>
-                  <td class="num">{n.cooccurrence_count.toLocaleString("fr-FR")}</td>
-                  <td class="num">
-                    <span class="spec-cell">
-                      <span class="spec-bar" style="width: {(specificity(n) / maxSpecificity) * 60}px"></span>
-                      {(specificity(n) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
-                    </span>
-                  </td>
-                  <td class="num muted-num">{n.usage_count.toLocaleString("fr-FR")}</td>
+                  <th>Sujet</th>
+                  <th class="num sortable" class:active={neighborSort === "common"} onclick={() => (neighborSort = "common")}>
+                    En commun <SortChevron direction={neighborSort === "common" ? "desc" : null} />
+                  </th>
+                  <th
+                    class="num sortable"
+                    class:active={neighborSort === "specificity"}
+                    onclick={() => (neighborSort = "specificity")}
+                    title="Part des publications du sujet associé qui portent aussi « {data.subject.label} »"
+                  >
+                    Spécificité <SortChevron direction={neighborSort === "specificity" ? "desc" : null} />
+                  </th>
+                  <th class="num sortable" class:active={neighborSort === "total"} onclick={() => (neighborSort = "total")}>
+                    Total <SortChevron direction={neighborSort === "total" ? "desc" : null} />
+                  </th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {#each sortedNeighbors as n (n.id)}
+                  <tr>
+                    <td><a class="entity-link" href={resolve(`subjects/${n.id}`)}>{n.label}</a></td>
+                    <td class="num">{n.cooccurrence_count.toLocaleString("fr-FR")}</td>
+                    <td class="num">
+                      <span class="spec-cell">
+                        <span class="spec-bar" style="width: {(specificity(n) / maxSpecificity) * 60}px"></span>
+                        {(specificity(n) * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 })} %
+                      </span>
+                    </td>
+                    <td class="num muted-num">{n.usage_count.toLocaleString("fr-FR")}</td>
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
         {/if}
       </div>
     {:else}

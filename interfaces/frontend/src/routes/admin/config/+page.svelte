@@ -319,37 +319,39 @@
 
 <h3 class="subsection-title">Définition des périmètres</h3>
 <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<table class="data-table perimeters-table">
-  <thead>
-    <tr>
-      <th>Code</th>
-      <th>Nom</th>
-      <th class="perim-structs">Structures racines</th>
-      <th class="num">Total</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each perimeters as perim (perim.id)}
+<div class="table-scroll">
+  <table class="data-table perimeters-table">
+    <thead>
       <tr>
-        <td class="perim-code">{perim.code}</td>
-        <td class="perim-name">{perim.name}</td>
-        <td class="perim-structs">
-          <div class="perimeter-rules">
-            {#each perim.structures as struct (struct.id)}
-              <span class="tag">{structureLabel(struct)}</span>
-            {/each}
-          </div>
-        </td>
-        <td class="num">{perim.structure_count}</td>
-        <td class="perim-actions">
-          <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
-          <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
-        </td>
+        <th>Code</th>
+        <th>Nom</th>
+        <th class="perim-structs">Structures racines</th>
+        <th class="num">Total</th>
+        <th></th>
       </tr>
-    {/each}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {#each perimeters as perim (perim.id)}
+        <tr>
+          <td class="perim-code">{perim.code}</td>
+          <td class="perim-name">{perim.name}</td>
+          <td class="perim-structs">
+            <div class="perimeter-rules">
+              {#each perim.structures as struct (struct.id)}
+                <span class="tag">{structureLabel(struct)}</span>
+              {/each}
+            </div>
+          </td>
+          <td class="num">{perim.structure_count}</td>
+          <td class="perim-actions">
+            <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
+            <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</div>
 <div class="perim-new">
   <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 </div>

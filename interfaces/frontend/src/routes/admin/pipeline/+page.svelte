@@ -102,6 +102,16 @@
   .col-detail {
     min-width: 0;
   }
+  /* Écran étroit : la liste des runs passe au-dessus du détail, avec une hauteur bornée. */
+  @media (max-width: 820px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .col-list {
+      position: static;
+      max-height: 40vh;
+    }
+  }
   .empty {
     color: var(--muted);
     font-size: 0.9rem;

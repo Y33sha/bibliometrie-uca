@@ -270,73 +270,75 @@
 {/if}
 
 <ListStatus {list} emptyText="Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.">
-	<table class="data-table">
-		<thead>
-			<tr>
-				<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
-				<th>{columnLabels.sources}</th>
-				<th>Nom</th>
-				<th>Publication</th>
-				<th>{columnLabels.labs}</th>
-				<th>Action</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each orphans as o, i (o.contribution_id)}
+	<div class="table-scroll">
+		<table class="data-table">
+			<thead>
 				<tr>
-					<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
-					<td class="links-cell">
-						{#each o.sources as source (source)}
-							<SourceTag {source} />
-						{/each}
-					</td>
-					<td>{o.full_name}</td>
-					<td>
-						<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
-							{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
-						</a>
-					</td>
-					<td>
-						{#each o.labs as lab (lab.id)}
-							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
-						{/each}
-					</td>
-					<td>
-						{#if activeAssignIdx === i}
-							<div class="assign-panel">
-								<div class="assign-row">
-									<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
-											use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
-										oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
-									<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
-								</div>
-								{#if assignSearch.loading}
-									<span class="loading-text">…</span>
-								{:else if assignSearch.results.length}
-									<div class="assign-results" use:anchored>
-										{#each assignSearch.results as r (r.id)}
-											<button class="result-btn" onclick={() => assign(o, r.id)}>
-												<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
-												{#if r.has_rh}<RhCheck />{/if}
-												<span class="result-hint">{r.department_name || `#${r.id}`}</span>
-											</button>
-										{/each}
-									</div>
-								{:else if assignSearch.query.length >= 2}
-									<div class="assign-results" use:anchored>
-										<span class="loading-text">Aucun résultat</span>
-										<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
-									</div>
-								{/if}
-							</div>
-						{:else}
-							<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
-						{/if}
-					</td>
+					<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
+					<th>{columnLabels.sources}</th>
+					<th>Nom</th>
+					<th>Publication</th>
+					<th>{columnLabels.labs}</th>
+					<th>Action</th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				{#each orphans as o, i (o.contribution_id)}
+					<tr>
+						<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
+						<td class="links-cell">
+							{#each o.sources as source (source)}
+								<SourceTag {source} />
+							{/each}
+						</td>
+						<td>{o.full_name}</td>
+						<td>
+							<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
+								{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
+							</a>
+						</td>
+						<td>
+							{#each o.labs as lab (lab.id)}
+								<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+							{/each}
+						</td>
+						<td>
+							{#if activeAssignIdx === i}
+								<div class="assign-panel">
+									<div class="assign-row">
+										<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
+												use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
+											oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
+										<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+									</div>
+									{#if assignSearch.loading}
+										<span class="loading-text">…</span>
+									{:else if assignSearch.results.length}
+										<div class="assign-results" use:anchored>
+											{#each assignSearch.results as r (r.id)}
+												<button class="result-btn" onclick={() => assign(o, r.id)}>
+													<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
+													{#if r.has_rh}<RhCheck />{/if}
+													<span class="result-hint">{r.department_name || `#${r.id}`}</span>
+												</button>
+											{/each}
+										</div>
+									{:else if assignSearch.query.length >= 2}
+										<div class="assign-results" use:anchored>
+											<span class="loading-text">Aucun résultat</span>
+											<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
+										</div>
+									{/if}
+								</div>
+							{:else}
+								<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
