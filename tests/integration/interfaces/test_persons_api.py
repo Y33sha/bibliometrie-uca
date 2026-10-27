@@ -599,6 +599,21 @@ class TestMarkPersonsDistinct:
         )
         assert r.status_code == 422
 
+    def test_lists_then_unmarks_pair(self, auth_client):
+        a = seed_person("DistinctListA", "Ec")
+        b = seed_person("DistinctListB", "Ec")
+        auth_client.post("/api/persons/mark-distinct", json={"person_id_a": a, "person_id_b": b})
+        r = auth_client.get(f"/api/persons/{b}/distinct-persons")
+        assert [p["person_id"] for p in r.json()] == [a]
+
+        r = auth_client.delete(f"/api/persons/{b}/distinct-persons/{a}")
+        assert r.status_code == 200
+        assert auth_client.get(f"/api/persons/{a}/distinct-persons").json() == []
+
+    def test_unmark_requires_admin(self, client):
+        r = client.delete("/api/persons/1/distinct-persons/2")
+        assert r.status_code == 401
+
 
 # ── Traçabilité des écritures sur les personnes ──────────────
 

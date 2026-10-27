@@ -909,6 +909,15 @@ class TestMarkDistinctPersons:
         ).scalar_one()
         assert n == 1
 
+    def test_unmark_removes_the_pair_in_either_order(self, sa_sync_conn, service):
+        p1 = _person(sa_sync_conn, last_name="A", first_name="A")
+        p2 = _person(sa_sync_conn, last_name="B", first_name="B")
+        service.mark_distinct(p1, p2)
+        service.unmark_distinct(p2, p1)
+        service.unmark_distinct(p2, p1)
+        n = sa_sync_conn.execute(text("SELECT COUNT(*) FROM distinct_persons")).scalar_one()
+        assert n == 0
+
     def test_idempotent(self, sa_sync_conn, service):
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")

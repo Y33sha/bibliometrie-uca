@@ -204,6 +204,13 @@
 		await refreshAfterChange();
 	}
 
+	/* ── Personnes distinctes ── */
+
+	async function unmarkDistinct(otherId: number) {
+		await personsApi.unmarkDistinct(personId, otherId);
+		await refreshAfterChange();
+	}
+
 	async function mergeFromModal(sourceId: number) {
 		if (!detachModal) return;
 		if (!(await confirmMerge(sourceId))) return;
@@ -231,6 +238,7 @@
 		onmergeClose={closeMergeSearch}
 		onmerge={mergeInto}
 		onabsorb={absorbPerson}
+		onunmarkDistinct={unmarkDistinct}
 		{onopenPerson}
 	/>
 {/if}

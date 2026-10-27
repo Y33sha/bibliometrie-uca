@@ -43,6 +43,9 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/persons/{person_id}/detach-contributions"): "contribution.rejected",
     ("POST", "/api/persons/{person_id}/identifiers"): "person_identifier.added",
     ("POST", "/api/persons/{person_id}/merge"): "person.merged",
+    ("DELETE", "/api/persons/{person_id}/distinct-persons/{other_id}"): (
+        "person.unmarked_distinct"
+    ),
     ("PATCH", "/api/persons/{person_id}/name"): "person.name_updated",
     ("PATCH", "/api/persons/{person_id}/name-forms/status"): "person_name_form.status_changed",
     ("PATCH", "/api/persons/{person_id}/exclusion"): "person.exclusion",

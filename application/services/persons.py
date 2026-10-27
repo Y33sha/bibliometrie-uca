@@ -233,6 +233,17 @@ class PersonService:
                 {"other_id": inserted[1]},
             )
 
+    def unmark_distinct(self, person_id_a: int, person_id_b: int) -> None:
+        """Annule la décision qui déclare deux personnes distinctes. Idempotent : l'événement d'audit est émis seulement si la paire existait."""
+        removed = self._persons.unmark_distinct(person_id_a, person_id_b)
+        if removed:
+            emit_event(
+                "person.unmarked_distinct",
+                "person",
+                removed[0],
+                {"other_id": removed[1]},
+            )
+
     def merge_person(self, target_id: int, source_id: int) -> tuple[int, int]:
         """Fusionne les personnes `target_id` et `source_id`, et retourne (id conservé, id absorbé).
 

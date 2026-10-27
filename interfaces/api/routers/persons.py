@@ -14,6 +14,7 @@ from domain.persons.identifier_attribution import AttributionOutcome
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models.persons.models import (
     AmbiguousNameFormsResponse,
+    DistinctPersonOut,
     IdentifierConflictsResponse,
     NameDuplicatesResponse,
     NameFormContributionsResponse,
@@ -323,6 +324,15 @@ def persons_sharing_name_form(
     return queries.persons_sharing_name_form(person_id)
 
 
+@router.get("/{person_id}/distinct-persons", response_model=list[DistinctPersonOut])
+def distinct_persons(
+    person_id: int,
+    queries: PersonsQueries = Depends(persons_queries),
+) -> list[DistinctPersonOut]:
+    """Personnes déclarées distinctes de celle-ci."""
+    return queries.distinct_persons(person_id)
+
+
 @router.get("/{person_id}/name-forms", response_model=list[NameFormSummaryOut])
 def person_name_forms(
     person_id: int,
@@ -370,7 +380,7 @@ def add_person_identifier(
     )
 
 
-# ── Une personne : exclusion, renommage, fusion, détachement ─────
+# ── Une personne : exclusion, renommage, fusion, distinction, détachement ─
 
 
 @router.patch("/{person_id}/exclusion", response_model=OkResponse)
@@ -413,6 +423,17 @@ def merge_persons(
     """
     target_id, source_id = persons.merge_person(person_id, body.source_id)
     return MergeResponse(merged=True, source_id=source_id, target_id=target_id)
+
+
+@router.delete("/{person_id}/distinct-persons/{other_id}", response_model=OkResponse)
+def unmark_persons_distinct(
+    person_id: int,
+    other_id: int,
+    persons: PersonService = Depends(person_service),
+) -> OkResponse:
+    """Annule la décision qui déclare les deux personnes distinctes : les files de triage peuvent de nouveau présenter la paire."""
+    persons.unmark_distinct(person_id, other_id)
+    return OkResponse()
 
 
 @router.post("/{person_id}/detach-contributions", response_model=DetachContributionsResponse)

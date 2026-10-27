@@ -42,4 +42,4 @@ Deux tables contiennent les décisions de l'administration sur le rattachement d
 - **Renommage.** Les formes de nom de la personne sont régénérées.
 - **Statut d'un identifiant ou d'une forme de nom.** Un rejet renvoie en redécision les contributions que l'identifiant ou la forme rattachait.
 - **Détachement.** La personne est écartée des publications choisies (`rejected_contributions`).
-- **Déclaration de deux personnes distinctes.** La paire sort des files de doublons.
+- **Déclaration de deux personnes distinctes.** La paire sort des files de doublons. La section « Distinct de » du volet de la personne annule la déclaration.

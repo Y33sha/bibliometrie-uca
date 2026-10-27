@@ -86,6 +86,9 @@ class PgPersonRepository(PersonRepository):
     def mark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
         return _core.mark_distinct(self._conn, person_id_a, person_id_b)
 
+    def unmark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
+        return _core.unmark_distinct(self._conn, person_id_a, person_id_b)
+
     # ── person_identifiers ─────────────────────────────────────────
 
     def find_identifier(self, id_type: str, id_value: str) -> "IdentifierAttribution | None":

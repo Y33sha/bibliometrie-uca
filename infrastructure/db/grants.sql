@@ -114,7 +114,12 @@ GRANT INSERT ON
 TO bibliometrie_app;
 
 GRANT INSERT, UPDATE ON
-    persons.distinct_persons, public.merge_redirects, publications.publications_detail
+    public.merge_redirects, publications.publications_detail
+TO bibliometrie_app;
+
+-- Une décision « personnes distinctes » s'annule depuis le volet de la personne.
+GRANT INSERT, UPDATE, DELETE ON
+    persons.distinct_persons
 TO bibliometrie_app;
 
 GRANT UPDATE ON

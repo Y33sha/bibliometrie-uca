@@ -133,3 +133,17 @@ def mark_distinct(conn: Connection, person_id_a: int, person_id_b: int) -> tuple
     if not row:
         return None
     return row.person_id_a, row.person_id_b
+
+
+def unmark_distinct(conn: Connection, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
+    row = conn.execute(
+        text("""
+            DELETE FROM distinct_persons
+            WHERE person_id_a = LEAST(:a, :b) AND person_id_b = GREATEST(:a, :b)
+            RETURNING person_id_a, person_id_b
+        """),
+        {"a": person_id_a, "b": person_id_b},
+    ).first()
+    if not row:
+        return None
+    return row.person_id_a, row.person_id_b
