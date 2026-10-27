@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { readableOn } from '#lib/components/charts/contrast.js';
 	import type { LegendItem } from 'chart.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
@@ -85,7 +86,7 @@
 						}
 					},
 					datalabels: {
-						color: '#fff',
+						color: (ctx: any) => readableOn(colors[ctx.dataIndex], cssVar('text')),
 						font: { weight: 'bold', size: 13 },
 						formatter: (value: number, ctx: any) => {
 							const total = ctx.dataset.data.reduce((a: number, b: number) => a + b, 0);
