@@ -13,8 +13,13 @@
   import PersonsBlock from "./PersonsBlock.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
   import SectionLabel from "./SectionLabel.svelte";
+  import PublicationDrawer from "#lib/components/publications/PublicationDrawer.svelte";
+  import { useDrawerParam } from "#lib/composables/useDrawerParam.svelte.js";
+  import { isAdmin } from "#lib/session.svelte.js";
 
   const publicationId = $derived(page.params.id);
+  // Volet de la publication, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL.
+  const drawer = useDrawerParam("publication", isAdmin);
   let data = $state<PubResponse | null>(null);
   let error = $state(false);
 
@@ -83,7 +88,11 @@
 {:else}
   <div class="detail-layout">
     <div class="detail-main">
-      <PublicationHeader {pub} relations={data!.relations} />
+      <PublicationHeader
+        {pub}
+        relations={data!.relations}
+        onopenDrawer={isAdmin() ? () => drawer.open(pub.id) : undefined}
+      />
 
       {#if thesesAuth.length || thesisMeta}
         <ThesisBlock
@@ -127,6 +136,10 @@
       externalIds={data!.external_identifiers}
     />
   </div>
+{/if}
+
+{#if drawer.id !== null}
+  <PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} />
 {/if}
 
 <style>

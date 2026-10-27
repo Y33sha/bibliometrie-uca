@@ -18,6 +18,11 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PartnersTab from './PartnersTab.svelte';
+	import StructureDrawer from '../StructureDrawer.svelte';
+	import TitleRow from '#lib/components/TitleRow.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import { isAdmin } from '#lib/session.svelte.js';
 
 	const labId = $derived(page.params.id);
@@ -27,6 +32,9 @@
 	type RelatedStructure = components['schemas']['RelatedStructureOut'];
 	type LabProfile = components['schemas']['StructureDetailResponse'];
 	type LabAddress = components['schemas']['StructureAddressOut'];
+
+	// Volet d'édition de la structure, en session admin : ouvert tant que `?structure=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('structure', isAdmin);
 
 	// --- State ---
 	let lab: Structure | null = $state(null);
@@ -142,12 +150,14 @@
 {:else}
 	<!-- Header -->
 	<div class="entity-header">
-		<h1 class="entity-title">
-			{lab.name}
-			{#if lab.acronym}
-				<span class="entity-acronym">{lab.acronym}</span>
-			{/if}
-		</h1>
+		<TitleRow onopen={isAdmin() ? () => drawer.open(lab!.id) : undefined}>
+			<h1 class="entity-title">
+				{lab.name}
+				{#if lab.acronym}
+					<span class="entity-acronym">{lab.acronym}</span>
+				{/if}
+			</h1>
+		</TitleRow>
 		<div class="entity-meta">
 			{#if lab.ror_id}
 				<EntityMetaItem label="ROR">
@@ -287,6 +297,16 @@
 		</div>
 	{/if}
 
+{/if}
+
+{#if drawer.id !== null}
+	<StructureDrawer
+		id={drawer.id}
+		onclose={() => drawer.open(null)}
+		onchange={loadProfile}
+		onopenStructure={drawer.open}
+		ondeleted={() => goto(resolve('structures'))}
+	/>
 {/if}
 
 <style>

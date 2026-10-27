@@ -2,10 +2,20 @@
   import { resolve } from "$app/paths";
   import DocTypePill from "#lib/components/DocTypePill.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import TitleRow from "#lib/components/TitleRow.svelte";
   import { relationTypeLabel, relationTier, relationTierRank } from "#lib/labels.js";
   import type { PubDetail, RelatedPublication } from "./types";
 
-  const { pub, relations = [] }: { pub: PubDetail; relations?: RelatedPublication[] } = $props();
+  const {
+    pub,
+    relations = [],
+    onopenDrawer,
+  }: {
+    pub: PubDetail;
+    relations?: RelatedPublication[];
+    /** Ouvre le volet de la publication ; fourni en session admin. */
+    onopenDrawer?: () => void;
+  } = $props();
 
   // Trié par niveau de gravité (rétractation, erratum, rattachement, secondaire) ; l'ordre d'origine est conservé à l'intérieur d'un niveau (le tri JS est stable).
   const sortedRelations = $derived(
@@ -35,7 +45,11 @@
     {#if pub.publication_year}<span class="publication-year">{pub.publication_year}</span>{/if}
     {#if pub.doi}<span class="publication-doi"><span class="doi-label">DOI</span> <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>{/if}
   </div>
-  <h1 class="publication-title-main"><PublicationTitle titre={pub.title} /></h1>
+  <div class="publication-title-row">
+    <TitleRow onopen={onopenDrawer}>
+      <h1 class="publication-title-main"><PublicationTitle titre={pub.title} /></h1>
+    </TitleRow>
+  </div>
 
   {#if pub.monograph_id || pub.journal_title || pub.container_title}
     <div class="publication-journal-line">
@@ -107,8 +121,11 @@
   .publication-header {
     margin-bottom: 28px;
   }
+  .publication-title-row {
+    margin: 12px 0;
+  }
   .publication-title-main {
-    margin: 12px 0 12px;
+    margin: 0;
     font-size: 1.75rem;
     font-weight: 700;
     line-height: 1.25;

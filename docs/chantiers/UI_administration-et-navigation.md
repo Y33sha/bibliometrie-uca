@@ -43,7 +43,8 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Comptes : `users`, `roles`, `user_roles`.** La table `users` liste les utilisateurs autorisés. Les rôles sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
 - **Une page par structure**, sous la route `structures/[id]`. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
 - **Volet d'édition de la structure**, sur le modèle des personnes et des publications : édition, tutelles et formes de nom.
-- **Volet d'édition ouvert par une icône** sur la ligne. Le titre ou le nom mène à la fiche.
+- **Volet d'édition ouvert par une icône** sur la ligne, et sur la fiche à gauche du titre principal. Le titre ou le nom mène à la fiche.
+- **Lectures réservées** : les files de triage et les volets d'édition exigent le rôle admin, en lecture comme en écriture.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
 - **Files de triage en onglets de la liste publique**, affichés selon le rôle. Le bandeau des contributions orphelines suit la même règle.
 - **Restrictions publiques en facettes.** Chaque restriction de la liste publique devient une facette réglée par défaut, que la session admin peut retirer : éditeurs et publications en série sans publication, personnes exclues, inactives ou absentes de la base RH.
@@ -60,6 +61,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - [x] Tables `users`, `roles`, `user_roles` ; premier utilisateur admin déclaré dans les réglages (c74e9350c)
 - [x] Session contenant l'identifiant de l'utilisateur ; garde des écritures qui exige le rôle admin (c74e9350c)
 - [x] `/api/auth/check` rend l'utilisateur et ses rôles (c74e9350c)
+- [ ] Lectures des files de triage et des volets d'édition réservées au rôle admin dans l'API
 
 ### 2. Session et navigation
 
@@ -96,6 +98,10 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - [x] `PersonsListView` : facettes d'administration, colonne du périmètre, icône de volet, onglets de triage, bandeau des contributions orphelines ; suppression de la réécriture de `admin/persons`
 
+#### 3g. Fiches
+
+- [x] Icône de volet à gauche du titre des fiches structure, personne et publication
+
 ### 4. Listes d'entités liées
 
 - [ ] Trancher entre onglets et renvoi vers la liste générale filtrée (voir Questions ouvertes)
@@ -107,5 +113,4 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 ## Questions ouvertes
 
 - **Listes d'entités liées.** Piste : la fiche garde ce qui caractérise l'entité (en-tête, dashboard, graphe des sujets, collaborations, adresses). Les listes liées deviennent des liens vers la liste générale filtrée, filtre visible et supprimable. La liste générale propose les fonctions liées à un contexte quand ce contexte est seul sélectionné : statut HAL pour un seul laboratoire, correspondance, périmètre et exclusion pour une seule personne. La même règle dirait quels filtres la page Statistiques reçoit de la liste ([Statistiques](archived/2026-10-27_METIER_statistiques.md)). Coût : la liste générale affiche l'en-tête de la liste, et l'en-tête de l'entité disparaît ; un bandeau de contexte peut le remplacer.
-- **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
 - **Comptes** : page de gestion des utilisateurs, rôles autres qu'admin.

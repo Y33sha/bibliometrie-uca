@@ -18,6 +18,9 @@
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import { confirmDialog } from '#lib/dialogs.svelte.js';
+	import TitleRow from '#lib/components/TitleRow.svelte';
+	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 
@@ -30,6 +33,9 @@
 	type ThesisSection = components['schemas']['PersonThesesSection'];
 	type ThesisStructInfo = components['schemas']['StructureRef'];
 	type ThesesResponse = components['schemas']['PersonThesesResponse'];
+
+	// Volet de curation de la personne, en session admin : ouvert tant que `?person=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('person', isAdmin);
 
 	// --- State ---
 	let profile = $state<Person | null>(null);
@@ -138,10 +144,12 @@
 {:else}
 	<!-- Profile header -->
 	<div class="entity-header">
-		<h1 class="entity-title">
-			{titleCase(profile.first_name)}
-			<span>{titleCase(profile.last_name)}</span>
-		</h1>
+		<TitleRow onopen={isAdmin() ? () => drawer.open(profile!.id) : undefined}>
+			<h1 class="entity-title">
+				{titleCase(profile.first_name)}
+				<span>{titleCase(profile.last_name)}</span>
+			</h1>
+		</TitleRow>
 		<div class="entity-meta">
 			{#if profile.role_title}
 				<span class="entity-tag">{profile.role_title}</span>
@@ -275,6 +283,15 @@
 			</ListStatus>
 		</div>
 	{/if}
+{/if}
+
+{#if drawer.id !== null}
+	<PersonCurationDrawer
+		personId={drawer.id}
+		onclose={() => drawer.open(null)}
+		onchange={() => personId && loadProfile(personId)}
+		onopenPerson={drawer.open}
+	/>
 {/if}
 
 <style>

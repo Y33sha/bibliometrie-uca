@@ -30,6 +30,7 @@
     onclose,
     onchange,
     onopenStructure,
+    ondeleted,
   }: {
     id: number;
     onclose: () => void;
@@ -37,6 +38,8 @@
     onchange: () => void;
     /** Ouvre le volet d'une autre structure. */
     onopenStructure: (id: number) => void;
+    /** Appelé après la suppression de la structure, à la place de `onchange` et `onclose`. */
+    ondeleted?: () => void;
   } = $props();
 
   /* ── State ── */
@@ -334,6 +337,10 @@
     )
       return;
     await structuresApi.remove(id);
+    if (ondeleted) {
+      ondeleted();
+      return;
+    }
     onchange();
     onclose();
   }
