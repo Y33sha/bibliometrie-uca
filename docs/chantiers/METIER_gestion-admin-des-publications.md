@@ -72,7 +72,7 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 
 - [x] Tables des fusions manuelles, ancrées sur `(source, source_id)` (4523e022c).
 - [x] Jeton de fusion lu par la réconciliation : un bras du voisinage, une clé de confirmation (6d7c53b69).
-- [ ] Réconciliation ciblée sur une liste d'enregistrements sources, hors de la file.
+- [x] Réconciliation ciblée sur une liste d'enregistrements sources, hors de la file (0ef354ac6).
 - [ ] Fusion manuelle exposée par `pipeline/public.py` : jeton, réconciliation ciblée, métadonnées consolidées, réalignement des auteurs de la publication conservée, périmètre et compteurs. Les contributions de la publication absorbée gardent leur rattachement aux personnes.
 - [ ] Volet : doublons potentiels par similarité de titre, champ « Fusionner » (identifiant, DOI ou titre).
 - [ ] Interdiction de fusion, relue par la réconciliation.
