@@ -4,12 +4,12 @@
 
 ### En cours
 
+- [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
 
 ### Non commencé
 
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
-- [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
