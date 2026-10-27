@@ -9,10 +9,8 @@ from pydantic import BaseModel
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models._common import (
-    DashboardOa,
     FacetOption,
     PaginatedResponse,
-    PublicationYearCount,
     StructureRef,
     YesNoCount,
 )
@@ -206,11 +204,6 @@ class PersonAddressOut(BaseModel):
 
 class PersonAddressesResponse(PaginatedResponse):
     addresses: list[PersonAddressOut]
-
-
-class PersonDashboardResponse(BaseModel):
-    publications_by_year: list[PublicationYearCount]
-    oa: DashboardOa
 
 
 # ---------------------------------------------------------------------------

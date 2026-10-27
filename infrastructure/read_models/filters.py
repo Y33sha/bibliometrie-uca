@@ -41,20 +41,6 @@ OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
     for status in OaStatus
 )
 
-# Buckets OA simplifiés pour les donuts dashboard (alias `p`) : open / embargo / closed /
-# unknown + total. `open_access` exclut `embargoed` (compté à part) et les statuts fermés.
-OA_DASHBOARD_COLS_SQL = f"""
-            COUNT(DISTINCT p.id) FILTER (
-                WHERE p.oa_status NOT IN {OA_CLOSED_SQL}
-                  AND p.oa_status != '{OaStatus.EMBARGOED.value}' AND p.oa_status IS NOT NULL
-            ) AS open_access,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{OaStatus.EMBARGOED.value}') AS embargoed,
-            COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{OaStatus.CLOSED.value}') AS closed,
-            COUNT(DISTINCT p.id) FILTER (
-                WHERE p.oa_status = '{OaStatus.UNKNOWN.value}' OR p.oa_status IS NULL
-            ) AS unknown,
-            COUNT(DISTINCT p.id) AS total""".strip()
-
 
 def publication_in_perimeter(alias: str = "p") -> str:
     """Filtre SQL : la publication (table `publications` aliasée `alias`) est dans

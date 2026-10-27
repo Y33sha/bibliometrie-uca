@@ -5,14 +5,10 @@ from typing import Literal
 
 from sqlalchemy import Connection, Row, text
 
-from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
-from domain.dates import today
-from domain.publications.doc_types import DocType
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
-from infrastructure.read_models._common import DashboardOa, FacetOption, PublicationYearCount
+from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import (
-    OA_DASHBOARD_COLS_SQL,
     OWN_RORS_SQL,
     entity_subjects_sql,
 )
@@ -22,8 +18,6 @@ from infrastructure.read_models.structures.models import (
     RelatedStructureOut,
     StructureAddressesResponse,
     StructureAddressOut,
-    StructureCollaborations,
-    StructureDashboardResponse,
     StructureDeletionImpact,
     StructureDetailResponse,
     StructureFilters,
@@ -34,12 +28,9 @@ from infrastructure.read_models.structures.models import (
     StructurePartnersResponse,
     StructuresFacetsResponse,
     StructureSort,
-    StructureTopCountry,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.sql_fragments import has_author_role
-
-_NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
 
 # Liens publication–ROR des publications de la structure `:structure_id`, hors ses ROR propres (`OWN_RORS_SQL`).
 _PARTNER_LINKS = f"""
@@ -562,94 +553,6 @@ class StructuresQueries:
             types=[
                 PartnerFacetOption(value=r.value, label=_ror_type_label(r.value), count=r.n)
                 for r in types_rows
-            ],
-        )
-
-    def get_structure_dashboard(self, structure_id: int) -> StructureDashboardResponse:
-        """Agrégats d'une structure : publications par année sur sept ans, répartition des statuts d'accès ouvert, part de collaboration internationale et pays les plus fréquents."""
-        current_year = today().year
-
-        publications_year_rows = self._conn.execute(
-            text(f"""
-                SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
-                FROM publications p
-                JOIN contributions a ON a.publication_id = p.id
-                WHERE {AUTHOR_SOURCE_CONTRIBUTION}
-                  AND p.publication_year IS NOT NULL
-                  AND p.publication_year >= :min_year
-                GROUP BY p.publication_year
-                ORDER BY p.publication_year
-            """),
-            {"structure_id": structure_id, "min_year": current_year - 6},
-        ).all()
-
-        oa = self._conn.execute(
-            text(f"""
-                SELECT
-                    {OA_DASHBOARD_COLS_SQL}
-                FROM publications p
-                JOIN contributions a ON a.publication_id = p.id
-                WHERE {AUTHOR_SOURCE_CONTRIBUTION}
-            """),
-            {"structure_id": structure_id},
-        ).one()
-
-        collab = self._conn.execute(
-            text(f"""
-                SELECT
-                    COUNT(DISTINCT p.id) AS total_articles,
-                    COUNT(DISTINCT p.id) FILTER (
-                        WHERE p.countries IS NOT NULL
-                          AND EXISTS (SELECT 1 FROM unnest(p.countries) c
-                                        WHERE c <> ALL(:non_international))
-                    ) AS international
-                FROM publications p
-                JOIN contributions a ON a.publication_id = p.id
-                WHERE {AUTHOR_SOURCE_CONTRIBUTION}
-                  AND p.doc_type = '{DocType.ARTICLE.value}'
-            """),
-            {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
-        ).one()
-
-        # L'`unnest` des pays multiplie chaque publication par ~27 : la dédupliquer avant, plutôt que par auteur de la structure ensuite, garde le tri en mémoire.
-        top_country_rows = self._conn.execute(
-            text(f"""
-                SELECT co.code, co.name, COUNT(*) AS n
-                FROM (
-                    SELECT p.id, unnest(p.countries) AS cc
-                    FROM publications p
-                    WHERE p.doc_type = '{DocType.ARTICLE.value}'
-                      AND {AUTHORED_PUBLICATION}
-                ) sub
-                JOIN countries co ON co.code = sub.cc
-                WHERE sub.cc <> ALL(:non_international)
-                GROUP BY co.code, co.name
-                ORDER BY n DESC
-                LIMIT 5
-            """),
-            {"structure_id": structure_id, "non_international": _NON_INTERNATIONAL},
-        ).all()
-
-        return StructureDashboardResponse(
-            publications_by_year=[
-                PublicationYearCount(year=r.publication_year, count=r.n)
-                for r in publications_year_rows
-            ],
-            oa=DashboardOa(
-                open_access=oa.open_access,
-                embargoed=oa.embargoed,
-                closed=oa.closed,
-                unknown=oa.unknown,
-                total=oa.total,
-            ),
-            collab=StructureCollaborations(
-                total_articles=collab.total_articles,
-                international=collab.international,
-                domestic=collab.total_articles - collab.international,
-            ),
-            top_countries=[
-                StructureTopCountry(code=r.code.strip(), name=r.name, count=r.n)
-                for r in top_country_rows
             ],
         )
 

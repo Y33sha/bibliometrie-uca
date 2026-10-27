@@ -10,7 +10,6 @@ from infrastructure.read_models.structures.models import StructureFilters
 from infrastructure.read_models.structures.queries import StructuresQueries
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import (
-    ensure_country,
     insert_address,
     insert_address_structure,
 )
@@ -189,48 +188,6 @@ class TestGetLaboratoryAddresses:
         res = StructuresQueries(sa_sync_conn).get_structure_addresses(lab, page=1, per_page=50)
         ids = [a.id for a in res.addresses]
         assert addr not in ids
-
-
-class TestGetLaboratoryDashboard:
-    def test_returns_structure_even_when_empty(self, sa_sync_conn):
-        lab = insert_structure(sa_sync_conn, "LAB")
-        res = StructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
-        assert res.publications_by_year == []
-        assert res.oa.total == 0
-        assert res.collab.total_articles == 0
-        assert res.top_countries == []
-
-    def test_aggregates_oa_and_countries(self, sa_sync_conn):
-        ensure_country(sa_sync_conn, "us", "USA")
-        lab = insert_structure(sa_sync_conn, "LAB")
-        pid = insert_person(sa_sync_conn)
-        publication_id = insert_publication(
-            sa_sync_conn, "X", oa_status="gold", countries=["fr", "us"]
-        )
-        aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
-        add_contribution_structure(sa_sync_conn, aid, lab)
-
-        res = StructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
-        assert res.oa.open_access == 1
-        assert res.collab.international == 1
-        assert any(c.code == "us" for c in res.top_countries)
-
-    def test_excludes_non_applicable_country(self, sa_sync_conn):
-        """`xx` (Non applicable) ne doit ni gonfler le compte international
-        ni apparaître dans le top pays."""
-        lab = insert_structure(sa_sync_conn, "LAB")
-        pid = insert_person(sa_sync_conn)
-        publication_id = insert_publication(
-            sa_sync_conn, "Y", oa_status="closed", countries=["fr", "xx"]
-        )
-        aid = _lab_author(sa_sync_conn, publication_id, person_id=pid)
-        add_contribution_structure(sa_sync_conn, aid, lab)
-
-        res = StructuresQueries(sa_sync_conn).get_structure_dashboard(lab)
-        assert res.collab.total_articles == 1
-        assert res.collab.international == 0
-        assert res.collab.domestic == 1
-        assert not any(c.code == "xx" for c in res.top_countries)
 
 
 class TestGetLaboratorySubjects:

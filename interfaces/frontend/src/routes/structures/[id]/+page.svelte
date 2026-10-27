@@ -6,13 +6,8 @@
 	import { api } from '#lib/api/index.js';
 	import { rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import OaBar from '#lib/components/charts/OaBar.svelte';
-	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
-	import KeyFigures from '#lib/components/KeyFigures.svelte';
+	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectBars from '#lib/components/SubjectBars.svelte';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -58,19 +53,11 @@
 		pageParam: 'apage',
 	});
 
-	// Dashboard tab
+	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les personnes présentes dans le SI RH et les sujets.
 	let dashboardLoaded = $state(false);
-	let dashPubsByYear: { year: number; count: number }[] = $state([]);
-	let dashOa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
-	let dashCollab: { total_articles: number; international: number; domestic: number } = $state({ total_articles: 0, international: 0, domestic: 0 });
-	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
+	let rhPersonsCount = $state(0);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
-
-	const collabSegments = $derived([
-		{ label: 'International', value: dashCollab.international, color: cssVar('accent-mid') },
-		{ label: 'National', value: dashCollab.domestic, color: cssVar('border') }
-	]);
 
 	const tutelles = $derived(parents);
 
@@ -93,21 +80,15 @@
 	}
 
 	async function loadDashboard() {
-		const [data, subjects] = await Promise.all([
-			api<{
-				publications_by_year: { year: number; count: number }[];
-				oa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number };
-				collab: { total_articles: number; international: number; domestic: number };
-				top_countries: { code: string; name: string; count: number }[];
-			}>(`/api/structures/${labId}/dashboard`, { key: 'lab-dashboard' }),
+		// Le décompte des personnes reprend les réglages par défaut de l'onglet Personnes : présentes dans le SI RH, retenues, actives.
+		const persons = new URLSearchParams({ lab_id: String(labId), has_rh: 'true', exclusion: 'none', active: 'true', per_page: '1' });
+		const [personsPage, subjects] = await Promise.all([
+			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-rh-persons' }),
 			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
 				key: 'lab-subjects',
 			}),
 		]);
-		dashPubsByYear = data.publications_by_year;
-		dashOa = data.oa;
-		dashCollab = data.collab;
-		dashTopCountries = data.top_countries;
+		rhPersonsCount = personsPage.total;
 		dashSubjects = subjects;
 		dashboardLoaded = true;
 	}
@@ -220,51 +201,19 @@
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
-			{#if !dashboardLoaded}
-				<div class="loading">Chargement…</div>
-			{:else}
-				<KeyFigures
-					items={[
-						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
-						...(dashOa.total > 0
-							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
-							: []),
-						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses' }] : []),
-					]}
-				/>
-				<div class="dash-grid">
-					<div class="dash-card">
-						<h2>Publications par année</h2>
-						<PublicationsByYearChart data={dashPubsByYear} />
-					</div>
-					<div class="dash-card">
-						<h2>Open access</h2>
-						<OaBar oa={dashOa} />
-					</div>
-					<div class="dash-card">
-						<h2>Collaborations internationales (articles)</h2>
-						<DoughnutChart segments={collabSegments} />
-						{#if dashCollab.total_articles > 0}
-							<div class="dash-summary">
-								{Math.round(dashCollab.international / dashCollab.total_articles * 100)} % international
-								({dashCollab.international.toLocaleString('fr-FR')} / {dashCollab.total_articles.toLocaleString('fr-FR')} articles)
-							</div>
-						{/if}
-					</div>
-					<div class="dash-card">
-						<h2>Top 5 pays partenaires (articles)</h2>
-						<BarChart
-							labels={dashTopCountries.map((c) => c.name)}
-							values={dashTopCountries.map((c) => c.count)}
-							datasetLabel="Articles"
-							horizontal
-						/>
-					</div>
+			{#if lab}
+				<PublicationsDashboard
+					context={{ kind: 'lab', id: lab.id }}
+					apiKey="lab-dashboard"
+					figures={dashboardLoaded && rhPersonsCount > 0
+						? [{ value: rhPersonsCount.toLocaleString('fr-FR'), label: 'personnes (SI RH)' }]
+						: []}
+				>
 					<div class="dash-card dash-card-wide">
 						<h2>Sujets principaux</h2>
 						<SubjectBars subjects={dashSubjects} />
 					</div>
-				</div>
+				</PublicationsDashboard>
 			{/if}
 		</div>
 	{/if}

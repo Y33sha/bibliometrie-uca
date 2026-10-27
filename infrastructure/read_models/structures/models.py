@@ -11,10 +11,8 @@ from pydantic import BaseModel
 
 from domain.structures.structure import Structure
 from infrastructure.read_models._common import (
-    DashboardOa,
     FacetOption,
     PaginatedResponse,
-    PublicationYearCount,
 )
 
 StructureSort = Literal[
@@ -142,27 +140,6 @@ class StructureAddressOut(BaseModel):
 
 class StructureAddressesResponse(PaginatedResponse):
     addresses: list[StructureAddressOut]
-
-
-class StructureCollaborations(BaseModel):
-    """Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère."""
-
-    total_articles: int
-    international: int
-    domestic: int
-
-
-class StructureTopCountry(BaseModel):
-    code: str
-    name: str
-    count: int
-
-
-class StructureDashboardResponse(BaseModel):
-    publications_by_year: list[PublicationYearCount]
-    oa: DashboardOa
-    collab: StructureCollaborations
-    top_countries: list[StructureTopCountry]
 
 
 class StructurePartner(BaseModel):

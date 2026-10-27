@@ -19,7 +19,6 @@ from infrastructure.read_models.persons.models import (
     NameFormContributionsResponse,
     NameFormSummaryOut,
     PersonAddressesResponse,
-    PersonDashboardResponse,
     PersonFilters,
     PersonListResponse,
     PersonOut,
@@ -303,15 +302,6 @@ def person_addresses(
 ) -> PersonAddressesResponse:
     """Adresses distinctes utilisées dans les contributions sources de cette personne."""
     return queries.person_addresses(person_id, page=page, per_page=per_page)
-
-
-@router.get("/{person_id}/dashboard", response_model=PersonDashboardResponse)
-def person_dashboard(
-    person_id: int,
-    queries: PersonsQueries = Depends(persons_queries),
-) -> PersonDashboardResponse:
-    """Dashboard personne : publis/an + Open Access."""
-    return queries.person_dashboard(person_id)
 
 
 @router.get("/{person_id}/subjects", response_model=list[SubjectFrequency])

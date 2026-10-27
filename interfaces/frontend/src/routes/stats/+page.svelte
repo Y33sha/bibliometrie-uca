@@ -4,23 +4,16 @@
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart } from '#lib/components/charts/chart.js';
-	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
-	import { chartColor } from '#lib/components/charts/palette.js';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
-	import { defaultYears } from './defaultYears';
+	import { defaultYears } from '#lib/defaultYears.js';
+	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
 	import { paramsToQuery } from '#lib/utils.js';
-	import {
-		oaStatusLabel,
-		docTypePlural,
-		docTypeFamilies,
-		docTypeGroupColorVar,
-		licenseOrder,
-		publicationsDocTypes,
-	} from '#lib/labels.js';
+	import { publicationsDocTypes } from '#lib/labels.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import {
 		appendFilterParams,
@@ -84,54 +77,12 @@
 		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable) : []
 	);
 
-	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
-	const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
-	const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
-	const OA_ACCESS_LABELS: Record<string, string> = {
-		ouvert: 'Ouvert', embargo: 'Sous embargo', ferme: 'Fermé', indetermine: 'Indéterminé',
-	};
-	const OA_ACCESS_STATUS: Record<string, string> = {
-		ouvert: 'open', embargo: 'embargoed', ferme: 'closed', indetermine: 'unknown',
-	};
-
 	function dimCard(dim: string): string {
 		return pivotSchema?.dimensions.find((d) => d.key === dim)?.cardinality ?? 'low';
 	}
-	function dimLabel(dim: string, value: string): string {
-		if (dim === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
-		if (dim === 'oa_voie') return oaStatusLabel(value);
-		if (dim === 'doc_type_grouped')
-			return docTypePlural[value] ?? docTypeFamilies.find((f) => f.key === value)?.label ?? value;
-		// Libellés servis par la facette, y compris celui des publications sans licence.
-		if (dim === 'license') return facets.options.license?.find((o) => o.value === value)?.text ?? value;
-		return value;
-	}
-	function dimColor(dim: string, value: string, idx: number): string {
-		if (dim === 'oa_voie') return oaStatusColor(value) ?? chartColor(idx);
-		if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? chartColor(idx);
-		if (dim === 'doc_type_grouped') return cssVar(docTypeGroupColorVar(value));
-		if (dim === 'license') return cssVar(`license-${value}`) || chartColor(idx);
-		return chartColor(idx);
-	}
-	function orderedValues(dim: string, rows: Record<string, unknown>[]): string[] {
-		const present = rows.map((r) => String(r[dim]));
-		if (dim === 'year') return [...new Set(present)].sort((a, b) => Number(a) - Number(b));
-		if (dim === 'oa_access') return OA_ACCESS_ORDER.filter((v) => present.includes(v));
-		if (dim === 'oa_voie') return OA_VOIE_ORDER.filter((v) => present.includes(v));
-		if (dim === 'license') return licenseOrder.filter((v) => present.includes(v));
-		if (dim === 'doc_type_grouped') {
-			// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
-			const order = docTypeFamilies.flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));
-			return order.filter((k) => present.includes(k));
-		}
-		// Sinon : valeurs distinctes triées par total décroissant.
-		const totals = new Map<string, number>();
-		for (const r of rows) {
-			const v = String(r[dim]);
-			totals.set(v, (totals.get(v) ?? 0) + Number(r.value ?? 0));
-		}
-		return [...totals.entries()].sort((a, b) => b[1] - a[1]).map(([v]) => v);
-	}
+	// Libellés servis par la facette, y compris celui des publications sans licence.
+	const licenseLabel = (value: string) => facets.options.license?.find((o) => o.value === value)?.text;
+	const dimLabel = (dim: string, value: string) => pivotValueLabel(dim, value, licenseLabel);
 
 	// Ordonne les catégories de l'axe `dim` par la part de la série `seriesValue` (lue sur `stackDim`) dans chaque catégorie : numérateur = valeur de cette série, dénominateur = total de la catégorie. Trier sur la part (et non la valeur brute) donne le classement « du plus au moins <série> » indépendamment de la taille de la catégorie, cohérent avec la vue en pourcentage.
 	function orderBySeriesShare(
@@ -249,7 +200,7 @@
 		const xDim = comparison || breakdown;
 		const stackDim = comparison ? breakdown : '';
 
-		const stackValues = stackDim ? orderedValues(stackDim, rows) : [];
+		const stackValues = stackDim ? orderedPivotValues(stackDim, rows) : [];
 
 		// Tri par part d'une série : n'a de sens que sur un axe entité à forte cardinalité (labo, éditeur, revue) avec un empilement. L'axe année reste chronologique, les axes à faible cardinalité gardent leur ordre métier. Le sélecteur n'apparaît que dans ce cas, et une clé devenue caduque (changement d'empilement ou d'axe) est réinitialisée.
 		const highCard = dimCard(xDim) === 'high';
@@ -261,7 +212,7 @@
 		const allCats =
 			chartSort && canSort
 				? orderBySeriesShare(xDim, stackDim, chartSort, chartSortDir, rows)
-				: orderedValues(xDim, rows);
+				: orderedPivotValues(xDim, rows);
 		chartCatTotal = highCard ? allCats.length : 0;
 		if (highCard && (chartPage - 1) * CHART_PAGE_SIZE >= allCats.length) chartPage = 1;
 		const cats = highCard
@@ -282,7 +233,7 @@
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? dimColor(stackDim, sv, i) : cssVar('accent'),
+			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssVar('accent'),
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
@@ -291,7 +242,7 @@
 		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
 		if (chartMode === 'part' && !stackDim) {
 			const values = datasets[0].data as number[];
-			const colors = cats.map((cv, i) => dimColor(xDim, cv, i));
+			const colors = cats.map((cv, i) => pivotValueColor(xDim, cv, i));
 			legendItems = cats.map((cv, i) => ({ label: dimLabel(xDim, cv), color: colors[i] }));
 			const sliceTotal = (ctx: { dataset: { data: unknown[] } }) =>
 				(ctx.dataset.data as number[]).reduce((s, v) => s + (v || 0), 0);

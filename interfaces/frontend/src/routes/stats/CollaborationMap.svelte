@@ -4,13 +4,11 @@
 	import { feature as topoFeature } from 'topojson-client';
 	import type { Topology } from 'topojson-specification';
 	import world from 'world-atlas/countries-110m.json';
-	import iso from 'i18n-iso-countries';
-	import frLocale from 'i18n-iso-countries/langs/fr.json';
+	import { alpha2ToNumeric, countryName, numericToAlpha2 } from '#lib/countryNames.js';
 	import { latestRequest } from '#lib/api/index.js';
 	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import type { components } from '#lib/api/schema.js';
 
-	iso.registerLocale(frLocale);
 	Chart.register(ChoroplethController, GeoFeature, ColorScale, ProjectionScale);
 
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
@@ -43,8 +41,8 @@
 
 	// Libellé français d'un pays à partir de son code numérique ; repli sur le nom porté par la carte.
 	function frenchName(numericId: string, fallback: string): string {
-		const alpha2 = iso.numericToAlpha2(numericId.padStart(3, '0'));
-		return (alpha2 && iso.getName(alpha2, 'fr')) || fallback;
+		const alpha2 = numericToAlpha2(numericId);
+		return (alpha2 && countryName(alpha2)) || fallback;
 	}
 
 	// Chaque changement de filtre relance la carte : la requête précédente, encore en vol, est annulée.
@@ -55,7 +53,7 @@
 		// Décomptes indexés par code numérique (comparaison sur `Number`, pour ignorer les zéros de tête : `alpha2ToNumeric` renvoie « 004 » là où la carte porte « 4 »).
 		const byNumeric = new Map<number, number>();
 		for (const row of res.rows) {
-			const numeric = iso.alpha2ToNumeric(row.code.toUpperCase());
+			const numeric = alpha2ToNumeric(row.code);
 			if (numeric) byNumeric.set(Number(numeric), row.value);
 		}
 		countryCount = res.rows.length;

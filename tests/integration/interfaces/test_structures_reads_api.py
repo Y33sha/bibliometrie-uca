@@ -33,12 +33,6 @@ class TestLaboratoryAddresses:
         assert r.status_code == 422
 
 
-class TestLaboratoryDashboard:
-    def test_returns_dashboard(self, client):
-        r = client.get("/api/structures/999999999/dashboard")
-        assert r.status_code == 200
-
-
 class TestLaboratorySubjects:
     def test_empty_without_publication(self, client):
         r = client.get("/api/structures/999999999/subjects")

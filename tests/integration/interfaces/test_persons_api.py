@@ -507,17 +507,7 @@ class TestUpdateNameFormStatus:
         assert r.status_code == 404
 
 
-class TestPersonDashboardAndSubjects:
-    def test_dashboard_of_unknown_person(self, client):
-        """Le tableau de bord d'un id inconnu rend une réponse vide, non un 404."""
-        r = client.get("/api/persons/999999999/dashboard")
-        assert r.status_code == 200
-
-    def test_dashboard_of_seeded_person(self, client):
-        pid = seed_person("Dash", "Bo")
-        r = client.get(f"/api/persons/{pid}/dashboard")
-        assert r.status_code == 200
-
+class TestPersonSubjects:
     def test_subjects_of_person_without_publication(self, client):
         pid = seed_person("Subj", "Ec")
         r = client.get(f"/api/persons/{pid}/subjects")

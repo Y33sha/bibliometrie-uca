@@ -862,26 +862,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/structures/{structure_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Structure Dashboard
-         * @description Agrégats de la structure : publications par année, accès ouvert, collaborations internationales.
-         */
-        get: operations["get_structure_dashboard_api_structures__structure_id__dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/structures/{structure_id}/subjects": {
         parameters: {
             query?: never;
@@ -1246,26 +1226,6 @@ export interface paths {
          * @description Adresses distinctes utilisées dans les contributions sources de cette personne.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Person Dashboard
-         * @description Dashboard personne : publis/an + Open Access.
-         */
-        get: operations["person_dashboard_api_persons__person_id__dashboard_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3276,19 +3236,6 @@ export interface components {
             /** Labs */
             labs: string[];
         };
-        /** DashboardOa */
-        DashboardOa: {
-            /** Open Access */
-            open_access: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Total */
-            total: number;
-        };
         /**
          * DeletedResponse
          * @description Acquittement de suppression : `{deleted: true}`.
@@ -4247,12 +4194,6 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** PersonDashboardResponse */
-        PersonDashboardResponse: {
-            /** Publications By Year */
-            publications_by_year: components["schemas"]["PublicationYearCount"][];
-            oa: components["schemas"]["DashboardOa"];
-        };
         /**
          * PersonExclusion
          * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching.
@@ -4743,13 +4684,6 @@ export interface components {
             structures: {
                 [key: string]: components["schemas"]["StructureInfo"];
             };
-        };
-        /** PublicationYearCount */
-        PublicationYearCount: {
-            /** Year */
-            year: number;
-            /** Count */
-            count: number;
         };
         /**
          * PublicationsFacetsResponse
@@ -5440,18 +5374,6 @@ export interface components {
             readonly pages: number;
         };
         /**
-         * StructureCollaborations
-         * @description Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère.
-         */
-        StructureCollaborations: {
-            /** Total Articles */
-            total_articles: number;
-            /** International */
-            international: number;
-            /** Domestic */
-            domestic: number;
-        };
-        /**
          * StructureCreate
          * @description Champs d'une structure à créer.
          */
@@ -5473,15 +5395,6 @@ export interface components {
             api_ids?: {
                 [key: string]: string | string[];
             } | null;
-        };
-        /** StructureDashboardResponse */
-        StructureDashboardResponse: {
-            /** Publications By Year */
-            publications_by_year: components["schemas"]["PublicationYearCount"][];
-            oa: components["schemas"]["DashboardOa"];
-            collab: components["schemas"]["StructureCollaborations"];
-            /** Top Countries */
-            top_countries: components["schemas"]["StructureTopCountry"][];
         };
         /**
          * StructureDeletionImpact
@@ -5635,15 +5548,6 @@ export interface components {
             acronym: string | null;
             /** Name */
             name: string;
-        };
-        /** StructureTopCountry */
-        StructureTopCountry: {
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Count */
-            count: number;
         };
         /**
          * StructureTutelleCreateResponse
@@ -7515,37 +7419,6 @@ export interface operations {
             };
         };
     };
-    get_structure_dashboard_api_structures__structure_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                structure_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StructureDashboardResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_structure_subjects_api_structures__structure_id__subjects_get: {
         parameters: {
             query?: {
@@ -8110,37 +7983,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonAddressesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    person_dashboard_api_persons__person_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonDashboardResponse"];
                 };
             };
             /** @description Validation Error */

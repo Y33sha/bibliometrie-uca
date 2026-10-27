@@ -30,15 +30,15 @@ Les chiffres clés actuels (total, part en open access, thèses) renseignent peu
 
 ### Serveur
 
-- [ ] Dashboards de structure et de personne servis par le moteur des statistiques (pivot, collaborations), sur le corpus de l'onglet Publications ; requêtes propres retirées
-- [ ] Nombre de personnes présentes dans le SI RH d'une structure
+- [x] Dashboards de structure et de personne servis par le moteur des statistiques (pivot, collaborations), sur le corpus de l'onglet Publications ; requêtes propres retirées
+- [x] Nombre de personnes présentes dans le SI RH d'une structure
 
 ### Interface
 
-- [ ] Chiffres clés : publications, part en open access, part de collaborations internationales, thèses ; pour une structure, personnes présentes dans le SI RH
-- [ ] Publications par année en barres empilées par statut d'accès
-- [ ] Nombre de publications par famille de types de documents
-- [ ] Corpus du dashboard indiqué à l'écran (types, années)
+- [x] Chiffres clés : publications, part en open access, part de collaborations internationales, thèses ; pour une structure, personnes présentes dans le SI RH
+- [x] Publications par année en barres empilées par statut d'accès
+- [x] Nombre de publications par famille de types de documents
+- [x] Corpus du dashboard indiqué à l'écran (types, années)
 - [ ] Mise à jour de la documentation
 
 ### Dashboards d'éditeur et de revue

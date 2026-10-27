@@ -22,7 +22,6 @@ from domain.structures.structure import StructureType
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     StructureAddressesResponse,
-    StructureDashboardResponse,
     StructureDeletionImpact,
     StructureDetailResponse,
     StructureFilters,
@@ -261,15 +260,6 @@ def get_structure_partners(
         page=page,
         per_page=per_page,
     )
-
-
-@router.get("/{structure_id}/dashboard", response_model=StructureDashboardResponse)
-def get_structure_dashboard(
-    structure_id: int,
-    queries: StructuresQueries = Depends(structures_queries),
-) -> StructureDashboardResponse:
-    """Agrégats de la structure : publications par année, accès ouvert, collaborations internationales."""
-    return queries.get_structure_dashboard(structure_id)
 
 
 @router.get("/{structure_id}/subjects", response_model=list[SubjectFrequency])
