@@ -70,7 +70,7 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 
 ### 4. Verdicts durables
 
-- [ ] Table des jetons de fusion, ancrée sur `(source, source_id)`.
+- [x] Tables des fusions forcées, ancrées sur `(source, source_id)` (4523e022c).
 - [ ] Jeton de fusion lu par la réconciliation : un bras du voisinage, une clé de confirmation.
 - [ ] Réconciliation ciblée sur une liste d'enregistrements sources, hors de la file.
 - [ ] Fusion forcée exposée par `pipeline/public.py` : jeton, réconciliation ciblée, métadonnées consolidées, réalignement des auteurs de la publication conservée, périmètre et compteurs. Les contributions de la publication absorbée gardent leur rattachement aux personnes.
