@@ -3,7 +3,6 @@
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { onMount } from 'svelte';
 	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
-	import { setQueryParam } from '#lib/url.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
@@ -16,6 +15,7 @@
 	import Picker from '#lib/components/Picker.svelte';
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
+	import { useTabParam } from '#lib/composables/useTabParam.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
@@ -29,7 +29,7 @@
 	// Onglets de la session admin : la liste, une file par type de doublon potentiel, la file des recueils d'actes probables, puis celle des publications en série que contredit l'espace de noms DOI. L'onglet ouvert se garde dans l'URL (`?tab=`).
 	type TabKey = 'all' | 'same-titles' | 'shared-issns' | 'likely-proceedings' | 'doi-namespace-conflicts';
 	const QUEUES: TabKey[] = ['same-titles', 'shared-issns', 'likely-proceedings', 'doi-namespace-conflicts'];
-	let tab = $state<TabKey>('all');
+	const tab = useTabParam(QUEUES, isAdmin);
 	let sameTitleCount = $state(0);
 	let sharedIssnCount = $state(0);
 	let likelyProceedingsCount = $state(0);
@@ -50,11 +50,6 @@
 			queueCount('likely-proceedings'),
 			queueCount('doi-namespace-conflicts'),
 		]);
-	}
-
-	function selectTab(t: TabKey) {
-		tab = t;
-		void setQueryParam('tab', t === 'all' ? null : t);
 	}
 
 	// Clé d'API utilisée pour invalider le cache de SerialsListView après une édition ou fusion (force un reload via incrément).
@@ -173,8 +168,6 @@
 
 	onMount(async () => {
 		if (!isAdmin()) return;
-		const t = new URLSearchParams(window.location.search).get('tab');
-		if (QUEUES.includes(t as TabKey)) tab = t as TabKey;
 		loadQueueCounts();
 		[serialTypes, oaModels] = await Promise.all([
 			api<EnumOption[]>('/api/serials/types'),
@@ -194,8 +187,8 @@
 			{ key: 'likely-proceedings', label: "Recueils d'actes probables", count: likelyProceedingsCount },
 			{ key: 'doi-namespace-conflicts', label: 'Contredites par le DOI', count: doiNamespaceConflictsCount },
 		]}
-		active={tab}
-		onselect={(key) => selectTab(key as TabKey)}
+		active={tab.current}
+		onselect={(key) => tab.select(key as TabKey)}
 	/>
 {/if}
 
@@ -225,17 +218,17 @@
 	{/if}
 {/snippet}
 
-{#if tab === 'same-titles'}
+{#if tab.current === 'same-titles'}
 	<SerialDuplicatesList
 		url="/api/serials/same-titles"
 		intro="Deux publications en série de même titre qui ont chacune un ISSN sont des homonymes probables : elles n'apparaissent pas ici."
 		onchange={loadQueueCounts}
 	/>
-{:else if tab === 'shared-issns'}
+{:else if tab.current === 'shared-issns'}
 	<SerialDuplicatesList url="/api/serials/shared-issns" valueLabel="ISSN" onchange={loadQueueCounts} />
-{:else if tab === 'likely-proceedings'}
+{:else if tab.current === 'likely-proceedings'}
 	<LikelyProceedingsList onchange={loadQueueCounts} />
-{:else if tab === 'doi-namespace-conflicts'}
+{:else if tab.current === 'doi-namespace-conflicts'}
 	<DoiNamespaceConflictsList onchange={loadQueueCounts} />
 {:else}
 	<SerialsListView {apiKey} urlSync actionCell={isAdmin() ? actionCell : undefined} />

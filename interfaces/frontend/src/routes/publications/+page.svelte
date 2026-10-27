@@ -6,23 +6,11 @@
 	import SuspectMergesList from './SuspectMergesList.svelte';
 	import { api } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
+	import { useTabParam } from '#lib/composables/useTabParam.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
-	import { setQueryParam } from '#lib/url.js';
-	import { onMount } from 'svelte';
 
 	// Onglets de la session admin : la liste, puis la file des fusions suspectes. L'onglet ouvert se garde dans l'URL (`?tab=`).
-	const QUEUES = ['suspect-merges'];
-	let tab = $state('all');
-
-	function selectTab(t: string) {
-		tab = t;
-		void setQueryParam('tab', t === 'all' ? null : t);
-	}
-
-	onMount(() => {
-		const t = new URLSearchParams(window.location.search).get('tab');
-		if (isAdmin() && t && QUEUES.includes(t)) tab = t;
-	});
+	const tab = useTabParam(['suspect-merges'], isAdmin);
 	let suspectMergeCount = $state(0);
 
 	$effect(() => {
@@ -33,7 +21,7 @@
 	});
 
 	// Volet de la file des fusions suspectes. La liste ouvre le sien.
-	const drawer = useDrawerParam('publication', () => isAdmin() && tab === 'suspect-merges');
+	const drawer = useDrawerParam('publication', () => isAdmin() && tab.current === 'suspect-merges');
 </script>
 
 <PageHeader title="Publications" hidden />
@@ -44,12 +32,12 @@
 			{ key: 'all', label: 'Toutes les publications' },
 			{ key: 'suspect-merges', label: 'Fusions suspectes', count: suspectMergeCount },
 		]}
-		active={tab}
-		onselect={selectTab}
+		active={tab.current}
+		onselect={(key) => tab.select(key as 'all' | 'suspect-merges')}
 	/>
 {/if}
 
-{#if tab === 'suspect-merges'}
+{#if tab.current === 'suspect-merges'}
 	<SuspectMergesList activePublicationId={drawer.id} onopenPublication={drawer.open} />
 {:else}
 	<PublicationsListView />
