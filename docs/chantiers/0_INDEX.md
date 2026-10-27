@@ -8,7 +8,6 @@
 
 ### Non commencé
 
-- [Administration intégrée au site, navigation entre entités liées](UI_administration-et-navigation.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
@@ -18,6 +17,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-27 — [Administration intégrée au site, navigation entre entités liées](archived/2026-10-27_UI_administration-et-navigation.md)
 - 2026-10-27 — [Cohérence graphique, responsivité et accessibilité du frontend](archived/2026-10-27_UI_coherence-et-accessibilite.md)
 - 2026-10-27 — [Contenu des dashboards de structure et de personne](archived/2026-10-27_METIER_dashboards.md)
 - 2026-10-27 — [Page Statistiques : filtres communs avec la liste des publications, indicateurs](archived/2026-10-27_METIER_statistiques.md)
