@@ -683,7 +683,7 @@ place_name_forms = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     # `iso_code` en minuscule (cf. countries.code / addresses.countries).
-    Column("iso_code", Text, nullable=False),
+    Column("iso_code", CHAR(2), nullable=False),
     Column("form_normalized", Text, nullable=False),
     # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
     # `city` (lieux détectés n'importe où, via la passe place). Défaut `country` :
