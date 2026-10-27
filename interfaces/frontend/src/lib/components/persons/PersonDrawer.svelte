@@ -9,7 +9,7 @@
   import Drawer from "#lib/components/Drawer.svelte";
   import type { Person, IdFormState, PersonSearchResult } from "./types";
   import type { components } from "#lib/api/schema.js";
-  import IdentifiersCell from "./IdentifiersCell.svelte";
+  import IdentifierEditor from "./IdentifierEditor.svelte";
   import Picker from "#lib/components/Picker.svelte";
   import NameFormsList from "./NameFormsList.svelte";
 
@@ -201,7 +201,7 @@
 
     <section class="drawer-section">
       <h3>Identifiants</h3>
-      <IdentifiersCell
+      <IdentifierEditor
         {person}
         form={idForm}
         onadd={onaddIdentifier}

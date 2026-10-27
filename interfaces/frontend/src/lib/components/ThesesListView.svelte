@@ -14,6 +14,9 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { paramsToQuery } from '#lib/utils.js';
+	import { isAdmin } from '#lib/session.svelte.js';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 
 	// Vue-liste des thèses réutilisable. Utilisée par :
 	// - `/theses` (mode autonome avec sync URL)
@@ -34,6 +37,9 @@
 	} = $props();
 
 	const hasFixedLab = $derived(labId != null);
+
+	// Volet d'une thèse, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('publication', isAdmin);
 
 	let search = $state('');
 	let currentSort: PublicationSort = $state('soutenance_desc');
@@ -199,7 +205,7 @@
 	{/snippet}
 </ListToolbar>
 
-<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
+<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} onopen={isAdmin() ? drawer.open : undefined} activeId={drawer.id} />
 <Pagination
 	page={listing.page}
 	pages={listing.pages}
@@ -209,3 +215,7 @@
 		listing.load();
 	}}
 />
+
+{#if drawer.id !== null}
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} />
+{/if}

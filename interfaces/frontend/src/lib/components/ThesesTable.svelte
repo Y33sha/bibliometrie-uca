@@ -1,5 +1,6 @@
 <script lang="ts">
 	import AccessButton from '#lib/components/AccessButton.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
@@ -47,6 +48,8 @@
 		sort,
 		onToggleSort,
 		showLabsColumn = false,
+		onopen,
+		activeId = null,
 	}: {
 		items: ThesisRow[];
 		loading?: boolean;
@@ -55,6 +58,10 @@
 		sort: PublicationSort;
 		onToggleSort: (column: ThesisSortColumn) => void;
 		showLabsColumn?: boolean;
+		/** Ouvre le volet de la thèse. Fourni, il ajoute en tête de ligne une icône qui l'appelle. */
+		onopen?: (publicationId: number) => void;
+		/** Thèse dont le volet est ouvert, dont la ligne est mise en évidence. */
+		activeId?: number | null;
 	} = $props();
 
 	const MONTHS = [
@@ -93,6 +100,7 @@
 <table class="data-table theses-table">
 	<thead>
 		<tr>
+			{#if onopen}<th class="panel-col"></th>{/if}
 			<th
 				class="col-date sortable"
 				class:active={inscrSort !== null}
@@ -126,12 +134,17 @@
 	</thead>
 	<tbody>
 		{#if items.length === 0}
-			<TableStatusRow {loading} {error} colspan={cv.visibleColumns.length} emptyText="Aucune thèse" />
+			<TableStatusRow {loading} {error} colspan={cv.visibleColumns.length + (onopen ? 1 : 0)} emptyText="Aucune thèse" />
 		{/if}
 		{#each items as t (t.id)}
 			{@const insc = formatDate(t.date_inscription)}
 			{@const sout = formatDate(t.date_soutenance)}
-			<tr>
+			<tr class:active-row={t.id === activeId}>
+				{#if onopen}
+					<td class="panel-col row-actions">
+						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopen(t.id)} />
+					</td>
+				{/if}
 				<td class="col-date">
 					{#if insc}<span class="date-month">{insc.month}</span> {insc.year}{/if}
 				</td>
@@ -227,6 +240,8 @@
 </div>
 
 <style>
+	.panel-col { width: 28px; padding-right: 0; }
+	.theses-table tr.active-row td { background: var(--accent-light); }
 	.theses-table {
 		min-width: 720px;
 		font-size: 0.9rem;

@@ -13,15 +13,17 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
 	import { withBase } from '#lib/paths.js';
 	import { paramsToQuery } from '#lib/utils.js';
 
 	type IdState = 'all' | 'yes' | 'no';
 
 	// Vue-liste des personnes réutilisable. Utilisée par :
-	// - `/persons` (annuaire autonome avec sync URL ; en session admin, une icône ouvre le volet de la personne)
+	// - `/persons` (annuaire autonome avec sync URL)
 	// - `/structures/[id]?tab=persons` (labo fixe via `labId`, sans sync URL)
-	// La session admin y gagne les facettes Exclusion, Activité et À confirmer, et la colonne des publications du périmètre.
+	// La session admin y gagne les facettes Exclusion, Activité et À confirmer, la colonne des publications du périmètre, et une icône qui ouvre le volet de la personne.
 	let {
 		apiKey = 'persons-dir',
 		labId,
@@ -37,11 +39,17 @@
 		urlSync?: boolean;
 		basePath?: string;
 		perPage?: number;
-		/** Ouvre le volet de la personne dans la page hôte. */
+		/** Ouvre le volet de la personne dans la page hôte. Sans lui, la session admin ouvre le volet de la liste. */
 		onopen?: (personId: number) => void;
 		/** Personne ouverte par la page hôte, dont la ligne est mise en évidence. */
 		activeId?: number | null;
 	} = $props();
+
+	// Volet de la liste, en session admin quand la page hôte n'en fournit pas : ouvert tant que `?person=<id>` figure dans l'URL.
+	const ownDrawer = $derived(!onopen && isAdmin());
+	const drawer = useDrawerParam('person', () => ownDrawer);
+	// Incrémenté après chaque écriture du volet : la liste et ses facettes se rechargent.
+	let listVersion = $state(0);
 
 	// `none` désigne les personnes retenues, comme dans le paramètre `exclusion` de l'API.
 	const exclusionOptions: FacetOption[] = [
@@ -106,7 +114,7 @@
 		itemsKey: 'persons',
 		// svelte-ignore state_referenced_locally
 		perPage,
-		apiKey: () => apiKey,
+		apiKey: () => `${apiKey}-${listVersion}`,
 		buildParams() {
 			const params = buildFilterParams();
 			const q = search.trim();
@@ -118,7 +126,7 @@
 
 	const facets = useFacets({
 		endpoint: '/api/persons/facets',
-		apiKey: () => `${apiKey}-facets`,
+		apiKey: () => `${apiKey}-${listVersion}-facets`,
 		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme l'annuaire).
 		buildParams() {
 			const params = buildFilterParams();
@@ -273,8 +281,8 @@
 	sort={currentSort}
 	{onSortChange}
 	perimeterCount={isAdmin()}
-	{onopen}
-	{activeId}
+	onopen={ownDrawer ? drawer.open : onopen}
+	activeId={ownDrawer ? drawer.id : activeId}
 />
 
 <Pagination
@@ -285,3 +293,12 @@
 		syncUrl();
 	}}
 />
+
+{#if drawer.id !== null}
+	<PersonCurationDrawer
+		personId={drawer.id}
+		onclose={() => drawer.open(null)}
+		onchange={() => listVersion++}
+		onopenPerson={drawer.open}
+	/>
+{/if}

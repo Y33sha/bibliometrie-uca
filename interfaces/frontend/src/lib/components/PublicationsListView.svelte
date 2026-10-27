@@ -11,6 +11,9 @@
 	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
+	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
+	import { isAdmin } from '#lib/session.svelte.js';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import {
 		activeColumns,
@@ -53,8 +56,6 @@
 		showAdminExclude = false,
 		perPage = 100,
 		onExcludeContribution,
-		onopenPublication,
-		activePublicationId = null,
 	}: {
 		apiKey?: string;
 		context?: PublicationListContext;
@@ -65,11 +66,10 @@
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
-		/** Ouvre le volet de la publication dans la page hôte. Fourni, il ajoute en tête de ligne une icône qui l'appelle ; le titre mène toujours à la fiche. */
-		onopenPublication?: (publicationId: number) => void;
-		/** Publication ouverte par la page hôte, dont la ligne est mise en évidence. */
-		activePublicationId?: number | null;
 	} = $props();
+
+	// Volet d'une publication, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
+	const drawer = useDrawerParam('publication', isAdmin);
 
 	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne et le filtre « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant.
 	// svelte-ignore state_referenced_locally
@@ -271,7 +271,7 @@
 <table class="data-table publication-table">
 	<thead>
 		<tr>
-			{#if onopenPublication}<th style="width:28px"></th>{/if}
+			{#if isAdmin()}<th style="width:28px"></th>{/if}
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
 			{#if col('type')}<th style="width:80px">{columnLabels.type}</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
@@ -303,13 +303,13 @@
 	</thead>
 	<tbody>
 		{#if listing.items.length === 0}
-			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (onopenPublication ? 1 : 0)} emptyText="Aucune publication trouvée" />
+			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each listing.items as p (p.id)}
-				<tr class:active-row={p.id === activePublicationId}>
-					{#if onopenPublication}
+				<tr class:active-row={p.id === drawer.id}>
+					{#if isAdmin()}
 						<td class="row-actions">
-							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopenPublication(p.id)} />
+							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
 						</td>
 					{/if}
 					{#if showAdminExclude}
@@ -414,6 +414,10 @@
 </div>
 
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
+
+{#if drawer.id !== null}
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} />
+{/if}
 
 <style>
 	.license-cell {

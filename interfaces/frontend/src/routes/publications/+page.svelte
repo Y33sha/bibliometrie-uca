@@ -1,13 +1,12 @@
 <script lang="ts">
 	import PageHeader from '#lib/components/PageHeader.svelte';
-	import { page } from '$app/state';
-	import { setQueryParam } from '#lib/url.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
-	import PublicationDrawer from './PublicationDrawer.svelte';
+	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 	import SuspectMergesList from './SuspectMergesList.svelte';
 	import { api } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 
 	// Onglets de la session admin : la liste, puis la file des fusions suspectes.
 	let tab = $state('all');
@@ -20,14 +19,8 @@
 		);
 	});
 
-	// Volet d'une publication, réservé à la session admin : ouvert tant que `?publication=<id>` figure dans l'URL.
-	const selectedPublicationId = $derived(
-		isAdmin() ? Number(page.url.searchParams.get('publication')) || null : null,
-	);
-
-	function selectPublication(id: number | null) {
-		void setQueryParam('publication', id === null ? null : String(id));
-	}
+	// Volet de la file des fusions suspectes. La liste ouvre le sien.
+	const drawer = useDrawerParam('publication', () => isAdmin() && tab === 'suspect-merges');
 </script>
 
 <PageHeader title="Publications" hidden />
@@ -44,20 +37,11 @@
 {/if}
 
 {#if tab === 'suspect-merges'}
-	<SuspectMergesList
-		activePublicationId={selectedPublicationId}
-		onopenPublication={selectPublication}
-	/>
+	<SuspectMergesList activePublicationId={drawer.id} onopenPublication={drawer.open} />
 {:else}
-	<PublicationsListView
-		activePublicationId={selectedPublicationId}
-		onopenPublication={isAdmin() ? selectPublication : undefined}
-	/>
+	<PublicationsListView />
 {/if}
 
-{#if selectedPublicationId !== null}
-	<PublicationDrawer
-		publicationId={selectedPublicationId}
-		onclose={() => selectPublication(null)}
-	/>
+{#if drawer.id !== null}
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} />
 {/if}

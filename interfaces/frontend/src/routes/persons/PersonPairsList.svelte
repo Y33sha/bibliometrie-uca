@@ -6,8 +6,8 @@
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
-  import { confirmMerge } from "./confirmMerge";
-  import type { CurationPerson } from "./types";
+  import { confirmMerge } from "#lib/components/persons/confirmMerge.js";
+  import type { CurationPerson } from "#lib/components/persons/types.js";
 
   let {
     endpoint,
