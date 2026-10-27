@@ -458,31 +458,27 @@
     margin: 16px 0 6px;
   }
 
-  /* Une grille par section : libellés dans une colonne de largeur fixe, valeurs alignées d'une ligne à l'autre. Réglages séparés par des filets. */
+  /* Une liste par section, réglages séparés par des filets. */
   .config-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 22rem) auto 1fr;
-    column-gap: 16px;
+    display: flex;
+    flex-direction: column;
     margin-bottom: 8px;
   }
+  /* Libellé à gauche ; valeur et bouton au bord droit. Le bouton Annuler de l'édition prend la place du bouton de modification. */
   .config-row {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: subgrid;
+    display: flex;
     align-items: center;
-    justify-items: start;
+    gap: 12px;
     min-height: 44px;
     padding: 4px 0;
     border-bottom: 1px solid var(--border-subtle);
-  }
-  /* Bouton de modification au bord droit de la ligne. */
-  .config-row > :global(.icon-btn) {
-    justify-self: end;
   }
   .config-row:last-child {
     border-bottom: none;
   }
   .config-label {
+    flex: 1;
+    min-width: 0;
     font-size: 0.9rem;
   }
   .config-value-inline {
