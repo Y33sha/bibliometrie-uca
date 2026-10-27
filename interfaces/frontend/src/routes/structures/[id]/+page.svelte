@@ -274,14 +274,8 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`lab-${lab.id}-publications`}
-				externalFilters={{
-					labId: lab.id,
-					labLabel: structureLabel(lab),
-					halCollection: lab.hal_collection ?? undefined,
-				}}
+				context={{ kind: 'lab', id: lab.id, halCollection: lab.hal_collection ?? null }}
 				basePath={`/structures/${labId}`}
-				showFilterBanner={false}
-				showHalStatusColumn
 				perPage={50}
 			/>
 		</div>

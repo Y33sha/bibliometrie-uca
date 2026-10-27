@@ -159,12 +159,8 @@
       {#key data.subject.id}
         <PublicationsListView
           apiKey={`subject-${data.subject.id}-publications`}
-          externalFilters={{
-            subjectId: data.subject.id,
-            subjectLabel: data.subject.label,
-          }}
+          context={{ kind: 'subject', id: data.subject.id }}
           urlSync={false}
-          showFilterBanner={false}
         />
       {/key}
     {/if}

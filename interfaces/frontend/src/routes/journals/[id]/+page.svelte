@@ -250,9 +250,8 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`journal-${serialId}-publications`}
-				externalFilters={{ serialId }}
+				context={{ kind: 'serial', id: serialId }}
 				basePath={`/journals/${serialId}`}
-				showFilterBanner={false}
 				perPage={50}
 			/>
 		</div>

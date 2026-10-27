@@ -50,7 +50,6 @@
 	/>
 {:else}
 	<PublicationsListView
-		restrictToPublications
 		activePublicationId={selectedPublicationId}
 		onopenPublication={isAdmin() ? selectPublication : undefined}
 	/>

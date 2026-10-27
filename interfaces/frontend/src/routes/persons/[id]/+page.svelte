@@ -217,17 +217,10 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`person-${personId}-publications`}
-				externalFilters={{
-					personId: Number(personId),
-					personLabel: displayName,
-				}}
+				context={{ kind: 'person', id: Number(personId) }}
 				basePath={`/persons/${personId}`}
-				showFilterBanner={false}
-				showCorrespondingColumn
-				showPerimeterFacet
 				showAdminExclude={isAdmin()}
 				onExcludeContribution={excludeContribution}
-				apcMode="person"
 				perPage={50}
 			/>
 		</div>

@@ -68,9 +68,8 @@
 	<div class="m-publications">
 		<PublicationsListView
 			apiKey={`monograph-${monographId}-publications`}
-			externalFilters={{ monographId }}
+			context={{ kind: 'monograph', id: monographId }}
 			basePath={`/monographs/${monographId}`}
-			showFilterBanner={false}
 			perPage={50}
 		/>
 	</div>

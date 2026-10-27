@@ -54,6 +54,7 @@
 	import { paramsToQuery } from '#lib/utils.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
 	import IconButton from '#lib/components/IconButton.svelte';
+	import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
 
 	import type { components } from '#lib/api/schema.js';
 	type Publication = components['schemas']['PublicationListItem'] & {
@@ -64,66 +65,26 @@
 	};
 
 	// --- Props ---
-	// Composant de liste de publications réutilisable. Utilisé par :
-	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de la publication)
-	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
-	// - `/structures/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
-	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Auteur correspondant/Périmètre)
-	// - `/journals/[id]?tab=publications` (filtre `serial_id` fixe)
-	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
-	// - `/monographs/[id]` (filtre `monograph_id` fixe)
-	interface ExternalFilters {
-		subjectId?: number;
-		subjectLabel?: string;
-		labId?: number;
-		labLabel?: string;
-		/** Collection HAL du laboratoire (ex 'lmbp'). Requis pour calculer la colonne « Statut HAL ». */
-		halCollection?: string;
-		personId?: number;
-		personLabel?: string;
-		serialId?: number;
-		publisherId?: number;
-		monographId?: number;
-	}
-	type ApcMode = 'institution' | 'person';
+	// Composant de liste de publications réutilisable : la liste générale `/publications`, et l'onglet des publications d'un sujet, d'un laboratoire, d'une personne, d'une revue, d'un éditeur ou d'une monographie.
 	let {
 		apiKey = 'publication-list',
-		externalFilters,
+		context = { kind: 'all' },
 		urlSync = true,
 		basePath = '/publications',
-		showFilterBanner = true,
-		showHalStatusColumn = false,
-		showCorrespondingColumn = false,
-		showPerimeterFacet = false,
 		showAdminExclude = false,
-		apcMode = 'institution' as ApcMode,
 		perPage = 100,
-		restrictToPublications = false,
 		onExcludeContribution,
 		onopenPublication,
 		activePublicationId = null,
 	}: {
 		apiKey?: string;
-		externalFilters?: ExternalFilters;
+		context?: PublicationListContext;
 		urlSync?: boolean;
 		basePath?: string;
-		showFilterBanner?: boolean;
-		/** Affiche la colonne et la facet « Statut HAL ». Requiert `externalFilters.halCollection` pour le calcul du badge. */
-		showHalStatusColumn?: boolean;
-		/** Affiche la colonne et la facet « Auteur correspondant ». */
-		showCorrespondingColumn?: boolean;
-		/** Affiche la facet du périmètre de l'établissement (in_perimeter). */
-		showPerimeterFacet?: boolean;
 		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure la contribution. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
 		showAdminExclude?: boolean;
-		/** Mode de rendu du tag APC :
-		 *  - 'institution' : paiements sur un budget du périmètre de l'établissement (défaut)
-		 *  - 'person' : 'institution' + classe `apc-other` si !is_corresponding */
-		apcMode?: ApcMode;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
-		/** Par défaut, restreint la liste à la famille « Publications » (au sens strict) tant qu'aucun type n'est coché. Réservé à la liste générale ; les listes embarquées (journal, éditeur, personne…) restent permissives. L'utilisatrice élargit via la facet « Types ». */
-		restrictToPublications?: boolean;
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
 		/** Ouvre le volet de la publication dans la page hôte. Fourni, il ajoute en tête de ligne une icône qui l'appelle ; le titre mène toujours à la fiche. */
 		onopenPublication?: (publicationId: number) => void;
@@ -131,8 +92,15 @@
 		activePublicationId?: number | null;
 	} = $props();
 
-	const hasFixedLab = $derived(externalFilters?.labId != null);
-	const hasFixedPerson = $derived(externalFilters?.personId != null);
+	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne et le filtre « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant.
+	// svelte-ignore state_referenced_locally
+	const isLab = context.kind === 'lab';
+	// svelte-ignore state_referenced_locally
+	const isPerson = context.kind === 'person';
+	// La liste générale présélectionne la famille « Publications » tant que l'URL ne fixe pas les types.
+	// svelte-ignore state_referenced_locally
+	const restrictToPublications = context.kind === 'all';
+	const fixedId = (kind: Parameters<typeof contextEntityId>[1]) => () => contextEntityId(context, kind);
 
 	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
 	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
@@ -143,14 +111,14 @@
 	};
 	function computeHalStatus(p: Publication): HalStatus {
 		if (!p.hal_id) return 'hors_hal';
-		const labCol = externalFilters?.halCollection;
+		const labCol = context.kind === 'lab' ? context.halCollection : null;
 		if (!labCol || !p.hal_collections || !p.hal_collections.includes(labCol)) return 'hors_collection';
 		if (!p.oa_status || ['closed', 'unknown'].includes(p.oa_status)) return 'notice';
 		return 'ok';
 	}
 
 	// --- Column visibility ---
-	// Ordre des colonnes = ordre dans le tableau. Les colonnes optionnelles (hal_status, corr) ne sont incluses dans la liste que si la prop correspondante est activée — sinon l'utilisatrice n'a pas à les voir dans le menu de visibilité.
+	// Ordre des colonnes = ordre dans le tableau. Les colonnes propres au contexte (hal_status, corr) figurent dans le menu de visibilité seulement dans leur contexte.
 	const columnDefs = [
 		{ key: 'type',       label: columnLabels.type },
 		{ key: 'year',       label: columnLabels.year },
@@ -158,31 +126,25 @@
 		{ key: 'title',      label: columnLabels.title, fixed: true },
 		{ key: 'serial',     label: columnLabels.serial },
 		{ key: 'publisher',  label: columnLabels.publisher },
-		// svelte-ignore state_referenced_locally
-		...(hasFixedLab ? [] : [{ key: 'labs', label: columnLabels.labs }]),
-		// svelte-ignore state_referenced_locally
-		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Auteur correspondant' }] : []),
+		...(isLab ? [] : [{ key: 'labs', label: columnLabels.labs }]),
+		...(isPerson ? [{ key: 'corr', label: 'Auteur correspondant' }] : []),
 		{ key: 'apc',        label: columnLabels.apc },
 		{ key: 'oa_status',  label: columnLabels.oaStatus },
 		{ key: 'license',    label: columnLabels.license },
-		// svelte-ignore state_referenced_locally
-		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
+		...(isLab ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
 		{ key: 'sources',    label: columnLabels.sources },
 		{ key: 'access',     label: columnLabels.access, fixed: true },
 	];
 	const initialHidden = ['apc', 'oa_status', 'license', 'publisher', 'sources'];
 	// Libellés de la colonne Licence, servis par l'API.
 	let licenseNames = $state<Record<string, string>>({});
-	// svelte-ignore state_referenced_locally
-	if (showHalStatusColumn) initialHidden.push('hal_status');
+	if (isLab) initialHidden.push('hal_status');
 	const cv = useColumnVisibility(columnDefs, initialHidden);
 	const col = cv.col;
 
 	// --- Filtres ---
 	let search = $state('');
 	let currentSort = $state('year_desc');
-
-	const fixedId = (id: number | undefined): string | null => (id != null ? String(id) : null);
 
 	// Ordre du tableau = ordre d'affichage. Un filtre sans `group` figure dans la barre principale.
 	const FILTERS: ListFilter[] = [
@@ -214,7 +176,7 @@
 			param: 'lab_id',
 			facet: { type: 'labeled', apiKey: 'labs' },
 			searchable: true,
-			fixed: () => fixedId(externalFilters?.labId),
+			fixed: fixedId('lab'),
 			// « Aucun labo » ne se combine pas avec un laboratoire.
 			normalize: (selected) =>
 				selected.includes('none') && selected.length > 1
@@ -234,7 +196,7 @@
 			label: 'Statuts HAL',
 			param: 'hal_status',
 			facet: { type: 'labeled', apiKey: 'hal_status' },
-			enabled: () => showHalStatusColumn,
+			enabled: () => isLab,
 			showColumns: ['hal_status'],
 		},
 		{
@@ -244,7 +206,7 @@
 			param: 'serial_id',
 			entity: 'serial',
 			group: 'Revue et éditeur',
-			fixed: () => fixedId(externalFilters?.serialId),
+			fixed: fixedId('serial'),
 			showColumns: ['serial'],
 		},
 		{
@@ -254,7 +216,7 @@
 			param: 'publisher_id',
 			entity: 'publisher',
 			group: 'Revue et éditeur',
-			fixed: () => fixedId(externalFilters?.publisherId),
+			fixed: fixedId('publisher'),
 			showColumns: ['serial'],
 		},
 		{
@@ -301,7 +263,7 @@
 			param: 'is_corresponding',
 			facet: { type: 'label_map', apiKey: 'corresponding', labels: { yes: 'Oui', no: 'Non' } },
 			group: 'Auteurs',
-			enabled: () => showCorrespondingColumn,
+			enabled: () => isPerson,
 			hideWhenEmpty: true,
 			showColumns: ['corr'],
 		},
@@ -314,7 +276,7 @@
 			param: 'in_perimeter',
 			facet: { type: 'labeled', apiKey: 'in_perimeter' },
 			group: 'Auteurs',
-			enabled: () => showPerimeterFacet,
+			enabled: () => isPerson,
 			hideWhenEmpty: true,
 		},
 		{
@@ -355,7 +317,7 @@
 			entity: 'subject',
 			multiple: true,
 			group: 'Détails',
-			fixed: () => fixedId(externalFilters?.subjectId),
+			fixed: fixedId('subject'),
 		},
 		{
 			key: 'sources',
@@ -375,15 +337,8 @@
 		sections.groups.flatMap((g) => g.filters).filter((f) => isAvailable(f) && isActive(f, values)).length,
 	);
 
-	// Le bandeau ne signale que le sujet, contexte fixé par la route (sans facette propre ici).
-	const subjectBannerText = $derived(
-		externalFilters?.subjectId
-			? 'sujet = ' + (externalFilters.subjectLabel ?? `#${externalFilters.subjectId}`)
-			: '',
-	);
-
-	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays, sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand la route fixe une dimension hors de sa portée (personne, sujet).
-	const showStatsLink = $derived(!externalFilters?.personId && !externalFilters?.subjectId && !externalFilters?.monographId);
+	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays, sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand le contexte est hors de sa portée (personne, sujet, monographie).
+	const showStatsLink = $derived(!['person', 'subject', 'monograph'].includes(context.kind));
 	const statsUrl = $derived.by(() => {
 		const p = new URLSearchParams();
 		const { checkbox, entity } = values;
@@ -394,14 +349,12 @@
 		if (checkbox.apc.length) p.set('has_apc', checkbox.apc.join(','));
 		// Laboratoire : fixé par la route ou choisi en facette (« aucun labo » n'a pas de sens côté stats).
 		const labId =
-			externalFilters?.labId != null
-				? String(externalFilters.labId)
-				: checkbox.labs.filter((v) => v !== 'none').join(',');
+			contextEntityId(context, 'lab') ?? checkbox.labs.filter((v) => v !== 'none').join(',');
 		if (labId) p.set('lab_id', labId);
 		// Éditeur / revue : fixés par la route ou choisis en facette.
-		const publisherId = fixedId(externalFilters?.publisherId) ?? entity.publisher.join(',');
+		const publisherId = contextEntityId(context, 'publisher') ?? entity.publisher.join(',');
 		if (publisherId) p.set('publisher_id', publisherId);
-		const serialId = fixedId(externalFilters?.serialId) ?? entity.serial.join(',');
+		const serialId = contextEntityId(context, 'serial') ?? entity.serial.join(',');
 		if (serialId) p.set('serial_id', serialId);
 		if (entity.partner.length) p.set('partner_ror', entity.partner.join(','));
 		return resolve('stats') + '?' + paramsToQuery(p);
@@ -416,8 +369,10 @@
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
 		params.set('excluded_doc_type', 'ongoing_thesis');
-		if (externalFilters?.personId != null) params.set('person_id', String(externalFilters.personId));
-		if (externalFilters?.monographId != null) params.set('monograph_id', String(externalFilters.monographId));
+		const personId = contextEntityId(context, 'person');
+		if (personId) params.set('person_id', personId);
+		const monographId = contextEntityId(context, 'monograph');
+		if (monographId) params.set('monograph_id', monographId);
 		appendFilterParams(FILTERS, values, params);
 		return params;
 	}
@@ -564,9 +519,6 @@
 	});
 </script>
 
-{#if showFilterBanner && subjectBannerText}
-	<div class="info-box">Filtre actif : {subjectBannerText}</div>
-{/if}
 
 <ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
 	{#snippet actions()}
@@ -623,14 +575,14 @@
 			</th>
 			{#if col('serial')}<th class="publication-col-journal">{columnLabels.serial}</th>{/if}
 			{#if col('publisher')}<th class="publication-col-journal">{columnLabels.publisher}</th>{/if}
-			{#if !hasFixedLab && col('labs')}<th style="width:80px">{columnLabels.labs}</th>{/if}
-			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
+			{#if !isLab && col('labs')}<th style="width:80px">{columnLabels.labs}</th>{/if}
+			{#if isPerson && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				{columnLabels.apc} <SortChevron direction={apcSort} />
 			</th>{/if}
 			{#if col('oa_status')}<th style="width:60px">{columnLabels.oaStatus}</th>{/if}
 			{#if col('license')}<th style="width:90px">{columnLabels.license}</th>{/if}
-			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
+			{#if isLab && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
 			{#if col('sources')}<th style="width:100px">{columnLabels.sources}</th>{/if}
 			<th style="width:120px" class="col-menu-th">
 				{columnLabels.access}
@@ -683,18 +635,18 @@
 							{p.publisher || ''}
 						{/if}
 					</td>{/if}
-					{#if !hasFixedLab && col('labs')}<td>
+					{#if !isLab && col('labs')}<td>
 						{#each p.lab_items || [] as lab}
 							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
 						{/each}
 					</td>{/if}
-					{#if showCorrespondingColumn && col('corr')}<td class="corr-cell">
+					{#if isPerson && col('corr')}<td class="corr-cell">
 						{#if p.is_corresponding}<span title="Auteur correspondant">&#10003;</span>{/if}
 					</td>{/if}
 					{#if col('apc')}<td class="apc-cell">
 						{#if p.apc}
 							{@const ucaApc = p.apc.filter(a => a.in_perimeter)}
-							{@const isPersonNonCorr = apcMode === 'person' &&!p.is_corresponding}
+							{@const isPersonNonCorr = isPerson && !p.is_corresponding}
 							{#if ucaApc.length > 0}
 								<span class="apc-tag" class:apc-other={isPersonNonCorr}
 									title={ucaApc.map(a => `${a.amount?.toLocaleString('fr-FR')} € (${a.lab_acronym || institution.name})`).join('\n') + (isPersonNonCorr ? '\nAuteur non correspondant' : '')}>
@@ -713,7 +665,7 @@
 						{/if}
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{p.license ? (licenseNames[p.license] ?? p.license) : ''}</td>{/if}
-					{#if showHalStatusColumn && col('hal_status')}
+					{#if isLab && col('hal_status')}
 						{@const hs = computeHalStatus(p)}
 						{@const meta = HAL_STATUS_META[hs]}
 						<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
