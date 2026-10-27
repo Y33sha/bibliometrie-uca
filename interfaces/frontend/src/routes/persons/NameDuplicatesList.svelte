@@ -16,8 +16,8 @@
 
   const OVERLAPS: [keyof Pair["overlaps"], string][] = [
     ["coauthors", "co-auteurs"],
-    ["shared_publications", "publis communes"],
-    ["labs", "labos"],
+    ["shared_publications", "publications communes"],
+    ["labs", "laboratoires"],
     ["serials", "publications en série"],
   ];
 </script>

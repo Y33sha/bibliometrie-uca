@@ -1,11 +1,12 @@
 <script lang="ts">
+	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
-	import { asset, resolve } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
@@ -179,58 +180,7 @@
 					</td>
 				{/if}
 				{#if col('sources')}<td class="links-cell">
-					{#if t.hal_id}
-						<a
-							href={t.record_urls.hal}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-hal"
-							title="HAL: {t.hal_id}"
-						>
-							<img src={asset('icons/hal.ico')} alt="HAL" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
-					{#if t.openalex_id}
-						<a
-							href={t.record_urls.openalex}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-openalex"
-							title="OpenAlex: {t.openalex_id}"
-						>
-							<img src={asset('icons/openalex.png')} alt="OA" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
-					{#if t.scanr_id}
-						<a
-							href={t.record_urls.scanr}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-scanr"
-							title="ScanR: {t.scanr_id}"
-						>
-							<img src={asset('scanr-icon.svg')} alt="ScanR" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
-					{#if t.theses_id}
-						<a
-							href={t.record_urls.theses}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-theses"
-							title="theses.fr: {t.theses_id}"
-						>
-							<img src={asset('icons/theses.ico')} alt="theses.fr" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
+					<SourceLinks ids={[['hal', t.hal_id], ['openalex', t.openalex_id], ['scanr', t.scanr_id], ['theses', t.theses_id]]} urls={t.record_urls} />
 				</td>{/if}
 				<td class="col-access"><AccessButton accessUrl={t.access_url} oaStatus={t.oa_status} compact /></td>
 			</tr>

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
@@ -7,7 +8,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
-	import { asset, resolve } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
@@ -374,34 +375,7 @@
 						<td>{#if p.hal_status}<span class="hal-badge hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
 					{/if}
 					{#if col('sources')}<td class="links-cell">
-						{#if p.hal_id}
-							<a href={p.record_urls.hal} target="_blank" rel="noopener" class="source-tag source-hal" title="HAL: {p.hal_id}">
-								<img src={asset('icons/hal.ico')} alt="HAL" />
-							</a>
-						{:else}
-							<span class="source-tag source-placeholder"></span>
-						{/if}
-						{#if p.openalex_id}
-							<a href={p.record_urls.openalex} target="_blank" rel="noopener" class="source-tag source-openalex" title="OpenAlex: {p.openalex_id}">
-								<img src={asset('icons/openalex.png')} alt="OA" />
-							</a>
-						{:else}
-							<span class="source-tag source-placeholder"></span>
-						{/if}
-						{#if p.scanr_id}
-							<a href={p.record_urls.scanr} target="_blank" rel="noopener" class="source-tag source-scanr" title="ScanR: {p.scanr_id}">
-								<img src={asset('scanr-icon.svg')} alt="ScanR" />
-							</a>
-						{:else}
-							<span class="source-tag source-placeholder"></span>
-						{/if}
-						{#if p.wos_id}
-							<a href={p.record_urls.wos} target="_blank" rel="noopener" class="source-tag source-wos" title="WoS: {p.wos_id}">
-								<img src={asset('icons/wos.ico')} alt="WoS" />
-							</a>
-						{:else}
-							<span class="source-tag source-placeholder"></span>
-						{/if}
+						<SourceLinks ids={[['hal', p.hal_id], ['openalex', p.openalex_id], ['scanr', p.scanr_id], ['wos', p.wos_id]]} urls={p.record_urls} />
 					</td>{/if}
 					<td class="access-cell"><AccessButton accessUrl={p.access_url} oaStatus={p.oa_status} compact /></td>
 				</tr>

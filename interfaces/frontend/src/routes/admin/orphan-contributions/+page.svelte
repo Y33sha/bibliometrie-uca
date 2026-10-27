@@ -3,6 +3,7 @@
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import RhCheck from '#lib/components/RhCheck.svelte';
+	import SourceTag from '#lib/components/SourceTag.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -109,16 +110,6 @@
 		rejectModal = null;
 		await retry();
 	}
-
-	const SOURCE_LABELS: Record<string, string> = {
-		hal: 'HAL',
-		openalex: 'OA',
-		wos: 'WoS',
-		theses: 'Thèses',
-		scanr: 'ScanR',
-		crossref: 'CrossRef',
-		datacite: 'DataCite',
-	};
 
 	function openAssign(idx: number) {
 		activeAssignIdx = idx;
@@ -294,9 +285,9 @@
 			{#each orphans as o, i (o.contribution_id)}
 				<tr>
 					<td><input type="checkbox" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
-					<td>
+					<td class="links-cell">
 						{#each o.sources as source (source)}
-							<span class="tag tag-source">{SOURCE_LABELS[source] ?? source}</span>
+							<SourceTag {source} />
 						{/each}
 					</td>
 					<td>{o.full_name}</td>
@@ -399,8 +390,6 @@
 {/if}
 
 <style>
-	.tag-source { display: inline-block; padding: 1px 6px; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
-	.tag-source + .tag-source { margin-left: 3px; }
 	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.publication-link:hover { text-decoration: underline; }
 	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */

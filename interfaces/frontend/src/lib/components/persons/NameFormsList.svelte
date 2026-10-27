@@ -65,7 +65,7 @@
       </span>
     {/if}
     <span class="publication-count" class:zero={nf.publication_count === 0}>
-      {nf.publication_count} pub.
+      {nf.publication_count.toLocaleString("fr-FR")} publication{nf.publication_count > 1 ? "s" : ""}
     </span>
     {#if nf.shared_count > 0}
       <span
