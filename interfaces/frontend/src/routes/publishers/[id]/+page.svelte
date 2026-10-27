@@ -1,21 +1,19 @@
 <script lang="ts">
+	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { docTypeColorVar, docTypeLabel, oaStatusLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
-	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
+	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
 	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import type { components } from '#lib/api/schema.js';
 
 	type PublisherDetail = components['schemas']['Publisher'];
-	type PublisherDashboard = components['schemas']['PublisherDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
@@ -31,28 +29,11 @@
 
 	let publisher = $state<PublisherDetail | null>(null);
 	let error = $state(false);
-	let dashboard = $state<PublisherDashboard | null>(null);
-	let subjects = $state<SubjectFrequency[]>([]);
+	let subjectList = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
 
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
-
-	// Distributions en segments pour les doughnuts, chaque type dans sa couleur. Pas de notion d'« attendu » au niveau éditeur, agrégat multi-revues.
-	const docTypeSegments = $derived(
-		(dashboard?.doc_types ?? []).map((d) => ({
-			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
-			value: d.count,
-			color: cssVar(docTypeColorVar(d.doc_type ?? 'misc'))
-		}))
-	);
-	const oaStatusSegments = $derived(
-		(dashboard?.oa_statuses ?? []).map((o) => ({
-			label: o.oa_status ? oaStatusLabel(o.oa_status) : '(non renseigné)',
-			value: o.count,
-			color: oaStatusColor(o.oa_status)
-		}))
-	);
 
 	async function loadPublisher() {
 		try {
@@ -69,16 +50,9 @@
 
 	async function loadDashboard() {
 		if (dashboardLoaded) return;
-		const [d, s] = await Promise.all([
-			api<PublisherDashboard>(`/api/publishers/${publisherId}/dashboard`, {
-				key: 'p-dashboard'
-			}),
-			api<SubjectFrequency[]>(`/api/publishers/${publisherId}/subjects?limit=20`, {
-				key: 'p-subjects'
-			})
-		]);
-		dashboard = d;
-		subjects = s;
+		subjectList = await api<SubjectFrequency[]>(`/api/publishers/${publisherId}/subjects?limit=20`, {
+			key: 'p-subjects'
+		});
 		dashboardLoaded = true;
 	}
 
@@ -111,25 +85,25 @@
 			{publisher.name}
 		</h1>
 		<div class="entity-meta">
-			<span class="entity-meta-label">Type</span>
-			<span class="entity-tag">
-				{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
-			</span>
+			<EntityMetaItem label="Type">
+				<span class="entity-tag">
+					{publisherTypeLabels[publisher.publisher_type] ?? publisher.publisher_type}
+				</span>
+			</EntityMetaItem>
 			{#if publisher.country}
-				<span class="entity-meta-label">Pays</span>
-				<span class="entity-tag">{publisher.country.toUpperCase()}</span>
+				<EntityMetaItem label="Pays"><span class="entity-tag">{publisher.country.toUpperCase()}</span></EntityMetaItem>
 			{/if}
 			{#if publisher.openalex_id}
-				<span class="entity-meta-label">OpenAlex</span>
-				<span class="id-badge">{publisher.openalex_id}</span>
+				<EntityMetaItem label="OpenAlex"><span class="id-badge">{publisher.openalex_id}</span></EntityMetaItem>
 			{/if}
 		</div>
 		{#if publisher.doi_prefixes.length > 0}
 			<div class="entity-meta">
-				<span class="entity-meta-label">Préfixes DOI</span>
-				{#each publisher.doi_prefixes as p (p.prefix)}
-					<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
-				{/each}
+				<EntityMetaItem label="Préfixes DOI">
+					{#each publisher.doi_prefixes as p (p.prefix)}
+						<span class="id-badge" title="RA: {p.ra}">{p.prefix}</span>
+					{/each}
+				</EntityMetaItem>
 			</div>
 		{/if}
 	</div>
@@ -148,38 +122,25 @@
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
-			{#if !dashboardLoaded || !dashboard}
-				<div class="loading">Chargement…</div>
-			{:else}
-				<div class="dash-grid">
-					<div class="dash-card dash-card-wide">
+			<PublicationsDashboard
+				context={{ kind: 'publisher', id: publisherId }}
+				apiKey="publisher-dashboard"
+				countries={false}
+				oaBreakdown="oa_voie"
+			>
+				{#snippet subjects()}
+					<div class="dash-card">
 						<h2>Sujets principaux</h2>
-						{#if subjects.length === 0}
+						{#if !dashboardLoaded}
+							<div class="loading">Chargement…</div>
+						{:else if subjectList.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<SubjectsCloud {subjects} />
+							<SubjectsCloud subjects={subjectList} />
 						{/if}
 					</div>
-
-					<div class="dash-card">
-						<h2>Types de documents ({dashboard.total_publications})</h2>
-						{#if dashboard.doc_types.length === 0}
-							<p class="muted">Aucune publication rattachée.</p>
-						{:else}
-							<DoughnutChart segments={docTypeSegments} />
-						{/if}
-					</div>
-
-					<div class="dash-card">
-						<h2>Statuts Open Access</h2>
-						{#if dashboard.oa_statuses.length === 0}
-							<p class="muted">Aucune publication rattachée.</p>
-						{:else}
-							<DoughnutChart segments={oaStatusSegments} />
-						{/if}
-					</div>
-				</div>
-			{/if}
+				{/snippet}
+			</PublicationsDashboard>
 		</div>
 	{/if}
 

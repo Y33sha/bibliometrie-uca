@@ -5,7 +5,7 @@ Les chemins littéraux — `/oa-models`, `/types`, `/facets`, `/export.csv` — 
 
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from application.ports.repositories.serial_repository import SerialUpdate
@@ -21,7 +21,6 @@ from infrastructure.read_models._common import EntityFacetResponse
 from infrastructure.read_models.serials.models import (
     DoiNamespaceConflictsResponse,
     LikelyProceedingsResponse,
-    SerialDashboardResponse,
     SerialDetailResponse,
     SerialDuplicatesResponse,
     SerialFilters,
@@ -230,21 +229,6 @@ def get_serial(
     Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
     """
     return detail.found(queries.get_serial_detail(serial_id))
-
-
-@router.get("/{serial_id}/dashboard", response_model=SerialDashboardResponse)
-def get_serial_dashboard(
-    serial_id: int,
-    queries: SerialQueries = Depends(serial_queries),
-) -> SerialDashboardResponse:
-    """Agrégats des publications de la revue : distributions de `doc_type` et de `oa_status`.
-
-    Sert l'onglet tableau de bord de la page d'une revue, où ces distributions donnent à voir les incohérences — un `article` dans une revue de type `proceedings`, par exemple. Renvoie 404 sur une revue inconnue.
-    """
-    result = queries.get_serial_dashboard(serial_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Revue introuvable")
-    return result
 
 
 @router.get("/{serial_id}/subjects", response_model=list[SubjectFrequency])

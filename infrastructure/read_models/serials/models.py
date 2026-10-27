@@ -86,28 +86,6 @@ class SerialDetailResponse(SerialListItem):
     doaj_imported_at: datetime | None
 
 
-class DocTypeCount(BaseModel):
-    """Compteur de publications par `doc_type` pour une revue.
-
-    `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `serial_type` de la revue (`domain.serials.expected`), ce qui laisse le frontend signaler les autres.
-    """
-
-    doc_type: str | None
-    count: int
-    expected: bool
-
-
-class OaStatusCount(BaseModel):
-    """Compteur de publications par `oa_status` pour une revue.
-
-    `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.serials.expected`).
-    """
-
-    oa_status: str | None
-    count: int
-    expected: bool
-
-
 class SerialsFacetsResponse(BaseModel):
     """Facettes de `/api/serials`.
 
@@ -118,21 +96,6 @@ class SerialsFacetsResponse(BaseModel):
     oa_models: list[FacetOption]
     doaj: list[FacetOption]
     publications: YesNoCount
-
-
-class SerialDashboardResponse(BaseModel):
-    """GET /api/serials/{id}/dashboard : distributions des publications d'une revue.
-
-    Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
-
-    `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue n'a pas la valeur correspondante, ou que celle-ci n'est pas mappée.
-    """
-
-    total_publications: int
-    doc_types: list[DocTypeCount]
-    oa_statuses: list[OaStatusCount]
-    expected_doc_types: list[str]
-    expected_oa_statuses: list[str]
 
 
 class SerialDuplicateGroup(BaseModel):

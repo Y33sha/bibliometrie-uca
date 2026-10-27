@@ -63,27 +63,6 @@ class PublisherListResponse(PaginatedResponse):
     publishers: list[PublisherListItem]
 
 
-class SerialTypeCount(BaseModel):
-    """Compteur de revues par `serial_type` pour un éditeur."""
-
-    serial_type: str | None
-    count: int
-
-
-class DocTypeCount(BaseModel):
-    """Compteur de publications par `doc_type` pour un éditeur."""
-
-    doc_type: str | None
-    count: int
-
-
-class OaStatusCount(BaseModel):
-    """Compteur de publications par `oa_status` pour un éditeur."""
-
-    oa_status: str | None
-    count: int
-
-
 class PublishersFacetsResponse(BaseModel):
     """Facettes dynamiques pour `/api/publishers`.
 
@@ -93,15 +72,3 @@ class PublishersFacetsResponse(BaseModel):
     publisher_types: list[FacetOption]
     countries: list[FacetOption]
     publications: YesNoCount
-
-
-class PublisherDashboardResponse(BaseModel):
-    """GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
-
-    `serial_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
-    """
-
-    total_publications: int
-    serial_types: list[SerialTypeCount]
-    doc_types: list[DocTypeCount]
-    oa_statuses: list[OaStatusCount]

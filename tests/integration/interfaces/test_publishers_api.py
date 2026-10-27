@@ -4,7 +4,6 @@ Couvre :
 - GET /api/publishers (liste + search + sort variants + filtres)
 - GET /api/publishers/facets (3 dimensions avec comptes exclusifs)
 - GET /api/publishers/{id} (detail enrichi, 404)
-- GET /api/publishers/{id}/dashboard (serial_types + doc_types + oa_statuses, 404)
 - GET /api/publishers/{id}/subjects (top sujets, exclusion sujets génériques)
 - PUT /api/publishers/{id} (update, auth requise)
 - POST /api/publishers/{id}/merge (fusion, auth requise, 404 target/source)
@@ -248,66 +247,6 @@ class TestGetPublisher:
         assert r.status_code == 200
         mine = next(p for p in r.json()["publishers"] if p["id"] == pid)
         assert [p["prefix"] for p in mine["doi_prefixes"]] == ["10.9010"]
-
-
-# ── GET /api/publishers/{id}/dashboard ──────────────────────────
-
-
-class TestPublisherDashboard:
-    def test_404_when_unknown(self, client):
-        r = client.get("/api/publishers/999999999/dashboard")
-        assert r.status_code == 404
-
-    def test_empty_distributions_for_publisher_without_serials(self, client):
-        pid = seed_publisher()
-        r = client.get(f"/api/publishers/{pid}/dashboard")
-        assert r.status_code == 200
-        body = r.json()
-        assert body == {
-            "total_publications": 0,
-            "serial_types": [],
-            "doc_types": [],
-            "oa_statuses": [],
-        }
-
-    def test_aggregates_serials_and_publications(self, client):
-        pid = seed_publisher()
-        j_serial = seed_serial(publisher_id=pid)
-        j_proc = seed_serial(publisher_id=pid)
-        with owner_pool() as cur:
-            cur.execute(
-                "UPDATE serials SET serial_type = 'journal' WHERE id = %s",
-                (j_serial,),
-            )
-            cur.execute(
-                "UPDATE serials SET serial_type = 'proceedings' WHERE id = %s",
-                (j_proc,),
-            )
-            _publication(
-                "p1", doc_type="article", oa_status="gold", serial_id=j_serial, publisher_id=pid
-            )
-            _publication(
-                "p2", doc_type="article", oa_status="closed", serial_id=j_serial, publisher_id=pid
-            )
-            _publication(
-                "p3",
-                doc_type="conference_paper",
-                oa_status=None,
-                serial_id=j_proc,
-                publisher_id=pid,
-            )
-        seed_in_perimeter_contributions(j_serial)
-        seed_in_perimeter_contributions(j_proc)
-        r = client.get(f"/api/publishers/{pid}/dashboard")
-        assert r.status_code == 200
-        body = r.json()
-        assert body["total_publications"] == 3
-        jt = {(j["serial_type"], j["count"]) for j in body["serial_types"]}
-        assert jt == {("journal", 1), ("proceedings", 1)}
-        dt = {(d["doc_type"], d["count"]) for d in body["doc_types"]}
-        assert dt == {("article", 2), ("conference_paper", 1)}
-        oa = {(o["oa_status"], o["count"]) for o in body["oa_statuses"]}
-        assert oa == {("gold", 1), ("closed", 1), (None, 1)}
 
 
 # ── GET /api/publishers/{id}/subjects ───────────────────────────

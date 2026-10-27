@@ -24,6 +24,7 @@
 		apiKey,
 		thesesFigure = true,
 		countries = true,
+		oaBreakdown = 'oa_access',
 		figures = [],
 		subjects,
 	}: {
@@ -34,6 +35,8 @@
 		thesesFigure?: boolean;
 		/** Affiche les pays partenaires. */
 		countries?: boolean;
+		/** Découpage des publications par année : niveau d'accès, ou modèle open access. */
+		oaBreakdown?: 'oa_access' | 'oa_voie';
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
 		figures?: Figure[];
 		/** Bloc des sujets, fourni par la page, à côté des publications par année. */
@@ -42,7 +45,10 @@
 
 	let loaded = $state(false);
 	let years = $state<number[]>([]);
+	// Publications par année et par niveau d'accès : total et part en open access.
 	let byYear = $state<Row[]>([]);
+	// Publications par année selon `oaBreakdown`, pour le graphique.
+	let chartRows = $state<Row[]>([]);
 	let types = $state<Row[]>([]);
 	let collab = $state<CollaborationsResponse | null>(null);
 
@@ -64,17 +70,24 @@
 		byYear = all.rows.filter((r) => recent.includes(String(r.year)));
 		if (recent.length) {
 			const year = recent.join(',');
-			[types, collab] = await Promise.all([
+			[types, collab, chartRows] = await Promise.all([
 				api<PivotResponse>(`/api/stats/pivot?${query(null, { indicator: 'doc_type_grouped', year })}`, {
 					key: `${apiKey}-types`,
 				}).then((r) => r.rows),
 				api<CollaborationsResponse>(`/api/stats/collaborations?${query(publicationsDocTypes, { year })}`, {
 					key: `${apiKey}-collaborations`,
 				}),
+				oaBreakdown === 'oa_access'
+					? Promise.resolve(byYear)
+					: api<PivotResponse>(
+							`/api/stats/pivot?${query(publicationsDocTypes, { indicator: oaBreakdown, compare: 'year', year })}`,
+							{ key: `${apiKey}-by-year-${oaBreakdown}` },
+						).then((r) => r.rows),
 			]);
 		} else {
 			types = [];
 			collab = null;
+			chartRows = [];
 		}
 		loaded = true;
 	}
@@ -101,14 +114,14 @@
 		...figures,
 	]);
 
-	// Publications par année, empilées par niveau d'accès. L'année en cours est incomplète.
+	// Publications par année, empilées selon `oaBreakdown`. L'année en cours est incomplète.
 	const currentYear = new Date().getFullYear();
 	const yearLabels = $derived(years.map((y) => (y === currentYear ? `${y} (en cours)` : String(y))));
 	const accessSeries = $derived(
-		orderedPivotValues('oa_access', byYear).map((access, i) => ({
-			label: pivotValueLabel('oa_access', access),
-			color: pivotValueColor('oa_access', access, i),
-			values: years.map((y) => sum(byYear.filter((r) => r.year === y && r.oa_access === access))),
+		orderedPivotValues(oaBreakdown, chartRows).map((value, i) => ({
+			label: pivotValueLabel(oaBreakdown, value),
+			color: pivotValueColor(oaBreakdown, value, i),
+			values: years.map((y) => sum(chartRows.filter((r) => r.year === y && r[oaBreakdown] === value))),
 		})),
 	);
 

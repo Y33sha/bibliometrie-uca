@@ -3,7 +3,7 @@
 Les chemins littéraux — `/types`, `/facets`, `/export.csv` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
@@ -12,7 +12,6 @@ from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from infrastructure.read_models.publishers.models import (
     Publisher,
-    PublisherDashboardResponse,
     PublisherFilters,
     PublisherListResponse,
     PublishersFacetsResponse,
@@ -120,21 +119,6 @@ def get_publisher(
     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
     """
     return detail.found(queries.get_publisher_detail(publisher_id))
-
-
-@router.get("/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
-def get_publisher_dashboard(
-    publisher_id: int,
-    queries: PublisherQueries = Depends(publisher_queries),
-) -> PublisherDashboardResponse:
-    """Agrégats de l'onglet tableau de bord de la page d'un éditeur.
-
-    Distribution des `serial_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
-    """
-    result = queries.get_publisher_dashboard(publisher_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Éditeur introuvable")
-    return result
 
 
 @router.get("/{publisher_id}/subjects", response_model=list[SubjectFrequency])

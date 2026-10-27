@@ -2030,28 +2030,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/publishers/{publisher_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Publisher Dashboard
-         * @description Agrégats de l'onglet tableau de bord de la page d'un éditeur.
-         *
-         *     Distribution des `serial_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
-         */
-        get: operations["get_publisher_dashboard_api_publishers__publisher_id__dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/publishers/{publisher_id}/subjects": {
         parameters: {
             query?: never;
@@ -2417,28 +2395,6 @@ export interface paths {
          *     Un `serial_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_serial`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
          */
         put: operations["update_serial_api_serials__serial_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/serials/{serial_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Serial Dashboard
-         * @description Agrégats des publications de la revue : distributions de `doc_type` et de `oa_status`.
-         *
-         *     Sert l'onglet tableau de bord de la page d'une revue, où ces distributions donnent à voir les incohérences — un `article` dans une revue de type `proceedings`, par exemple. Renvoie 404 sur une revue inconnue.
-         */
-        get: operations["get_serial_dashboard_api_serials__serial_id__dashboard_get"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -4746,22 +4702,6 @@ export interface components {
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
         };
         /**
-         * PublisherDashboardResponse
-         * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
-         *
-         *     `serial_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
-         */
-        PublisherDashboardResponse: {
-            /** Total Publications */
-            total_publications: number;
-            /** Serial Types */
-            serial_types: components["schemas"]["SerialTypeCount"][];
-            /** Doc Types */
-            doc_types: components["schemas"]["infrastructure__read_models__publishers__models__DocTypeCount"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["infrastructure__read_models__publishers__models__OaStatusCount"][];
-        };
-        /**
          * PublisherListItem
          * @description Ligne de la liste des éditeurs.
          *
@@ -4964,26 +4904,6 @@ export interface components {
             phases: components["schemas"]["PhaseBrief"][];
         };
         /**
-         * SerialDashboardResponse
-         * @description GET /api/serials/{id}/dashboard : distributions des publications d'une revue.
-         *
-         *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
-         *
-         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue n'a pas la valeur correspondante, ou que celle-ci n'est pas mappée.
-         */
-        SerialDashboardResponse: {
-            /** Total Publications */
-            total_publications: number;
-            /** Doc Types */
-            doc_types: components["schemas"]["infrastructure__read_models__serials__models__DocTypeCount"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["infrastructure__read_models__serials__models__OaStatusCount"][];
-            /** Expected Doc Types */
-            expected_doc_types: string[];
-            /** Expected Oa Statuses */
-            expected_oa_statuses: string[];
-        };
-        /**
          * SerialDetailResponse
          * @description GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
          *
@@ -5125,16 +5045,6 @@ export interface components {
          * @description Compte des publications dont le `doc_type` canonique changerait si le `serial_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
          */
         SerialTypeChangeImpact: {
-            /** Count */
-            count: number;
-        };
-        /**
-         * SerialTypeCount
-         * @description Compteur de revues par `serial_type` pour un éditeur.
-         */
-        SerialTypeCount: {
-            /** Serial Type */
-            serial_type: string | null;
             /** Count */
             count: number;
         };
@@ -5838,54 +5748,6 @@ export interface components {
             yes: number;
             /** No */
             no: number;
-        };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
-         */
-        infrastructure__read_models__publishers__models__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
-         */
-        infrastructure__read_models__publishers__models__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
-            /** Count */
-            count: number;
-        };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `serial_type` de la revue (`domain.serials.expected`), ce qui laisse le frontend signaler les autres.
-         */
-        infrastructure__read_models__serials__models__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
-         *
-         *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.serials.expected`).
-         */
-        infrastructure__read_models__serials__models__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
         };
     };
     responses: never;
@@ -9213,37 +9075,6 @@ export interface operations {
             };
         };
     };
-    get_publisher_dashboard_api_publishers__publisher_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                publisher_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublisherDashboardResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_publisher_subjects_api_publishers__publisher_id__subjects_get: {
         parameters: {
             query?: {
@@ -9724,37 +9555,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_serial_dashboard_api_serials__serial_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                serial_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SerialDashboardResponse"];
                 };
             };
             /** @description Validation Error */

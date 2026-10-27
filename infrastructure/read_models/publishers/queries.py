@@ -8,19 +8,15 @@ from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
-from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
+from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.publishers.models import (
-    DocTypeCount,
     DoiPrefixInfo,
-    OaStatusCount,
     Publisher,
-    PublisherDashboardResponse,
     PublisherFilters,
     PublisherListItem,
     PublisherListResponse,
     PublishersFacetsResponse,
     PublisherSort,
-    SerialTypeCount,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 
@@ -240,57 +236,6 @@ class PublisherQueries:
         if row is None:
             return None
         return _row_to_publisher(row)
-
-    def get_publisher_dashboard(self, publisher_id: int) -> PublisherDashboardResponse | None:
-        exists = self._conn.execute(
-            text("SELECT 1 FROM publishers WHERE id = :id"),
-            {"id": publisher_id},
-        ).one_or_none()
-        if exists is None:
-            return None
-
-        serial_type_rows = self._conn.execute(
-            text("""
-                SELECT serial_type, COUNT(*) AS n
-                FROM serials
-                WHERE publisher_id = :id
-                GROUP BY serial_type
-                ORDER BY n DESC, serial_type NULLS LAST
-            """),
-            {"id": publisher_id},
-        ).all()
-        doc_type_rows = self._conn.execute(
-            text(f"""
-                SELECT p.doc_type, COUNT(*) AS n
-                FROM publications p
-                WHERE p.publisher_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.doc_type
-                ORDER BY n DESC, p.doc_type NULLS LAST
-            """),
-            {"id": publisher_id},
-        ).all()
-        oa_rows = self._conn.execute(
-            text(f"""
-                SELECT p.oa_status, COUNT(*) AS n
-                FROM publications p
-                WHERE p.publisher_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.oa_status
-                ORDER BY n DESC, p.oa_status NULLS LAST
-            """),
-            {"id": publisher_id},
-        ).all()
-        total = sum(r.n for r in doc_type_rows)
-
-        return PublisherDashboardResponse(
-            total_publications=total,
-            serial_types=[
-                SerialTypeCount(serial_type=r.serial_type, count=r.n) for r in serial_type_rows
-            ],
-            doc_types=[DocTypeCount(doc_type=r.doc_type, count=r.n) for r in doc_type_rows],
-            oa_statuses=[OaStatusCount(oa_status=r.oa_status, count=r.n) for r in oa_rows],
-        )
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Sujets des publications de l'éditeur, les plus fréquents d'abord.

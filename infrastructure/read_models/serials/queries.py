@@ -9,12 +9,6 @@ from domain.normalize import normalize_text
 from domain.publications.identifiers import issn_search_prefix
 from domain.serials.containers import conference_paper_share, holds_mostly_conference_papers
 from domain.serials.doi_namespaces import DoiNamespace, namespace_candidates, resolve_serial
-from domain.serials.expected import (
-    EXPECTED_DOC_TYPES_BY_SERIAL_TYPE,
-    EXPECTED_OA_STATUSES_BY_OA_MODEL,
-    is_doc_type_expected,
-    is_oa_status_expected,
-)
 from domain.serials.serial import (
     OA_MODEL_LABELS_FR,
     OA_MODELS,
@@ -30,15 +24,12 @@ from infrastructure.read_models._common import (
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
-from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
+from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.serials.models import (
-    DocTypeCount,
     DoiNamespaceConflict,
     DoiNamespaceConflictsResponse,
     LikelyProceedingsItem,
     LikelyProceedingsResponse,
-    OaStatusCount,
-    SerialDashboardResponse,
     SerialDetailResponse,
     SerialDuplicateGroup,
     SerialDuplicatesResponse,
@@ -502,60 +493,6 @@ class SerialQueries:
             is_academic=row.is_academic,
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,
-        )
-
-    def _serial_publication_distribution(
-        self, serial_id: int, column: str
-    ) -> list[tuple[str | None, int]]:
-        """Répartition des publications du périmètre de la revue par une colonne.
-
-        `column` est un identifiant figé (`doc_type` ou `oa_status`), interpolé dans le SQL.
-        """
-        rows = self._conn.execute(
-            text(f"""
-                SELECT p.{column} AS value, COUNT(*) AS n
-                FROM publications p
-                WHERE p.serial_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.{column}
-                ORDER BY n DESC, p.{column} NULLS LAST
-            """),
-            {"id": serial_id},
-        ).all()
-        return [(r.value, r.n) for r in rows]
-
-    def get_serial_dashboard(self, serial_id: int) -> SerialDashboardResponse | None:
-        # Récupère aussi serial_type + oa_model pour calculer les `expected`.
-        serial_row = self._conn.execute(
-            text("SELECT serial_type, oa_model FROM serials WHERE id = :id"),
-            {"id": serial_id},
-        ).one_or_none()
-        if serial_row is None:
-            return None
-        j_type = serial_row.serial_type
-        oa_model = serial_row.oa_model
-
-        doc_type_rows = self._serial_publication_distribution(serial_id, "doc_type")
-        oa_rows = self._serial_publication_distribution(serial_id, "oa_status")
-        total = sum(count for _, count in doc_type_rows)
-
-        expected_doc_types = sorted(EXPECTED_DOC_TYPES_BY_SERIAL_TYPE.get(j_type, frozenset()))
-        expected_oa_statuses = sorted(EXPECTED_OA_STATUSES_BY_OA_MODEL.get(oa_model, frozenset()))
-
-        return SerialDashboardResponse(
-            total_publications=total,
-            doc_types=[
-                DocTypeCount(doc_type=dt, count=count, expected=is_doc_type_expected(j_type, dt))
-                for dt, count in doc_type_rows
-            ],
-            oa_statuses=[
-                OaStatusCount(
-                    oa_status=oa, count=count, expected=is_oa_status_expected(oa_model, oa)
-                )
-                for oa, count in oa_rows
-            ],
-            expected_doc_types=expected_doc_types,
-            expected_oa_statuses=expected_oa_statuses,
         )
 
     def get_serial_subjects(self, serial_id: int, *, limit: int) -> list[SubjectFrequency]:
