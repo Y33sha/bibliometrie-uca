@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
@@ -92,23 +91,19 @@ def collaborations(
 def pivot_schema(
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotSchemaResponse:
-    """Vocabulaire du pivot (dimensions groupables, mesures) dont l'interface tire ses sélecteurs."""
+    """Vocabulaire du pivot (dimensions, indicateurs) dont l'interface tire ses sélecteurs."""
     return queries.pivot_schema()
 
 
 @router.get("/pivot", response_model=PivotResponse)
 def pivot(
-    measure: str = Query("publication_count"),
-    group: str = Query(""),
-    group2: str = Query(""),
+    indicator: str = Query("doc_type_grouped"),
+    compare: str = Query(""),
     filters: StatsFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotResponse:
-    """Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
+    """Agrégation d'un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.
 
-    Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 422, comme `group2` fourni sans `group`.
+    Un indicateur inconnu ou un axe non comparable donnent un 422.
     """
-    if group2 and not group:
-        raise ValidationError("Une seconde ventilation exige la première : `group2` sans `group`")
-    groups = [g for g in (group, group2) if g]
-    return queries.pivot(measure=measure, groups=groups, filters=filters)
+    return queries.indicator_pivot(indicator=indicator, compare=compare, filters=filters)

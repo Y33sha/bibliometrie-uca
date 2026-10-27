@@ -143,7 +143,7 @@ export interface paths {
         };
         /**
          * Pivot Schema
-         * @description Vocabulaire du pivot (dimensions groupables, mesures) dont l'interface tire ses sélecteurs.
+         * @description Vocabulaire du pivot (dimensions, indicateurs) dont l'interface tire ses sélecteurs.
          */
         get: operations["pivot_schema_api_stats_pivot_schema_get"];
         put?: never;
@@ -163,9 +163,9 @@ export interface paths {
         };
         /**
          * Pivot
-         * @description Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
+         * @description Agrégation d'un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.
          *
-         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 422, comme `group2` fourni sans `group`.
+         *     Un indicateur inconnu ou un axe non comparable donnent un 422.
          */
         get: operations["pivot_api_stats_pivot_get"];
         put?: never;
@@ -4297,14 +4297,19 @@ export interface components {
             /** Filterable */
             filterable: boolean;
         };
-        /** PivotMeasureOut */
-        PivotMeasureOut: {
+        /**
+         * PivotIndicatorOut
+         * @description Indicateur du sélecteur de l'interface. `unit` est l'unité de sa mesure, vide pour un nombre de publications. `breakdown` est la dimension empilée dans chaque barre.
+         */
+        PivotIndicatorOut: {
             /** Key */
             key: string;
             /** Label */
             label: string;
             /** Unit */
             unit: string;
+            /** Breakdown */
+            breakdown: string;
         };
         /**
          * PivotResponse
@@ -4327,8 +4332,8 @@ export interface components {
         PivotSchemaResponse: {
             /** Dimensions */
             dimensions: components["schemas"]["PivotDimensionOut"][];
-            /** Measures */
-            measures: components["schemas"]["PivotMeasureOut"][];
+            /** Indicators */
+            indicators: components["schemas"]["PivotIndicatorOut"][];
         };
         /**
          * PublicationApcPayment
@@ -5978,9 +5983,8 @@ export interface operations {
     pivot_api_stats_pivot_get: {
         parameters: {
             query?: {
-                measure?: string;
-                group?: string;
-                group2?: string;
+                indicator?: string;
+                compare?: string;
                 lab_id?: string;
                 year?: string;
                 publisher_id?: string;

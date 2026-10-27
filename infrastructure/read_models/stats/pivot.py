@@ -9,6 +9,8 @@ Propriétés d'une dimension :
 
 Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC que l'établissement a payées pour elles. Le taux d'open access relève de la présentation.
 
+Un **indicateur** est ce que l'interface propose d'afficher : une mesure, ventilée par une dimension empilée dans chaque barre. L'indicateur impose sa mesure. Un axe de comparaison facultatif s'ajoute à la ventilation (`indicator_pivot`).
+
 La requête est composée sur **liste blanche** : `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` utilise seulement les expressions du registre, indexées par des clés validées (`validate_pivot`). Le grain est tenu par une sous-requête qui rend chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui démultiplie les lignes (`lab`) ne fait donc compter ni sommer deux fois la même publication.
 """
 
@@ -33,7 +35,7 @@ from infrastructure.read_models.publications.models import NO_LICENSE
 from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
 from infrastructure.read_models.stats.models import (
     PivotDimensionOut,
-    PivotMeasureOut,
+    PivotIndicatorOut,
     PivotResponse,
     PivotSchemaResponse,
     StatsFilters,
@@ -230,6 +232,38 @@ MEASURES: dict[str, Measure] = {
 }
 
 
+@dataclass(frozen=True, slots=True)
+class Indicator:
+    """Une mesure ventilée par la dimension `breakdown`, empilée dans chaque barre."""
+
+    key: str
+    label: str
+    measure: str
+    breakdown: str
+
+
+# L'ordre du registre est celui du sélecteur de l'interface.
+INDICATORS: dict[str, Indicator] = {
+    i.key: i
+    for i in (
+        Indicator("doc_type_grouped", "Productions", "publication_count", "doc_type_grouped"),
+        Indicator("oa_access", "Open access", "publication_count", "oa_access"),
+        Indicator("oa_voie", "Modèle OA", "publication_count", "oa_voie"),
+        Indicator("license", "Licence", "publication_count", "license"),
+        Indicator("apc_amount", "Montant des APC", "apc_amount", "oa_voie"),
+    )
+}
+
+assert all(
+    i.measure in MEASURES
+    and DIMENSIONS[i.breakdown].groupable
+    and not DIMENSIONS[i.breakdown].comparable
+    for i in INDICATORS.values()
+), (
+    "un indicateur agrège une mesure du registre, ventilée par une dimension groupable non comparable"
+)
+
+
 def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[Dimension]]:
     """Valide une requête de pivot contre le registre (liste blanche).
 
@@ -249,6 +283,21 @@ def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[D
         seen.add(key)
         dims.append(DIMENSIONS[key])
     return MEASURES[measure], dims
+
+
+def validate_indicator(indicator: str, compare: str) -> tuple[str, list[str]]:
+    """Résout un indicateur et son axe de comparaison facultatif en mesure et groupements du moteur.
+
+    Lève `ValidationError` si l'indicateur est inconnu ou si `compare` n'est pas une dimension comparable.
+    """
+    if indicator not in INDICATORS:
+        raise ValidationError(f"Indicateur inconnu : {indicator!r}")
+    ind = INDICATORS[indicator]
+    if not compare:
+        return ind.measure, [ind.breakdown]
+    if compare not in DIMENSIONS or not DIMENSIONS[compare].comparable:
+        raise ValidationError(f"Axe de comparaison inconnu : {compare!r}")
+    return ind.measure, [ind.breakdown, compare]
 
 
 def _order_by(dims: list[Dimension]) -> str:
@@ -275,10 +324,23 @@ class StatsPivotQueries:
                 )
                 for d in DIMENSIONS.values()
             ],
-            measures=[
-                PivotMeasureOut(key=m.key, label=m.label, unit=m.unit) for m in MEASURES.values()
+            indicators=[
+                PivotIndicatorOut(
+                    key=i.key,
+                    label=i.label,
+                    unit=MEASURES[i.measure].unit,
+                    breakdown=i.breakdown,
+                )
+                for i in INDICATORS.values()
             ],
         )
+
+    def indicator_pivot(
+        self, *, indicator: str, compare: str, filters: StatsFilters
+    ) -> PivotResponse:
+        """Exécute l'agrégation d'un indicateur, ventilé par sa dimension puis par `compare` si renseigné."""
+        measure, groups = validate_indicator(indicator, compare)
+        return self.pivot(measure=measure, groups=groups, filters=filters)
 
     def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse:
         """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""

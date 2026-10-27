@@ -51,9 +51,9 @@
 	let pivotRows: Record<string, unknown>[] = [];
 	let initialYearsApplied = false;
 
-	// --- Pivot : axes de l'histogramme. Groupement primaire (abscisse) + comparaison empilée (facultative). ---
+	// --- Pivot : un indicateur (mesure et ventilation) + un axe de comparaison facultatif. ---
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
-	let primaryBy = $state('doc_type_grouped'); // groupement primaire (abscisse) : une catégorie, jamais l'année
+	let indicator = $state('doc_type_grouped');
 	let groupBy = $state('year'); // comparaison : série secondaire empilée (facultative), p. ex. l'année
 	let chartMode = $state<'absolu' | 'part'>('absolu'); // part = empilement aplati à 100 %
 	let chartPage = $state(1); // page de l'axe de comparaison à forte cardinalité (laboratoires)
@@ -65,34 +65,23 @@
 	let sortableSeries = $state<{ value: string; label: string }[]>([]);
 	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
-	// Mesure agrégée par le pivot : nombre de publications, ou montant des APC payées par l'établissement. Le taux d'open access se lit via le découpage par accès.
-	let measure = $state('publication_count');
-	const measureDef = $derived(pivotSchema?.measures.find((m) => m.key === measure));
+	const indicatorDef = $derived(pivotSchema?.indicators.find((i) => i.key === indicator));
+	// Dimension empilée dans chaque barre, imposée par l'indicateur.
+	const breakdown = $derived(indicatorDef?.breakdown ?? '');
 	// Valeur affichée d'une barre ou d'un total : entier pour un nombre de publications, montant arrondi à l'euro suivi de l'unité pour une somme.
 	function formatValue(value: number): string {
-		const unit = measureDef?.unit;
+		const unit = indicatorDef?.unit;
 		const text = Math.round(value).toLocaleString('fr-FR');
 		return unit ? `${text} ${unit}` : text;
 	}
 
 	// Entrée spéciale du sélecteur d'indicateur : remplace l'histogramme par la carte des collaborations internationales. Ce n'est pas une dimension du pivot, d'où les gardes dédiées.
 	const COLLAB_VIEW = 'collaborations';
-	const isCollab = $derived(primaryBy === COLLAB_VIEW);
+	const isCollab = $derived(indicator === COLLAB_VIEW);
 
-	// Groupement primaire : catégories à analyser, faible cardinalité, non ordinales (accès, voie, type). L'année ne se groupe pas (elle se compare) ; le laboratoire non plus (forte cardinalité).
-	const groupingDims = $derived(
-		pivotSchema
-			? pivotSchema.dimensions
-					.filter((d) => d.groupable && d.cardinality === 'low' && !d.ordinal)
-					// Le type de production est l'indicateur le plus parlant : on le place en tête.
-					.sort((a, b) =>
-						a.key === 'doc_type_grouped' ? -1 : b.key === 'doc_type_grouped' ? 1 : 0
-					)
-			: []
-	);
-	// Comparaison : les dimensions déclarées `comparable` (année et les entités à forte cardinalité — labo, éditeur, revue ; pas l'accès ni la voie, qui s'empilent), moins celle déjà prise comme groupement primaire.
+	// Comparaison : les dimensions déclarées `comparable` (l'année et les entités à forte cardinalité : laboratoire, éditeur, revue, organisation partenaire).
 	const comparableDims = $derived(
-		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable && d.key !== primaryBy) : []
+		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable) : []
 	);
 
 	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
@@ -176,14 +165,6 @@
 		return [...den.keys()].sort((a, b) => sign * (share(a) - share(b)));
 	}
 
-	function onPrimaryChange() {
-		// Le groupement primaire ne peut pas être aussi la comparaison.
-		if (groupBy === primaryBy) groupBy = '';
-		onAxisChange();
-	}
-	function onGroupByChange() {
-		onAxisChange();
-	}
 	function onAxisChange() {
 		chartPage = 1; // changer d'axe repart de la première page
 		syncUrl();
@@ -233,8 +214,7 @@
 			publisherId: { type: 'single', urlKey: 'publisher_id' },
 			serialId: { type: 'single', urlKey: 'serial_id' },
 			partnerRor: { type: 'single', urlKey: 'partner_ror' },
-			measure: { type: 'single', urlKey: 'measure', defaultValue: 'publication_count' },
-			primaryBy: { type: 'single', urlKey: 'axis', defaultValue: 'doc_type_grouped' },
+			indicator: { type: 'single', urlKey: 'indicator', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
 				chartPage: { type: 'page', urlKey: 'chart_page' },
@@ -254,8 +234,7 @@
 			publisherId: selectedPublisherId ?? '',
 			serialId: selectedSerialId ?? '',
 			partnerRor: selectedPartnerRor ?? '',
-			measure,
-			primaryBy,
+			indicator,
 			groupBy,
 			chartMode,
 			chartPage,
@@ -280,7 +259,7 @@
 		await Promise.all([loadChart(), facets.load()]);
 	}
 
-	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête ne dépend que des filtres, du groupement primaire et de la comparaison ; les contrôles d'affichage (mode, tri, page) re-tracent depuis ce cache sans nouvel appel réseau (voir `renderChart`).
+	// Récupère les lignes du pivot depuis l'API, puis délègue le tracé. La requête dépend seulement des filtres, de l'indicateur et de la comparaison ; les contrôles d'affichage (mode, tri, page) re-tracent depuis ce cache sans nouvel appel réseau (voir `renderChart`).
 	async function loadChart() {
 		// Vue Collaborations : la carte se dessine seule (composant dédié). On détruit l'histogramme éventuel et on n'interroge pas le pivot (`collaborations` n'est pas une dimension valide).
 		if (isCollab) {
@@ -292,10 +271,8 @@
 			return;
 		}
 		const p = chartParams();
-		p.set('measure', measure);
-		p.set('group', primaryBy);
-		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
-		if (comparison) p.set('group2', comparison);
+		p.set('indicator', indicator);
+		if (groupBy) p.set('compare', groupBy);
 		const res = await pivotRequest<{ rows: Record<string, unknown>[] }>('/api/stats/pivot?' + p);
 		pivotRows = res.rows;
 		await tick();
@@ -308,11 +285,11 @@
 		if (yearChart) yearChart.destroy();
 		const rows = pivotRows;
 		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
-		const comparison = groupBy && groupBy !== primaryBy ? groupBy : '';
+		const comparison = groupBy;
 
-		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va naturellement) ; le groupement est l'empilement (la catégorie lue dans chaque barre). Sans comparaison, le groupement passe en abscisse, en barres simples.
-		const xDim = comparison || primaryBy;
-		const stackDim = comparison ? primaryBy : '';
+		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va naturellement) ; la ventilation de l'indicateur est l'empilement (la catégorie lue dans chaque barre). Sans comparaison, la ventilation passe en abscisse, en barres simples.
+		const xDim = comparison || breakdown;
+		const stackDim = comparison ? breakdown : '';
 
 		const stackValues = stackDim ? orderedValues(stackDim, rows) : [];
 
@@ -345,7 +322,7 @@
 		const valueMax = Math.max(0, ...allCats.map(catTotal));
 
 		const datasets = series.map((sv, i) => ({
-			label: stackDim ? dimLabel(stackDim, sv) : (measureDef?.label ?? 'Publications'),
+			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
 			backgroundColor: stackDim ? dimColor(stackDim, sv, i) : cssVar('accent'),
 			barPercentage: 0.85,
@@ -525,8 +502,7 @@
 		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
 		if (restored.serialId) selectedSerialId = restored.serialId as string;
 		if (restored.partnerRor) selectedPartnerRor = restored.partnerRor as string;
-		if (restored.measure !== undefined) measure = restored.measure as string;
-		if (restored.primaryBy !== undefined) primaryBy = restored.primaryBy as string;
+		if (restored.indicator !== undefined) indicator = restored.indicator as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
 		if (restored.chartPage) chartPage = restored.chartPage as number;
@@ -561,9 +537,9 @@
 	{#if pivotSchema}
 		<label class="groupby">
 			Indicateur&nbsp;:
-			<select bind:value={primaryBy} onchange={onPrimaryChange}>
-				{#each groupingDims as d (d.key)}
-					<option value={d.key}>{d.label}</option>
+			<select bind:value={indicator} onchange={onAxisChange}>
+				{#each pivotSchema.indicators as i (i.key)}
+					<option value={i.key}>{i.unit ? `${i.label} (${i.unit})` : i.label}</option>
 				{/each}
 				<option value={COLLAB_VIEW}>Collaborations internationales</option>
 			</select>
@@ -571,26 +547,14 @@
 		{#if !isCollab}
 		<span class="sep" aria-hidden="true"></span>
 		<label class="groupby">
-			Mesure&nbsp;:
-			<select bind:value={measure} onchange={() => { syncUrl(); loadChart(); }}>
-				{#each pivotSchema.measures as m (m.key)}
-					<option value={m.key}>{m.unit ? `${m.label} (${m.unit})` : m.label}</option>
+			Comparer par&nbsp;:
+			<select bind:value={groupBy} onchange={onAxisChange}>
+				<option value="">Aucun</option>
+				{#each comparableDims as d (d.key)}
+					<option value={d.key}>{d.label}</option>
 				{/each}
 			</select>
 		</label>
-		<span class="sep" aria-hidden="true"></span>
-		<!-- {#key primaryBy} : recrée le select quand le groupement change, pour que sa valeur affichée reste synchronisée avec `groupBy` malgré le recalcul des options. -->
-		{#key primaryBy}
-			<label class="groupby">
-				Comparer par&nbsp;:
-				<select bind:value={groupBy} onchange={onGroupByChange}>
-					<option value="">Aucun</option>
-					{#each comparableDims as d (d.key)}
-						<option value={d.key}>{d.label}</option>
-					{/each}
-				</select>
-			</label>
-		{/key}
 			<span class="sep" aria-hidden="true"></span>
 			{/if}
 		{/if}

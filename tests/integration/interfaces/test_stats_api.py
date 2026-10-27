@@ -42,40 +42,32 @@ class TestCollaborations:
 
 
 class TestPivot:
-    def test_schema_lists_dimensions_and_measures(self, client):
+    def test_schema_lists_dimensions_and_indicators(self, client):
         r = client.get("/api/stats/pivot/schema")
         assert r.status_code == 200
         body = r.json()
         assert body["dimensions"]
-        assert body["measures"]
+        apc = next(i for i in body["indicators"] if i["key"] == "apc_amount")
+        assert apc["unit"] == "€ HT"
 
-    def test_default_measure_without_grouping(self, client):
+    def test_default_indicator(self, client):
         r = client.get("/api/stats/pivot")
         assert r.status_code == 200
+        assert r.json()["groups"] == ["doc_type_grouped"]
 
-    def test_single_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"measure": "publication_count", "group": "year"})
+    def test_indicator_with_comparison(self, client):
+        r = client.get("/api/stats/pivot", params={"indicator": "apc_amount", "compare": "year"})
         assert r.status_code == 200
+        body = r.json()
+        assert body["measure"] == "apc_amount"
+        assert body["groups"] == ["oa_voie", "year"]
 
-    def test_double_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"group": "year", "group2": "doc_type_grouped"})
-        assert r.status_code == 200
-
-    def test_rejects_a_dimension_that_is_not_groupable(self, client):
-        """`doc_type` se filtre mais ne se ventile pas ; `doc_type_grouped` est sa forme groupable."""
-        r = client.get("/api/stats/pivot", params={"group": "doc_type"})
+    def test_rejects_unknown_indicator(self, client):
+        r = client.get("/api/stats/pivot", params={"indicator": "inexistant"})
         assert r.status_code == 422
 
-    def test_rejects_second_grouping_without_the_first(self, client):
-        r = client.get("/api/stats/pivot", params={"group2": "year"})
-        assert r.status_code == 422
-
-    def test_rejects_unknown_measure(self, client):
-        r = client.get("/api/stats/pivot", params={"measure": "inexistante"})
-        assert r.status_code == 422
-
-    def test_rejects_repeated_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"group": "year", "group2": "year"})
+    def test_rejects_a_dimension_that_is_not_comparable(self, client):
+        r = client.get("/api/stats/pivot", params={"compare": "oa_access"})
         assert r.status_code == 422
 
 

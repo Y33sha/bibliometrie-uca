@@ -47,17 +47,20 @@ class PivotDimensionOut(BaseModel):
     filterable: bool
 
 
-class PivotMeasureOut(BaseModel):
+class PivotIndicatorOut(BaseModel):
+    """Indicateur du sélecteur de l'interface. `unit` est l'unité de sa mesure, vide pour un nombre de publications. `breakdown` est la dimension empilée dans chaque barre."""
+
     key: str
     label: str
     unit: str
+    breakdown: str
 
 
 class PivotSchemaResponse(BaseModel):
     """Vocabulaire du pivot exposé à l'interface (sans liaison SQL)."""
 
     dimensions: list[PivotDimensionOut]
-    measures: list[PivotMeasureOut]
+    indicators: list[PivotIndicatorOut]
 
 
 class PivotResponse(BaseModel):
