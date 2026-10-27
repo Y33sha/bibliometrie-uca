@@ -13,8 +13,8 @@ import {
 	presenceSummary,
 	restoreValues,
 	summarizeParts,
+	ignoredFilters,
 	transferParams,
-	untransferredFilters,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -152,14 +152,13 @@ describe('filterRegistry', () => {
 		});
 	});
 
-	it('signale les filtres actifs que la page cible ne propose pas', () => {
+	it('signale les filtres sélectionnés que la page ne propose pas', () => {
 		const values = initialValues(FILTERS);
 		values.checkbox.years = ['2024'];
 		values.checkbox.perimeter = ['yes'];
-		const target = FILTERS.map((f) => (f.key === 'perimeter' ? { ...f, enabled: () => false } : f));
-		expect(untransferredFilters(FILTERS, values, target).map((f) => f.key)).toEqual(['perimeter']);
-		values.checkbox.perimeter = [];
-		expect(untransferredFilters(FILTERS, values, target)).toEqual([]);
+		expect(ignoredFilters(FILTERS, values)).toEqual([]);
+		perimeterEnabled = false;
+		expect(ignoredFilters(FILTERS, values).map((f) => f.key)).toEqual(['perimeter']);
 	});
 
 	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {

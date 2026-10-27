@@ -20,8 +20,11 @@
 		licenseOrder,
 		publicationsDocTypes,
 	} from '#lib/labels.js';
+	import { toast } from '#lib/dialogs.svelte.js';
 	import {
 		appendFilterParams,
+		clearValue,
+		ignoredFilters,
 		initialValues,
 		restoreValues,
 		transferParams,
@@ -453,6 +456,15 @@
 		if (restored.chartPage) chartPage = restored.chartPage as number;
 		if (restored.chartSort !== undefined) chartSort = restored.chartSort as string;
 		if (restored.chartSortDir !== undefined) chartSortDir = restored.chartSortDir as 'desc' | 'asc';
+
+		// Un lien venu de la liste peut contenir un filtre propre à un laboratoire ou à une personne : il est annoncé, puis retiré.
+		const ignored = ignoredFilters(FILTERS, values);
+		if (ignored.length) {
+			const names = ignored.map((f) => `« ${f.label} »`).join(', ');
+			toast(`${ignored.length > 1 ? 'Filtres non pris en compte' : 'Filtre non pris en compte'} : ${names}`, 'info', 6000);
+			for (const f of ignored) clearValue(f, values);
+			syncUrl();
+		}
 
 		// Vocabulaire du pivot : dimensions graphables (faible cardinalité, hors l'axe année) proposées au sélecteur de découpage. Ajouter une dimension au registre l'y fait apparaître.
 		try {

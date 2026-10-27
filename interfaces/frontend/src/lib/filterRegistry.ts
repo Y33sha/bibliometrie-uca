@@ -183,16 +183,9 @@ export function appendFilterParams(
 	}
 }
 
-/** Filtres actifs de la page que la page cible ne propose pas : `transferParams` les écrit, mais la page cible les ignore. */
-export function untransferredFilters(
-	filters: ListFilter[],
-	values: FilterValues,
-	target: ListFilter[],
-): ListFilter[] {
-	const proposed = new Set(target.filter((f) => f.enabled?.() ?? true).map((f) => f.key));
-	return filters.filter(
-		(f) => (f.enabled?.() ?? true) && (isActive(f, values) || f.fixed?.() != null) && !proposed.has(f.key),
-	);
+/** Filtres sélectionnés que la page ne propose pas, par exemple lus dans l'URL d'un lien venu d'une autre page. La requête les ignore. */
+export function ignoredFilters(filters: ListFilter[], values: FilterValues): ListFilter[] {
+	return filters.filter((f) => !(f.enabled?.() ?? true) && isActive(f, values));
 }
 
 /** Configuration des décomptes pour `useFacets`, par clé de filtre. */
