@@ -4,7 +4,7 @@
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 
 	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent.
-	// Collée sous le menu supérieur, la barre suit le défilement pixel par pixel : elle glisse sous le menu quand la page descend, et en ressort quand la page remonte. L'en-tête du tableau qui suit se colle sous sa part visible.
+	// Collée sous le menu supérieur, la barre glisse sous le menu au rythme de la page quand celle-ci descend, et réapparaît en entier dès que la page remonte. L'en-tête du tableau qui suit se colle sous sa part visible.
 	let {
 		search = $bindable(),
 		placeholder = 'Rechercher',
@@ -76,9 +76,10 @@
 		// La barre glisse au plus de sa hauteur, et au plus du chemin parcouru depuis sa place.
 		const limit = Math.min(bar.offsetHeight, Math.max(0, headerHeight - anchor.getBoundingClientRect().top));
 		const gesture = performance.now() - lastGesture < GESTURE_WINDOW_MS;
+		// En descente, la barre glisse au rythme de la page ; à la remontée, elle réapparaît en entier.
 		let next = offset;
 		if (delta > 0 && gesture) next += delta;
-		else if (delta < 0) next += delta;
+		else if (delta < 0) next = 0;
 		offset = Math.min(limit, Math.max(0, next));
 	}
 </script>
