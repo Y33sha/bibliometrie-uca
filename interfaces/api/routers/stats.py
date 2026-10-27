@@ -5,13 +5,15 @@ from fastapi import APIRouter, Depends, Query
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.metadata import OA_STATUSES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
-from infrastructure.read_models.publications.models import LICENSE_FILTER_VALUES
+from infrastructure.read_models.publications.models import (
+    LICENSE_FILTER_VALUES,
+    PublicationFilters,
+)
 from infrastructure.read_models.stats.models import (
     CollaborationsResponse,
     PivotResponse,
     PivotSchemaResponse,
     StatsFacetsResponse,
-    StatsFilters,
 )
 from infrastructure.read_models.stats.queries import StatsQueries
 from interfaces.api.deps import stats_queries
@@ -24,23 +26,23 @@ router = APIRouter(prefix="/api/stats", tags=["stats"])
 def stats_filters(
     lab_id: str = Query(""),
     year: str = Query(""),
-    publisher_id: str = Query(""),
-    serial_id: str = Query(""),
+    publisher_id: int | None = Query(None),
+    serial_id: int | None = Query(None),
     partner_ror: str = Query(""),
     oa_status: str = Query(""),
     license_: str = Query("", alias="license"),
     has_apc: str = Query(""),
     doc_type: str = Query(""),
-) -> StatsFilters:
+) -> PublicationFilters:
     """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en listes séparées par des virgules.
 
     `oa_status`, `license`, `has_apc` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422.
     """
-    return StatsFilters(
+    return PublicationFilters(
         lab_ids=parse_int_csv(lab_id, param="lab_id"),
         years=parse_int_csv(year, param="year"),
-        publisher_ids=parse_int_csv(publisher_id, param="publisher_id"),
-        serial_ids=parse_int_csv(serial_id, param="serial_id"),
+        publisher_id=publisher_id,
+        serial_id=serial_id,
         partner_rors=parse_ror_csv(partner_ror, param="partner_ror"),
         oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
         license=parse_vocabulary_csv(license_, allowed=LICENSE_FILTER_VALUES, param="license"),
@@ -51,7 +53,7 @@ def stats_filters(
 
 @router.get("/facets", response_model=StatsFacetsResponse)
 def stats_facets(
-    filters: StatsFilters = Depends(stats_filters),
+    filters: PublicationFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> StatsFacetsResponse:
     """Décomptes par option des facettes des tableaux de bord.
@@ -65,7 +67,7 @@ def stats_facets(
 def stats_entity_facet(
     kind: EntityKind = Query(...),
     entity_search: SearchTerm = "",
-    filters: StatsFilters = Depends(stats_filters),
+    filters: PublicationFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> EntityFacetResponse:
     """Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
@@ -77,7 +79,7 @@ def stats_entity_facet(
 
 @router.get("/collaborations", response_model=CollaborationsResponse)
 def collaborations(
-    filters: StatsFilters = Depends(stats_filters),
+    filters: PublicationFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> CollaborationsResponse:
     """Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
@@ -99,7 +101,7 @@ def pivot_schema(
 def pivot(
     indicator: str = Query("doc_type_grouped"),
     compare: str = Query(""),
-    filters: StatsFilters = Depends(stats_filters),
+    filters: PublicationFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotResponse:
     """Agrégation d'un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.

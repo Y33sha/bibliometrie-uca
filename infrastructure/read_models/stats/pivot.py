@@ -27,18 +27,18 @@ from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     OA_OPEN_SQL,
     OWN_RORS_SQL,
-    assemble_where,
     own_structure_ids,
 )
-from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
-from infrastructure.read_models.publications.models import NO_LICENSE
-from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
+from infrastructure.read_models.publications.filtering import (
+    filter_context,
+    publication_filter_where,
+)
+from infrastructure.read_models.publications.models import NO_LICENSE, PublicationFilters
 from infrastructure.read_models.stats.models import (
     PivotDimensionOut,
     PivotIndicatorOut,
     PivotResponse,
     PivotSchemaResponse,
-    StatsFilters,
 )
 
 Cardinality = Literal["low", "high"]
@@ -336,22 +336,20 @@ class StatsPivotQueries:
         )
 
     def indicator_pivot(
-        self, *, indicator: str, compare: str, filters: StatsFilters
+        self, *, indicator: str, compare: str, filters: PublicationFilters
     ) -> PivotResponse:
         """Exécute l'agrégation d'un indicateur, ventilé par sa dimension puis par `compare` si renseigné."""
         measure, groups = validate_indicator(indicator, compare)
         return self.pivot(measure=measure, groups=groups, filters=filters)
 
-    def pivot(self, *, measure: str, groups: list[str], filters: StatsFilters) -> PivotResponse:
+    def pivot(
+        self, *, measure: str, groups: list[str], filters: PublicationFilters
+    ) -> PivotResponse:
         """Exécute une agrégation : `mesure` ventilée selon `groups`, sous les filtres. Les clés sont validées contre le registre (`validate_pivot`) avant toute composition SQL."""
         m, dims = validate_pivot(measure, groups)
-        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
-        where, binds = assemble_where(
-            stats_filter_clauses(
-                perimeter_structure_ids=perimeter_structure_ids,
-                filters=filters,
-            )
-        )
+        context = filter_context(self._conn, filters)
+        perimeter_structure_ids = context.perimeter_structure_ids
+        where, binds = publication_filter_where(filters, context)
         joins = " ".join(dict.fromkeys(d.join_sql for d in dims if d.join_sql))
         inner_select = ", ".join(
             [*[f"{d.group_sql} AS {d.key}" for d in dims], "p.id AS publication_id"]
@@ -359,7 +357,7 @@ class StatsPivotQueries:
         inner = (
             f"SELECT DISTINCT {inner_select} FROM publications p "
             f"LEFT JOIN serials j ON j.id = p.serial_id {joins} "
-            f"WHERE {STATS_BASE} AND {where}"
+            f"WHERE {where}"
         )
         keys = [d.key for d in dims]
         select = ", ".join([*keys, f"{m.agg_sql} AS value"])

@@ -5846,8 +5846,8 @@ export interface operations {
             query?: {
                 lab_id?: string;
                 year?: string;
-                publisher_id?: string;
-                serial_id?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
                 partner_ror?: string;
                 oa_status?: string;
                 license?: string;
@@ -5887,8 +5887,8 @@ export interface operations {
                 entity_search?: string;
                 lab_id?: string;
                 year?: string;
-                publisher_id?: string;
-                serial_id?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
                 partner_ror?: string;
                 oa_status?: string;
                 license?: string;
@@ -5926,8 +5926,8 @@ export interface operations {
             query?: {
                 lab_id?: string;
                 year?: string;
-                publisher_id?: string;
-                serial_id?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
                 partner_ror?: string;
                 oa_status?: string;
                 license?: string;
@@ -5987,8 +5987,8 @@ export interface operations {
                 compare?: string;
                 lab_id?: string;
                 year?: string;
-                publisher_id?: string;
-                serial_id?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
                 partner_ror?: string;
                 oa_status?: string;
                 license?: string;

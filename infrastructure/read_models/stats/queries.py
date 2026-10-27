@@ -5,7 +5,8 @@ Le package est organisé par thème d'agrégat, une classe par module :
 - `collaborations` : décompte des pays étrangers co-affiliés
 - `entity_facets` : facette éditeur, revue ou organisation partenaire
 - `summary` : facettes croisées
-- `_shared` : périmètre de base, assemblage des filtres et filtre APC partagés par les agrégats.
+
+Leurs conditions de filtrage sont celles de la liste des publications (`publications.filtering`).
 
 `StatsQueries` réunit ces classes.
 """

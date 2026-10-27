@@ -5,7 +5,9 @@ from functools import partial
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
+from infrastructure.read_models.publications.filtering import FilterContext, filter_context
 from infrastructure.read_models.publications.models import PublicationFilters
+from infrastructure.read_models.stats.queries import StatsQueries
 from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
@@ -121,7 +123,9 @@ class TestSearch:
 
         def years_total(search: str) -> int:
             builder = _PublicationFacetsBuilder(
-                sa_sync_conn, PublicationFilters(search=search, lab_ids=[lab]), []
+                sa_sync_conn,
+                PublicationFilters(search=search, lab_ids=[lab]),
+                FilterContext([], None),
             )
             return sum(r.count for r in builder._facet_years())
 
@@ -274,6 +278,58 @@ class TestThesesExport:
         assert line.split(",")[-1] == "https://theses.hal.science/tel-1"
 
 
+class TestLabScope:
+    """Les laboratoires sélectionnés délimitent l'ensemble, hors périmètre compris, pour la liste, ses facettes et les statistiques."""
+
+    def _seed(self, conn):
+        lab = _lab(conn)
+        for in_perimeter in (True, False):
+            _attach(conn, insert_publication(conn, in_perimeter=in_perimeter), lab)
+        return lab
+
+    def test_list_facets_and_stats_count_the_same_set(self, sa_sync_conn):
+        lab = self._seed(sa_sync_conn)
+        filters = PublicationFilters(lab_ids=[lab])
+
+        listed = publications_queries(sa_sync_conn).list_publications(
+            filters=filters, page=1, per_page=50, sort="year_desc"
+        )
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, filters, filter_context(sa_sync_conn, filters)
+        )
+        pivot = StatsQueries(sa_sync_conn).pivot(
+            measure="publication_count", groups=[], filters=filters
+        )
+
+        assert listed.total == 2
+        assert sum(o.count for o in builder._facet_years()) == 2
+        assert pivot.rows == [{"value": 2}]
+
+    def test_lab_facet_counts_within_the_perimeter(self, sa_sync_conn):
+        """La facette des laboratoires écarte le filtre laboratoire : elle part du périmètre."""
+        lab = self._seed(sa_sync_conn)
+        filters = PublicationFilters(lab_ids=[lab])
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, filters, filter_context(sa_sync_conn, filters)
+        )
+
+        labs, _ = builder._facet_labs()
+        assert [(o.value, o.count) for o in labs] == [(str(lab), 1)]
+
+
+class TestHalStatusNeedsASingleLab:
+    def test_facets_ignore_hal_status_with_two_labs(self, sa_sync_conn):
+        labs = [insert_structure(sa_sync_conn, code) for code in ("LAB-A", "LAB-B")]
+        for lab in labs:
+            _attach(sa_sync_conn, insert_publication(sa_sync_conn, in_perimeter=True), lab)
+        filters = PublicationFilters(lab_ids=labs, hal_status_values=["ok"])
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, filters, filter_context(sa_sync_conn, filters)
+        )
+
+        assert sum(o.count for o in builder._facet_years()) == 2
+
+
 class TestExcludedPersonLab:
     """La contribution source d'une personne exclue ne rattache pas sa publication au laboratoire de cette contribution source."""
 
@@ -360,7 +416,9 @@ class TestPersonView:
             publication
         ]
 
-        builder = _PublicationFacetsBuilder(sa_sync_conn, PublicationFilters(person_id=person), [])
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn, PublicationFilters(person_id=person), FilterContext([], None)
+        )
         assert {(o.value, o.count) for o in builder._facet_corresponding()} == {
             ("yes", 1),
             ("no", 0),
@@ -452,7 +510,9 @@ class TestLicense:
         lab, _, _ = self._seed(sa_sync_conn)
 
         builder = _PublicationFacetsBuilder(
-            sa_sync_conn, PublicationFilters(lab_ids=[lab], license=["cc-by"]), []
+            sa_sync_conn,
+            PublicationFilters(lab_ids=[lab], license=["cc-by"]),
+            FilterContext([], None),
         )
         facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
         assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}

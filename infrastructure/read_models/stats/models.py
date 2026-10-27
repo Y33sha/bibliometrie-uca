@@ -1,29 +1,10 @@
 """Modèles de réponse : agrégats des tableaux de bord."""
 
-from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import BaseModel
 
 from infrastructure.read_models._common import FacetOption
-
-
-@dataclass(frozen=True, slots=True)
-class StatsFilters:
-    """Filtres des tableaux de bord, partagés par les facettes, les collaborations et le pivot.
-
-    Les quatre lectures interrogent le même ensemble de publications : leurs décomptes ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Une liste vide vaut absence de filtre. `has_apc` prend des valeurs de `yes` / `no` combinées en OR, comme dans la liste des publications.
-    """
-
-    lab_ids: list[int] = field(default_factory=list)
-    years: list[int] = field(default_factory=list)
-    publisher_ids: list[int] = field(default_factory=list)
-    serial_ids: list[int] = field(default_factory=list)
-    partner_rors: list[str] = field(default_factory=list)
-    oa_status: list[str] = field(default_factory=list)
-    license: list[str] = field(default_factory=list)
-    has_apc: list[str] = field(default_factory=list)
-    doc_types: list[str] = field(default_factory=list)
 
 
 class StatsFacetsResponse(BaseModel):

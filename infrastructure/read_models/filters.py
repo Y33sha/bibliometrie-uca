@@ -338,7 +338,7 @@ def _toggle_clause(
     return WhereClause(sql, binds)
 
 
-def corresponding_clause(person_id: int, corr_filter: list[str]) -> WhereClause | None:
+def corresponding_clause(person_id: int | None, corr_filter: list[str]) -> WhereClause | None:
     if not corr_filter or not person_id:
         return None
     return _toggle_clause(

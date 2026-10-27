@@ -19,36 +19,11 @@ from infrastructure.read_models.csv_export import (
     cap_export_rows,
     chunked,
 )
-from infrastructure.read_models.filters import (
-    PUBLICATION_IS_IN_PERIMETER,
-    WhereClause,
-    access_clause,
-    apc_clause,
-    assemble_where,
-    author_clause,
-    corresponding_clause,
-    country_clause,
-    doc_type_clause,
-    excluded_doc_type_clause,
-    hal_status_clause,
-    hal_status_expression,
-    in_perimeter_person_clause,
-    lab_clause,
-    language_clause,
-    license_clause,
-    monograph_id_clause,
-    no_lab_clause,
-    oa_clause,
-    partner_clause,
-    person_clause,
-    publisher_id_clause,
-    search_clause,
-    serial_id_clause,
-    source_clause,
-    subject_clause,
-    year_clause,
+from infrastructure.read_models.filters import WhereClause, hal_status_expression
+from infrastructure.read_models.publications.filtering import (
+    filter_context,
+    publication_filter_where,
 )
-from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
     PublicationFilters,
@@ -78,78 +53,6 @@ def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str
         for source, value in ids.items()
         if value
     }
-
-
-def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
-    """Initialise les conditions de base selon le scope (person, labs, UCA)."""
-    if filters.person_id:
-        return [person_clause(filters.person_id)]
-    if filters.lab_ids:
-        return []
-    return [WhereClause(PUBLICATION_IS_IN_PERIMETER, {})]
-
-
-def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
-    """Filtres simples partagés entre list/export."""
-    out: list[WhereClause | None] = [
-        excluded_doc_type_clause(filters.excluded_types),
-        search_clause(filters.search),
-        year_clause(filters.years),
-        doc_type_clause(filters.doc_types),
-        license_clause(filters.license),
-        publisher_id_clause(filters.publisher_id),
-        serial_id_clause(filters.serial_id),
-        monograph_id_clause(filters.monograph_id),
-        country_clause(filters.country_values),
-        language_clause(filters.language_codes),
-        subject_clause(filters.subject_ids),
-        author_clause(filters.author_id),
-        partner_clause(filters.partner_rors),
-    ]
-    return out
-
-
-def lab_hal_collection(conn: Connection, lab_ids: list[int]) -> str | None:
-    """Collection HAL du laboratoire quand un seul est sélectionné, au regard de laquelle se lit le statut HAL."""
-    if len(lab_ids) != 1:
-        return None
-    row = conn.execute(
-        text("SELECT hal_collection FROM structures WHERE id = :sid"), {"sid": lab_ids[0]}
-    ).one_or_none()
-    return row.hal_collection if row else None
-
-
-def _hal_status_clause(conn: Connection, filters: PublicationFilters) -> WhereClause | None:
-    """Filtre hal_status, lu au regard de la collection du labo unique."""
-    if filters.hal_status_values and len(filters.lab_ids) == 1:
-        return hal_status_clause(
-            filters.hal_status_values, lab_hal_collection(conn, filters.lab_ids)
-        )
-    return None
-
-
-def _build_list_clauses(
-    conn: Connection, filters: PublicationFilters, perimeter_structure_ids: list[int]
-) -> tuple[str, dict[str, object]]:
-    """Construit le WHERE complet de la liste et de son export."""
-    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
-    clauses.extend(_inline_clauses(filters))
-
-    if filters.lab_none and not filters.lab_ids:
-        clauses.append(no_lab_clause())
-    elif filters.lab_ids:
-        clauses.append(lab_clause(filters.lab_ids))
-
-    clauses.append(source_clause(filters.source_values))
-    clauses.append(access_clause(filters.access))
-    clauses.append(oa_clause(filters.oa_status))
-
-    if filters.person_id:
-        clauses.append(corresponding_clause(filters.person_id, filters.is_corresponding))
-    clauses.append(apc_clause(filters.has_apc, perimeter_structure_ids))
-    clauses.append(_hal_status_clause(conn, filters))
-    clauses.append(in_perimeter_person_clause(filters.in_perimeter, filters.person_id))
-    return assemble_where(clauses)
 
 
 _APC_SORT = (
@@ -216,23 +119,6 @@ def _publication_lines(
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
-def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, object]]:
-    """Conditions WHERE pour l'export CSV des thèses.
-
-    Spécifique à la page thèses : `source_clause` canonique (4 sources) + filtre `access` (open/closed, facette primaire) + `oa_clause`.
-    """
-    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
-    clauses.extend(_inline_clauses(filters))
-    if filters.lab_none and not filters.lab_ids:
-        clauses.append(no_lab_clause())
-    elif filters.lab_ids:
-        clauses.append(lab_clause(filters.lab_ids))
-    clauses.append(source_clause(filters.source_values))
-    clauses.append(access_clause(filters.access))
-    clauses.append(oa_clause(filters.oa_status))
-    return assemble_where(clauses)
-
-
 def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) -> Iterator[str]:
     """Lignes CSV de l'export des thèses, en-tête comprise."""
     writer = CsvWriter()
@@ -290,10 +176,11 @@ class PublicationListQueries:
         sort: str,
     ) -> PublicationListResponse:
         """Liste paginée des publications avec sources, labos, journal."""
-        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
+        context = filter_context(self._conn, filters)
+        perimeter_structure_ids = context.perimeter_structure_ids
         self._conn.execute(text("SET LOCAL jit = off"))
         offset = (page - 1) * per_page
-        where_clause, binds = _build_list_clauses(self._conn, filters, perimeter_structure_ids)
+        where_clause, binds = publication_filter_where(filters, context)
         order = _ORDER_MAP[sort]
 
         # Quand la recherche match un sujet (cf. _search_clause), on remonte d'abord les publis dont le *titre* match — les correspondances purement via sujet sont reléguées en deuxième.
@@ -450,9 +337,8 @@ class PublicationListQueries:
         **Cette méthode n'est pas un générateur**, et ne doit pas le devenir : la requête s'exécute à l'appel, sous la connexion que la dépendance FastAPI tient ouverte pour la durée du traitement. Cette connexion est refermée avant que le corps de la réponse ne parte ; un générateur qui interrogerait la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire sont parcourues ensuite.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
-        where_clause, binds = _build_list_clauses(
-            self._conn, filters, get_persons_structure_ids_list(self._conn)
-        )
+        context = filter_context(self._conn, filters)
+        where_clause, binds = publication_filter_where(filters, context)
         order = _ORDER_MAP[sort]
 
         # Titre et accès toujours présents. `columns` vide => toutes.
@@ -460,7 +346,7 @@ class PublicationListQueries:
         requested |= {"title", "access"}
         # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
         hal_status = (
-            hal_status_expression(lab_hal_collection(self._conn, filters.lab_ids))
+            hal_status_expression(context.lab_hal_collection)
             if "hal_status" in requested
             else WhereClause("NULL", {})
         )
@@ -550,7 +436,7 @@ class PublicationListQueries:
         Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
-        where_clause, binds = _build_theses_export_clauses(filters)
+        where_clause, binds = publication_filter_where(filters, filter_context(self._conn, filters))
         order = _ORDER_MAP.get(
             sort, f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title"
         )

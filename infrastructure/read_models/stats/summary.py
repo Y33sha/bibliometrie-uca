@@ -7,46 +7,36 @@ from sqlalchemy import Connection, Row, text
 from domain.publications.licenses import license_label
 from domain.structures.structure import StructureType
 from infrastructure.read_models._common import FacetOption
-from infrastructure.read_models.filters import (
-    WhereClause,
-    assemble_where,
-    institution_apc_payment_sql,
+from infrastructure.read_models.filters import institution_apc_payment_sql
+from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
+from infrastructure.read_models.publications.filtering import (
+    FilterContext,
+    filter_context,
+    publication_filter_where,
 )
-from infrastructure.read_models.perimeters.queries import (
-    get_persons_perimeter_name,
-    get_persons_structure_ids_list,
-)
-from infrastructure.read_models.publications.models import NO_LICENSE
-from infrastructure.read_models.stats._shared import STATS_BASE, stats_filter_clauses
-from infrastructure.read_models.stats.models import StatsFacetsResponse, StatsFilters
+from infrastructure.read_models.publications.models import NO_LICENSE, PublicationFilters
+from infrastructure.read_models.stats.models import StatsFacetsResponse
 
 
 def _facets_sqls(
     *,
-    perimeter_structure_ids: list[int],
-    filters: StatsFilters,
+    context: FilterContext,
+    filters: PublicationFilters,
 ) -> dict[str, tuple[str, dict[str, object]]]:
     """Retourne {facet_name: (sql, binds)} pour les sous-requêtes de facettes."""
 
-    def _clauses(skip: str) -> list[WhereClause | None]:
-        return stats_filter_clauses(
-            perimeter_structure_ids=perimeter_structure_ids,
-            filters=filters,
-            skip=skip,
-        )
-
-    year_where, year_binds = assemble_where(_clauses("year"))
+    year_where, year_binds = publication_filter_where(filters, context, "year")
     year_sql = f"""
         SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN serials j ON j.id = p.serial_id
-        WHERE {STATS_BASE} AND {year_where}
+        WHERE {year_where}
           AND p.publication_year IS NOT NULL
         GROUP BY p.publication_year
         ORDER BY p.publication_year DESC
     """
 
-    lab_where, lab_binds = assemble_where(_clauses("lab"))
+    lab_where, lab_binds = publication_filter_where(filters, context, "lab")
     lab_sql = f"""
         SELECT s.id, COALESCE(s.acronym, s.name) AS label,
                COUNT(DISTINCT p.id) AS n
@@ -54,24 +44,24 @@ def _facets_sqls(
         JOIN publications p ON p.id = ps.publication_id
         LEFT JOIN serials j ON j.id = p.serial_id
         JOIN structures s ON s.id = ps.structure_id
-        WHERE {STATS_BASE} AND {lab_where}
+        WHERE {lab_where}
           AND s.structure_type = '{StructureType.LABO.value}'
         GROUP BY s.id, s.acronym, s.name
         ORDER BY n DESC
     """
 
-    oa_where, oa_binds = assemble_where(_clauses("oa"))
+    oa_where, oa_binds = publication_filter_where(filters, context, "oa_status")
     oa_sql = f"""
         SELECT p.oa_status::text AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN serials j ON j.id = p.serial_id
-        WHERE {STATS_BASE} AND {oa_where}
+        WHERE {oa_where}
           AND p.oa_status IS NOT NULL
         GROUP BY p.oa_status
         ORDER BY n DESC
     """
 
-    apc_where, apc_binds = assemble_where(_clauses("apc"))
+    apc_where, apc_binds = publication_filter_where(filters, context, "apc")
     paid = institution_apc_payment_sql("apc_root_ids")
     apc_sql = f"""
         SELECT
@@ -79,25 +69,25 @@ def _facets_sqls(
             COUNT(DISTINCT p.id) FILTER (WHERE NOT {paid}) AS apc_no
         FROM publications p
         LEFT JOIN serials j ON j.id = p.serial_id
-        WHERE {STATS_BASE} AND {apc_where}
+        WHERE {apc_where}
     """
 
-    dt_where, dt_binds = assemble_where(_clauses("doc_type"))
+    dt_where, dt_binds = publication_filter_where(filters, context, "doc_type")
     doc_type_sql = f"""
         SELECT p.doc_type::text AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN serials j ON j.id = p.serial_id
-        WHERE {STATS_BASE} AND {dt_where}
+        WHERE {dt_where}
         GROUP BY p.doc_type
         ORDER BY n DESC
     """
 
-    license_where, license_binds = assemble_where(_clauses("license"))
+    license_where, license_binds = publication_filter_where(filters, context, "license")
     license_sql = f"""
         SELECT COALESCE(p.license::text, '{NO_LICENSE}') AS value, COUNT(DISTINCT p.id) AS n
         FROM publications p
         LEFT JOIN serials j ON j.id = p.serial_id
-        WHERE {STATS_BASE} AND {license_where}
+        WHERE {license_where}
         GROUP BY 1
         ORDER BY n DESC
     """
@@ -107,7 +97,7 @@ def _facets_sqls(
         "lab": (lab_sql, lab_binds),
         "oa": (oa_sql, oa_binds),
         "license": (license_sql, license_binds),
-        "apc": (apc_sql, {**apc_binds, "apc_root_ids": perimeter_structure_ids}),
+        "apc": (apc_sql, {**apc_binds, "apc_root_ids": context.perimeter_structure_ids}),
         "doc_type": (doc_type_sql, dt_binds),
     }
 
@@ -115,11 +105,11 @@ def _facets_sqls(
 class StatsFacetQueries:
     _conn: Connection
 
-    def stats_facets(self, *, filters: StatsFilters) -> StatsFacetsResponse:
+    def stats_facets(self, *, filters: PublicationFilters) -> StatsFacetsResponse:
         """Décomptes de chaque facette, sa propre dimension écartée de la clause WHERE."""
         self._conn.execute(text("SET LOCAL jit = off"))
         sqls = _facets_sqls(
-            perimeter_structure_ids=get_persons_structure_ids_list(self._conn),
+            context=filter_context(self._conn, filters),
             filters=filters,
         )
         rows = {

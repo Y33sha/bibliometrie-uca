@@ -32,7 +32,7 @@ Cette distinction est pertinente pour le calcul, mais obscure pour l'utilisateur
 
 ### Serveur
 
-- [ ] Un seul modèle de filtres et une seule fonction d'assemblage des conditions pour la liste, ses facettes et les statistiques
+- [x] Un seul modèle de filtres et une seule fonction d'assemblage des conditions pour la liste, ses facettes et les statistiques
 - [ ] L'API des statistiques accepte tous les filtres de la liste, sauf statut HAL, correspondance et périmètre
 
 ### Interface
