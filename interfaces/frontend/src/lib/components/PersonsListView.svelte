@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { page } from '$app/state';
 	import FacetDropdown, { type FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
@@ -230,31 +230,31 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input type="search" placeholder="Rechercher par nom" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	<PresenceFilterToggle
-		label="Identifiants"
-		items={IDENTIFIER_ITEMS}
-		bind:states={idStates}
-		counts={idCounts}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown label="Fonctions" options={facets.options.roles} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
-	<FacetDropdown label="Départements" options={facets.options.depts} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
-	<FacetDropdown label="Base RH" options={facets.options.rh} bind:selected={selectedRh} onchange={onFilterChange} />
-	{#if isAdmin()}
+<ListToolbar bind:search placeholder="Rechercher par nom" onsearch={onSearchInput} list={dir} one="personne" many="personnes">
+	{#snippet filters()}
 		<PresenceFilterToggle
-			label="À confirmer"
-			items={PENDING_ITEMS}
-			bind:states={pendingStates}
-			counts={pendingCounts}
+			label="Identifiants"
+			items={IDENTIFIER_ITEMS}
+			bind:states={idStates}
+			counts={idCounts}
 			onchange={onFilterChange}
 		/>
-		<FacetDropdown label="Activité" options={activityOptions} bind:selected={selectedActivity} onchange={onFilterChange} />
-		<FacetDropdown label="Exclusion" options={exclusionOptions} allLabel="Toutes" bind:selected={selectedExclusions} onchange={onFilterChange} />
-	{/if}
-	<ResultCount list={dir} one="personne" many="personnes" />
-</div>
+		<FacetDropdown label="Fonctions" options={facets.options.roles} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
+		<FacetDropdown label="Départements" options={facets.options.depts} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
+		<FacetDropdown label="Base RH" options={facets.options.rh} bind:selected={selectedRh} onchange={onFilterChange} />
+		{#if isAdmin()}
+			<PresenceFilterToggle
+				label="À confirmer"
+				items={PENDING_ITEMS}
+				bind:states={pendingStates}
+				counts={pendingCounts}
+				onchange={onFilterChange}
+			/>
+			<FacetDropdown label="Activité" options={activityOptions} bind:selected={selectedActivity} onchange={onFilterChange} />
+			<FacetDropdown label="Exclusion" options={exclusionOptions} allLabel="Toutes" bind:selected={selectedExclusions} onchange={onFilterChange} />
+		{/if}
+	{/snippet}
+</ListToolbar>
 
 <PersonsTable
 	persons={dir.items}
@@ -275,9 +275,3 @@
 		syncUrl();
 	}}
 />
-
-<style>
-	.toolbar input[type='search'] {
-		width: 240px;
-	}
-</style>

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -184,52 +184,46 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		placeholder="Rechercher par titre ou ISSN"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput}
-	/>
-	{#if !publisherFixed}
-		<EntityFilter
-			label={filterLabels.publisher}
-			endpoint="/api/serials/facets"
-			kind="publisher"
-			buildParams={buildFilterParams}
-			selected={selectedPublisher}
-			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
-		/>
-	{/if}
-	<FacetDropdown
-		label={filterLabels.types}
-		options={facets.options.serialTypes}
-		bind:selected={selectedSerialTypes}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label="DOAJ"
-		options={facets.options.doaj}
-		bind:selected={selectedDoaj}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label="Modèle OA"
-		options={facets.options.oaModels}
-		bind:selected={selectedOaModels}
-		onchange={onFilterChange}
-	/>
-	{#if isAdmin()}
+<ListToolbar bind:search placeholder="Rechercher par titre ou ISSN" onsearch={onSearchInput} list={serials} one="publication en série" many="publications en série">
+	{#snippet filters()}
+		{#if !publisherFixed}
+			<EntityFilter
+				label={filterLabels.publisher}
+				endpoint="/api/serials/facets"
+				kind="publisher"
+				buildParams={buildFilterParams}
+				selected={selectedPublisher}
+				onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+			/>
+		{/if}
 		<FacetDropdown
-			label="Publications"
-			options={facets.options.publications}
-			bind:selected={selectedPublications}
+			label={filterLabels.types}
+			options={facets.options.serialTypes}
+			bind:selected={selectedSerialTypes}
 			onchange={onFilterChange}
 		/>
-	{/if}
-	<ResultCount list={serials} one="publication en série" many="publications en série" />
-</div>
+		<FacetDropdown
+			label="DOAJ"
+			options={facets.options.doaj}
+			bind:selected={selectedDoaj}
+			onchange={onFilterChange}
+		/>
+		<FacetDropdown
+			label="Modèle OA"
+			options={facets.options.oaModels}
+			bind:selected={selectedOaModels}
+			onchange={onFilterChange}
+		/>
+		{#if isAdmin()}
+			<FacetDropdown
+				label="Publications"
+				options={facets.options.publications}
+				bind:selected={selectedPublications}
+				onchange={onFilterChange}
+			/>
+		{/if}
+	{/snippet}
+</ListToolbar>
 
 <div class="table-scroll">
 <table class="data-table journals-table">

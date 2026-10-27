@@ -1,5 +1,6 @@
 <script lang="ts">
 	import PageHeader from '#lib/components/PageHeader.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import { onMount } from 'svelte';
@@ -23,6 +24,7 @@
 	// Toutes les structures, filtrées dans la page : elles se comptent en dizaines.
 	let structures: Structure[] = $state([]);
 	let perimeters: Perimeter[] = $state([]);
+	let loaded = $state(false);
 	let search = $state('');
 	let selectedTypes = $state<string[]>([]);
 	let selectedTutelles = $state<string[]>([]);
@@ -179,28 +181,26 @@
 		selectedPerimeters = persons ? [String(persons.id)] : [];
 		perimeters = perimeterList;
 		structures = all;
+		loaded = true;
 	});
 </script>
 
 <PageHeader title="Labos" hidden />
 
-<div class="toolbar toolbar-card">
-	<input
-		type="search"
-		placeholder="Rechercher par nom ou acronyme"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; } }}
-	/>
-	<FacetDropdown label={filterLabels.types} options={typeOptions} bind:selected={selectedTypes} />
-	<FacetDropdown label="Tutelles" options={tutelleOptions} searchable bind:selected={selectedTutelles} />
-	{#if isAdmin()}
-		<FacetDropdown label="Périmètre" options={perimeterOptions} bind:selected={selectedPerimeters} />
-	{/if}
-	<span class="count">{filtered.length} structure{filtered.length > 1 ? 's' : ''}</span>
-	{#if isAdmin()}
-		<button class="btn btn-primary btn-sm" onclick={openCreateModal}>+ Nouvelle</button>
-	{/if}
-</div>
+<ListToolbar bind:search placeholder="Rechercher par nom ou acronyme" list={{ loaded, error: null, total: filtered.length }} one="structure" many="structures">
+	{#snippet actions()}
+		{#if isAdmin()}
+			<button class="btn btn-primary btn-sm" onclick={openCreateModal}>+ Nouvelle</button>
+		{/if}
+	{/snippet}
+	{#snippet filters()}
+		<FacetDropdown label={filterLabels.types} options={typeOptions} bind:selected={selectedTypes} />
+		<FacetDropdown label="Tutelles" options={tutelleOptions} searchable bind:selected={selectedTutelles} />
+		{#if isAdmin()}
+			<FacetDropdown label="Périmètre" options={perimeterOptions} bind:selected={selectedPerimeters} />
+		{/if}
+	{/snippet}
+</ListToolbar>
 
 <table class="data-table">
 	<thead>
@@ -276,9 +276,6 @@
 {/if}
 
 <style>
-	.toolbar input[type='search'] {
-		width: 260px;
-	}
 	td {
 		vertical-align: middle;
 	}

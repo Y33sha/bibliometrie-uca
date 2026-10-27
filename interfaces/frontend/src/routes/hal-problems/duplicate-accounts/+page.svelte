@@ -1,6 +1,6 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
-  import ResultCount from "#lib/components/ResultCount.svelte";
+  import ListToolbar from "#lib/components/ListToolbar.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import { resolve } from "$app/paths";
   import { replaceQuery } from "#lib/url.js";
@@ -38,9 +38,7 @@
   Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.
 </PageHeader>
 
-<div class="toolbar">
-  <ResultCount {list} one="personne" many="personnes" />
-</div>
+<ListToolbar {list} one="personne" many="personnes" />
 
 <ListStatus {list} emptyText="Aucun doublon détecté">
   <table class="data-table">

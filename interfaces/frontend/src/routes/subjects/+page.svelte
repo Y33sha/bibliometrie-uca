@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
+  import ListToolbar from "#lib/components/ListToolbar.svelte";
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
@@ -45,34 +46,20 @@
   });
 </script>
 
-<svelte:head>
-  <title>{pageTitle("Sujets")}</title>
-</svelte:head>
+<PageHeader title="Sujets">
+  Liste de tous les sujets observés sur les publications, triés par nombre d'occurrences. Cliquer sur un sujet pour explorer ses voisins par co-occurrence.
+</PageHeader>
 
-<h1>Sujets</h1>
-  <p class="hint">
-    Liste de tous les sujets observés sur les publications, triés par nombre d'occurrences.
-    Cliquer sur un sujet pour explorer ses voisins par co-occurrence.
-  </p>
-
-  <div class="filters">
-    <input
-      type="search"
-      placeholder="Rechercher dans les libellés"
-      bind:value={search}
-      onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-      oninput={onSearchInput}
-    />
-    <label>
-      Occurrences min&nbsp;:
-      <input type="number" min="1" bind:value={minCount} onchange={onMinCountChange} />
-    </label>
-  </div>
+  <ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets">
+    {#snippet filters()}
+      <label class="min-count">
+        Occurrences minimales
+        <input type="number" min="1" bind:value={minCount} onchange={onMinCountChange} />
+      </label>
+    {/snippet}
+  </ListToolbar>
 
   <ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
-    <p class="total">
-      {list.total.toLocaleString("fr-FR")} sujets
-    </p>
     <table class="data-table">
       <thead>
         <tr>
@@ -96,34 +83,15 @@
   </ListStatus>
 
 <style>
-  h1 {
-    margin: 0 0 4px;
-    font-size: 1.4rem;
-  }
-  .hint {
-    margin: 0 0 16px;
-    color: var(--muted);
-    font-size: 0.9rem;
-  }
-  .filters {
-    display: flex;
-    gap: 16px;
+  .min-count {
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 12px;
-  }
-  .filters input[type="search"] {
-    min-width: 320px;
-  }
-  .filters input[type="number"] {
-    width: 70px;
-    padding: 4px 8px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    margin-left: 4px;
-  }
-  .total {
-    color: var(--muted);
-    margin: 0 0 8px;
+    gap: 6px;
+    padding-left: 10px;
     font-size: 0.9rem;
+    white-space: nowrap;
+  }
+  .min-count input {
+    width: 70px;
   }
 </style>

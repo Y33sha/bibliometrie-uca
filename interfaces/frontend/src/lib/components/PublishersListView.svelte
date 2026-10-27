@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
@@ -155,37 +155,31 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		placeholder="Rechercher dans les noms"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput}
-	/>
-	<FacetDropdown
-		label={filterLabels.types}
-		options={facets.options.publisherTypes}
-		bind:selected={selectedPublisherTypes}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label={filterLabels.countries}
-		options={facets.options.countries}
-		searchable
-		bind:selected={selectedCountries}
-		onchange={onFilterChange}
-	/>
-	{#if isAdmin()}
+<ListToolbar bind:search placeholder="Rechercher dans les noms" onsearch={onSearchInput} list={publishers} one="éditeur" many="éditeurs">
+	{#snippet filters()}
 		<FacetDropdown
-			label="Publications"
-			options={facets.options.publications}
-			bind:selected={selectedPublications}
+			label={filterLabels.types}
+			options={facets.options.publisherTypes}
+			bind:selected={selectedPublisherTypes}
 			onchange={onFilterChange}
 		/>
-	{/if}
-	<ResultCount list={publishers} one="éditeur" many="éditeurs" />
-</div>
+		<FacetDropdown
+			label={filterLabels.countries}
+			options={facets.options.countries}
+			searchable
+			bind:selected={selectedCountries}
+			onchange={onFilterChange}
+		/>
+		{#if isAdmin()}
+			<FacetDropdown
+				label="Publications"
+				options={facets.options.publications}
+				bind:selected={selectedPublications}
+				onchange={onFilterChange}
+			/>
+		{/if}
+	{/snippet}
+</ListToolbar>
 
 <div class="table-scroll">
 <table class="data-table publishers-table">

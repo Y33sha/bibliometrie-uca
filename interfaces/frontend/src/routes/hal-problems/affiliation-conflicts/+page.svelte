@@ -2,7 +2,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
@@ -41,9 +41,7 @@
 	Publications affiliées à {institution.name} dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature {institution.name} à la même position d'auteur.
 </PageHeader>
 
-<div class="toolbar">
-	<ResultCount {list} one="publication" many="publications" />
-</div>
+<ListToolbar {list} one="publication" many="publications" />
 
 <ListStatus {list} emptyText="Aucun conflit détecté">
 	<div class="publication-list">

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import AccessButton from '#lib/components/AccessButton.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { institution } from '#lib/institution.svelte.js';
@@ -568,15 +568,11 @@
 	<div class="info-box">Filtre actif : {subjectBannerText}</div>
 {/if}
 
-<div class="toolbar-card toolbar-sticky publication-toolbar">
-	<div class="toolbar publication-toolbar-main">
-		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-		<ResultCount list={listing} one="publication" many="publications" />
-		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
+<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
+	{#snippet actions()}
 		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
-	</div>
-	<div class="toolbar publication-toolbar-facets">
-		<span class="facets-label">Filtrer par&nbsp;:</span>
+	{/snippet}
+	{#snippet filters()}
 		{#each sections.primary as f (f.key)}
 			{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
 		{/each}
@@ -585,7 +581,7 @@
 			{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
 			<span class="chevron" class:up={showMoreFilters} aria-hidden="true"></span>
 		</button>
-	</div>
+	{/snippet}
 	{#if showMoreFilters}
 		<div class="more-filters">
 			{#each sections.groups as g (g.label)}
@@ -599,7 +595,7 @@
 		</div>
 	{/if}
 	<ActiveFilterBar filters={FILTERS} {values} options={facets.options} onclear={clearFilter} onclearall={clearAllFilters} />
-</div>
+</ListToolbar>
 
 {#snippet filterControl(f: ListFilter)}
 	{#if f.control === 'checkbox'}
@@ -766,11 +762,6 @@
 	.license-cell {
 		font-size: 0.8rem;
 	}
-	/* Deux lignes : commandes (recherche extensible, compte, exports, lien stats) puis facettes. */
-	.publication-toolbar { display: flex; flex-direction: column; gap: 8px; }
-	.publication-toolbar .toolbar { margin-bottom: 0; }
-	.publication-search { flex: 1; min-width: 220px; }
-	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
 	.more-filters-btn {
 		display: inline-flex;
 		align-items: center;

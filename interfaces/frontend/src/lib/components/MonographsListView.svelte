@@ -1,7 +1,7 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -148,39 +148,32 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		class="search"
-		placeholder="Rechercher par titre ou ISBN"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput}
-	/>
-	<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
-	<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
-	{#if !publisherFixed}
-		<EntityFilter
-			label={filterLabels.publisher}
-			endpoint="/api/monographs/facets"
-			kind="publisher"
-			buildParams={buildFilterParams}
-			selected={selectedPublisher}
-			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
-		/>
-	{/if}
-	{#if !serialFixed}
-		<EntityFilter
-			label="Collection"
-			endpoint="/api/monographs/facets"
-			kind="serial"
-			buildParams={buildFilterParams}
-			selected={selectedSerial}
-			onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
-		/>
-	{/if}
-	<ResultCount list={monographs} one="monographie" many="monographies" />
-</div>
+<ListToolbar bind:search placeholder="Rechercher par titre ou ISBN" onsearch={onSearchInput} list={monographs} one="monographie" many="monographies">
+	{#snippet filters()}
+		<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+		{#if !publisherFixed}
+			<EntityFilter
+				label={filterLabels.publisher}
+				endpoint="/api/monographs/facets"
+				kind="publisher"
+				buildParams={buildFilterParams}
+				selected={selectedPublisher}
+				onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+			/>
+		{/if}
+		{#if !serialFixed}
+			<EntityFilter
+				label="Collection"
+				endpoint="/api/monographs/facets"
+				kind="serial"
+				buildParams={buildFilterParams}
+				selected={selectedSerial}
+				onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
+			/>
+		{/if}
+	{/snippet}
+</ListToolbar>
 
 <div class="table-scroll">
 	<table class="data-table monographs-table">
@@ -237,5 +230,4 @@
 	.monographs-table { min-width: 720px; }
 	.isbn { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
 	.muted { color: var(--muted); }
-	.search { width: 22rem; max-width: 100%; }
 </style>

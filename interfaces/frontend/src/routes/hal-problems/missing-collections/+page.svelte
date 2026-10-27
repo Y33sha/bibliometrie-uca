@@ -2,7 +2,7 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
@@ -70,14 +70,15 @@
 	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.
 </PageHeader>
 
-<div class="toolbar">
-	<select class="lab-select" bind:value={selectedLabId} onchange={onLabChange}>
-		{#each labs as lab}
-			<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
-		{/each}
-	</select>
-	<ResultCount {list} one="publication" many="publications" />
-</div>
+<ListToolbar {list} one="publication" many="publications">
+	{#snippet filters()}
+		<select class="lab-select" aria-label="Laboratoire" bind:value={selectedLabId} onchange={onLabChange}>
+			{#each labs as lab}
+				<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
+			{/each}
+		</select>
+	{/snippet}
+</ListToolbar>
 
 {#if !labsLoaded}
 	<div class="loading">Chargement…</div>
@@ -111,14 +112,7 @@
 
 <style>
 	.lab-select {
-		padding: 6px 10px;
-		border: 2px solid var(--accent);
-		border-radius: var(--radius);
-		font-size: 0.9rem;
-		font-family: inherit;
-		font-weight: 600;
-		color: var(--accent);
-		min-width: 300px;
+		max-width: 100%;
 	}
 	.publication-list { display: flex; flex-direction: column; gap: 8px; }
 	.publication-card {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { page } from '$app/state';
 	import { withBase } from '#lib/paths.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
@@ -176,44 +176,28 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		placeholder="Rechercher par titre ou sujet"
-		bind:value={search}
-		oninput={onSearchInput}
-		onkeydown={(e: KeyboardEvent) => {
-			if (e.key === 'Enter') {
-				e.preventDefault();
-				onFilterChange();
-			} else if (e.key === 'Escape') {
-				e.preventDefault();
-				search = '';
-				onFilterChange();
-			}
-		}}
-	/>
-	<FacetDropdown label={filterLabels.years} options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
-	{#if !hasFixedLab}
-		<FacetDropdown label={filterLabels.labs} options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
-	{/if}
-	<FacetDropdown label="Statuts" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
-	<FacetDropdown label={filterLabels.access} options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
-	<PresenceFilterToggle
-		label={filterLabels.sources}
-		items={[
-			{ key: 'hal', label: 'HAL' },
-			{ key: 'oa', label: 'OpenAlex' },
-			{ key: 'scanr', label: 'ScanR' },
-			{ key: 'theses', label: 'theses.fr' }
-		]}
-		bind:states={sourceStates}
-		counts={facets.sourceCounts}
-		onchange={() => onFilterChange()}
-	/>
-	<ResultCount list={listing} one="thèse" many="thèses" />
-	<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
-</div>
+<ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="thèse" many="thèses" exportUrl={exportCsvUrl()}>
+	{#snippet filters()}
+		<FacetDropdown label={filterLabels.years} options={facets.options.years} bind:selected={selectedYears} onchange={() => onFilterChange()} />
+		{#if !hasFixedLab}
+			<FacetDropdown label={filterLabels.labs} options={facets.options.labs} bind:selected={selectedLabs} onchange={(v: string[]) => onLabChange(v)} />
+		{/if}
+		<FacetDropdown label="Statuts" options={facets.options.status} bind:selected={selectedStatus} onchange={() => onFilterChange()} />
+		<FacetDropdown label={filterLabels.access} options={facets.options.access} bind:selected={selectedAccess} onchange={() => onFilterChange()} />
+		<PresenceFilterToggle
+			label={filterLabels.sources}
+			items={[
+				{ key: 'hal', label: 'HAL' },
+				{ key: 'oa', label: 'OpenAlex' },
+				{ key: 'scanr', label: 'ScanR' },
+				{ key: 'theses', label: 'theses.fr' }
+			]}
+			bind:states={sourceStates}
+			counts={facets.sourceCounts}
+			onchange={() => onFilterChange()}
+		/>
+	{/snippet}
+</ListToolbar>
 
 <ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} />
 <Pagination
@@ -225,9 +209,3 @@
 		listing.load();
 	}}
 />
-
-<style>
-	.toolbar input[type='search'] {
-		width: 280px;
-	}
-</style>

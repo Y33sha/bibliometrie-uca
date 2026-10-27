@@ -104,7 +104,8 @@
 }
 
 .toolbar input[type='text'],
-.toolbar input[type='text' i] {
+.toolbar input[type='text' i],
+.toolbar input[type='number'] {
 	padding: 6px 10px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);

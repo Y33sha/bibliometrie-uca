@@ -142,7 +142,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 4. En-tête de page et barre d'outils
 
 - [ ] Composant d'en-tête de page : Sujets, Problèmes HAL, administration
-- [ ] Composant de barre d'outils : toutes les listes, pages Problèmes HAL comprises ; champ « Occurrences min » au style des contrôles
+- [x] Composant de barre d'outils : toutes les listes, pages Problèmes HAL comprises ; champ « Occurrences min » au style des contrôles
 - [ ] Export CSV de chaque liste, API comprise
 
 ### 5. Composants
@@ -158,7 +158,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 6. Accessibilité restante
 
 - [ ] Contrastes des pastilles de tutelle, des années, des badges « Soutenue » et « Hors collections »
-- [ ] Nom accessible du `select` de Manques collections
+- [x] Nom accessible du `select` de Manques collections
 - [ ] Graphe des sujets sans éléments focusables imbriqués
 - [ ] Titres de section des fiches en H2
 - [ ] Avertissements d'accessibilité de svelte-check
