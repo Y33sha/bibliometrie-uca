@@ -1,9 +1,9 @@
 <script lang="ts">
-  // Onglet « Gestion » de la fiche d'une structure, réservé à la session admin : identifiants, tutelles et formes de nom.
+  // Volet d'édition d'une structure, réservé à la session admin : identifiants, tutelles et formes de nom.
+  import Drawer from "#lib/components/Drawer.svelte";
   import IconButton from "#lib/components/IconButton.svelte";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
-  import { goto } from "$app/navigation";
   import { api, ApiError, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import {
@@ -16,22 +16,27 @@
     type NameForm,
     type Structure,
     type StructureDetail,
-  } from "../types";
+  } from "./types";
   import type { components } from "#lib/api/schema.js";
-  import RelationsSection from "../RelationsSection.svelte";
-  import NameFormsSection from "../NameFormsSection.svelte";
-  import EditFormModal from "../EditFormModal.svelte";
-  import StructureFormModal from "../StructureFormModal.svelte";
+  import RelationsSection from "./RelationsSection.svelte";
+  import NameFormsSection from "./NameFormsSection.svelte";
+  import EditFormModal from "./EditFormModal.svelte";
+  import StructureFormModal from "./StructureFormModal.svelte";
 
   type StructureDeletionImpact = components["schemas"]["StructureDeletionImpact"];
 
   let {
     id,
-    onupdated,
+    onclose,
+    onchange,
+    onopenStructure,
   }: {
     id: number;
-    /** Appelé après une modification de la structure, pour rafraîchir l'en-tête de la fiche. */
-    onupdated: () => void;
+    onclose: () => void;
+    /** Appelé après une modification ou une suppression de la structure, pour que la page hôte recharge sa liste. */
+    onchange: () => void;
+    /** Ouvre le volet d'une autre structure. */
+    onopenStructure: (id: number) => void;
   } = $props();
 
   /* ── State ── */
@@ -147,7 +152,7 @@
     newFormCtx = [];
   }
 
-  // Charge le détail de la structure de l'identifiant de la page.
+  // Charge le détail de la structure du volet.
   $effect(() => {
     if (!isNaN(id)) loadDetail();
   });
@@ -172,16 +177,18 @@
     relationPickerOpen = false;
     await loadDetail();
     refreshCache();
+    onchange();
   }
 
   async function deleteTutelle(tutelleId: number) {
     await structuresApi.deleteTutelle(tutelleId);
     await loadDetail();
     refreshCache();
+    onchange();
   }
 
   function selectRelatedStructure(otherId: number) {
-    goto(resolve(`structures/${otherId}?tab=management`));
+    onopenStructure(otherId);
   }
 
   /* ── Forms ── */
@@ -327,7 +334,8 @@
     )
       return;
     await structuresApi.remove(id);
-    goto(resolve('structures'));
+    onchange();
+    onclose();
   }
 
   /* ── Edit modal ── */
@@ -375,11 +383,18 @@
       editModalOpen = false;
       await loadDetail();
       refreshCache();
-      onupdated();
+      onchange();
     } catch (e: any) {
       const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
       toast("Erreur: " + msg, "error");
     }
+  }
+
+  // Échap ferme d'abord un sélecteur ouvert, puis le volet.
+  function onescape() {
+    if (relationPickerOpen) relationPickerOpen = false;
+    else if (ctxPickerOpen) ctxPickerOpen = false;
+    else onclose();
   }
 
   /* ── Click-outside handling ── */
@@ -416,23 +431,34 @@
   });
 </script>
 
-{#if !detail}
-  <p class="loading">Chargement…</p>
-{:else}
-  {@const s = detail.structure}
-  <div>
-    <div class="management-header">
+<Drawer width="600px" {onclose} {onescape}>
+  {#snippet head()}
+    {#if detail}
+      {@const s = detail.structure}
+      <div class="structure-head">
+        <a class="drawer-name-link" href={resolve(`structures/${s.id}`)} target="_blank" rel="noopener" title="Voir la fiche publique">
+          {#if s.acronym}<span class="drawer-acronym">{s.acronym}</span>{/if}
+          {s.name}
+        </a>
+        <div class="drawer-head-actions">
+          <IconButton icon="edit" label="Modifier la structure" onclick={openEditModal} />
+          <IconButton icon="delete" label="Supprimer la structure" onclick={deleteStructure} />
+        </div>
+      </div>
+    {/if}
+  {/snippet}
+
+  {#if !detail}
+    <p class="loading">Chargement…</p>
+  {:else}
+    {@const s = detail.structure}
+    <div class="drawer-meta">
       <span class="structure-type structure-type-{s.type}">{s.type}</span>
-      <span class="detail-item">
-        <span class="field-label">Code</span>
-        <span>{s.code}</span>
-      </span>
-      <IconButton icon="edit" label="Modifier la structure" onclick={openEditModal} />
-      <IconButton icon="delete" label="Supprimer la structure" onclick={deleteStructure} />
+      <span><span class="field-label">Code</span> {s.code}</span>
     </div>
     {#if s.api_ids && Object.keys(s.api_ids).length}
       <div class="api-ids-display">
-        <span class="field-label">Paramètres requête API :</span>
+        <span class="field-label">Paramètres requête API&nbsp;:</span>
         {#each Object.entries(s.api_ids) as [src, ids]}
           <span class="api-id-item">
             <span class="api-id-source">{src}</span>
@@ -483,8 +509,8 @@
       onpickCtxClear={pickCtxClear}
       oncloseCtxPicker={() => (ctxPickerOpen = false)}
     />
-  </div>
-{/if}
+  {/if}
+</Drawer>
 
 {#if editFormModal}
   <EditFormModal
@@ -513,19 +539,37 @@
   .loading {
     color: var(--muted);
   }
-
-  .management-header {
+  .structure-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .drawer-name-link {
+    font-size: 1.1rem;
+    color: inherit;
+    text-decoration: none;
+  }
+  .drawer-name-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .drawer-acronym {
+    font-weight: 600;
+    margin-right: 6px;
+  }
+  .drawer-head-actions {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .drawer-meta {
+    display: flex;
+    align-items: center;
+    gap: 14px;
     margin-bottom: 8px;
     font-size: 0.9rem;
-  }
-  .detail-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    margin-right: auto;
   }
   .field-label {
     color: var(--muted);

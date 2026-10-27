@@ -18,7 +18,6 @@
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PartnersTab from './PartnersTab.svelte';
-	import StructureManagement from './StructureManagement.svelte';
 	import { isAdmin } from '#lib/session.svelte.js';
 
 	const labId = $derived(page.params.id);
@@ -36,8 +35,8 @@
 	let thesesCount = $state(0);
 	let error = $state(false);
 
-	// Les onglets « Adresses » et « Gestion » sont réservés à la session admin.
-	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', ...(isAdmin() ? ['addresses', 'management'] : [])];
+	// L'onglet « Adresses » est réservé à la session admin.
+	const validTabs = ['dashboard', 'publications', 'theses', 'persons', 'collaborations', ...(isAdmin() ? ['addresses'] : [])];
 	const activeTab = $derived(
 		(() => {
 			const t = page.url.searchParams.get('tab');
@@ -94,7 +93,7 @@
 		dashboardLoaded = true;
 	}
 
-	// En-tête de la fiche : la structure, ses tutelles et son nombre de thèses. Relu après une modification depuis l'onglet « Gestion ».
+	// En-tête de la fiche : la structure, ses tutelles et son nombre de thèses.
 	async function loadProfile(): Promise<boolean> {
 		try {
 			const profileData = await api<LabProfile>(`/api/structures/${labId}`);
@@ -190,12 +189,7 @@
 			...(thesesCount > 0 ? [{ id: 'theses', label: 'Thèses' }] : []),
 			{ id: 'persons', label: 'Personnes' },
 			{ id: 'collaborations', label: 'Collaborations' },
-			...(isAdmin()
-				? [
-						{ id: 'addresses', label: 'Adresses' },
-						{ id: 'management', label: 'Gestion' },
-					]
-				: []),
+			...(isAdmin() ? [{ id: 'addresses', label: 'Adresses' }] : []),
 		]}
 		onswitch={onTabSwitch}
 		afterNavigate={syncUrl}
@@ -293,12 +287,6 @@
 		</div>
 	{/if}
 
-	<!-- Tab: Gestion -->
-	{#if activeTab === 'management'}
-		<div class="tab-content">
-			<StructureManagement id={lab.id} onupdated={loadProfile} />
-		</div>
-	{/if}
 {/if}
 
 <style>

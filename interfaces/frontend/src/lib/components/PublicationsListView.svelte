@@ -402,7 +402,6 @@
 		width: 1%;
 		white-space: nowrap;
 	}
-	.publication-table tr.active-row td { background: var(--accent-light); }
 	.access-cell { white-space: nowrap; }
 
 	/* Statut HAL (lab) */

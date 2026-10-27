@@ -192,7 +192,6 @@
 
 <style>
 	.panel-col { width: 28px; padding-right: 0; }
-	.theses-table tr.active-row td { background: var(--accent-light); }
 	.theses-table {
 		min-width: 720px;
 		font-size: 0.9rem;

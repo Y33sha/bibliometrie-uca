@@ -468,6 +468,10 @@
 .data-table tbody tr:hover td {
 	background: var(--surface-hover);
 }
+/* Ligne dont le volet est ouvert. */
+.data-table tr.active-row td {
+	background: var(--accent-light);
+}
 
 /* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
 @media (hover: hover) {

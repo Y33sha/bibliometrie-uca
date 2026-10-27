@@ -88,7 +88,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - [x] Route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
 - [x] Liste unique sous `structures`, facette de type, création de structure selon le rôle ; suppression de `admin/structures` et de `laboratories`
-- [ ] Volet d'édition de la structure, ouvert par une icône sur la ligne ; suppression de l'onglet « Gestion »
+- [x] Volet d'édition de la structure, ouvert par une icône sur la ligne ; suppression de l'onglet « Gestion »
 
 #### 3f. Personnes
 
@@ -97,6 +97,10 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 ### 4. Listes d'entités liées
 
 - [ ] Trancher entre onglets et renvoi vers la liste générale filtrée (voir Questions ouvertes)
+
+### 5. Documentation
+
+- [ ] Guide utilisateur : volet de la structure, entrées d'administration de la barre de navigation
 
 ## Questions ouvertes
 
