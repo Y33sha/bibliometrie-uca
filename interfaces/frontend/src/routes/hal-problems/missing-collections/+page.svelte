@@ -97,7 +97,7 @@
 					<div class="hal-list">
 						{#if pub.hal_links.length}
 							{#each pub.hal_links as link (link.source_id)}
-								<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
+								<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
 							{/each}
 						{/if}
 						{#if pub.doi}

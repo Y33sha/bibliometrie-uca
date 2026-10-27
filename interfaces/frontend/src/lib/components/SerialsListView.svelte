@@ -162,10 +162,6 @@
 		serials.load();
 	}
 
-	function formatIssns(j: Serial): string {
-		return j.issns.join(' / ');
-	}
-
 	function serialTypeLabel(value: string | null): string {
 		if (!value) return '';
 		const opt = facets.options.serialTypes.find((o) => o.value === value);
@@ -265,7 +261,7 @@
 							<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
 						{/if}
 					{/if}				</td>
-				<td class="issn-cell">{formatIssns(j)}</td>
+				<td><div class="id-list">{#each j.issns as issn (issn)}<span class="id-badge">{issn}</span>{/each}</div></td>
 				{#if !publisherFixed}
 					<td class="muted">
 						{#if j.publisher_name}
@@ -307,12 +303,6 @@
 
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
-	.issn-cell {
-		color: var(--muted);
-		font-size: 0.85rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
 	.muted { color: var(--muted); }
 
 

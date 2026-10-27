@@ -98,7 +98,7 @@
 					<div class="hal-list">
 						{#each pair.publication.hal_docs as hd}
 							<div class="hal-row">
-								<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
+								<a href={hd.record_url} target="_blank" rel="noopener" class="id-badge">{hd.halid}</a>
 								{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
 								{#if hd.hal_doc_type}<span class="meta-badge type-badge">{docTypeLabel(hd.hal_doc_type)}</span>{/if}
 								<span class="author-count">{hd.author_count} aut.</span>
@@ -135,7 +135,7 @@
 								<div class="hal-list">
 									{#each pub.hal_docs as hd}
 										<div class="hal-row">
-											<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
+											<a href={hd.record_url} target="_blank" rel="noopener" class="id-badge">{hd.halid}</a>
 											{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
 											{#if hd.hal_doc_type}<span class="meta-badge type-badge">{docTypeLabel(hd.hal_doc_type)}</span>{/if}
 											<span class="author-count">{hd.author_count} aut.</span>

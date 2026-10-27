@@ -5,7 +5,7 @@ from collections.abc import Iterator
 from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text
-from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
+from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
 from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
@@ -160,7 +160,9 @@ class PublisherQueries:
             (
                 [
                     r.name,
-                    PUBLISHER_TYPE_LABELS_FR.get(r.publisher_type, r.publisher_type),
+                    ""
+                    if r.publisher_type == PublisherType.UNKNOWN
+                    else PUBLISHER_TYPE_LABELS_FR.get(r.publisher_type, r.publisher_type),
                     (r.country or "").upper(),
                     " ".join(p["prefix"] for p in r.doi_prefixes),
                     r.serial_count,

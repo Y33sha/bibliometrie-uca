@@ -639,19 +639,27 @@
 	width: 180px;
 }
 
-/* ── ID badge ── */
+/* ── Identifiant (ISSN, ISBN, DOI, ROR, HAL…) : seul style d'identifiant, sur les listes comme dans les en-têtes d'entité ── */
 .id-badge {
 	display: inline-block;
 	padding: 2px 7px;
 	background: var(--accent-light);
 	border-radius: var(--radius);
-	font-size: 0.8rem;
+	font-family: var(--mono);
+	font-size: 0.75rem;
 	color: var(--accent);
 	text-decoration: none;
 	white-space: nowrap;
 }
 
-.id-badge:hover {
+/* Plusieurs identifiants dans une cellule ou une ligne. */
+.id-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+a.id-badge:hover {
 	background: color-mix(in srgb, var(--accent) 20%, white);
 	color: var(--accent);
 	text-decoration: none;
@@ -662,7 +670,7 @@
 	color: var(--success);
 }
 
-.id-badge.id-confirmed:hover {
+a.id-badge.id-confirmed:hover {
 	background: color-mix(in srgb, var(--success) 20%, white);
 	color: var(--success);
 }
@@ -990,20 +998,6 @@ a.structure-tag:hover {
 	padding: 0 6px;
 }
 
-/* ── Lien vers la notice HAL (pages Problèmes HAL) ── */
-.hal-link-badge {
-	display: inline-block;
-	padding: 2px 8px;
-	background: #1a6fb5;
-	border-radius: var(--radius);
-	font-size: 0.82rem;
-	color: white;
-	text-decoration: none;
-	font-weight: 500;
-}
-.hal-link-badge:hover {
-	background: color-mix(in srgb, #1a6fb5, black 20%);
-}
 
 /* ── Pastille DOAJ d'une revue ── */
 .badge-doaj {

@@ -141,8 +141,9 @@
 		return withBase(`/api/publishers/export.csv?${paramsToQuery(params)}`);
 	}
 
+	// Un type inconnu est une valeur absente : la cellule reste vide.
 	function publisherTypeLabel(value: string | null): string {
-		if (!value) return '';
+		if (!value || value === 'unknown') return '';
 		const opt = facets.options.publisherTypes.find((o) => o.value === value);
 		return opt ? opt.text : value;
 	}
@@ -229,10 +230,12 @@
 				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
-				<td class="prefixes">
-					{#each p.doi_prefixes as dp (dp.prefix)}
-						<span class="prefix-chip" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
-					{/each}
+				<td>
+					<div class="id-list">
+						{#each p.doi_prefixes as dp (dp.prefix)}
+							<span class="id-badge" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
+						{/each}
+					</div>
 				</td>
 				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
@@ -262,16 +265,6 @@
 	.muted { color: var(--muted); }
 
 	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
-	.prefixes { display: flex; flex-wrap: wrap; gap: 3px; }
-	.prefix-chip {
-		background: var(--border-subtle);
-		color: var(--muted);
-		padding: 1px 6px;
-		border-radius: var(--radius);
-		font-size: 0.75rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
 
 	.actions { white-space: nowrap; position: relative; }
 </style>

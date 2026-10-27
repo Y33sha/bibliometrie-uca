@@ -59,14 +59,15 @@
             </a>
             {#if p.has_rh}<RhCheck />{/if}
           </td>
-          <td class="hal-accounts">
+          <td>
+            <div class="hal-accounts">
             {#each p.hal_accounts as ha}
               <div class="hal-account">
-                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="hal-id">
+                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="id-badge">
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>
-                <span class="hal-publications">{ha.publication_count} publi{ha.publication_count > 1 ? "s" : ""}</span>
+                <span class="hal-publications">{ha.publication_count} publication{ha.publication_count > 1 ? "s" : ""}</span>
                 {#if ha.idhal}
                   <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}
@@ -78,6 +79,7 @@
                 {/if}
               </div>
             {/each}
+            </div>
           </td>
         </tr>
       {/each}
@@ -109,15 +111,6 @@
     gap: 8px;
     font-size: 0.85rem;
     flex-wrap: wrap;
-  }
-  .hal-id {
-    color: var(--accent);
-    text-decoration: none;
-    font-family: var(--mono);
-    font-size: 0.8rem;
-  }
-  .hal-id:hover {
-    text-decoration: underline;
   }
   .hal-name {
     font-weight: 500;
