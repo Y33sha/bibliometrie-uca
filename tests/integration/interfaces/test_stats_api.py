@@ -7,29 +7,6 @@ dynamiques).
 import pytest
 
 
-class TestStatsEntityFacet:
-    def test_serial(self, client):
-        r = client.get("/api/stats/facets/entities", params={"kind": "serial"})
-        assert r.status_code == 200
-
-    def test_publisher_with_search_and_filters(self, client):
-        r = client.get(
-            "/api/stats/facets/entities",
-            params={"kind": "publisher", "entity_search": "els", "year": "2024", "serial_id": "1"},
-        )
-        assert r.status_code == 200
-
-
-class TestStatsFacets:
-    def test_facets(self, client):
-        r = client.get("/api/stats/facets")
-        assert r.status_code == 200
-
-    def test_facets_with_filter(self, client):
-        r = client.get("/api/stats/facets", params={"year": "2024"})
-        assert r.status_code == 200
-
-
 class TestCollaborations:
     def test_returns_country_counts(self, client):
         r = client.get("/api/stats/collaborations")
@@ -108,6 +85,6 @@ class TestStatsClosedVocabularyFilters:
         ],
     )
     def test_refuses_a_value_outside_the_vocabulary(self, client, param, value):
-        r = client.get("/api/stats/facets", params={param: value})
+        r = client.get("/api/stats/pivot", params={param: value})
         assert r.status_code == 422
         assert value in r.json()["detail"]

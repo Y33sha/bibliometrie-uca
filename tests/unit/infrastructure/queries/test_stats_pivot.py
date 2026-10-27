@@ -38,13 +38,6 @@ def test_validate_rejects_repeated_group():
         validate_pivot("publication_count", ["year", "year"])
 
 
-def test_validate_rejects_non_groupable_dimension():
-    # `apc` est filtrable mais pas un axe de ventilation.
-    assert DIMENSIONS["apc"].groupable is False
-    with pytest.raises(ValidationError, match="Dimension non groupable : 'apc'"):
-        validate_pivot("publication_count", ["apc"])
-
-
 def test_validate_allows_lab_grouping():
     # Le laboratoire (forte cardinalité) est groupable : il sert d'axe de comparaison.
     assert DIMENSIONS["lab"].cardinality == "high"

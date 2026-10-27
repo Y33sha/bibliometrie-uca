@@ -4,28 +4,15 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from infrastructure.read_models._common import FacetOption
-
-
-class StatsFacetsResponse(BaseModel):
-    years: list[FacetOption]
-    labs: list[FacetOption]
-    oa_statuses: list[FacetOption]
-    licenses: list[FacetOption]
-    apc: list[FacetOption]
-    doc_types: list[FacetOption]
-
 
 class PivotDimensionOut(BaseModel):
-    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction)."""
+    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `comparable` pilote le choix de la comparaison (abscisse)."""
 
     key: str
     label: str
     cardinality: Literal["low", "high"]
     ordinal: bool
-    groupable: bool
     comparable: bool
-    filterable: bool
 
 
 class PivotIndicatorOut(BaseModel):

@@ -12,7 +12,7 @@
 	 * Le parent tient la sélection sous forme d'**ids** : un au plus en choix simple, plusieurs avec `multiple`. Les libellés sont de la donnée dérivée, gérée ici : connus d'emblée quand l'utilisateur choisit une option, sinon résolus par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Un libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
 	interface Props {
 		label: string;
-		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
+		/** Base de la facette contextuelle (ex. /api/publications/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
 		endpoint: string;
 		kind: EntityKind;
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */

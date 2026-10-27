@@ -5,7 +5,7 @@ Une vue est une **mesure** agrégée selon un ou plusieurs **groupements**, sous
 Propriétés d'une dimension :
 - **cardinalité** — `low` (peu de valeurs, portables sur un axe) ou `high` (milliers de valeurs : table classée ou top-N).
 - **ordinal** — axe ordonné (l'année) ou catégoriel, qui change le tri et l'éligibilité au filtrage par plage.
-- **groupable / comparable / filterable** — rôles : catégorie de ventilation, axe de comparaison (abscisse), facette. Une dimension groupable a une expression de groupement. Un axe comparable est toujours groupable.
+- **comparable** — la dimension sert aussi d'axe de comparaison (abscisse). Toute dimension sert de ventilation.
 
 Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC que l'établissement a payées pour elles. Le taux d'open access relève de la présentation.
 
@@ -46,13 +46,9 @@ Cardinality = Literal["low", "high"]
 
 @dataclass(frozen=True, slots=True)
 class Dimension:
-    """Un attribut d'une publication et ses rôles possibles :
+    """Un attribut d'une publication, par lequel le pivot ventile.
 
-    - groupable : catégorie de ventilation (empilée dans chaque barre), quand `group_sql` est renseigné ;
-    - `comparable` : axe de comparaison (l'abscisse : l'année, les laboratoires, les éditeurs, les revues). L'accès et la voie d'accès se groupent mais ne se comparent pas ;
-    - `filterable` : facette. Certaines dimensions sont seulement filtrables (APC : utile en filtre, sans intérêt comme axe). Leur filtrage vit dans `filters.py`.
-
-    `group_sql` est l'expression de groupement sur la publication `p` et la revue `j`. `join_sql` est la jointure qu'elle demande.
+    `comparable` en fait aussi un axe de comparaison (l'abscisse : l'année, les laboratoires, les éditeurs, les revues). `group_sql` est l'expression de groupement sur la publication `p` et la revue `j`. `join_sql` est la jointure qu'elle demande.
     """
 
     key: str
@@ -60,13 +56,8 @@ class Dimension:
     cardinality: Cardinality
     ordinal: bool
     comparable: bool
-    filterable: bool
-    group_sql: str | None = None
+    group_sql: str
     join_sql: str = ""
-
-    @property
-    def groupable(self) -> bool:
-        return self.group_sql is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,7 +94,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "low",
             ordinal=True,
             comparable=True,
-            filterable=True,
             group_sql="p.publication_year",
         ),
         Dimension(
@@ -112,7 +102,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "low",
             ordinal=False,
             comparable=False,
-            filterable=False,
             group_sql=(
                 f"CASE WHEN p.oa_status::text IN {OA_OPEN_SQL} THEN 'ouvert' "
                 f"WHEN p.oa_status = '{OaStatus.EMBARGOED.value}' THEN 'embargo' "
@@ -126,11 +115,7 @@ DIMENSIONS: dict[str, Dimension] = {
             "low",
             ordinal=False,
             comparable=False,
-            filterable=True,
             group_sql="p.oa_status::text",
-        ),
-        Dimension(
-            "doc_type", "Type de document", "low", ordinal=False, comparable=False, filterable=True
         ),
         Dimension(
             "doc_type_grouped",
@@ -138,7 +123,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "low",
             ordinal=False,
             comparable=False,
-            filterable=False,
             group_sql=doc_type_grouped_sql("p.doc_type"),
         ),
         # Forte cardinalité : comparaison paginée, pas de groupement primaire. Une publication compte dans chacun des labos de ses auteurs. Alias dédiés (`lps`/`ls`), distincts de la sous-requête de `lab_clause`.
@@ -148,7 +132,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "high",
             ordinal=False,
             comparable=True,
-            filterable=True,
             group_sql="COALESCE(ls.acronym, ls.name)",
             join_sql=(
                 "JOIN publication_structures lps ON lps.publication_id = p.id "
@@ -162,7 +145,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "high",
             ordinal=False,
             comparable=True,
-            filterable=True,
             group_sql="pub.name",
             join_sql="JOIN publishers pub ON pub.id = p.publisher_id",
         ),
@@ -173,7 +155,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "high",
             ordinal=False,
             comparable=True,
-            filterable=True,
             group_sql="jt.title",
             join_sql="JOIN serials jt ON jt.id = p.serial_id",
         ),
@@ -184,7 +165,6 @@ DIMENSIONS: dict[str, Dimension] = {
             "high",
             ordinal=False,
             comparable=True,
-            filterable=True,
             group_sql="pro.name",
             join_sql=(
                 "JOIN publication_rors ppr ON ppr.publication_id = p.id "
@@ -192,7 +172,6 @@ DIMENSIONS: dict[str, Dimension] = {
                 "JOIN ror_organizations pro ON pro.ror_id = ppr.ror_id"
             ),
         ),
-        Dimension("apc", "APC", "low", ordinal=False, comparable=False, filterable=True),
         # Licence de la version éditeur.
         Dimension(
             "license",
@@ -200,16 +179,11 @@ DIMENSIONS: dict[str, Dimension] = {
             "low",
             ordinal=False,
             comparable=False,
-            filterable=True,
             group_sql=f"COALESCE(p.license::text, '{NO_LICENSE}')",
         ),
     )
 }
 
-# Le moteur ventile par l'axe de comparaison (groups).
-assert all(d.groupable for d in DIMENSIONS.values() if d.comparable), (
-    "une dimension comparable doit être groupable"
-)
 
 MEASURES: dict[str, Measure] = {
     m.key: m
@@ -255,12 +229,10 @@ INDICATORS: dict[str, Indicator] = {
 }
 
 assert all(
-    i.measure in MEASURES
-    and DIMENSIONS[i.breakdown].groupable
-    and not DIMENSIONS[i.breakdown].comparable
+    i.measure in MEASURES and i.breakdown in DIMENSIONS and not DIMENSIONS[i.breakdown].comparable
     for i in INDICATORS.values()
 ), (
-    "un indicateur agrège une mesure du registre, ventilée par une dimension groupable non comparable"
+    "un indicateur agrège une mesure du registre, ventilée par une dimension du registre non comparable"
 )
 
 
@@ -276,8 +248,6 @@ def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[D
     for key in groups:
         if key not in DIMENSIONS:
             raise ValidationError(f"Dimension inconnue : {key!r}")
-        if not DIMENSIONS[key].groupable:
-            raise ValidationError(f"Dimension non groupable : {key!r}")
         if key in seen:
             raise ValidationError(f"Groupement répété : {key!r}")
         seen.add(key)
@@ -318,9 +288,7 @@ class StatsPivotQueries:
                     label=d.label,
                     cardinality=d.cardinality,
                     ordinal=d.ordinal,
-                    groupable=d.groupable,
                     comparable=d.comparable,
-                    filterable=d.filterable,
                 )
                 for d in DIMENSIONS.values()
             ],

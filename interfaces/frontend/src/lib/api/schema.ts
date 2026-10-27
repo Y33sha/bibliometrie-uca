@@ -68,50 +68,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/facets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Facets
-         * @description Décomptes par option des facettes des tableaux de bord.
-         *
-         *     Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
-         */
-        get: operations["stats_facets_api_stats_facets_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/facets/entities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Entity Facet
-         * @description Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
-         *
-         *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
-         */
-        get: operations["stats_entity_facet_api_stats_facets_entities_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/collaborations": {
         parameters: {
             query?: never;
@@ -4538,7 +4494,7 @@ export interface components {
         PhaseStatus: "ok" | "warning" | "error";
         /**
          * PivotDimensionOut
-         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction).
+         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `comparable` pilote le choix de la comparaison (abscisse).
          */
         PivotDimensionOut: {
             /** Key */
@@ -4552,12 +4508,8 @@ export interface components {
             cardinality: "low" | "high";
             /** Ordinal */
             ordinal: boolean;
-            /** Groupable */
-            groupable: boolean;
             /** Comparable */
             comparable: boolean;
-            /** Filterable */
-            filterable: boolean;
         };
         /**
          * PivotIndicatorOut
@@ -5467,21 +5419,6 @@ export interface components {
              */
             readonly record_url: string;
         };
-        /** StatsFacetsResponse */
-        StatsFacetsResponse: {
-            /** Years */
-            years: components["schemas"]["FacetOption"][];
-            /** Labs */
-            labs: components["schemas"]["FacetOption"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["FacetOption"][];
-            /** Licenses */
-            licenses: components["schemas"]["FacetOption"][];
-            /** Apc */
-            apc: components["schemas"]["FacetOption"][];
-            /** Doc Types */
-            doc_types: components["schemas"]["FacetOption"][];
-        };
         /** StructureAddressOut */
         StructureAddressOut: {
             /** Id */
@@ -6126,106 +6063,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-        };
-    };
-    stats_facets_api_stats_facets_get: {
-        parameters: {
-            query?: {
-                search?: string;
-                lab_id?: string;
-                year?: string;
-                publisher_id?: number | null;
-                serial_id?: number | null;
-                monograph_id?: number | null;
-                person_id?: number | null;
-                author_id?: number | null;
-                subject_id?: string;
-                access?: string;
-                oa_status?: string;
-                license?: string;
-                source_filter?: string;
-                doc_type?: string;
-                excluded_doc_type?: string;
-                has_apc?: string;
-                country?: string;
-                language?: string;
-                partner_ror?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatsFacetsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stats_entity_facet_api_stats_facets_entities_get: {
-        parameters: {
-            query: {
-                kind: "publisher" | "serial" | "person" | "subject" | "partner";
-                entity_search?: string;
-                search?: string;
-                lab_id?: string;
-                year?: string;
-                publisher_id?: number | null;
-                serial_id?: number | null;
-                monograph_id?: number | null;
-                person_id?: number | null;
-                author_id?: number | null;
-                subject_id?: string;
-                access?: string;
-                oa_status?: string;
-                license?: string;
-                source_filter?: string;
-                doc_type?: string;
-                excluded_doc_type?: string;
-                has_apc?: string;
-                country?: string;
-                language?: string;
-                partner_ror?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EntityFacetResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
