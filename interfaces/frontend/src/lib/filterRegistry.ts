@@ -183,6 +183,18 @@ export function appendFilterParams(
 	}
 }
 
+/** Filtres actifs de la page que la page cible ne propose pas : `transferParams` les écrit, mais la page cible les ignore. */
+export function untransferredFilters(
+	filters: ListFilter[],
+	values: FilterValues,
+	target: ListFilter[],
+): ListFilter[] {
+	const proposed = new Set(target.filter((f) => f.enabled?.() ?? true).map((f) => f.key));
+	return filters.filter(
+		(f) => (f.enabled?.() ?? true) && (isActive(f, values) || f.fixed?.() != null) && !proposed.has(f.key),
+	);
+}
+
 /** Configuration des décomptes pour `useFacets`, par clé de filtre. */
 export function facetDefs(filters: ListFilter[]): Record<string, FacetDef> {
 	const defs: Record<string, FacetDef> = {};

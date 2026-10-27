@@ -14,6 +14,7 @@ import {
 	restoreValues,
 	summarizeParts,
 	transferParams,
+	untransferredFilters,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -149,6 +150,16 @@ describe('filterRegistry', () => {
 			lab_id: '7',
 			source_filter: 'hal_yes',
 		});
+	});
+
+	it('signale les filtres actifs que la page cible ne propose pas', () => {
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.checkbox.perimeter = ['yes'];
+		const target = FILTERS.map((f) => (f.key === 'perimeter' ? { ...f, enabled: () => false } : f));
+		expect(untransferredFilters(FILTERS, values, target).map((f) => f.key)).toEqual(['perimeter']);
+		values.checkbox.perimeter = [];
+		expect(untransferredFilters(FILTERS, values, target)).toEqual([]);
 	});
 
 	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {

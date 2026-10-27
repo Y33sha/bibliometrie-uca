@@ -17,6 +17,7 @@
 		initialValues,
 		restoreValues,
 		transferParams,
+		untransferredFilters,
 		urlFilterDefs,
 		urlState,
 	} from '#lib/filterRegistry.js';
@@ -136,6 +137,11 @@
 		if (q) p.set('search', q);
 		return resolve('stats') + '?' + paramsToQuery(p);
 	});
+	// Filtres actifs que la page Statistiques ne propose pas, annoncés à côté du lien.
+	const STATS_FILTERS = publicationFilters({ kind: 'all' });
+	const untransferred = $derived(
+		untransferredFilters(FILTERS, values, STATS_FILTERS).map((f) => f.label).join(', '),
+	);
 
 	// Sort display
 	const yearSort = $derived(sortDirection(currentSort, 'year'));
@@ -269,7 +275,10 @@
 
 <ListToolbar bind:search placeholder="Rechercher par titre ou sujet" onsearch={onSearchInput} list={listing} one="publication" many="publications" exportUrl={exportCsvUrl()}>
 	{#snippet actions()}
-		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
+		{#if showStatsLink}
+			{#if untransferred}<span class="untransferred" role="note">Non transmis aux statistiques&nbsp;: {untransferred}</span>{/if}
+			<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>
+		{/if}
 	{/snippet}
 	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={buildFilterParams} onchange={onFilterChange} />
 </ListToolbar>
@@ -427,6 +436,10 @@
 <style>
 	.license-cell {
 		font-size: 0.8rem;
+	}
+	.untransferred {
+		font-size: 0.85rem;
+		color: var(--text-secondary);
 	}
 	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
