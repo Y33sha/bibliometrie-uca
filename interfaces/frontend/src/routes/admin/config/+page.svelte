@@ -261,150 +261,152 @@
   </span>
 {/snippet}
 
-<!-- ═══ ANNÉES ═══ -->
-<h3 class="section-title">Options d'extraction</h3>
-<div class="config-grid">
-  {#each ["pipeline_start_year_full"] as key}
-    {@const item = configByKey(key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">Année de début</span>
-        {#if editingKey === key}
-          {@render inlineEdit(key)}
-        {:else}
-          <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
-          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
-        {/if}
-      </div>
-    {/if}
-  {/each}
-  {#each CAPS as cap (cap.key)}
-    {@const item = configByKey(cap.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{cap.label}</span>
-        {#if editingKey === cap.key}
-          {@render inlineEdit(cap.key)}
-        {:else}
-          <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
-          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(cap.key)} />
-        {/if}
-      </div>
-    {/if}
-  {/each}
-</div>
-
-<!-- ═══ DÉLAIS ═══ -->
-<h3 class="section-title">Délais de réinterrogation</h3>
-<p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
-<div class="config-grid">
-  {#each DELAYS as delay (delay.key)}
-    {@const item = configByKey(delay.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{delay.label}</span>
-        {#if editingKey === delay.key}
-          {@render inlineEdit(delay.key)}
-        {:else}
-          <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
-          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(delay.key)} />
-        {/if}
-      </div>
-    {/if}
-  {/each}
-</div>
-
-<!-- ═══ PÉRIMÈTRES ═══ -->
-<h3 class="section-title">Périmètres</h3>
-
-<h4 class="subsection-title">Définition des périmètres</h4>
-<p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<table class="data-table perimeters-table">
-  <thead>
-    <tr>
-      <th>Code</th>
-      <th>Nom</th>
-      <th class="perim-structs">Structures racines</th>
-      <th class="num">Total</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each perimeters as perim (perim.id)}
-      <tr>
-        <td class="perim-code">{perim.code}</td>
-        <td class="perim-name">{perim.name}</td>
-        <td class="perim-structs">
-          <div class="perimeter-rules">
-            {#each perim.structures as struct (struct.id)}
-              <span class="tag">{structureLabel(struct)}</span>
-            {/each}
-          </div>
-        </td>
-        <td class="num">{perim.structure_count}</td>
-        <td class="perim-actions">
-          <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
-          <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
-        </td>
-      </tr>
-    {/each}
-  </tbody>
-</table>
-<div class="perim-new">
-  <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
-</div>
-
-<h4 class="subsection-title">Rôle des périmètres</h4>
-<table class="data-table perimeters-table">
-  <thead>
-    <tr>
-      <th class="role-phase-col">Phase</th>
-      <th class="role-perimeter-col">Périmètre</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each PERIMETER_ROLES as role (role.key)}
-      {@const item = configByKey(role.key)}
+<div class="config-page">
+  <!-- ═══ ANNÉES ═══ -->
+  <h2 class="section-title">Options d'extraction</h2>
+  <div class="config-grid">
+    {#each ["pipeline_start_year_full"] as key}
+      {@const item = configByKey(key)}
       {#if item}
-        <tr>
-          <td class="role-phase-col">
-            <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
-          </td>
-          <td class="role-perimeter-col">
-            <select
-              class="config-select"
-              value={item.value}
-              onchange={async (e) => {
-                const target = e.target as HTMLSelectElement;
-                try {
-                  await configApi.setValue(role.key, target.value);
-                  await load();
-                } catch {}
-              }}
-            >
-              {#each perimeters as p (p.id)}
-                <option value={p.code}>{p.name} ({p.code})</option>
-              {/each}
-            </select>
-          </td>
-        </tr>
+        <div class="config-row">
+          <span class="config-label">Année de début</span>
+          {#if editingKey === key}
+            {@render inlineEdit(key)}
+          {:else}
+            <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
+            <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
+          {/if}
+        </div>
       {/if}
     {/each}
-  </tbody>
-</table>
+    {#each CAPS as cap (cap.key)}
+      {@const item = configByKey(cap.key)}
+      {#if item}
+        <div class="config-row">
+          <span class="config-label">{cap.label}</span>
+          {#if editingKey === cap.key}
+            {@render inlineEdit(cap.key)}
+          {:else}
+            <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
+            <IconButton icon="edit" label="Modifier" onclick={() => startEdit(cap.key)} />
+          {/if}
+        </div>
+      {/if}
+    {/each}
+  </div>
 
-<!-- ═══ AFFICHAGE ═══ -->
-<h3 class="section-title">Affichage</h3>
-<div class="config-grid">
-  <div class="config-row" style="flex-wrap: wrap;">
-    <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
-    <div class="type-checks">
-      {#each STRUCTURE_TYPES as t (t.value)}
-        <label class="type-check">
-          <input type="checkbox" checked={labDisplayTypes.includes(t.value)} onchange={() => toggleLabType(t.value)} />
-          {t.label}
-        </label>
+  <!-- ═══ DÉLAIS ═══ -->
+  <h2 class="section-title">Délais de réinterrogation</h2>
+  <p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
+  <div class="config-grid">
+    {#each DELAYS as delay (delay.key)}
+      {@const item = configByKey(delay.key)}
+      {#if item}
+        <div class="config-row">
+          <span class="config-label">{delay.label}</span>
+          {#if editingKey === delay.key}
+            {@render inlineEdit(delay.key)}
+          {:else}
+            <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
+            <IconButton icon="edit" label="Modifier" onclick={() => startEdit(delay.key)} />
+          {/if}
+        </div>
+      {/if}
+    {/each}
+  </div>
+
+  <!-- ═══ PÉRIMÈTRES ═══ -->
+  <h2 class="section-title">Périmètres</h2>
+
+  <h3 class="subsection-title">Définition des périmètres</h3>
+  <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
+  <table class="data-table perimeters-table">
+    <thead>
+      <tr>
+        <th>Code</th>
+        <th>Nom</th>
+        <th class="perim-structs">Structures racines</th>
+        <th class="num">Total</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each perimeters as perim (perim.id)}
+        <tr>
+          <td class="perim-code">{perim.code}</td>
+          <td class="perim-name">{perim.name}</td>
+          <td class="perim-structs">
+            <div class="perimeter-rules">
+              {#each perim.structures as struct (struct.id)}
+                <span class="tag">{structureLabel(struct)}</span>
+              {/each}
+            </div>
+          </td>
+          <td class="num">{perim.structure_count}</td>
+          <td class="perim-actions">
+            <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
+            <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
+          </td>
+        </tr>
       {/each}
+    </tbody>
+  </table>
+  <div class="perim-new">
+    <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
+  </div>
+
+  <h3 class="subsection-title">Rôle des périmètres</h3>
+  <table class="data-table perimeters-table">
+    <thead>
+      <tr>
+        <th class="role-phase-col">Phase</th>
+        <th class="role-perimeter-col">Périmètre</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each PERIMETER_ROLES as role (role.key)}
+        {@const item = configByKey(role.key)}
+        {#if item}
+          <tr>
+            <td class="role-phase-col">
+              <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
+            </td>
+            <td class="role-perimeter-col">
+              <select
+                class="config-select"
+                value={item.value}
+                onchange={async (e) => {
+                  const target = e.target as HTMLSelectElement;
+                  try {
+                    await configApi.setValue(role.key, target.value);
+                    await load();
+                  } catch {}
+                }}
+              >
+                {#each perimeters as p (p.id)}
+                  <option value={p.code}>{p.name} ({p.code})</option>
+                {/each}
+              </select>
+            </td>
+          </tr>
+        {/if}
+      {/each}
+    </tbody>
+  </table>
+
+  <!-- ═══ AFFICHAGE ═══ -->
+  <h2 class="section-title">Affichage</h2>
+  <div class="config-grid">
+    <div class="config-row" style="flex-wrap: wrap;">
+      <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
+      <div class="type-checks">
+        {#each STRUCTURE_TYPES as t (t.value)}
+          <label class="type-check">
+            <input type="checkbox" checked={labDisplayTypes.includes(t.value)} onchange={() => toggleLabType(t.value)} />
+            {t.label}
+          </label>
+        {/each}
+      </div>
     </div>
   </div>
 </div>
@@ -442,33 +444,31 @@
 {/if}
 
 <style>
-  .section-title {
-    margin: 24px auto 8px;
+  /* Colonne alignée sur le titre de la page : une ligne de réglage trop large éloigne la valeur de son libellé. */
+  .config-page {
     max-width: 800px;
   }
-  /* Bouton « Nouveau périmètre » sous la table, aligné à gauche de la colonne centrée. */
+  .section-title {
+    margin: 24px 0 8px;
+  }
   .perim-new {
-    max-width: 800px;
-    margin: 8px auto 0;
+    margin-top: 8px;
   }
   .info-box {
-    max-width: 800px;
-    margin: 4px auto 12px;
+    margin: 4px 0 12px;
   }
   .subsection-title {
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--muted);
-    margin: 16px auto 6px;
-    max-width: 800px;
+    margin: 16px 0 6px;
   }
 
   /* Une liste par section, réglages séparés par des filets. */
   .config-grid {
     display: flex;
     flex-direction: column;
-    max-width: 800px;
-    margin: 0 auto 8px;
+    margin-bottom: 8px;
   }
   .config-row {
     display: flex;
@@ -509,8 +509,7 @@
   }
 
   .perimeters-table {
-    max-width: 800px;
-    margin: 0 auto 10px;
+    margin-bottom: 10px;
   }
   .perimeters-table td {
     vertical-align: middle;

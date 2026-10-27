@@ -144,8 +144,6 @@
 
 	let searchTimeout: ReturnType<typeof setTimeout> | null = null;
 
-	let mainPanel: HTMLDivElement | undefined = $state();
-
 	const selectedCount = $derived(selectedIds.size);
 
 	// Libellé d'une structure par id (pour les tags des prédicats).
@@ -364,7 +362,7 @@
 	function goToPage(p: number): void {
 		list.page = p;
 		loadAddresses();
-		mainPanel?.scrollTo(0, 0);
+		window.scrollTo(0, 0);
 	}
 
 	function matchesFilter(addr: Address): boolean {
@@ -376,10 +374,10 @@
 		return true;
 	}
 
-	function cardClass(addr: Address): string {
-		if (addr.is_confirmed === false) return 'addr-card reviewed-rejected';
-		if (addr.is_confirmed === true) return 'addr-card reviewed-confirmed';
-		return 'addr-card';
+	function rowClass(addr: Address): string {
+		if (addr.is_confirmed === false) return 'addr-row reviewed-rejected';
+		if (addr.is_confirmed === true) return 'addr-row reviewed-confirmed';
+		return 'addr-row';
 	}
 
 	function structTagClass(s: AddressStructure): string {
@@ -427,10 +425,10 @@
 		</select>
 		<div class="stats-bar">
 			<span class="stat-badge stat-total">{stats.total.toLocaleString('fr-FR')} adresses</span>
-			<span class="stat-badge stat-detected">Détectées : {stats.detected}</span>
-			<span class="stat-badge stat-pending">Non validées : {stats.pending}</span>
-			<span class="stat-badge stat-confirmed">Reliées : {stats.confirmed}</span>
-			<span class="stat-badge stat-rejected">Rejetées : {stats.rejected}</span>
+			<span class="stat-badge stat-detected">Détectées&nbsp;: {stats.detected.toLocaleString('fr-FR')}</span>
+			<span class="stat-badge stat-pending">Non validées&nbsp;: {stats.pending.toLocaleString('fr-FR')}</span>
+			<span class="stat-badge stat-confirmed">Reliées&nbsp;: {stats.confirmed.toLocaleString('fr-FR')}</span>
+			<span class="stat-badge stat-rejected">Rejetées&nbsp;: {stats.rejected.toLocaleString('fr-FR')}</span>
 		</div>
 		{#if currentStructureId}
 			<a href={resolve(`admin/feedback?structure_id=${currentStructureId}`)} class="btn btn-sm feedback-btn">Qualité de la détection</a>
@@ -550,99 +548,97 @@
 	{/if}
 
 	<!-- Address list -->
-	<div class="main-panel" bind:this={mainPanel}>
-		{#if requiresSearch && !list.loading}
-			<div class="loading-msg">Ajoutez un filtre (texte ou structure) pour afficher les résultats.</div>
-		{:else}
-			<ListStatus {list} emptyText="Aucune adresse trouvée.">
-				<div class="select-all-row">
-					<label class="select-all-label">
+	{#if requiresSearch && !list.loading}
+		<div class="loading-msg">Ajoutez un filtre (texte ou structure) pour afficher les résultats.</div>
+	{:else}
+		<ListStatus {list} emptyText="Aucune adresse trouvée.">
+			<div class="select-all-row">
+				<label class="select-all-label">
+					<input
+						type="checkbox"
+						checked={selectAll}
+						onchange={(e) => toggleSelectAll((e.target as HTMLInputElement).checked)}
+					/>
+					Tout sélectionner
+				</label>
+			</div>
+			{#each addresses as addr (addr.id)}
+				<div class={rowClass(addr)}>
+					<div class="addr-header">
 						<input
 							type="checkbox"
-							checked={selectAll}
-							onchange={(e) => toggleSelectAll((e.target as HTMLInputElement).checked)}
+							aria-label="Sélectionner l'adresse"
+							checked={selectedIds.has(addr.id)}
+							onchange={() => toggleSelect(addr.id)}
 						/>
-						Tout sélectionner
-					</label>
-				</div>
-				{#each addresses as addr (addr.id)}
-					<div class={cardClass(addr)}>
-						<div class="addr-header">
-							<input
-								type="checkbox"
-								aria-label="Sélectionner l'adresse"
-								checked={selectedIds.has(addr.id)}
-								onchange={() => toggleSelect(addr.id)}
-							/>
-							<button
-								type="button"
-								class="addr-toggle"
-								aria-expanded={expandedId === addr.id}
-								onclick={() => toggleDetail(addr.id)}
-							>
-								<div class="addr-text">{addr.raw_text}</div>
-								<div class="addr-meta">
-									<span class="publication-count-tag"
-										>{addr.publication_count} publication{addr.publication_count > 1 ? 's' : ''}</span
-									>
-									{#each addr.structures || [] as s}
-										<span class={structTagClass(s)}>{structureLabel(s)}</span>
-									{/each}
-								</div>
-							</button>
-							<div class="addr-actions" role="group" aria-label="Lien de l'adresse à la structure">
-								{#if addr.is_confirmed !== false}
-									<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
-								{/if}
-								{#if addr.is_confirmed !== true}
-									<button class="btn btn-sm btn-confirm-outline" title="Relier à la structure" onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button>
-								{/if}
-								{#if addr.is_confirmed !== null}
-									<button class="btn btn-sm btn-reset" title="Reset" onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button>
-								{/if}
+						<button
+							type="button"
+							class="addr-toggle"
+							aria-expanded={expandedId === addr.id}
+							onclick={() => toggleDetail(addr.id)}
+						>
+							<div class="addr-text">{addr.raw_text}</div>
+							<div class="addr-meta">
+								<span class="publication-count-tag"
+									>{addr.publication_count} publication{addr.publication_count > 1 ? 's' : ''}</span
+								>
+								{#each addr.structures || [] as s}
+									<span class={structTagClass(s)}>{structureLabel(s)}</span>
+								{/each}
 							</div>
+						</button>
+						<div class="addr-actions" role="group" aria-label="Lien de l'adresse à la structure">
+							{#if addr.is_confirmed !== false}
+								<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
+							{/if}
+							{#if addr.is_confirmed !== true}
+								<button class="btn btn-sm btn-confirm-outline" title="Relier à la structure" onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button>
+							{/if}
+							{#if addr.is_confirmed !== null}
+								<button class="btn btn-sm btn-reset" title="Reset" onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button>
+							{/if}
 						</div>
-
-						{#if expandedId === addr.id}
-							<div class="addr-detail">
-								{#if pubsLoading}
-									<div class="detail-loading">Chargement…</div>
-								{:else if publications.length === 0}
-									<div class="detail-loading">Aucune publication liée.</div>
-								{:else}
-									<div class="detail-title">
-										Publications ({publications.length})
-									</div>
-									{#each publications as p}
-										<div class="publication-row">
-											<div class="publication-title-link">
-												<PublicationTitle titre={p.title || '(sans titre)'} />
-											</div>
-											<div class="publication-meta-inline">
-												{p.publication_year}
-												{#if p.doc_type}&middot; {docTypeLabel(p.doc_type)}{/if}
-												{#if p.author_name}&middot; {p.author_name}{/if}
-												{#if p.journal_title}&middot; {p.journal_title}{/if}
-												{#if p.doi}
-													<a
-														href="https://doi.org/{encodeURIComponent(p.doi)}"
-														target="_blank"
-														rel="noopener noreferrer">DOI</a
-													>
-												{/if}
-											</div>
-										</div>
-									{/each}
-								{/if}
-							</div>
-						{/if}
 					</div>
-				{/each}
-			</ListStatus>
-		{/if}
 
-		<Pagination page={list.page} pages={list.pages} onchange={goToPage} />
-	</div>
+					{#if expandedId === addr.id}
+						<div class="addr-detail">
+							{#if pubsLoading}
+								<div class="detail-loading">Chargement…</div>
+							{:else if publications.length === 0}
+								<div class="detail-loading">Aucune publication liée.</div>
+							{:else}
+								<div class="detail-title">
+									Publications ({publications.length})
+								</div>
+								{#each publications as p}
+									<div class="publication-row">
+										<div class="publication-title-link">
+											<PublicationTitle titre={p.title || '(sans titre)'} />
+										</div>
+										<div class="publication-meta-inline">
+											{p.publication_year}
+											{#if p.doc_type}&middot; {docTypeLabel(p.doc_type)}{/if}
+											{#if p.author_name}&middot; {p.author_name}{/if}
+											{#if p.journal_title}&middot; {p.journal_title}{/if}
+											{#if p.doi}
+												<a
+													href="https://doi.org/{encodeURIComponent(p.doi)}"
+													target="_blank"
+													rel="noopener noreferrer">DOI</a
+												>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							{/if}
+						</div>
+					{/if}
+				</div>
+			{/each}
+		</ListStatus>
+	{/if}
+
+	<Pagination page={list.page} pages={list.pages} onchange={goToPage} />
 </div>
 
 <style>
@@ -651,11 +647,7 @@
 		display: flex;
 		align-items: center;
 		gap: 12px;
-		margin-bottom: 10px;
-		padding: 8px 12px;
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
+		margin-bottom: 12px;
 		flex-wrap: wrap;
 	}
 	.structure-label {
@@ -831,7 +823,8 @@
 		background: var(--accent-light);
 	}
 	.select-all-row {
-		padding: 4px 12px;
+		padding: 4px 12px 6px 15px;
+		border-bottom: 1px solid var(--border);
 	}
 	.select-all-label {
 		font-size: 0.85rem;
@@ -842,28 +835,16 @@
 		color: var(--muted);
 	}
 
-	/* Main panel */
-	.main-panel {
-		overflow-y: auto;
-		max-height: calc(100vh - 240px);
-	}
-
-	/* Address cards */
-	.addr-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		margin-bottom: 6px;
-		transition: border-color 0.15s;
-	}
-	.addr-card:hover {
-		border-color: var(--accent);
+	/* Une ligne par adresse ; le liseré gauche marque le lien rejeté ou relié. */
+	.addr-row {
+		border-bottom: 1px solid var(--border);
+		border-left: 3px solid transparent;
 	}
 	.reviewed-rejected {
-		border-left: 3px solid var(--danger);
+		border-left-color: var(--danger);
 	}
 	.reviewed-confirmed {
-		border-left: 3px solid var(--success);
+		border-left-color: var(--success);
 	}
 
 	.addr-header {

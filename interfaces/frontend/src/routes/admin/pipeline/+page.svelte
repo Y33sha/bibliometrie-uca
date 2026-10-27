@@ -87,24 +87,20 @@
   .layout {
     display: grid;
     grid-template-columns: 360px 1fr;
-    gap: 20px;
+    gap: 24px;
     align-items: start;
   }
   .col-list {
     position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
+    top: calc(var(--header-height) + 16px);
+    max-height: calc(100vh - var(--header-height) - 32px);
     overflow-y: auto;
-    /* Gouttière pour que la scrollbar ne se superpose pas aux cartes de run. */
+    /* Gouttière pour que la scrollbar ne se superpose pas aux runs. */
     padding-right: 8px;
     scrollbar-gutter: stable;
   }
   .col-detail {
     min-width: 0;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
   }
   .empty {
     color: var(--muted);

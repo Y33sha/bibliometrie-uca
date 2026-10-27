@@ -170,9 +170,9 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 8. Administration
 
 - [x] En-tête de page ; noms de page (« Logs » et « Pipeline »)
-- [ ] Pipeline, Affiliations, Qualité de la détection sans cartes ; Configuration en pleine largeur
+- [x] Pipeline, Affiliations, Qualité de la détection sans cartes ; Configuration alignée à gauche ; Affiliations sans défilement interne
 - [x] Fil d'Ariane sur Contributions orphelines
-- [ ] Chiffres clés de Qualité de la détection en `KeyFigures` ; format des nombres
+- [x] Chiffres clés de Qualité de la détection en `KeyFigures` ; format des nombres
 - [ ] Contrôles stylés ; sélecteur de pays par ligne, boutons de rejet et de validation
 - [ ] Pastille de source OpenAlex distincte de l'open access ; abréviations
 - [ ] Libellés des cases à cocher et des `select` ; en-tête cliquable d'Affiliations sans contrôle imbriqué ; contrastes

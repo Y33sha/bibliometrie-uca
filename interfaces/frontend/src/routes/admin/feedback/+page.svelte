@@ -2,6 +2,7 @@
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import ResultCount from '#lib/components/ResultCount.svelte';
   import PageHeader from '#lib/components/PageHeader.svelte';
+  import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
   import { replaceQuery } from "#lib/url.js";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
@@ -258,34 +259,19 @@
 
   <!-- Stats row -->
   {#if stats}
-    <div class="stats-row">
-      <div class="stat-card highlight-success">
-        <div class="value val-success">
-          {stats.detection_rate !== null ? stats.detection_rate + "%" : "\u2014"}
-        </div>
-        <div class="label">Taux de concordance</div>
-      </div>
-      <div class="stat-card">
-        <div class="value">{stats.total_reviewed}</div>
-        <div class="label">Adresses examinées</div>
-      </div>
-      <div class="stat-card highlight-warning">
-        <div class="value val-warning">{stats.false_negatives}</div>
-        <div class="label">Faux négatifs</div>
-      </div>
-      <div class="stat-card highlight-danger">
-        <div class="value val-danger">{stats.false_positives}</div>
-        <div class="label">Faux positifs</div>
-      </div>
-      <div class="stat-card">
-        <div class="value">{stats.concordant_valid}</div>
-        <div class="label">Vrais positifs</div>
-      </div>
-      <div class="stat-card">
-        <div class="value">{stats.pending}</div>
-        <div class="label">En attente</div>
-      </div>
-    </div>
+    <KeyFigures
+      items={[
+        {
+          value: stats.detection_rate !== null ? `${stats.detection_rate.toLocaleString("fr-FR")}\u00a0%` : "\u2014",
+          label: "taux de concordance",
+        },
+        { value: stats.total_reviewed.toLocaleString("fr-FR"), label: "adresses examinées" },
+        { value: stats.false_negatives.toLocaleString("fr-FR"), label: "faux négatifs" },
+        { value: stats.false_positives.toLocaleString("fr-FR"), label: "faux positifs" },
+        { value: stats.concordant_valid.toLocaleString("fr-FR"), label: "vrais positifs" },
+        { value: stats.pending.toLocaleString("fr-FR"), label: "en attente" },
+      ]}
+    />
   {/if}
 
   <!-- Help text -->
@@ -398,58 +384,6 @@
 </div>
 
 <style>
-
-  /* Stats row */
-  .stats-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-
-  .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 18px;
-    text-align: center;
-    flex: 1;
-    min-width: 120px;
-  }
-
-  .stat-card .value {
-    font-size: 1.55rem;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  .stat-card .label {
-    font-size: 0.8rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .stat-card.highlight-danger {
-    border-left: 3px solid var(--danger);
-  }
-  .stat-card.highlight-warning {
-    border-left: 3px solid var(--warning);
-  }
-  .stat-card.highlight-success {
-    border-left: 3px solid var(--success);
-  }
-  .val-danger {
-    color: var(--danger);
-  }
-  .val-warning {
-    color: var(--warning);
-  }
-  .val-success {
-    color: var(--success);
-  }
-
-  /* Help text */
 
   /* Toolbar */
   .toolbar {
