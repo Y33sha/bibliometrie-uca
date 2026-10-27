@@ -1304,19 +1304,6 @@ a.badge-doaj:hover {
 	border-color: color-mix(in srgb, var(--accent), black 20%);
 }
 
-/* Bouton de validation bordé de vert, rempli au survol. */
-.btn-confirm-outline {
-	background: var(--card);
-	color: var(--success);
-	border-color: var(--success);
-}
-
-.btn-confirm-outline:hover {
-	background: var(--success);
-	color: white;
-	border-color: var(--success);
-}
-
 .btn-create {
 	background: var(--success-light);
 	color: var(--success);
@@ -1599,11 +1586,13 @@ button.status-chip:hover {
 	background: var(--hover);
 	color: var(--accent);
 }
-.icon-btn-danger:hover:not(:disabled) {
+.icon-btn-danger:hover:not(:disabled),
+.icon-btn-danger[aria-pressed='true'] {
 	background: var(--danger-light);
 	color: var(--danger);
 }
-.icon-btn-success:hover:not(:disabled) {
+.icon-btn-success:hover:not(:disabled),
+.icon-btn-success[aria-pressed='true'] {
 	background: var(--success-light);
 	color: var(--success);
 }
@@ -1612,58 +1601,11 @@ button.status-chip:hover {
 	cursor: default;
 }
 
-.btn-icon-sm {
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	line-height: 1;
-}
-
-/* Bouton bascule de statut ✓ (.confirm) / ✗ (.reject), carré. Inactif grisé, actif coloré discret (texte + bordure), rempli au survol. */
-.toggle-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	background: var(--card);
-	color: var(--muted);
-	cursor: pointer;
-	line-height: 1;
-	transition: all 0.12s;
-}
-.toggle-btn.confirm.active {
-	border-color: var(--success);
-	color: var(--success);
-	font-weight: 700;
-}
-.toggle-btn.reject.active {
-	border-color: var(--danger);
-	color: var(--danger);
-	font-weight: 700;
-}
-.toggle-btn.confirm:hover {
-	background: var(--success);
-	border-color: var(--success);
-	color: #fff;
-}
-.toggle-btn.reject:hover {
-	background: var(--danger);
-	border-color: var(--danger);
-	color: #fff;
-}
-
-/* Colonne de contrôles (boutons ✓/✗ ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */
+/* Colonne de contrôles (bascules confirmer et rejeter, ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */
 .chip-controls {
 	display: inline-flex;
 	align-items: center;
 	gap: 2px;
-	min-width: 46px;
+	min-width: 58px;
 	flex-shrink: 0;
 }

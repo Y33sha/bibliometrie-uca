@@ -1,4 +1,5 @@
 <script lang="ts">
+  import StatusToggles from "#lib/components/StatusToggles.svelte";
   import type { NameForm } from "./types";
 
   let {
@@ -41,28 +42,7 @@
       {#if isCanonical(nf)}
         <span class="canonical-tag" title="Forme dérivée du nom canonique">nom</span>
       {:else}
-        <button
-          class="toggle-btn confirm"
-          class:active={nf.status === "confirmed"}
-          title={nf.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
-          onclick={() =>
-            onsetStatus(
-              personId,
-              nf.name_form,
-              nf.status === "confirmed" ? "pending" : "confirmed",
-            )}>&#x2713;</button
-        >
-        <button
-          class="toggle-btn reject"
-          class:active={nf.status === "rejected"}
-          title={nf.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
-          onclick={() =>
-            onsetStatus(
-              personId,
-              nf.name_form,
-              nf.status === "rejected" ? "pending" : "rejected",
-            )}>&#x2717;</button
-        >
+        <StatusToggles status={nf.status} onchange={(s) => onsetStatus(personId, nf.name_form, s)} />
       {/if}
     </span>
     {#if nf.publication_count > 0}

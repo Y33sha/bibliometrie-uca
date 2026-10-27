@@ -128,12 +128,8 @@
       <form class="drawer-edit" onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
         <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" use:autofocus={{ select: true }} />
         <input class="edit-input" bind:value={firstName} placeholder="Prénom" aria-label="Prénom" />
-        <button type="submit" class="btn btn-icon-sm btn-confirm-outline" title="Enregistrer"
-          >&#x2713;</button
-        >
-        <button type="button" class="btn btn-icon-sm" title="Annuler" onclick={() => (editing = false)}
-          >&#x2715;</button
-        >
+        <button type="submit" class="btn btn-sm btn-primary">OK</button>
+        <button type="button" class="btn btn-sm" onclick={() => (editing = false)}>Annuler</button>
       </form>
     {:else}
       <div class="drawer-title" class:excluded={!!person.exclusion}>
@@ -152,7 +148,7 @@
       <div class="drawer-head-actions">
         <IconButton icon="edit" label="Modifier le nom" onclick={startEdit} />
         <select
-          class="exclusion-select"
+          class="select exclusion-select"
           class:excluded={!!person.exclusion}
           title="Exclusion de la personne"
           aria-label="Exclusion de la personne"
@@ -337,8 +333,8 @@
     font-size: 0.9rem;
   }
   .exclusion-select {
+    height: 28px;
     font-size: 0.8rem;
-    padding: 2px 4px;
     color: var(--muted);
   }
   .exclusion-select.excluded {

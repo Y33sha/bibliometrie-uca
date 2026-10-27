@@ -1,5 +1,6 @@
 <script lang="ts">
   import IdentifierLink from "#lib/components/IdentifierLink.svelte";
+  import StatusToggles from "#lib/components/StatusToggles.svelte";
   import { autofocus } from "#lib/actions/focus.js";
   import { identifierTypeLabel } from "#lib/labels.js";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
@@ -68,22 +69,7 @@
           </span>
         {:else}
           <span class="chip-controls">
-            <button
-              class="toggle-btn confirm"
-              class:active={ident.status === "confirmed"}
-              title={ident.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
-              onclick={() =>
-                onsetStatus(ident.id, ident.status === "confirmed" ? "pending" : "confirmed")}
-              >&#x2713;</button
-            >
-            <button
-              class="toggle-btn reject"
-              class:active={ident.status === "rejected"}
-              title={ident.status === "rejected" ? "Retirer le rejet" : "Rejeter"}
-              onclick={() =>
-                onsetStatus(ident.id, ident.status === "rejected" ? "pending" : "rejected")}
-              >&#x2717;</button
-            >
+            <StatusToggles status={ident.status} onchange={(s) => onsetStatus(ident.id, s)} />
           </span>
         {/if}
         <span
@@ -105,7 +91,7 @@
 {/if}
 {#if form}
   <div class="id-form">
-    <select bind:value={form.id_type}>
+    <select class="select" aria-label="Type d'identifiant" bind:value={form.id_type}>
       {#each ["orcid", "idhal", "idref"] as idType (idType)}
         <option value={idType}>{identifierTypeLabel(idType)}</option>
       {/each}
@@ -198,19 +184,13 @@
     margin-top: 4px;
     flex-wrap: wrap;
   }
-  .id-form select,
   .id-form input {
+    width: 180px;
     padding: 3px 6px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
     font-size: 0.85rem;
     font-family: inherit;
-  }
-  .id-form select {
-    width: 80px;
-  }
-  .id-form input {
-    width: 180px;
   }
   .id-error {
     font-size: 0.8rem;

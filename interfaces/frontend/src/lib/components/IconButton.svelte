@@ -4,12 +4,15 @@
 		icon,
 		label,
 		onclick,
-		disabled = false
+		disabled = false,
+		pressed
 	}: {
 		icon: 'edit' | 'delete' | 'panel' | 'reject' | 'confirm' | 'reset';
 		label: string;
 		onclick: () => void;
 		disabled?: boolean;
+		/** Fait du bouton une bascule : enfoncé, il garde la couleur de son action. */
+		pressed?: boolean;
 	} = $props();
 </script>
 
@@ -20,6 +23,7 @@
 	class:icon-btn-success={icon === 'confirm'}
 	title={label}
 	aria-label={label}
+	aria-pressed={pressed}
 	{disabled}
 	{onclick}
 >
