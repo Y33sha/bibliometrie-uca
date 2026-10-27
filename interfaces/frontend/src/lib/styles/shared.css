@@ -9,7 +9,7 @@
 	/* Texte */
 	--text: #1d2433;
 	--text-secondary: #5b6474;
-	--muted: #6b7280;          /* texte discret */
+	--muted: #636b78;          /* texte discret, contraste de 4,5:1 au moins sur --border-subtle */
 	--text-faint: #a3a9b3;     /* valeurs nulles ou absentes */
 
 	/* Surfaces et lignes */
@@ -34,7 +34,7 @@
 	--nav-admin-menu: #2a6c6c;
 
 	/* États */
-	--success: #2a7d4f;
+	--success: #25734a;        /* contraste de 4,5:1 au moins en texte sur --success-light */
 	--success-light: #e6f4ec;
 	--danger: #b42318;
 	--danger-light: #fbe9e7;
