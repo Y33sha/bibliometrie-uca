@@ -31,12 +31,13 @@ const RENDU_HTML_ASSAINI = [
 
 /* Champs de titre de publication. Un titre porte du formatage déposé par les sources (MathML,
  * LaTeX, balises) : dans un gabarit, il passe par `PublicationTitle` (prop `titre`), ou par
- * `titleText` là où seul du texte est admis (titre d'onglet, info-bulle). */
+ * `titleText` là où seul du texte est admis (titre d'onglet, info-bulle). `columnLabels.title`
+ * est le libellé d'une colonne. */
 const CHAMP_TITRE = '/^(title|monograph_title|publication_title)$/';
 
 const TITRE_AFFICHE_BRUT = {
 	selector:
-		`SvelteMustacheTag MemberExpression[property.name=${CHAMP_TITRE}]` +
+		`SvelteMustacheTag MemberExpression[property.name=${CHAMP_TITRE}][object.name!='columnLabels']` +
 		`:not(SvelteAttribute[key.name='titre'] *)` +
 		`:not(CallExpression[callee.name='titleText'] *)`,
 	message:
