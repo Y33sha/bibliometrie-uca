@@ -8,7 +8,7 @@ Une partie des publications de l'Alliance UCA est absente des publications de l'
 
 Le moissonnage interroge le périmètre Alliance UCA (`perimeter_extraction`). L'entrée d'une contribution source dans le périmètre se calcule sur le périmètre UCA (`perimeter_persons`). Une contribution source dont l'adresse cite seulement le CHU est donc moissonnée, mais reste hors périmètre. Elle entre dans le périmètre par un autre indice : identifiant d'une personne RH (ORCID, idHAL, IdRef), structure HAL du laboratoire. Sans ces indices, elle reste sans personne : la phase `persons` rattache une contribution hors périmètre seulement par identifiant. Son enregistrement source reste sans publication si aucun coauteur n'est dans le périmètre.
 
-Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adresse. Chez Crossref et DataCite, la chaîne est parfois le seul nom de l'établissement, transmis par l'éditeur. HAL, ScanR et theses.fr donnent des structures de leur référentiel.
+Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adresse. Chez Crossref et DataCite, la chaîne est parfois le seul nom de l'établissement, transmis par l'éditeur. OpenAlex reprend aussi les libellés des structures HAL (« IP - Institut Pascal (Campus Universitaire des Cézeaux… - France) ») parmi ses adresses. HAL, ScanR et theses.fr donnent des structures de leur référentiel.
 
 `address_structures` rattache une adresse à chaque structure dont une forme de nom figure dans le texte : université, laboratoire, CHU, organisme. OpenAlex pose aussi des ROR sur chaque affiliation (`source_contribution_rors`). Il ajoute souvent le ROR du parent quand l'adresse cite l'enfant. Quand l'adresse cite seulement le CHU, le ROR du CHU est souvent le seul.
 
@@ -20,7 +20,7 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 2. **Population** : les personnes du référentiel RH.
 3. **Dénominateur** : les publications de la personne parues pendant sa période RH, avec une tolérance en fin de période. Une publication dont les adresses de la personne citent seulement des structures hors Alliance est comptée à part et sort du dénominateur.
 4. **Indicateur, en trois comptes par personne** : publications ; parmi elles, publications avec une adresse exploitable ; parmi celles-ci, publications dont une adresse mentionne l'université.
-5. **Adresse exploitable** : texte d'affiliation d'OpenAlex ou de WoS ; de Crossref ou DataCite quand la chaîne est une adresse, et pas le seul nom de l'établissement.
+5. **Adresse exploitable** : texte d'affiliation d'OpenAlex ou de WoS ; de Crossref ou DataCite quand la chaîne est une adresse, et pas le seul nom de l'établissement. Un libellé HAL repris par OpenAlex est exclu. Il est reconnu à son format : sigle et nom d'une structure HAL, ou adresse entre parenthèses terminée par le pays.
 6. **Mention de l'université**, sous n'importe quelle forme : `address_structures` rattache l'adresse à l'université elle-même. Un laboratoire de l'université cité seul ne vaut pas mention.
 7. **Grain de la publication** : une publication compte une fois par personne. Les comptes sont aussi donnés par source.
 8. **ROR d'OpenAlex** : mesure d'appoint, à côté du texte.
@@ -31,7 +31,8 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 ### Phase 1 — Audit
 
 - [x] Enregistrements sources sans contribution rattachée à la personne : rapprocher par le nom les personnes RH des contributions sources hors périmètre dont l'adresse cite une structure de l'Alliance, pendant la période RH (`interfaces/cli/oneshot/measure_university_mention.py`, 41d5aab8d). Base locale, 2026-10-27 : 1 692 couples (personne, travail) absents des publications de la personne, pour 155 personnes RH, presque toutes de l'UFR de médecine. 1 808 contributions sources sont sans publication. 615 sont dans une publication, souvent du périmètre, mais sans personne : la phase `persons` rattache une contribution hors périmètre seulement par identifiant.
-- [ ] Classement des adresses sans l'université, sur les publications rattachées et sur les enregistrements sources rapprochés : structure de l'Alliance hors UCA, structure hors Alliance, aucune structure reconnue.
+- [x] Classement des adresses sans l'université, sur les publications rattachées et sur les enregistrements sources rapprochés : structure de l'université seule, structure de l'Alliance hors UCA, autre structure connue, aucune structure reconnue. Base locale, 2026-10-27, datasets et noms ambigus exclus : 49 329 travaux, dont 33 835 exploitables. 71 % des travaux exploitables mentionnent l'université. Sans mention : structure de l'université seule 4 206, Alliance 4 039, aucune structure reconnue 1 323, autre structure 173. Avec les libellés HAL d'OpenAlex, le taux tombe à 62 %, et la structure de l'université seule monte à 10 449.
+- [ ] Revue des 500 adresses sans l'université les plus fréquentes, sur la page d'audit : forme de l'université non reconnue, ou nom de structure repris d'un référentiel.
 - [ ] Sources divergentes : examiner sur pièces les publications où une source mentionne l'université et une autre non, pour la même personne. Distinguer l'erreur de source de l'erreur de fusion des enregistrements sources.
 - [ ] ROR d'OpenAlex sur les adresses sans l'université : part avec le ROR de l'université, part avec le seul ROR du CHU.
 - [ ] Crossref et DataCite : séparer les adresses des noms d'établissement, par comparaison avec la chaîne OpenAlex du même auteur.
