@@ -2,29 +2,30 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import cloud from 'd3-cloud';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { mixColors } from '#lib/components/charts/contrast.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 
 	interface CloudWord extends cloud.Word {
 		id: number;
-		/** Rang du sujet entre le moins et le plus fréquent, de 0 à 1, sur une échelle logarithmique. */
-		weight: number;
+		color: string;
 	}
 
-	// Nuage des sujets les plus fréquents : la taille et la teinte d'un mot croissent avec le nombre de publications. Chaque mot mène à la fiche du sujet.
+	// Nuage des sujets les plus fréquents : la taille et la teinte d'un mot croissent avec le nombre de publications, sur une échelle logarithmique. Chaque mot mène à la fiche du sujet.
 	let { subjects }: { subjects: SubjectFrequency[] } = $props();
 
 	const MIN_SIZE = 11;
 	const MAX_SIZE = 32;
-	// Teinte d'un mot : de la plus claire (sujet le moins fréquent) au bleu-vert du site (le plus fréquent).
-	const wordColor = (weight: number) =>
-		`color-mix(in srgb, var(--accent) ${Math.round(45 + weight * 55)}%, var(--accent-soft))`;
 
 	let container: HTMLDivElement | undefined = $state();
-	let width = $state(800);
-	let height = $state(420);
+	let width = $state(0);
+	let height = $state(0);
+	let placedWords = $state<CloudWord[]>([]);
+	let layoutDone = $state(false);
 
+	// Rang d'un sujet entre le moins et le plus fréquent, de 0 à 1.
 	function weightFor(count: number, minCount: number, maxCount: number): number {
 		if (maxCount === minCount) return 0.5;
 		return (
@@ -33,26 +34,42 @@
 		);
 	}
 
-	let placedWords = $state<CloudWord[]>([]);
-	let layoutDone = $state(false);
+	// Générateur pseudo-aléatoire à graine fixe (mulberry32) : un même nuage se dispose toujours de la même façon.
+	function seededRandom(seed: number): () => number {
+		let state = seed;
+		return () => {
+			state = (state + 0x6d2b79f5) | 0;
+			let t = Math.imul(state ^ (state >>> 15), 1 | state);
+			t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+			return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+		};
+	}
 
-	function buildLayout() {
-		if (!subjects.length) {
+	function buildLayout(list: SubjectFrequency[], w: number, h: number) {
+		if (!list.length) {
 			placedWords = [];
 			layoutDone = true;
 			return;
 		}
-		const counts = subjects.map((s) => s.count);
+		const counts = list.map((s) => s.count);
 		const minCount = Math.min(...counts);
 		const maxCount = Math.max(...counts);
-		const words: CloudWord[] = subjects.map((s) => {
+		// Teinte : de la plus claire (sujet le moins fréquent) au bleu-vert du site (le plus fréquent).
+		const light = cssVar('accent-soft');
+		const dark = cssVar('accent');
+		const words: CloudWord[] = list.map((s) => {
 			const weight = weightFor(s.count, minCount, maxCount);
-			return { text: s.label, size: MIN_SIZE + weight * (MAX_SIZE - MIN_SIZE), id: s.id, weight };
+			return {
+				text: s.label,
+				size: MIN_SIZE + weight * (MAX_SIZE - MIN_SIZE),
+				id: s.id,
+				color: mixColors(light, dark, 0.45 + weight * 0.55),
+			};
 		});
 
 		layoutDone = false;
 		cloud<CloudWord>()
-			.size([width, height])
+			.size([w, h])
 			.words(words)
 			.padding(3)
 			// Texte horizontal uniquement, plus lisible.
@@ -60,6 +77,7 @@
 			.font('system-ui, sans-serif')
 			.fontSize((d) => d.size!)
 			.spiral('archimedean')
+			.random(seededRandom(1))
 			.on('end', (placed: CloudWord[]) => {
 				placedWords = placed;
 				layoutDone = true;
@@ -67,24 +85,23 @@
 			.start();
 	}
 
-	function onResize() {
-		if (container) {
-			const rect = container.getBoundingClientRect();
-			width = Math.max(300, rect.width);
-			// Tous les mots sont horizontaux : une hauteur compacte suffit.
-			height = Math.max(180, Math.round(rect.width * 0.4));
-		}
-		buildLayout();
+	// Dimensions du nuage, suivies par le conteneur. Tous les mots sont horizontaux : une hauteur compacte suffit.
+	function measure() {
+		if (!container) return;
+		const w = Math.max(300, Math.round(container.getBoundingClientRect().width));
+		if (w === width) return;
+		width = w;
+		height = Math.max(180, Math.round(w * 0.4));
 	}
 
+	// Le nuage se recalcule quand les sujets ou la largeur changent.
 	$effect(() => {
-		void subjects;
-		if (container) buildLayout();
+		if (width > 0) buildLayout(subjects, width, height);
 	});
 
 	onMount(() => {
-		onResize();
-		const ro = new ResizeObserver(() => onResize());
+		measure();
+		const ro = new ResizeObserver(measure);
 		if (container) ro.observe(container);
 		return () => ro.disconnect();
 	});
@@ -102,7 +119,7 @@
 							text-anchor="middle"
 							font-family="system-ui, sans-serif"
 							font-size={w.size}
-							style:fill={wordColor(w.weight)}
+							style:fill={w.color}
 							transform={`translate(${w.x ?? 0}, ${w.y ?? 0})`}
 						>
 							{w.text}

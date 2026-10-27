@@ -29,6 +29,14 @@ export function contrastRatio(a: string, b: string): number {
 	return (hi + 0.05) / (lo + 0.05);
 }
 
+/** Couleur `#rrggbb` intermédiaire entre `a` (`weight` à 0) et `b` (`weight` à 1). `b` quand l'une des deux est illisible. */
+export function mixColors(a: string, b: string, weight: number): string {
+	const ca = parseColor(a);
+	const cb = parseColor(b);
+	if (!ca || !cb) return b;
+	return '#' + ca.map((c, i) => Math.round(c + (cb[i] - c) * weight).toString(16).padStart(2, '0')).join('');
+}
+
 /** Couleur de texte posée sur `background` : `light` ou `dark`, celle qui contraste le plus. */
 export function readableOn(background: string, dark: string, light = '#ffffff'): string {
 	return contrastRatio(background, light) >= contrastRatio(background, dark) ? light : dark;
