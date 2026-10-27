@@ -24,7 +24,10 @@ Les chiffres clés actuels (total, part en open access, thèses) renseignent peu
 - **Un seul moteur** : les blocs communs aux dashboards et à la page Statistiques passent par le moteur des statistiques. Les requêtes propres aux dashboards disparaissent.
 - **Chiffres clés** : publications, part en open access, part de collaborations internationales, thèses. Pour une structure, s'y ajoute le nombre de personnes présentes dans le SI RH.
 - **Types de documents** : nombre de publications par famille de types.
-- **Open access par année** : barres empilées par statut d'accès dans le graphique des publications par année, à la place de la répartition globale.
+- **Open access par année** : barres empilées par statut d'accès dans le graphique des publications par année, à la place de la répartition globale. Pour un éditeur ou une revue, le découpage suit le modèle open access.
+- **Pays partenaires** : pour une structure seulement.
+- **Disposition** : publications par année et nuage de sujets en haut, types de documents et pays partenaires en dessous.
+- **Valeurs inattendues d'une revue** (types de documents et statuts open access selon le type et le modèle de la revue) : retirées. Elles relèvent d'un audit de qualité systématique.
 
 ## Phasage
 
@@ -39,7 +42,7 @@ Les chiffres clés actuels (total, part en open access, thèses) renseignent peu
 - [x] Publications par année en barres empilées par statut d'accès
 - [x] Nombre de publications par famille de types de documents
 - [x] Corpus du dashboard indiqué à l'écran (types, années)
-- [ ] Mise à jour de la documentation
+- [x] Mise à jour de la documentation
 
 ### Dashboards d'éditeur et de revue
 
@@ -47,5 +50,4 @@ Les chiffres clés actuels (total, part en open access, thèses) renseignent peu
 
 ## Questions ouvertes
 
-- **Disposition.** Graphiques de même nature côte à côte (publications par année et pays partenaires pour une structure), répartition par types de documents en bande compacte sur toute la largeur, sujets en fin de page.
 - **Choix du corpus par l'utilisateur.** Un dashboard sans facettes montre un corpus fixe ; le lien vers la page Statistiques ne convient pas pour le modifier.

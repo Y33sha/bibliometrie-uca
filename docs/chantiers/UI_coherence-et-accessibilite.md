@@ -191,6 +191,5 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ## Questions ouvertes
 
-- **Rendu des barres des dashboards.** Deux techniques coexistent : Chart.js (`BarChart`, `DoughnutChart`, `PublicationsByYearChart`, page Statistiques, carte) et HTML (`SubjectBars`, `OaBar`). Chart.js partout : les libellés d'axe sont du texte peint dans le canvas, inaccessible au clavier et aux lecteurs d'écran ; seules les barres répondent au clic. Partage par usage : les classements qui mènent à une page (sujets, pays partenaires) en listes de liens HTML, les autres graphiques en Chart.js.
+- **Rendu des barres des dashboards.** Les graphiques passent par Chart.js (`BarChart`, `StackedBarChart`, page Statistiques, carte) ; le nuage de sujets est en SVG, chaque mot un lien. Dans un canvas, les libellés d'axe sont du texte peint, inaccessible au clavier et aux lecteurs d'écran ; seules les barres répondent au clic.
 - **Colonnes de la liste des publications sur mobile.** À 390 px, le type, l'année et le DOI occupent le premier écran ; le titre commence au bord droit. Masquer ces colonnes sous 600 px laisserait la place au titre.
-- **Dashboards d'éditeur et de publication en série** sans chiffres clés : à traiter avec le [contenu des dashboards](METIER_dashboards.md).
