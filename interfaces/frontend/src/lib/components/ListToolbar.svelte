@@ -4,7 +4,7 @@
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 
 	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent.
-	// La barre se masque quand la page descend au-delà d'elle, et réapparaît sous le menu supérieur dès que la page remonte. L'en-tête du tableau qui suit se colle sous la barre, ou sous le menu quand la barre est masquée.
+	// Collée sous le menu supérieur, la barre suit le défilement pixel par pixel : elle glisse sous le menu quand la page descend, et en ressort quand la page remonte. L'en-tête du tableau qui suit se colle sous sa part visible.
 	let {
 		search = $bindable(),
 		placeholder = 'Rechercher',
@@ -44,9 +44,12 @@
 		onsearch?.();
 	}
 
-	// Repère placé à l'emplacement de la barre dans la page : au-dessus du menu supérieur, la barre a quitté sa place et se colle sous le menu.
+	// Repère placé à l'emplacement de la barre dans la page : sa distance au-dessus du menu supérieur est le chemin que la barre aurait parcouru sans être collée.
 	let anchor = $state<HTMLElement | undefined>();
-	let hidden = $state(false);
+	let bar = $state<HTMLElement | undefined>();
+	// Part de la barre glissée sous le menu, en pixels, de zéro à la hauteur de la barre.
+	let offset = $state(0);
+	const hidden = $derived(bar !== undefined && offset >= bar.offsetHeight);
 	let lastY = 0;
 
 	// Instant du dernier geste de défilement : molette, glissé tactile, touche de défilement. Le navigateur décale aussi la page quand la hauteur de la barre change (panneau ouvert, filtre ajouté) ; seul un défilement vers le bas qui suit un geste masque la barre.
@@ -65,20 +68,25 @@
 	}
 
 	function onscroll() {
+		if (!anchor || !bar) return;
 		const y = window.scrollY;
-		const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0;
-		const stuck = (anchor?.getBoundingClientRect().top ?? 0) < headerHeight;
-		const gesture = performance.now() - lastGesture < GESTURE_WINDOW_MS;
-		if (!stuck || y < lastY) hidden = false;
-		else if (y > lastY && gesture) hidden = true;
+		const delta = y - lastY;
 		lastY = y;
+		const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0;
+		// La barre glisse au plus de sa hauteur, et au plus du chemin parcouru depuis sa place.
+		const limit = Math.min(bar.offsetHeight, Math.max(0, headerHeight - anchor.getBoundingClientRect().top));
+		const gesture = performance.now() - lastGesture < GESTURE_WINDOW_MS;
+		let next = offset;
+		if (delta > 0 && gesture) next += delta;
+		else if (delta < 0) next += delta;
+		offset = Math.min(limit, Math.max(0, next));
 	}
 </script>
 
 <svelte:window {onscroll} onwheel={markGesture} ontouchmove={markGesture} onkeydown={onScrollKey} />
 
 <div class="list-toolbar-anchor" bind:this={anchor}></div>
-<div class="list-toolbar" class:hidden use:stickyHeight={!hidden}>
+<div class="list-toolbar" class:hidden bind:this={bar} style:transform={offset ? `translateY(${-offset}px)` : undefined} use:stickyHeight={offset}>
 	<div class="toolbar-card">
 		<div class="toolbar">
 			{#if search !== undefined}
@@ -106,13 +114,10 @@
 		z-index: 40;
 		margin-bottom: 12px;
 		background: var(--bg);
-		transition: transform 0.2s ease, visibility 0s;
 	}
-	/* Masquée : glissée au-dessus du menu supérieur, puis retirée du parcours au clavier à la fin du glissement. */
+	/* Entièrement glissée sous le menu : retirée du parcours au clavier. */
 	.list-toolbar.hidden {
-		transform: translateY(calc(-100% - var(--header-height)));
 		visibility: hidden;
-		transition: transform 0.2s ease, visibility 0s linear 0.2s;
 	}
 	.toolbar-card {
 		display: flex;

@@ -1,21 +1,21 @@
 import type { Action } from 'svelte/action';
 
 /**
- * Publie la hauteur du nœud dans la variable CSS `--list-sticky-height` de la racine du document, et la tient à jour quand le nœud change de taille. Avec le paramètre `false`, la variable vaut zéro.
+ * Publie dans la variable CSS `--list-sticky-height` de la racine du document la hauteur visible du nœud : sa hauteur moins le paramètre, en pixels. La variable suit les changements de taille du nœud.
  *
- * Le nœud est la barre collante posée au-dessus d'un tableau de liste : l'en-tête du tableau se colle sous elle, ou sous le menu supérieur quand elle est masquée.
+ * Le nœud est la barre collante posée au-dessus d'un tableau de liste, et le paramètre la part de la barre glissée sous le menu supérieur. L'en-tête du tableau se colle sous la part visible.
  */
-export const stickyHeight: Action<HTMLElement, boolean | undefined> = (node, shown = true) => {
+export const stickyHeight: Action<HTMLElement, number | undefined> = (node, hiddenPart = 0) => {
 	const root = document.documentElement;
-	let visible = shown;
+	let hidden = hiddenPart;
 	const publish = () =>
-		root.style.setProperty('--list-sticky-height', `${visible ? node.offsetHeight : 0}px`);
+		root.style.setProperty('--list-sticky-height', `${Math.max(0, node.offsetHeight - hidden)}px`);
 	const observer = new ResizeObserver(publish);
 	observer.observe(node);
 	publish();
 	return {
-		update(next = true) {
-			visible = next;
+		update(next = 0) {
+			hidden = next;
 			publish();
 		},
 		destroy() {
