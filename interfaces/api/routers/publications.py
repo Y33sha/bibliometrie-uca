@@ -5,7 +5,6 @@ Les lectures passent par `PublicationsQueries`.
 Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
 """
 
-from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Annotated
 
@@ -31,6 +30,7 @@ from infrastructure.read_models.publications.models import (
     SuspectMergesResponse,
 )
 from infrastructure.read_models.publications.queries import PublicationsQueries
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, publications_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import (
@@ -43,7 +43,7 @@ from interfaces.api.filters import (
 )
 from interfaces.api.models import EnumOption, TotalCountResponse
 from interfaces.api.params import SearchTerm
-from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot, releasing
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/publications", tags=["publications"])
 
@@ -163,22 +163,6 @@ def publications_entity_facet(
     )
 
 
-def _csv_stream(chunks: Iterator[str], *, filename: str, slot: ExportSlot) -> StreamingResponse:
-    """Emballe les blocs d'un export en réponse de téléchargement, envoyés au fil de leur production.
-
-    La mémoire tenue pendant l'envoi vaut un bloc à la fois, plus les lignes que la requête a ramenées.
-
-    Le droit d'export passe au flux, qui le rend quand le parcours s'achève : la mémoire reste prise tant que le corps part, et le cycle de vie des dépendances s'achève avant.
-
-    Le statut et les en-têtes partent avec le premier bloc : une erreur survenant pendant l'envoi ferme la connexion sur un fichier tronqué, sous un statut 200. Les lignes sont en mémoire à ce stade, la requête s'étant exécutée avant que la réponse ne commence.
-    """
-    return StreamingResponse(
-        releasing(chunks, slot),
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={filename}"},
-    )
-
-
 @router.get("/export.csv")
 def export_publications_csv(
     filters: Filters,
@@ -191,7 +175,7 @@ def export_publications_csv(
     """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
 
     Le nombre de lignes est plafonné, et la fréquence des demandes l'est aussi (429 au-delà) : l'export balaie la table sous les seuls filtres reçus, et rien n'oblige un appelant à s'arrêter."""
-    return _csv_stream(
+    return csv_response(
         queries.export_publications_csv(
             filters=filters.to_filters(),
             sort=sort,
@@ -234,7 +218,7 @@ def export_theses_csv(
         doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type")
         or ["thesis", "ongoing_thesis"],
     )
-    return _csv_stream(
+    return csv_response(
         queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv", slot=slot
     )
 

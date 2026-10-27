@@ -1,10 +1,8 @@
 """Liste paginée + export CSV des publications."""
 
-import csv
 import json
 import logging
-from collections.abc import Iterable, Iterator, Sequence
-from typing import cast
+from collections.abc import Iterator, Sequence
 
 from sqlalchemy import Connection, Row, text
 
@@ -15,6 +13,12 @@ from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
 from domain.structures.structure import StructureType
+from infrastructure.read_models.csv_export import (
+    MAX_EXPORT_ROWS,
+    CsvWriter,
+    cap_export_rows,
+    chunked,
+)
 from infrastructure.read_models.filters import (
     PUBLICATION_IS_IN_PERIMETER,
     WhereClause,
@@ -167,101 +171,6 @@ _ORDER_MAP = {
 }
 
 
-# Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui
-# commence par l'un d'eux est évaluée à l'ouverture du fichier — avec le contenu qu'une
-# source externe y a déposé, titres et noms de revues venant de HAL et OpenAlex.
-_FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
-
-
-def _neutralize_formula(value: object) -> object:
-    """Valeur préfixée d'une apostrophe si un tableur y lirait une formule, rendue intacte sinon.
-
-    L'apostrophe marque la cellule comme texte sans amputer la valeur : un titre qui commence par un tiret garde son tiret. Le test porte aussi sur la valeur débarrassée de ses espaces de tête, qui ne servent donc pas d'échappatoire. Les valeurs non textuelles (année, montant) traversent sans préfixe, qui leur ferait perdre leur type à la lecture — une année en texte ne se trie plus, un montant ne s'additionne plus.
-    """
-    if not isinstance(value, str):
-        return value
-    if value.startswith(_FORMULA_STARTERS) or value.lstrip().startswith(_FORMULA_STARTERS):
-        return f"'{value}"
-    return value
-
-
-class _EchoStream:
-    """Flux de sortie qui rend le texte qu'on lui écrit.
-
-    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
-    """
-
-    def write(self, value: str) -> str:
-        return value
-
-
-class _CsvWriter:
-    """Formateur de lignes CSV dont chaque cellule passe par `_neutralize_formula`.
-
-    L'assainissement tient dans le writer plutôt que dans la construction de chaque ligne : une colonne ajoutée à un export en hérite sans qu'on ait à y penser.
-    """
-
-    def __init__(self) -> None:
-        self._writer = csv.writer(_EchoStream())
-
-    def line(self, row: Iterable[object]) -> str:
-        """Ligne CSV terminée par un saut de ligne, cellules assainies."""
-        return cast("str", self._writer.writerow([_neutralize_formula(cell) for cell in row]))
-
-    def truncation_notice(self, cap: int) -> str:
-        """Dernière ligne disant que l'export s'arrête au plafond.
-
-        Le fichier est le seul canal vers qui l'a demandé — il arrive par un lien de téléchargement, hors de toute page qui pourrait l'avertir. Un export incomplet qui se présente comme complet induit en erreur bien plus qu'une ligne étrangère aux données.
-        """
-        milliers = f"{cap:,}".replace(",", " ")
-        return self.line(
-            [f"— Export tronqué à {milliers} lignes : affiner les filtres pour l'obtenir entier."]
-        )
-
-
-# Taille visée d'un bloc rendu au client. Une ligne par bloc ferait des dizaines de milliers
-# d'envois pour un export ; un bloc trop gros ramènerait le tampon qu'on cherche à supprimer.
-EXPORT_CHUNK_SIZE = 64 * 1024
-
-
-def _chunked(lines: Iterator[str], size: int = EXPORT_CHUNK_SIZE) -> Iterator[str]:
-    """Regroupe des lignes en blocs d'au moins `size` caractères, le dernier plus court."""
-    pending: list[str] = []
-    pending_size = 0
-    for line in lines:
-        pending.append(line)
-        pending_size += len(line)
-        if pending_size >= size:
-            yield "".join(pending)
-            pending.clear()
-            pending_size = 0
-    if pending:
-        yield "".join(pending)
-
-
-# Marque d'ordre des octets, en tête du premier bloc : sans elle, un tableur lit l'UTF-8 comme
-# de l'ANSI et les accents ressortent en mojibake.
-_BOM = "﻿"
-
-
-# Plafond de lignes d'un export. Assez haut pour qu'un export légitime ne l'approche jamais —
-# à ce compte, requête et fichier tiennent confortablement en mémoire — et assez bas pour
-# qu'une demande sans filtre, que n'importe qui peut répéter, ne puisse pas la saturer.
-MAX_EXPORT_ROWS = 500_000
-
-
-def _cap_export_rows(
-    rows: Sequence[Row[tuple[object, ...]]], cap: int
-) -> tuple[Sequence[Row[tuple[object, ...]]], bool]:
-    """Rend les lignes ramenées au plafond, et si la coupe a eu lieu.
-
-    Les requêtes demandent une ligne de plus que le plafond : sa présence signale le dépassement sans qu'un `COUNT` séparé soit nécessaire. La coupe suit le tri demandé, appliqué avant elle en base.
-    """
-    if len(rows) <= cap:
-        return rows, False
-    return rows[:cap], True
-
-
 def _plain_text(s: str | None) -> str:
     """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur n'interprète pas le balisage — il l'afficherait tel quel dans la cellule."""
     return to_plain_text(s)
@@ -271,8 +180,8 @@ def _publication_lines(
     rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
 ) -> Iterator[str]:
     """Lignes CSV de l'export des publications, en-tête comprise."""
-    writer = _CsvWriter()
-    yield _BOM + writer.line([header for _, header in emitted])
+    writer = CsvWriter()
+    yield writer.header([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
         sources = _source_links(
@@ -326,8 +235,8 @@ def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict
 
 def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) -> Iterator[str]:
     """Lignes CSV de l'export des thèses, en-tête comprise."""
-    writer = _CsvWriter()
-    yield _BOM + writer.line(
+    writer = CsvWriter()
+    yield writer.header(
         [
             "Inscription",
             "Soutenance",
@@ -606,7 +515,7 @@ class PublicationListQueries:
                 "export_limit": MAX_EXPORT_ROWS + 1,
             },
         ).all()
-        rows, truncated = _cap_export_rows(rows, MAX_EXPORT_ROWS)
+        rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
         if truncated:
             logger.warning(
                 "Export des publications tronqué au plafond de %d lignes (filtres : %s)",
@@ -633,7 +542,7 @@ class PublicationListQueries:
         ]
         emitted = [(key, header) for key, header in spec if key in requested]
 
-        return _chunked(_publication_lines(rows, emitted, truncated=truncated))
+        return chunked(_publication_lines(rows, emitted, truncated=truncated))
 
     def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> Iterator[str]:
         """Export CSV dédié à la page thèses.
@@ -677,7 +586,7 @@ class PublicationListQueries:
             """),
             {**binds, "export_limit": MAX_EXPORT_ROWS + 1},
         ).all()
-        rows, truncated = _cap_export_rows(rows, MAX_EXPORT_ROWS)
+        rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
         if truncated:
             logger.warning(
                 "Export des thèses tronqué au plafond de %d lignes (filtres : %s)",
@@ -685,4 +594,4 @@ class PublicationListQueries:
                 filters,
             )
 
-        return _chunked(_these_lines(rows, truncated=truncated))
+        return chunked(_these_lines(rows, truncated=truncated))
