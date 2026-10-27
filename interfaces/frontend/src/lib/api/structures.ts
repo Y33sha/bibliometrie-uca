@@ -14,7 +14,7 @@ type DeletedResponse = components['schemas']['DeletedResponse'];
  * Un site sert seulement de contexte au matching des formes de nom.
  */
 export async function listDetectable(): Promise<StructureListItem[]> {
-	const all = await api<StructureListItem[]>('/api/structures');
+	const all = await api<StructureListItem[]>('/api/structures/all');
 	return all.filter((s) => s.type !== 'site').sort(compareStructureLabels);
 }
 

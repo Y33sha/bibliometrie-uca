@@ -665,9 +665,7 @@ export interface paths {
         };
         /**
          * List Structures
-         * @description Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
-         *
-         *     `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
+         * @description Liste paginée des structures.
          */
         get: operations["list_structures_api_structures_get"];
         put?: never;
@@ -676,6 +674,68 @@ export interface paths {
          * @description Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé.
          */
         post: operations["create_structure_api_structures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Structures
+         * @description Toutes les structures, triées par nom, pour les sélecteurs de structure.
+         */
+        get: operations["list_all_structures_api_structures_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Structures Facets
+         * @description Décomptes par option des facettes de la liste des structures.
+         *
+         *     Chaque facette écarte sa propre dimension de la clause WHERE.
+         */
+        get: operations["structures_facets_api_structures_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Structures Csv
+         * @description Export CSV de la liste des structures, aux filtres et au tri de la liste.
+         */
+        get: operations["export_structures_csv_api_structures_export_csv_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -5328,7 +5388,7 @@ export interface components {
         };
         /**
          * StructureListItem
-         * @description Ligne résumée de `/api/structures` (liste + recherche).
+         * @description Ligne résumée d'une structure, dans la liste paginée et dans le référentiel complet.
          */
         StructureListItem: {
             /** Id */
@@ -5349,6 +5409,19 @@ export interface components {
             perimeter_ids: number[];
             /** Tutelles */
             tutelles: components["schemas"]["RelatedStructureOut"][] | null;
+        };
+        /** StructureListResponse */
+        StructureListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Structures */
+            structures: components["schemas"]["StructureListItem"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * StructureOut
@@ -5477,6 +5550,20 @@ export interface components {
             api_ids?: {
                 [key: string]: string | string[];
             } | null;
+        };
+        /**
+         * StructuresFacetsResponse
+         * @description Facettes de la liste des structures.
+         *
+         *     `types` laisse le libellé au client. `tutelles` et `perimeters` donnent le libellé de la structure ou du périmètre ; `perimeters` se termine par l'option `none`, hors de tout périmètre. Chaque décompte écarte le filtre de sa propre facette.
+         */
+        StructuresFacetsResponse: {
+            /** Types */
+            types: components["schemas"]["FacetOption"][];
+            /** Tutelles */
+            tutelles: components["schemas"]["FacetOption"][];
+            /** Perimeters */
+            perimeters: components["schemas"]["FacetOption"][];
         };
         /**
          * SubjectDetailResponse
@@ -6833,9 +6920,13 @@ export interface operations {
     list_structures_api_structures_get: {
         parameters: {
             query?: {
-                structure_type?: string;
+                page?: number;
+                per_page?: number;
+                sort?: "acronym_asc" | "acronym_desc" | "name_asc" | "name_desc" | "tutelles_asc" | "tutelles_desc";
                 search?: string;
-                in_perimeter?: boolean;
+                structure_type?: string;
+                tutelle_id?: string;
+                perimeter_id?: string;
             };
             header?: never;
             path?: never;
@@ -6849,7 +6940,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StructureListItem"][];
+                    "application/json": components["schemas"]["StructureListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6883,6 +6974,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_structures_api_structures_all_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureListItem"][];
+                };
+            };
+        };
+    };
+    structures_facets_api_structures_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                structure_type?: string;
+                tutelle_id?: string;
+                perimeter_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructuresFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_structures_csv_api_structures_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "acronym_asc" | "acronym_desc" | "name_asc" | "name_desc" | "tutelles_asc" | "tutelles_desc";
+                search?: string;
+                structure_type?: string;
+                tutelle_id?: string;
+                perimeter_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

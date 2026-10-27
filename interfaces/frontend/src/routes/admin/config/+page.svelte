@@ -12,6 +12,7 @@
   import type { components } from "#lib/api/schema.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
+  type StructureListResponse = components["schemas"]["StructureListResponse"];
 
   type ConfigItem = components["schemas"]["ConfigItem"];
 
@@ -115,7 +116,8 @@
       if (perimModal) perimModal.structResults = [];
       return;
     }
-    perimModal.structResults = await structureSearch<StructureListItem[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
+    const found = await structureSearch<StructureListResponse>(`/api/structures?per_page=20&search=${encodeURIComponent(perimModal.structSearch)}`);
+    perimModal.structResults = found.structures;
   }
 
   function perimAddStruct(s: any) {

@@ -1,7 +1,12 @@
 """Tests d'intégration des lectures de structure servant la page publique des laboratoires."""
 
+import csv
+import io
 from functools import partial
 
+from sqlalchemy import text
+
+from infrastructure.read_models.structures.models import StructureFilters
 from infrastructure.read_models.structures.queries import StructuresQueries
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 from tests.integration.helpers.addresses import (
@@ -35,65 +40,121 @@ def _setup_perimeter(conn, lab_ids, code="uca"):
     return root
 
 
-class TestListLaboratories:
-    def test_lists_labos_in_perimeter(self, sa_sync_conn):
-        lab = insert_structure(sa_sync_conn, "LAB-1", name="Lab 1")
-        _setup_perimeter(sa_sync_conn, [lab])
-        labs = StructuresQueries(sa_sync_conn).list_structures(
-            types=["labo"], search="", in_perimeter=True
-        )
-        ids = [lab_.id for lab_ in labs]
+def _perimeter_id(conn, code="uca"):
+    return conn.execute(text("SELECT id FROM perimeters WHERE code = :c"), {"c": code}).scalar_one()
+
+
+def _ids(conn, sort="acronym_asc", **filters):
+    page = StructuresQueries(conn).list_structures(
+        filters=StructureFilters(**filters), sort=sort, page=1, per_page=200
+    )
+    return [s.id for s in page.structures]
+
+
+class TestListStructures:
+    def test_filters_on_the_perimeter(self, sa_sync_conn):
+        conn = sa_sync_conn
+        lab = insert_structure(conn, "LAB-1", name="Lab 1")
+        outside = insert_structure(conn, "LAB-OUT")
+        _setup_perimeter(conn, [lab])
+        ids = _ids(conn, perimeter_ids=[_perimeter_id(conn)])
         assert lab in ids
+        assert outside not in ids
+
+    def test_none_keeps_structures_outside_every_perimeter(self, sa_sync_conn):
+        conn = sa_sync_conn
+        lab = insert_structure(conn, "LAB-1")
+        outside = insert_structure(conn, "LAB-OUT")
+        _setup_perimeter(conn, [lab])
+        ids = _ids(conn, perimeter_none=True)
+        assert outside in ids
+        assert lab not in ids
+        assert {lab, outside} <= set(
+            _ids(conn, perimeter_ids=[_perimeter_id(conn)], perimeter_none=True)
+        )
 
     def test_includes_root_as_tutelle(self, sa_sync_conn):
-        # La racine de périmètre (université) n'est plus masquée : elle figure dans les tutelles.
         lab = insert_structure(sa_sync_conn, "LAB-2")
         root = _setup_perimeter(sa_sync_conn, [lab])
-        labs = StructuresQueries(sa_sync_conn).list_structures(
-            types=["labo"], search="", in_perimeter=True
+        page = StructuresQueries(sa_sync_conn).list_structures(
+            filters=StructureFilters(), sort="acronym_asc", page=1, per_page=200
         )
-        lab_row = next(lab_ for lab_ in labs if lab_.id == lab)
-        tutelles_ids = [t.id for t in (lab_row.tutelles or [])]
-        assert root in tutelles_ids
+        lab_row = next(s for s in page.structures if s.id == lab)
+        assert root in [t.id for t in (lab_row.tutelles or [])]
 
-    def test_filters_on_the_types_asked_for(self, sa_sync_conn):
-        """Les types viennent de l'appelant : la page publique y met ceux que sa configuration lui donne."""
+    def test_filters_on_types_and_tutelles(self, sa_sync_conn):
         conn = sa_sync_conn
+        parent = insert_structure(conn, "UNIV", structure_type="universite")
         lab = insert_structure(conn, "LAB-D", structure_type="labo")
         team = insert_structure(conn, "TEAM-D", structure_type="equipe")
-        _setup_perimeter(conn, [lab, team])
-        q = StructuresQueries(conn)
+        other = insert_structure(conn, "LAB-E", structure_type="labo")
+        insert_tutelle(conn, parent, child_id=lab)
+        insert_tutelle(conn, parent, child_id=team)
 
-        ids = {r.id for r in q.list_structures(types=["labo"], search="", in_perimeter=True)}
-        assert lab in ids
-        assert team not in ids
+        assert set(_ids(conn, types=["labo"])) >= {lab, other}
+        assert team not in _ids(conn, types=["labo"])
+        assert set(_ids(conn, tutelle_ids=[parent])) == {lab, team}
+        assert _ids(conn, types=["labo"], tutelle_ids=[parent]) == [lab]
 
-        both = {
-            r.id for r in q.list_structures(types=["labo", "equipe"], search="", in_perimeter=True)
-        }
-        assert {lab, team} <= both
-
-    def test_without_types_keeps_every_type_of_the_perimeter(self, sa_sync_conn):
+    def test_sorts_on_the_requested_column(self, sa_sync_conn):
         conn = sa_sync_conn
-        lab = insert_structure(conn, "LAB-N", structure_type="labo")
-        team = insert_structure(conn, "TEAM-N", structure_type="equipe")
-        _setup_perimeter(conn, [lab, team])
-        ids = {
-            r.id
-            for r in StructuresQueries(conn).list_structures(types=[], search="", in_perimeter=True)
-        }
-        assert {lab, team} <= ids
+        a = insert_structure(conn, "TRI-A", name="Zeta", acronym="AC1")
+        b = insert_structure(conn, "TRI-B", name="Alpha", acronym="AC2")
+        assert _ids(conn, search="TRI-", sort="acronym_asc") == [a, b]
+        assert _ids(conn, search="TRI-", sort="acronym_desc") == [b, a]
+        assert _ids(conn, search="TRI-", sort="name_asc") == [b, a]
 
-    def test_without_perimeter_keeps_structures_outside_it(self, sa_sync_conn):
+    def test_pages_the_list(self, sa_sync_conn):
         conn = sa_sync_conn
-        outside = insert_structure(conn, "LAB-OUT", structure_type="labo")
-        ids = {
-            r.id
-            for r in StructuresQueries(conn).list_structures(
-                types=["labo"], search="", in_perimeter=False
+        for i in range(3):
+            insert_structure(conn, f"PAGE-{i}", name=f"Page {i}")
+        page = StructuresQueries(conn).list_structures(
+            filters=StructureFilters(search="Page "), sort="name_asc", page=2, per_page=2
+        )
+        assert page.total == 3
+        assert page.pages == 2
+        assert [s.name for s in page.structures] == ["Page 2"]
+
+
+class TestStructuresFacets:
+    def test_each_facet_ignores_its_own_filter(self, sa_sync_conn):
+        conn = sa_sync_conn
+        parent = insert_structure(conn, "UNIV-F", structure_type="universite")
+        lab = insert_structure(conn, "LAB-F", structure_type="labo")
+        team = insert_structure(conn, "TEAM-F", structure_type="equipe")
+        insert_tutelle(conn, parent, child_id=lab)
+        insert_tutelle(conn, parent, child_id=team)
+        _setup_perimeter(conn, [lab])
+
+        facets = StructuresQueries(conn).structures_facets(
+            filters=StructureFilters(types=["labo"], tutelle_ids=[parent])
+        )
+        types = {o.value: o.count for o in facets.types}
+        assert types["labo"] >= 1
+        assert types["equipe"] >= 1
+        tutelle = next(o for o in facets.tutelles if o.value == str(parent))
+        assert tutelle.count == 1
+        perimeters = {o.value: o.count for o in facets.perimeters}
+        assert perimeters[str(_perimeter_id(conn))] == 1
+        assert perimeters["none"] == 0
+
+
+class TestExportStructures:
+    def test_writes_the_filtered_list(self, sa_sync_conn):
+        conn = sa_sync_conn
+        parent = insert_structure(conn, "UNIV-X", acronym="UX", structure_type="universite")
+        lab = insert_structure(conn, "LAB-X", name="Labo X", acronym="LX")
+        insert_tutelle(conn, parent, child_id=lab)
+        content = "".join(
+            StructuresQueries(conn).export_structures_csv(
+                filters=StructureFilters(tutelle_ids=[parent]), sort="acronym_asc"
             )
-        }
-        assert outside in ids
+        )
+        rows = list(csv.reader(io.StringIO(content.removeprefix("﻿"))))
+        assert rows == [
+            ["Type", "Acronyme", "Nom", "Tutelles", "ROR", "Collection HAL"],
+            ["labo", "LX", "Labo X", "UX", "", ""],
+        ]
 
 
 class TestGetLaboratory:

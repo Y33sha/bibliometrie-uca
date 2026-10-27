@@ -10,7 +10,7 @@ class TestLaboratoriesList:
     def test_returns_list(self, client):
         r = client.get("/api/structures")
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        assert isinstance(r.json()["structures"], list)
 
 
 class TestLaboratoryDetail:

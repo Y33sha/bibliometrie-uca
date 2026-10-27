@@ -121,7 +121,7 @@
   /* ── Data loading ── */
 
   async function refreshCache() {
-    allStructuresCache = await api<Structure[]>("/api/structures");
+    allStructuresCache = await api<Structure[]>("/api/structures/all");
   }
 
   async function loadDetail() {

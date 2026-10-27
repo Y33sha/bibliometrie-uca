@@ -1,18 +1,21 @@
 """Query services pour /api/structures/* (structures et leurs formes de nom)."""
 
+from collections.abc import Iterator
+from typing import Literal
+
 from sqlalchemy import Connection, Row, text
 
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.publications.doc_types import DocType
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
-from infrastructure.read_models._common import DashboardOa, PublicationYearCount
+from infrastructure.read_models._common import DashboardOa, FacetOption, PublicationYearCount
+from infrastructure.read_models.csv_export import csv_chunks
 from infrastructure.read_models.filters import (
     OA_DASHBOARD_COLS_SQL,
     OWN_RORS_SQL,
     entity_subjects_sql,
 )
-from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     PartnerFacetOption,
@@ -23,10 +26,14 @@ from infrastructure.read_models.structures.models import (
     StructureDashboardResponse,
     StructureDeletionImpact,
     StructureDetailResponse,
+    StructureFilters,
     StructureListItem,
+    StructureListResponse,
     StructureOut,
     StructurePartner,
     StructurePartnersResponse,
+    StructuresFacetsResponse,
+    StructureSort,
     StructureTopCountry,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
@@ -79,46 +86,96 @@ AUTHORED_PUBLICATION = f"""
 """
 
 
-def _list_structures_sql(
-    *, types: list[str], search: str, perimeter_ids: list[int] | None
+StructureFacet = Literal["types", "tutelles", "perimeters"]
+
+
+def _structure_where(
+    filters: StructureFilters, *, skip: StructureFacet | None = None
 ) -> tuple[str, dict[str, object]]:
+    """Clause WHERE sur l'alias `s` de `structures`, sans le filtre de la facette `skip`."""
     parts: list[str] = []
     binds: dict[str, object] = {}
-    if types:
-        parts.append("s.structure_type::text = ANY(:types)")
-        binds["types"] = types
-    if perimeter_ids is not None:
-        parts.append("s.id = ANY(:perimeter_ids)")
-        binds["perimeter_ids"] = perimeter_ids
-    if search:
+    if filters.search:
         parts.append(
             "(unaccent(s.name) ILIKE unaccent(:search)"
             " OR s.acronym ILIKE :search OR s.code ILIKE :search)"
         )
-        binds["search"] = f"%{search}%"
-    where = " AND ".join(parts) if parts else "TRUE"
-    sql = f"""
-        SELECT s.id, s.code, s.name, s.acronym, s.structure_type::text AS type,
-               s.ror_id, s.hal_collection,
-               COALESCE(
-                   array_agg(ps.perimeter_id) FILTER (WHERE ps.perimeter_id IS NOT NULL),
-                   '{{}}'
-               ) AS perimeter_ids,
-               (SELECT json_agg(json_build_object(
-                    'id', sp.id, 'code', sp.code, 'name', sp.name, 'acronym', sp.acronym,
-                    'type', sp.structure_type::text,
-                    'relation_id', sr.id
-                ) ORDER BY sp.name)
-                FROM structure_parents sr
-                JOIN structures sp ON sp.id = sr.parent_id
-                WHERE sr.child_id = s.id
-               ) AS tutelles
-        FROM structures s
-        LEFT JOIN perimeter_structures ps ON ps.structure_id = s.id
-        WHERE {where}
-        GROUP BY s.id, s.code, s.name, s.acronym, s.structure_type, s.ror_id, s.hal_collection
-    """
-    return sql, binds
+        binds["search"] = f"%{filters.search}%"
+    if skip != "types" and filters.types:
+        parts.append("s.structure_type::text = ANY(:types)")
+        binds["types"] = filters.types
+    if skip != "tutelles" and filters.tutelle_ids:
+        parts.append(
+            "EXISTS (SELECT 1 FROM structure_parents sr"
+            " WHERE sr.child_id = s.id AND sr.parent_id = ANY(:tutelle_ids))"
+        )
+        binds["tutelle_ids"] = filters.tutelle_ids
+    if skip != "perimeters" and (filters.perimeter_ids or filters.perimeter_none):
+        alternatives: list[str] = []
+        if filters.perimeter_ids:
+            alternatives.append(
+                "EXISTS (SELECT 1 FROM perimeter_structures ps"
+                " WHERE ps.structure_id = s.id AND ps.perimeter_id = ANY(:perimeter_ids))"
+            )
+            binds["perimeter_ids"] = filters.perimeter_ids
+        if filters.perimeter_none:
+            alternatives.append(_OUTSIDE_PERIMETERS)
+        parts.append(f"({' OR '.join(alternatives)})")
+    return (" AND ".join(parts) if parts else "TRUE"), binds
+
+
+_OUTSIDE_PERIMETERS = (
+    "NOT EXISTS (SELECT 1 FROM perimeter_structures ps WHERE ps.structure_id = s.id)"
+)
+
+# Libellés des tutelles de `s`, dans l'ordre alphabétique, joints par des virgules.
+_TUTELLE_LABELS = """(
+    SELECT string_agg(COALESCE(sp.acronym, sp.name), ', ' ORDER BY COALESCE(sp.acronym, sp.name))
+    FROM structure_parents sr
+    JOIN structures sp ON sp.id = sr.parent_id
+    WHERE sr.child_id = s.id
+)"""
+
+_STRUCTURE_SORT: dict[str, str] = {
+    "acronym_asc": "lower(COALESCE(s.acronym, s.name)) ASC, s.id",
+    "acronym_desc": "lower(COALESCE(s.acronym, s.name)) DESC, s.id",
+    "name_asc": "lower(s.name) ASC, s.id",
+    "name_desc": "lower(s.name) DESC, s.id",
+    "tutelles_asc": f"lower(COALESCE({_TUTELLE_LABELS}, '')) ASC, s.id",
+    "tutelles_desc": f"lower(COALESCE({_TUTELLE_LABELS}, '')) DESC, s.id",
+}
+
+_STRUCTURE_LIST_COLUMNS = """
+    s.id, s.code, s.name, s.acronym, s.structure_type::text AS type,
+    s.ror_id, s.hal_collection,
+    ARRAY(
+        SELECT ps.perimeter_id FROM perimeter_structures ps
+        WHERE ps.structure_id = s.id ORDER BY ps.perimeter_id
+    ) AS perimeter_ids,
+    (SELECT json_agg(json_build_object(
+         'id', sp.id, 'code', sp.code, 'name', sp.name, 'acronym', sp.acronym,
+         'type', sp.structure_type::text,
+         'relation_id', sr.id
+     ) ORDER BY sp.name)
+     FROM structure_parents sr
+     JOIN structures sp ON sp.id = sr.parent_id
+     WHERE sr.child_id = s.id
+    ) AS tutelles
+"""
+
+
+def _list_item_from_row(r: Row[tuple[object, ...]]) -> StructureListItem:
+    return StructureListItem(
+        id=r.id,
+        code=r.code,
+        name=r.name,
+        acronym=r.acronym,
+        type=r.type,
+        ror_id=r.ror_id,
+        hal_collection=r.hal_collection,
+        perimeter_ids=list(r.perimeter_ids),
+        tutelles=[RelatedStructureOut.model_validate(x) for x in (r.tutelles or [])],
+    )
 
 
 def _related_from_row(row: Row[tuple[object, ...]]) -> RelatedStructureOut:
@@ -150,30 +207,130 @@ class StructuresQueries:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    def list_structures(
-        self, *, types: list[str], search: str, in_perimeter: bool
-    ) -> list[StructureListItem]:
-        """Liste des structures, filtrable par types, recherche accent-insensible et périmètre.
+    def list_all_structures(self) -> list[StructureListItem]:
+        """Toutes les structures, triées par nom, pour les sélecteurs de structure."""
+        rows = self._conn.execute(
+            text(f"SELECT {_STRUCTURE_LIST_COLUMNS} FROM structures s ORDER BY lower(s.name), s.id")
+        ).all()
+        return [_list_item_from_row(r) for r in rows]
 
-        `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise — ce que la page publique des laboratoires demande. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
+    def list_structures(
+        self, *, filters: StructureFilters, sort: StructureSort, page: int, per_page: int
+    ) -> StructureListResponse:
+        """Page de la liste des structures sous les filtres, au tri demandé."""
+        where, binds = _structure_where(filters)
+        total = self._conn.execute(
+            text(f"SELECT COUNT(*) FROM structures s WHERE {where}"), binds
+        ).scalar_one()
+        rows = self._conn.execute(
+            text(f"""
+                SELECT {_STRUCTURE_LIST_COLUMNS}
+                FROM structures s
+                WHERE {where}
+                ORDER BY {_STRUCTURE_SORT[sort]}
+                LIMIT :pg_limit OFFSET :pg_offset
+            """),
+            {**binds, "pg_limit": per_page, "pg_offset": (page - 1) * per_page},
+        ).all()
+        return StructureListResponse(
+            total=total,
+            page=page,
+            per_page=per_page,
+            structures=[_list_item_from_row(r) for r in rows],
+        )
+
+    def structures_facets(self, *, filters: StructureFilters) -> StructuresFacetsResponse:
+        """Décomptes par option des facettes de la liste des structures."""
+        where, binds = _structure_where(filters, skip="types")
+        type_rows = self._conn.execute(
+            text(f"""
+                SELECT s.structure_type::text AS value, COUNT(*) AS n
+                FROM structures s
+                WHERE {where}
+                GROUP BY s.structure_type
+                ORDER BY s.structure_type
+            """),
+            binds,
+        ).all()
+
+        where, binds = _structure_where(filters, skip="tutelles")
+        tutelle_rows = self._conn.execute(
+            text(f"""
+                SELECT sp.id AS value, COALESCE(sp.acronym, sp.name) AS label, COUNT(*) AS n
+                FROM structures s
+                JOIN structure_parents sr ON sr.child_id = s.id
+                JOIN structures sp ON sp.id = sr.parent_id
+                WHERE {where}
+                GROUP BY sp.id, label
+                ORDER BY n DESC, label
+            """),
+            binds,
+        ).all()
+
+        where, binds = _structure_where(filters, skip="perimeters")
+        perimeter_rows = self._conn.execute(
+            text(f"""
+                SELECT pe.id AS value, pe.name AS label,
+                       COUNT(s.id) AS n
+                FROM perimeters pe
+                LEFT JOIN perimeter_structures ps ON ps.perimeter_id = pe.id
+                LEFT JOIN structures s ON s.id = ps.structure_id AND {where}
+                GROUP BY pe.id, pe.name
+                ORDER BY pe.id
+            """),
+            binds,
+        ).all()
+        outside = self._conn.execute(
+            text(f"SELECT COUNT(*) FROM structures s WHERE {where} AND {_OUTSIDE_PERIMETERS}"),
+            binds,
+        ).scalar_one()
+
+        return StructuresFacetsResponse(
+            types=[FacetOption(value=r.value, count=r.n) for r in type_rows],
+            tutelles=[
+                FacetOption(value=str(r.value), label=r.label, count=r.n) for r in tutelle_rows
+            ],
+            perimeters=[
+                *(
+                    FacetOption(value=str(r.value), label=r.label, count=r.n)
+                    for r in perimeter_rows
+                ),
+                FacetOption(value="none", label="Hors périmètre", count=outside),
+            ],
+        )
+
+    def export_structures_csv(
+        self, *, filters: StructureFilters, sort: StructureSort
+    ) -> Iterator[str]:
+        """Export CSV de la liste des structures, aux filtres et au tri de la liste.
+
+        La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
-        perimeter_ids = get_persons_structure_ids_list(self._conn) if in_perimeter else None
-        sql, binds = _list_structures_sql(types=types, search=search, perimeter_ids=perimeter_ids)
-        rows = self._conn.execute(text(sql), binds).all()
-        return [
-            StructureListItem(
-                id=r.id,
-                code=r.code,
-                name=r.name,
-                acronym=r.acronym,
-                type=r.type,
-                ror_id=r.ror_id,
-                hal_collection=r.hal_collection,
-                perimeter_ids=list(r.perimeter_ids),
-                tutelles=[RelatedStructureOut.model_validate(x) for x in (r.tutelles or [])],
-            )
-            for r in rows
-        ]
+        where, binds = _structure_where(filters)
+        rows = self._conn.execute(
+            text(f"""
+                SELECT s.structure_type::text AS type, s.acronym, s.name,
+                       {_TUTELLE_LABELS} AS tutelles, s.ror_id, s.hal_collection
+                FROM structures s
+                WHERE {where}
+                ORDER BY {_STRUCTURE_SORT[sort]}
+            """),
+            binds,
+        ).all()
+        return csv_chunks(
+            ["Type", "Acronyme", "Nom", "Tutelles", "ROR", "Collection HAL"],
+            (
+                [
+                    r.type,
+                    r.acronym or "",
+                    r.name,
+                    r.tutelles or "",
+                    f"https://ror.org/{r.ror_id}" if r.ror_id else "",
+                    r.hal_collection or "",
+                ]
+                for r in rows
+            ),
+        )
 
     def get_structure_detail(self, structure_id: int) -> StructureDetailResponse | None:
         """Détail complet : structure + parents + enfants + formes de noms.

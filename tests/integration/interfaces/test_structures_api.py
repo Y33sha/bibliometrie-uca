@@ -22,32 +22,73 @@ from tests.integration.helpers.seeds import (
 
 
 class TestListStructures:
-    def test_empty_ok(self, client):
-        r = client.get("/api/structures")
+    def test_paginated_response(self, client):
+        r = client.get("/api/structures", params={"page": 1, "per_page": 10})
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        body = r.json()
+        assert isinstance(body["structures"], list)
+        assert {"total", "page", "per_page", "pages"} <= body.keys()
 
     def test_filter_by_type(self, client):
         seed_structure(type_="labo")
         r = client.get("/api/structures", params={"structure_type": "labo"})
         assert r.status_code == 200
-        assert all(s["type"] == "labo" for s in r.json())
+        assert all(s["type"] == "labo" for s in r.json()["structures"])
 
     def test_filter_by_search(self, client):
         code = uniq("FINDME")
         seed_structure(code=code)
         r = client.get("/api/structures", params={"search": code})
         assert r.status_code == 200
-        assert any(s["code"] == code for s in r.json())
+        assert any(s["code"] == code for s in r.json()["structures"])
 
     def test_combined_filters(self, client):
-        r = client.get("/api/structures", params={"structure_type": "labo", "search": "abc"})
+        r = client.get(
+            "/api/structures",
+            params={"structure_type": "labo", "search": "abc", "perimeter_id": "1,none"},
+        )
         assert r.status_code == 200
 
     def test_rejects_type_outside_the_vocabulary(self, client):
         r = client.get("/api/structures", params={"structure_type": "nimportequoi"})
         assert r.status_code == 422
         assert "nimportequoi" in r.json()["detail"]
+
+    def test_rejects_a_non_integer_perimeter(self, client):
+        r = client.get("/api/structures", params={"perimeter_id": "abc"})
+        assert r.status_code == 422
+
+    def test_rejects_an_unknown_sort(self, client):
+        assert client.get("/api/structures", params={"sort": "code_asc"}).status_code == 422
+
+
+class TestAllStructures:
+    def test_lists_every_structure(self, client):
+        code = uniq("ALL")
+        seed_structure(code=code)
+        r = client.get("/api/structures/all")
+        assert r.status_code == 200
+        assert any(s["code"] == code for s in r.json())
+
+
+class TestStructuresFacets:
+    def test_ok(self, client):
+        r = client.get("/api/structures/facets", params={"structure_type": "labo"})
+        assert r.status_code == 200
+        body = r.json()
+        assert {"types", "tutelles", "perimeters"} == body.keys()
+        assert body["perimeters"][-1]["value"] == "none"
+
+
+class TestExportStructures:
+    def test_downloads_a_csv(self, client):
+        code = uniq("CSV")
+        seed_structure(code=code, name="Structure exportée")
+        r = client.get("/api/structures/export.csv", params={"search": code})
+        assert r.status_code == 200
+        assert r.headers["content-type"].startswith("text/csv")
+        assert r.text.startswith("﻿")
+        assert "Structure exportée" in r.text
 
 
 # ── GET /api/structures/{id} ────────────────────────────────────
