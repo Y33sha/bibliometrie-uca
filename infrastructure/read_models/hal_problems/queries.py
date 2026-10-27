@@ -4,12 +4,15 @@ Contrôles qualité HAL au niveau des publications (doublons de dépôts, manque
 """
 
 from collections import defaultdict
+from collections.abc import Iterator, Sequence
 
 from sqlalchemy import Connection, bindparam, text
 
+from domain.normalize import to_plain_text
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.source_records.keys import DISCRIMINANT_TITLE_MIN_LENGTH
 from infrastructure.read_models._common import StructureRef
+from infrastructure.read_models.csv_export import MAX_EXPORT_ROWS, csv_chunks
 from infrastructure.read_models.hal_problems.models import (
     HalAccountSummary,
     HalAffiliationConflictPublication,
@@ -486,3 +489,140 @@ class HalProblemsQueries:
             per_page=per_page,
             publications=publications,
         )
+
+    # ── Exports CSV ──────────────────────────────────────────────
+    # Chaque export lit sa liste en une seule page, de la taille du plafond commun plus une ligne : la ligne excédentaire signale la coupe.
+
+    def export_duplicate_accounts_csv(self) -> Iterator[str]:
+        """Export CSV des comptes auteur HAL en double : une ligne par compte HAL d'une personne."""
+        persons, truncated = _capped(
+            self.hal_duplicate_accounts(page=1, per_page=_EXPORT_PAGE).persons
+        )
+        return csv_chunks(
+            [
+                "Nom",
+                "Prénom",
+                "RH",
+                "Compte HAL",
+                "Nom HAL",
+                "Publications",
+                "idHAL",
+                "ORCID",
+                "IdRef",
+            ],
+            (
+                [
+                    p.last_name,
+                    p.first_name,
+                    "oui" if p.has_rh else "",
+                    a.hal_person_id,
+                    a.full_name or "",
+                    a.publication_count,
+                    a.idhal or "",
+                    a.orcid or "",
+                    a.idref or "",
+                ]
+                for p in persons
+                for a in p.hal_accounts
+            ),
+            truncated=truncated,
+        )
+
+    def export_duplicate_publications_by_doi_csv(self) -> Iterator[str]:
+        """Export CSV des dépôts HAL en double par DOI : une ligne par DOI."""
+        pairs, truncated = _capped(
+            self.hal_duplicate_publications_by_doi(page=1, per_page=_EXPORT_PAGE).pairs
+        )
+        return csv_chunks(
+            ["DOI", "Année", "Type", "Titre", "Dépôts HAL"],
+            (
+                [
+                    _doi_url(pair.doi),
+                    pair.publication.publication_year or "",
+                    pair.publication.doc_type or "",
+                    to_plain_text(pair.publication.title),
+                    " ".join(pair.halids),
+                ]
+                for pair in pairs
+            ),
+            truncated=truncated,
+        )
+
+    def export_duplicate_publications_by_metadata_csv(self) -> Iterator[str]:
+        """Export CSV des doublons possibles par métadonnées : une ligne par paire de publications."""
+        pairs, truncated = _capped(
+            self.hal_duplicate_publications_by_metadata(page=1, per_page=_EXPORT_PAGE).pairs
+        )
+        return csv_chunks(
+            ["Année", "Type", "Titre A", "Dépôts HAL A", "Titre B", "Dépôts HAL B"],
+            (
+                [
+                    pair.publication_a.publication_year or "",
+                    pair.publication_a.doc_type or "",
+                    to_plain_text(pair.publication_a.title),
+                    " ".join(d.halid for d in pair.publication_a.hal_docs),
+                    to_plain_text(pair.publication_b.title),
+                    " ".join(d.halid for d in pair.publication_b.hal_docs),
+                ]
+                for pair in pairs
+            ),
+            truncated=truncated,
+        )
+
+    def export_missing_collections_csv(
+        self, *, lab_id: int
+    ) -> Iterator[str] | NoMissingCollections:
+        """Export CSV des publications du laboratoire absentes de sa collection HAL."""
+        result = self.hal_missing_collections(lab_id=lab_id, page=1, per_page=_EXPORT_PAGE)
+        if isinstance(result, NoMissingCollections):
+            return result
+        publications, truncated = _capped(result.publications)
+        return csv_chunks(
+            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Hors collections de l'établissement"],
+            (
+                [
+                    p.publication_year or "",
+                    p.doc_type or "",
+                    to_plain_text(p.title),
+                    _doi_url(p.doi),
+                    " ".join(p.halids or []),
+                    "oui" if p.outside_perimeter_collections else "",
+                ]
+                for p in publications
+            ),
+            truncated=truncated,
+        )
+
+    def export_affiliation_conflicts_csv(self) -> Iterator[str]:
+        """Export CSV des publications aux affiliations HAL divergentes."""
+        publications, truncated = _capped(
+            self.hal_affiliation_conflicts(page=1, per_page=_EXPORT_PAGE).publications
+        )
+        return csv_chunks(
+            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Laboratoires"],
+            (
+                [
+                    p.publication_year or "",
+                    p.doc_type or "",
+                    to_plain_text(p.title),
+                    _doi_url(p.doi),
+                    " ".join(p.halids or []),
+                    ", ".join(lab.acronym or lab.name for lab in p.laboratories),
+                ]
+                for p in publications
+            ),
+            truncated=truncated,
+        )
+
+
+# Taille de la page unique d'un export.
+_EXPORT_PAGE = MAX_EXPORT_ROWS + 1
+
+
+def _capped[T](items: Sequence[T]) -> tuple[Sequence[T], bool]:
+    """Éléments ramenés au plafond des exports, et si la coupe a eu lieu."""
+    return items[:MAX_EXPORT_ROWS], len(items) > MAX_EXPORT_ROWS
+
+
+def _doi_url(doi: str | None) -> str:
+    return f"https://doi.org/{doi}" if doi else ""

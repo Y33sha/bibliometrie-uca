@@ -1,5 +1,7 @@
 <script lang="ts">
 	import PageHeader from '#lib/components/PageHeader.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import { withBase } from '#lib/paths.js';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
@@ -75,6 +77,13 @@
 		Par métadonnées{meta.items.length ? ` (${meta.total})` : ''}
 	</button>
 </div>
+
+<ListToolbar
+	list={activeTab === 'doi' ? doi : meta}
+	one={activeTab === 'doi' ? 'DOI' : 'paire'}
+	many={activeTab === 'doi' ? 'DOI' : 'paires'}
+	exportUrl={withBase(`/api/hal-problems/duplicate-publications-${activeTab}/export.csv`)}
+/>
 
 {#if activeTab === 'doi'}
 	<ListStatus list={doi} emptyText="Aucun doublon par DOI">

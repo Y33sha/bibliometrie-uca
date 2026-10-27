@@ -3,6 +3,7 @@
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
@@ -70,7 +71,7 @@
 	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.
 </PageHeader>
 
-<ListToolbar {list} one="publication" many="publications">
+<ListToolbar {list} one="publication" many="publications" exportUrl={selectedLabId ? withBase(`/api/hal-problems/missing-collections/export.csv?lab_id=${selectedLabId}`) : undefined}>
 	{#snippet filters()}
 		<select class="lab-select" aria-label="Laboratoire" bind:value={selectedLabId} onchange={onLabChange}>
 			{#each labs as lab}

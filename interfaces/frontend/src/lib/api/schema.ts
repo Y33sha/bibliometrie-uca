@@ -1778,6 +1778,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hal-problems/duplicate-accounts/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Duplicate Accounts Csv
+         * @description Export CSV des comptes auteur HAL en double.
+         */
+        get: operations["export_duplicate_accounts_csv_api_hal_problems_duplicate_accounts_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/duplicate-publications-doi/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Duplicate Publications By Doi Csv
+         * @description Export CSV des dépôts HAL en double par DOI.
+         */
+        get: operations["export_duplicate_publications_by_doi_csv_api_hal_problems_duplicate_publications_doi_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/duplicate-publications-meta/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Duplicate Publications By Metadata Csv
+         * @description Export CSV des doublons possibles de dépôts HAL par métadonnées.
+         */
+        get: operations["export_duplicate_publications_by_metadata_csv_api_hal_problems_duplicate_publications_meta_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/missing-collections/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Missing Collections Csv
+         * @description Export CSV des publications d'un laboratoire absentes de sa collection HAL.
+         *
+         *     Renvoie 404 et 422 dans les mêmes cas que la liste.
+         */
+        get: operations["export_missing_collections_csv_api_hal_problems_missing_collections_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/affiliation-conflicts/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Affiliation Conflicts Csv
+         * @description Export CSV des publications aux affiliations HAL divergentes.
+         */
+        get: operations["export_affiliation_conflicts_csv_api_hal_problems_affiliation_conflicts_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -8893,6 +8995,117 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_duplicate_accounts_csv_api_hal_problems_duplicate_accounts_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_duplicate_publications_by_doi_csv_api_hal_problems_duplicate_publications_doi_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_duplicate_publications_by_metadata_csv_api_hal_problems_duplicate_publications_meta_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_missing_collections_csv_api_hal_problems_missing_collections_export_csv_get: {
+        parameters: {
+            query: {
+                lab_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_affiliation_conflicts_csv_api_hal_problems_affiliation_conflicts_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

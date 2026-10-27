@@ -1,6 +1,7 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
   import ListToolbar from "#lib/components/ListToolbar.svelte";
+  import { withBase } from "#lib/paths.js";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import { resolve } from "$app/paths";
   import { replaceQuery } from "#lib/url.js";
@@ -38,7 +39,7 @@
   Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.
 </PageHeader>
 
-<ListToolbar {list} one="personne" many="personnes" />
+<ListToolbar {list} one="personne" many="personnes" exportUrl={withBase("/api/hal-problems/duplicate-accounts/export.csv")} />
 
 <ListStatus {list} emptyText="Aucun doublon détecté">
   <table class="data-table">

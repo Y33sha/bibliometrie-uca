@@ -58,6 +58,36 @@ def _rows(text: str) -> list[list[str]]:
             {"structure_type": "labo"},
             ["Type", "Acronyme", "Nom", "Tutelles", "ROR", "Collection HAL"],
         ),
+        (
+            "/api/hal-problems/duplicate-accounts/export.csv",
+            {},
+            [
+                "Nom",
+                "Prénom",
+                "RH",
+                "Compte HAL",
+                "Nom HAL",
+                "Publications",
+                "idHAL",
+                "ORCID",
+                "IdRef",
+            ],
+        ),
+        (
+            "/api/hal-problems/duplicate-publications-doi/export.csv",
+            {},
+            ["DOI", "Année", "Type", "Titre", "Dépôts HAL"],
+        ),
+        (
+            "/api/hal-problems/duplicate-publications-meta/export.csv",
+            {},
+            ["Année", "Type", "Titre A", "Dépôts HAL A", "Titre B", "Dépôts HAL B"],
+        ),
+        (
+            "/api/hal-problems/affiliation-conflicts/export.csv",
+            {},
+            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Laboratoires"],
+        ),
     ],
 )
 def test_serves_a_csv_with_the_table_columns(client, path, params, header):
@@ -79,6 +109,36 @@ def test_serves_a_csv_with_the_table_columns(client, path, params, header):
 )
 def test_rejects_an_unknown_sort(client, path):
     assert client.get(path, params={"sort": "nimportequoi"}).status_code == 422
+
+
+class TestMissingCollectionsExport:
+    def test_unknown_lab_is_404(self, client):
+        r = client.get(
+            "/api/hal-problems/missing-collections/export.csv", params={"lab_id": 999_999_999}
+        )
+        assert r.status_code == 404
+
+    def test_lab_without_collection_is_422(self, client):
+        lab_id = seed_structure(code=uniq("NOCOL"))
+        r = client.get(
+            "/api/hal-problems/missing-collections/export.csv", params={"lab_id": lab_id}
+        )
+        assert r.status_code == 422
+
+    def test_lab_with_collection_serves_a_csv(self, client):
+        lab_id = seed_structure(code=uniq("COL"), hal_collection=uniq("col"))
+        r = client.get(
+            "/api/hal-problems/missing-collections/export.csv", params={"lab_id": lab_id}
+        )
+        assert r.status_code == 200
+        assert _rows(r.text)[0] == [
+            "Année",
+            "Type",
+            "Titre",
+            "DOI",
+            "Dépôts HAL",
+            "Hors collections de l'établissement",
+        ]
 
 
 def test_exports_the_filtered_rows(client):

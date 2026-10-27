@@ -3,6 +3,7 @@
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
@@ -41,7 +42,7 @@
 	Publications affiliées à {institution.name} dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature {institution.name} à la même position d'auteur.
 </PageHeader>
 
-<ListToolbar {list} one="publication" many="publications" />
+<ListToolbar {list} one="publication" many="publications" exportUrl={withBase('/api/hal-problems/affiliation-conflicts/export.csv')} />
 
 <ListStatus {list} emptyText="Aucun conflit détecté">
 	<div class="publication-list">
