@@ -1,4 +1,7 @@
 <script lang="ts">
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import RhCheck from '#lib/components/RhCheck.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
@@ -234,31 +237,23 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Contributions orphelines — Admin</title>
-</svelte:head>
+<Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current="Contributions orphelines" />
 
-<div class="header">
-	<h1>Contributions orphelines ({list.total})</h1>
-	<a href={resolve('persons')} class="btn">← Retour aux personnes</a>
-</div>
-
-<div class="info-box">
+<PageHeader title="Contributions orphelines">
 	Contributions {institution.name} non reliées à une personne. Pour chaque contribution, vous pouvez l'attribuer à une personne existante ou créer une nouvelle personne.
-</div>
+</PageHeader>
 
-<div class="toolbar">
-	<input type="search" placeholder="Rechercher par nom" bind:value={search}
- onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput} autocomplete="off" />
-	<FacetDropdown
-		label={filterLabels.labs}
-		options={labOptions}
-		searchable
-		bind:selected={selectedLabs}
-		onchange={onLabsChange}
-	/>
-</div>
+<ListToolbar bind:search placeholder="Rechercher par nom" onsearch={onSearchInput} {list} one="contribution" many="contributions">
+	{#snippet filters()}
+		<FacetDropdown
+			label={filterLabels.labs}
+			options={labOptions}
+			searchable
+			bind:selected={selectedLabs}
+			onchange={onLabsChange}
+		/>
+	{/snippet}
+</ListToolbar>
 
 {#if selectedIds.size > 0}
 	<div class="batch-bar">
@@ -404,13 +399,6 @@
 {/if}
 
 <style>
-	.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-	.header h1 { margin: 0; font-size: 1.2rem; }
-	.info-box {
-		background: var(--warning-light); border: 1px solid color-mix(in srgb, var(--warning) 40%, white); border-radius: var(--radius);
-		padding: 10px 14px; font-size: 0.85rem; color: var(--warning-text); margin-bottom: 14px;
-	}
-	.toolbar input { width: 300px; }
 	.tag-source { display: inline-block; padding: 1px 6px; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
 	.tag-source + .tag-source { margin-left: 3px; }
 	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }

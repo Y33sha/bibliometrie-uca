@@ -93,9 +93,8 @@
 {/snippet}
 {#snippet adminLabel()}Administration{/snippet}
 {#snippet adminItems()}
-  <span class="nav-dropdown-group">Pipeline</span>
-  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
-  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
+  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Configuration</a>
+  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Pipeline</a>
   <span class="nav-dropdown-group">Adresses</span>
   <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
   <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>

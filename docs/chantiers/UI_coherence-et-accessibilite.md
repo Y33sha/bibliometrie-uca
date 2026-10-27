@@ -141,7 +141,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 4. En-tête de page et barre d'outils
 
-- [ ] Composant d'en-tête de page : Problèmes HAL, administration
+- [x] Composant d'en-tête de page : Problèmes HAL, administration
 - [x] Composant de barre d'outils : toutes les listes, pages Problèmes HAL comprises ; champ « Occurrences min » au style des contrôles
 - [ ] Export CSV de chaque liste, API comprise
 
@@ -169,9 +169,9 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 8. Administration
 
-- [ ] En-tête de page ; noms de page (« Logs » et « Pipeline »)
+- [x] En-tête de page ; noms de page (« Logs » et « Pipeline »)
 - [ ] Pipeline, Affiliations, Qualité de la détection sans cartes ; Configuration en pleine largeur
-- [ ] Fil d'Ariane sur Contributions orphelines
+- [x] Fil d'Ariane sur Contributions orphelines
 - [ ] Chiffres clés de Qualité de la détection en `KeyFigures` ; format des nombres
 - [ ] Contrôles stylés ; sélecteur de pays par ligne, boutons de rejet et de validation
 - [ ] Pastille de source OpenAlex distincte de l'open access ; abréviations

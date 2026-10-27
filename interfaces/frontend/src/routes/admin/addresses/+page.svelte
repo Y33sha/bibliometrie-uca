@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { institution, loadInstitution, pageTitle } from '#lib/institution.svelte.js';
+	import { institution, loadInstitution } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -405,11 +406,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Admin - Adresses")}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Affiliations</h1>
+<PageHeader title="Affiliations" hidden />
 
 <div class="page-addresses">
 	<!-- Structure selection + feedback button -->

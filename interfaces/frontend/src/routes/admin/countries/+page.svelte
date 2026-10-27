@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
@@ -193,11 +194,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Adresses — Pays — Admin</title>
-</svelte:head>
-
-<h1>Attribution des pays aux adresses</h1>
+<PageHeader title="Pays" hidden />
 
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
@@ -279,7 +276,6 @@
 <Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 
 <style>
-	h1 { font-size: 1.3rem; margin-bottom: 12px; }
 	.toolbar input[type="search"] { width: 300px; }
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;

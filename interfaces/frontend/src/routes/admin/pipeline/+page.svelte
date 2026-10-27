@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import { onMount } from "svelte";
   import { api } from "#lib/api/index.js";
   import type { components } from "#lib/api/schema.js";
@@ -58,11 +58,7 @@
   });
 </script>
 
-<svelte:head><title>{pageTitle("Pipeline")}</title></svelte:head>
-
-<div class="page-header">
-  <h1>Pipeline</h1>
-</div>
+<PageHeader title="Pipeline" />
 
 <div class="layout">
   <div class="col-list">
@@ -88,10 +84,6 @@
 </div>
 
 <style>
-  .page-header h1 {
-    margin: 0 0 16px;
-    font-size: 1.5rem;
-  }
   .layout {
     display: grid;
     grid-template-columns: 360px 1fr;

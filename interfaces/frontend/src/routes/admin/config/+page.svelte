@@ -1,6 +1,6 @@
 <script lang="ts">
   import IconButton from "#lib/components/IconButton.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import { onMount } from "svelte";
   import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
@@ -245,10 +245,7 @@
   onMount(load);
 </script>
 
-<svelte:head><title>{pageTitle("Configuration")}</title></svelte:head>
-
-<h1>Configuration du pipeline</h1>
-<p class="subtitle">Les modifications prennent effet au prochain lancement du pipeline.</p>
+<PageHeader title="Configuration">Les modifications prennent effet au prochain lancement du pipeline.</PageHeader>
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
@@ -443,18 +440,6 @@
 {/if}
 
 <style>
-  h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin: 0 auto 4px;
-    max-width: 800px;
-  }
-  .subtitle {
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin: 0 auto 20px;
-    max-width: 800px;
-  }
   .section-title {
     margin: 24px auto 8px;
     max-width: 800px;

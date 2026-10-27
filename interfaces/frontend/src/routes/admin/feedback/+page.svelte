@@ -1,7 +1,7 @@
 <script lang="ts">
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import ResultCount from '#lib/components/ResultCount.svelte';
-  import { pageTitle } from '#lib/institution.svelte.js';
+  import PageHeader from '#lib/components/PageHeader.svelte';
   import { onMount } from "svelte";
   import { replaceQuery } from "#lib/url.js";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
@@ -245,10 +245,6 @@
   });
 </script>
 
-<svelte:head>
-  <title>{pageTitle("Admin - Qualité détection")}</title>
-</svelte:head>
-
 <svelte:window onclick={handleOutsideClick} />
 
 <div class="page-feedback">
@@ -256,7 +252,7 @@
     trail={[{ label: "Affiliations", path: currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses" }]}
     current="Qualité de la détection"
   />
-  <h1>Qualité de la détection</h1>
+  <PageHeader title="Qualité de la détection" />
 
   <!-- Stats row -->
   {#if stats}
@@ -400,11 +396,6 @@
 </div>
 
 <style>
-  h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin: 0 0 16px;
-  }
 
   /* Stats row */
   .stats-row {
