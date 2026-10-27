@@ -1,6 +1,6 @@
 """Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Trois mécanismes, dans cet ordre :
 
-1. **Recherche dans HAL par hal-id** (`pipeline.ingestion.hal.fetch_missing`) : hal-id repérés dans OpenAlex et ScanR.
+1. **Recherche par hal-id** : dans HAL, les hal-id repérés dans OpenAlex et ScanR (`pipeline.ingestion.hal.fetch_missing`) ; dans ScanR, les hal-id repérés dans HAL et OpenAlex (`pipeline.ingestion.scanr.fetch_missing`). Les deux tâches forment un groupe parallèle.
 2. **Recherche par NNT** : dans HAL, les thèses de theses.fr sans document HAL (`pipeline.ingestion.hal.fetch_missing`) ; dans theses.fr, les NNT repérés dans une autre source (`pipeline.ingestion.theses.fetch_missing`). Les deux tâches forment un groupe parallèle.
 3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les tâches `fetch_missing.doi.<source>` forment un groupe parallèle.
 
@@ -27,13 +27,15 @@ from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 FetchChannel = Callable[[PhaseContext], PhaseMetrics]
-"""Recherche HAL par hal-id ou par NNT : rend les métriques du canal."""
+"""Recherche par hal-id ou par NNT : rend les métriques du canal."""
 FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
 """Recherche par DOI dans une source cible."""
 
 _HAL_BY_ID = "fetch_missing.hal_by_id"
+_SCANR_BY_HAL_ID = "fetch_missing.scanr_by_hal_id"
 _HAL_BY_NNT = "fetch_missing.hal_by_nnt"
 _THESES_BY_NNT = "fetch_missing.theses_by_nnt"
+_HAL_ID_SECTION = "Recherche des documents avec hal-id trouvés ailleurs"
 _NNT_SECTION = "Recherche par NNT des thèses trouvées ailleurs"
 
 
@@ -54,15 +56,17 @@ def _summary(metrics: PhaseMetrics) -> dict[str, float | None]:
 @dataclass(frozen=True)
 class FetchMissingPhase:
     fetch_hal_by_id: FetchChannel
+    fetch_scanr_by_hal_id: FetchChannel
     fetch_hal_by_nnt: FetchChannel
     fetch_theses_by_nnt: FetchChannel
     fetch_doi_one: FetchDoiOne
     run_parallel: RunParallel
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les canaux HAL puis le lot parallèle de la recherche par DOI, et assemble les métriques."""
+        """Exécute les recherches par hal-id, par NNT, puis le lot parallèle de la recherche par DOI, et assemble les métriques."""
         options = ctx.options
         hal = "hal" in options.sources
+        scanr = "scanr" in options.sources
         theses = "theses" in options.sources
         # WoS opt-in.
         doi_targets = set(
@@ -70,6 +74,7 @@ class FetchMissingPhase:
         )
         selected_tasks = {
             _HAL_BY_ID: hal,
+            _SCANR_BY_HAL_ID: scanr,
             _HAL_BY_NNT: hal and options.mode == "full",
             _THESES_BY_NNT: theses,
             **{_doi_task(target): target in doi_targets for target in DOI_SEARCHABLE_SOURCES},
@@ -86,8 +91,14 @@ class FetchMissingPhase:
             {
                 _HAL_BY_ID: TaskStep(
                     self.fetch_hal_by_id,
-                    section="Recherche dans HAL des documents avec hal-id trouvés ailleurs",
+                    section=_HAL_ID_SECTION,
                     when=when_selected(_HAL_BY_ID),
+                    silent_when_empty=True,
+                ),
+                _SCANR_BY_HAL_ID: TaskStep(
+                    self.fetch_scanr_by_hal_id,
+                    section=_HAL_ID_SECTION,
+                    when=when_selected(_SCANR_BY_HAL_ID),
                     silent_when_empty=True,
                 ),
                 _HAL_BY_NNT: TaskStep(
@@ -120,6 +131,7 @@ class FetchMissingPhase:
         by_channel: dict[str, dict[str, float | None]] = {}
         channels = {
             _HAL_BY_ID: "hal-id",
+            _SCANR_BY_HAL_ID: "hal-id ScanR",
             _HAL_BY_NNT: "NNT",
             _THESES_BY_NNT: "NNT theses.fr",
             **{_doi_task(target): target for target in DOI_SEARCHABLE_SOURCES},
@@ -141,6 +153,7 @@ class FetchMissingPhase:
 def build() -> Phase:
     return FetchMissingPhase(
         fetch_hal_by_id=_run_fetch_missing_hal_by_id,
+        fetch_scanr_by_hal_id=_run_fetch_missing_scanr_by_hal_id,
         fetch_hal_by_nnt=_run_fetch_missing_hal_by_nnt,
         fetch_theses_by_nnt=_run_fetch_missing_theses_by_nnt,
         fetch_doi_one=_run_fetch_missing_doi,
@@ -156,6 +169,17 @@ def _run_fetch_missing_hal_by_id(ctx: PhaseContext) -> PhaseMetrics:
         retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
         return asyncio.run(
             fetch_missing_hal_by_id(conn, ctx.logger, retry_after_days=retry_after_days)
+        )
+
+
+def _run_fetch_missing_scanr_by_hal_id(ctx: PhaseContext) -> PhaseMetrics:
+    """Recherche dans ScanR par hal-id (HAL/OpenAlex) : documents absents de ScanR."""
+    from pipeline.ingestion.scanr.fetch_missing import fetch_missing_scanr_by_hal_id
+
+    with ctx.open_tx() as conn:
+        retry_after_days = delay(conn, ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS)
+        return asyncio.run(
+            fetch_missing_scanr_by_hal_id(conn, ctx.logger, retry_after_days=retry_after_days)
         )
 
 
