@@ -161,7 +161,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [x] Nom accessible du `select` de Manques collections
 - [x] Graphe des sujets sans éléments focusables imbriqués
 - [x] Titres de section des fiches en H2
-- [ ] Avertissements d'accessibilité de svelte-check
+- [x] Avertissements d'accessibilité de svelte-check
 
 ### 7. Couleurs en dur
 
