@@ -70,4 +70,9 @@
 	.toast-info {
 		background: var(--accent);
 	}
+	.toast-warning {
+		background: var(--warning-light);
+		color: var(--warning-text);
+		border: 1px solid var(--warning);
+	}
 </style>

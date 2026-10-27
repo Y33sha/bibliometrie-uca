@@ -461,7 +461,7 @@
 		const ignored = ignoredFilters(FILTERS, values);
 		if (ignored.length) {
 			const names = ignored.map((f) => `« ${f.label} »`).join(', ');
-			toast(`${ignored.length > 1 ? 'Filtres non pris en compte' : 'Filtre non pris en compte'} : ${names}`, 'info', 6000);
+			toast(`${ignored.length > 1 ? 'Filtres non pris en compte' : 'Filtre non pris en compte'} : ${names}`, 'warning', 6000);
 			for (const f of ignored) clearValue(f, values);
 			syncUrl();
 		}

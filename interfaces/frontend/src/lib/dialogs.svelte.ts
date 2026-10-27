@@ -19,7 +19,7 @@ interface ConfirmRequest extends ConfirmOptions {
 	resolve: (ok: boolean) => void;
 }
 
-export type ToastType = 'success' | 'error' | 'info';
+export type ToastType = 'success' | 'error' | 'info' | 'warning';
 export interface ToastItem {
 	id: number;
 	message: string;
