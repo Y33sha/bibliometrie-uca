@@ -273,7 +273,7 @@
 	<table class="data-table">
 		<thead>
 			<tr>
-				<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
+				<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
 				<th>{columnLabels.sources}</th>
 				<th>Nom</th>
 				<th>Publication</th>
@@ -284,7 +284,7 @@
 		<tbody>
 			{#each orphans as o, i (o.contribution_id)}
 				<tr>
-					<td><input type="checkbox" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
+					<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
 					<td class="links-cell">
 						{#each o.sources as source (source)}
 							<SourceTag {source} />

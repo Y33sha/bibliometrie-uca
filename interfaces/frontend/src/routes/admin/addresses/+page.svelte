@@ -505,7 +505,7 @@
 					{#each sp.structureIds as sid (sid)}
 						<span class="struct-chip">
 							{structureLabelById.get(sid) || `#${sid}`}
-							<button title="Retirer" onclick={() => removeStructureFromPredicate(i, sid)}>&#x2717;</button>
+							<button title="Retirer" aria-label="Retirer {structureLabelById.get(sid) || `#${sid}`}" onclick={() => removeStructureFromPredicate(i, sid)}>&#x2717;</button>
 						</span>
 					{/each}
 					<select

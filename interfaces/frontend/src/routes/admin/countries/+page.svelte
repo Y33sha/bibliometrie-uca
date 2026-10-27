@@ -228,7 +228,7 @@
 <table class="data-table addr-table">
 	<thead>
 		<tr>
-			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
+			<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
 			<th style="width:55%">{columnLabels.address}</th>
 			<th style="width:110px">{columnLabels.publications}</th>
 			<th>{columnLabels.country}</th>
@@ -237,7 +237,7 @@
 	<tbody>
 		{#each addresses as a (a.id)}
 			<tr>
-				<td><input type="checkbox" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
+				<td><input type="checkbox" aria-label="Sélectionner l'adresse" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
 				<td class="addr-cell">{a.raw_text}</td>
 				<td class="num-cell">{a.publication_count}</td>
 				<td>
@@ -246,7 +246,7 @@
 						{@const found = a.found_countries.find(f => f.country_code === c)}
 						<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
 							{countryLabel(c)}
-							<button class="tag-remove" onclick={() => removeCountry(a.id, c)}>×</button>
+							<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
 						</span>
 					{/each}
 					<span class="country-actions">

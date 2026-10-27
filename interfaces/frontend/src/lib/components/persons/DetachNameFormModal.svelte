@@ -71,7 +71,7 @@
         <div class="detach-list">
           {#each state.publications as p, i}
             <div class="detach-item">
-              <input type="checkbox" bind:checked={state.publications[i].checked} />
+              <input type="checkbox" aria-label="Détacher : {p.title}" bind:checked={state.publications[i].checked} />
               <span class="detach-year">{p.publication_year ?? "?"}</span>
               <a
                 class="detach-title"
