@@ -1,13 +1,14 @@
 name: Documentation
 
 # Construit le site de la documentation (zensical) et le publie sur GitHub Pages, à chaque envoi sur
-# master qui touche la documentation ou le code dont elle tire la référence (`domain/`).
+# master qui touche la documentation ou le code dont elle tire la référence (`domain/`, `pipeline/`).
 on:
   push:
     branches: [master]
     paths:
       - "docs/**"
       - "domain/**"
+      - "pipeline/**"
       - "zensical.toml"
       - "pyproject.toml"
       - "uv.lock"

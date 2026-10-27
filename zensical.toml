@@ -31,5 +31,5 @@ options.show_source = false
 options.members_order = "source"
 
 [project.plugins.api-autonav]
-modules = ["domain"]
+modules = ["domain", "pipeline"]
 nav_section_title = "Référence du code"
