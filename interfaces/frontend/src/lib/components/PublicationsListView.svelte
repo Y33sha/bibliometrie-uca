@@ -61,7 +61,7 @@
 		context?: PublicationListContext;
 		urlSync?: boolean;
 		basePath?: string;
-		/** Affiche la 1ère colonne avec un bouton ✕ pour exclure la contribution. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
+		/** Ajoute en tête de ligne une croix qui exclut la contribution. Le parent gère l'auth check et passe le callback. Si le callback retourne `true` (ou void), la ligne est retirée du tableau ; retourne `false` pour annuler (ex. l'utilisatrice a cliqué Annuler dans un confirm). */
 		showAdminExclude?: boolean;
 		/** Nombre d'éléments par page (50 pour les onglets, 100 pour /publications). */
 		perPage?: number;
@@ -70,6 +70,8 @@
 
 	// Volet d'une publication, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
 	const drawer = useDrawerParam('publication', isAdmin);
+	// Une seule cellule d'actions en tête de ligne : volet, puis exclusion de la contribution.
+	const hasRowActions = $derived(isAdmin() || showAdminExclude);
 
 	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne et le filtre « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant.
 	// svelte-ignore state_referenced_locally
@@ -271,8 +273,7 @@
 <table class="data-table publication-table">
 	<thead>
 		<tr>
-			{#if isAdmin()}<th style="width:28px"></th>{/if}
-			{#if showAdminExclude}<th style="width:28px"></th>{/if}
+			{#if hasRowActions}<th class="row-actions"></th>{/if}
 			{#if col('type')}<th style="width:80px">{columnLabels.type}</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
 				{columnLabels.year} <SortChevron direction={yearSort} />
@@ -303,20 +304,17 @@
 	</thead>
 	<tbody>
 		{#if listing.items.length === 0}
-			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + (showAdminExclude ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune publication trouvée" />
+			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + (hasRowActions ? 1 : 0)} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === drawer.id}>
-					{#if isAdmin()}
+					{#if hasRowActions}
 						<td class="row-actions">
-							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
-						</td>
-					{/if}
-					{#if showAdminExclude}
-						<td class="exclude-cell row-actions">
-							{#if p.contribution_id != null}
-								<button class="exclude-btn" title="Exclure ce lien auteur–publication"
-									onclick={() => onExcludeClick(p)}>✕</button>
+							{#if isAdmin()}
+								<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
+							{/if}
+							{#if showAdminExclude && p.contribution_id != null}
+								<IconButton icon="reject" label="Exclure ce lien auteur–publication" onclick={() => onExcludeClick(p)} />
 							{/if}
 						</td>
 					{/if}
@@ -422,7 +420,13 @@
 <style>
 	.license-cell {
 		font-size: 0.8rem;
-	}	.publication-table { min-width: 760px; }
+	}
+	.publication-table { min-width: 760px; }
+	/* La cellule d'actions se réduit à ses icônes. */
+	.publication-table .row-actions {
+		width: 1%;
+		white-space: nowrap;
+	}
 	.publication-table tr.active-row td { background: var(--accent-light); }
 	.access-cell { white-space: nowrap; }
 
@@ -444,11 +448,4 @@
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
 
 	/* Bouton exclure (admin, person) */
-	.exclude-cell { padding-left: 2px; padding-right: 2px; text-align: center; }
-	.exclude-btn {
-		background: none; border: none; cursor: pointer;
-		color: var(--text-faint); font-size: 0.85rem; padding: 2px 4px;
-		border-radius: var(--radius); line-height: 1; transition: color 0.15s, background 0.15s;
-	}
-	.exclude-btn:hover { color: var(--danger); background: var(--danger-light); }
 </style>
