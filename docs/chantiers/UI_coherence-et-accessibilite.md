@@ -182,7 +182,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [x] Aucun défilement horizontal de la page : `/structures`, `/subjects`, `/subjects/[id]`, Configuration, Pipeline, Affiliations, Pays, Contributions orphelines
 - [x] Indice de défilement au bord des tableaux et des onglets
 - [x] Barre d'outils des publications, séparateurs de la page Statistiques
-- [ ] Fil d'Ariane et ligne revue / éditeur de la fiche publication
+- [x] Fil d'Ariane et ligne revue / éditeur de la fiche publication
 - [ ] Libellé « Tutelles » solidaire de ses valeurs ; compteurs d'Affiliations
 
 ### 10. Audit final

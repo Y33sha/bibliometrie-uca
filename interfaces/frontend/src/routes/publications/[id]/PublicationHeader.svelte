@@ -51,12 +51,15 @@
         <span class="journal-name" class:container={!pub.journal_title}>{pub.journal_title || pub.container_title}</span>
       {/if}
       {#if pub.publisher_name}
-        <span class="publisher-sep">—</span>
-        {#if pub.publisher_id}
-          <a href={resolve(`publishers/${pub.publisher_id}`)} class="publisher-name">{pub.publisher_name}</a>
-        {:else}
-          <span class="publisher-name">{pub.publisher_name}</span>
-        {/if}
+        <!-- Le tiret passe à la ligne avec l'éditeur. -->
+        <span class="publisher">
+          <span class="publisher-sep">—</span>
+          {#if pub.publisher_id}
+            <a href={resolve(`publishers/${pub.publisher_id}`)} class="publisher-name">{pub.publisher_name}</a>
+          {:else}
+            <span class="publisher-name">{pub.publisher_name}</span>
+          {/if}
+        </span>
       {/if}
     </div>
   {/if}
@@ -268,6 +271,11 @@
   }
   span.publisher-name {
     color: var(--muted);
+  }
+  .publisher {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
   }
   .publisher-sep {
     font-size: 0.85rem;
