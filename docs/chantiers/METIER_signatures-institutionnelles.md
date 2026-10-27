@@ -24,7 +24,7 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 6. **Mention de l'université**, sous n'importe quelle forme : `address_structures` rattache l'adresse à l'université elle-même. Un laboratoire de l'université cité seul ne vaut pas mention.
 7. **Grain de la publication** : une publication compte une fois par personne. Les comptes sont aussi donnés par source.
 8. **ROR d'OpenAlex** : mesure d'appoint, à côté du texte.
-9. **Restitution** : tableau de bord de la personne.
+9. **Restitution** : tableau de bord de la personne, visible de l'administration seulement.
 
 ## Phasage
 
@@ -39,7 +39,7 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 ### Phase 2 — Indicateur par personne
 
 - [ ] Calcul des trois comptes par personne.
-- [ ] Affichage sur le tableau de bord de la personne.
+- [ ] Affichage sur le tableau de bord de la personne, réservé à l'administration.
 - [ ] Liste des publications sans mention de l'université, ouverte depuis l'indicateur.
 
 ### Phase 3 — Publications de l'Alliance hors périmètre
@@ -51,7 +51,6 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 
 - **Indicateur et publications manquantes** : calculé sur les publications rattachées à la personne, l'indicateur omet les cas visés, restés en enregistrements sources sans contribution rattachée. L'inclusion (phase 3) doit-elle précéder la publication de l'indicateur ?
 - **Sources divergentes** : quelle règle de comptage, d'après l'examen de la phase 1 ?
-- **Visibilité de l'indicateur** : public, ou administration seulement ?
 - **Tolérance de fin de période** : quelle durée ? L'indice `hr_record` retient les documents parus entre l'année qui suit l'arrivée et la fin du contrat.
 - **Personnes hors référentiel RH** : chercheurs des organismes, doctorants, contractuels, émérites. Sans période connue, aucune attente de mention.
 - **Mention reconnaissable** : quelles formes de l'université permettent à WoS de relier la publication à l'établissement ?
