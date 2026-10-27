@@ -443,7 +443,6 @@
 	}
 	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }
-	.col-menu-th { position: relative; }
 	.access-cell { white-space: nowrap; }
 
 	/* Statut HAL (lab) */

@@ -272,10 +272,6 @@
 		width: 120px;
 		white-space: nowrap;
 	}
-	.col-menu-th {
-		position: relative;
-	}
-
 	.status-badge {
 		font-size: 0.75rem;
 		padding: 2px 6px;
