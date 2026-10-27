@@ -49,17 +49,33 @@
 	let hidden = $state(false);
 	let lastY = 0;
 
+	// Instant du dernier geste de défilement : molette, glissé tactile, touche de défilement. Le navigateur décale aussi la page quand la hauteur de la barre change (panneau ouvert, filtre ajouté) ; seul un défilement vers le bas qui suit un geste masque la barre.
+	let lastGesture = 0;
+	const GESTURE_WINDOW_MS = 300;
+	const SCROLL_KEYS = new Set(['ArrowDown', 'PageDown', 'End', ' ']);
+
+	function markGesture() {
+		lastGesture = performance.now();
+	}
+
+	function onScrollKey(e: KeyboardEvent) {
+		const target = e.target as HTMLElement | null;
+		if (target?.closest('input, textarea, select, [contenteditable]')) return;
+		if (SCROLL_KEYS.has(e.key)) markGesture();
+	}
+
 	function onscroll() {
 		const y = window.scrollY;
 		const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0;
 		const stuck = (anchor?.getBoundingClientRect().top ?? 0) < headerHeight;
+		const gesture = performance.now() - lastGesture < GESTURE_WINDOW_MS;
 		if (!stuck || y < lastY) hidden = false;
-		else if (y > lastY) hidden = true;
+		else if (y > lastY && gesture) hidden = true;
 		lastY = y;
 	}
 </script>
 
-<svelte:window {onscroll} />
+<svelte:window {onscroll} onwheel={markGesture} ontouchmove={markGesture} onkeydown={onScrollKey} />
 
 <div class="list-toolbar-anchor" bind:this={anchor}></div>
 <div class="list-toolbar" class:hidden use:stickyHeight={!hidden}>
