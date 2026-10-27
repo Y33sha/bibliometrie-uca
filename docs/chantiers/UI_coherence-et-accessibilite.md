@@ -103,7 +103,6 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - **Un nom par page**, identique dans le menu, le H1 et le titre du navigateur. Le H1 et le titre d'une page Problèmes HAL comportent « HAL ». Les pages des structures et des personnes s'appellent « Labos » et « Chercheurs ».
 - **Placeholders** sans ponctuation finale.
 - **Un seul style d'identifiant**, en `--mono`, sur les listes comme dans les en-têtes d'entité.
-- **Un seul composant de barres horizontales** : `SubjectBars` sert aussi aux pays partenaires.
 - **Valeur absente** : cellule vide.
 - **Export CSV sur toutes les listes.** Menu de colonnes sur les listes à nombreuses colonnes.
 - **Aucun défilement horizontal de la page**, à toutes les largeurs. Un tableau trop large défile dans son conteneur, avec un indice visuel au bord.
@@ -148,7 +147,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 5. Composants
 
 - [x] Style d'identifiant unique (ISSN, ISBN, HAL)
-- [ ] Pays partenaires en `SubjectBars`
+- [ ] Rendu des barres des dashboards (voir Questions ouvertes)
 - [ ] Libellés de l'anneau lisibles sur toutes les parts
 - [ ] Liste des publications : en-tête « Accès / Liens », poids du bouton « Texte intégral », en-tête de tableau collant
 - [x] Liste des éditeurs : filets de la colonne des préfixes, valeur absente en cellule vide
@@ -192,4 +191,5 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ## Questions ouvertes
 
+- **Rendu des barres des dashboards.** Deux techniques coexistent : Chart.js (`BarChart`, `DoughnutChart`, `PublicationsByYearChart`, page Statistiques, carte) et HTML (`SubjectBars`, `OaBar`). Chart.js partout : les libellés d'axe sont du texte peint dans le canvas, inaccessible au clavier et aux lecteurs d'écran ; seules les barres répondent au clic. Partage par usage : les classements qui mènent à une page (sujets, pays partenaires) en listes de liens HTML, les autres graphiques en Chart.js.
 - **Dashboards d'éditeur et de publication en série** sans chiffres clés : à traiter avec le [contenu des dashboards](METIER_dashboards.md).
