@@ -49,8 +49,9 @@ const ROUTE = /^(resolve|loginUrl)\(/;
 const TABLE_IDENTIFIANTS = /^(EXT_META\[|meta\.url\()/;
 /* Fiche DOAJ servie par l'API, dont l'hôte est vérifié côté serveur. Lien vers le portail d'une
  * source, composé par l'API : l'hôte y est écrit dans le code et l'identifiant encodé
- * (`domain/sources/registry.py`, `source_record_url`). */
-const VERIFIE_COTE_SERVEUR = /^[a-z]+\.(doaj_url|record_url|record_urls\.[a-z]+)$/;
+ * (`domain/sources/registry.py`, `source_record_url`). `SourceLinks` reçoit ces liens de sa
+ * liste, dans `urls`. */
+const VERIFIE_COTE_SERVEUR = /^([a-z]+\.(doaj_url|record_url|record_urls\.[a-z]+)|urls\[source\])$/;
 /* Copie ouverte d'une publication, et bouton d'accès qui y mène à défaut du DOI : l'hôte vient
  * des données, le serveur vérifie seulement le schéma `http` ou `https`
  * (`domain/publications/access.py`). */
