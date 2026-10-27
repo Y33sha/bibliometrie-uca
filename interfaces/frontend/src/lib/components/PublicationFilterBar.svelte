@@ -4,10 +4,8 @@
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
-	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import { PUBLICATION_FACETS_ENDPOINT } from '#lib/composables/usePublicationFacets.svelte.js';
 	import {
-		clearValue,
 		filterSections,
 		isActive,
 		isAvailable,
@@ -18,7 +16,7 @@
 		type ListFilter,
 	} from '#lib/filterRegistry.js';
 
-	// Barre de filtres des publications, partagée par la liste des publications et la page Statistiques : les contrôles de la barre principale, le panneau « Plus de filtres » et la barre des filtres actifs.
+	// Barre de filtres des publications, partagée par la liste des publications et la page Statistiques : les contrôles de la barre principale et le panneau « Plus de filtres ». Chaque page place la barre des filtres actifs (`ActiveFilterBar`).
 	let {
 		filters,
 		values = $bindable(),
@@ -60,15 +58,6 @@
 		onchange();
 	}
 
-	function clearFilter(filter: ListFilter) {
-		clearValue(filter, values);
-		onchange();
-	}
-
-	function clearAllFilters() {
-		for (const f of filters) clearValue(f, values);
-		onchange();
-	}
 </script>
 
 <div class="toolbar">
@@ -95,7 +84,6 @@
 		{/each}
 	</div>
 {/if}
-<ActiveFilterBar {filters} {values} {options} onclear={clearFilter} onclearall={clearAllFilters} />
 
 {#snippet filterControl(f: ListFilter)}
 	{#if f.control === 'checkbox'}

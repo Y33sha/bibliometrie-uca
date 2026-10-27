@@ -286,10 +286,10 @@
 	color: var(--muted);
 }
 
-/* Conteneur d'un tableau de liste. Sur écran large, le tableau tient dans la page : son en-tête se colle sous le menu supérieur. Le filet inférieur passe par une ombre, qu'un en-tête collant garde, là où la bordure d'un tableau en `border-collapse` disparaît. */
+/* Conteneur d'un tableau de liste. Sur écran large, le tableau tient dans la page : son en-tête se colle sous le menu supérieur et sous la bande collante de la barre d'outils (`--list-sticky-height`, publiée par l'action `stickyHeight`). Le filet inférieur passe par une ombre, qu'un en-tête collant garde, là où la bordure d'un tableau en `border-collapse` disparaît. */
 .table-scroll thead th {
 	position: sticky;
-	top: var(--header-height);
+	top: calc(var(--header-height) + var(--list-sticky-height, 0px));
 	z-index: 2;
 	background: var(--bg);
 	border-bottom: none;

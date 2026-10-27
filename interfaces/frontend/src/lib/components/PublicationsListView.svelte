@@ -11,6 +11,7 @@
 	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import {
 		activeColumns,
 		appendFilterParams,
@@ -281,6 +282,9 @@
 		{/if}
 	{/snippet}
 	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={buildFilterParams} onchange={onFilterChange} />
+	{#snippet activeFilters()}
+		<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
+	{/snippet}
 </ListToolbar>
 
 <div class="table-scroll">

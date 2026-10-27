@@ -1,8 +1,9 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
+	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 
-	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant suit, par exemple les filtres actifs. La barre défile avec la page ; l'en-tête du tableau qui suit se colle sous le menu supérieur.
+	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant suit. La barre défile avec la page. La bande `activeFilters` reste collée sous le menu supérieur, et l'en-tête du tableau qui suit se colle sous elle.
 	let {
 		search = $bindable(),
 		placeholder = 'Rechercher',
@@ -13,6 +14,7 @@
 		exportUrl,
 		actions,
 		filters,
+		activeFilters,
 		children,
 	}: {
 		/** Terme de recherche. Sans valeur, la barre n'affiche aucun champ de recherche. */
@@ -30,6 +32,8 @@
 		exportUrl?: string;
 		actions?: Snippet;
 		filters?: Snippet;
+		/** Filtres actifs, dans la bande collante. */
+		activeFilters?: Snippet;
 		children?: Snippet;
 	} = $props();
 
@@ -57,6 +61,9 @@
 	{/if}
 	{@render children?.()}
 </div>
+{#if activeFilters}
+	<div class="list-sticky" use:stickyHeight>{@render activeFilters()}</div>
+{/if}
 
 <style>
 	.list-toolbar {
@@ -71,6 +78,12 @@
 	.list-search {
 		flex: 1;
 		min-width: 220px;
+	}
+	.list-sticky {
+		position: sticky;
+		top: var(--header-height);
+		z-index: 40;
+		background: var(--bg);
 	}
 	.filters-label {
 		font-size: 0.9rem;

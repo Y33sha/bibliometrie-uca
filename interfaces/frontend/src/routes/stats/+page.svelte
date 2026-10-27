@@ -7,6 +7,7 @@
 	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
+	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
 	import { defaultYears } from './defaultYears';
 	import { paramsToQuery } from '#lib/utils.js';
@@ -535,6 +536,7 @@
 			<input type="search" class="stats-search" placeholder="Rechercher par titre ou sujet" aria-label="Rechercher par titre ou sujet" bind:value={search} oninput={onSearchInput} />
 		{/snippet}
 	</PublicationFilterBar>
+	<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
 </div>
 
 {#if isCollab}
