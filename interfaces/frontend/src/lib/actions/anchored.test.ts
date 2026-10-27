@@ -33,6 +33,18 @@ describe('anchored', () => {
 		action.destroy();
 	});
 
+	it('sort le panneau du flux avant de mesurer son ancre', () => {
+		const panel = setup(100);
+		let positionAtMeasure = '';
+		panel.parentElement!.getBoundingClientRect = () => {
+			positionAtMeasure = panel.style.position;
+			return { left: 50, right: 150, top: 100, bottom: 120, width: 100, height: 20 } as DOMRect;
+		};
+		const action = anchored(panel);
+		expect(positionAtMeasure).toBe('fixed');
+		action.destroy();
+	});
+
 	it('passe au-dessus de l\'ancre quand la place manque en bas de la fenêtre', () => {
 		const panel = setup(window.innerHeight - 40);
 		const action = anchored(panel);

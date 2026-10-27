@@ -22,7 +22,6 @@ export function anchored(node: HTMLElement, options: AnchoredOptions = {}) {
 		const align = opts.align ?? 'start';
 		const offset = opts.offset ?? 4;
 		const r = anchor.getBoundingClientRect();
-		node.style.position = 'fixed';
 		node.style.bottom = 'auto';
 
 		node.style.transform = align === 'center' ? 'translateX(-50%)' : 'none';
@@ -41,6 +40,8 @@ export function anchored(node: HTMLElement, options: AnchoredOptions = {}) {
 		node.style.top = above ? `${r.top - offset - height}px` : `${r.bottom + offset}px`;
 	}
 
+	// Hors du flux avant toute mesure : resté dans le flux pendant la mesure de l'ancre, le panneau allongerait son conteneur, et le navigateur décalerait la page pour compenser.
+	node.style.position = 'fixed';
 	place();
 	// Le contenu du panneau (résultats d'une recherche) change sa hauteur : on recalcule, pour le cas où il passe au-dessus.
 	const resize = new ResizeObserver(place);
