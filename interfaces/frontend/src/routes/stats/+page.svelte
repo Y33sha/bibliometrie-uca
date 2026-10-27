@@ -6,13 +6,11 @@
 	import { Chart } from '#lib/components/charts/chart.js';
 	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
-	import EntityFilter from '#lib/components/EntityFilter.svelte';
+	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import CollaborationMap from './CollaborationMap.svelte';
 	import { defaultYears } from './defaultYears';
 	import { paramsToQuery } from '#lib/utils.js';
 	import {
-		oaLabelsMap,
 		oaStatusLabel,
 		docTypePlural,
 		docTypeFamilies,
@@ -20,11 +18,17 @@
 		licenseColors,
 		licenseOrder,
 		publicationsDocTypes,
-		docTypeFilterToken,
-		docTypeFilterFromToken,
-		filterLabels,
 	} from '#lib/labels.js';
-	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import {
+		appendFilterParams,
+		initialValues,
+		restoreValues,
+		transferParams,
+		urlFilterDefs,
+		urlState,
+	} from '#lib/filterRegistry.js';
+	import { publicationFilters } from '#lib/publicationFilters.js';
+	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 
 	// Chaque changement de filtre relance le graphe : la requête précédente, encore en vol, est annulée.
@@ -33,17 +37,10 @@
 	// --- Types ---
 	import type { components } from '#lib/api/schema.js';
 	// --- State ---
-	let selectedYears: string[] = $state([]);
-	let selectedLabs: string[] = $state([]);
-	let selectedOa: string[] = $state([]);
-	let selectedApc: string[] = $state([]);
-	let selectedLicenses: string[] = $state([]);
-	let selectedDocTypes: string[] = $state([]); // défaut = famille « Publications » (cf. onMount)
-	// Facettes à forte cardinalité (recherche serveur) : une entité sélectionnée (id + libellé).
-	// Facettes éditeur / revue : seul l'id (état canonique) ; le libellé de la pastille est résolu par EntityFilter.
-	let selectedSerialId = $state<string | null>(null);
-	let selectedPublisherId = $state<string | null>(null);
-	let selectedPartnerRor = $state<string | null>(null);
+	// Filtres de la liste des publications, hors contexte. La famille « Publications » est présélectionnée (cf. onMount).
+	const FILTERS = publicationFilters({ kind: 'all' });
+	let values = $state(initialValues(FILTERS));
+	let search = $state('');
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -84,13 +81,6 @@
 		pivotSchema ? pivotSchema.dimensions.filter((d) => d.comparable) : []
 	);
 
-	// Barre de facettes dérivée du registre `pivotSchema` : ensemble des dimensions filtrables, moins un groupement catégoriel déjà visible (l'année, ordinale, reste filtrable). Règle de présentation.
-	const facetKeys = $derived.by(() => {
-		if (!pivotSchema) return new Set(['year', 'lab', 'oa_voie', 'apc']);
-		// Une facette reste offerte même quand le graphique compare sur sa dimension : elle restreint alors les valeurs comparées.
-		return new Set(pivotSchema.dimensions.filter((d) => d.filterable).map((d) => d.key));
-	});
-
 	// Couleurs / libellés / ordre par dimension de découpage. Les valeurs OA réutilisent les variables CSS existantes ; les autres dimensions piochent dans une palette catégorielle.
 	const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
 	const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
@@ -111,7 +101,7 @@
 		if (dim === 'doc_type_grouped')
 			return docTypePlural[value] ?? docTypeFamilies.find((f) => f.key === value)?.label ?? value;
 		// Libellés servis par la facette, y compris celui des publications sans licence.
-		if (dim === 'license') return facets.options.licenses.find((o) => o.value === value)?.text ?? value;
+		if (dim === 'license') return facets.options.license?.find((o) => o.value === value)?.text ?? value;
 		return value;
 	}
 	function dimColor(dim: string, value: string, idx: number): string {
@@ -174,46 +164,25 @@
 	// --- Filter params (partagés par le graphe et les facettes) ---
 	function chartParams(): URLSearchParams {
 		const p = new URLSearchParams();
-		if (selectedLabs.length) p.set('lab_id', selectedLabs.join(','));
-		if (selectedYears.length) p.set('year', selectedYears.join(','));
-		if (selectedOa.length) p.set('oa_status', selectedOa.join(','));
-		if (selectedLicenses.length) p.set('license', selectedLicenses.join(','));
-		if (selectedApc.length) p.set('has_apc', selectedApc.join(','));
-		if (selectedDocTypes.length) p.set('doc_type', selectedDocTypes.join(','));
-		if (selectedPublisherId) p.set('publisher_id', selectedPublisherId);
-		if (selectedSerialId) p.set('serial_id', selectedSerialId);
-		if (selectedPartnerRor) p.set('partner_ror', selectedPartnerRor);
+		appendFilterParams(FILTERS, values, p);
+		const q = search.trim();
+		if (q) p.set('search', q);
 		return p;
 	}
 
 	// --- Composable: facets ---
-	const facets = useFacets<'years' | 'labs' | 'oa' | 'licenses' | 'apc' | 'docTypes'>({
-		endpoint: '/api/stats/facets',
-		apiKey: 'stats-facets',
+	const facets = usePublicationFacets({
+		filters: FILTERS,
+		apiKey: () => 'stats-facets',
 		buildParams: chartParams,
-		facets: {
-			years: { type: 'simple', apiKey: 'years' },
-			labs: { type: 'labeled', apiKey: 'labs' },
-			oa: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			licenses: { type: 'labeled', apiKey: 'licenses' },
-			apc: { type: 'labeled', apiKey: 'apc' },
-			docTypes: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
-		},
 	});
 
 	// --- Composable: URL filters ---
 	const urlFilters = useUrlFilters({
 		basePath: '/stats',
 		filters: {
-			selectedYears: { type: 'string_array', urlKey: 'year' },
-			selectedLabs: { type: 'string_array', urlKey: 'lab_id' },
-			selectedOa: { type: 'string_array', urlKey: 'oa_status' },
-			selectedApc: { type: 'string_array', urlKey: 'has_apc' },
-			selectedLicenses: { type: 'string_array', urlKey: 'license' },
-			selectedDocTypes: { type: 'single', urlKey: 'doc_type', defaultValue: publicationsDocTypes.join(',') },
-			publisherId: { type: 'single', urlKey: 'publisher_id' },
-			serialId: { type: 'single', urlKey: 'serial_id' },
-			partnerRor: { type: 'single', urlKey: 'partner_ror' },
+			...urlFilterDefs(FILTERS),
+			search: { type: 'single', urlKey: 'search' },
 			indicator: { type: 'single', urlKey: 'indicator', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
@@ -225,15 +194,8 @@
 
 	function syncUrl() {
 		urlFilters.syncUrl(() => ({
-			selectedYears,
-			selectedLabs,
-			selectedOa,
-			selectedApc,
-			selectedLicenses,
-			selectedDocTypes: docTypeFilterToken(selectedDocTypes),
-			publisherId: selectedPublisherId ?? '',
-			serialId: selectedSerialId ?? '',
-			partnerRor: selectedPartnerRor ?? '',
+			...urlState(FILTERS, values),
+			search,
 			indicator,
 			groupBy,
 			chartMode,
@@ -244,10 +206,11 @@
 	}
 
 	// --- Derived: publications link ---
+	// Les filtres et la recherche passent tels quels : les deux pages partagent le registre des filtres.
 	const pubsUrl = $derived.by(() => {
-		// Les entités passent par leur identifiant ; la liste résout elle-même le libellé de la pastille.
-		const p = chartParams();
-		p.set('doc_type', docTypeFilterToken(selectedDocTypes));
+		const p = transferParams(FILTERS, values);
+		const q = search.trim();
+		if (q) p.set('search', q);
 		return resolve('publications') + '?' + paramsToQuery(p);
 	});
 
@@ -475,33 +438,14 @@
 		syncUrl();
 		refresh();
 	}
-	function onPublisherFilter(id: string | null) {
-		selectedPublisherId = id;
-		onFilterChange();
-	}
-	function onSerialFilter(id: string | null) {
-		selectedSerialId = id;
-		onFilterChange();
-	}
-	function onPartnerFilter(ror: string | null) {
-		selectedPartnerRor = ror;
-		onFilterChange();
-	}
+	const onSearchInput = urlFilters.debouncedSearch(onFilterChange);
 
 	onMount(async () => {
 		// Restore state from URL params
 		const u = new URLSearchParams(window.location.search);
 		const restored = urlFilters.restoreFromUrl(u);
-		if (restored.selectedYears) selectedYears = restored.selectedYears as string[];
-		if (restored.selectedLabs) selectedLabs = restored.selectedLabs as string[];
-		if (restored.selectedOa) selectedOa = restored.selectedOa as string[];
-		if (restored.selectedApc) selectedApc = restored.selectedApc as string[];
-		if (restored.selectedLicenses) selectedLicenses = restored.selectedLicenses as string[];
-		if (restored.selectedDocTypes != null)
-			selectedDocTypes = docTypeFilterFromToken(restored.selectedDocTypes as string);
-		if (restored.publisherId) selectedPublisherId = restored.publisherId as string;
-		if (restored.serialId) selectedSerialId = restored.serialId as string;
-		if (restored.partnerRor) selectedPartnerRor = restored.partnerRor as string;
+		restoreValues(FILTERS, restored, values);
+		if (restored.search) search = restored.search as string;
 		if (restored.indicator !== undefined) indicator = restored.indicator as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
@@ -516,12 +460,13 @@
 
 		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne porte pas de filtre de types ; le token `all` (sélection « Tous » explicite) le laisse vide.
 		if (!u.has('doc_type')) {
-			selectedDocTypes = [...publicationsDocTypes];
+			values.checkbox.docTypes = [...publicationsDocTypes];
 		}
 
 		await facets.load();
-		if (!initialYearsApplied && selectedYears.length === 0 && facets.options.years.length > 0) {
-			selectedYears = defaultYears(facets.options.years.map((o) => o.value), new Date().getFullYear());
+		const yearOptions = facets.options.years ?? [];
+		if (!initialYearsApplied && values.checkbox.years.length === 0 && yearOptions.length > 0) {
+			values.checkbox.years = defaultYears(yearOptions.map((o) => o.value), new Date().getFullYear());
 			syncUrl();
 		}
 		initialYearsApplied = true;
@@ -583,36 +528,13 @@
 	{/if}
 	<a class="toolbar-action pubs-link" href={pubsUrl}>Voir les publications &rarr;</a>
 </div>
-<!-- Ligne 2 : filtres à facettes, dérivés du registre `pivotSchema` (cf. `facetKeys`). -->
-<div class="toolbar facets-row">
-	<span class="facets-label">Filtrer par&nbsp;:</span>
-	{#if facetKeys.has('year')}
-		<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
-	{/if}
-	{#if facetKeys.has('lab')}
-		<FacetDropdown label={filterLabels.labs} options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
-	{/if}
-	{#if facetKeys.has('oa_voie')}
-		<FacetDropdown label={filterLabels.oaStatuses} options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
-	{/if}
-	{#if facetKeys.has('doc_type')}
-		<FacetDropdown label={filterLabels.types} options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
-	{/if}
-	{#if facetKeys.has('serial')}
-		<EntityFilter label={filterLabels.serial} endpoint="/api/stats/facets" kind="serial" buildParams={chartParams} selected={selectedSerialId ? [selectedSerialId] : []} onchange={(ids) => onSerialFilter(ids[0] ?? null)} />
-	{/if}
-	{#if facetKeys.has('publisher')}
-		<EntityFilter label={filterLabels.publisher} endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
-	{/if}
-	{#if facetKeys.has('partner')}
-		<EntityFilter label={filterLabels.partner} endpoint="/api/stats/facets" kind="partner" buildParams={chartParams} selected={selectedPartnerRor ? [selectedPartnerRor] : []} onchange={(ids) => onPartnerFilter(ids[0] ?? null)} />
-	{/if}
-	{#if facetKeys.has('license')}
-		<FacetDropdown label={filterLabels.licenses} options={facets.options.licenses} bind:selected={selectedLicenses} onchange={onFilterChange} tooltip="Licence de la version éditeur" />
-	{/if}
-	{#if facetKeys.has('apc')}
-		<FacetDropdown label={filterLabels.apc} options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />
-	{/if}
+<!-- Ligne 2 : filtres, ceux de la liste des publications. -->
+<div class="stats-filters">
+	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={chartParams} onchange={onFilterChange}>
+		{#snippet leading()}
+			<input type="search" class="stats-search" placeholder="Rechercher par titre ou sujet" aria-label="Rechercher par titre ou sujet" bind:value={search} oninput={onSearchInput} />
+		{/snippet}
+	</PublicationFilterBar>
 </div>
 
 {#if isCollab}
@@ -653,8 +575,13 @@
 	}
 	.pubs-link { margin-left: auto; }
 
-	.facets-row { margin-bottom: 16px; }
-	.facets-label { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
+	.stats-filters {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-bottom: 16px;
+	}
+	.stats-search { min-width: 220px; }
 	.groupby {
 		font-size: 0.9rem;
 		color: var(--muted);

@@ -144,13 +144,32 @@ export function presenceSummary(filter: PresenceFilter, states: PresenceStates):
 		.join(', ');
 }
 
-/** Valeur d'un filtre dans la requête, ou `null` quand il ne filtre rien. */
+/** Valeur d'un filtre dans la requête, ou `null` quand il ne filtre rien ou n'est pas proposé dans la page. */
 function paramValue(filter: ListFilter, values: FilterValues): string | null {
+	if (!(filter.enabled?.() ?? true)) return null;
 	const fixed = filter.fixed?.() ?? null;
 	if (fixed !== null) return fixed;
 	if (filter.control === 'checkbox') return (values.checkbox[filter.key] ?? []).join(',') || null;
 	if (filter.control === 'entity') return (values.entity[filter.key] ?? []).join(',') || null;
 	return encodePresence(values.presence[filter.key] ?? {}) || null;
+}
+
+/**
+ * Filtres de la page, écrits pour l'URL d'une autre page qui partage le registre.
+ *
+ * La valeur fixée par la page devient une sélection ordinaire. Une sélection dont l'URL a une forme propre est toujours écrite : la page cible n'applique donc pas sa sélection par défaut.
+ */
+export function transferParams(filters: ListFilter[], values: FilterValues): URLSearchParams {
+	const params = new URLSearchParams();
+	for (const f of filters) {
+		if (f.control === 'checkbox' && f.url && (f.fixed?.() ?? null) === null) {
+			params.set(f.param, f.url.encode(values.checkbox[f.key] ?? []));
+			continue;
+		}
+		const value = paramValue(f, values);
+		if (value !== null) params.set(f.param, value);
+	}
+	return params;
 }
 
 export function appendFilterParams(

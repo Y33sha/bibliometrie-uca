@@ -10,44 +10,23 @@
 	import { asset, resolve } from '$app/paths';
 	import { withBase } from '#lib/paths.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
-	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
-	import EntityFilter from '#lib/components/EntityFilter.svelte';
-	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
-	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
-	import { SOURCE_ITEMS } from '#lib/filterItems.js';
+	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import {
 		activeColumns,
 		appendFilterParams,
-		clearValue,
-		facetDefs,
-		filterSections,
 		initialValues,
-		isActive,
-		isAvailable,
-		isShown,
 		restoreValues,
+		transferParams,
 		urlFilterDefs,
 		urlState,
-		type CheckboxFilter,
-		type EntityChoiceFilter,
-		type ListFilter,
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { licenseLabels } from '#lib/licenses.js';
-	import {
-		columnLabels,
-		filterLabels,
-		oaLabelsMap,
-		oaStatusLabel,
-		docTypePlural,
-		docTypeFamilies,
-		publicationsDocTypes,
-		docTypeFilterToken,
-		docTypeFilterFromToken,
-	} from '#lib/labels.js';
+	import { columnLabels, oaStatusLabel, publicationsDocTypes } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { useFacets } from '#lib/composables/useFacets.svelte.js';
+	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
+	import { publicationFilters } from '#lib/publicationFilters.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
@@ -100,7 +79,6 @@
 	// La liste générale présélectionne la famille « Publications » tant que l'URL ne fixe pas les types.
 	// svelte-ignore state_referenced_locally
 	const restrictToPublications = context.kind === 'all';
-	const fixedId = (kind: Parameters<typeof contextEntityId>[1]) => () => contextEntityId(context, kind);
 
 	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
 	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
@@ -146,217 +124,16 @@
 	let search = $state('');
 	let currentSort = $state('year_desc');
 
-	// Ordre du tableau = ordre d'affichage. Un filtre sans `group` figure dans la barre principale.
-	const FILTERS: ListFilter[] = [
-		{
-			key: 'docTypes',
-			control: 'checkbox',
-			label: filterLabels.types,
-			param: 'doc_type',
-			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
-			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
-			showColumns: ['type'],
-			url: {
-				encode: docTypeFilterToken,
-				decode: docTypeFilterFromToken,
-				defaultValue: publicationsDocTypes.join(','),
-			},
-		},
-		{
-			key: 'years',
-			control: 'checkbox',
-			label: filterLabels.years,
-			param: 'year',
-			facet: { type: 'simple', apiKey: 'years' },
-		},
-		{
-			key: 'labs',
-			control: 'checkbox',
-			label: filterLabels.labs,
-			param: 'lab_id',
-			facet: { type: 'labeled', apiKey: 'labs' },
-			searchable: true,
-			fixed: fixedId('lab'),
-			// « Aucun labo » ne se combine pas avec un laboratoire.
-			normalize: (selected) =>
-				selected.includes('none') && selected.length > 1
-					? selected.filter((v) => v !== 'none')
-					: selected,
-		},
-		{
-			key: 'access',
-			control: 'checkbox',
-			label: filterLabels.access,
-			param: 'access',
-			facet: { type: 'labeled', apiKey: 'access' },
-		},
-		{
-			key: 'halStatus',
-			control: 'checkbox',
-			label: 'Statuts HAL',
-			param: 'hal_status',
-			facet: { type: 'labeled', apiKey: 'hal_status' },
-			enabled: () => isLab,
-			showColumns: ['hal_status'],
-		},
-		{
-			key: 'serial',
-			control: 'entity',
-			label: filterLabels.serial,
-			param: 'serial_id',
-			entity: 'serial',
-			group: 'Revue et éditeur',
-			fixed: fixedId('serial'),
-			showColumns: ['serial'],
-		},
-		{
-			key: 'publisher',
-			control: 'entity',
-			label: filterLabels.publisher,
-			param: 'publisher_id',
-			entity: 'publisher',
-			group: 'Revue et éditeur',
-			fixed: fixedId('publisher'),
-			showColumns: ['serial'],
-		},
-		{
-			key: 'apc',
-			control: 'checkbox',
-			label: filterLabels.apc,
-			param: 'has_apc',
-			facet: { type: 'labeled', apiKey: 'apc' },
-			group: 'Revue et éditeur',
-			tooltip: "Pas d'info après 2024\nSans APC = ou APC non documentés",
-			showColumns: ['apc'],
-		},
-		{
-			key: 'oa',
-			control: 'checkbox',
-			label: filterLabels.oaStatuses,
-			param: 'oa_status',
-			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
-			group: 'Revue et éditeur',
-			showColumns: ['oa_status'],
-		},
-		{
-			key: 'license',
-			control: 'checkbox',
-			label: filterLabels.licenses,
-			param: 'license',
-			facet: { type: 'labeled', apiKey: 'licenses' },
-			group: 'Revue et éditeur',
-			tooltip: 'Licence de la version éditeur',
-			showColumns: ['license'],
-		},
-		{
-			key: 'author',
-			control: 'entity',
-			label: filterLabels.author,
-			param: 'author_id',
-			entity: 'person',
-			group: 'Auteurs',
-		},
-		{
-			key: 'corresponding',
-			control: 'checkbox',
-			label: 'Auteur correspondant',
-			param: 'is_corresponding',
-			facet: { type: 'label_map', apiKey: 'corresponding', labels: { yes: 'Oui', no: 'Non' } },
-			group: 'Auteurs',
-			enabled: () => isPerson,
-			hideWhenEmpty: true,
-			showColumns: ['corr'],
-		},
-		{
-			key: 'perimeter',
-			control: 'checkbox',
-			get label() {
-				return institution.name;
-			},
-			param: 'in_perimeter',
-			facet: { type: 'labeled', apiKey: 'in_perimeter' },
-			group: 'Auteurs',
-			enabled: () => isPerson,
-			hideWhenEmpty: true,
-		},
-		{
-			key: 'partner',
-			control: 'entity',
-			label: filterLabels.partner,
-			param: 'partner_ror',
-			entity: 'partner',
-			group: 'Auteurs',
-		},
-		{
-			key: 'countries',
-			control: 'checkbox',
-			label: filterLabels.countries,
-			param: 'country',
-			facet: {
-				type: 'labeled',
-				apiKey: 'countries',
-				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }),
-			},
-			group: 'Auteurs',
-			searchable: true,
-		},
-		{
-			key: 'languages',
-			control: 'checkbox',
-			label: 'Langues',
-			param: 'language',
-			facet: { type: 'labeled', apiKey: 'languages' },
-			group: 'Détails',
-			searchable: true,
-		},
-		{
-			key: 'subjects',
-			control: 'entity',
-			label: 'Sujets',
-			param: 'subject_id',
-			entity: 'subject',
-			multiple: true,
-			group: 'Détails',
-			fixed: fixedId('subject'),
-		},
-		{
-			key: 'sources',
-			control: 'presence',
-			label: filterLabels.sources,
-			param: 'source_filter',
-			group: 'Détails',
-			items: SOURCE_ITEMS,
-			showColumns: ['sources'],
-		},
-	];
-	const sections = filterSections(FILTERS);
-
+	// svelte-ignore state_referenced_locally
+	const FILTERS = publicationFilters(context);
 	let values = $state(initialValues(FILTERS));
-	let showMoreFilters = $state(false);
-	const moreFiltersActive = $derived(
-		sections.groups.flatMap((g) => g.filters).filter((f) => isAvailable(f) && isActive(f, values)).length,
-	);
 
-	// Lien vers le tableau de bord, pendant inverse du bouton « Voir les publications ». Transmet les filtres que le tableau de bord sait représenter (les facettes propres à la liste — accès, pays, sources, statut HAL, correspondance, périmètre — n'y ont pas d'équivalent). Masqué quand le contexte est hors de sa portée (personne, sujet, monographie).
-	const showStatsLink = $derived(!['person', 'subject', 'monograph'].includes(context.kind));
+	// Lien vers les statistiques, pendant inverse du bouton « Voir les publications » : il transmet les filtres et la recherche. Masqué quand le contexte est une personne ou une monographie, que la page Statistiques ne représente pas.
+	const showStatsLink = $derived(!['person', 'monograph'].includes(context.kind));
 	const statsUrl = $derived.by(() => {
-		const p = new URLSearchParams();
-		const { checkbox, entity } = values;
-		if (checkbox.years.length) p.set('year', checkbox.years.join(','));
-		p.set('doc_type', docTypeFilterToken(checkbox.docTypes));
-		if (checkbox.oa.length) p.set('oa_status', checkbox.oa.join(','));
-		if (checkbox.license.length) p.set('license', checkbox.license.join(','));
-		if (checkbox.apc.length) p.set('has_apc', checkbox.apc.join(','));
-		// Laboratoire : fixé par la route ou choisi en facette (« aucun labo » n'a pas de sens côté stats).
-		const labId =
-			contextEntityId(context, 'lab') ?? checkbox.labs.filter((v) => v !== 'none').join(',');
-		if (labId) p.set('lab_id', labId);
-		// Éditeur / revue : fixés par la route ou choisis en facette.
-		const publisherId = contextEntityId(context, 'publisher') ?? entity.publisher.join(',');
-		if (publisherId) p.set('publisher_id', publisherId);
-		const serialId = contextEntityId(context, 'serial') ?? entity.serial.join(',');
-		if (serialId) p.set('serial_id', serialId);
-		if (entity.partner.length) p.set('partner_ror', entity.partner.join(','));
+		const p = transferParams(FILTERS, values);
+		const q = search.trim();
+		if (q) p.set('search', q);
 		return resolve('stats') + '?' + paramsToQuery(p);
 	});
 
@@ -393,8 +170,8 @@
 		},
 	});
 
-	const facets = useFacets({
-		endpoint: '/api/publications/facets',
+	const facets = usePublicationFacets({
+		filters: FILTERS,
 		apiKey: () => `${apiKey}-facets`,
 		// Inclut le terme de recherche pour que les comptes de facettes suivent le champ de recherche (comme la liste), pas seulement les autres filtres.
 		buildParams() {
@@ -402,14 +179,6 @@
 			const q = search.trim();
 			if (q) params.set('search', q);
 			return params;
-		},
-		sourceCountsKey: 'source_counts',
-		facets: facetDefs(FILTERS),
-		afterLoad(data, options) {
-			options.labs = [
-				{ value: 'none', text: '— Aucun labo —', count: (data.no_lab_count as number) ?? 0 },
-				...options.labs,
-			];
 		},
 	});
 
@@ -440,28 +209,6 @@
 		listing.load();
 		facets.load();
 	}
-
-	function onCheckboxChange(filter: CheckboxFilter, selected: string[]) {
-		values.checkbox[filter.key] = filter.normalize ? filter.normalize(selected) : selected;
-		onFilterChange();
-	}
-
-	function onEntityChange(filter: EntityChoiceFilter, ids: string[]) {
-		values.entity[filter.key] = ids;
-		onFilterChange();
-	}
-
-	function clearFilter(filter: ListFilter) {
-		clearValue(filter, values);
-		onFilterChange();
-	}
-
-	function clearAllFilters() {
-		for (const f of FILTERS) clearValue(f, values);
-		onFilterChange();
-	}
-
-	const optionCount = (key: string): number => facets.options[key]?.length ?? 0;
 
 	const onSearchInput = url.debouncedSearch(() => {
 		listing.page = 1;
@@ -524,40 +271,8 @@
 	{#snippet actions()}
 		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
 	{/snippet}
-	{#snippet filters()}
-		{#each sections.primary as f (f.key)}
-			{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
-		{/each}
-		<button type="button" class="more-filters-btn" class:open={showMoreFilters} aria-expanded={showMoreFilters} onclick={() => (showMoreFilters = !showMoreFilters)}>
-			{showMoreFilters ? 'Cacher les filtres' : 'Plus de filtres'}
-			{#if moreFiltersActive > 0}<span class="facet-badge">{moreFiltersActive}</span>{/if}
-			<span class="chevron" class:up={showMoreFilters} aria-hidden="true"></span>
-		</button>
-	{/snippet}
-	{#if showMoreFilters}
-		<div class="more-filters">
-			{#each sections.groups as g (g.label)}
-				{@const shown = g.filters.filter((f) => isShown(f, optionCount))}
-				{#if shown.length}
-					<div class="filter-group" role="group" aria-label={g.label} title={g.label}>
-						{#each shown as f (f.key)}{@render filterControl(f)}{/each}
-					</div>
-				{/if}
-			{/each}
-		</div>
-	{/if}
-	<ActiveFilterBar filters={FILTERS} {values} options={facets.options} onclear={clearFilter} onclearall={clearAllFilters} />
+	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={buildFilterParams} onchange={onFilterChange} />
 </ListToolbar>
-
-{#snippet filterControl(f: ListFilter)}
-	{#if f.control === 'checkbox'}
-		<FacetDropdown label={f.label} options={facets.options[f.key] ?? []} searchable={f.searchable} groups={f.groups} tooltip={f.tooltip} bind:selected={values.checkbox[f.key]} onchange={(selected) => onCheckboxChange(f, selected)} />
-	{:else if f.control === 'entity'}
-		<EntityFilter label={f.label} endpoint="/api/publications/facets" kind={f.entity} multiple={f.multiple} buildParams={buildFilterParams} selected={values.entity[f.key]} onchange={(ids) => onEntityChange(f, ids)} />
-	{:else}
-		<PresenceFilterToggle label={f.label} items={f.items} bind:states={values.presence[f.key]} counts={facets.sourceCounts} onchange={onFilterChange} />
-	{/if}
-{/snippet}
 
 <div class="table-scroll">
 <table class="data-table publication-table">
@@ -713,36 +428,6 @@
 <style>
 	.license-cell {
 		font-size: 0.8rem;
-	}
-	.more-filters-btn {
-		display: inline-flex;
-		align-items: center;
-		gap: 4px;
-		height: 34px;
-		padding: 0 10px;
-		border: none;
-		border-radius: var(--radius);
-		background: none;
-		font: inherit;
-		font-size: 0.9rem;
-		color: var(--text-secondary);
-		white-space: nowrap;
-		cursor: pointer;
-	}
-	.more-filters-btn:hover,
-	.more-filters-btn.open { background: var(--hover); }
-	/* Facettes optionnelles sur une ligne, rubriques séparées par un filet vertical. */
-	.more-filters {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 6px 0;
-	}
-	.filter-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-	.filter-group + .filter-group {
-		margin-left: 10px;
-		padding-left: 10px;
-		border-left: 1px solid var(--border);
 	}
 	.publication-table { min-width: 760px; }
 	.publication-table tr.active-row td { background: var(--accent-light); }

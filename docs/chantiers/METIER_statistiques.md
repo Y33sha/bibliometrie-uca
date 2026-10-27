@@ -38,8 +38,8 @@ Cette distinction est pertinente pour le calcul, mais obscure pour l'utilisateur
 ### Interface
 
 - [x] Contexte de la liste en union discriminée (sujet, laboratoire, personne, revue, éditeur, monographie). Il détermine les filtres liés au contexte et le mode APC, à la place de `showHalStatusColumn`, `showCorrespondingColumn`, `showPerimeterFacet` et `apcMode`
-- [ ] Barre de filtres de la liste extraite en composant, réutilisée par la page Statistiques
-- [ ] Sérialisation unique des filtres dans l'URL ; « Statistiques » et « Voir les publications » transmettent tous les filtres
+- [x] Barre de filtres de la liste extraite en composant, réutilisée par la page Statistiques
+- [x] Sérialisation unique des filtres dans l'URL ; « Statistiques » et « Voir les publications » transmettent tous les filtres
 - [ ] Message d'avertissement quand un filtre n'est pas transmis
 - [x] Indicateurs imposant leur mesure ; « Montant des APC » ajouté aux indicateurs, réglage « Mesure » retiré
 

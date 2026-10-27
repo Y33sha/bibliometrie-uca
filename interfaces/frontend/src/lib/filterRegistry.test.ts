@@ -13,6 +13,7 @@ import {
 	presenceSummary,
 	restoreValues,
 	summarizeParts,
+	transferParams,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -126,6 +127,28 @@ describe('filterRegistry', () => {
 		appendFilterParams(FILTERS, values, params);
 		expect(params.get('lab_id')).toBe('7');
 		expect(isShown(labs, () => 1)).toBe(false);
+	});
+
+	it("n'écrit pas dans la requête un filtre que la page ne propose pas", () => {
+		perimeterEnabled = false;
+		const values = initialValues(FILTERS);
+		values.checkbox.perimeter = ['yes'];
+		const params = new URLSearchParams();
+		appendFilterParams(FILTERS, values, params);
+		expect(params.has('in_perimeter')).toBe(false);
+	});
+
+	it("transmet à une autre page la valeur fixée comme une sélection, et la forme d'URL explicite", () => {
+		fixedLab = '7';
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.presence.sources = { hal: 'yes' };
+		expect(Object.fromEntries(transferParams(FILTERS, values))).toEqual({
+			year: '2024',
+			doc_type: 'all',
+			lab_id: '7',
+			source_filter: 'hal_yes',
+		});
 	});
 
 	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {
