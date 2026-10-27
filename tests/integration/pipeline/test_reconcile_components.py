@@ -17,6 +17,7 @@ from pipeline.transformation.publications.reconciliation import (
     mark_for_reconciliation,
     mark_publication_siblings,
     reconcile,
+    reconcile_source_records,
     snapshot_queued_source_records,
 )
 from pipeline.transformation.publications.store import PublicationStore
@@ -385,6 +386,68 @@ class TestManualMerge:
 
         assert _source_record_state(conn, source_record_a)[0] == publication_a
         assert _source_record_state(conn, source_record_b)[0] == publication_b
+
+
+class TestReconcileSourceRecords:
+    def test_merges_the_neighborhood_of_the_listed_source_records(self, sa_sync_conn_owner):
+        """La liste suffit : les enregistrements sources rattachés aux mêmes publications et leurs voisins entrent dans la passe."""
+        conn = sa_sync_conn_owner
+        with_doi = _seed_publication(conn, doi="10.1/x")
+        without_doi = _seed_publication(conn)
+        crossref = _source_record(
+            conn, with_doi, source="crossref", source_id="c", doi="10.1/x", marked=False
+        )
+        hal = _source_record(
+            conn,
+            without_doi,
+            source="hal",
+            source_id="hal-04263452",
+            external_ids={"hal_id": ["hal-04263452"]},
+            marked=False,
+        )
+        sibling = _source_record(
+            conn,
+            without_doi,
+            source_id="W1",
+            external_ids={"hal_id": ["hal-04263452"]},
+            marked=False,
+        )
+        _manual_merge(conn, [crossref, hal])
+
+        applied = reconcile_source_records(conn, [hal])
+
+        assert {_source_record_state(conn, i)[0] for i in (crossref, hal, sibling)} == {with_doi}
+        assert not _publication_exists(conn, without_doi)
+        assert applied.survivors == {with_doi}
+        assert applied.changed == {with_doi}
+        assert with_doi in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
+
+    def test_leaves_the_queue_untouched(self, sa_sync_conn):
+        """Les marquages de la file restent en place, pour le prochain passage du pipeline."""
+        conn = sa_sync_conn
+        listed = _source_record(conn, _seed_publication(conn), source_id="a", marked=False)
+        queued_elsewhere = _source_record(conn, _seed_publication(conn), source_id="b")
+
+        reconcile_source_records(conn, [listed])
+
+        assert queued(conn, Queue.SOURCE_RECORD_KEYS) & {listed, queued_elsewhere} == {
+            queued_elsewhere
+        }
+
+    def test_refreshes_the_consolidated_metadata(self, sa_sync_conn):
+        """La publication conservée reprend ses métadonnées de ses sources."""
+        conn = sa_sync_conn
+        publication = _seed_publication(conn)
+        source_record = _source_record(
+            conn, publication, source_id="a", title="Titre de la source", marked=False
+        )
+
+        reconcile_source_records(conn, [source_record])
+
+        title = conn.execute(
+            text("SELECT title FROM publications WHERE id = :id"), {"id": publication}
+        ).scalar_one()
+        assert title == "Titre de la source"
 
 
 class TestMetadataBlock:
