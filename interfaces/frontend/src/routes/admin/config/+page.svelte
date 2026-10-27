@@ -135,10 +135,6 @@
     perimModal.structures = perimModal.structures.filter((s) => s.id !== sid);
   }
 
-  function yearsLabel(value: number): string {
-    return `Depuis ${value}`;
-  }
-
   /** Plafonds d'interrogation des API, dont le champ vidé retire la borne. */
   const CAPS = [
     { key: "fetch_missing_max_per_source", label: "Imports par DOI : max par source" },
@@ -274,7 +270,7 @@
           {#if editingKey === key}
             {@render inlineEdit(key)}
           {:else}
-            <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
+            <span class="config-value-inline">{item.value}</span>
             <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
           {/if}
         </div>
