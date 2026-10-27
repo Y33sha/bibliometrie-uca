@@ -231,10 +231,6 @@
     background: color-mix(in srgb, var(--accent-light) 60%, white);
     text-decoration: none;
   }
-  /* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
-  .tag-zenodo {
-    background: #0047a8;
-  }
   /* La pastille garde sa largeur, icône ou non : les libellés restent alignés. */
   .source-row :global(.source-tag) {
     flex-shrink: 0;

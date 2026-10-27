@@ -1,23 +1,22 @@
 """Query services pour les éditeurs (table `publishers`)."""
 
+from collections.abc import Iterator
+
 from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text
-from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
+from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES, PublisherType
 from infrastructure.read_models._common import FacetOption, YesNoCount
-from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
+from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.publishers.models import (
-    DocTypeCount,
     DoiPrefixInfo,
-    OaStatusCount,
     Publisher,
-    PublisherDashboardResponse,
     PublisherFilters,
     PublisherListItem,
     PublisherListResponse,
     PublishersFacetsResponse,
     PublisherSort,
-    SerialTypeCount,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
 
@@ -90,6 +89,11 @@ _PUBLISHER_COLUMNS = f"""
 """.strip()
 
 
+def _list_sql(where: str, sort: PublisherSort) -> str:
+    """Requête triée de la liste des éditeurs, sans pagination."""
+    return f"SELECT {_PUBLISHER_COLUMNS} FROM publishers p WHERE {where} ORDER BY {_SORT_MAP[sort]}"
+
+
 def _row_to_list_item(row: Row[tuple[object, ...]]) -> PublisherListItem:
     return PublisherListItem(**_row_to_publisher(row).model_dump())
 
@@ -124,16 +128,9 @@ class PublisherQueries:
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP[sort]
         offset = (page - 1) * per_page
         rows = self._conn.execute(
-            text(f"""
-                SELECT {_PUBLISHER_COLUMNS}
-                FROM publishers p
-                WHERE {where}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
+            text(f"{_list_sql(where, sort)} LIMIT :pg_limit OFFSET :pg_offset"),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
         return PublisherListResponse(
@@ -141,6 +138,35 @@ class PublisherQueries:
             page=page,
             per_page=per_page,
             publishers=[_row_to_list_item(r) for r in rows],
+        )
+
+    def export_publishers_csv(
+        self, *, filters: PublisherFilters, sort: PublisherSort
+    ) -> Iterator[str]:
+        """Export CSV de la liste des éditeurs, aux filtres et au tri de la liste.
+
+        La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
+        """
+        where, binds = _build_publisher_where(filters)
+        rows, truncated = fetch_export_rows(
+            self._conn, _list_sql(where, sort), binds, name="éditeurs"
+        )
+        return csv_chunks(
+            ["Nom", "Type", "Pays", "Préfixes DOI", "Publications en série", "Publications"],
+            (
+                [
+                    r.name,
+                    ""
+                    if r.publisher_type == PublisherType.UNKNOWN
+                    else PUBLISHER_TYPE_LABELS_FR.get(r.publisher_type, r.publisher_type),
+                    (r.country or "").upper(),
+                    " ".join(p["prefix"] for p in r.doi_prefixes),
+                    r.serial_count,
+                    r.publication_count,
+                ]
+                for r in rows
+            ),
+            truncated=truncated,
         )
 
     def publishers_facets(self, *, filters: PublisherFilters) -> PublishersFacetsResponse:
@@ -210,57 +236,6 @@ class PublisherQueries:
         if row is None:
             return None
         return _row_to_publisher(row)
-
-    def get_publisher_dashboard(self, publisher_id: int) -> PublisherDashboardResponse | None:
-        exists = self._conn.execute(
-            text("SELECT 1 FROM publishers WHERE id = :id"),
-            {"id": publisher_id},
-        ).one_or_none()
-        if exists is None:
-            return None
-
-        serial_type_rows = self._conn.execute(
-            text("""
-                SELECT serial_type, COUNT(*) AS n
-                FROM serials
-                WHERE publisher_id = :id
-                GROUP BY serial_type
-                ORDER BY n DESC, serial_type NULLS LAST
-            """),
-            {"id": publisher_id},
-        ).all()
-        doc_type_rows = self._conn.execute(
-            text(f"""
-                SELECT p.doc_type, COUNT(*) AS n
-                FROM publications p
-                WHERE p.publisher_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.doc_type
-                ORDER BY n DESC, p.doc_type NULLS LAST
-            """),
-            {"id": publisher_id},
-        ).all()
-        oa_rows = self._conn.execute(
-            text(f"""
-                SELECT p.oa_status, COUNT(*) AS n
-                FROM publications p
-                WHERE p.publisher_id = :id
-                  AND {publication_in_perimeter("p")}
-                GROUP BY p.oa_status
-                ORDER BY n DESC, p.oa_status NULLS LAST
-            """),
-            {"id": publisher_id},
-        ).all()
-        total = sum(r.n for r in doc_type_rows)
-
-        return PublisherDashboardResponse(
-            total_publications=total,
-            serial_types=[
-                SerialTypeCount(serial_type=r.serial_type, count=r.n) for r in serial_type_rows
-            ],
-            doc_types=[DocTypeCount(doc_type=r.doc_type, count=r.n) for r in doc_type_rows],
-            oa_statuses=[OaStatusCount(oa_status=r.oa_status, count=r.n) for r in oa_rows],
-        )
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Sujets des publications de l'éditeur, les plus fréquents d'abord.

@@ -2,24 +2,20 @@
 
 from sqlalchemy import Connection, text
 
-from domain.dates import today
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models._common import (
-    DashboardOa,
-    PublicationYearCount,
     StructureRef,
     page_count,
 )
-from infrastructure.read_models.filters import OA_DASHBOARD_COLS_SQL, entity_subjects_sql
+from infrastructure.read_models.filters import entity_subjects_sql
 from infrastructure.read_models.persons.identifiers import person_identifiers
 from infrastructure.read_models.persons.models import (
     PersonAddressesResponse,
     PersonAddressOut,
     PersonAddressStruct,
-    PersonDashboardResponse,
     PersonProfileCore,
     PersonProfileResponse,
     PersonThesesResponse,
@@ -242,48 +238,3 @@ class PersonDetailQueries:
             {"pid": person_id, "lim": limit},
         ).all()
         return [SubjectFrequency(id=r.id, label=r.label, count=r.n) for r in rows]
-
-    def person_dashboard(self, person_id: int) -> PersonDashboardResponse:
-        """Dashboard personne : publis/an + répartition Open Access."""
-        current_year = today().year
-
-        publications_year_rows = self._conn.execute(
-            text(f"""
-                SELECT p.publication_year, COUNT(DISTINCT p.id) AS n
-                FROM publications p
-                JOIN contributions a ON a.publication_id = p.id
-                WHERE a.person_id = :pid
-                  AND {has_author_role("a")}
-                  AND p.publication_year IS NOT NULL
-                  AND p.publication_year >= :min_year
-                GROUP BY p.publication_year
-                ORDER BY p.publication_year
-            """),
-            {"pid": person_id, "min_year": current_year - 6},
-        ).all()
-        publications_by_year = [
-            PublicationYearCount(year=r.publication_year, count=r.n) for r in publications_year_rows
-        ]
-
-        oa = self._conn.execute(
-            text(f"""
-                SELECT
-                    {OA_DASHBOARD_COLS_SQL}
-                FROM publications p
-                JOIN contributions a ON a.publication_id = p.id
-                WHERE a.person_id = :pid
-                  AND {has_author_role("a")}
-            """),
-            {"pid": person_id},
-        ).one()
-
-        return PersonDashboardResponse(
-            publications_by_year=publications_by_year,
-            oa=DashboardOa(
-                open_access=oa.open_access,
-                embargoed=oa.embargoed,
-                closed=oa.closed,
-                unknown=oa.unknown,
-                total=oa.total,
-            ),
-        )

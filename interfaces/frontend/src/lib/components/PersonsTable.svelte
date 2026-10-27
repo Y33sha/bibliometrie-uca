@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
 	import RhCheck from '#lib/components/RhCheck.svelte';
@@ -57,7 +58,7 @@
 	}
 </script>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table persons-table">
 	<thead>
 		<tr>
@@ -120,7 +121,7 @@
 		{/if}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <style>
 	.persons-table { min-width: 620px; }

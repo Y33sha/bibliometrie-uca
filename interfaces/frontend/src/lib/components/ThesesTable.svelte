@@ -1,10 +1,13 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
+	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels } from '#lib/labels.js';
-	import { asset, resolve } from '$app/paths';
+	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
@@ -47,6 +50,8 @@
 		sort,
 		onToggleSort,
 		showLabsColumn = false,
+		onopen,
+		activeId = null,
 	}: {
 		items: ThesisRow[];
 		loading?: boolean;
@@ -55,6 +60,10 @@
 		sort: PublicationSort;
 		onToggleSort: (column: ThesisSortColumn) => void;
 		showLabsColumn?: boolean;
+		/** Ouvre le volet de la thèse. Fourni, il ajoute en tête de ligne une icône qui l'appelle. */
+		onopen?: (publicationId: number) => void;
+		/** Thèse dont le volet est ouvert, dont la ligne est mise en évidence. */
+		activeId?: number | null;
 	} = $props();
 
 	const MONTHS = [
@@ -89,10 +98,11 @@
 	const titleSort = $derived(sortDirection(sort, 'title'));
 </script>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table theses-table">
 	<thead>
 		<tr>
+			{#if onopen}<th class="panel-col"></th>{/if}
 			<th
 				class="col-date sortable"
 				class:active={inscrSort !== null}
@@ -116,8 +126,7 @@
 			{/if}
 			{#if col('sources')}<th class="col-sources">{columnLabels.sources}</th>{/if}
 			<th class="col-access col-menu-th">
-				{columnLabels.access}
-				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
+				<ColumnMenu label={columnLabels.access} columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}
 					onClose={() => cv.showMenu = false}
@@ -127,12 +136,17 @@
 	</thead>
 	<tbody>
 		{#if items.length === 0}
-			<TableStatusRow {loading} {error} colspan={cv.visibleColumns.length} emptyText="Aucune thèse" />
+			<TableStatusRow {loading} {error} colspan={cv.visibleColumns.length + (onopen ? 1 : 0)} emptyText="Aucune thèse" />
 		{/if}
 		{#each items as t (t.id)}
 			{@const insc = formatDate(t.date_inscription)}
 			{@const sout = formatDate(t.date_soutenance)}
-			<tr>
+			<tr class:active-row={t.id === activeId}>
+				{#if onopen}
+					<td class="panel-col row-actions">
+						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopen(t.id)} />
+					</td>
+				{/if}
 				<td class="col-date">
 					{#if insc}<span class="date-month">{insc.month}</span> {insc.year}{/if}
 				</td>
@@ -167,67 +181,18 @@
 					</td>
 				{/if}
 				{#if col('sources')}<td class="links-cell">
-					{#if t.hal_id}
-						<a
-							href={t.record_urls.hal}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-hal"
-							title="HAL: {t.hal_id}"
-						>
-							<img src={asset('icons/hal.ico')} alt="HAL" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
-					{#if t.openalex_id}
-						<a
-							href={t.record_urls.openalex}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-openalex"
-							title="OpenAlex: {t.openalex_id}"
-						>
-							<img src={asset('icons/openalex.png')} alt="OA" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
-					{#if t.scanr_id}
-						<a
-							href={t.record_urls.scanr}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-scanr"
-							title="ScanR: {t.scanr_id}"
-						>
-							<img src={asset('scanr-icon.svg')} alt="ScanR" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
-					{#if t.theses_id}
-						<a
-							href={t.record_urls.theses}
-							target="_blank"
-							rel="noopener"
-							class="source-tag source-theses"
-							title="theses.fr: {t.theses_id}"
-						>
-							<img src={asset('icons/theses.ico')} alt="theses.fr" />
-						</a>
-					{:else}
-						<span class="source-tag source-placeholder"></span>
-					{/if}
+					<SourceLinks ids={[['hal', t.hal_id], ['openalex', t.openalex_id], ['scanr', t.scanr_id], ['theses', t.theses_id]]} urls={t.record_urls} />
 				</td>{/if}
 				<td class="col-access"><AccessButton accessUrl={t.access_url} oaStatus={t.oa_status} compact /></td>
 			</tr>
 		{/each}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <style>
+	.panel-col { width: 28px; padding-right: 0; }
+	.theses-table tr.active-row td { background: var(--accent-light); }
 	.theses-table {
 		min-width: 720px;
 		font-size: 0.9rem;
@@ -273,10 +238,6 @@
 		width: 120px;
 		white-space: nowrap;
 	}
-	.col-menu-th {
-		position: relative;
-	}
-
 	.status-badge {
 		font-size: 0.75rem;
 		padding: 2px 6px;

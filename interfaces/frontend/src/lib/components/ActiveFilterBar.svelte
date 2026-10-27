@@ -3,6 +3,7 @@
 	import { entityLabel } from '#lib/entityLabels.js';
 	import {
 		checkboxSummary,
+		clearValue,
 		isActive,
 		isAvailable,
 		presenceSummary,
@@ -17,11 +18,21 @@
 		values: FilterValues;
 		/** Options des cases à cocher, par clé de filtre, pour afficher les libellés des valeurs. */
 		options: Record<string, FacetOption[]>;
-		onclear: (filter: ListFilter) => void;
-		onclearall: () => void;
+		/** Appelé après le retrait d'un filtre ou de tous. */
+		onchange: () => void;
 	}
 
-	let { filters, values, options, onclear, onclearall }: Props = $props();
+	let { filters, values = $bindable(), options, onchange }: Props = $props();
+
+	function onclear(filter: ListFilter) {
+		clearValue(filter, values);
+		onchange();
+	}
+
+	function onclearall() {
+		for (const f of filters) clearValue(f, values);
+		onchange();
+	}
 
 	const active = $derived(filters.filter((f) => isAvailable(f) && isActive(f, values)));
 
@@ -71,6 +82,7 @@
 		align-items: center;
 		gap: 6px;
 		flex-wrap: wrap;
+		padding: 6px 0;
 	}
 	.active-filters-label {
 		font-size: 0.9rem;

@@ -8,7 +8,7 @@ from pipeline.transformation.persons.identifier_arbitration import (
     fetch_identifier_votes,
     write_misplaced_neutralizations,
 )
-from tests.integration.helpers.alignment import align_unaligned
+from tests.integration.helpers.alignment import align_unaligned, recompose_contribution_attributes
 from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.queues import clear, queued
@@ -44,6 +44,7 @@ def _carte(conn, source_contribution_id):
 
 def _orcid_projete(conn):
     align_unaligned(conn)
+    recompose_contribution_attributes(conn)
     [member] = [
         m
         for by_contribution in load_candidate_contributions(conn).values()

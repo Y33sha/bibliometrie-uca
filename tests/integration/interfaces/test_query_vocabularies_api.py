@@ -42,7 +42,7 @@ class TestValeursAdmises:
             ("/api/publications", {"has_apc": "yes,no"}),
             ("/api/publications", {"license": "cc-by,none"}),
             ("/api/publications/export.csv", {"columns": "title,year,serial"}),
-            ("/api/stats/facets", {"has_apc": "no"}),
+            ("/api/stats/pivot", {"has_apc": "no"}),
             ("/api/structures", {"structure_type": "labo,equipe"}),
             ("/api/structures/1/partners", {"type": "education,funder"}),
         ],
@@ -54,7 +54,7 @@ class TestValeursAdmises:
 class TestFiltreApc:
     """Le filtre APC prend `yes` / `no`, avec ou sans sélection de laboratoires."""
 
-    @pytest.mark.parametrize("chemin", ["/api/publications", "/api/stats/facets"])
+    @pytest.mark.parametrize("chemin", ["/api/publications", "/api/stats/pivot"])
     def test_admis_avec_un_laboratoire(self, client, chemin):
         r = client.get(chemin, params={"has_apc": "yes", "lab_id": "1"})
         assert r.status_code == 200

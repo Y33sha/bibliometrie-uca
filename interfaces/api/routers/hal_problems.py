@@ -4,6 +4,7 @@ Alimente le tableau de bord qualité HAL : comptes d'auteur dupliqués, dépôts
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from infrastructure.read_models.hal_problems.models import (
     HalAffiliationConflictsResponse,
@@ -15,7 +16,9 @@ from infrastructure.read_models.hal_problems.models import (
     NoMissingCollections,
 )
 from infrastructure.read_models.hal_problems.queries import HalProblemsQueries
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import hal_problems_queries
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/hal-problems", tags=["hal-problems"])
 
@@ -85,3 +88,81 @@ def hal_affiliation_conflicts(
 ) -> HalAffiliationConflictsResponse:
     """Publications affiliées à l'établissement dans HAL mais pas dans une autre source."""
     return queries.hal_affiliation_conflicts(page=page, per_page=per_page)
+
+
+# ── Exports CSV ──────────────────────────────────────────────────
+
+
+@router.get("/duplicate-accounts/export.csv")
+def export_duplicate_accounts_csv(
+    queries: HalProblemsQueries = Depends(hal_problems_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV des comptes auteur HAL en double."""
+    return csv_response(
+        queries.export_duplicate_accounts_csv(),
+        filename="comptes-hal-en-double.csv",
+        slot=slot,
+    )
+
+
+@router.get("/duplicate-publications-doi/export.csv")
+def export_duplicate_publications_by_doi_csv(
+    queries: HalProblemsQueries = Depends(hal_problems_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV des dépôts HAL en double par DOI."""
+    return csv_response(
+        queries.export_duplicate_publications_by_doi_csv(),
+        filename="depots-hal-en-double-doi.csv",
+        slot=slot,
+    )
+
+
+@router.get("/duplicate-publications-meta/export.csv")
+def export_duplicate_publications_by_metadata_csv(
+    queries: HalProblemsQueries = Depends(hal_problems_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV des doublons possibles de dépôts HAL par métadonnées."""
+    return csv_response(
+        queries.export_duplicate_publications_by_metadata_csv(),
+        filename="depots-hal-en-double-metadonnees.csv",
+        slot=slot,
+    )
+
+
+@router.get("/missing-collections/export.csv")
+def export_missing_collections_csv(
+    lab_id: int = Query(...),
+    queries: HalProblemsQueries = Depends(hal_problems_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV des publications d'un laboratoire absentes de sa collection HAL.
+
+    Renvoie 404 et 422 dans les mêmes cas que la liste.
+    """
+    result = queries.export_missing_collections_csv(lab_id=lab_id)
+    if result is NoMissingCollections.UNKNOWN_LAB:
+        raise HTTPException(status_code=404, detail="Laboratoire introuvable")
+    if result is NoMissingCollections.NO_COLLECTION:
+        raise HTTPException(status_code=422, detail="Laboratoire sans collection HAL")
+    return csv_response(result, filename="publications-absentes-des-collections.csv", slot=slot)
+
+
+@router.get("/affiliation-conflicts/export.csv")
+def export_affiliation_conflicts_csv(
+    queries: HalProblemsQueries = Depends(hal_problems_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV des publications aux affiliations HAL divergentes."""
+    return csv_response(
+        queries.export_affiliation_conflicts_csv(),
+        filename="affiliations-hal-divergentes.csv",
+        slot=slot,
+    )

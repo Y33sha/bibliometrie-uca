@@ -26,41 +26,17 @@ from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import (
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
-    PUBLICATION_IS_IN_PERIMETER,
-    WhereClause,
-    access_clause,
-    apc_clause,
-    assemble_where,
-    author_clause,
-    corresponding_clause,
-    country_clause,
-    doc_type_clause,
-    excluded_doc_type_clause,
-    hal_status_clause,
     hal_status_expression,
-    in_perimeter_person_clause,
     institution_apc_payment_sql,
-    lab_clause,
-    language_clause,
-    license_clause,
-    monograph_id_clause,
-    no_lab_clause,
-    oa_clause,
     own_structure_ids,
-    partner_clause,
-    person_clause,
-    publisher_id_clause,
-    search_clause,
-    serial_id_clause,
-    source_clause,
-    subject_clause,
-    year_clause,
 )
-from infrastructure.read_models.perimeters.queries import (
-    get_persons_perimeter_name,
-    get_persons_structure_ids_list,
+from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
+from infrastructure.read_models.publications.filtering import (
+    FilterContext,
+    FilterDimension,
+    filter_context,
+    publication_filter_where,
 )
-from infrastructure.read_models.publications.list import lab_hal_collection
 from infrastructure.read_models.publications.models import (
     NO_LICENSE,
     PublicationFilters,
@@ -75,77 +51,15 @@ class _PublicationFacetsBuilder:
     """
 
     def __init__(
-        self, conn: Connection, filters: PublicationFilters, perimeter_structure_ids: list[int]
+        self, conn: Connection, filters: PublicationFilters, context: FilterContext
     ) -> None:
         self.conn = conn
         self.filters = filters
-        self.perimeter_structure_ids = perimeter_structure_ids
-        self.lab_hal_col: str | None = None
+        self.context = context
 
-    # ── Utilitaires internes ────────────────────────────────────
-
-    def _preload_lab_hal_col(self) -> None:
-        """Charge la hal_collection du labo (si un seul labo est sélectionné)."""
-        self.lab_hal_col = lab_hal_collection(self.conn, self.filters.lab_ids)
-
-    def _base_clauses(self) -> list[WhereClause | None]:
-        """Conditions de base : publications UCA ou par personne."""
-        f = self.filters
-        out: list[WhereClause | None] = []
-        if f.person_id:
-            out.append(person_clause(f.person_id))
-        else:
-            out.append(WhereClause(PUBLICATION_IS_IN_PERIMETER, {}))
-        out.append(excluded_doc_type_clause(f.excluded_types))
-        out.append(monograph_id_clause(f.monograph_id))
-        # Recherche titre/sujet : filtre global (jamais une dimension de facette), appliqué à tous les comptes pour qu'ils suivent le champ de recherche.
-        out.append(search_clause(f.search))
-        return out
-
-    def _clauses_skipping(self, skip: str) -> tuple[str, dict[str, object]]:  # noqa: C901
-        """Conditions de base + tous les filtres sauf `skip`."""
-        clauses: list[WhereClause | None] = list(self._base_clauses())
-        f = self.filters
-        if skip != "year":
-            clauses.append(year_clause(f.years))
-        if skip != "corresponding" and f.person_id:
-            clauses.append(corresponding_clause(f.person_id, f.is_corresponding))
-        if skip != "lab":
-            if f.lab_none and not f.lab_ids:
-                clauses.append(no_lab_clause())
-            elif f.lab_ids:
-                clauses.append(lab_clause(f.lab_ids))
-        if skip != "doc_type":
-            clauses.append(doc_type_clause(f.doc_types))
-        if skip != "access":
-            clauses.append(access_clause(f.access))
-        if skip != "oa_status":
-            clauses.append(oa_clause(f.oa_status))
-        if skip != "license":
-            clauses.append(license_clause(f.license))
-        if skip != "source":
-            clauses.append(source_clause(f.source_values))
-        if skip != "apc":
-            clauses.append(apc_clause(f.has_apc, self.perimeter_structure_ids))
-        if skip != "publisher":
-            clauses.append(publisher_id_clause(f.publisher_id))
-        if skip != "serial":
-            clauses.append(serial_id_clause(f.serial_id))
-        if skip != "country":
-            clauses.append(country_clause(f.country_values))
-        if skip != "language":
-            clauses.append(language_clause(f.language_codes))
-        if skip != "hal_status":
-            clauses.append(hal_status_clause(f.hal_status_values, self.lab_hal_col))
-        if skip != "in_perimeter":
-            clauses.append(in_perimeter_person_clause(f.in_perimeter, f.person_id))
-        if skip != "subject":
-            clauses.append(subject_clause(f.subject_ids))
-        if skip != "person":
-            clauses.append(author_clause(f.author_id))
-        if skip != "partner":
-            clauses.append(partner_clause(f.partner_rors))
-        return assemble_where(clauses)
+    def _clauses_skipping(self, skip: FilterDimension) -> tuple[str, dict[str, object]]:
+        """WHERE sous tous les filtres sauf celui de `skip`."""
+        return publication_filter_where(self.filters, self.context, skip)
 
     # ── Facettes ────────────────────────────────────────────────
 
@@ -333,7 +247,7 @@ class _PublicationFacetsBuilder:
                 FROM publications p
                 WHERE {where}
             """),
-            {**binds, "apc_facet_root_ids": self.perimeter_structure_ids},
+            {**binds, "apc_facet_root_ids": self.context.perimeter_structure_ids},
         ).one()
         return [
             FacetOption(
@@ -386,7 +300,7 @@ class _PublicationFacetsBuilder:
         if len(self.filters.lab_ids) != 1:
             return []
         where_sql, binds = self._clauses_skipping("hal_status")
-        status = hal_status_expression(self.lab_hal_col)
+        status = hal_status_expression(self.context.lab_hal_collection)
         rows = self.conn.execute(
             text(f"""
                 SELECT value, COUNT(*) AS n
@@ -439,18 +353,14 @@ class PublicationFacetQueries:
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
         """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
 
-        Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion ouverte par `_open_connection` (psycopg libère le GIL pendant la requête). Le `lab_hal_col` est préchargé une fois et partagé.
+        Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion ouverte par `_open_connection` (psycopg libère le GIL pendant la requête). Le contexte de filtrage est lu une fois et partagé.
         """
-        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
-        pre = _PublicationFacetsBuilder(self._conn, filters, perimeter_structure_ids)
-        pre._preload_lab_hal_col()
-        lab_hal_col = pre.lab_hal_col
+        context = filter_context(self._conn, filters)
 
         def run(method_name: str) -> Any:
             with self._open_connection() as facet_conn:
                 facet_conn.execute(text("SET LOCAL jit = off"))
-                builder = _PublicationFacetsBuilder(facet_conn, filters, perimeter_structure_ids)
-                builder.lab_hal_col = lab_hal_col
+                builder = _PublicationFacetsBuilder(facet_conn, filters, context)
                 return getattr(builder, method_name)()
 
         facet_methods = {
@@ -502,10 +412,8 @@ class PublicationFacetQueries:
         filters: PublicationFilters,
     ) -> EntityFacetResponse:
         """Facette éditeur, revue, auteur ou sujet contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
-        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
-        builder = _PublicationFacetsBuilder(self._conn, filters, perimeter_structure_ids)
-        builder._preload_lab_hal_col()
-        where_sql, binds = builder._clauses_skipping(kind)
+        context = filter_context(self._conn, filters)
+        where_sql, binds = publication_filter_where(filters, context, kind)
         return EntityFacetResponse(
             entities=entity_facet_rows(
                 self._conn,
@@ -514,6 +422,8 @@ class PublicationFacetQueries:
                 binds=binds,
                 search=search,
                 limit=_ENTITY_FACET_LIMIT,
-                own_structure_ids=own_structure_ids(filters.lab_ids, perimeter_structure_ids),
+                own_structure_ids=own_structure_ids(
+                    filters.lab_ids, context.perimeter_structure_ids
+                ),
             )
         )

@@ -25,12 +25,11 @@
 {/if}
 
 {#if dialogs.toasts.length}
-	<div class="toast-stack">
+	<div class="toast-stack" role="status">
 		{#each dialogs.toasts as t (t.id)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div class="toast toast-{t.type}" role="status" onclick={() => dismissToast(t.id)}>
+			<button type="button" class="toast toast-{t.type}" title="Fermer" onclick={() => dismissToast(t.id)}>
 				{t.message}
-			</div>
+			</button>
 		{/each}
 	</div>
 {/if}
@@ -54,7 +53,10 @@
 	}
 	.toast {
 		padding: 10px 14px;
+		border: none;
 		border-radius: var(--radius);
+		font-family: inherit;
+		text-align: left;
 		font-size: 0.9rem;
 		color: white;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
@@ -69,5 +71,9 @@
 	}
 	.toast-info {
 		background: var(--accent);
+	}
+	/* Orange assombri : le texte blanc y reste lisible (contraste d'environ 5:1). */
+	.toast-warning {
+		background: color-mix(in srgb, var(--attention) 85%, black);
 	}
 </style>

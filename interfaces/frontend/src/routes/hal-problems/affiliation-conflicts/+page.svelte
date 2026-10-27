@@ -1,7 +1,12 @@
 <script lang="ts">
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import TableScroll from '#lib/components/TableScroll.svelte';
+	import { institution } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
+	import { columnLabels } from '#lib/labels.js';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
@@ -36,60 +41,44 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Affiliations HAL divergentes")}</title>
-</svelte:head>
-
-<h1>Affiliations HAL divergentes</h1>
-
-<div class="info-box">
+<PageHeader title="Affiliations HAL divergentes">
 	Publications affiliées à {institution.name} dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature {institution.name} à la même position d'auteur.
-</div>
+</PageHeader>
 
-<div class="toolbar">
-	<ResultCount {list} one="publication" many="publications" />
-</div>
+<ListToolbar {list} one="publication" many="publications" exportUrl={withBase('/api/hal-problems/affiliation-conflicts/export.csv')} />
 
 <ListStatus {list} emptyText="Aucun conflit détecté">
-	<div class="publication-list">
-		{#each list.items as pub}
-			<div class="publication-card">
-				<div class="publication-meta-line">
-					{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-					{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
-					{#each pub.laboratories as lab}<span class="meta-badge lab-badge" title={lab.name}>{structureLabel(lab)}</span>{/each}
-					<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
-				</div>
-				<div class="hal-list">
-					{#if pub.hal_links.length}
-						{#each pub.hal_links as link (link.source_id)}
-							<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
-						{/each}
-					{/if}
-					{#if pub.doi}
-						<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
-					{/if}
-				</div>
-			</div>
-		{/each}
-	</div>
+	<TableScroll>
+		<table class="data-table">
+			<thead>
+				<tr>
+					<th>{columnLabels.type}</th>
+					<th>{columnLabels.year}</th>
+					<th>{columnLabels.doi}</th>
+					<th>{columnLabels.title}</th>
+					<th>{columnLabels.labs}</th>
+					<th>Dépôts HAL</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each list.items as pub (pub.id)}
+					<tr>
+						<td>{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}</td>
+						<td>{pub.publication_year ?? ''}</td>
+						<td>{#if pub.doi}<DoiLink doi={pub.doi} />{/if}</td>
+						<td><a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a></td>
+						<td>{#each pub.laboratories as lab (lab.name)}<span class="lab-tag" title={lab.name}>{structureLabel(lab)}</span>{/each}</td>
+						<td>
+							<div class="id-list">
+								{#each pub.hal_links as link (link.source_id)}
+									<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
+								{/each}
+							</div>
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</TableScroll>
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
-
-<style>
-	.publication-list { display: flex; flex-direction: column; gap: 8px; }
-	.publication-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 10px 14px;
-	}
-	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-	.meta-badge { flex-shrink: 0; }
-	.lab-badge { background: var(--success-light); color: var(--success); font-weight: 500; }
-	.hal-list {
-		display: flex; flex-wrap: wrap; gap: 6px;
-		align-items: center; margin-top: 6px; padding-left: 20px;
-	}
-	.doi-ref { font-size: 0.82rem; color: var(--muted); }
-</style>

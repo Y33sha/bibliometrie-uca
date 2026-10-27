@@ -108,54 +108,48 @@ export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
 export const publicationsDocTypes: string[] =
 	docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [];
 
-/**
- * Sérialisation du filtre de types dans l'URL. Une sélection vide signifie « tous les types » (aucun filtre) : on l'écrit avec le token `all` pour la distinguer de l'absence de filtre (qui, elle, déclenche le défaut « publications »). Même convention que le filtre `has_rh` de l'annuaire.
- */
-export const DOC_TYPE_FILTER_ALL = 'all';
-export function docTypeFilterToken(selected: string[]): string {
-	return selected.length ? selected.join(',') : DOC_TYPE_FILTER_ALL;
+/** Licences dans l'ordre d'affichage. Chacune a sa couleur dans la variable CSS `--license-<clé>` de `shared.css`. `none` désigne une publication sans licence connue. */
+export const licenseOrder = [
+	'public-domain',
+	'cc-by',
+	'licence-ouverte',
+	'open-source',
+	'cc-by-sa',
+	'cc-by-nd',
+	'cc-by-nc',
+	'cc-by-nc-sa',
+	'cc-by-nc-nd',
+	'publisher-open',
+	'other-oa',
+	'repository-distribution',
+	'other',
+	'all-rights-reserved',
+	'none',
+];
+
+/** Clés de groupement des types de document qui ont leur couleur, dans la variable CSS `--doctype-<clé>` de `shared.css`. */
+const DOC_TYPE_COLOR_KEYS = new Set([
+	'article',
+	'review',
+	'preprints',
+	'conference_paper',
+	'book',
+	'book_chapter',
+	'data_paper',
+	'theses',
+	'data',
+	'misc',
+]);
+
+/** Variable CSS de la couleur d'une clé de groupement des types de document (`doc_type_grouped`), sans le préfixe `--`. Une clé sans couleur prend celle de `misc`. */
+export function docTypeGroupColorVar(key: string): string {
+	return `doctype-${DOC_TYPE_COLOR_KEYS.has(key) ? key : 'misc'}`;
 }
-export function docTypeFilterFromToken(raw: string): string[] {
-	return raw === DOC_TYPE_FILTER_ALL ? [] : raw.split(',');
-}
 
-/** Couleur de chaque licence, dans l'ordre d'affichage : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). `none` désigne une publication sans licence connue. */
-export const licenseColors: Record<string, string> = {
-	'public-domain': '#2e669e',
-	'cc-by': '#2e9e4a',
-	'licence-ouverte': '#43ad5c',
-	'open-source': '#5bb873',
-	'cc-by-sa': '#7cc36b',
-	'cc-by-nd': '#a7d35c',
-	'cc-by-nc': '#c8d84d',
-	'cc-by-nc-sa': '#e1cf45',
-	'cc-by-nc-nd': '#efb93e',
-	'publisher-open': '#ee9f3a',
-	'other-oa': '#f3c98d',
-	'repository-distribution': '#9db4c4',
-	other: '#bdbdbd',
-	'all-rights-reserved': '#7a7a7a',
-	none: '#3c3c3c',
-};
-export const licenseOrder = Object.keys(licenseColors);
-
-export const docTypeGroupedColors: Record<string, string> = {
-	article: '#2f7ed8',
-	review: '#1f5c9e',
-	preprints: '#b3d9f5',
-	conference_paper: '#b18fcf',
-	book: '#ffa93b',
-	book_chapter: '#f4c430',
-	data_paper: '#66bb6a',
-	theses: '#c0392b',
-	data: '#43a047',
-	misc: '#cfd3d6'
-};
-
-/** Couleur d'un `doc_type` : celle de sa clé de groupement dans la page Statistiques. Les types de la famille « publications » gardent leur couleur propre, les autres prennent celle de leur famille. */
-export function docTypeColor(docType: string): string {
+/** Variable CSS de la couleur d'un `doc_type`, sans le préfixe `--` : celle de sa clé de groupement dans la page Statistiques. Les types de la famille « publications » gardent leur couleur propre, les autres prennent celle de leur famille. */
+export function docTypeColorVar(docType: string): string {
 	const family = docTypeFamilyOf[docType] ?? 'misc';
-	return docTypeGroupedColors[family === 'publications' ? docType : family] ?? docTypeGroupedColors.misc;
+	return docTypeGroupColorVar(family === 'publications' ? docType : family);
 }
 
 /** Libellés FR des types de relation entre publications, lus depuis la publication courante (sujet). Miroir de l'enum PG `relation_type` / `RelationType` du domain backend. */

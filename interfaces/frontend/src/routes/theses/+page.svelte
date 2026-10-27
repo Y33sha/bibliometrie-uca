@@ -1,10 +1,8 @@
 <script lang="ts">
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import ThesesListView from "#lib/components/ThesesListView.svelte";
 </script>
 
-<svelte:head><title>{pageTitle("Thèses")}</title></svelte:head>
-
-<h1 class="visually-hidden">Thèses</h1>
+<PageHeader title="Thèses" hidden />
 
 <ThesesListView apiKey="theses-list" basePath="/theses" />

@@ -1,63 +1,34 @@
 """Modèles de réponse : agrégats des tableaux de bord."""
 
-from dataclasses import dataclass, field
 from typing import Literal
 
 from pydantic import BaseModel
 
-from infrastructure.read_models._common import FacetOption
-
-
-@dataclass(frozen=True, slots=True)
-class StatsFilters:
-    """Filtres des tableaux de bord, partagés par les facettes, les collaborations et le pivot.
-
-    Les quatre lectures interrogent le même ensemble de publications : leurs décomptes ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Une liste vide vaut absence de filtre. `has_apc` prend des valeurs de `yes` / `no` combinées en OR, comme dans la liste des publications.
-    """
-
-    lab_ids: list[int] = field(default_factory=list)
-    years: list[int] = field(default_factory=list)
-    publisher_ids: list[int] = field(default_factory=list)
-    serial_ids: list[int] = field(default_factory=list)
-    partner_rors: list[str] = field(default_factory=list)
-    oa_status: list[str] = field(default_factory=list)
-    license: list[str] = field(default_factory=list)
-    has_apc: list[str] = field(default_factory=list)
-    doc_types: list[str] = field(default_factory=list)
-
-
-class StatsFacetsResponse(BaseModel):
-    years: list[FacetOption]
-    labs: list[FacetOption]
-    oa_statuses: list[FacetOption]
-    licenses: list[FacetOption]
-    apc: list[FacetOption]
-    doc_types: list[FacetOption]
-
 
 class PivotDimensionOut(BaseModel):
-    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction)."""
+    """Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `comparable` pilote le choix de la comparaison (abscisse)."""
 
     key: str
     label: str
     cardinality: Literal["low", "high"]
     ordinal: bool
-    groupable: bool
     comparable: bool
-    filterable: bool
 
 
-class PivotMeasureOut(BaseModel):
+class PivotIndicatorOut(BaseModel):
+    """Indicateur du sélecteur de l'interface. `unit` est l'unité de sa mesure, vide pour un nombre de publications. `breakdown` est la dimension empilée dans chaque barre."""
+
     key: str
     label: str
     unit: str
+    breakdown: str
 
 
 class PivotSchemaResponse(BaseModel):
     """Vocabulaire du pivot exposé à l'interface (sans liaison SQL)."""
 
     dimensions: list[PivotDimensionOut]
-    measures: list[PivotMeasureOut]
+    indicators: list[PivotIndicatorOut]
 
 
 class PivotResponse(BaseModel):

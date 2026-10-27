@@ -30,9 +30,9 @@
 		margin-bottom: 14px;
 		font-size: 0.85rem;
 	}
+	/* Une seule ligne : les niveaux parents gardent leur largeur, la page courante se tronque. */
 	ol {
 		display: flex;
-		flex-wrap: wrap;
 		align-items: baseline;
 		margin: 0;
 		padding: 0;
@@ -41,6 +41,11 @@
 	}
 	li {
 		display: flex;
+		flex: none;
+		white-space: nowrap;
+	}
+	li:last-child {
+		flex: 0 1 auto;
 		min-width: 0;
 	}
 	li + li::before {

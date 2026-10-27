@@ -66,7 +66,7 @@
 		position: fixed;
 		transform: translateY(calc(-100% - 8px));
 		background: var(--tooltip-bg);
-		color: #fff;
+		color: white;
 		font-size: 0.78rem;
 		line-height: 1.4;
 		/* Typographie propre : l'infobulle n'hérite pas de son contexte (en-tête de colonne en capitales, gras…). */

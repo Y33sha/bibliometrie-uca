@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
@@ -51,14 +52,14 @@
 	onMount(() => partners.load());
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facetOptions(partners.data?.years)} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+<div class="toolbar toolbar-card">
+	<FacetDropdown label={filterLabels.years} options={facetOptions(partners.data?.years)} searchable bind:selected={selectedYears} onchange={onFilterChange} />
 	<FacetDropdown label={filterLabels.countries} options={facetOptions(partners.data?.countries)} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 	<FacetDropdown label={filterLabels.types} options={facetOptions(partners.data?.types)} bind:selected={selectedTypes} onchange={onFilterChange} />
 	<ResultCount list={partners} one="organisation partenaire" many="organisations partenaires" />
 </div>
 
-<div class="table-scroll">
+<TableScroll>
 	<table class="data-table">
 		<thead>
 			<tr>
@@ -84,7 +85,7 @@
 			{/if}
 		</tbody>
 	</table>
-</div>
+</TableScroll>
 
 <Pagination
 	page={partners.page}

@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import text
 
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
+from infrastructure.read_models.publications.filtering import FilterContext
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.repositories.perimeter_repository import PgPerimeterRepository
 from infrastructure.repositories.publisher_repository import PgPublisherRepository
@@ -66,7 +67,9 @@ class TestRelevesRendantUneListe:
 
     def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):
         """Les quatre facettes bâties par appariement aboutissent, l'accord étant prononcé au passage."""
-        builder = _PublicationFacetsBuilder(sa_sync_conn_owner, PublicationFilters(), [])
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn_owner, PublicationFilters(), FilterContext([], None)
+        )
         options, total = builder._facet_labs()
         assert builder._facet_years() == []
         assert builder._facet_doc_types() == []

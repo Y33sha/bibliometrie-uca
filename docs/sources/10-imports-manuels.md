@@ -7,7 +7,7 @@
 Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `hr_records`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin;
 - Rattaché à une personne du référentiel via `hr_records.person_id`;
-- Sert de filtre dans la [liste des personnes](../guide-utilisateur/01-pages-publiques.md#liste-persons) (filtre "Base RH") et permet d'afficher une *blue checkmark* sur les personnes concernées.
+- Sert de filtre dans la [liste des personnes](../guide-utilisateur/pages-publiques/04-personnes.md#liste-persons) (filtre "Base RH") et permet d'afficher une *blue checkmark* sur les personnes concernées.
 
 Données fournies datées du 15/12/2025. La date est documentée dans la colonne `hr_export_date`. Cette extraction contient uniquement les **enseignants-chercheurs UCA**: pas les chercheurs CNRS, Inrae, etc., ni les personnels BIATSS UCA.
 

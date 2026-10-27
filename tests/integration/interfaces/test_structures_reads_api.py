@@ -10,7 +10,7 @@ class TestLaboratoriesList:
     def test_returns_list(self, client):
         r = client.get("/api/structures")
         assert r.status_code == 200
-        assert isinstance(r.json(), list)
+        assert isinstance(r.json()["structures"], list)
 
 
 class TestLaboratoryDetail:
@@ -31,12 +31,6 @@ class TestLaboratoryAddresses:
     def test_rejects_per_page_above_ceiling(self, client):
         r = client.get("/api/structures/1/addresses", params={"per_page": 500})
         assert r.status_code == 422
-
-
-class TestLaboratoryDashboard:
-    def test_returns_dashboard(self, client):
-        r = client.get("/api/structures/999999999/dashboard")
-        assert r.status_code == 200
 
 
 class TestLaboratorySubjects:

@@ -12,6 +12,7 @@
   import StructuresBlock from "./StructuresBlock.svelte";
   import PersonsBlock from "./PersonsBlock.svelte";
   import SubjectsBlock from "./SubjectsBlock.svelte";
+  import SectionLabel from "./SectionLabel.svelte";
 
   const publicationId = $derived(page.params.id);
   let data = $state<PubResponse | null>(null);
@@ -94,9 +95,15 @@
       {/if}
 
       <div class="detail-body">
+        {#if hasTruthTable && pub.doc_type !== "thesis" && pub.doc_type !== "ongoing_thesis"}
+          <PersonsBlock contributions={data!.contributions} />
+        {/if}
+
+        <StructuresBlock {structureIds} structures={data!.structures} />
+
         {#if pub.abstract}
           <div class="detail-section">
-            <div class="detail-label">Résumé</div>
+            <SectionLabel icon="document" text="Résumé" />
             <div class="abstract-text" class:clamped={!abstractOpen} class:overflows={abstractOverflows} bind:this={abstractEl}>
               <PublicationAbstract resume={pub.abstract} />
             </div>
@@ -107,12 +114,6 @@
             {/if}
           </div>
         {/if}
-
-        {#if hasTruthTable && pub.doc_type !== "thesis" && pub.doc_type !== "ongoing_thesis"}
-          <PersonsBlock contributions={data!.contributions} />
-        {/if}
-
-        <StructuresBlock {structureIds} structures={data!.structures} />
 
         <SubjectsBlock subjects={data!.subjects} keywords={data!.keywords} />
       </div>

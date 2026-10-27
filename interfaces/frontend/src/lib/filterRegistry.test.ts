@@ -6,6 +6,7 @@ import {
 	checkboxSummary,
 	clearValue,
 	encodePresence,
+	explicitSelectionUrl,
 	facetDefs,
 	filterSections,
 	initialValues,
@@ -13,6 +14,8 @@ import {
 	presenceSummary,
 	restoreValues,
 	summarizeParts,
+	ignoredFilters,
+	transferParams,
 	urlFilterDefs,
 	urlState,
 	type CheckboxFilter,
@@ -126,6 +129,45 @@ describe('filterRegistry', () => {
 		appendFilterParams(FILTERS, values, params);
 		expect(params.get('lab_id')).toBe('7');
 		expect(isShown(labs, () => 1)).toBe(false);
+	});
+
+	it("n'écrit pas dans la requête un filtre que la page ne propose pas", () => {
+		perimeterEnabled = false;
+		const values = initialValues(FILTERS);
+		values.checkbox.perimeter = ['yes'];
+		const params = new URLSearchParams();
+		appendFilterParams(FILTERS, values, params);
+		expect(params.has('in_perimeter')).toBe(false);
+	});
+
+	it("transmet à une autre page la valeur fixée comme une sélection, et la forme d'URL explicite", () => {
+		fixedLab = '7';
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.presence.sources = { hal: 'yes' };
+		expect(Object.fromEntries(transferParams(FILTERS, values))).toEqual({
+			year: '2024',
+			doc_type: 'all',
+			lab_id: '7',
+			source_filter: 'hal_yes',
+		});
+	});
+
+	it('écrit une sélection explicite, `all` pour une sélection vide', () => {
+		const url = explicitSelectionUrl('all');
+		expect(url.encode([])).toBe('all');
+		expect(url.encode(['2023', '2024'])).toBe('2023,2024');
+		expect(url.decode('all')).toEqual([]);
+		expect(url.decode('2023,2024')).toEqual(['2023', '2024']);
+	});
+
+	it('signale les filtres sélectionnés que la page ne propose pas', () => {
+		const values = initialValues(FILTERS);
+		values.checkbox.years = ['2024'];
+		values.checkbox.perimeter = ['yes'];
+		expect(ignoredFilters(FILTERS, values)).toEqual([]);
+		perimeterEnabled = false;
+		expect(ignoredFilters(FILTERS, values).map((f) => f.key)).toEqual(['perimeter']);
 	});
 
 	it('masque un contrôle que la page ne propose pas, ou qui attend des options', () => {

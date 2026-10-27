@@ -3,21 +3,44 @@
 `StructureOut` et `NameFormOut` composent aussi la réponse des écritures sur les structures.
 """
 
+from dataclasses import dataclass, field
 from datetime import datetime
-from typing import cast
+from typing import Literal, cast
 
 from pydantic import BaseModel
 
 from domain.structures.structure import Structure
 from infrastructure.read_models._common import (
-    DashboardOa,
+    FacetOption,
     PaginatedResponse,
-    PublicationYearCount,
 )
+
+StructureSort = Literal[
+    "acronym_asc",
+    "acronym_desc",
+    "name_asc",
+    "name_desc",
+    "tutelles_asc",
+    "tutelles_desc",
+]
+
+
+@dataclass(frozen=True, slots=True)
+class StructureFilters:
+    """Filtres de la liste des structures, de ses facettes et de son export.
+
+    `perimeter_ids` retient les structures de ces périmètres, clôture comprise. `perimeter_none` retient les structures hors de tout périmètre. Les deux se combinent en OU.
+    """
+
+    search: str = ""
+    types: list[str] = field(default_factory=list)
+    tutelle_ids: list[int] = field(default_factory=list)
+    perimeter_ids: list[int] = field(default_factory=list)
+    perimeter_none: bool = False
 
 
 class StructureListItem(BaseModel):
-    """Ligne résumée de `/api/structures` (liste + recherche)."""
+    """Ligne résumée d'une structure, dans la liste paginée et dans le référentiel complet."""
 
     id: int
     code: str
@@ -30,6 +53,21 @@ class StructureListItem(BaseModel):
     """Périmètres auxquels la structure appartient (clôture transitive). Vide = hors périmètre."""
     tutelles: list["RelatedStructureOut"] | None
     """Structures qui exercent une tutelle sur celle-ci."""
+
+
+class StructureListResponse(PaginatedResponse):
+    structures: list[StructureListItem]
+
+
+class StructuresFacetsResponse(BaseModel):
+    """Facettes de la liste des structures.
+
+    `types` laisse le libellé au client. `tutelles` et `perimeters` donnent le libellé de la structure ou du périmètre ; `perimeters` se termine par l'option `none`, hors de tout périmètre. Chaque décompte écarte le filtre de sa propre facette.
+    """
+
+    types: list[FacetOption]
+    tutelles: list[FacetOption]
+    perimeters: list[FacetOption]
 
 
 class StructureOut(BaseModel):
@@ -102,27 +140,6 @@ class StructureAddressOut(BaseModel):
 
 class StructureAddressesResponse(PaginatedResponse):
     addresses: list[StructureAddressOut]
-
-
-class StructureCollaborations(BaseModel):
-    """Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère."""
-
-    total_articles: int
-    international: int
-    domestic: int
-
-
-class StructureTopCountry(BaseModel):
-    code: str
-    name: str
-    count: int
-
-
-class StructureDashboardResponse(BaseModel):
-    publications_by_year: list[PublicationYearCount]
-    oa: DashboardOa
-    collab: StructureCollaborations
-    top_countries: list[StructureTopCountry]
 
 
 class StructurePartner(BaseModel):

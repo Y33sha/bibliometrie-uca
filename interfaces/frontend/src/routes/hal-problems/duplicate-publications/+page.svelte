@@ -1,12 +1,17 @@
 <script lang="ts">
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import TableScroll from '#lib/components/TableScroll.svelte';
+	import { horizontalOverflow } from '#lib/actions/horizontalOverflow.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import { withBase } from '#lib/paths.js';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { docTypeLabel } from '#lib/labels.js';
+	import { columnLabels, docTypeLabel } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
@@ -14,6 +19,7 @@
 	import type { components } from '#lib/api/schema.js';
 	type DoiPair = components['schemas']['HalDoiDuplicatePair'];
 	type MetaPair = components['schemas']['HalMetaDuplicatePair'];
+	type HalDoc = components['schemas']['HalDocSummary'];
 
 	let activeTab: 'doi' | 'meta' = $state('doi');
 
@@ -59,21 +65,15 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Dépôts HAL en double")}</title>
-</svelte:head>
-
-<h1>Dépôts HAL en double</h1>
-
-<div class="info-box">
+<PageHeader title="Dépôts HAL en double">
 	{#if activeTab === 'doi'}
 		Dépôts HAL avec DOI identique. Soit dépôts en doublon, soit DOI erroné.
 	{:else}
 		Doublons possibles : dépôts HAL avec titre, année, type et nombre d'auteurs cohérents.
 	{/if}
-</div>
+</PageHeader>
 
-<div class="tabs">
+<div class="tabs" use:horizontalOverflow>
 	<button class="tab" class:active={activeTab === 'doi'} onclick={() => switchTab('doi')}>
 		Par DOI{doi.items.length ? ` (${doi.total})` : ''}
 	</button>
@@ -82,30 +82,43 @@
 	</button>
 </div>
 
+<ListToolbar
+	list={activeTab === 'doi' ? doi : meta}
+	one={activeTab === 'doi' ? 'DOI' : 'paire'}
+	many={activeTab === 'doi' ? 'DOI' : 'paires'}
+	exportUrl={withBase(`/api/hal-problems/duplicate-publications-${activeTab}/export.csv`)}
+/>
+
 {#if activeTab === 'doi'}
 	<ListStatus list={doi} emptyText="Aucun doublon par DOI">
-		<div class="doi-list">
-			{#each doi.items as pair}
-				<div class="doi-card">
-					<div class="publication-meta-line">
-						{#if pair.publication.publication_year}<span class="meta-badge">{pair.publication.publication_year}</span>{/if}
-						{#if pair.publication.doc_type}<DocTypePill docType={pair.publication.doc_type} />{/if}
-						<a href={resolve(`publications/${pair.publication.id}`)} class="publication-title"><PublicationTitle titre={pair.publication.title} /></a>
-					</div>
-					<div class="hal-list">
-						{#each pair.publication.hal_docs as hd}
-							<div class="hal-row">
-								<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
-								{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
-								{#if hd.hal_doc_type}<span class="meta-badge type-badge">{docTypeLabel(hd.hal_doc_type)}</span>{/if}
-								<span class="author-count">{hd.author_count} aut.</span>
-							</div>
-						{/each}
-						<span class="doi-ref">DOI : <a href="https://doi.org/{pair.doi}" target="_blank" rel="noopener">{pair.doi}</a></span>
-					</div>
-				</div>
-			{/each}
-		</div>
+		<TableScroll>
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>{columnLabels.type}</th>
+						<th>{columnLabels.year}</th>
+						<th>{columnLabels.doi}</th>
+						<th>{columnLabels.title}</th>
+						<th>Dépôts HAL</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each doi.items as pair (`${pair.publication.id}:${pair.doi}`)}
+						<tr>
+							<td>{#if pair.publication.doc_type}<DocTypePill docType={pair.publication.doc_type} />{/if}</td>
+							<td>{pair.publication.publication_year ?? ''}</td>
+							<td><DoiLink doi={pair.doi} /></td>
+							<td><a href={resolve(`publications/${pair.publication.id}`)} class="publication-title"><PublicationTitle titre={pair.publication.title} /></a></td>
+							<td>
+								<div class="hal-list">
+									{#each pair.publication.hal_docs as hd (hd.halid)}{@render halDoc(hd)}{/each}
+								</div>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</TableScroll>
 		<Pagination page={doi.page} pages={doi.pages} onchange={(p) => { doi.goToPage(p); syncUrl(); }} />
 	</ListStatus>
 
@@ -130,14 +143,7 @@
 									{#if pub.doi}<span class="meta-badge">DOI</span>{/if}
 								</div>
 								<div class="hal-list">
-									{#each pub.hal_docs as hd}
-										<div class="hal-row">
-											<a href={hd.record_url} target="_blank" rel="noopener" class="hal-link-badge">{hd.halid}</a>
-											{#if hd.hal_publication_year}<span class="meta-badge">{hd.hal_publication_year}</span>{/if}
-											{#if hd.hal_doc_type}<span class="meta-badge type-badge">{docTypeLabel(hd.hal_doc_type)}</span>{/if}
-											<span class="author-count">{hd.author_count} aut.</span>
-										</div>
-									{/each}
+									{#each pub.hal_docs as hd (hd.halid)}{@render halDoc(hd)}{/each}
 								</div>
 								{#if pub.container_title}
 									<div class="container-title">{pub.container_title}</div>
@@ -152,21 +158,22 @@
 	</ListStatus>
 {/if}
 
+<!-- Un dépôt HAL : son identifiant, puis l'année, le type et le nombre d'auteurs que HAL lui donne. -->
+{#snippet halDoc(hd: HalDoc)}
+	<div class="hal-row">
+		<a href={hd.record_url} target="_blank" rel="noopener" class="id-badge">{hd.halid}</a>
+		<span class="hal-details">{[hd.hal_publication_year, hd.hal_doc_type ? docTypeLabel(hd.hal_doc_type) : null, `${hd.author_count} auteur${hd.author_count > 1 ? 's' : ''}`].filter(Boolean).join(' · ')}</span>
+	</div>
+{/snippet}
+
 <style>
 	.data-table td { font-size: 0.9rem; }
 	.meta-table td { width: 50%; }
 
-	.doi-list { display: flex; flex-direction: column; gap: 8px; }
-	.doi-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 10px 14px;
-	}
-	.hal-list { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-left: 20px; }
-	.hal-row { display: flex; gap: 6px; align-items: center; }
-	.doi-ref { font-size: 0.82rem; color: var(--muted); margin-left: 8px; }
+	.hal-list { display: flex; flex-direction: column; gap: 4px; }
+	.meta-table .hal-list { margin-top: 6px; }
+	.hal-row { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
-	.author-count { font-size: 0.8rem; color: var(--muted); }
+	.hal-details { font-size: 0.8rem; color: var(--text-secondary); }
 	.container-title { font-size: 0.82rem; color: var(--muted); margin-top: 2px; font-style: italic; }
 </style>

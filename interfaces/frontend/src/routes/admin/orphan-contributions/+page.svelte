@@ -1,5 +1,10 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
+	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import RhCheck from '#lib/components/RhCheck.svelte';
+	import SourceTag from '#lib/components/SourceTag.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -106,16 +111,6 @@
 		rejectModal = null;
 		await retry();
 	}
-
-	const SOURCE_LABELS: Record<string, string> = {
-		hal: 'HAL',
-		openalex: 'OA',
-		wos: 'WoS',
-		theses: 'Thèses',
-		scanr: 'ScanR',
-		crossref: 'CrossRef',
-		datacite: 'DataCite',
-	};
 
 	function openAssign(idx: number) {
 		activeAssignIdx = idx;
@@ -234,31 +229,23 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Contributions orphelines — Admin</title>
-</svelte:head>
+<Breadcrumb trail={[{ label: 'Chercheurs', path: 'persons' }]} current="Contributions orphelines" />
 
-<div class="header">
-	<h1>Contributions orphelines ({list.total})</h1>
-	<a href={resolve('persons')} class="btn">← Retour aux personnes</a>
-</div>
-
-<div class="info-box">
+<PageHeader title="Contributions orphelines">
 	Contributions {institution.name} non reliées à une personne. Pour chaque contribution, vous pouvez l'attribuer à une personne existante ou créer une nouvelle personne.
-</div>
+</PageHeader>
 
-<div class="toolbar">
-	<input type="search" placeholder="Rechercher par nom" bind:value={search}
- onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput} autocomplete="off" />
-	<FacetDropdown
-		label={filterLabels.labs}
-		options={labOptions}
-		searchable
-		bind:selected={selectedLabs}
-		onchange={onLabsChange}
-	/>
-</div>
+<ListToolbar bind:search placeholder="Rechercher par nom" onsearch={onSearchInput} {list} one="contribution" many="contributions">
+	{#snippet filters()}
+		<FacetDropdown
+			label={filterLabels.labs}
+			options={labOptions}
+			searchable
+			bind:selected={selectedLabs}
+			onchange={onLabsChange}
+		/>
+	{/snippet}
+</ListToolbar>
 
 {#if selectedIds.size > 0}
 	<div class="batch-bar">
@@ -284,73 +271,75 @@
 {/if}
 
 <ListStatus {list} emptyText="Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.">
-	<table class="data-table">
-		<thead>
-			<tr>
-				<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
-				<th>{columnLabels.sources}</th>
-				<th>Nom</th>
-				<th>Publication</th>
-				<th>{columnLabels.labs}</th>
-				<th>Action</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each orphans as o, i (o.contribution_id)}
+	<TableScroll>
+		<table class="data-table">
+			<thead>
 				<tr>
-					<td><input type="checkbox" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
-					<td>
-						{#each o.sources as source (source)}
-							<span class="tag tag-source">{SOURCE_LABELS[source] ?? source}</span>
-						{/each}
-					</td>
-					<td>{o.full_name}</td>
-					<td>
-						<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
-							{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
-						</a>
-					</td>
-					<td>
-						{#each o.labs as lab (lab.id)}
-							<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
-						{/each}
-					</td>
-					<td>
-						{#if activeAssignIdx === i}
-							<div class="assign-panel">
-								<div class="assign-row">
-									<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
-											use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
-										oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
-									<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
-								</div>
-								{#if assignSearch.loading}
-									<span class="loading-text">…</span>
-								{:else if assignSearch.results.length}
-									<div class="assign-results" use:anchored>
-										{#each assignSearch.results as r (r.id)}
-											<button class="result-btn" onclick={() => assign(o, r.id)}>
-												<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
-												{#if r.has_rh}<RhCheck />{/if}
-												<span class="result-hint">{r.department_name || `#${r.id}`}</span>
-											</button>
-										{/each}
-									</div>
-								{:else if assignSearch.query.length >= 2}
-									<div class="assign-results" use:anchored>
-										<span class="loading-text">Aucun résultat</span>
-										<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
-									</div>
-								{/if}
-							</div>
-						{:else}
-							<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
-						{/if}
-					</td>
+					<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
+					<th>{columnLabels.sources}</th>
+					<th>Nom</th>
+					<th>Publication</th>
+					<th>{columnLabels.labs}</th>
+					<th>Action</th>
 				</tr>
-			{/each}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				{#each orphans as o, i (o.contribution_id)}
+					<tr>
+						<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
+						<td class="links-cell">
+							{#each o.sources as source (source)}
+								<SourceTag {source} />
+							{/each}
+						</td>
+						<td>{o.full_name}</td>
+						<td>
+							<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
+								{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
+							</a>
+						</td>
+						<td>
+							{#each o.labs as lab (lab.id)}
+								<a href={resolve(`structures/${lab.id}`)} class="lab-tag">{lab.label}</a>
+							{/each}
+						</td>
+						<td>
+							{#if activeAssignIdx === i}
+								<div class="assign-panel">
+									<div class="assign-row">
+										<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
+												use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
+											oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
+										<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+									</div>
+									{#if assignSearch.loading}
+										<span class="loading-text">…</span>
+									{:else if assignSearch.results.length}
+										<div class="assign-results" use:anchored>
+											{#each assignSearch.results as r (r.id)}
+												<button class="result-btn" onclick={() => assign(o, r.id)}>
+													<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
+													{#if r.has_rh}<RhCheck />{/if}
+													<span class="result-hint">{r.department_name || `#${r.id}`}</span>
+												</button>
+											{/each}
+										</div>
+									{:else if assignSearch.query.length >= 2}
+										<div class="assign-results" use:anchored>
+											<span class="loading-text">Aucun résultat</span>
+											<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
+										</div>
+									{/if}
+								</div>
+							{:else}
+								<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
+							{/if}
+						</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</TableScroll>
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
@@ -404,15 +393,6 @@
 {/if}
 
 <style>
-	.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
-	.header h1 { margin: 0; font-size: 1.2rem; }
-	.info-box {
-		background: var(--warning-light); border: 1px solid color-mix(in srgb, var(--warning) 40%, white); border-radius: var(--radius);
-		padding: 10px 14px; font-size: 0.85rem; color: var(--warning-text); margin-bottom: 14px;
-	}
-	.toolbar input { width: 300px; }
-	.tag-source { display: inline-block; padding: 1px 6px; border-radius: var(--radius); font-size: 0.75rem; font-weight: 600; background: var(--accent-light); color: var(--accent); }
-	.tag-source + .tag-source { margin-left: 3px; }
 	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
 	.publication-link:hover { text-decoration: underline; }
 	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */

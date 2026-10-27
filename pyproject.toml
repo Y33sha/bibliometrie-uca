@@ -52,6 +52,7 @@ dev = [
     "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
     "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
     "mkdocstrings-python==2.0.10", # référence du code dans le site, générée depuis les docstrings
+    "playwright==1.58.0",          # captures d'écran du guide utilisateur (interfaces/cli/dev/screenshots.py)
 ]
 
 [tool.setuptools]
@@ -69,7 +70,8 @@ known_first_party = ["application", "domain", "infrastructure", "interfaces", "p
 # `scripts/` et les hooks de `.claude/` outillent le dépôt sans être distribués : leurs imports
 # relèvent de l'environnement de développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
 # hors du dépôt. L'estimation des poids du modèle de l'alignement des auteurs tourne sur le poste de
-# développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement.
+# développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement. Les captures
+# d'écran du guide utilisateur s'y prennent aussi : elles importent Playwright.
 extend_exclude = [
     "frontend",
     ".venv",
@@ -78,6 +80,7 @@ extend_exclude = [
     ".claude",
     "data",
     "interfaces/cli/dev/estimate_residual_weights.py",
+    "interfaces/cli/dev/screenshots.py",
 ]
 
 # ----------------------------------------------------------------------

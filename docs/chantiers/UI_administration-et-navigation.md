@@ -40,7 +40,8 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - **L'administration est un état de la session.** Un seul site. Les pages communes ajoutent leurs fonctions d'administration quand l'utilisateur de la session a le rôle admin. Les pages propres à l'administration (pipeline, configuration, adresses, pays, files de triage) restent des pages à part, dans la même barre de navigation.
 - **Comptes : `users`, `roles`, `user_roles`.** La table `users` liste les utilisateurs autorisés. Les rôles sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
-- **Une page par structure**, sous la route `structures/[id]`. Un onglet « Gestion », réservé à l'admin, comporte l'édition, les tutelles et les formes de nom. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
+- **Une page par structure**, sous la route `structures/[id]`. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
+- **Volet d'édition de la structure**, sur le modèle des personnes et des publications : édition, tutelles et formes de nom.
 - **Volet d'édition ouvert par une icône** sur la ligne. Le titre ou le nom mène à la fiche.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
 - **Files de triage en onglets de la liste publique**, affichés selon le rôle. Le bandeau des contributions orphelines suit la même règle.
@@ -87,6 +88,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - [x] Route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
 - [x] Liste unique sous `structures`, facette de type, création de structure selon le rôle ; suppression de `admin/structures` et de `laboratories`
+- [ ] Volet d'édition de la structure, ouvert par une icône sur la ligne ; suppression de l'onglet « Gestion »
 
 #### 3f. Personnes
 
@@ -98,7 +100,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 ## Questions ouvertes
 
-- **Listes d'entités liées.** Piste : la fiche garde ce qui caractérise l'entité (en-tête, dashboard, graphe des sujets, collaborations, adresses). Les listes liées deviennent des liens vers la liste générale filtrée, filtre visible et supprimable. La liste générale propose les fonctions liées à un contexte quand ce contexte est seul sélectionné : statut HAL pour un seul laboratoire, correspondance, périmètre et exclusion pour une seule personne. La même règle dirait quels filtres la page Statistiques reçoit de la liste ([Statistiques](METIER_statistiques.md)). Coût : la liste générale affiche l'en-tête de la liste, et l'en-tête de l'entité disparaît ; un bandeau de contexte peut le remplacer.
+- **Listes d'entités liées.** Piste : la fiche garde ce qui caractérise l'entité (en-tête, dashboard, graphe des sujets, collaborations, adresses). Les listes liées deviennent des liens vers la liste générale filtrée, filtre visible et supprimable. La liste générale propose les fonctions liées à un contexte quand ce contexte est seul sélectionné : statut HAL pour un seul laboratoire, correspondance, périmètre et exclusion pour une seule personne. La même règle dirait quels filtres la page Statistiques reçoit de la liste ([Statistiques](archived/2026-10-27_METIER_statistiques.md)). Coût : la liste générale affiche l'en-tête de la liste, et l'en-tête de l'entité disparaît ; un bandeau de contexte peut le remplacer.
 - **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
 - **Repère visuel du mode admin.** La barre d'administration a sa couleur (`--nav-admin`). La garder pour la session ouverte, ou signaler la session autrement.
 - **Comptes** : page de gestion des utilisateurs, rôles autres qu'admin.

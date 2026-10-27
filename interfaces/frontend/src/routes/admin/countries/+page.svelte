@@ -1,5 +1,7 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
@@ -193,11 +195,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>Adresses — Pays — Admin</title>
-</svelte:head>
-
-<h1>Attribution des pays aux adresses</h1>
+<PageHeader title="Pays" hidden />
 
 <div class="toolbar">
 	<input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
@@ -207,7 +205,7 @@
 </div>
 
 <div class="batch-bar">
-	<select bind:value={batchCountry}>
+	<select class="select" aria-label="Pays à ajouter" bind:value={batchCountry}>
 		<option value="">— Choisir un pays à ajouter —</option>
 		{#each countries as c}
 			<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
@@ -228,65 +226,65 @@
 	{/if}
 </div>
 
-<table class="data-table addr-table">
-	<thead>
-		<tr>
-			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
-			<th style="width:55%">{columnLabels.address}</th>
-			<th style="width:50px">{columnLabels.publications}</th>
-			<th>{columnLabels.country}</th>
-		</tr>
-	</thead>
-	<tbody>
-		{#each addresses as a (a.id)}
+<TableScroll>
+	<table class="data-table addr-table">
+		<thead>
 			<tr>
-				<td><input type="checkbox" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
-				<td class="addr-cell">{a.raw_text}</td>
-				<td class="num-cell">{a.publication_count}</td>
-				<td>
-					<div class="country-cell">
-					{#each a.countries ?? [] as c}
-						{@const found = a.found_countries.find(f => f.country_code === c)}
-						<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
-							{countryLabel(c)}
-							<button class="tag-remove" onclick={() => removeCountry(a.id, c)}>×</button>
-						</span>
-					{/each}
-					<span class="country-actions">
-						{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
-							<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
-								{countryLabel(p.country_code)} ?
-								<span class="proposal-methods">{methodsLabel(p.methods)}</span>
-							</button>
-						{/each}
-						<select class="add-country" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
-							<option value="">+</option>
-							{#each countries as c}
-								<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
-							{/each}
-						</select>
-					</span>
-					</div>
-				</td>
+				<th style="width:30px"><input type="checkbox" aria-label="Tout sélectionner" checked={allSelected} onchange={toggleAll} /></th>
+				<th style="width:55%">{columnLabels.address}</th>
+				<th style="width:110px">{columnLabels.publications}</th>
+				<th>{columnLabels.country}</th>
 			</tr>
-		{/each}
-		{#if addresses.length === 0}
-			<TableStatusRow loading={list.loading} error={list.error} colspan={4} emptyText="Aucune adresse trouvée." />
-		{/if}
-	</tbody>
-</table>
+		</thead>
+		<tbody>
+			{#each addresses as a (a.id)}
+				<tr>
+					<td><input type="checkbox" aria-label="Sélectionner l'adresse" checked={selectedIds.has(a.id)} onchange={() => toggleSelect(a.id)} /></td>
+					<td class="addr-cell">{a.raw_text}</td>
+					<td class="num-cell">{a.publication_count}</td>
+					<td>
+						<div class="country-cell">
+						{#each a.countries ?? [] as c}
+							{@const found = a.found_countries.find(f => f.country_code === c)}
+							<span class="country-tag" title={found ? `Trouvé par : ${methodsLabel(found.methods)}` : undefined}>
+								{countryLabel(c)}
+								<button class="tag-remove" aria-label="Retirer {countryLabel(c)}" title="Retirer {countryLabel(c)}" onclick={() => removeCountry(a.id, c)}>×</button>
+							</span>
+						{/each}
+						<span class="country-actions">
+							{#each a.found_countries.filter(f => !a.countries?.includes(f.country_code)) as p}
+								<button class="proposal-tag" title="Ajouter ce pays" onclick={() => addCountry(a.id, p.country_code)}>
+									{countryLabel(p.country_code)} ?
+									<span class="proposal-methods">{methodsLabel(p.methods)}</span>
+								</button>
+							{/each}
+							<select class="select add-country" aria-label="Ajouter un pays" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
+								<option value="">+ Pays</option>
+								{#each countries as c}
+									<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
+								{/each}
+							</select>
+						</span>
+						</div>
+					</td>
+				</tr>
+			{/each}
+			{#if addresses.length === 0}
+				<TableStatusRow loading={list.loading} error={list.error} colspan={4} emptyText="Aucune adresse trouvée." />
+			{/if}
+		</tbody>
+	</table>
+</TableScroll>
 
 <Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 
 <style>
-	h1 { font-size: 1.3rem; margin-bottom: 12px; }
 	.toolbar input[type="search"] { width: 300px; }
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;
 		background: var(--accent-light); border-radius: var(--radius); font-size: 0.9rem;
 	}
-	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); }
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
 	.proposal-tag {
 		display: inline-flex; align-items: center; gap: 4px;
@@ -296,7 +294,7 @@
 	}
 	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
-	.addr-table { table-layout: fixed; }
+	.addr-table { table-layout: fixed; min-width: 640px; }
 	.addr-table td { font-size: 0.9rem; vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
 	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
@@ -312,8 +310,5 @@
 		color: var(--muted); font-size: 0.8rem; padding: 0 1px; line-height: 1;
 	}
 	.tag-remove:hover { color: var(--danger); }
-	.add-country {
-		padding: 2px 4px; border: 1px solid var(--border); border-radius: var(--radius);
-		font-size: 0.75rem; width: 32px; color: var(--muted); cursor: pointer;
-	}
+	.add-country { width: 7rem; height: 26px; font-size: 0.8rem; color: var(--muted); }
 </style>

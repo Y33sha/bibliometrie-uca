@@ -1,0 +1,413 @@
+<script lang="ts">
+  import IconButton from "#lib/components/IconButton.svelte";
+  import RhCheck from "#lib/components/RhCheck.svelte";
+  import { resolve } from "$app/paths";
+  import { api } from "#lib/api/index.js";
+  import { titleCase } from "#lib/utils.js";
+  import { personExclusionLabels } from "#lib/labels.js";
+  import { autofocus } from "#lib/actions/focus.js";
+  import Drawer from "#lib/components/Drawer.svelte";
+  import type { Person, IdFormState, PersonSearchResult } from "./types";
+  import type { components } from "#lib/api/schema.js";
+  import IdentifierEditor from "./IdentifierEditor.svelte";
+  import Picker from "#lib/components/Picker.svelte";
+  import NameFormsList from "./NameFormsList.svelte";
+
+  type SharingPerson = components["schemas"]["SharingPersonOut"];
+  type NameFormSummary = components["schemas"]["NameFormSummaryOut"];
+  type PersonExclusion = components["schemas"]["PersonExclusion"];
+
+  let {
+    person,
+    idForm,
+    mergeActive,
+    mergeSearch,
+    onclose,
+    onrename,
+    onsetExclusion,
+    onaddIdentifier,
+    ontoggleIdForm,
+    onsetIdentifierStatus,
+    onopenDetach,
+    onsetFormStatus,
+    onmergeOpen,
+    onmergeClose,
+    onmerge,
+    onabsorb,
+    onopenPerson,
+  }: {
+    person: Person;
+    idForm: IdFormState | null;
+    mergeActive: boolean;
+    mergeSearch: {
+      query: string;
+      loading: boolean;
+      results: PersonSearchResult[];
+      setQuery: (q: string) => void;
+    };
+    onclose: () => void;
+    /** Renvoie true si le renommage a réussi (sinon l'édition reste ouverte). */
+    onrename: (personId: number, lastName: string, firstName: string) => Promise<boolean>;
+    onsetExclusion: (personId: number, exclusion: PersonExclusion | null) => void | Promise<void>;
+    onaddIdentifier: (personId: number) => void | Promise<void>;
+    ontoggleIdForm: (personId: number) => void;
+    onsetIdentifierStatus: (identId: number, status: string) => void | Promise<void>;
+    onopenDetach: (personId: number, nameForm: string) => void | Promise<void>;
+    onsetFormStatus: (
+      personId: number,
+      nameForm: string,
+      status: string,
+    ) => void | Promise<void>;
+    onmergeOpen: (personId: number) => void;
+    onmergeClose: () => void;
+    onmerge: (targetId: number, sourceId: number) => void | Promise<void>;
+    /** Absorbe une autre personne dans celle du drawer (fusion vers `person`). */
+    onabsorb: (otherId: number) => Promise<void>;
+    /** Ouvre le drawer d'une autre personne (depuis la liste des partages). */
+    onopenPerson: (personId: number) => void;
+  } = $props();
+
+  // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
+  let sharing = $state<SharingPerson[]>([]);
+  // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre.
+  let nameForms = $state<NameFormSummary[]>([]);
+
+  async function loadDetails() {
+    [sharing, nameForms] = await Promise.all([
+      api<SharingPerson[]>(`/api/persons/${person.id}/sharing-name-forms`),
+      api<NameFormSummary[]>(`/api/persons/${person.id}/name-forms`)
+    ]);
+  }
+
+  $effect(() => {
+    void person.id; // re-fetch quand le drawer change de personne
+    loadDetails();
+  });
+
+  async function absorb(otherId: number) {
+    await onabsorb(otherId);
+    await loadDetails();
+  }
+
+  let editing = $state(false);
+  let lastName = $state("");
+  let firstName = $state("");
+
+  function startEdit() {
+    lastName = person.last_name;
+    firstName = person.first_name;
+    editing = true;
+  }
+
+  async function saveEdit() {
+    if (await onrename(person.id, lastName, firstName)) editing = false;
+  }
+
+  function formatDate(d: string | null): string {
+    return d ? new Date(d).toLocaleDateString("fr-FR") : "";
+  }
+
+  function dateRange(start: string | null, end: string | null): string {
+    if (start && end) return `${formatDate(start)} – ${formatDate(end)}`;
+    if (start) return `depuis le ${formatDate(start)}`;
+    if (end) return `jusqu'au ${formatDate(end)}`;
+    return "";
+  }
+
+  // Échap annule d'abord l'édition du nom en cours.
+  function onescape() {
+    if (editing) editing = false;
+    else onclose();
+  }
+</script>
+
+<Drawer {onclose} {onescape}>
+  {#snippet head()}
+  <div class="person-head">
+    {#if editing}
+      <form class="drawer-edit" onsubmit={(e) => { e.preventDefault(); saveEdit(); }}>
+        <input class="edit-input" bind:value={lastName} placeholder="Nom" aria-label="Nom" use:autofocus={{ select: true }} />
+        <input class="edit-input" bind:value={firstName} placeholder="Prénom" aria-label="Prénom" />
+        <button type="submit" class="btn btn-sm btn-primary">OK</button>
+        <button type="button" class="btn btn-sm" onclick={() => (editing = false)}>Annuler</button>
+      </form>
+    {:else}
+      <div class="drawer-title" class:excluded={!!person.exclusion}>
+        <a
+          class="drawer-name-link"
+          href={resolve(`persons/${person.id}`)}
+          target="_blank"
+          rel="noopener"
+          title="Voir la fiche publique"
+        >
+          <span class="drawer-last">{titleCase(person.last_name)}</span>
+          {titleCase(person.first_name)}
+        </a>
+        {#if person.has_rh}<RhCheck />{/if}
+      </div>
+      <div class="drawer-head-actions">
+        <IconButton icon="edit" label="Modifier le nom" onclick={startEdit} />
+        <select
+          class="select exclusion-select"
+          class:excluded={!!person.exclusion}
+          title="Exclusion de la personne"
+          aria-label="Exclusion de la personne"
+          value={person.exclusion ?? ""}
+          onchange={(e) =>
+            onsetExclusion(
+              person.id,
+              ((e.currentTarget as HTMLSelectElement).value || null) as PersonExclusion | null,
+            )}
+        >
+          <option value="">Retenue</option>
+          {#each Object.entries(personExclusionLabels) as [value, label] (value)}
+            <option {value}>{label}</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+  </div>
+  {/snippet}
+
+    <div class="drawer-meta">
+      <span>{person.contribution_count ?? 0} publications</span>
+      <span>{person.in_perimeter_contribution_count ?? 0} dans le périmètre</span>
+      {#if person.exclusion}<span class="tag tag-excluded">{personExclusionLabels[person.exclusion]}</span>{/if}
+    </div>
+
+    {#if person.has_rh}
+      <section class="drawer-section">
+        <h3>Fiche RH</h3>
+        <dl class="rh-info">
+          {#if person.role_title}
+            <dt>Rôle</dt>
+            <dd>{person.role_title}</dd>
+          {/if}
+          {#if person.department_name}
+            <dt>Département</dt>
+            <dd>{person.department_name}</dd>
+          {/if}
+          {#if person.start_date || person.end_date}
+            <dt>Dates</dt>
+            <dd>{dateRange(person.start_date, person.end_date)}</dd>
+          {/if}
+        </dl>
+      </section>
+    {/if}
+
+    <section class="drawer-section">
+      <h3>Identifiants</h3>
+      <IdentifierEditor
+        {person}
+        form={idForm}
+        onadd={onaddIdentifier}
+        ontoggleForm={ontoggleIdForm}
+        onsetStatus={onsetIdentifierStatus}
+      />
+    </section>
+
+    <section class="drawer-section">
+      <h3>Formes de nom</h3>
+      <NameFormsList personId={person.id} {nameForms} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
+    </section>
+
+    {#if sharing.length}
+      <section class="drawer-section">
+        <h3>Personnes partageant une forme de nom</h3>
+        <div class="sharing-list">
+          {#each sharing as sp (sp.person_id)}
+            <div class="sharing-row">
+              {#if !sp.has_rh}
+                <button
+                  class="btn btn-sm"
+                  title="Fusionner cette personne dans celle-ci"
+                  onclick={() => absorb(sp.person_id)}>Absorber</button
+                >
+              {/if}
+              <button class="sharing-name" onclick={() => onopenPerson(sp.person_id)}>
+                <span class="person-last">{titleCase(sp.last_name)}</span>
+                {titleCase(sp.first_name)}
+              </button>
+              {#if sp.has_rh}<RhCheck />{/if}
+              <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
+                {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
+              </span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
+    <section class="drawer-section">
+      <h3>Fusion</h3>
+      {#if mergeActive}
+        <Picker
+          floating
+          minLength={2}
+          placeholder="Nom à absorber"
+          search={mergeSearch.query}
+          onsearch={mergeSearch.setQuery}
+          loading={mergeSearch.loading}
+          results={mergeSearch.results}
+          onpick={(r) => onmerge(person.id, r.id)}
+          onclose={onmergeClose}
+        >
+          {#snippet item(r)}
+            <strong>{r.last_name}</strong>
+            {r.first_name}
+            {#if r.department_name}<span class="merge-dept">{r.department_name}</span>{/if}
+            {#if r.has_rh}<RhCheck />{/if}
+          {/snippet}
+        </Picker>
+      {:else}
+        <button class="btn btn-merge-inline" onclick={() => onmergeOpen(person.id)}>Fusionner…</button>
+      {/if}
+    </section>
+</Drawer>
+
+<style>
+  .btn-merge-inline {
+    padding: 2px 8px;
+    border: 1px dashed var(--border);
+    border-radius: var(--radius);
+    background: none;
+    font-size: 0.8rem;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: inherit;
+  }
+  .btn-merge-inline:hover {
+    background: var(--warning-light);
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+  .merge-dept {
+    font-size: 0.8rem;
+    color: var(--muted);
+    margin-left: 6px;
+  }
+  .person-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .drawer-title.excluded {
+    text-decoration: line-through;
+    opacity: 0.7;
+  }
+  .drawer-title {
+    font-size: 1.1rem;
+  }
+  .drawer-name-link {
+    color: inherit;
+    text-decoration: none;
+  }
+  .drawer-name-link:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .drawer-last {
+    font-weight: 600;
+  }
+  .drawer-head-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .drawer-edit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .drawer-edit .btn {
+    flex-shrink: 0;
+  }
+  .edit-input {
+    width: 128px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: 0.9rem;
+  }
+  .exclusion-select {
+    height: 28px;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+  .exclusion-select.excluded {
+    color: var(--danger);
+  }
+  .drawer-meta {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-bottom: 18px;
+  }
+  .drawer-section {
+    margin-bottom: 22px;
+  }
+  .rh-info {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 3px 12px;
+    margin: 0;
+    font-size: 0.85rem;
+  }
+  .rh-info dt {
+    color: var(--muted);
+  }
+  .rh-info dd {
+    margin: 0;
+  }
+  .drawer-section h3 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 0 0 8px;
+  }
+  .sharing-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .sharing-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .sharing-name {
+    font-size: 0.9rem;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    font-family: inherit;
+    color: inherit;
+    text-align: left;
+  }
+  .sharing-name:hover {
+    color: var(--accent);
+    text-decoration: underline;
+  }
+  .sharing-forms {
+    font-size: 0.72rem;
+    color: var(--muted);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 0.8rem;
+    padding: 1px 7px;
+    border-radius: var(--radius-pill);
+    font-weight: 500;
+  }
+  .tag-excluded {
+    background: var(--danger-light);
+    color: var(--danger);
+  }
+</style>

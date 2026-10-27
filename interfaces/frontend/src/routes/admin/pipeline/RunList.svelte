@@ -74,11 +74,10 @@
   .run-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
   }
   .load-more {
     padding: 8px 12px;
-    margin-top: 2px;
+    margin-top: 8px;
     border: 1px dashed var(--border);
     border-radius: var(--radius);
     background: transparent;
@@ -102,9 +101,10 @@
     width: 100%;
     text-align: left;
     padding: 10px 12px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    background: none;
     cursor: pointer;
     font: inherit;
   }
@@ -112,8 +112,8 @@
     background: var(--hover);
   }
   .run-item.active {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px var(--accent);
+    border-left-color: var(--accent);
+    background: var(--accent-light);
   }
   .run-head {
     display: flex;

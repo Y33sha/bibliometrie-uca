@@ -31,7 +31,6 @@ from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
     DETACHED_CONTRIBUTION,
-    pinned,
     pinned_contributions_sql,
     strong_identifier_source_contributions,
     usable_identifier,
@@ -59,12 +58,22 @@ from pipeline.transformation.persons.store import (
 # Relevé de la file des contributions à redécider (`Queue.CONTRIBUTION_RESOLUTION`), pris en début de tâche.
 _RESOLUTION_SNAPSHOT = "contribution_resolution_snapshot"
 
+# Contributions à décider, matérialisées en début de tâche.
+_CANDIDATES_TABLE = "contribution_resolution_candidates"
+
+# `contributions.in_perimeter` réunit les indices de périmètre de ses contributions sources (`propagate_contribution_attributes_sql`).
 _CANDIDATES_SQL = " UNION ".join(
     [
-        f"""
-        SELECT g.id AS contribution_id
-        FROM {CONTRIBUTIONS_AND_SOURCES}
-        WHERE g.person_id IS NULL AND (sc.in_perimeter OR {pinned("sc.id")})
+        """
+        SELECT id AS contribution_id FROM contributions
+        WHERE person_id IS NULL AND in_perimeter
+        """,
+        """
+        SELECT gm.contribution_id
+        FROM confirmed_source_contributions ca
+        JOIN aligned_source_contributions gm ON gm.source_contribution_id = ca.source_contribution_id
+        JOIN contributions g ON g.id = gm.contribution_id
+        WHERE g.person_id IS NULL
         """,
         f"""
         SELECT g.id AS contribution_id
@@ -101,7 +110,7 @@ _MEMBERS_SQL = f"""
            (SELECT ca.person_id FROM confirmed_source_contributions ca
             WHERE ca.source_contribution_id = sc.id) AS pinned_person_id
     FROM {CONTRIBUTIONS_AND_SOURCES}
-    JOIN ({_CANDIDATES_SQL}) c ON c.contribution_id = g.id
+    JOIN {_CANDIDATES_TABLE} c ON c.contribution_id = g.id
     ORDER BY g.id
 """
 
@@ -149,8 +158,15 @@ def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> P
 def load_candidate_contributions(
     conn: Connection,
 ) -> dict[int, dict[int, list[AlignedSourceContribution]]]:
-    """Contributions sources des contributions à décider, par publication puis par contribution : contributions sans personne, et contributions non manuelles de la file à redécider. Relève la file (`snapshot`) : `resolve_contributions` en retire ensuite les marquages relevés."""
+    """Contributions sources des contributions à décider, par publication puis par contribution : contributions sans personne, et contributions non manuelles de la file à redécider. Relève la file (`snapshot`) : `resolve_contributions` en retire ensuite les marquages relevés.
+
+    Les contributions à décider sont matérialisées dans une table temporaire analysée : l'estimation de leur nombre guide la jointure avec leurs contributions sources.
+    """
     snapshot(conn, Queue.CONTRIBUTION_RESOLUTION, _RESOLUTION_SNAPSHOT)
+    conn.execute(text(f"DROP TABLE IF EXISTS pg_temp.{_CANDIDATES_TABLE}"))
+    conn.execute(text(f"CREATE TEMP TABLE {_CANDIDATES_TABLE} AS {_CANDIDATES_SQL}"))
+    conn.execute(text(f"ALTER TABLE {_CANDIDATES_TABLE} ADD PRIMARY KEY (contribution_id)"))
+    conn.execute(text(f"ANALYZE {_CANDIDATES_TABLE}"))
     candidates: dict[int, dict[int, list[AlignedSourceContribution]]] = defaultdict(
         lambda: defaultdict(list)
     )

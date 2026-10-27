@@ -59,13 +59,18 @@ def parse_ror_csv(s: str, *, param: str) -> list[str]:
     return rors
 
 
+def parse_ids_with_none(s: str, *, param: str) -> tuple[list[int], bool]:
+    """Découpe une liste d'identifiants mêlée de la sentinelle `none`, en identifiants et en drapeau `none`."""
+    parts = parse_str_csv(s)
+    return parse_ints([v for v in parts if v != "none"], param=param), "none" in parts
+
+
 def parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
     """Découpe `lab_id` en identifiants de laboratoires et en drapeau « sans laboratoire ».
 
-    La sentinelle `none` se mêle aux identifiants dans la même liste : `lab_id=12,none` retient ce que le laboratoire 12 signe et ce qu'aucun laboratoire ne signe.
+    `lab_id=12,none` retient ce que le laboratoire 12 signe et ce qu'aucun laboratoire ne signe.
     """
-    parts = parse_str_csv(lab_id)
-    return parse_ints([v for v in parts if v != "none"], param="lab_id"), "none" in parts
+    return parse_ids_with_none(lab_id, param="lab_id")
 
 
 TOGGLE_VALUES: frozenset[str] = frozenset({"yes", "no"})

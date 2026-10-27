@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import { onMount } from "svelte";
   import { api } from "#lib/api/index.js";
   import type { components } from "#lib/api/schema.js";
@@ -58,11 +58,7 @@
   });
 </script>
 
-<svelte:head><title>{pageTitle("Pipeline")}</title></svelte:head>
-
-<div class="page-header">
-  <h1>Pipeline</h1>
-</div>
+<PageHeader title="Pipeline" />
 
 <div class="layout">
   <div class="col-list">
@@ -88,31 +84,33 @@
 </div>
 
 <style>
-  .page-header h1 {
-    margin: 0 0 16px;
-    font-size: 1.5rem;
-  }
   .layout {
     display: grid;
     grid-template-columns: 360px 1fr;
-    gap: 20px;
+    gap: 24px;
     align-items: start;
   }
   .col-list {
     position: sticky;
-    top: 1rem;
-    max-height: calc(100vh - 2rem);
+    top: calc(var(--header-height) + 16px);
+    max-height: calc(100vh - var(--header-height) - 32px);
     overflow-y: auto;
-    /* Gouttière pour que la scrollbar ne se superpose pas aux cartes de run. */
+    /* Gouttière pour que la scrollbar ne se superpose pas aux runs. */
     padding-right: 8px;
     scrollbar-gutter: stable;
   }
   .col-detail {
     min-width: 0;
-    padding: 16px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--card);
+  }
+  /* Écran étroit : la liste des runs passe au-dessus du détail, avec une hauteur bornée. */
+  @media (max-width: 820px) {
+    .layout {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .col-list {
+      position: static;
+      max-height: 40vh;
+    }
   }
   .empty {
     color: var(--muted);

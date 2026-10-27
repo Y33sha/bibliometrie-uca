@@ -1,24 +1,43 @@
 <script lang="ts">
-	// Bouton d'action réduit à son icône : crayon pour modifier, corbeille pour supprimer, panneau latéral pour ouvrir un volet. Le libellé sert d'infobulle et de nom accessible.
+	// Bouton d'action réduit à son icône : crayon pour modifier, corbeille pour supprimer, panneau latéral pour ouvrir un volet, croix pour rejeter, coche pour valider, flèche circulaire pour réinitialiser. Le libellé sert d'infobulle et de nom accessible.
 	let {
 		icon,
 		label,
 		onclick,
-		disabled = false
+		disabled = false,
+		pressed
 	}: {
-		icon: 'edit' | 'delete' | 'panel';
+		icon: 'edit' | 'delete' | 'panel' | 'reject' | 'confirm' | 'reset';
 		label: string;
 		onclick: () => void;
 		disabled?: boolean;
+		/** Fait du bouton une bascule : enfoncé, il garde la couleur de son action. */
+		pressed?: boolean;
 	} = $props();
 </script>
 
-<button type="button" class="icon-btn" class:icon-btn-danger={icon === 'delete'} title={label} aria-label={label} {disabled} {onclick}>
+<button
+	type="button"
+	class="icon-btn"
+	class:icon-btn-danger={icon === 'delete' || icon === 'reject'}
+	class:icon-btn-success={icon === 'confirm'}
+	title={label}
+	aria-label={label}
+	aria-pressed={pressed}
+	{disabled}
+	{onclick}
+>
 	<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
 		{#if icon === 'edit'}
 			<path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" />
 		{:else if icon === 'panel'}
 			<rect width="18" height="18" x="3" y="3" rx="2" /><path d="M15 3v18" />
+		{:else if icon === 'reject'}
+			<path d="M18 6 6 18" /><path d="m6 6 12 12" />
+		{:else if icon === 'confirm'}
+			<path d="M20 6 9 17l-5-5" />
+		{:else if icon === 'reset'}
+			<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" /><path d="M3 3v5h5" />
 		{:else}
 			<path d="M3 6h18" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" /><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
 		{/if}

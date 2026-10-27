@@ -3,9 +3,8 @@
 Le package est organisé par thème d'agrégat, une classe par module :
 - `pivot` : agrégation générique et schéma de son registre
 - `collaborations` : décompte des pays étrangers co-affiliés
-- `entity_facets` : facette éditeur, revue ou organisation partenaire
-- `summary` : facettes croisées
-- `_shared` : périmètre de base, assemblage des filtres et filtre APC partagés par les agrégats.
+
+Leurs conditions de filtrage sont celles de la liste des publications (`publications.filtering`). Les décomptes des filtres sont ceux de la liste.
 
 `StatsQueries` réunit ces classes.
 """
@@ -13,14 +12,10 @@ Le package est organisé par thème d'agrégat, une classe par module :
 from sqlalchemy import Connection
 
 from infrastructure.read_models.stats.collaborations import StatsCollaborationQueries
-from infrastructure.read_models.stats.entity_facets import StatsEntityFacetQueries
 from infrastructure.read_models.stats.pivot import StatsPivotQueries
-from infrastructure.read_models.stats.summary import StatsFacetQueries
 
 
-class StatsQueries(
-    StatsPivotQueries, StatsCollaborationQueries, StatsEntityFacetQueries, StatsFacetQueries
-):
+class StatsQueries(StatsPivotQueries, StatsCollaborationQueries):
     """Agrégats des tableaux de bord.
 
     Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour demander des statistiques.

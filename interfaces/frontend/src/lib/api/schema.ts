@@ -68,50 +68,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/stats/facets": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Facets
-         * @description Décomptes par option des facettes des tableaux de bord.
-         *
-         *     Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
-         */
-        get: operations["stats_facets_api_stats_facets_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/stats/facets/entities": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Stats Entity Facet
-         * @description Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
-         *
-         *     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
-         */
-        get: operations["stats_entity_facet_api_stats_facets_entities_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/stats/collaborations": {
         parameters: {
             query?: never;
@@ -143,7 +99,7 @@ export interface paths {
         };
         /**
          * Pivot Schema
-         * @description Vocabulaire du pivot (dimensions groupables, mesures) dont l'interface tire ses sélecteurs.
+         * @description Vocabulaire du pivot (dimensions, indicateurs) dont l'interface tire ses sélecteurs.
          */
         get: operations["pivot_schema_api_stats_pivot_schema_get"];
         put?: never;
@@ -163,9 +119,9 @@ export interface paths {
         };
         /**
          * Pivot
-         * @description Agrégation générique : `measure` ventilée selon `group` puis `group2`, sous les filtres actifs.
+         * @description Agrégation d'un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.
          *
-         *     Les trois clés sont validées contre le registre des mesures et des ventilations ; une clé inconnue, une ventilation non groupable ou répétée donnent un 422, comme `group2` fourni sans `group`.
+         *     Un indicateur inconnu ou un axe non comparable donnent un 422.
          */
         get: operations["pivot_api_stats_pivot_get"];
         put?: never;
@@ -665,9 +621,7 @@ export interface paths {
         };
         /**
          * List Structures
-         * @description Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
-         *
-         *     `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
+         * @description Liste paginée des structures.
          */
         get: operations["list_structures_api_structures_get"];
         put?: never;
@@ -676,6 +630,68 @@ export interface paths {
          * @description Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé.
          */
         post: operations["create_structure_api_structures_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All Structures
+         * @description Toutes les structures, triées par nom, pour les sélecteurs de structure.
+         */
+        get: operations["list_all_structures_api_structures_all_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Structures Facets
+         * @description Décomptes par option des facettes de la liste des structures.
+         *
+         *     Chaque facette écarte sa propre dimension de la clause WHERE.
+         */
+        get: operations["structures_facets_api_structures_facets_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/structures/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Structures Csv
+         * @description Export CSV de la liste des structures, aux filtres et au tri de la liste.
+         */
+        get: operations["export_structures_csv_api_structures_export_csv_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -846,26 +862,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/structures/{structure_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Structure Dashboard
-         * @description Agrégats de la structure : publications par année, accès ouvert, collaborations internationales.
-         */
-        get: operations["get_structure_dashboard_api_structures__structure_id__dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/structures/{structure_id}/subjects": {
         parameters: {
             query?: never;
@@ -940,6 +936,26 @@ export interface paths {
          *     L'annuaire public et la liste de curation appellent tous deux cette lecture, avec des filtres différents.
          */
         get: operations["list_persons_api_persons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Persons Csv
+         * @description Export CSV de la liste des personnes, aux filtres et au tri de la liste.
+         */
+        get: operations["export_persons_csv_api_persons_export_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1210,26 +1226,6 @@ export interface paths {
          * @description Adresses distinctes utilisées dans les contributions sources de cette personne.
          */
         get: operations["person_addresses_api_persons__person_id__addresses_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/persons/{person_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Person Dashboard
-         * @description Dashboard personne : publis/an + Open Access.
-         */
-        get: operations["person_dashboard_api_persons__person_id__dashboard_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1698,6 +1694,108 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/hal-problems/duplicate-accounts/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Duplicate Accounts Csv
+         * @description Export CSV des comptes auteur HAL en double.
+         */
+        get: operations["export_duplicate_accounts_csv_api_hal_problems_duplicate_accounts_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/duplicate-publications-doi/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Duplicate Publications By Doi Csv
+         * @description Export CSV des dépôts HAL en double par DOI.
+         */
+        get: operations["export_duplicate_publications_by_doi_csv_api_hal_problems_duplicate_publications_doi_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/duplicate-publications-meta/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Duplicate Publications By Metadata Csv
+         * @description Export CSV des doublons possibles de dépôts HAL par métadonnées.
+         */
+        get: operations["export_duplicate_publications_by_metadata_csv_api_hal_problems_duplicate_publications_meta_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/missing-collections/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Missing Collections Csv
+         * @description Export CSV des publications d'un laboratoire absentes de sa collection HAL.
+         *
+         *     Renvoie 404 et 422 dans les mêmes cas que la liste.
+         */
+        get: operations["export_missing_collections_csv_api_hal_problems_missing_collections_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/hal-problems/affiliation-conflicts/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Affiliation Conflicts Csv
+         * @description Export CSV des publications aux affiliations HAL divergentes.
+         */
+        get: operations["export_affiliation_conflicts_csv_api_hal_problems_affiliation_conflicts_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -1862,6 +1960,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publishers/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Publishers Csv
+         * @description Export CSV de la liste des éditeurs, aux filtres et au tri de la liste.
+         */
+        get: operations["export_publishers_csv_api_publishers_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publishers": {
         parameters: {
             query?: never;
@@ -1905,28 +2023,6 @@ export interface paths {
          *     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
          */
         put: operations["update_publisher_api_publishers__publisher_id__put"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/publishers/{publisher_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Publisher Dashboard
-         * @description Agrégats de l'onglet tableau de bord de la page d'un éditeur.
-         *
-         *     Distribution des `serial_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
-         */
-        get: operations["get_publisher_dashboard_api_publishers__publisher_id__dashboard_get"];
-        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -2086,6 +2182,26 @@ export interface paths {
          *     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_serials_api_serials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/serials/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Serials Csv
+         * @description Export CSV de la liste des revues, aux filtres et au tri de la liste.
+         */
+        get: operations["export_serials_csv_api_serials_export_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2286,28 +2402,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/serials/{serial_id}/dashboard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Serial Dashboard
-         * @description Agrégats des publications de la revue : distributions de `doc_type` et de `oa_status`.
-         *
-         *     Sert l'onglet tableau de bord de la page d'une revue, où ces distributions donnent à voir les incohérences — un `article` dans une revue de type `proceedings`, par exemple. Renvoie 404 sur une revue inconnue.
-         */
-        get: operations["get_serial_dashboard_api_serials__serial_id__dashboard_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/serials/{serial_id}/subjects": {
         parameters: {
             query?: never;
@@ -2388,6 +2482,26 @@ export interface paths {
          * @description Liste paginée des monographies, avec leur éditeur, leur collection et le nombre de publications qu'elles contiennent.
          */
         get: operations["list_monographs_api_monographs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monographs/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Monographs Csv
+         * @description Export CSV de la liste des monographies, aux filtres et au tri de la liste.
+         */
+        get: operations["export_monographs_csv_api_monographs_export_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2530,6 +2644,26 @@ export interface paths {
          * @description Liste paginée des sujets, les plus portés par des publications d'abord.
          */
         get: operations["list_subjects_api_subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subjects/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Subjects Csv
+         * @description Export CSV de la liste des sujets, aux filtres et au tri de la liste.
+         */
+        get: operations["export_subjects_csv_api_subjects_export_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3058,19 +3192,6 @@ export interface components {
             /** Labs */
             labs: string[];
         };
-        /** DashboardOa */
-        DashboardOa: {
-            /** Open Access */
-            open_access: number;
-            /** Embargoed */
-            embargoed: number;
-            /** Closed */
-            closed: number;
-            /** Unknown */
-            unknown: number;
-            /** Total */
-            total: number;
-        };
         /**
          * DeletedResponse
          * @description Acquittement de suppression : `{deleted: true}`.
@@ -3457,8 +3578,6 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Outside Perimeter Collections */
-            outside_perimeter_collections: boolean;
             /**
              * Hal Links
              * @description Dépôts HAL de la publication, avec leur lien.
@@ -4031,12 +4150,6 @@ export interface components {
             /** Pages */
             readonly pages: number;
         };
-        /** PersonDashboardResponse */
-        PersonDashboardResponse: {
-            /** Publications By Year */
-            publications_by_year: components["schemas"]["PublicationYearCount"][];
-            oa: components["schemas"]["DashboardOa"];
-        };
         /**
          * PersonExclusion
          * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching.
@@ -4276,7 +4389,7 @@ export interface components {
         PhaseStatus: "ok" | "warning" | "error";
         /**
          * PivotDimensionOut
-         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `groupable` pilote le choix de ventilation, `comparable` celui de la comparaison (abscisse), `filterable` la barre de facettes (dérivée par soustraction).
+         * @description Métadonnée d'une dimension, lue par les sélecteurs de l'interface : `comparable` pilote le choix de la comparaison (abscisse).
          */
         PivotDimensionOut: {
             /** Key */
@@ -4290,21 +4403,22 @@ export interface components {
             cardinality: "low" | "high";
             /** Ordinal */
             ordinal: boolean;
-            /** Groupable */
-            groupable: boolean;
             /** Comparable */
             comparable: boolean;
-            /** Filterable */
-            filterable: boolean;
         };
-        /** PivotMeasureOut */
-        PivotMeasureOut: {
+        /**
+         * PivotIndicatorOut
+         * @description Indicateur du sélecteur de l'interface. `unit` est l'unité de sa mesure, vide pour un nombre de publications. `breakdown` est la dimension empilée dans chaque barre.
+         */
+        PivotIndicatorOut: {
             /** Key */
             key: string;
             /** Label */
             label: string;
             /** Unit */
             unit: string;
+            /** Breakdown */
+            breakdown: string;
         };
         /**
          * PivotResponse
@@ -4327,8 +4441,8 @@ export interface components {
         PivotSchemaResponse: {
             /** Dimensions */
             dimensions: components["schemas"]["PivotDimensionOut"][];
-            /** Measures */
-            measures: components["schemas"]["PivotMeasureOut"][];
+            /** Indicators */
+            indicators: components["schemas"]["PivotIndicatorOut"][];
         };
         /**
          * PublicationApcPayment
@@ -4488,8 +4602,8 @@ export interface components {
             is_corresponding: boolean | null;
             /** Contribution Id */
             contribution_id: number | null;
-            /** Hal Collections */
-            hal_collections: string[] | null;
+            /** Hal Status */
+            hal_status: string | null;
             /**
              * Record Urls
              * @description Lien vers le portail de chaque source où la publication est présente.
@@ -4526,13 +4640,6 @@ export interface components {
             structures: {
                 [key: string]: components["schemas"]["StructureInfo"];
             };
-        };
-        /** PublicationYearCount */
-        PublicationYearCount: {
-            /** Year */
-            year: number;
-            /** Count */
-            count: number;
         };
         /**
          * PublicationsFacetsResponse
@@ -4593,22 +4700,6 @@ export interface components {
             publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
-        };
-        /**
-         * PublisherDashboardResponse
-         * @description GET /api/publishers/{id}/dashboard : agrégats pour l'exploration visuelle.
-         *
-         *     `serial_types` : distribution des types des revues de l'éditeur (qualifie son portfolio). `doc_types` / `oa_statuses` : distributions des publications de l'éditeur, utiles pour le repérage d'incohérences.
-         */
-        PublisherDashboardResponse: {
-            /** Total Publications */
-            total_publications: number;
-            /** Serial Types */
-            serial_types: components["schemas"]["SerialTypeCount"][];
-            /** Doc Types */
-            doc_types: components["schemas"]["infrastructure__read_models__publishers__models__DocTypeCount"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["infrastructure__read_models__publishers__models__OaStatusCount"][];
         };
         /**
          * PublisherListItem
@@ -4813,26 +4904,6 @@ export interface components {
             phases: components["schemas"]["PhaseBrief"][];
         };
         /**
-         * SerialDashboardResponse
-         * @description GET /api/serials/{id}/dashboard : distributions des publications d'une revue.
-         *
-         *     Les compteurs sont bruts, `None` et `unknown` compris : c'est à l'œil que se repèrent les incohérences, par exemple des publications `article` dans une revue de type `proceedings`.
-         *
-         *     `expected_doc_types` et `expected_oa_statuses` listent les valeurs attendues pour le `serial_type` et le `oa_model` de la revue (`domain.serials.expected`), affichées au-dessus de chaque tableau. Elles sont vides quand la revue n'a pas la valeur correspondante, ou que celle-ci n'est pas mappée.
-         */
-        SerialDashboardResponse: {
-            /** Total Publications */
-            total_publications: number;
-            /** Doc Types */
-            doc_types: components["schemas"]["infrastructure__read_models__serials__models__DocTypeCount"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["infrastructure__read_models__serials__models__OaStatusCount"][];
-            /** Expected Doc Types */
-            expected_doc_types: string[];
-            /** Expected Oa Statuses */
-            expected_oa_statuses: string[];
-        };
-        /**
          * SerialDetailResponse
          * @description GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
          *
@@ -4974,16 +5045,6 @@ export interface components {
          * @description Compte des publications dont le `doc_type` canonique changerait si le `serial_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
          */
         SerialTypeChangeImpact: {
-            /** Count */
-            count: number;
-        };
-        /**
-         * SerialTypeCount
-         * @description Compteur de revues par `serial_type` pour un éditeur.
-         */
-        SerialTypeCount: {
-            /** Serial Type */
-            serial_type: string | null;
             /** Count */
             count: number;
         };
@@ -5200,21 +5261,6 @@ export interface components {
              */
             readonly record_url: string;
         };
-        /** StatsFacetsResponse */
-        StatsFacetsResponse: {
-            /** Years */
-            years: components["schemas"]["FacetOption"][];
-            /** Labs */
-            labs: components["schemas"]["FacetOption"][];
-            /** Oa Statuses */
-            oa_statuses: components["schemas"]["FacetOption"][];
-            /** Licenses */
-            licenses: components["schemas"]["FacetOption"][];
-            /** Apc */
-            apc: components["schemas"]["FacetOption"][];
-            /** Doc Types */
-            doc_types: components["schemas"]["FacetOption"][];
-        };
         /** StructureAddressOut */
         StructureAddressOut: {
             /** Id */
@@ -5238,18 +5284,6 @@ export interface components {
             readonly pages: number;
         };
         /**
-         * StructureCollaborations
-         * @description Articles de la structure, selon qu'ils comportent ou non une affiliation étrangère.
-         */
-        StructureCollaborations: {
-            /** Total Articles */
-            total_articles: number;
-            /** International */
-            international: number;
-            /** Domestic */
-            domestic: number;
-        };
-        /**
          * StructureCreate
          * @description Champs d'une structure à créer.
          */
@@ -5271,15 +5305,6 @@ export interface components {
             api_ids?: {
                 [key: string]: string | string[];
             } | null;
-        };
-        /** StructureDashboardResponse */
-        StructureDashboardResponse: {
-            /** Publications By Year */
-            publications_by_year: components["schemas"]["PublicationYearCount"][];
-            oa: components["schemas"]["DashboardOa"];
-            collab: components["schemas"]["StructureCollaborations"];
-            /** Top Countries */
-            top_countries: components["schemas"]["StructureTopCountry"][];
         };
         /**
          * StructureDeletionImpact
@@ -5323,7 +5348,7 @@ export interface components {
         };
         /**
          * StructureListItem
-         * @description Ligne résumée de `/api/structures` (liste + recherche).
+         * @description Ligne résumée d'une structure, dans la liste paginée et dans le référentiel complet.
          */
         StructureListItem: {
             /** Id */
@@ -5344,6 +5369,19 @@ export interface components {
             perimeter_ids: number[];
             /** Tutelles */
             tutelles: components["schemas"]["RelatedStructureOut"][] | null;
+        };
+        /** StructureListResponse */
+        StructureListResponse: {
+            /** Total */
+            total: number;
+            /** Page */
+            page: number;
+            /** Per Page */
+            per_page: number;
+            /** Structures */
+            structures: components["schemas"]["StructureListItem"][];
+            /** Pages */
+            readonly pages: number;
         };
         /**
          * StructureOut
@@ -5421,15 +5459,6 @@ export interface components {
             /** Name */
             name: string;
         };
-        /** StructureTopCountry */
-        StructureTopCountry: {
-            /** Code */
-            code: string;
-            /** Name */
-            name: string;
-            /** Count */
-            count: number;
-        };
         /**
          * StructureTutelleCreateResponse
          * @description Réponse de POST /api/structures/tutelles, polymorphe : soit la tutelle créée, soit `{status: "already_exists"}`.
@@ -5472,6 +5501,20 @@ export interface components {
             api_ids?: {
                 [key: string]: string | string[];
             } | null;
+        };
+        /**
+         * StructuresFacetsResponse
+         * @description Facettes de la liste des structures.
+         *
+         *     `types` laisse le libellé au client. `tutelles` et `perimeters` donnent le libellé de la structure ou du périmètre ; `perimeters` se termine par l'option `none`, hors de tout périmètre. Chaque décompte écarte le filtre de sa propre facette.
+         */
+        StructuresFacetsResponse: {
+            /** Types */
+            types: components["schemas"]["FacetOption"][];
+            /** Tutelles */
+            tutelles: components["schemas"]["FacetOption"][];
+            /** Perimeters */
+            perimeters: components["schemas"]["FacetOption"][];
         };
         /**
          * SubjectDetailResponse
@@ -5706,54 +5749,6 @@ export interface components {
             /** No */
             no: number;
         };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour un éditeur.
-         */
-        infrastructure__read_models__publishers__models__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour un éditeur.
-         */
-        infrastructure__read_models__publishers__models__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
-            /** Count */
-            count: number;
-        };
-        /**
-         * DocTypeCount
-         * @description Compteur de publications par `doc_type` pour une revue.
-         *
-         *     `expected` est vrai si ce `doc_type` figure parmi les valeurs attendues pour le `serial_type` de la revue (`domain.serials.expected`), ce qui laisse le frontend signaler les autres.
-         */
-        infrastructure__read_models__serials__models__DocTypeCount: {
-            /** Doc Type */
-            doc_type: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
-        };
-        /**
-         * OaStatusCount
-         * @description Compteur de publications par `oa_status` pour une revue.
-         *
-         *     `expected` est vrai si ce `oa_status` figure parmi les valeurs attendues pour le `oa_model` de la revue (`domain.serials.expected`).
-         */
-        infrastructure__read_models__serials__models__OaStatusCount: {
-            /** Oa Status */
-            oa_status: string | null;
-            /** Count */
-            count: number;
-            /** Expected */
-            expected: boolean;
-        };
     };
     responses: never;
     parameters: never;
@@ -5836,98 +5831,28 @@ export interface operations {
             };
         };
     };
-    stats_facets_api_stats_facets_get: {
-        parameters: {
-            query?: {
-                lab_id?: string;
-                year?: string;
-                publisher_id?: string;
-                serial_id?: string;
-                partner_ror?: string;
-                oa_status?: string;
-                license?: string;
-                has_apc?: string;
-                doc_type?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StatsFacetsResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    stats_entity_facet_api_stats_facets_entities_get: {
-        parameters: {
-            query: {
-                kind: "publisher" | "serial" | "person" | "subject" | "partner";
-                entity_search?: string;
-                lab_id?: string;
-                year?: string;
-                publisher_id?: string;
-                serial_id?: string;
-                partner_ror?: string;
-                oa_status?: string;
-                license?: string;
-                has_apc?: string;
-                doc_type?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["EntityFacetResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     collaborations_api_stats_collaborations_get: {
         parameters: {
             query?: {
+                search?: string;
                 lab_id?: string;
                 year?: string;
-                publisher_id?: string;
-                serial_id?: string;
-                partner_ror?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
+                monograph_id?: number | null;
+                person_id?: number | null;
+                author_id?: number | null;
+                subject_id?: string;
+                access?: string;
                 oa_status?: string;
                 license?: string;
-                has_apc?: string;
+                source_filter?: string;
                 doc_type?: string;
+                excluded_doc_type?: string;
+                has_apc?: string;
+                country?: string;
+                language?: string;
+                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -5978,18 +5903,27 @@ export interface operations {
     pivot_api_stats_pivot_get: {
         parameters: {
             query?: {
-                measure?: string;
-                group?: string;
-                group2?: string;
+                indicator?: string;
+                compare?: string;
+                search?: string;
                 lab_id?: string;
                 year?: string;
-                publisher_id?: string;
-                serial_id?: string;
-                partner_ror?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
+                monograph_id?: number | null;
+                person_id?: number | null;
+                author_id?: number | null;
+                subject_id?: string;
+                access?: string;
                 oa_status?: string;
                 license?: string;
-                has_apc?: string;
+                source_filter?: string;
                 doc_type?: string;
+                excluded_doc_type?: string;
+                has_apc?: string;
+                country?: string;
+                language?: string;
+                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6055,13 +5989,13 @@ export interface operations {
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
-                is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 language?: string;
+                partner_ror?: string;
+                is_corresponding?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6109,13 +6043,13 @@ export interface operations {
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
-                is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 language?: string;
+                partner_ror?: string;
+                is_corresponding?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6163,13 +6097,13 @@ export interface operations {
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
-                is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 language?: string;
+                partner_ror?: string;
+                is_corresponding?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6369,13 +6303,13 @@ export interface operations {
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
-                is_corresponding?: string;
                 has_apc?: string;
                 country?: string;
                 language?: string;
+                partner_ror?: string;
+                is_corresponding?: string;
                 hal_status?: string;
                 in_perimeter?: string;
-                partner_ror?: string;
             };
             header?: never;
             path?: never;
@@ -6829,9 +6763,13 @@ export interface operations {
     list_structures_api_structures_get: {
         parameters: {
             query?: {
-                structure_type?: string;
+                page?: number;
+                per_page?: number;
+                sort?: "acronym_asc" | "acronym_desc" | "name_asc" | "name_desc" | "tutelles_asc" | "tutelles_desc";
                 search?: string;
-                in_perimeter?: boolean;
+                structure_type?: string;
+                tutelle_id?: string;
+                perimeter_id?: string;
             };
             header?: never;
             path?: never;
@@ -6845,7 +6783,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["StructureListItem"][];
+                    "application/json": components["schemas"]["StructureListResponse"];
                 };
             };
             /** @description Validation Error */
@@ -6879,6 +6817,95 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StructureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_structures_api_structures_all_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructureListItem"][];
+                };
+            };
+        };
+    };
+    structures_facets_api_structures_facets_get: {
+        parameters: {
+            query?: {
+                search?: string;
+                structure_type?: string;
+                tutelle_id?: string;
+                perimeter_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StructuresFacetsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_structures_csv_api_structures_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "acronym_asc" | "acronym_desc" | "name_asc" | "name_desc" | "tutelles_asc" | "tutelles_desc";
+                search?: string;
+                structure_type?: string;
+                tutelle_id?: string;
+                perimeter_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7254,37 +7281,6 @@ export interface operations {
             };
         };
     };
-    get_structure_dashboard_api_structures__structure_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                structure_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StructureDashboardResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_structure_subjects_api_structures__structure_id__subjects_get: {
         parameters: {
             query?: {
@@ -7413,6 +7409,49 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_persons_csv_api_persons_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                search?: string;
+                department?: string;
+                role?: string;
+                has_orcid?: boolean | null;
+                has_idhal?: boolean | null;
+                has_idref?: boolean | null;
+                has_rh?: boolean | null;
+                has_pending_forms?: boolean | null;
+                has_pending_identifiers?: boolean | null;
+                exclusion?: string;
+                active?: boolean | null;
+                lab_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -7806,37 +7845,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PersonAddressesResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    person_dashboard_api_persons__person_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                person_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PersonDashboardResponse"];
                 };
             };
             /** @description Validation Error */
@@ -8570,6 +8578,117 @@ export interface operations {
             };
         };
     };
+    export_duplicate_accounts_csv_api_hal_problems_duplicate_accounts_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_duplicate_publications_by_doi_csv_api_hal_problems_duplicate_publications_doi_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_duplicate_publications_by_metadata_csv_api_hal_problems_duplicate_publications_meta_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    export_missing_collections_csv_api_hal_problems_missing_collections_export_csv_get: {
+        parameters: {
+            query: {
+                lab_id: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_affiliation_conflicts_csv_api_hal_problems_affiliation_conflicts_export_csv_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
     list_config_api_config_get: {
         parameters: {
             query?: never;
@@ -8818,6 +8937,41 @@ export interface operations {
             };
         };
     };
+    export_publishers_csv_api_publishers_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "name_asc" | "name_desc" | "serials_asc" | "serials_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                publisher_type?: string;
+                country?: string;
+                has_publications?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_publishers_api_publishers_get: {
         parameters: {
             query?: {
@@ -8908,37 +9062,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OkResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_publisher_dashboard_api_publishers__publisher_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                publisher_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PublisherDashboardResponse"];
                 };
             };
             /** @description Validation Error */
@@ -9182,6 +9305,43 @@ export interface operations {
             };
         };
     };
+    export_serials_csv_api_serials_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                publisher_id?: number | null;
+                serial_type?: string;
+                is_in_doaj?: boolean | null;
+                oa_model?: string;
+                has_publications?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     serials_with_same_title_count_api_serials_same_titles_count_get: {
         parameters: {
             query?: never;
@@ -9408,37 +9568,6 @@ export interface operations {
             };
         };
     };
-    get_serial_dashboard_api_serials__serial_id__dashboard_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                serial_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SerialDashboardResponse"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     get_serial_subjects_api_serials__serial_id__subjects_get: {
         parameters: {
             query?: {
@@ -9567,6 +9696,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MonographListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_monographs_csv_api_monographs_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                type?: string;
+                year?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -9789,6 +9954,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_subjects_csv_api_subjects_export_csv_get: {
+        parameters: {
+            query?: {
+                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
+                search?: string | null;
+                /** @description Nombre minimal de publications portant le sujet */
+                min_count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

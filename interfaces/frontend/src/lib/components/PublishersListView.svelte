@@ -1,7 +1,8 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { asset, resolve } from '$app/paths';
@@ -16,6 +17,8 @@
 	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -131,8 +134,17 @@
 		publishers.load();
 	}
 
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
+		const q = search.trim();
+		if (q) params.set('search', q);
+		return withBase(`/api/publishers/export.csv?${paramsToQuery(params)}`);
+	}
+
+	// Un type inconnu est une valeur absente : la cellule reste vide.
 	function publisherTypeLabel(value: string | null): string {
-		if (!value) return '';
+		if (!value || value === 'unknown') return '';
 		const opt = facets.options.publisherTypes.find((o) => o.value === value);
 		return opt ? opt.text : value;
 	}
@@ -155,39 +167,33 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		placeholder="Rechercher dans les noms"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput}
-	/>
-	<FacetDropdown
-		label={filterLabels.types}
-		options={facets.options.publisherTypes}
-		bind:selected={selectedPublisherTypes}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label={filterLabels.countries}
-		options={facets.options.countries}
-		searchable
-		bind:selected={selectedCountries}
-		onchange={onFilterChange}
-	/>
-	{#if isAdmin()}
+<ListToolbar bind:search placeholder="Rechercher dans les noms" onsearch={onSearchInput} list={publishers} one="éditeur" many="éditeurs" exportUrl={exportCsvUrl()}>
+	{#snippet filters()}
 		<FacetDropdown
-			label="Publications"
-			options={facets.options.publications}
-			bind:selected={selectedPublications}
+			label={filterLabels.types}
+			options={facets.options.publisherTypes}
+			bind:selected={selectedPublisherTypes}
 			onchange={onFilterChange}
 		/>
-	{/if}
-	<ResultCount list={publishers} one="éditeur" many="éditeurs" />
-</div>
+		<FacetDropdown
+			label={filterLabels.countries}
+			options={facets.options.countries}
+			searchable
+			bind:selected={selectedCountries}
+			onchange={onFilterChange}
+		/>
+		{#if isAdmin()}
+			<FacetDropdown
+				label="Publications"
+				options={facets.options.publications}
+				bind:selected={selectedPublications}
+				onchange={onFilterChange}
+			/>
+		{/if}
+	{/snippet}
+</ListToolbar>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table publishers-table">
 	<thead>
 		<tr>
@@ -225,10 +231,12 @@
 				</td>
 				<td class="muted">{publisherTypeLabel(p.publisher_type)}</td>
 				<td class="muted">{p.country?.toUpperCase() ?? ''}</td>
-				<td class="prefixes">
-					{#each p.doi_prefixes as dp (dp.prefix)}
-						<span class="prefix-chip" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
-					{/each}
+				<td>
+					<div class="id-list">
+						{#each p.doi_prefixes as dp (dp.prefix)}
+							<span class="id-badge" title="RA : {dp.ra}{dp.crossref_member_id ? ` / member ${dp.crossref_member_id}` : ''}">{dp.prefix}</span>
+						{/each}
+					</div>
 				</td>
 				<td class="num">{p.serial_count.toLocaleString('fr-FR')}</td>
 				<td class="num">{p.publication_count.toLocaleString('fr-FR')}</td>
@@ -240,7 +248,7 @@
 		{/if}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <Pagination
 	page={publishers.page}
@@ -258,16 +266,6 @@
 	.muted { color: var(--muted); }
 
 	.crossref-link { text-decoration: none; margin-left: 5px; vertical-align: text-bottom; }
-	.prefixes { display: flex; flex-wrap: wrap; gap: 3px; }
-	.prefix-chip {
-		background: var(--border-subtle);
-		color: var(--muted);
-		padding: 1px 6px;
-		border-radius: var(--radius);
-		font-size: 0.75rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
 
 	.actions { white-space: nowrap; position: relative; }
 </style>

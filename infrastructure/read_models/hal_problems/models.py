@@ -77,8 +77,6 @@ class HalMissingCollectionPublication(BaseModel):
     doc_type: str
     doi: str | None
     halids: list[str] | None = Field(exclude=True)
-    outside_perimeter_collections: bool
-    """Le dépôt HAL ne figure dans aucune collection des structures racines du périmètre : il a été trouvé par la collection d'un autre laboratoire, non par celle de l'établissement."""
 
     @computed_field
     @property

@@ -1,7 +1,8 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -16,6 +17,8 @@
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
@@ -77,6 +80,12 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
+	}
+
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
+		return withBase(`/api/serials/export.csv?${paramsToQuery(params)}`);
 	}
 
 	const serials = usePaginatedFetch<Serial>({
@@ -154,10 +163,6 @@
 		serials.load();
 	}
 
-	function formatIssns(j: Serial): string {
-		return j.issns.join(' / ');
-	}
-
 	function serialTypeLabel(value: string | null): string {
 		if (!value) return '';
 		const opt = facets.options.serialTypes.find((o) => o.value === value);
@@ -184,54 +189,48 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		placeholder="Rechercher par titre ou ISSN"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput}
-	/>
-	{#if !publisherFixed}
-		<EntityFilter
-			label={filterLabels.publisher}
-			endpoint="/api/serials/facets"
-			kind="publisher"
-			buildParams={buildFilterParams}
-			selected={selectedPublisher}
-			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
-		/>
-	{/if}
-	<FacetDropdown
-		label={filterLabels.types}
-		options={facets.options.serialTypes}
-		bind:selected={selectedSerialTypes}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label="DOAJ"
-		options={facets.options.doaj}
-		bind:selected={selectedDoaj}
-		onchange={onFilterChange}
-	/>
-	<FacetDropdown
-		label="Modèle OA"
-		options={facets.options.oaModels}
-		bind:selected={selectedOaModels}
-		onchange={onFilterChange}
-	/>
-	{#if isAdmin()}
+<ListToolbar bind:search placeholder="Rechercher par titre ou ISSN" onsearch={onSearchInput} list={serials} one="publication en série" many="publications en série" exportUrl={exportCsvUrl()}>
+	{#snippet filters()}
+		{#if !publisherFixed}
+			<EntityFilter
+				label={filterLabels.publisher}
+				endpoint="/api/serials/facets"
+				kind="publisher"
+				buildParams={buildFilterParams}
+				selected={selectedPublisher}
+				onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+			/>
+		{/if}
 		<FacetDropdown
-			label="Publications"
-			options={facets.options.publications}
-			bind:selected={selectedPublications}
+			label={filterLabels.types}
+			options={facets.options.serialTypes}
+			bind:selected={selectedSerialTypes}
 			onchange={onFilterChange}
 		/>
-	{/if}
-	<ResultCount list={serials} one="publication en série" many="publications en série" />
-</div>
+		<FacetDropdown
+			label="DOAJ"
+			options={facets.options.doaj}
+			bind:selected={selectedDoaj}
+			onchange={onFilterChange}
+		/>
+		<FacetDropdown
+			label="Modèle OA"
+			options={facets.options.oaModels}
+			bind:selected={selectedOaModels}
+			onchange={onFilterChange}
+		/>
+		{#if isAdmin()}
+			<FacetDropdown
+				label="Publications"
+				options={facets.options.publications}
+				bind:selected={selectedPublications}
+				onchange={onFilterChange}
+			/>
+		{/if}
+	{/snippet}
+</ListToolbar>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table journals-table">
 	<thead>
 		<tr>
@@ -263,7 +262,7 @@
 							<span class="badge-doaj" title="Indexée dans DOAJ">DOAJ</span>
 						{/if}
 					{/if}				</td>
-				<td class="issn-cell">{formatIssns(j)}</td>
+				<td><div class="id-list">{#each j.issns as issn (issn)}<span class="id-badge">{issn}</span>{/each}</div></td>
 				{#if !publisherFixed}
 					<td class="muted">
 						{#if j.publisher_name}
@@ -285,7 +284,7 @@
 		{/if}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <Pagination
 	page={serials.page}
@@ -298,19 +297,8 @@
 />
 
 <style>
-	/* Assez large pour que le texte indicatif du champ tienne en entier. */
-	.toolbar input[type='search'] {
-		width: 280px;
-	}
-
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
-	.issn-cell {
-		color: var(--muted);
-		font-size: 0.85rem;
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
 	.muted { color: var(--muted); }
 
 

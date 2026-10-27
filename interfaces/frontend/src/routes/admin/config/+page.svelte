@@ -1,6 +1,7 @@
 <script lang="ts">
+  import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import { onMount } from "svelte";
   import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
@@ -12,6 +13,7 @@
   import type { components } from "#lib/api/schema.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
+  type StructureListResponse = components["schemas"]["StructureListResponse"];
 
   type ConfigItem = components["schemas"]["ConfigItem"];
 
@@ -115,7 +117,8 @@
       if (perimModal) perimModal.structResults = [];
       return;
     }
-    perimModal.structResults = await structureSearch<StructureListItem[]>(`/api/structures?search=${encodeURIComponent(perimModal.structSearch)}`);
+    const found = await structureSearch<StructureListResponse>(`/api/structures?per_page=20&search=${encodeURIComponent(perimModal.structSearch)}`);
+    perimModal.structResults = found.structures;
   }
 
   function perimAddStruct(s: any) {
@@ -245,10 +248,7 @@
   onMount(load);
 </script>
 
-<svelte:head><title>{pageTitle("Configuration")}</title></svelte:head>
-
-<h1>Configuration du pipeline</h1>
-<p class="subtitle">Les modifications prennent effet au prochain lancement du pipeline.</p>
+<PageHeader title="Configuration" />
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
@@ -263,7 +263,7 @@
 {/snippet}
 
 <!-- ═══ ANNÉES ═══ -->
-<h3 class="section-title">Options d'extraction</h3>
+<h2 class="section-title">Options d'extraction</h2>
 <div class="config-grid">
   {#each ["pipeline_start_year_full"] as key}
     {@const item = configByKey(key)}
@@ -296,7 +296,7 @@
 </div>
 
 <!-- ═══ DÉLAIS ═══ -->
-<h3 class="section-title">Délais de réinterrogation</h3>
+<h2 class="section-title">Délais de réinterrogation</h2>
 <p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
 <div class="config-grid">
   {#each DELAYS as delay (delay.key)}
@@ -316,88 +316,81 @@
 </div>
 
 <!-- ═══ PÉRIMÈTRES ═══ -->
-<h3 class="section-title">Périmètres</h3>
+<h2 class="section-title">Périmètres</h2>
 
-<h4 class="subsection-title">Définition des périmètres</h4>
+<h3 class="subsection-title">Définition des périmètres</h3>
 <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<table class="data-table perimeters-table">
-  <thead>
-    <tr>
-      <th>Code</th>
-      <th>Nom</th>
-      <th class="perim-structs">Structures racines</th>
-      <th class="num">Total</th>
-      <th></th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each perimeters as perim (perim.id)}
+<TableScroll>
+  <table class="data-table perimeters-table">
+    <thead>
       <tr>
-        <td class="perim-code">{perim.code}</td>
-        <td class="perim-name">{perim.name}</td>
-        <td class="perim-structs">
-          <div class="perimeter-rules">
-            {#each perim.structures as struct (struct.id)}
-              <span class="tag">{structureLabel(struct)}</span>
-            {/each}
-          </div>
-        </td>
-        <td class="num">{perim.structure_count}</td>
-        <td class="perim-actions">
-          <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
-          <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
-        </td>
+        <th>Code</th>
+        <th>Nom</th>
+        <th class="perim-structs">Structures racines</th>
+        <th class="num">Total</th>
+        <th></th>
       </tr>
-    {/each}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {#each perimeters as perim (perim.id)}
+        <tr>
+          <td class="perim-code">{perim.code}</td>
+          <td class="perim-name">{perim.name}</td>
+          <td class="perim-structs">
+            <div class="perimeter-rules">
+              {#each perim.structures as struct (struct.id)}
+                <span class="tag">{structureLabel(struct)}</span>
+              {/each}
+            </div>
+          </td>
+          <td class="num">{perim.structure_count}</td>
+          <td class="perim-actions">
+            <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
+            <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
+          </td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
+</TableScroll>
 <div class="perim-new">
   <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 </div>
 
-<h4 class="subsection-title">Rôle des périmètres</h4>
-<table class="data-table perimeters-table">
-  <thead>
-    <tr>
-      <th class="role-phase-col">Phase</th>
-      <th class="role-perimeter-col">Périmètre</th>
-    </tr>
-  </thead>
-  <tbody>
-    {#each PERIMETER_ROLES as role (role.key)}
-      {@const item = configByKey(role.key)}
-      {#if item}
-        <tr>
-          <td class="role-phase-col">
-            <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
-          </td>
-          <td class="role-perimeter-col">
-            <select
-              class="config-select"
-              value={item.value}
-              onchange={async (e) => {
-                const target = e.target as HTMLSelectElement;
-                try {
-                  await configApi.setValue(role.key, target.value);
-                  await load();
-                } catch {}
-              }}
-            >
-              {#each perimeters as p (p.id)}
-                <option value={p.code}>{p.name} ({p.code})</option>
-              {/each}
-            </select>
-          </td>
-        </tr>
-      {/if}
-    {/each}
-  </tbody>
-</table>
+<h3 class="subsection-title">Rôle des périmètres</h3>
+<div class="config-grid">
+  {#each PERIMETER_ROLES as role (role.key)}
+    {@const item = configByKey(role.key)}
+    {#if item}
+      <div class="config-row">
+        <span class="config-label">
+          <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
+        </span>
+        <select
+          class="select"
+          aria-label="Périmètre : {role.label}"
+          value={item.value}
+          onchange={async (e) => {
+            const target = e.target as HTMLSelectElement;
+            try {
+              await configApi.setValue(role.key, target.value);
+              await load();
+            } catch {}
+          }}
+        >
+          {#each perimeters as p (p.id)}
+            <option value={p.code}>{p.name} ({p.code})</option>
+          {/each}
+        </select>
+      </div>
+    {/if}
+  {/each}
+</div>
 
 <!-- ═══ AFFICHAGE ═══ -->
-<h3 class="section-title">Affichage</h3>
+<h2 class="section-title">Affichage</h2>
 <div class="config-grid">
-  <div class="config-row" style="flex-wrap: wrap;">
+  <div class="config-row">
     <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
     <div class="type-checks">
       {#each STRUCTURE_TYPES as t (t.value)}
@@ -443,52 +436,37 @@
 {/if}
 
 <style>
-  h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin: 0 auto 4px;
-    max-width: 800px;
-  }
-  .subtitle {
-    color: var(--muted);
-    font-size: 0.9rem;
-    margin: 0 auto 20px;
-    max-width: 800px;
-  }
   .section-title {
-    margin: 24px auto 8px;
-    max-width: 800px;
+    margin: 24px 0 8px;
   }
-  /* Bouton « Nouveau périmètre » sous la table, aligné à gauche de la colonne centrée. */
   .perim-new {
-    max-width: 800px;
-    margin: 8px auto 0;
+    margin-top: 8px;
   }
   .info-box {
-    max-width: 800px;
-    margin: 4px auto 12px;
+    margin: 4px 0 12px;
   }
   .subsection-title {
     font-size: 0.85rem;
     font-weight: 600;
     color: var(--muted);
-    margin: 16px auto 6px;
-    max-width: 800px;
+    margin: 16px 0 6px;
   }
 
   /* Une liste par section, réglages séparés par des filets. */
   .config-grid {
     display: flex;
     flex-direction: column;
-    max-width: 800px;
-    margin: 0 auto 8px;
+    margin-bottom: 8px;
   }
+  /* Libellés dans une colonne de largeur fixe : la valeur et son bouton suivent le libellé, alignés d'une ligne à l'autre. */
   .config-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(0, 22rem) auto auto;
+    justify-content: start;
     align-items: center;
-    gap: 10px;
+    column-gap: 16px;
     min-height: 44px;
-    padding: 4px 4px 4px 0;
+    padding: 4px 0;
     border-bottom: 1px solid var(--border-subtle);
   }
   .config-row:last-child {
@@ -496,34 +474,26 @@
   }
   .config-label {
     font-size: 0.9rem;
-    min-width: 180px;
   }
-  /* Valeur alignée à droite, contre le bouton : d'une ligne à l'autre, les valeurs se superposent. */
   .config-value-inline {
     font-size: 0.9rem;
-    flex: 1;
-    text-align: right;
     font-variant-numeric: tabular-nums;
-    margin-right: 6px;
   }
   .config-editor-inline {
-    width: 80px;
+    width: 100px;
     font-family: var(--mono);
     font-size: 0.85rem;
     padding: 3px 6px;
     border: 1px solid var(--accent);
     border-radius: var(--radius);
-    flex: 1;
   }
   .config-actions-inline {
     display: flex;
     gap: 4px;
-    margin-left: auto;
   }
 
   .perimeters-table {
-    max-width: 800px;
-    margin: 0 auto 10px;
+    margin-bottom: 10px;
   }
   .perimeters-table td {
     vertical-align: middle;
@@ -601,25 +571,10 @@
   .picker-item:hover {
     background: var(--accent-light);
   }
-  .config-select {
-    padding: 3px 6px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-  }
   /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
   .role-phase {
     border-bottom: 1px dotted var(--muted);
     cursor: help;
-  }
-  /* La colonne Phase absorbe la largeur : le sélecteur de périmètre se colle au bord droit. */
-  .perimeters-table .role-phase-col {
-    width: 100%;
-  }
-  .perimeters-table .role-perimeter-col {
-    text-align: right;
-    white-space: nowrap;
   }
   .type-checks {
     display: flex;

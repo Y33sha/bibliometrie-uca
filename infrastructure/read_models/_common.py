@@ -85,27 +85,12 @@ class StructureRef(BaseModel):
     name: str
 
 
-class PublicationYearCount(BaseModel):
-    year: int
-    count: int
-
-
-class DashboardOa(BaseModel):
-    open_access: int
-    embargoed: int
-    closed: int
-    unknown: int
-    total: int
-
-
 __all__ = [
-    "DashboardOa",
     "EntityFacetItem",
     "EntityFacetResponse",
     "EntityKind",
     "FacetOption",
     "PaginatedResponse",
-    "PublicationYearCount",
     "page_count",
     "StructureRef",
     "YesNoCount",

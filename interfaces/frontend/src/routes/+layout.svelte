@@ -93,9 +93,8 @@
 {/snippet}
 {#snippet adminLabel()}Administration{/snippet}
 {#snippet adminItems()}
-  <span class="nav-dropdown-group">Pipeline</span>
-  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Config</a>
-  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Logs</a>
+  <a href={resolve('admin/config')} class:active={isActive("/admin/config")}>Configuration</a>
+  <a href={resolve('admin/pipeline')} class:active={isActive("/admin/pipeline")}>Pipeline</a>
   <span class="nav-dropdown-group">Adresses</span>
   <a href={resolve('admin/addresses')} class:active={isActive("/admin/addresses")}>Affiliations</a>
   <a href={resolve('admin/countries')} class:active={isActive("/admin/countries")}>Pays</a>
@@ -332,6 +331,12 @@
     letter-spacing: 1px;
     text-transform: uppercase;
   }
+  /* Une rubrique qui suit des entrées en est séparée par un filet. */
+  .nav-dropdown-group:not(:first-child) {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
   .nav-dropdown-action {
     display: block;
     width: 100%;
@@ -352,7 +357,7 @@
   .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 24px var(--page-gutter);
   }
   /* Cible du lien d'évitement : le focus s'y pose sans contour, la zone n'étant pas un contrôle. */
   .container:focus {

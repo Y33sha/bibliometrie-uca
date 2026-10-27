@@ -7,29 +7,6 @@ dynamiques).
 import pytest
 
 
-class TestStatsEntityFacet:
-    def test_serial(self, client):
-        r = client.get("/api/stats/facets/entities", params={"kind": "serial"})
-        assert r.status_code == 200
-
-    def test_publisher_with_search_and_filters(self, client):
-        r = client.get(
-            "/api/stats/facets/entities",
-            params={"kind": "publisher", "entity_search": "els", "year": "2024", "serial_id": "1"},
-        )
-        assert r.status_code == 200
-
-
-class TestStatsFacets:
-    def test_facets(self, client):
-        r = client.get("/api/stats/facets")
-        assert r.status_code == 200
-
-    def test_facets_with_filter(self, client):
-        r = client.get("/api/stats/facets", params={"year": "2024"})
-        assert r.status_code == 200
-
-
 class TestCollaborations:
     def test_returns_country_counts(self, client):
         r = client.get("/api/stats/collaborations")
@@ -42,41 +19,54 @@ class TestCollaborations:
 
 
 class TestPivot:
-    def test_schema_lists_dimensions_and_measures(self, client):
+    def test_schema_lists_dimensions_and_indicators(self, client):
         r = client.get("/api/stats/pivot/schema")
         assert r.status_code == 200
         body = r.json()
         assert body["dimensions"]
-        assert body["measures"]
+        apc = next(i for i in body["indicators"] if i["key"] == "apc_amount")
+        assert apc["unit"] == "€ HT"
 
-    def test_default_measure_without_grouping(self, client):
+    def test_default_indicator(self, client):
         r = client.get("/api/stats/pivot")
         assert r.status_code == 200
+        assert r.json()["groups"] == ["doc_type_grouped"]
 
-    def test_single_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"measure": "publication_count", "group": "year"})
+    def test_indicator_with_comparison(self, client):
+        r = client.get("/api/stats/pivot", params={"indicator": "apc_amount", "compare": "year"})
         assert r.status_code == 200
+        body = r.json()
+        assert body["measure"] == "apc_amount"
+        assert body["groups"] == ["oa_voie", "year"]
 
-    def test_double_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"group": "year", "group2": "doc_type_grouped"})
+    def test_rejects_unknown_indicator(self, client):
+        r = client.get("/api/stats/pivot", params={"indicator": "inexistant"})
+        assert r.status_code == 422
+
+    def test_rejects_a_dimension_that_is_not_comparable(self, client):
+        r = client.get("/api/stats/pivot", params={"compare": "oa_access"})
+        assert r.status_code == 422
+
+
+class TestStatsAcceptListFilters:
+    """Les statistiques lisent les filtres de la liste, sauf ceux qui supposent un seul laboratoire ou une personne."""
+
+    @pytest.mark.parametrize(
+        ("param", "value"),
+        [("access", "inconnu"), ("source_filter", "inconnu"), ("subject_id", "x")],
+    )
+    def test_reads_list_filters(self, client, param, value):
+        r = client.get("/api/stats/pivot", params={param: value})
+        assert r.status_code == 422
+
+    def test_accepts_search_country_and_author(self, client):
+        params = {"search": "quantum", "country": "de", "author_id": "1", "lab_id": "none"}
+        assert client.get("/api/stats/pivot", params=params).status_code == 200
+
+    @pytest.mark.parametrize("param", ["hal_status", "is_corresponding", "in_perimeter"])
+    def test_ignores_context_filters(self, client, param):
+        r = client.get("/api/stats/pivot", params={param: "inconnu"})
         assert r.status_code == 200
-
-    def test_rejects_a_dimension_that_is_not_groupable(self, client):
-        """`doc_type` se filtre mais ne se ventile pas ; `doc_type_grouped` est sa forme groupable."""
-        r = client.get("/api/stats/pivot", params={"group": "doc_type"})
-        assert r.status_code == 422
-
-    def test_rejects_second_grouping_without_the_first(self, client):
-        r = client.get("/api/stats/pivot", params={"group2": "year"})
-        assert r.status_code == 422
-
-    def test_rejects_unknown_measure(self, client):
-        r = client.get("/api/stats/pivot", params={"measure": "inexistante"})
-        assert r.status_code == 422
-
-    def test_rejects_repeated_grouping(self, client):
-        r = client.get("/api/stats/pivot", params={"group": "year", "group2": "year"})
-        assert r.status_code == 422
 
 
 class TestStatsClosedVocabularyFilters:
@@ -95,6 +85,6 @@ class TestStatsClosedVocabularyFilters:
         ],
     )
     def test_refuses_a_value_outside_the_vocabulary(self, client, param, value):
-        r = client.get("/api/stats/facets", params={param: value})
+        r = client.get("/api/stats/pivot", params={param: value})
         assert r.status_code == 422
         assert value in r.json()["detail"]

@@ -9,10 +9,8 @@
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
-	import OaBar from '#lib/components/charts/OaBar.svelte';
-	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
-	import KeyFigures from '#lib/components/KeyFigures.svelte';
-	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -62,12 +60,9 @@
 		pageParam: null,
 	});
 
-	// Dashboard tab
-	type DashboardResponse = components['schemas']['PersonDashboardResponse'];
+	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les thèses dirigées ou jugées et les sujets.
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashboardLoaded = $state(false);
-	let dashPubsByYear: { year: number; count: number }[] = $state([]);
-	let dashOa = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
 	let dashSubjects: SubjectFrequency[] = $state([]);
 
 	const displayName = $derived(
@@ -87,13 +82,9 @@
 	}
 
 	async function loadDashboard() {
-		const [data, subjects] = await Promise.all([
-			api<DashboardResponse>(`/api/persons/${personId}/dashboard`, { key: 'person-detail-dashboard' }),
-			api<SubjectFrequency[]>(`/api/persons/${personId}/subjects?limit=30`, { key: 'person-detail-subjects' }),
-		]);
-		dashPubsByYear = data.publications_by_year;
-		dashOa = data.oa;
-		dashSubjects = subjects;
+		dashSubjects = await api<SubjectFrequency[]>(`/api/persons/${personId}/subjects?limit=30`, {
+			key: 'person-detail-subjects',
+		});
 		dashboardLoaded = true;
 	}
 
@@ -182,32 +173,25 @@
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
-			{#if !dashboardLoaded}
-				<div class="loading">Chargement…</div>
-			{:else}
-				<KeyFigures
-					items={[
-						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
-						...(dashOa.total > 0
-							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
-							: []),
-						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }] : []),
-					]}
-				/>
-				<div class="dash-grid">
-					<div class="dash-card">
-						<h3>Publications par année</h3>
-						<PublicationsByYearChart data={dashPubsByYear} />
-					</div>
-					<div class="dash-card">
-						<h3>Open access</h3>
-						<OaBar oa={dashOa} />
-					</div>
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectBars subjects={dashSubjects} />
-					</div>
-				</div>
+			{#if profile}
+				<PublicationsDashboard
+					context={{ kind: 'person', id: profile.id }}
+					apiKey="person-detail-dashboard"
+					thesesFigure={false}
+					countries={false}
+					figures={thesesCount > 0
+						? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }]
+						: []}
+				>
+					{#snippet subjects()}
+						{#if dashboardLoaded}
+							<div class="dash-card">
+								<h2>Sujets principaux</h2>
+								<SubjectsCloud subjects={dashSubjects} />
+							</div>
+						{/if}
+					{/snippet}
+				</PublicationsDashboard>
 			{/if}
 		</div>
 	{/if}
@@ -217,17 +201,10 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`person-${personId}-publications`}
-				externalFilters={{
-					personId: Number(personId),
-					personLabel: displayName,
-				}}
+				context={{ kind: 'person', id: Number(personId) }}
 				basePath={`/persons/${personId}`}
-				showFilterBanner={false}
-				showCorrespondingColumn
-				showPerimeterFacet
 				showAdminExclude={isAdmin()}
 				onExcludeContribution={excludeContribution}
-				apcMode="person"
 				perPage={50}
 			/>
 		</div>
@@ -242,7 +219,7 @@
 				<div class="no-results">Aucune thèse liée</div>
 			{:else}
 				{#each thesesSections as section (section.role)}
-					<h3 class="thesis-role-heading">{section.label}</h3>
+					<h2 class="thesis-role-heading">{section.label}</h2>
 					<table class="data-table">
 						<thead>
 							<tr>

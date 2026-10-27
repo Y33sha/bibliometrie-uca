@@ -4,13 +4,11 @@
 	import { feature as topoFeature } from 'topojson-client';
 	import type { Topology } from 'topojson-specification';
 	import world from 'world-atlas/countries-110m.json';
-	import iso from 'i18n-iso-countries';
-	import frLocale from 'i18n-iso-countries/langs/fr.json';
+	import { alpha2ToNumeric, countryName, numericToAlpha2 } from '#lib/countryNames.js';
 	import { latestRequest } from '#lib/api/index.js';
 	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import type { components } from '#lib/api/schema.js';
 
-	iso.registerLocale(frLocale);
 	Chart.register(ChoroplethController, GeoFeature, ColorScale, ProjectionScale);
 
 	type CollaborationsResponse = components['schemas']['CollaborationsResponse'];
@@ -30,6 +28,8 @@
 	let canvas: HTMLCanvasElement | undefined = $state();
 	let chart: Chart | null = null;
 	let countryCount = $state(0);
+	// Pays partenaires et leur nombre de publications, du plus grand au plus petit, pour les lecteurs d'écran.
+	let countryRows = $state<{ name: string; value: number }[]>([]);
 	let internationalCount = $state(0);
 	let pctLabel = $state('');
 
@@ -43,8 +43,8 @@
 
 	// Libellé français d'un pays à partir de son code numérique ; repli sur le nom porté par la carte.
 	function frenchName(numericId: string, fallback: string): string {
-		const alpha2 = iso.numericToAlpha2(numericId.padStart(3, '0'));
-		return (alpha2 && iso.getName(alpha2, 'fr')) || fallback;
+		const alpha2 = numericToAlpha2(numericId);
+		return (alpha2 && countryName(alpha2)) || fallback;
 	}
 
 	// Chaque changement de filtre relance la carte : la requête précédente, encore en vol, est annulée.
@@ -55,10 +55,13 @@
 		// Décomptes indexés par code numérique (comparaison sur `Number`, pour ignorer les zéros de tête : `alpha2ToNumeric` renvoie « 004 » là où la carte porte « 4 »).
 		const byNumeric = new Map<number, number>();
 		for (const row of res.rows) {
-			const numeric = iso.alpha2ToNumeric(row.code.toUpperCase());
+			const numeric = alpha2ToNumeric(row.code);
 			if (numeric) byNumeric.set(Number(numeric), row.value);
 		}
 		countryCount = res.rows.length;
+		countryRows = res.rows
+			.map((row) => ({ name: countryName(row.code) || row.code, value: row.value }))
+			.sort((a, b) => b.value - a.value);
 		internationalCount = res.international_count;
 		pctLabel = res.total_count
 			? ((res.international_count / res.total_count) * 100).toLocaleString('fr-FR', {
@@ -136,9 +139,20 @@
 	}
 </script>
 
+<!-- La carte est dessinée dans un canvas : les lecteurs d'écran lisent le tableau des pays. -->
 <div class="collab-map">
-	<canvas bind:this={canvas}></canvas>
+	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
+<table class="visually-hidden">
+	<thead>
+		<tr><th scope="col">Pays</th><th scope="col">Publications</th></tr>
+	</thead>
+	<tbody>
+		{#each countryRows as row (row.name)}
+			<tr><th scope="row">{row.name}</th><td>{row.value.toLocaleString('fr-FR')}</td></tr>
+		{/each}
+	</tbody>
+</table>
 {#if internationalCount}
 	<p class="collab-caption">
 		{internationalCount.toLocaleString('fr-FR')} publications en collaboration internationale, soit

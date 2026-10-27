@@ -1,10 +1,8 @@
 """Liste paginée + export CSV des publications."""
 
-import csv
 import json
 import logging
-from collections.abc import Iterable, Iterator, Sequence
-from typing import cast
+from collections.abc import Iterator, Sequence
 
 from sqlalchemy import Connection, Row, text
 
@@ -15,36 +13,17 @@ from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
 from domain.structures.structure import StructureType
-from infrastructure.read_models.filters import (
-    PUBLICATION_IS_IN_PERIMETER,
-    WhereClause,
-    access_clause,
-    apc_clause,
-    assemble_where,
-    author_clause,
-    corresponding_clause,
-    country_clause,
-    doc_type_clause,
-    excluded_doc_type_clause,
-    hal_status_clause,
-    hal_status_expression,
-    in_perimeter_person_clause,
-    lab_clause,
-    language_clause,
-    license_clause,
-    monograph_id_clause,
-    no_lab_clause,
-    oa_clause,
-    partner_clause,
-    person_clause,
-    publisher_id_clause,
-    search_clause,
-    serial_id_clause,
-    source_clause,
-    subject_clause,
-    year_clause,
+from infrastructure.read_models.csv_export import (
+    MAX_EXPORT_ROWS,
+    CsvWriter,
+    cap_export_rows,
+    chunked,
 )
-from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
+from infrastructure.read_models.filters import WhereClause, hal_status_expression
+from infrastructure.read_models.publications.filtering import (
+    filter_context,
+    publication_filter_where,
+)
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
     PublicationFilters,
@@ -76,78 +55,6 @@ def _source_links(ids: dict[str, str | None], oa_status: str | None) -> dict[str
     }
 
 
-def _initial_clauses(filters: PublicationFilters) -> list[WhereClause]:
-    """Initialise les conditions de base selon le scope (person, labs, UCA)."""
-    if filters.person_id:
-        return [person_clause(filters.person_id)]
-    if filters.lab_ids:
-        return []
-    return [WhereClause(PUBLICATION_IS_IN_PERIMETER, {})]
-
-
-def _inline_clauses(filters: PublicationFilters) -> list[WhereClause | None]:
-    """Filtres simples partagés entre list/export."""
-    out: list[WhereClause | None] = [
-        excluded_doc_type_clause(filters.excluded_types),
-        search_clause(filters.search),
-        year_clause(filters.years),
-        doc_type_clause(filters.doc_types),
-        license_clause(filters.license),
-        publisher_id_clause(filters.publisher_id),
-        serial_id_clause(filters.serial_id),
-        monograph_id_clause(filters.monograph_id),
-        country_clause(filters.country_values),
-        language_clause(filters.language_codes),
-        subject_clause(filters.subject_ids),
-        author_clause(filters.author_id),
-        partner_clause(filters.partner_rors),
-    ]
-    return out
-
-
-def lab_hal_collection(conn: Connection, lab_ids: list[int]) -> str | None:
-    """Collection HAL du laboratoire quand un seul est sélectionné, au regard de laquelle se lit le statut HAL."""
-    if len(lab_ids) != 1:
-        return None
-    row = conn.execute(
-        text("SELECT hal_collection FROM structures WHERE id = :sid"), {"sid": lab_ids[0]}
-    ).one_or_none()
-    return row.hal_collection if row else None
-
-
-def _hal_status_clause(conn: Connection, filters: PublicationFilters) -> WhereClause | None:
-    """Filtre hal_status, lu au regard de la collection du labo unique."""
-    if filters.hal_status_values and len(filters.lab_ids) == 1:
-        return hal_status_clause(
-            filters.hal_status_values, lab_hal_collection(conn, filters.lab_ids)
-        )
-    return None
-
-
-def _build_list_clauses(
-    conn: Connection, filters: PublicationFilters, perimeter_structure_ids: list[int]
-) -> tuple[str, dict[str, object]]:
-    """Construit le WHERE complet de la liste et de son export."""
-    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
-    clauses.extend(_inline_clauses(filters))
-
-    if filters.lab_none and not filters.lab_ids:
-        clauses.append(no_lab_clause())
-    elif filters.lab_ids:
-        clauses.append(lab_clause(filters.lab_ids))
-
-    clauses.append(source_clause(filters.source_values))
-    clauses.append(access_clause(filters.access))
-    clauses.append(oa_clause(filters.oa_status))
-
-    if filters.person_id:
-        clauses.append(corresponding_clause(filters.person_id, filters.is_corresponding))
-    clauses.append(apc_clause(filters.has_apc, perimeter_structure_ids))
-    clauses.append(_hal_status_clause(conn, filters))
-    clauses.append(in_perimeter_person_clause(filters.in_perimeter, filters.person_id))
-    return assemble_where(clauses)
-
-
 _APC_SORT = (
     "(SELECT COALESCE(SUM(ap.amount_eur_ht), 0) FROM apc_payments ap "
     "WHERE ap.publication_id = p.id)"
@@ -167,101 +74,6 @@ _ORDER_MAP = {
 }
 
 
-# Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui
-# commence par l'un d'eux est évaluée à l'ouverture du fichier — avec le contenu qu'une
-# source externe y a déposé, titres et noms de revues venant de HAL et OpenAlex.
-_FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
-
-
-def _neutralize_formula(value: object) -> object:
-    """Valeur préfixée d'une apostrophe si un tableur y lirait une formule, rendue intacte sinon.
-
-    L'apostrophe marque la cellule comme texte sans amputer la valeur : un titre qui commence par un tiret garde son tiret. Le test porte aussi sur la valeur débarrassée de ses espaces de tête, qui ne servent donc pas d'échappatoire. Les valeurs non textuelles (année, montant) traversent sans préfixe, qui leur ferait perdre leur type à la lecture — une année en texte ne se trie plus, un montant ne s'additionne plus.
-    """
-    if not isinstance(value, str):
-        return value
-    if value.startswith(_FORMULA_STARTERS) or value.lstrip().startswith(_FORMULA_STARTERS):
-        return f"'{value}"
-    return value
-
-
-class _EchoStream:
-    """Flux de sortie qui rend le texte qu'on lui écrit.
-
-    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
-    """
-
-    def write(self, value: str) -> str:
-        return value
-
-
-class _CsvWriter:
-    """Formateur de lignes CSV dont chaque cellule passe par `_neutralize_formula`.
-
-    L'assainissement tient dans le writer plutôt que dans la construction de chaque ligne : une colonne ajoutée à un export en hérite sans qu'on ait à y penser.
-    """
-
-    def __init__(self) -> None:
-        self._writer = csv.writer(_EchoStream())
-
-    def line(self, row: Iterable[object]) -> str:
-        """Ligne CSV terminée par un saut de ligne, cellules assainies."""
-        return cast("str", self._writer.writerow([_neutralize_formula(cell) for cell in row]))
-
-    def truncation_notice(self, cap: int) -> str:
-        """Dernière ligne disant que l'export s'arrête au plafond.
-
-        Le fichier est le seul canal vers qui l'a demandé — il arrive par un lien de téléchargement, hors de toute page qui pourrait l'avertir. Un export incomplet qui se présente comme complet induit en erreur bien plus qu'une ligne étrangère aux données.
-        """
-        milliers = f"{cap:,}".replace(",", " ")
-        return self.line(
-            [f"— Export tronqué à {milliers} lignes : affiner les filtres pour l'obtenir entier."]
-        )
-
-
-# Taille visée d'un bloc rendu au client. Une ligne par bloc ferait des dizaines de milliers
-# d'envois pour un export ; un bloc trop gros ramènerait le tampon qu'on cherche à supprimer.
-EXPORT_CHUNK_SIZE = 64 * 1024
-
-
-def _chunked(lines: Iterator[str], size: int = EXPORT_CHUNK_SIZE) -> Iterator[str]:
-    """Regroupe des lignes en blocs d'au moins `size` caractères, le dernier plus court."""
-    pending: list[str] = []
-    pending_size = 0
-    for line in lines:
-        pending.append(line)
-        pending_size += len(line)
-        if pending_size >= size:
-            yield "".join(pending)
-            pending.clear()
-            pending_size = 0
-    if pending:
-        yield "".join(pending)
-
-
-# Marque d'ordre des octets, en tête du premier bloc : sans elle, un tableur lit l'UTF-8 comme
-# de l'ANSI et les accents ressortent en mojibake.
-_BOM = "﻿"
-
-
-# Plafond de lignes d'un export. Assez haut pour qu'un export légitime ne l'approche jamais —
-# à ce compte, requête et fichier tiennent confortablement en mémoire — et assez bas pour
-# qu'une demande sans filtre, que n'importe qui peut répéter, ne puisse pas la saturer.
-MAX_EXPORT_ROWS = 500_000
-
-
-def _cap_export_rows(
-    rows: Sequence[Row[tuple[object, ...]]], cap: int
-) -> tuple[Sequence[Row[tuple[object, ...]]], bool]:
-    """Rend les lignes ramenées au plafond, et si la coupe a eu lieu.
-
-    Les requêtes demandent une ligne de plus que le plafond : sa présence signale le dépassement sans qu'un `COUNT` séparé soit nécessaire. La coupe suit le tri demandé, appliqué avant elle en base.
-    """
-    if len(rows) <= cap:
-        return rows, False
-    return rows[:cap], True
-
-
 def _plain_text(s: str | None) -> str:
     """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur n'interprète pas le balisage — il l'afficherait tel quel dans la cellule."""
     return to_plain_text(s)
@@ -271,8 +83,8 @@ def _publication_lines(
     rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
 ) -> Iterator[str]:
     """Lignes CSV de l'export des publications, en-tête comprise."""
-    writer = _CsvWriter()
-    yield _BOM + writer.line([header for _, header in emitted])
+    writer = CsvWriter()
+    yield writer.header([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
         sources = _source_links(
@@ -307,27 +119,10 @@ def _publication_lines(
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
-def _build_theses_export_clauses(filters: PublicationFilters) -> tuple[str, dict[str, object]]:
-    """Conditions WHERE pour l'export CSV des thèses.
-
-    Spécifique à la page thèses : `source_clause` canonique (4 sources) + filtre `access` (open/closed, facette primaire) + `oa_clause`.
-    """
-    clauses: list[WhereClause | None] = list(_initial_clauses(filters))
-    clauses.extend(_inline_clauses(filters))
-    if filters.lab_none and not filters.lab_ids:
-        clauses.append(no_lab_clause())
-    elif filters.lab_ids:
-        clauses.append(lab_clause(filters.lab_ids))
-    clauses.append(source_clause(filters.source_values))
-    clauses.append(access_clause(filters.access))
-    clauses.append(oa_clause(filters.oa_status))
-    return assemble_where(clauses)
-
-
 def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) -> Iterator[str]:
     """Lignes CSV de l'export des thèses, en-tête comprise."""
-    writer = _CsvWriter()
-    yield _BOM + writer.line(
+    writer = CsvWriter()
+    yield writer.header(
         [
             "Inscription",
             "Soutenance",
@@ -381,11 +176,18 @@ class PublicationListQueries:
         sort: str,
     ) -> PublicationListResponse:
         """Liste paginée des publications avec sources, labos, journal."""
-        perimeter_structure_ids = get_persons_structure_ids_list(self._conn)
+        context = filter_context(self._conn, filters)
+        perimeter_structure_ids = context.perimeter_structure_ids
         self._conn.execute(text("SET LOCAL jit = off"))
         offset = (page - 1) * per_page
-        where_clause, binds = _build_list_clauses(self._conn, filters, perimeter_structure_ids)
+        where_clause, binds = publication_filter_where(filters, context)
         order = _ORDER_MAP[sort]
+        # Le statut HAL se lit au regard d'un laboratoire : il est calculé quand la liste porte sur un seul.
+        hal_status = (
+            hal_status_expression(context.lab_hal_collection)
+            if len(filters.lab_ids) == 1
+            else WhereClause("NULL", {})
+        )
 
         # Quand la recherche match un sujet (cf. _search_clause), on remonte d'abord les publis dont le *titre* match — les correspondances purement via sujet sont reléguées en deuxième.
         if filters.search:
@@ -416,7 +218,8 @@ class PublicationListQueries:
                     pub.id AS publisher_id,
                     pub.name AS publisher_name,
                     src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
-                    src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
+                    src_ids.wos_id, src_ids.theses_id,
+                    {hal_status.sql} AS hal_status,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                     (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
@@ -471,10 +274,7 @@ class PublicationListQueries:
                 LEFT JOIN publishers pub ON pub.id = p.publisher_id
                 LEFT JOIN LATERAL (
                     SELECT
-                        {_SOURCE_ID_COLUMNS},
-                        (SELECT array_agg(DISTINCT col) FROM source_records sr2,
-                                unnest(COALESCE(sr2.hal_collections, '{{}}'::text[])) AS col
-                         WHERE sr2.publication_id = p.id AND sr2.source = '{Source.HAL.value}') AS hal_collections
+                        {_SOURCE_ID_COLUMNS}
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
                 WHERE {where_clause}
@@ -483,6 +283,7 @@ class PublicationListQueries:
             """),
             {
                 **binds,
+                **hal_status.binds,
                 "focus_person": filters.person_id,
                 "person_lab_a4": filters.person_id,
                 "apc_perimeter_ids": perimeter_structure_ids,
@@ -519,7 +320,7 @@ class PublicationListQueries:
                 apc=r.apc_details,
                 is_corresponding=r.is_corresponding,
                 contribution_id=r.contribution_id,
-                hal_collections=r.hal_collections,
+                hal_status=r.hal_status,
             )
             for r in rows
         ]
@@ -541,9 +342,8 @@ class PublicationListQueries:
         **Cette méthode n'est pas un générateur**, et ne doit pas le devenir : la requête s'exécute à l'appel, sous la connexion que la dépendance FastAPI tient ouverte pour la durée du traitement. Cette connexion est refermée avant que le corps de la réponse ne parte ; un générateur qui interrogerait la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire sont parcourues ensuite.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
-        where_clause, binds = _build_list_clauses(
-            self._conn, filters, get_persons_structure_ids_list(self._conn)
-        )
+        context = filter_context(self._conn, filters)
+        where_clause, binds = publication_filter_where(filters, context)
         order = _ORDER_MAP[sort]
 
         # Titre et accès toujours présents. `columns` vide => toutes.
@@ -551,7 +351,7 @@ class PublicationListQueries:
         requested |= {"title", "access"}
         # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
         hal_status = (
-            hal_status_expression(lab_hal_collection(self._conn, filters.lab_ids))
+            hal_status_expression(context.lab_hal_collection)
             if "hal_status" in requested
             else WhereClause("NULL", {})
         )
@@ -606,7 +406,7 @@ class PublicationListQueries:
                 "export_limit": MAX_EXPORT_ROWS + 1,
             },
         ).all()
-        rows, truncated = _cap_export_rows(rows, MAX_EXPORT_ROWS)
+        rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
         if truncated:
             logger.warning(
                 "Export des publications tronqué au plafond de %d lignes (filtres : %s)",
@@ -633,7 +433,7 @@ class PublicationListQueries:
         ]
         emitted = [(key, header) for key, header in spec if key in requested]
 
-        return _chunked(_publication_lines(rows, emitted, truncated=truncated))
+        return chunked(_publication_lines(rows, emitted, truncated=truncated))
 
     def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> Iterator[str]:
         """Export CSV dédié à la page thèses.
@@ -641,7 +441,7 @@ class PublicationListQueries:
         Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
-        where_clause, binds = _build_theses_export_clauses(filters)
+        where_clause, binds = publication_filter_where(filters, filter_context(self._conn, filters))
         order = _ORDER_MAP.get(
             sort, f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title"
         )
@@ -677,7 +477,7 @@ class PublicationListQueries:
             """),
             {**binds, "export_limit": MAX_EXPORT_ROWS + 1},
         ).all()
-        rows, truncated = _cap_export_rows(rows, MAX_EXPORT_ROWS)
+        rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
         if truncated:
             logger.warning(
                 "Export des thèses tronqué au plafond de %d lignes (filtres : %s)",
@@ -685,4 +485,4 @@ class PublicationListQueries:
                 filters,
             )
 
-        return _chunked(_these_lines(rows, truncated=truncated))
+        return chunked(_these_lines(rows, truncated=truncated))

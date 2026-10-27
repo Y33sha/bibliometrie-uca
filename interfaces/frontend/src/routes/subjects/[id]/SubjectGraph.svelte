@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from "$app/paths";
   import type { components } from "#lib/api/schema.js";
   import { CX, CY, subjectGraphLayout, type GraphNode } from "./subjectGraphLayout";
 
@@ -11,17 +12,16 @@
     subject,
     neighbors,
     links,
-    onSelect,
   }: {
     subject: SubjectListItem;
     neighbors: SubjectNeighbor[];
     links: SubjectNeighborLink[];
-    onSelect: (id: number) => void;
   } = $props();
 
   const layout = $derived(subjectGraphLayout(subject, neighbors, links));
 
-  let hovered = $state<GraphNode | null>(null);
+  // Brut : comparé par identité aux nœuds du placement, il ne doit pas être enveloppé dans un proxy.
+  let hovered = $state.raw<GraphNode | null>(null);
 
   function percent(spec: number): string {
     return (spec * 100).toLocaleString("fr-FR", { maximumFractionDigits: 1 }) + " %";
@@ -32,7 +32,7 @@
   <svg
     viewBox="{layout.box.x} {layout.box.y} {layout.box.width} {layout.box.height}"
     style="max-width: {layout.box.width}px"
-    role="img"
+    role="group"
     aria-label="Graphe des sujets associés à {subject.label}"
   >
     {#each layout.nodes as n (n.neighbor.id)}
@@ -51,20 +51,14 @@
 
     {#each layout.nodes as n (n.neighbor.id)}
       {@const right = n.x >= CX}
-      <g
+      <a
+        href={resolve(`subjects/${n.neighbor.id}`)}
         class="node"
         class:active={hovered === n}
-        role="link"
-        tabindex="0"
-        aria-label={n.neighbor.label}
         onmouseenter={() => (hovered = n)}
         onmouseleave={() => (hovered = null)}
         onfocus={() => (hovered = n)}
         onblur={() => (hovered = null)}
-        onclick={() => onSelect(n.neighbor.id)}
-        onkeydown={(e) => {
-          if (e.key === "Enter") onSelect(n.neighbor.id);
-        }}
       >
         <circle cx={n.x} cy={n.y} r={n.r} />
         <text
@@ -74,7 +68,7 @@
           text-anchor={right ? "start" : "end"}
           dominant-baseline="middle">{n.neighbor.label}</text
         >
-      </g>
+      </a>
     {/each}
 
     <!-- Titre du sujet central, dessiné en dernier pour rester au-dessus. -->
@@ -122,6 +116,11 @@
   .node {
     cursor: pointer;
     outline: none;
+  }
+  /* Focus au clavier : le cercle du sujet se cerne de la couleur d'accent. */
+  .node:focus-visible circle {
+    stroke: var(--accent);
+    stroke-width: 3;
   }
   .node circle {
     fill: var(--muted);

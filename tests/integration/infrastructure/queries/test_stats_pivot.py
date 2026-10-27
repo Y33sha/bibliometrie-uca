@@ -2,7 +2,7 @@
 
 from sqlalchemy import text
 
-from infrastructure.read_models.stats.models import StatsFilters
+from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.read_models.stats.queries import StatsQueries
 from tests.integration.helpers.publications import insert_apc_payment, insert_publication
 from tests.integration.helpers.rors import insert_author, insert_ror_tree, refresh_publication_rors
@@ -17,7 +17,7 @@ def _piv(conn, measure, groups, doc_types=("article", "review")):
     return StatsQueries(conn).pivot(
         measure=measure,
         groups=list(groups),
-        filters=StatsFilters(doc_types=list(doc_types)),
+        filters=PublicationFilters(doc_types=list(doc_types)),
     )
 
 
@@ -109,7 +109,7 @@ class TestLicense:
         filtered = StatsQueries(sa_sync_conn).pivot(
             measure="publication_count",
             groups=[],
-            filters=StatsFilters(license=["none"]),
+            filters=PublicationFilters(license=["none"]),
         )
         assert filtered.rows == [{"value": 1}]
 
@@ -148,7 +148,7 @@ class TestApcAmount:
 
     def _pivot(self, conn, groups):
         return StatsQueries(conn).pivot(
-            measure="apc_amount", groups=list(groups), filters=StatsFilters()
+            measure="apc_amount", groups=list(groups), filters=PublicationFilters()
         )
 
     def test_sums_only_institution_payments(self, sa_sync_conn):
@@ -168,7 +168,7 @@ class TestApcAmount:
         res = StatsQueries(sa_sync_conn).pivot(
             measure="publication_count",
             groups=[],
-            filters=StatsFilters(has_apc=["yes"]),
+            filters=PublicationFilters(has_apc=["yes"]),
         )
         assert res.rows == [{"value": 1}]
 
@@ -192,7 +192,7 @@ class TestPartner:
         filtered = StatsQueries(sa_sync_conn).pivot(
             measure="publication_count",
             groups=[],
-            filters=StatsFilters(partner_rors=["0univ0001"]),
+            filters=PublicationFilters(partner_rors=["0univ0001"]),
         )
         assert filtered.rows == [{"value": 1}]
 
@@ -211,7 +211,7 @@ class TestPartner:
 
         def partners() -> dict[str, int]:
             res = StatsQueries(sa_sync_conn).pivot(
-                measure="publication_count", groups=["partner"], filters=StatsFilters()
+                measure="publication_count", groups=["partner"], filters=PublicationFilters()
             )
             return {r["partner"]: r["value"] for r in res.rows}
 

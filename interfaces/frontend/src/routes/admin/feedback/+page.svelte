@@ -1,7 +1,8 @@
 <script lang="ts">
   import Breadcrumb from '#lib/components/Breadcrumb.svelte';
   import ResultCount from '#lib/components/ResultCount.svelte';
-  import { pageTitle } from '#lib/institution.svelte.js';
+  import PageHeader from '#lib/components/PageHeader.svelte';
+  import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
   import { replaceQuery } from "#lib/url.js";
   import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
@@ -195,9 +196,11 @@
 
   function handleOutsideClick(event: MouseEvent) {
     if (!ctxPicker) return;
-    const target = event.target as HTMLElement;
+    // Le chemin du clic est figé à sa production : un clic sur un résultat que le rendu retire ensuite compte bien comme intérieur.
+    const path = event.composedPath();
     const picker = document.getElementById("form-ctx-picker");
-    if (picker && !picker.contains(target) && !target.classList.contains("form-action")) {
+    const onTrigger = path.some((n) => n instanceof HTMLElement && n.classList.contains("form-action"));
+    if (picker && !path.includes(picker) && !onTrigger) {
       closeCtxPicker();
     }
   }
@@ -245,10 +248,6 @@
   });
 </script>
 
-<svelte:head>
-  <title>{pageTitle("Admin - Qualité détection")}</title>
-</svelte:head>
-
 <svelte:window onclick={handleOutsideClick} />
 
 <div class="page-feedback">
@@ -256,38 +255,23 @@
     trail={[{ label: "Affiliations", path: currentStructureId ? `admin/addresses?structure_id=${currentStructureId}` : "admin/addresses" }]}
     current="Qualité de la détection"
   />
-  <h1>Qualité de la détection</h1>
+  <PageHeader title="Qualité de la détection" />
 
   <!-- Stats row -->
   {#if stats}
-    <div class="stats-row">
-      <div class="stat-card highlight-success">
-        <div class="value val-success">
-          {stats.detection_rate !== null ? stats.detection_rate + "%" : "\u2014"}
-        </div>
-        <div class="label">Taux de concordance</div>
-      </div>
-      <div class="stat-card">
-        <div class="value">{stats.total_reviewed}</div>
-        <div class="label">Adresses examinées</div>
-      </div>
-      <div class="stat-card highlight-warning">
-        <div class="value val-warning">{stats.false_negatives}</div>
-        <div class="label">Faux négatifs</div>
-      </div>
-      <div class="stat-card highlight-danger">
-        <div class="value val-danger">{stats.false_positives}</div>
-        <div class="label">Faux positifs</div>
-      </div>
-      <div class="stat-card">
-        <div class="value">{stats.concordant_valid}</div>
-        <div class="label">Vrais positifs</div>
-      </div>
-      <div class="stat-card">
-        <div class="value">{stats.pending}</div>
-        <div class="label">En attente</div>
-      </div>
-    </div>
+    <KeyFigures
+      items={[
+        {
+          value: stats.detection_rate !== null ? `${stats.detection_rate.toLocaleString("fr-FR")}\u00a0%` : "\u2014",
+          label: "taux de concordance",
+        },
+        { value: stats.total_reviewed.toLocaleString("fr-FR"), label: "adresses examinées" },
+        { value: stats.false_negatives.toLocaleString("fr-FR"), label: "faux négatifs" },
+        { value: stats.false_positives.toLocaleString("fr-FR"), label: "faux positifs" },
+        { value: stats.concordant_valid.toLocaleString("fr-FR"), label: "vrais positifs" },
+        { value: stats.pending.toLocaleString("fr-FR"), label: "en attente" },
+      ]}
+    />
   {/if}
 
   <!-- Help text -->
@@ -297,7 +281,7 @@
 
   <!-- Toolbar -->
   <div class="toolbar">
-    <select class="structure-filter" value={currentStructureId ?? ""} onchange={onStructureChange}>
+    <select aria-label="Structure" value={currentStructureId ?? ""} onchange={onStructureChange}>
       {#each structureGroups as [type, group] (type)}
         <optgroup label={structureGroupLabel(type)}>
           {#each group as s (s.id)}
@@ -379,7 +363,7 @@
 
   <!-- Context picker -->
   {#if ctxPicker}
-    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog">
+    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog" aria-label="Contexte contraignant" tabindex="-1">
       <div class="picker-shortcuts">
         <button onclick={() => addCtxToForm("tutelles")}>{"\uD83D\uDD17"} tutelles</button>
       </div>
@@ -400,77 +384,10 @@
 </div>
 
 <style>
-  h1 {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin: 0 0 16px;
-  }
-
-  /* Stats row */
-  .stats-row {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
-
-  .stat-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 12px 18px;
-    text-align: center;
-    flex: 1;
-    min-width: 120px;
-  }
-
-  .stat-card .value {
-    font-size: 1.55rem;
-    font-weight: 700;
-    line-height: 1.2;
-  }
-
-  .stat-card .label {
-    font-size: 0.8rem;
-    color: var(--muted);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-
-  .stat-card.highlight-danger {
-    border-left: 3px solid var(--danger);
-  }
-  .stat-card.highlight-warning {
-    border-left: 3px solid var(--warning);
-  }
-  .stat-card.highlight-success {
-    border-left: 3px solid var(--success);
-  }
-  .val-danger {
-    color: var(--danger);
-  }
-  .val-warning {
-    color: var(--warning);
-  }
-  .val-success {
-    color: var(--success);
-  }
-
-  /* Help text */
 
   /* Toolbar */
   .toolbar {
     margin-bottom: 16px;
-  }
-  .structure-filter {
-    padding: 6px 10px;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--accent);
-    background: var(--card);
-    font-family: inherit;
   }
 
   .toolbar-sep {

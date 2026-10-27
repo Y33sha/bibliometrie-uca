@@ -2,7 +2,7 @@
 
 Une valeur séparée par des virgules échappe à la validation de FastAPI : c'est le code de la route qui la découpe, et rien n'oblige à en vérifier le contenu. Une valeur inconnue laissée passer ne provoque pas d'erreur — elle traverse jusqu'au constructeur de clause SQL, qui l'ignore, et la lecture rend alors un ensemble plus large que celui qu'on croit avoir demandé, sous un code 200.
 
-Fermer chaque vocabulaire est le remède ; s'en souvenir à chaque paramètre ajouté n'en est pas un. Ce module confronte donc le code à la liste : `parse_str_csv` rend une liste de chaînes sans rien vérifier, et chacun de ses appels dans les routes doit figurer ci-dessous, motivé. Un paramètre ajouté sans vocabulaire fait échouer l'intégration.
+Fermer chaque vocabulaire est le remède ; s'en souvenir à chaque paramètre ajouté n'en est pas un. Ce module confronte donc le code à la liste : `parse_str_csv` rend une liste de chaînes sans rien vérifier, et chacun de ses appels dans l'API doit figurer ci-dessous, motivé. Un paramètre ajouté sans vocabulaire fait échouer l'intégration.
 
 Les vocabulaires fermés eux-mêmes sont exercés par la surface HTTP (`tests/integration/interfaces/test_query_vocabularies_api.py`), qui vérifie qu'une valeur intruse rend 422.
 """
@@ -11,16 +11,18 @@ import re
 
 from infrastructure import PROJECT_ROOT
 
-_ROUTES = PROJECT_ROOT / "interfaces" / "api" / "routers"
+_API = PROJECT_ROOT / "interfaces" / "api"
+# Module qui définit `parse_str_csv`.
+_DEFINITION = _API / "filters.py"
 _APPEL = re.compile(r"parse_str_csv\(\s*([^),]+?)\s*\)")
 
 LISTES_LIBRES: dict[tuple[str, str], str] = {
-    ("publications.py", "self.country"): (
+    ("publication_filters.py", "self.country"): (
         "Codes pays présents dans les données, non énumérables dans le code. La valeur est liée "
         "à une comparaison de tableaux : une valeur inconnue ne rend aucune ligne, au lieu "
         "d'annuler le filtre."
     ),
-    ("publications.py", "self.language"): (
+    ("publication_filters.py", "self.language"): (
         "Codes du référentiel des langues, qui vit dans les données et non dans le code. La "
         "valeur est liée à une comparaison `= ANY` : une valeur inconnue ne rend aucune ligne, "
         "au lieu d'annuler le filtre."
@@ -38,16 +40,18 @@ LISTES_LIBRES: dict[tuple[str, str], str] = {
     ),
     ("persons.py", "role"): "Fonctions issues de la même extraction, pour la même raison.",
 }
-"""Appels à `parse_str_csv` dans les routes, et ce qui justifie l'absence de vocabulaire fermé.
+"""Appels à `parse_str_csv` dans l'API, et ce qui justifie l'absence de vocabulaire fermé.
 
-Clé : le fichier de route et l'expression passée à l'appel. Y inscrire une entrée est un geste délibéré — la question à trancher étant « puis-je énumérer les valeurs admises ? », et la réponse « non » demandant de dire pourquoi.
+Clé : le module et l'expression passée à l'appel. Y inscrire une entrée est un geste délibéré — la question à trancher étant « puis-je énumérer les valeurs admises ? », et la réponse « non » demandant de dire pourquoi.
 """
 
 
 def _appels_dans_les_routes() -> set[tuple[str, str]]:
-    """Appels à `parse_str_csv` écrits dans les modules de route, par fichier et argument."""
+    """Appels à `parse_str_csv` écrits dans les modules de l'API, par fichier et argument."""
     appels: set[tuple[str, str]] = set()
-    for fichier in _ROUTES.glob("*.py"):
+    for fichier in _API.rglob("*.py"):
+        if fichier == _DEFINITION:
+            continue
         for argument in _APPEL.findall(fichier.read_text(encoding="utf-8")):
             appels.add((fichier.name, argument))
     return appels

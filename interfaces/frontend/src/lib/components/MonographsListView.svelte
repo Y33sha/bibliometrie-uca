@@ -1,7 +1,8 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
@@ -14,6 +15,8 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Monograph = components['schemas']['MonographListItem'];
@@ -66,6 +69,12 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
+	}
+
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
+		return withBase(`/api/monographs/export.csv?${paramsToQuery(params)}`);
 	}
 
 	const monographs = usePaginatedFetch<Monograph>({
@@ -148,41 +157,34 @@
 	});
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
-	<input
-		type="search"
-		class="search"
-		placeholder="Rechercher par titre ou ISBN"
-		bind:value={search}
-		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
-		oninput={onSearchInput}
-	/>
-	<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
-	<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
-	{#if !publisherFixed}
-		<EntityFilter
-			label={filterLabels.publisher}
-			endpoint="/api/monographs/facets"
-			kind="publisher"
-			buildParams={buildFilterParams}
-			selected={selectedPublisher}
-			onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
-		/>
-	{/if}
-	{#if !serialFixed}
-		<EntityFilter
-			label="Collection"
-			endpoint="/api/monographs/facets"
-			kind="serial"
-			buildParams={buildFilterParams}
-			selected={selectedSerial}
-			onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
-		/>
-	{/if}
-	<ResultCount list={monographs} one="monographie" many="monographies" />
-</div>
+<ListToolbar bind:search placeholder="Rechercher par titre ou ISBN" onsearch={onSearchInput} list={monographs} one="monographie" many="monographies" exportUrl={exportCsvUrl()}>
+	{#snippet filters()}
+		<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.years} options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+		{#if !publisherFixed}
+			<EntityFilter
+				label={filterLabels.publisher}
+				endpoint="/api/monographs/facets"
+				kind="publisher"
+				buildParams={buildFilterParams}
+				selected={selectedPublisher}
+				onchange={(ids) => { selectedPublisher = ids; onFilterChange(); }}
+			/>
+		{/if}
+		{#if !serialFixed}
+			<EntityFilter
+				label="Collection"
+				endpoint="/api/monographs/facets"
+				kind="serial"
+				buildParams={buildFilterParams}
+				selected={selectedSerial}
+				onchange={(ids) => { selectedSerial = ids; onFilterChange(); }}
+			/>
+		{/if}
+	{/snippet}
+</ListToolbar>
 
-<div class="table-scroll">
+<TableScroll>
 	<table class="data-table monographs-table">
 		<thead>
 			<tr>
@@ -201,7 +203,7 @@
 					<td><a href={resolve(`monographs/${m.id}`)}><PublicationTitle titre={m.title} /></a></td>
 					<td class="muted">{m.proceedings ? 'Actes' : 'Livre'}</td>
 					<td class="num">{m.year ?? ''}</td>
-					<td class="isbn">{[m.isbn, m.eisbn].filter(Boolean).join(' / ')}</td>
+					<td><div class="id-list">{#each [m.isbn, m.eisbn].filter(Boolean) as isbn (isbn)}<span class="id-badge">{isbn}</span>{/each}</div></td>
 					{#if !publisherFixed}
 						<td>
 							{#if m.publisher_id}<a href={resolve(`publishers/${m.publisher_id}`)}>{m.publisher_name}</a>{/if}
@@ -220,7 +222,7 @@
 			{/if}
 		</tbody>
 	</table>
-</div>
+</TableScroll>
 
 <Pagination
 	page={monographs.page}
@@ -235,7 +237,5 @@
 
 <style>
 	.monographs-table { min-width: 720px; }
-	.isbn { font-family: var(--mono); font-size: 0.8rem; white-space: nowrap; }
 	.muted { color: var(--muted); }
-	.search { width: 22rem; max-width: 100%; }
 </style>

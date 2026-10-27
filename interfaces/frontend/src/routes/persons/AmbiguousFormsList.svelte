@@ -1,5 +1,6 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
+  import StatusToggles from "#lib/components/StatusToggles.svelte";
   import { untrack } from "svelte";
   import { persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
@@ -73,23 +74,7 @@
                 >
               {:else}
               <span class="chip-controls">
-                <button
-                  class="toggle-btn confirm"
-                  class:active={p.status === "confirmed"}
-                  title={p.status === "confirmed" ? "Retirer la confirmation" : "Confirmer"}
-                  onclick={() =>
-                    setStatus(
-                      p.person_id,
-                      form.name_form,
-                      p.status === "confirmed" ? "pending" : "confirmed",
-                    )}>&#x2713;</button
-                >
-                <button
-                  class="toggle-btn reject"
-                  title="Rejeter"
-                  onclick={() => setStatus(p.person_id, form.name_form, "rejected")}
-                  >&#x2717;</button
-                >
+                <StatusToggles status={p.status} onchange={(s) => setStatus(p.person_id, form.name_form, s)} />
               </span>
               {/if}
               <button class="triage-person" onclick={() => onopenPerson(p.person_id)}>

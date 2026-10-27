@@ -9,7 +9,7 @@
 	/* Texte */
 	--text: #1d2433;
 	--text-secondary: #5b6474;
-	--muted: #6b7280;          /* texte discret */
+	--muted: #636b78;          /* texte discret, contraste de 4,5:1 au moins sur --border-subtle */
 	--text-faint: #a3a9b3;     /* valeurs nulles ou absentes */
 
 	/* Surfaces et lignes */
@@ -34,21 +34,21 @@
 	--nav-admin-menu: #2a6c6c;
 
 	/* États */
-	--success: #2a7d4f;
+	--success: #25734a;        /* contraste de 4,5:1 au moins en texte sur --success-light */
 	--success-light: #e6f4ec;
 	--danger: #b42318;
 	--danger-light: #fbe9e7;
 	--warning: #d4a017;
 	--warning-light: #fef8e8;
 	--warning-text: #856404;    /* assombri, lisible en texte sur fond clair */
-	--attention: #e65100;       /* élément à traiter : orphelin, hors collection, exclusion */
+	--attention: #b84000;       /* élément à traiter : orphelin, hors collection, exclusion ; contraste de 4,5:1 au moins en texte sur --attention-light */
 	--attention-light: #fff3e0;
 
 	/* Infobulles */
 	--tooltip-bg: #333;
 
 	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
-	--open: #2e9b4f;       /* ouvert, toutes voies confondues */
+	--open: #50c84a;       /* ouvert, toutes voies confondues */
 	--open-text: #22743c;  /* assombri, lisible en texte sur fond clair */
 	--embargoed: #d29a1e;
 	--closed: #4b5260;
@@ -61,12 +61,54 @@
 	--green: #5ec62c;
 	--green-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
 
+	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
+	--chart-1: #4e79a7;
+	--chart-2: #f28e2b;
+	--chart-3: #59a14f;
+	--chart-4: #e15759;
+	--chart-5: #b07aa1;
+	--chart-6: #76b7b2;
+	--chart-7: #ff9da7;
+	--chart-8: #9c755f;
+	--chart-9: #bab0ac;
+	--chart-10: #edc948;
+
+	/* Types de document, par clé de groupement de la page Statistiques (`docTypeColorVar()`). */
+	--doctype-article: #2f7ed8;
+	--doctype-review: #1f5c9e;
+	--doctype-preprints: #b3d9f5;
+	--doctype-conference_paper: #b18fcf;
+	--doctype-book: #ffa93b;
+	--doctype-book_chapter: #f4c430;
+	--doctype-data_paper: #66bb6a;
+	--doctype-theses: #c0392b;
+	--doctype-data: #43a047;
+	--doctype-misc: #cfd3d6;
+
+	/* Licences : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). */
+	--license-public-domain: #2e669e;
+	--license-cc-by: #2e9e4a;
+	--license-licence-ouverte: #43ad5c;
+	--license-open-source: #5bb873;
+	--license-cc-by-sa: #7cc36b;
+	--license-cc-by-nd: #a7d35c;
+	--license-cc-by-nc: #c8d84d;
+	--license-cc-by-nc-sa: #e1cf45;
+	--license-cc-by-nc-nd: #efb93e;
+	--license-publisher-open: #ee9f3a;
+	--license-other-oa: #f3c98d;
+	--license-repository-distribution: #9db4c4;
+	--license-other: #bdbdbd;
+	--license-all-rights-reserved: #7a7a7a;
+	--license-none: #3c3c3c;
+
 	/* Polices */
 	--font: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 	--mono: "SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
 
 	/* Gabarit */
 	--header-height: 46px; /* hauteur du menu supérieur fixe */
+	--page-gutter: 24px; /* marge latérale du contenu de la page */
 	--radius: 8px;
 	--radius-pill: 999px;
 }
@@ -104,7 +146,8 @@
 }
 
 .toolbar input[type='text'],
-.toolbar input[type='text' i] {
+.toolbar input[type='text' i],
+.toolbar input[type='number'] {
 	padding: 6px 10px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
@@ -137,6 +180,24 @@
 	background-color: var(--hover);
 }
 
+/* Menu déroulant natif hors barre d'outils : champ bordé, flèche dessinée. */
+.select {
+	appearance: none;
+	max-width: 100%;
+	height: 32px;
+	padding: 0 28px 0 10px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+	font: inherit;
+	font-size: 0.9rem;
+	color: var(--text);
+	cursor: pointer;
+}
+.select:hover {
+	border-color: var(--accent);
+}
+
 /* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
 .toolbar .btn:not(.btn-sm) {
 	padding: 6px 10px;
@@ -147,18 +208,10 @@
 	flex: 1;
 }
 
-/* Zone recherche et filtres d'une liste. Le fond de page masque les lignes qui défilent sous la barre collante ; un filet la sépare du tableau. */
+/* Zone recherche et filtres d'une liste, séparée du tableau par un filet. */
 .toolbar-card {
 	padding: 10px 0;
-	background: var(--bg);
 	border-bottom: 1px solid var(--border);
-}
-
-/* Barre collante sous le menu supérieur */
-.toolbar-sticky {
-	position: sticky;
-	top: var(--header-height);
-	z-index: 50;
 }
 
 /* Action principale d'une barre d'outils (lien vers une autre vue) */
@@ -262,6 +315,22 @@
 	border-radius: var(--radius);
 	font-size: 0.85rem;
 }
+/* Retire la sélection d'une facette, en tête du panneau. */
+.facet-clear {
+	display: block;
+	width: 100%;
+	padding: 4px 12px;
+	border: none;
+	background: none;
+	font: inherit;
+	font-size: 0.85rem;
+	color: var(--accent);
+	text-align: left;
+	cursor: pointer;
+}
+.facet-clear:hover {
+	background: var(--hover);
+}
 .facet-options label {
 	display: flex;
 	align-items: center;
@@ -293,23 +362,46 @@
 	color: var(--muted);
 }
 
-/* Conteneur de tableau scrollable horizontalement (petit écran). */
-.table-scroll {
-	overflow-x: auto;
+/* Conteneur d'un tableau (composant TableScroll). Quand le tableau tient dans la page, son en-tête se colle sous le menu supérieur et sous la barre d'outils quand elle est affichée (`--list-sticky-height`, publiée par l'action `stickyHeight`). Le filet inférieur passe par une ombre, qu'un en-tête collant garde, là où la bordure d'un tableau en `border-collapse` disparaît. */
+.table-scroll thead th {
+	position: sticky;
+	top: calc(var(--header-height) + var(--list-sticky-height, 0px));
+	z-index: 2;
+	background: var(--bg);
+	border-bottom: none;
+	box-shadow: inset 0 -1px 0 var(--border);
+}
+/* Barre d'outils détachée (`ListToolbar`) : l'en-tête glisse au même rythme qu'elle. */
+:root[data-list-toolbar='detached'] .table-scroll thead th {
+	transition: top 0.2s ease;
 }
 
-/* En petit écran, on borne la hauteur pour que la barre de scroll horizontale reste dans le viewport (sinon elle est tout en bas d'un tableau long), et on fige les en-têtes pendant le scroll vertical interne. */
-@media (max-width: 760px) {
+/* Tableau plus large que son conteneur (classe posée par l'action `horizontalOverflow`) : il défile horizontalement dans le conteneur, et son en-tête défile avec la page. */
+.table-scroll.overflowing {
+	overflow-x: auto;
+}
+.table-scroll.overflowing thead th {
+	position: static;
+}
+/* Sur écran étroit, le tableau occupe toute la largeur de l'écran, sans la marge de la page. */
+@media (max-width: 820px) {
 	.table-scroll {
-		max-height: 75vh;
-		overflow-y: auto;
+		margin-inline: calc(-1 * var(--page-gutter));
 	}
-	.table-scroll thead th {
-		position: sticky;
-		top: 0;
-		z-index: 1;
-		background: var(--bg);
-	}
+}
+
+/* Bord estompé d'un conteneur à défilement horizontal, du côté où le contenu continue (action `horizontalOverflow`). */
+.fade-start,
+.fade-end {
+	--fade-start: 0px;
+	--fade-end: 0px;
+	mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+}
+.fade-start {
+	--fade-start: 40px;
+}
+.fade-end {
+	--fade-end: 40px;
 }
 
 /* ── Nombre de résultats (barre d'outils) ── */
@@ -377,16 +469,30 @@
 	background: var(--surface-hover);
 }
 
-/* Actions secondaires d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. */
+/* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
 @media (hover: hover) {
-	.data-table .row-actions > * {
+	.data-table .row-actions > .icon-btn {
 		opacity: 0.4;
 		transition: opacity 0.1s;
 	}
-	.data-table tr:hover .row-actions > *,
-	.data-table .row-actions:focus-within > * {
+	.data-table tr:hover .row-actions > .icon-btn,
+	.data-table .row-actions:focus-within > .icon-btn {
 		opacity: 1;
 	}
+}
+
+/* Bouton « Fusionner… » d'une ligne de liste. */
+.btn-merge {
+	font-size: 0.8rem;
+	color: var(--accent);
+	background: none;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	cursor: pointer;
+	padding: 2px 8px;
+}
+.btn-merge:hover {
+	background: var(--accent-light);
 }
 
 /* Liens de structure dans un tableau : texte simple, les pastilles étant réservées aux valeurs codées par couleur. */
@@ -545,9 +651,16 @@
 	display: flex;
 	align-items: center;
 	flex-wrap: wrap;
-	gap: 6px 8px;
+	gap: 6px 22px;
 	font-size: 0.85rem;
 	color: var(--text-secondary);
+}
+/* Libellé et valeurs d'une métadonnée (composant EntityMetaItem). */
+.entity-meta-item {
+	display: inline-flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 6px 8px;
 }
 .entity-meta-label {
 	font-size: 0.7rem;
@@ -555,9 +668,6 @@
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 	color: var(--muted);
-}
-.entity-meta-label:not(:first-child) {
-	margin-left: 14px;
 }
 .entity-tag {
 	display: inline-block;
@@ -625,10 +735,16 @@
 	font-weight: 600;
 }
 
-/* ── Pub table column widths ── */
+/* ── Largeurs des colonnes du tableau des publications ── */
 /* width: 100% sur le th = idiome HTML table « cette colonne absorbe tout le restant » : les autres colonnes gardent leur largeur, le titre prend la place résiduelle. */
 .publication-col-title {
 	width: 100%;
+}
+/* Sur écran étroit, le tableau défile : la largeur minimale l'élargit plutôt que de réduire le titre à quelques mots par ligne. Sur écran large, le tableau tient dans la page. */
+@media (max-width: 820px) {
+	.publication-col-title {
+		min-width: 240px;
+	}
 }
 
 /* Min-width : `width` seul est une simple hint en table-layout: auto et la colonne Titre (width: 100%) la grignoterait jusqu'à la min-content-width (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width` est la seule contrainte que l'auto-layout respecte vraiment. */
@@ -638,19 +754,27 @@
 	width: 180px;
 }
 
-/* ── ID badge ── */
+/* ── Identifiant (ISSN, ISBN, DOI, ROR, HAL…) : seul style d'identifiant, sur les listes comme dans les en-têtes d'entité ── */
 .id-badge {
 	display: inline-block;
 	padding: 2px 7px;
 	background: var(--accent-light);
 	border-radius: var(--radius);
-	font-size: 0.8rem;
+	font-family: var(--mono);
+	font-size: 0.75rem;
 	color: var(--accent);
 	text-decoration: none;
 	white-space: nowrap;
 }
 
-.id-badge:hover {
+/* Plusieurs identifiants dans une cellule ou une ligne. */
+.id-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+
+a.id-badge:hover {
 	background: color-mix(in srgb, var(--accent) 20%, white);
 	color: var(--accent);
 	text-decoration: none;
@@ -661,7 +785,7 @@
 	color: var(--success);
 }
 
-.id-badge.id-confirmed:hover {
+a.id-badge.id-confirmed:hover {
 	background: color-mix(in srgb, var(--success) 20%, white);
 	color: var(--success);
 }
@@ -811,6 +935,11 @@
 	background: #c6e8e0;
 }
 
+/* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
+.tag-zenodo {
+	background: #0047a8;
+}
+
 .source-placeholder {
 	visibility: hidden;
 }
@@ -932,7 +1061,7 @@ a.structure-tag:hover {
 .dash-card {
 	min-width: 0; /* autorise la cellule de grille à rétrécir sous la largeur du canvas */
 }
-.dash-card h3 {
+.dash-card h2 {
 	margin: 0 0 20px;
 	padding-bottom: 6px;
 	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
@@ -989,20 +1118,6 @@ a.structure-tag:hover {
 	padding: 0 6px;
 }
 
-/* ── Lien vers la notice HAL (pages Problèmes HAL) ── */
-.hal-link-badge {
-	display: inline-block;
-	padding: 2px 8px;
-	background: #1a6fb5;
-	border-radius: var(--radius);
-	font-size: 0.82rem;
-	color: white;
-	text-decoration: none;
-	font-weight: 500;
-}
-.hal-link-badge:hover {
-	background: color-mix(in srgb, #1a6fb5, black 20%);
-}
 
 /* ── Pastille DOAJ d'une revue ── */
 .badge-doaj {
@@ -1023,7 +1138,7 @@ a.badge-doaj:hover {
 
 /* ── Titre de section : petites capitales en couleur d'accent ── */
 .section-title,
-.dash-card h3,
+.dash-card h2,
 .detail-label {
 	color: var(--accent);
 	font-size: 0.8rem;
@@ -1147,7 +1262,8 @@ a.badge-doaj:hover {
 	padding: 2px 8px;
 	border-radius: var(--radius-pill);
 	background: color-mix(in srgb, var(--type-color) 16%, white);
-	color: color-mix(in srgb, var(--type-color), black 45%);
+	/* 50 % de noir : contraste de 4,5:1 au moins, y compris pour les types les plus clairs (preprints, autres). */
+	color: color-mix(in srgb, var(--type-color), black 50%);
 	font-size: 0.75rem;
 	font-weight: 600;
 	white-space: nowrap;
@@ -1229,31 +1345,6 @@ a.badge-doaj:hover {
 	background: color-mix(in srgb, var(--accent), black 20%);
 	color: white;
 	border-color: color-mix(in srgb, var(--accent), black 20%);
-}
-
-/* Boutons outline (petits boutons icône ✕ ✓) */
-.btn-danger-outline {
-	background: var(--card);
-	color: var(--danger);
-	border-color: var(--danger);
-}
-
-.btn-danger-outline:hover {
-	background: var(--danger);
-	color: white;
-	border-color: var(--danger);
-}
-
-.btn-confirm-outline {
-	background: var(--card);
-	color: var(--success);
-	border-color: var(--success);
-}
-
-.btn-confirm-outline:hover {
-	background: var(--success);
-	color: white;
-	border-color: var(--success);
 }
 
 .btn-create {
@@ -1413,6 +1504,24 @@ button.entity-link {
 .detail-label {
 	margin: 0 0 9px;
 }
+/* Section en ligne : le titre dans une colonne de largeur fixe, le contenu à sa droite. Les contenus de sections voisines s'alignent. Sur écran étroit, le titre repasse au-dessus. */
+.detail-section.detail-row {
+	display: grid;
+	grid-template-columns: 13rem minmax(0, 1fr);
+	align-items: baseline;
+	column-gap: 16px;
+}
+.detail-row .detail-label {
+	margin: 0;
+}
+@media (max-width: 600px) {
+	.detail-section.detail-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.detail-row .detail-label {
+		margin-bottom: 9px;
+	}
+}
 .detail-tags {
 	display: flex;
 	flex-wrap: wrap;
@@ -1483,7 +1592,6 @@ button.status-chip {
 button.status-chip:hover {
 	filter: brightness(0.97);
 }
-/* Bouton icône carré ; compose avec .btn + une variante outline (.btn-confirm-outline / .btn-danger-outline). */
 /* Bouton d'ajout discret (« + Ajouter ») : texte en couleur d'accent, fond au survol. */
 .btn-add {
 	height: 28px;
@@ -1521,67 +1629,26 @@ button.status-chip:hover {
 	background: var(--hover);
 	color: var(--accent);
 }
-.icon-btn-danger:hover:not(:disabled) {
+.icon-btn-danger:hover:not(:disabled),
+.icon-btn-danger[aria-pressed='true'] {
 	background: var(--danger-light);
 	color: var(--danger);
+}
+.icon-btn-success:hover:not(:disabled),
+.icon-btn-success[aria-pressed='true'] {
+	background: var(--success-light);
+	color: var(--success);
 }
 .icon-btn:disabled {
 	opacity: 0.4;
 	cursor: default;
 }
 
-.btn-icon-sm {
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	line-height: 1;
-}
-
-/* Bouton bascule de statut ✓ (.confirm) / ✗ (.reject), carré. Inactif grisé, actif coloré discret (texte + bordure), rempli au survol. */
-.toggle-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 22px;
-	height: 22px;
-	padding: 0;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	background: var(--card);
-	color: var(--muted);
-	cursor: pointer;
-	line-height: 1;
-	transition: all 0.12s;
-}
-.toggle-btn.confirm.active {
-	border-color: var(--success);
-	color: var(--success);
-	font-weight: 700;
-}
-.toggle-btn.reject.active {
-	border-color: var(--danger);
-	color: var(--danger);
-	font-weight: 700;
-}
-.toggle-btn.confirm:hover {
-	background: var(--success);
-	border-color: var(--success);
-	color: #fff;
-}
-.toggle-btn.reject:hover {
-	background: var(--danger);
-	border-color: var(--danger);
-	color: #fff;
-}
-
-/* Colonne de contrôles (boutons ✓/✗ ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */
+/* Colonne de contrôles (bascules confirmer et rejeter, ou tag « nom ») à gauche d'une puce, largeur fixe pour aligner verticalement les puces entre les lignes. */
 .chip-controls {
 	display: inline-flex;
 	align-items: center;
 	gap: 2px;
-	min-width: 46px;
+	min-width: 58px;
 	flex-shrink: 0;
 }

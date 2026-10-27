@@ -1,7 +1,8 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
-  import ResultCount from "#lib/components/ResultCount.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import ListToolbar from "#lib/components/ListToolbar.svelte";
+  import { withBase } from "#lib/paths.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import { resolve } from "$app/paths";
   import { replaceQuery } from "#lib/url.js";
   import { page } from "$app/state";
@@ -34,17 +35,11 @@
   });
 </script>
 
-<svelte:head>
-  <title>{pageTitle("Comptes auteur HAL en double")}</title>
-</svelte:head>
+<PageHeader title="Comptes auteur HAL en double">
+  Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.
+</PageHeader>
 
-<h1>Comptes auteur HAL en double</h1>
-
-<div class="info-box">Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.</div>
-
-<div class="toolbar">
-  <ResultCount {list} one="personne" many="personnes" />
-</div>
+<ListToolbar {list} one="personne" many="personnes" exportUrl={withBase("/api/hal-problems/duplicate-accounts/export.csv")} />
 
 <ListStatus {list} emptyText="Aucun doublon détecté">
   <table class="data-table">
@@ -64,14 +59,15 @@
             </a>
             {#if p.has_rh}<RhCheck />{/if}
           </td>
-          <td class="hal-accounts">
+          <td>
+            <div class="hal-accounts">
             {#each p.hal_accounts as ha}
               <div class="hal-account">
-                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="hal-id">
+                <a href={halPersonUrl(ha.hal_person_id)} target="_blank" rel="noopener" class="id-badge">
                   {ha.hal_person_id}
                 </a>
                 <span class="hal-name">{ha.full_name}</span>
-                <span class="hal-publications">{ha.publication_count} publi{ha.publication_count > 1 ? "s" : ""}</span>
+                <span class="hal-publications">{ha.publication_count} publication{ha.publication_count > 1 ? "s" : ""}</span>
                 {#if ha.idhal}
                   <span class="hal-secondary-id">idHAL: {ha.idhal}</span>
                 {/if}
@@ -83,6 +79,7 @@
                 {/if}
               </div>
             {/each}
+            </div>
           </td>
         </tr>
       {/each}
@@ -114,15 +111,6 @@
     gap: 8px;
     font-size: 0.85rem;
     flex-wrap: wrap;
-  }
-  .hal-id {
-    color: var(--accent);
-    text-decoration: none;
-    font-family: var(--mono);
-    font-size: 0.8rem;
-  }
-  .hal-id:hover {
-    text-decoration: underline;
   }
   .hal-name {
     font-weight: 500;

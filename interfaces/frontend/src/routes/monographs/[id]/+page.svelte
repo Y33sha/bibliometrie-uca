@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
@@ -41,26 +42,25 @@
 		<div class="entity-meta">
 			<span class="entity-tag">{monograph.proceedings ? "Volume d'actes" : 'Livre'}</span>
 			{#if monograph.year}
-				<span class="entity-meta-label">Année</span>
-				<span>{monograph.year}</span>
+				<EntityMetaItem label="Année"><span>{monograph.year}</span></EntityMetaItem>
 			{/if}
 			{#if monograph.isbn}
-				<span class="entity-meta-label">ISBN</span>
-				<span class="id-badge">{monograph.isbn}</span>
+				<EntityMetaItem label="ISBN"><span class="id-badge">{monograph.isbn}</span></EntityMetaItem>
 			{/if}
 			{#if monograph.eisbn}
-				<span class="entity-meta-label">ISBN électronique</span>
-				<span class="id-badge">{monograph.eisbn}</span>
+				<EntityMetaItem label="ISBN électronique"><span class="id-badge">{monograph.eisbn}</span></EntityMetaItem>
 			{/if}
 		</div>
 		<div class="entity-meta">
 			{#if monograph.publisher_id}
-				<span class="entity-meta-label">Éditeur</span>
-				<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
+				<EntityMetaItem label="Éditeur">
+					<a href={resolve(`publishers/${monograph.publisher_id}`)}>{monograph.publisher_name}</a>
+				</EntityMetaItem>
 			{/if}
 			{#if monograph.serial_id}
-				<span class="entity-meta-label">Collection</span>
-				<a href={resolve(`journals/${monograph.serial_id}`)}>{monograph.journal_title}</a>
+				<EntityMetaItem label="Collection">
+					<a href={resolve(`journals/${monograph.serial_id}`)}>{monograph.journal_title}</a>
+				</EntityMetaItem>
 			{/if}
 		</div>
 	</div>
@@ -68,9 +68,8 @@
 	<div class="m-publications">
 		<PublicationsListView
 			apiKey={`monograph-${monographId}-publications`}
-			externalFilters={{ monographId }}
+			context={{ kind: 'monograph', id: monographId }}
 			basePath={`/monographs/${monographId}`}
-			showFilterBanner={false}
 			perPage={50}
 		/>
 	</div>

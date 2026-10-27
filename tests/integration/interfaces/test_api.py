@@ -105,10 +105,9 @@ class TestPersons:
 
 class TestLaboratories:
     def test_list(self, client):
-        r = client.get("/api/structures", params={"in_perimeter": "true", "type": "labo"})
+        r = client.get("/api/structures", params={"structure_type": "labo"})
         assert r.status_code == 200
-        data = r.json()
-        assert isinstance(data, list)
+        assert isinstance(r.json()["structures"], list)
 
     def test_not_found(self, client):
         r = client.get("/api/structures/999999999")

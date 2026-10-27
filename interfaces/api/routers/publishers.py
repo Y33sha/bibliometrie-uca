@@ -1,9 +1,10 @@
 """Router des éditeurs : listes, recherche, édition, fusion. Sert `/api/publishers/*`.
 
-Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux — `/types`, `/facets`, `/export.csv` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.publishers import PublisherService
@@ -11,7 +12,6 @@ from domain.merge import MergedEntity
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from infrastructure.read_models.publishers.models import (
     Publisher,
-    PublisherDashboardResponse,
     PublisherFilters,
     PublisherListResponse,
     PublishersFacetsResponse,
@@ -19,6 +19,7 @@ from infrastructure.read_models.publishers.models import (
 )
 from infrastructure.read_models.publishers.queries import PublisherQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, publisher_queries, publisher_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
@@ -30,6 +31,7 @@ from interfaces.api.models import (
     PublisherMergeBlockedResponse,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 
@@ -75,6 +77,22 @@ def publishers_facets(
     return queries.publishers_facets(filters=filters)
 
 
+@router.get("/export.csv")
+def export_publishers_csv(
+    sort: PublisherSort = "name_asc",
+    filters: PublisherFilters = Depends(publisher_filters),
+    queries: PublisherQueries = Depends(publisher_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV de la liste des éditeurs, aux filtres et au tri de la liste."""
+    return csv_response(
+        queries.export_publishers_csv(filters=filters, sort=sort),
+        filename="editeurs.csv",
+        slot=slot,
+    )
+
+
 @router.get("", response_model=PublisherListResponse)
 def list_publishers(
     page: int = Query(1, ge=1),
@@ -101,21 +119,6 @@ def get_publisher(
     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
     """
     return detail.found(queries.get_publisher_detail(publisher_id))
-
-
-@router.get("/{publisher_id}/dashboard", response_model=PublisherDashboardResponse)
-def get_publisher_dashboard(
-    publisher_id: int,
-    queries: PublisherQueries = Depends(publisher_queries),
-) -> PublisherDashboardResponse:
-    """Agrégats de l'onglet tableau de bord de la page d'un éditeur.
-
-    Distribution des `serial_type` de son catalogue, et distributions des `doc_type` et `oa_status` de ses publications. Renvoie 404 sur un éditeur inconnu.
-    """
-    result = queries.get_publisher_dashboard(publisher_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Éditeur introuvable")
-    return result
 
 
 @router.get("/{publisher_id}/subjects", response_model=list[SubjectFrequency])

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
 	import { anchored } from '#lib/actions/anchored.js';
+	import { useFacetPanel } from '#lib/composables/useFacetPanel.svelte.js';
 	import { api } from '#lib/api/index.js';
 	import type { components } from '#lib/api/schema.js';
 	import { displayEntityLabel, entityLabel, rememberEntityLabel, type EntityKind } from '#lib/entityLabels.js';
@@ -12,7 +12,7 @@
 	 * Le parent tient la sélection sous forme d'**ids** : un au plus en choix simple, plusieurs avec `multiple`. Les libellés sont de la donnée dérivée, gérée ici : connus d'emblée quand l'utilisateur choisit une option, sinon résolus par `/api/entity-labels` quand un id est restauré depuis l'URL sans son nom. Un libellé ne dépend d'aucun filtre, là où les options proposées en dépendent. */
 	interface Props {
 		label: string;
-		/** Base de la facette contextuelle (ex. /api/stats/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
+		/** Base de la facette contextuelle (ex. /api/publications/facets) : `${endpoint}/entities` liste les premières entités sous les filtres actifs. */
 		endpoint: string;
 		kind: EntityKind;
 		/** Filtres actifs du contexte (l'endpoint saute de lui-même celui de `kind`). */
@@ -32,14 +32,14 @@
 		count: number;
 	}
 
-	let open = $state(false);
+	const panel = useFacetPanel();
+	const facetRoot = panel.root;
 	let query = $state('');
 	let results = $state<Result[]>([]);
 	let loading = $state(false);
 	// Libellés des entités sélectionnées, par id.
 	let labels = $state<Record<string, string>>({});
 	let debounce: ReturnType<typeof setTimeout>;
-	const instanceId = Symbol();
 
 	// Résout le libellé des ids sélectionnés dont le nom est inconnu (restaurés de l'URL). `entityLabel` mémorise les réponses.
 	$effect(() => {
@@ -90,7 +90,7 @@
 		}
 		if (!multiple) {
 			onchange?.(r ? [r.value] : []);
-			open = false;
+			panel.open = false;
 		} else if (!r) {
 			onchange?.([]);
 		} else {
@@ -98,64 +98,43 @@
 		}
 	}
 
-	function pickAll(e: Event & { currentTarget: HTMLInputElement }) {
-		// « Tous » sans sélection reste coché : il n'y a rien à retirer.
-		if (!selected.length) {
-			e.currentTarget.checked = true;
-			return;
+	function togglePanel() {
+		if (!panel.open) {
+			query = '';
+			search();
 		}
-		pick(null);
+		panel.toggle();
 	}
-
-	function openPanel() {
-		window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
-		open = true;
-		query = '';
-		search();
-	}
-
-	function handleFacetClose(ev: Event) {
-		if ((ev as CustomEvent).detail !== instanceId) open = false;
-	}
-	onMount(() => window.addEventListener('facet-close', handleFacetClose));
-	onDestroy(() => window.removeEventListener('facet-close', handleFacetClose));
 </script>
 
-<svelte:window onclick={() => { open = false; }} />
-
-<div class="facet">
+<div class="facet" use:facetRoot>
 	<button
 		type="button"
 		class="facet-btn"
 		class:has-selection={selected.length > 0}
-		onclick={(e) => {
-			e.stopPropagation();
-			if (open) open = false;
-			else openPanel();
-		}}
+		aria-expanded={panel.open}
+		onclick={togglePanel}
 	>
 		<span class="facet-label">{buttonText}</span>
 		{#if multiple && selected.length}
 			<span class="facet-badge">{selected.length}</span>
 		{/if}
-		<span class="chevron" class:up={open} aria-hidden="true"></span>
+		<span class="chevron" class:up={panel.open} aria-hidden="true"></span>
 	</button>
 
-	{#if open}
-		<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
-		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
+	{#if panel.open}
+		<div class="facet-panel" use:anchored>
 			<input type="text" class="facet-search" placeholder="Rechercher" bind:value={query} oninput={onInput} />
+			{#if selected.length}
+				<button type="button" class="facet-clear" onclick={() => pick(null)}>Effacer</button>
+			{/if}
 			<div class="facet-options">
-				<label>
-					<input type={multiple ? 'checkbox' : 'radio'} checked={!selected.length} onchange={pickAll} />
-					<span style="font-weight:500">Tous</span>
-				</label>
 				{#each selectedOutside as id (id)}
 					<label>
 						<input
 							type={multiple ? 'checkbox' : 'radio'}
 							checked
-							onchange={() => (multiple ? pick({ value: id, text: labels[id] ?? id, count: 0 }) : (open = false))}
+							onchange={() => (multiple ? pick({ value: id, text: labels[id] ?? id, count: 0 }) : (panel.open = false))}
 						/>
 						<span class="facet-option-text"title={labels[id] ?? id}>{labels[id] ?? id}</span>
 					</label>

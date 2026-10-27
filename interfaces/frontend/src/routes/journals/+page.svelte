@@ -1,6 +1,6 @@
 <script lang="ts">
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
 	import { setQueryParam } from '#lib/url.js';
@@ -183,11 +183,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Publications en série")}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Publications en série</h1>
+<PageHeader title="Publications en série" hidden />
 
 {#if isAdmin()}
 	<HubTabs
@@ -278,8 +274,6 @@
 
 <style>
 
-	.btn-merge { font-size: 0.8rem; color: var(--accent); background: none; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; padding: 2px 8px; }
-	.btn-merge:hover { background: var(--accent-light); }
 
 	.muted { color: var(--muted); }
 </style>

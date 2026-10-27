@@ -1,21 +1,20 @@
 <script lang="ts">
+	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { docTypeLabel, issnLabel, oaStatusLabel } from '#lib/labels.js';
+	import { issnLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
-	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/cssVar.js';
-	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
-	type SerialDashboard = components['schemas']['SerialDashboardResponse'];
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	type EnumOption = components['schemas']['EnumOption'];
 
@@ -33,26 +32,8 @@
 	const MONOGRAPHS_TAB_LABELS: Record<string, string> = { proceedings: 'Volumes', book_series: 'Livres' };
 	const monographsTabLabel = $derived(journal?.serial_type ? MONOGRAPHS_TAB_LABELS[journal.serial_type] : undefined);
 	let error = $state(false);
-	let dashboard = $state<SerialDashboard | null>(null);
-	let subjects = $state<SubjectFrequency[]>([]);
+	let subjectList = $state<SubjectFrequency[]>([]);
 	let dashboardLoaded = $state(false);
-
-	// Distributions en segments pour les doughnuts ; `expected=false` (valeur inattendue pour le type de revue / modèle OA) est signalé visuellement par le composant (couleur d'alerte + ⚠ en légende), sans énumérer les valeurs attendues.
-	const docTypeSegments = $derived(
-		(dashboard?.doc_types ?? []).map((d) => ({
-			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
-			value: d.count,
-			expected: d.expected
-		}))
-	);
-	const oaStatusSegments = $derived(
-		(dashboard?.oa_statuses ?? []).map((o) => ({
-			label: o.oa_status ? oaStatusLabel(o.oa_status) : '(non renseigné)',
-			value: o.count,
-			color: oaStatusColor(o.oa_status),
-			expected: o.expected
-		}))
-	);
 
 	let showRawDoaj = $state(false);
 
@@ -82,14 +63,9 @@
 
 	async function loadDashboard() {
 		if (dashboardLoaded) return;
-		const [d, s] = await Promise.all([
-			api<SerialDashboard>(`/api/serials/${serialId}/dashboard`, { key: 'j-dashboard' }),
-			api<SubjectFrequency[]>(`/api/serials/${serialId}/subjects?limit=20`, {
-				key: 'j-subjects'
-			})
-		]);
-		dashboard = d;
-		subjects = s;
+		subjectList = await api<SubjectFrequency[]>(`/api/serials/${serialId}/subjects?limit=20`, {
+			key: 'j-subjects'
+		});
 		dashboardLoaded = true;
 	}
 
@@ -141,26 +117,28 @@
 		</h1>
 		<div class="entity-meta">
 			{#each journal.issn_details.filter((i) => i.status === 'active' || i.linking) as issn (issn.issn)}
-				<span class="entity-meta-label">{issnLabel(issn)}</span>
-				<span class="id-badge">{issn.issn}</span>
+				<EntityMetaItem label={issnLabel(issn)}><span class="id-badge">{issn.issn}</span></EntityMetaItem>
 			{/each}
 		</div>
 		<div class="entity-meta">
 			{#if journal.publisher_name}
-				<span class="entity-meta-label">Éditeur</span>
-				{#if journal.publisher_id}
-					<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
-				{:else}
-					<span class="publisher-link">{journal.publisher_name}</span>
-				{/if}
+				<EntityMetaItem label="Éditeur">
+					{#if journal.publisher_id}
+						<a href={resolve(`publishers/${journal.publisher_id}`)} class="publisher-link">{journal.publisher_name}</a>
+					{:else}
+						<span class="publisher-link">{journal.publisher_name}</span>
+					{/if}
+				</EntityMetaItem>
 			{/if}
 			{#if journal.serial_type}
-				<span class="entity-meta-label">Type</span>
-				<span class="entity-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
+				<EntityMetaItem label="Type">
+					<span class="entity-tag">{serialTypeLabels[journal.serial_type] ?? journal.serial_type}</span>
+				</EntityMetaItem>
 			{/if}
 			{#if journal.oa_model}
-				<span class="entity-meta-label">OA</span>
-				<span class="entity-tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
+				<EntityMetaItem label="Open access">
+					<span class="entity-tag">{oaModelLabels[journal.oa_model] ?? journal.oa_model}</span>
+				</EntityMetaItem>
 			{/if}
 		</div>
 	</div>
@@ -178,45 +156,34 @@
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
-			{#if !dashboardLoaded || !dashboard}
-				<div class="loading">Chargement…</div>
-			{:else}
-				<div class="dash-grid">
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						{#if subjects.length === 0}
+			<PublicationsDashboard
+				context={{ kind: 'serial', id: serialId }}
+				apiKey="serial-dashboard"
+				countries={false}
+				oaBreakdown="oa_voie"
+			>
+				{#snippet subjects()}
+					<div class="dash-card">
+						<h2>Sujets principaux</h2>
+						{#if !dashboardLoaded}
+							<div class="loading">Chargement…</div>
+						{:else if subjectList.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<SubjectBars {subjects} />
+							<SubjectsCloud subjects={subjectList} />
 						{/if}
 					</div>
-
-					<div class="dash-card">
-						<h3>Types de documents ({dashboard.total_publications})</h3>
-						{#if dashboard.doc_types.length === 0}
-							<p class="muted">Aucune publication rattachée.</p>
-						{:else}
-							<DoughnutChart segments={docTypeSegments} flagAnomalies />
-						{/if}
-					</div>
-
-					<div class="dash-card">
-						<h3>Statuts Open Access</h3>
-						{#if dashboard.oa_statuses.length === 0}
-							<p class="muted">Aucune publication rattachée.</p>
-						{:else}
-							<DoughnutChart segments={oaStatusSegments} flagAnomalies />
-						{/if}
-					</div>
-
-					{#if journal.doaj_payload}
+				{/snippet}
+			</PublicationsDashboard>
+			{#if journal.doaj_payload}
+				<div class="dash-grid doaj-grid">
 						<div class="dash-card dash-card-wide">
-							<h3>
+							<h2>
 								Données DOAJ
 								{#if journal.doaj_imported_at}
 									<span class="muted small">(import {formatDate(journal.doaj_imported_at)})</span>
 								{/if}
-							</h3>
+							</h2>
 							<dl class="doaj-fields">
 								{#each READABLE_DOAJ_FIELDS as f (f.key)}
 									{#if journal.doaj_payload[f.key]}
@@ -232,7 +199,6 @@
 								<pre class="raw-payload">{JSON.stringify(journal.doaj_payload, null, 2)}</pre>
 							{/if}
 						</div>
-					{/if}
 				</div>
 			{/if}
 		</div>
@@ -250,9 +216,8 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`journal-${serialId}-publications`}
-				externalFilters={{ serialId }}
+				context={{ kind: 'serial', id: serialId }}
 				basePath={`/journals/${serialId}`}
-				showFilterBanner={false}
 				perPage={50}
 			/>
 		</div>
@@ -262,6 +227,7 @@
 <style>
 
 	.loading, .no-results { padding: 20px; color: var(--muted); }
+	.doaj-grid { margin-top: 24px; }
 
 	.muted { color: var(--muted); }
 	.small { font-size: 0.8rem; font-weight: 400; }

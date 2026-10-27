@@ -5,7 +5,10 @@ Une structure est un laboratoire, une composante, une université, un centre hos
 Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe placé après serait capté par le paramètre.
 """
 
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from application.ports.repositories.structure_repository import (
     NameFormCreate,
@@ -19,44 +22,107 @@ from domain.structures.structure import StructureType
 from infrastructure.read_models.structures.models import (
     NameFormOut,
     StructureAddressesResponse,
-    StructureDashboardResponse,
     StructureDeletionImpact,
     StructureDetailResponse,
+    StructureFilters,
     StructureListItem,
+    StructureListResponse,
     StructureOut,
     StructurePartnersResponse,
+    StructuresFacetsResponse,
+    StructureSort,
 )
 from infrastructure.read_models.structures.queries import StructuresQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import structure_service, structures_queries
-from interfaces.api.filters import parse_int_csv, parse_str_csv, parse_vocabulary_csv
+from interfaces.api.filters import (
+    parse_ids_with_none,
+    parse_int_csv,
+    parse_str_csv,
+    parse_vocabulary_csv,
+)
 from interfaces.api.models import (
     DeletedResponse,
     StructureTutelleCreateResponse,
     TutelleCreate,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/structures", tags=["structures"])
 
 
-@router.get("", response_model=list[StructureListItem])
-def list_structures(
-    structure_type: str = Query(""),
+def structure_filters(
     search: SearchTerm = "",
-    in_perimeter: bool = Query(False),
-    queries: StructuresQueries = Depends(structures_queries),
-) -> list[StructureListItem]:
-    """Liste des structures, filtrable par types, par texte libre et par appartenance au périmètre.
+    structure_type: str = Query(""),
+    tutelle_id: str = Query(""),
+    perimeter_id: str = Query(""),
+) -> StructureFilters:
+    """Filtres communs à la liste des structures, à ses facettes et à son export.
 
-    `structure_type` accepte plusieurs valeurs de l'énumération `structure_type` séparées par des virgules. `search` : matching accent-insensible sur nom / acronyme / code. `in_perimeter` restreint aux structures du périmètre `persons`, clôture comprise : la page publique des laboratoires s'en sert, avec les types que sa configuration lui donne. L'ordre de la liste n'est pas garanti : les consommateurs trient à l'affichage.
+    Les valeurs multiples se séparent par des virgules. `search` cherche dans le nom, l'acronyme et le code, sans tenir compte des accents. `perimeter_id` accepte la sentinelle `none`, qui retient les structures hors de tout périmètre.
     """
-    return queries.list_structures(
+    perimeter_ids, perimeter_none = parse_ids_with_none(perimeter_id, param="perimeter_id")
+    return StructureFilters(
+        search=search,
         types=parse_vocabulary_csv(
             structure_type, allowed=tuple(StructureType), param="structure_type"
         ),
-        search=search,
-        in_perimeter=in_perimeter,
+        tutelle_ids=parse_int_csv(tutelle_id, param="tutelle_id"),
+        perimeter_ids=perimeter_ids,
+        perimeter_none=perimeter_none,
+    )
+
+
+Filters = Annotated[StructureFilters, Depends(structure_filters)]
+
+
+@router.get("", response_model=StructureListResponse)
+def list_structures(
+    filters: Filters,
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    sort: StructureSort = "acronym_asc",
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructureListResponse:
+    """Liste paginée des structures."""
+    return queries.list_structures(filters=filters, sort=sort, page=page, per_page=per_page)
+
+
+@router.get("/all", response_model=list[StructureListItem])
+def list_all_structures(
+    queries: StructuresQueries = Depends(structures_queries),
+) -> list[StructureListItem]:
+    """Toutes les structures, triées par nom, pour les sélecteurs de structure."""
+    return queries.list_all_structures()
+
+
+@router.get("/facets", response_model=StructuresFacetsResponse)
+def structures_facets(
+    filters: Filters,
+    queries: StructuresQueries = Depends(structures_queries),
+) -> StructuresFacetsResponse:
+    """Décomptes par option des facettes de la liste des structures.
+
+    Chaque facette écarte sa propre dimension de la clause WHERE.
+    """
+    return queries.structures_facets(filters=filters)
+
+
+@router.get("/export.csv")
+def export_structures_csv(
+    filters: Filters,
+    sort: StructureSort = "acronym_asc",
+    queries: StructuresQueries = Depends(structures_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV de la liste des structures, aux filtres et au tri de la liste."""
+    return csv_response(
+        queries.export_structures_csv(filters=filters, sort=sort),
+        filename="structures.csv",
+        slot=slot,
     )
 
 
@@ -194,15 +260,6 @@ def get_structure_partners(
         page=page,
         per_page=per_page,
     )
-
-
-@router.get("/{structure_id}/dashboard", response_model=StructureDashboardResponse)
-def get_structure_dashboard(
-    structure_id: int,
-    queries: StructuresQueries = Depends(structures_queries),
-) -> StructureDashboardResponse:
-    """Agrégats de la structure : publications par année, accès ouvert, collaborations internationales."""
-    return queries.get_structure_dashboard(structure_id)
 
 
 @router.get("/{structure_id}/subjects", response_model=list[SubjectFrequency])

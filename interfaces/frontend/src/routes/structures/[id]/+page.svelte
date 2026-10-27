@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
@@ -6,13 +7,8 @@
 	import { api } from '#lib/api/index.js';
 	import { rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
-	import BarChart from '#lib/components/charts/BarChart.svelte';
-	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import OaBar from '#lib/components/charts/OaBar.svelte';
-	import PublicationsByYearChart from '#lib/components/charts/PublicationsByYearChart.svelte';
-	import KeyFigures from '#lib/components/KeyFigures.svelte';
-	import SubjectBars from '#lib/components/SubjectBars.svelte';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -58,19 +54,11 @@
 		pageParam: 'apage',
 	});
 
-	// Dashboard tab
+	// Dashboard tab : les publications passent par `PublicationsDashboard` ; la page ajoute les personnes présentes dans le SI RH et les sujets.
 	let dashboardLoaded = $state(false);
-	let dashPubsByYear: { year: number; count: number }[] = $state([]);
-	let dashOa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number } = $state({ open_access: 0, embargoed: 0, closed: 0, unknown: 0, total: 0 });
-	let dashCollab: { total_articles: number; international: number; domestic: number } = $state({ total_articles: 0, international: 0, domestic: 0 });
-	let dashTopCountries: { code: string; name: string; count: number }[] = $state([]);
+	let rhPersonsCount = $state(0);
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 	let dashSubjects: SubjectFrequency[] = $state([]);
-
-	const collabSegments = $derived([
-		{ label: 'International', value: dashCollab.international, color: cssVar('accent-mid') },
-		{ label: 'National', value: dashCollab.domestic, color: cssVar('border') }
-	]);
 
 	const tutelles = $derived(parents);
 
@@ -93,21 +81,15 @@
 	}
 
 	async function loadDashboard() {
-		const [data, subjects] = await Promise.all([
-			api<{
-				publications_by_year: { year: number; count: number }[];
-				oa: { open_access: number; embargoed: number; closed: number; unknown: number; total: number };
-				collab: { total_articles: number; international: number; domestic: number };
-				top_countries: { code: string; name: string; count: number }[];
-			}>(`/api/structures/${labId}/dashboard`, { key: 'lab-dashboard' }),
+		// Le décompte des personnes reprend les réglages par défaut de l'onglet Personnes : présentes dans le SI RH, retenues, actives.
+		const persons = new URLSearchParams({ lab_id: String(labId), has_rh: 'true', exclusion: 'none', active: 'true', per_page: '1' });
+		const [personsPage, subjects] = await Promise.all([
+			api<{ total: number }>(`/api/persons?${persons}`, { key: 'lab-rh-persons' }),
 			api<SubjectFrequency[]>(`/api/structures/${labId}/subjects?limit=30`, {
 				key: 'lab-subjects',
 			}),
 		]);
-		dashPubsByYear = data.publications_by_year;
-		dashOa = data.oa;
-		dashCollab = data.collab;
-		dashTopCountries = data.top_countries;
+		rhPersonsCount = personsPage.total;
 		dashSubjects = subjects;
 		dashboardLoaded = true;
 	}
@@ -169,31 +151,33 @@
 		</h1>
 		<div class="entity-meta">
 			{#if lab.ror_id}
-				<span class="entity-meta-label">ROR</span>
-				<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
-					{rorShortId(lab.ror_id)}
-				</a>
+				<EntityMetaItem label="ROR">
+					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
+						{rorShortId(lab.ror_id)}
+					</a>
+				</EntityMetaItem>
 			{/if}
 			{#if lab.rnsr_id}
-				<span class="entity-meta-label">RNSR</span>
-				<span class="id-badge">{lab.rnsr_id}</span>
+				<EntityMetaItem label="RNSR"><span class="id-badge">{lab.rnsr_id}</span></EntityMetaItem>
 			{/if}
 			{#if lab.hal_collection}
-				<span class="entity-meta-label">HAL</span>
-				<a
-					href="https://hal.science/{lab.hal_collection}"
-					target="_blank"
-					rel="noopener"
-					class="id-badge"
-				>
-					{lab.hal_collection}
-				</a>
+				<EntityMetaItem label="HAL">
+					<a
+						href="https://hal.science/{lab.hal_collection}"
+						target="_blank"
+						rel="noopener"
+						class="id-badge"
+					>
+						{lab.hal_collection}
+					</a>
+				</EntityMetaItem>
 			{/if}
 			{#if tutelles.length}
-				<span class="entity-meta-label">Tutelles</span>
-				{#each tutelles as t (t.id)}
-					<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
-				{/each}
+				<EntityMetaItem label="Tutelles">
+					{#each tutelles as t (t.id)}
+						<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
+					{/each}
+				</EntityMetaItem>
 			{/if}
 		</div>
 	</div>
@@ -220,51 +204,21 @@
 	<!-- Tab: Dashboard -->
 	{#if activeTab === 'dashboard'}
 		<div class="tab-content">
-			{#if !dashboardLoaded}
-				<div class="loading">Chargement…</div>
-			{:else}
-				<KeyFigures
-					items={[
-						{ value: dashOa.total.toLocaleString('fr-FR'), label: 'publications' },
-						...(dashOa.total > 0
-							? [{ value: `${Math.round((dashOa.open_access / dashOa.total) * 100)} %`, label: 'en open access', tone: 'open' as const }]
-							: []),
-						...(thesesCount > 0 ? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses' }] : []),
-					]}
-				/>
-				<div class="dash-grid">
-					<div class="dash-card">
-						<h3>Publications par année</h3>
-						<PublicationsByYearChart data={dashPubsByYear} />
-					</div>
-					<div class="dash-card">
-						<h3>Open access</h3>
-						<OaBar oa={dashOa} />
-					</div>
-					<div class="dash-card">
-						<h3>Collaborations internationales (articles)</h3>
-						<DoughnutChart segments={collabSegments} />
-						{#if dashCollab.total_articles > 0}
-							<div class="dash-summary">
-								{Math.round(dashCollab.international / dashCollab.total_articles * 100)} % international
-								({dashCollab.international.toLocaleString('fr-FR')} / {dashCollab.total_articles.toLocaleString('fr-FR')} articles)
-							</div>
-						{/if}
-					</div>
-					<div class="dash-card">
-						<h3>Top 5 pays partenaires (articles)</h3>
-						<BarChart
-							labels={dashTopCountries.map((c) => c.name)}
-							values={dashTopCountries.map((c) => c.count)}
-							datasetLabel="Articles"
-							horizontal
-						/>
-					</div>
-					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
-						<SubjectBars subjects={dashSubjects} />
-					</div>
-				</div>
+			{#if lab}
+				<PublicationsDashboard
+					context={{ kind: 'lab', id: lab.id }}
+					apiKey="lab-dashboard"
+					figures={dashboardLoaded && rhPersonsCount > 0
+						? [{ value: rhPersonsCount.toLocaleString('fr-FR'), label: 'personnes (SI RH)' }]
+						: []}
+				>
+					{#snippet subjects()}
+						<div class="dash-card">
+							<h2>Sujets principaux</h2>
+							<SubjectsCloud subjects={dashSubjects} />
+						</div>
+					{/snippet}
+				</PublicationsDashboard>
 			{/if}
 		</div>
 	{/if}
@@ -274,14 +228,8 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`lab-${lab.id}-publications`}
-				externalFilters={{
-					labId: lab.id,
-					labLabel: structureLabel(lab),
-					halCollection: lab.hal_collection ?? undefined,
-				}}
+				context={{ kind: 'lab', id: lab.id }}
 				basePath={`/structures/${labId}`}
-				showFilterBanner={false}
-				showHalStatusColumn
 				perPage={50}
 			/>
 		</div>

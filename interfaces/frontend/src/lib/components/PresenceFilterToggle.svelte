@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
 	import { anchored } from '#lib/actions/anchored.js';
+	import { useFacetPanel } from '#lib/composables/useFacetPanel.svelte.js';
 
 	type ToggleState = 'all' | 'yes' | 'no';
 
@@ -28,8 +28,8 @@
 		onchange,
 	}: Props = $props();
 
-	let open = $state(false);
-	const instanceId = Symbol();
+	const panel = useFacetPanel();
+	const facetRoot = panel.root;
 
 	const activeCount = $derived(Object.keys(states).length);
 
@@ -70,51 +70,25 @@
 		return c.yes + c.no;
 	}
 
-	function handleClickOutside() {
-		open = false;
-	}
-
-	function handleFacetClose(e: Event) {
-		if ((e as CustomEvent).detail !== instanceId) {
-			open = false;
-		}
-	}
-
-	onMount(() => {
-		window.addEventListener('facet-close', handleFacetClose);
-	});
-	onDestroy(() => {
-		window.removeEventListener('facet-close', handleFacetClose);
-	});
 </script>
 
-<svelte:window onclick={handleClickOutside} />
-
-<div class="facet">
+<div class="facet" use:facetRoot>
 	<button
 		type="button"
 		class="facet-btn"
 		class:has-selection={activeCount > 0}
-		onclick={(e) => {
-			e.stopPropagation();
-			if (open) {
-				open = false;
-				return;
-			}
-			window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
-			open = true;
-		}}
+		aria-expanded={panel.open}
+		onclick={panel.toggle}
 	>
 		<span class="facet-label">{label}</span>
 		{#if activeCount > 0}
 			<span class="facet-badge">{activeCount}</span>
 		{/if}
-		<span class="chevron" class:up={open} aria-hidden="true"></span>
+		<span class="chevron" class:up={panel.open} aria-hidden="true"></span>
 	</button>
 
-	{#if open}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
+	{#if panel.open}
+		<div class="facet-panel" use:anchored>
 			{#each items as item (item.key)}
 				{@const state = stateOf(item.key)}
 				{@const c = countFor(item.key, state)}

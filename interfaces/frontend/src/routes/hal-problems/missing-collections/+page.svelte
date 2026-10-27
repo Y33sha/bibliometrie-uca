@@ -1,7 +1,12 @@
 <script lang="ts">
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import TableScroll from '#lib/components/TableScroll.svelte';
+	import { institution } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
-	import ResultCount from '#lib/components/ResultCount.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
+	import { columnLabels } from '#lib/labels.js';
+	import ListToolbar from '#lib/components/ListToolbar.svelte';
+	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { page } from '$app/state';
@@ -65,83 +70,59 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Publications absentes des collections HAL")}</title>
-</svelte:head>
-
-<h1>Publications absentes des collections HAL</h1>
-
-<div class="info-box">
+<PageHeader title="Publications absentes des collections HAL">
 	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.
-</div>
+</PageHeader>
 
-<div class="toolbar">
-	<select class="lab-select" bind:value={selectedLabId} onchange={onLabChange}>
-		{#each labs as lab}
-			<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
-		{/each}
-	</select>
-	<ResultCount {list} one="publication" many="publications" />
-</div>
+<ListToolbar {list} one="publication" many="publications" filtersLabel="Laboratoire" exportUrl={selectedLabId ? withBase(`/api/hal-problems/missing-collections/export.csv?lab_id=${selectedLabId}`) : undefined}>
+	{#snippet filters()}
+		<select class="lab-select" aria-label="Laboratoire" bind:value={selectedLabId} onchange={onLabChange}>
+			{#each labs as lab}
+				<option value={lab.id}>{lab.acronym} — {lab.name} ({lab.hal_collection})</option>
+			{/each}
+		</select>
+	{/snippet}
+</ListToolbar>
 
 {#if !labsLoaded}
 	<div class="loading">Chargement…</div>
 {:else if selectedLabId}
 	<ListStatus {list} emptyText="Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})">
-		<div class="publication-list">
-			{#each list.items as pub}
-				<div class="publication-card">
-					<div class="publication-meta-line">
-						{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-						{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
-						{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
-						<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
-					</div>
-					<div class="hal-list">
-						{#if pub.hal_links.length}
-							{#each pub.hal_links as link (link.source_id)}
-								<a href={link.record_url} target="_blank" rel="noopener" class="hal-link-badge">{link.source_id}</a>
-							{/each}
-						{/if}
-						{#if pub.doi}
-							<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
-						{/if}
-					</div>
-				</div>
-			{/each}
-		</div>
+		<TableScroll>
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>{columnLabels.type}</th>
+						<th>{columnLabels.year}</th>
+						<th>{columnLabels.doi}</th>
+						<th>{columnLabels.title}</th>
+						<th>Dépôts HAL</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each list.items as pub (pub.id)}
+						<tr>
+							<td>{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}</td>
+							<td>{pub.publication_year ?? ''}</td>
+							<td>{#if pub.doi}<DoiLink doi={pub.doi} />{/if}</td>
+							<td><a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a></td>
+							<td>
+								<div class="id-list">
+									{#each pub.hal_links as link (link.source_id)}
+										<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
+									{/each}
+								</div>
+							</td>						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</TableScroll>
 		<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 	</ListStatus>
 {/if}
 
 <style>
 	.lab-select {
-		padding: 6px 10px;
-		border: 2px solid var(--accent);
-		border-radius: var(--radius);
-		font-size: 0.9rem;
-		font-family: inherit;
-		font-weight: 600;
-		color: var(--accent);
-		min-width: 300px;
+		max-width: 100%;
 	}
-	.publication-list { display: flex; flex-direction: column; gap: 8px; }
-	.publication-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 10px 14px;
-	}
-	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-	.meta-badge { flex-shrink: 0; }
-	.badge-hors-uca {
-		display: inline-block; padding: 1px 8px; background: var(--attention-light);
-		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: var(--radius); font-size: 0.78rem;
-		color: var(--attention); font-weight: 600; flex-shrink: 0;
-	}
-	.hal-list {
-		display: flex; flex-wrap: wrap; gap: 6px;
-		align-items: center; margin-top: 6px; padding-left: 20px;
-	}
-	.doi-ref { font-size: 0.82rem; color: var(--muted); }
 </style>

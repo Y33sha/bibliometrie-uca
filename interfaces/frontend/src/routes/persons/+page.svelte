@@ -1,32 +1,18 @@
 <script lang="ts">
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
+	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { api, ApiError, persons as personsApi } from '#lib/api/index.js';
-	import { toast } from '#lib/dialogs.svelte.js';
+	import { api } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
-	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import { setQueryParam } from '#lib/url.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
-	import type {
-		DetachModalState,
-		DetachPublication,
-		IdFormState,
-		OtherPerson,
-		Person,
-		PersonExclusion,
-		PersonSearchResult,
-	} from './types';
-	import type { components } from '#lib/api/schema.js';
-	import DetachNameFormModal from './DetachNameFormModal.svelte';
-	import PersonDrawer from './PersonDrawer.svelte';
+	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import AmbiguousFormsList from './AmbiguousFormsList.svelte';
 	import IdentifierConflictsList from './IdentifierConflictsList.svelte';
 	import NameDuplicatesList from './NameDuplicatesList.svelte';
-	import { confirmMerge } from './confirmMerge';
-
-	type NameFormContributionRef = components['schemas']['NameFormContributionRef'];
 
 	/* ── Onglets de la session admin : la liste, puis les files de triage ── */
 
@@ -42,20 +28,8 @@
 	// Incrémenté après chaque action du volet : la clé d'API de la liste change, la liste et ses facettes se rechargent.
 	let listVersion = $state(0);
 
-	// Volet d'une personne : ouvert tant que `?person=<id>` figure dans l'URL.
-	let selectedPersonId: number | null = $state(null);
-	let selectedPerson: Person | null = $state(null);
-
-	let idForms: Record<number, IdFormState> = $state({});
-	let detachModal: DetachModalState | null = $state(null);
-
-	let activeMergePersonId: number | null = $state(null);
-	const mergeSearch = useDebouncedSearch<PersonSearchResult>({
-		search: (q, request) =>
-			request<PersonSearchResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`),
-		// Une personne RH est toujours conservée : elle ne figure pas parmi les personnes à absorber.
-		transform: (results) => results.filter((r) => r.id !== activeMergePersonId && !r.has_rh),
-	});
+	// Volet d'une personne, partagé par la liste et les files de triage.
+	const drawer = useDrawerParam('person', isAdmin);
 
 	/* ── Compteurs ── */
 
@@ -88,178 +62,12 @@
 
 	/* ── Volet ── */
 
-	async function openDrawer(personId: number) {
-		selectedPersonId = personId;
-		void setQueryParam('person', String(personId));
-		selectedPerson = await api<Person>(`/api/persons/${personId}/curation`);
-	}
-
-	function closeDrawer() {
-		selectedPersonId = null;
-		selectedPerson = null;
-		closeMergeSearch();
-		void setQueryParam('person', null);
-	}
-
-	// Après une mutation : relit la personne du volet, la liste et la file de triage affichée.
-	async function refreshAfterChange() {
+	// Après une écriture du volet : recharge la liste, la file de triage affichée et les compteurs des files.
+	function onDrawerChange() {
 		listVersion++;
 		reloadFiles++;
-		if (selectedPersonId !== null) {
-			selectedPerson = await api<Person>(`/api/persons/${selectedPersonId}/curation`);
-		}
-	}
-
-	/* ── Identifiants ── */
-
-	function toggleIdForm(personId: number) {
-		if (personId in idForms) {
-			const next = { ...idForms };
-			delete next[personId];
-			idForms = next;
-		} else {
-			idForms = { ...idForms, [personId]: { id_type: 'orcid', id_value: '', error: '' } };
-		}
-	}
-
-	async function addIdentifier(personId: number) {
-		const form = idForms[personId];
-		if (!form || !form.id_value.trim()) return;
-		try {
-			await personsApi.addIdentifier(personId, {
-				id_type: form.id_type,
-				id_value: form.id_value.trim(),
-			});
-		} catch (e) {
-			const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-			idForms = { ...idForms, [personId]: { ...form, error: detail || 'Erreur inconnue' } };
-			return;
-		}
-		const next = { ...idForms };
-		delete next[personId];
-		idForms = next;
-		await refreshAfterChange();
-	}
-
-	async function setIdentifierStatus(identId: number, status: string) {
-		const { propagated } = await personsApi.setIdentifierStatus(identId, status);
-		if (propagated > 0) {
-			toast(
-				`${propagated} identifiant${propagated > 1 ? 's' : ''} du même compte HAL ${propagated > 1 ? 'ont' : 'a'} reçu le même statut`,
-			);
-		}
-		await refreshAfterChange();
-	}
-
-	/* ── Nom et exclusion ── */
-
-	async function renamePerson(personId: number, lastName: string, firstName: string): Promise<boolean> {
-		try {
-			await personsApi.rename(personId, lastName, firstName);
-		} catch (e) {
-			const status = e instanceof ApiError ? e.status : '?';
-			const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-			toast(detail || `Erreur ${status}`, 'error');
-			return false;
-		}
-		await refreshAfterChange();
-		return true;
-	}
-
-	async function setPersonExclusion(personId: number, exclusion: PersonExclusion | null) {
-		await personsApi.setExclusion(personId, exclusion);
-		await refreshAfterChange();
-	}
-
-	/* ── Formes de nom et détachement ── */
-
-	async function openDetachModal(personId: number, nameForm: string) {
-		detachModal = { personId, nameForm, publications: [], otherPersons: [], loading: true };
-		const data = await api<{ contributions: NameFormContributionRef[]; other_persons: OtherPerson[] }>(
-			`/api/persons/${personId}/name-form-contributions?name_form=${encodeURIComponent(nameForm)}`,
-		);
-		// Le rejet porte sur la publication entière : on regroupe les sources par publication pour n'afficher qu'une ligne par publication.
-		const byPub = new Map<number, DetachPublication>();
-		for (const r of data.contributions) {
-			let pub = byPub.get(r.publication_id);
-			if (!pub) {
-				pub = { publication_id: r.publication_id, title: r.title, publication_year: r.publication_year, sources: [], checked: true };
-				byPub.set(r.publication_id, pub);
-			}
-			pub.sources.push({ source: r.source, source_contribution_id: r.source_contribution_id });
-		}
-		detachModal = {
-			personId,
-			nameForm,
-			loading: false,
-			publications: [...byPub.values()],
-			otherPersons: data.other_persons,
-		};
-	}
-
-	async function confirmDetach() {
-		if (!detachModal) return;
-		const toDetach = detachModal.publications.filter((p) => p.checked);
-		if (toDetach.length === 0) {
-			detachModal = null;
-			return;
-		}
-		// Une référence de source par publication suffit : le backend détache toutes les sources de la publication.
-		await personsApi.detachContributions(detachModal.personId, {
-			contributions: toDetach.map((p) => p.sources[0]),
-		});
-		detachModal = null;
-		await refreshAfterChange();
-	}
-
-	async function setNameFormStatus(personId: number, nameForm: string, status: string) {
-		await personsApi.updateNameFormStatus(personId, nameForm, status as 'pending' | 'confirmed' | 'rejected');
-		await refreshAfterChange();
-	}
-
-	/* ── Fusion ── */
-
-	function openMergeSearch(personId: number) {
-		activeMergePersonId = personId;
-		mergeSearch.clear();
-	}
-
-	function closeMergeSearch() {
-		activeMergePersonId = null;
-		mergeSearch.clear();
-	}
-
-	async function mergeInto(targetId: number, sourceId: number) {
-		if (!(await confirmMerge(sourceId))) return;
-		await personsApi.merge(targetId, sourceId);
-		closeMergeSearch();
-		await refreshAfterChange();
 		loadAmbiguousCount();
 		loadIdentifierConflictCount();
-	}
-
-	// Absorbe une autre personne (otherId) dans celle du volet (la cible).
-	async function absorbPerson(otherId: number) {
-		if (selectedPersonId === null) return;
-		if (!(await confirmMerge(otherId))) return;
-		try {
-			await personsApi.merge(selectedPersonId, otherId);
-		} catch (e) {
-			const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-			toast(detail || 'Fusion impossible', 'error');
-			return;
-		}
-		await refreshAfterChange();
-		loadAmbiguousCount();
-		loadIdentifierConflictCount();
-	}
-
-	async function mergeFromModal(sourceId: number) {
-		if (!detachModal) return;
-		if (!(await confirmMerge(sourceId))) return;
-		await personsApi.merge(detachModal.personId, sourceId);
-		detachModal = null;
-		await refreshAfterChange();
 	}
 
 	onMount(() => {
@@ -272,16 +80,10 @@
 		loadIdentifierConflictCount();
 		// Compteur « Doublons par nom » : seulement si l'onglet est l'onglet courant ; sinon il se charge à l'ouverture de l'onglet (cf. `selectTab`).
 		if (tab === 'name-duplicates') loadNameDuplicateCount();
-		const personId = parseInt(params.get('person') ?? '', 10);
-		if (personId) openDrawer(personId);
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle('Chercheurs')}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Chercheurs</h1>
+<PageHeader title="Chercheurs" hidden />
 
 {#if isAdmin()}
 	<HubTabs
@@ -297,11 +99,11 @@
 {/if}
 
 {#if tab === 'ambiguous-forms'}
-	<AmbiguousFormsList onopenPerson={openDrawer} onchange={loadAmbiguousCount} reloadKey={reloadFiles} />
+	<AmbiguousFormsList onopenPerson={drawer.open} onchange={loadAmbiguousCount} reloadKey={reloadFiles} />
 {:else if tab === 'identifier-conflicts'}
-	<IdentifierConflictsList onopenPerson={openDrawer} onchange={loadIdentifierConflictCount} reloadKey={reloadFiles} />
+	<IdentifierConflictsList onopenPerson={drawer.open} onchange={loadIdentifierConflictCount} reloadKey={reloadFiles} />
 {:else if tab === 'name-duplicates'}
-	<NameDuplicatesList onopenPerson={openDrawer} onchange={loadNameDuplicateCount} reloadKey={reloadFiles} />
+	<NameDuplicatesList onopenPerson={drawer.open} onchange={loadNameDuplicateCount} reloadKey={reloadFiles} />
 {:else}
 	{#if isAdmin() && orphanCount > 0}
 		<a href={resolve('admin/orphan-contributions')} class="orphan-link">
@@ -312,41 +114,17 @@
 	<PersonsListView
 		apiKey={`persons-dir-${listVersion}`}
 		basePath="/persons"
-		onopen={isAdmin() ? openDrawer : undefined}
-		activeId={selectedPersonId}
+		onopen={isAdmin() ? drawer.open : undefined}
+		activeId={drawer.id}
 	/>
 {/if}
 
-{#if selectedPerson}
-	<PersonDrawer
-		person={selectedPerson}
-		idForm={idForms[selectedPerson.id] ?? null}
-		mergeActive={activeMergePersonId === selectedPerson.id}
-		{mergeSearch}
-		onclose={closeDrawer}
-		onrename={renamePerson}
-		onsetExclusion={setPersonExclusion}
-		onaddIdentifier={addIdentifier}
-		ontoggleIdForm={toggleIdForm}
-		onsetIdentifierStatus={setIdentifierStatus}
-		onopenDetach={openDetachModal}
-		onsetFormStatus={setNameFormStatus}
-		onmergeOpen={openMergeSearch}
-		onmergeClose={closeMergeSearch}
-		onmerge={mergeInto}
-		onabsorb={absorbPerson}
-		onopenPerson={openDrawer}
-	/>
-{/if}
-
-{#if detachModal}
-	<DetachNameFormModal
-		bind:state={detachModal}
-		onclose={() => {
-			detachModal = null;
-		}}
-		onconfirmDetach={confirmDetach}
-		onmerge={mergeFromModal}
+{#if drawer.id !== null}
+	<PersonCurationDrawer
+		personId={drawer.id}
+		onclose={() => drawer.open(null)}
+		onchange={onDrawerChange}
+		onopenPerson={drawer.open}
 	/>
 {/if}
 
