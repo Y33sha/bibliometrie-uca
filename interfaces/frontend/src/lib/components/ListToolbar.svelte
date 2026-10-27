@@ -4,7 +4,7 @@
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 
 	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant et les filtres actifs suivent.
-	// Collée sous le menu supérieur, la barre glisse sous le menu au rythme de la page quand celle-ci descend, et réapparaît en entier dès que la page remonte. L'en-tête du tableau qui suit se colle sous sa part visible.
+	// Depuis le haut de la page, la barre suit la page en descente jusqu'à quitter l'écran. Elle glisse ensuite d'un bloc : elle réapparaît sous le menu supérieur dès que la page remonte, et repart dès que la page redescend. L'en-tête du tableau qui suit se colle sous sa part visible.
 	let {
 		search = $bindable(),
 		placeholder = 'Rechercher',
@@ -44,13 +44,23 @@
 		onsearch?.();
 	}
 
-	// Repère placé à l'emplacement de la barre dans la page : sa distance au-dessus du menu supérieur est le chemin que la barre aurait parcouru sans être collée.
+	// Repère placé à l'emplacement de la barre dans la page : sa distance au-dessus du menu supérieur est le chemin que la barre a parcouru depuis sa place.
 	let anchor = $state<HTMLElement | undefined>();
 	let bar = $state<HTMLElement | undefined>();
 	// Part de la barre glissée sous le menu, en pixels, de zéro à la hauteur de la barre.
 	let offset = $state(0);
 	const hidden = $derived(bar !== undefined && offset >= bar.offsetHeight);
+	// Détachée : la barre a quitté l'écran en suivant la page ; elle glisse alors d'un bloc, vers le bas à la remontée et vers le haut à la descente, jusqu'au retour de la page en haut.
+	let detached = $state(false);
 	let lastY = 0;
+
+	// L'en-tête du tableau glisse avec la barre détachée (`shared.css`).
+	$effect(() => {
+		const root = document.documentElement;
+		if (detached) root.dataset.listToolbar = 'detached';
+		else delete root.dataset.listToolbar;
+		return () => delete root.dataset.listToolbar;
+	});
 
 	// Instant du dernier geste de défilement : molette, glissé tactile, touche de défilement. Le navigateur décale aussi la page quand la hauteur de la barre change (panneau ouvert, filtre ajouté) ; seul un défilement vers le bas qui suit un geste masque la barre.
 	let lastGesture = 0;
@@ -73,21 +83,27 @@
 		const delta = y - lastY;
 		lastY = y;
 		const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0;
-		// La barre glisse au plus de sa hauteur, et au plus du chemin parcouru depuis sa place.
-		const limit = Math.min(bar.offsetHeight, Math.max(0, headerHeight - anchor.getBoundingClientRect().top));
-		const gesture = performance.now() - lastGesture < GESTURE_WINDOW_MS;
-		// En descente, la barre glisse au rythme de la page ; à la remontée, elle réapparaît en entier.
-		let next = offset;
-		if (delta > 0 && gesture) next += delta;
-		else if (delta < 0) next = 0;
-		offset = Math.min(limit, Math.max(0, next));
+		const height = bar.offsetHeight;
+		const travelled = headerHeight - anchor.getBoundingClientRect().top;
+		if (!detached) {
+			// À sa place, la barre suit la page jusqu'à quitter l'écran. Elle se détache au défilement suivant : sa sortie de l'écran se fait sans glissement.
+			detached = offset >= height && travelled > height;
+			offset = Math.min(height, Math.max(0, travelled));
+		} else if (travelled <= 0) {
+			detached = false;
+			offset = 0;
+		} else if (delta < 0) {
+			offset = 0;
+		} else if (delta > 0 && performance.now() - lastGesture < GESTURE_WINDOW_MS) {
+			offset = height;
+		}
 	}
 </script>
 
 <svelte:window {onscroll} onwheel={markGesture} ontouchmove={markGesture} onkeydown={onScrollKey} />
 
 <div class="list-toolbar-anchor" bind:this={anchor}></div>
-<div class="list-toolbar" class:hidden bind:this={bar} style:transform={offset ? `translateY(${-offset}px)` : undefined} use:stickyHeight={offset}>
+<div class="list-toolbar" class:hidden class:detached bind:this={bar} style:transform={offset ? `translateY(${-offset}px)` : undefined} use:stickyHeight={offset}>
 	<div class="toolbar-card">
 		<div class="toolbar">
 			{#if search !== undefined}
@@ -119,6 +135,13 @@
 	/* Entièrement glissée sous le menu : retirée du parcours au clavier. */
 	.list-toolbar.hidden {
 		visibility: hidden;
+	}
+	/* Détachée, la barre glisse d'un bloc. Masquée, elle quitte le parcours au clavier à la fin du glissement. */
+	.list-toolbar.detached {
+		transition: transform 0.2s ease, visibility 0s;
+	}
+	.list-toolbar.detached.hidden {
+		transition: transform 0.2s ease, visibility 0s linear 0.2s;
 	}
 	.toolbar-card {
 		display: flex;
