@@ -58,6 +58,8 @@
 	let sortableSeries = $state<{ value: string; label: string }[]>([]);
 	const CHART_PAGE_SIZE = 10;
 	let legendItems: { label: string; color: string }[] = $state([]);
+	// Données du graphique pour les lecteurs d'écran : une ligne par catégorie de l'abscisse, une colonne par série, en valeurs absolues.
+	let chartTable = $state<{ columns: string[]; rows: { label: string; values: string[] }[] } | null>(null);
 	const indicatorDef = $derived(pivotSchema?.indicators.find((i) => i.key === indicator));
 	// Dimension empilée dans chaque barre, imposée par l'indicateur.
 	const breakdown = $derived(indicatorDef?.breakdown ?? '');
@@ -193,7 +195,7 @@
 	function renderChart() {
 		if (yearChart) yearChart.destroy();
 		const rows = pivotRows;
-		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; return; }
+		if (!rows.length || !chartCanvas) { yearChart = null; legendItems = []; chartTable = null; return; }
 		const comparison = groupBy;
 
 		// La comparaison occupe l'abscisse (on compare le long de l'axe des x ; l'année y va naturellement) ; la ventilation de l'indicateur est l'empilement (la catégorie lue dans chaque barre). Sans comparaison, la ventilation passe en abscisse, en barres simples.
@@ -238,6 +240,10 @@
 			categoryPercentage: 0.7
 		}));
 		legendItems = datasets.map((d) => ({ label: d.label, color: d.backgroundColor }));
+		chartTable = {
+			columns: datasets.map((d) => d.label),
+			rows: labels.map((label, ci) => ({ label, values: datasets.map((d) => formatValue(d.data[ci] as number)) })),
+		};
 
 		// Mode « part » sans comparaison : un camembert des parts de chaque catégorie du groupement primaire (l'empilement à 100 % d'une barre unique, déroulé en secteurs lisibles).
 		if (chartMode === 'part' && !stackDim) {
@@ -506,7 +512,20 @@
 	</div>
 {/if}
 <div class="chart-area">
-	<canvas bind:this={chartCanvas}></canvas>
+	<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
+	<canvas bind:this={chartCanvas} aria-hidden="true"></canvas>
+	{#if chartTable}
+		<table class="visually-hidden">
+			<thead>
+				<tr><td></td>{#each chartTable.columns as c, i (i)}<th scope="col">{c}</th>{/each}</tr>
+			</thead>
+			<tbody>
+				{#each chartTable.rows as row, i (i)}
+					<tr><th scope="row">{row.label}</th>{#each row.values as v, j (j)}<td>{v}</td>{/each}</tr>
+				{/each}
+			</tbody>
+		</table>
+	{/if}
 	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
 {#if chartCatTotal > CHART_PAGE_SIZE}

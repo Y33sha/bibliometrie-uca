@@ -28,6 +28,8 @@
 	let canvas: HTMLCanvasElement | undefined = $state();
 	let chart: Chart | null = null;
 	let countryCount = $state(0);
+	// Pays partenaires et leur nombre de publications, du plus grand au plus petit, pour les lecteurs d'écran.
+	let countryRows = $state<{ name: string; value: number }[]>([]);
 	let internationalCount = $state(0);
 	let pctLabel = $state('');
 
@@ -57,6 +59,9 @@
 			if (numeric) byNumeric.set(Number(numeric), row.value);
 		}
 		countryCount = res.rows.length;
+		countryRows = res.rows
+			.map((row) => ({ name: countryName(row.code) || row.code, value: row.value }))
+			.sort((a, b) => b.value - a.value);
 		internationalCount = res.international_count;
 		pctLabel = res.total_count
 			? ((res.international_count / res.total_count) * 100).toLocaleString('fr-FR', {
@@ -134,9 +139,20 @@
 	}
 </script>
 
+<!-- La carte est dessinée dans un canvas : les lecteurs d'écran lisent le tableau des pays. -->
 <div class="collab-map">
-	<canvas bind:this={canvas}></canvas>
+	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
+<table class="visually-hidden">
+	<thead>
+		<tr><th scope="col">Pays</th><th scope="col">Publications</th></tr>
+	</thead>
+	<tbody>
+		{#each countryRows as row (row.name)}
+			<tr><th scope="row">{row.name}</th><td>{row.value.toLocaleString('fr-FR')}</td></tr>
+		{/each}
+	</tbody>
+</table>
 {#if internationalCount}
 	<p class="collab-caption">
 		{internationalCount.toLocaleString('fr-FR')} publications en collaboration internationale, soit
