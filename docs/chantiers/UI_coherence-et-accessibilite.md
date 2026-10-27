@@ -187,7 +187,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 10. Audit final
 
-- [ ] Audit axe-core des pages publiques et d'administration
+- [x] Audit axe-core des pages publiques et d'administration : contraste des pastilles de type et des boutons « Fusionner… », liens soulignés du volet publication
 
 ## Questions ouvertes
 

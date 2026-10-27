@@ -185,6 +185,12 @@
     text-align: left;
     vertical-align: top;
   }
+  /* Une valeur liée se distingue d'une valeur en texte autrement que par la couleur. */
+  .comparison td a {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+    text-underline-offset: 2px;
+  }
   /* En-têtes des sources figés au bord haut du volet, qui défile dans les deux sens. Le décalage de -16px compense la marge haute du corps du volet, dans laquelle `top: 0` laisserait passer les lignes défilées ; la marge négative du tableau colle l'en-tête à ce bord dès l'ouverture. Le filet du bas est une ombre : une bordure de tableau fusionnée reste en place au défilement. */
   .comparison {
     margin-top: -16px;

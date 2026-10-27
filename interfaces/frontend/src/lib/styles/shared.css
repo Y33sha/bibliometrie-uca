@@ -469,16 +469,30 @@
 	background: var(--surface-hover);
 }
 
-/* Actions secondaires d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. */
+/* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */
 @media (hover: hover) {
-	.data-table .row-actions > * {
+	.data-table .row-actions > .icon-btn {
 		opacity: 0.4;
 		transition: opacity 0.1s;
 	}
-	.data-table tr:hover .row-actions > *,
-	.data-table .row-actions:focus-within > * {
+	.data-table tr:hover .row-actions > .icon-btn,
+	.data-table .row-actions:focus-within > .icon-btn {
 		opacity: 1;
 	}
+}
+
+/* Bouton « Fusionner… » d'une ligne de liste. */
+.btn-merge {
+	font-size: 0.8rem;
+	color: var(--accent);
+	background: none;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	cursor: pointer;
+	padding: 2px 8px;
+}
+.btn-merge:hover {
+	background: var(--accent-light);
 }
 
 /* Liens de structure dans un tableau : texte simple, les pastilles étant réservées aux valeurs codées par couleur. */
@@ -1248,7 +1262,8 @@ a.badge-doaj:hover {
 	padding: 2px 8px;
 	border-radius: var(--radius-pill);
 	background: color-mix(in srgb, var(--type-color) 16%, white);
-	color: color-mix(in srgb, var(--type-color), black 45%);
+	/* 50 % de noir : contraste de 4,5:1 au moins, y compris pour les types les plus clairs (preprints, autres). */
+	color: color-mix(in srgb, var(--type-color), black 50%);
 	font-size: 0.75rem;
 	font-weight: 600;
 	white-space: nowrap;
