@@ -189,6 +189,10 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 - [x] Audit axe-core des pages publiques et d'administration : contraste des pastilles de type et des boutons « Fusionner… », liens soulignés du volet publication
 
+### 11. Documentation
+
+- [x] Guide utilisateur : page Pipeline
+
 ## Questions ouvertes
 
 - **Colonnes de la liste des publications sur mobile.** À 390 px, le type, l'année et le DOI occupent le premier écran ; le titre commence au bord droit. Masquer ces colonnes sous 600 px laisserait la place au titre.

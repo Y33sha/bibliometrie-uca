@@ -13,5 +13,6 @@ Les identifiants d'accès aux sources (clés API, compte ScanR, adresse du *poli
 
 ![Configuration](../../img/screenshots/admin_config.png)
 
-## Logs
-TODO: à compléter
+## Pipeline `/admin/pipeline`
+
+Historique des runs du pipeline : mode, sources, phases jouées, statut et durée de chaque phase.
