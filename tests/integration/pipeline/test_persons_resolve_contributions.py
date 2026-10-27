@@ -7,7 +7,10 @@ from sqlalchemy import text
 from infrastructure.db.queues import Queue
 from infrastructure.repositories import person_repository
 from pipeline.transformation.persons.contribution_resolution import resolve_contributions
-from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.alignment import (
+    align_source_contributions,
+    recompose_contribution_attributes,
+)
 from tests.integration.helpers.persons import (
     insert_person,
     insert_person_identifier,
@@ -22,7 +25,7 @@ _ORCID = "0000-0002-1825-0097"
 
 
 def _contribution(conn, publication, members):
-    """Contribution des contributions sources `(source, nom, identifiants, du périmètre)` de la publication."""
+    """Contribution des contributions sources `(source, nom, identifiants, du périmètre)` de la publication, aux attributs recomposés comme par la phase `author_grouping`."""
     pairs = []
     for index, (source, name, identifiers, in_perimeter) in enumerate(members):
         source_record = insert_source_record(
@@ -38,7 +41,9 @@ def _contribution(conn, publication, members):
             in_perimeter=in_perimeter,
         )
         pairs.append((source_contribution, source_record))
-    return align_source_contributions(conn, publication, pairs)
+    contribution = align_source_contributions(conn, publication, pairs)
+    recompose_contribution_attributes(conn)
+    return contribution
 
 
 def _person(conn, contribution):
@@ -349,6 +354,7 @@ class TestPersonIndex:
             in_perimeter=True,
         )
         contribution = align_source_contributions(conn, publication, [(inverted, source_record)])
+        recompose_contribution_attributes(conn)
 
         resolve_contributions(conn, logging.getLogger("test"))
 
