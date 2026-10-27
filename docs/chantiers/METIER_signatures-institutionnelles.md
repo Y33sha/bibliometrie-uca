@@ -30,7 +30,7 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 
 ### Phase 1 — Audit
 
-- [ ] Enregistrements sources sans contribution rattachée à la personne : rapprocher par le nom les personnes RH des contributions sources hors périmètre dont l'adresse cite une structure de l'Alliance, pendant la période RH. Mesurer le volume, et la part d'homonymes sur un échantillon contrôlé à la main.
+- [x] Enregistrements sources sans contribution rattachée à la personne : rapprocher par le nom les personnes RH des contributions sources hors périmètre dont l'adresse cite une structure de l'Alliance, pendant la période RH (`interfaces/cli/oneshot/measure_university_mention.py`, 41d5aab8d). Base locale, 2026-10-27 : 1 692 couples (personne, travail) absents des publications de la personne, pour 155 personnes RH, presque toutes de l'UFR de médecine. 1 808 contributions sources sont sans publication. 615 sont dans une publication, souvent du périmètre, mais sans personne : la phase `persons` rattache une contribution hors périmètre seulement par identifiant.
 - [ ] Classement des adresses sans l'université, sur les publications rattachées et sur les enregistrements sources rapprochés : structure de l'Alliance hors UCA, structure hors Alliance, aucune structure reconnue.
 - [ ] Sources divergentes : examiner sur pièces les publications où une source mentionne l'université et une autre non, pour la même personne. Distinguer l'erreur de source de l'erreur de fusion des enregistrements sources.
 - [ ] ROR d'OpenAlex sur les adresses sans l'université : part avec le ROR de l'université, part avec le seul ROR du CHU.
@@ -44,7 +44,9 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 
 ### Phase 3 — Publications de l'Alliance hors périmètre
 
-- [ ] Choisir la voie d'inclusion. Piste : périmètre Alliance UCA pour toutes les phases du pipeline.
+- [ ] Choisir la voie d'inclusion. Pistes :
+  - rapprochement par le nom, dans la phase `persons`, des contributions sources dont l'adresse cite une structure de l'Alliance, sans création de personne ;
+  - `perimeter_persons` sur le périmètre Alliance UCA. Ce périmètre fixe aussi l'entrée des contributions sources dans le périmètre, donc le périmètre des publications et le nom de l'établissement affiché.
 - [ ] Mesurer l'effet sur les publications, les contributions et les personnes du périmètre.
 
 ## Questions ouvertes
@@ -56,7 +58,8 @@ Seules OpenAlex, Web of Science, Crossref et DataCite donnent le texte de l'adre
 - **Mention reconnaissable** : quelles formes de l'université permettent à WoS de relier la publication à l'établissement ?
 - **Conformité de forme** : la convention de signature (cf. Liens) impose une ligne unique, dans cet ordre : université, tutelles, laboratoire, code postal, ville, pays. Faut-il mesurer aussi les écarts de forme, d'ordre et d'éléments ?
 - **Liste blanche des `doc_type`** au dénominateur : quels types retenir ?
-- **Conséquences du périmètre Alliance UCA** pour toutes les phases : personnes créées pour les chercheurs de l'Alliance hors UCA, publications listées par l'université.
+- **Conséquences du périmètre Alliance UCA** comme `perimeter_persons` : personnes créées pour les chercheurs de l'Alliance hors UCA ; publications de l'Alliance sans auteur de l'université comptées dans les publications de l'université.
+- **Périmètre d'une publication rapprochée par le nom** : la contribution d'une personne RH, rattachée par le nom sur une adresse de l'Alliance, fait-elle entrer la publication dans le périmètre ? L'indice `hr_record` suppose un identifiant.
 
 ## Liens
 
