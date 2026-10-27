@@ -56,6 +56,14 @@ def active_name_form(form: str) -> str:
     )
 
 
+def pending_name_form(form: str) -> str:
+    """Condition vraie quand la forme de nom `form` (ligne de `person_name_forms`, ou son alias) est à confirmer : en attente, hors forme dérivée du nom de la personne, qui se confirme d'office."""
+    return (
+        f"({form}.status = '{AttributionStatus.PENDING.value}'"
+        f" AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY({form}.sources)))"
+    )
+
+
 DETACHED_CONTRIBUTION = "person_id = NULL, resolution_mode = NULL"
 """Affectations d'un `UPDATE contributions` qui retire sa personne à une contribution."""
 

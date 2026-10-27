@@ -33,20 +33,19 @@ from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
     has_author_role,
     identifier_neutralized,
+    pending_name_form,
 )
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Formes de ≥2 personnes au sens de `name_form_holder`, dont au moins une en attente. Les formes dérivées du nom de la personne, confirmées d'office, ne comptent pas comme en attente.
+# Formes de ≥2 personnes au sens de `name_form_holder`, dont au moins une à confirmer (`pending_name_form`).
 _AMBIGUOUS_FORMS_SQL = f"""
     SELECT pnf.name_form
     FROM person_name_forms pnf
     JOIN persons p ON p.id = pnf.person_id
     WHERE {name_form_holder("pnf", "p")}
     GROUP BY pnf.name_form
-    HAVING count(*) >= 2
-       AND bool_or(pnf.status = '{AttributionStatus.PENDING.value}'
-                   AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)))
+    HAVING count(*) >= 2 AND bool_or({pending_name_form("pnf")})
 """
 
 
