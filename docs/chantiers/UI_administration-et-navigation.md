@@ -44,7 +44,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - **Une page par structure**, sous la route `structures/[id]`. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
 - **Volet d'édition de la structure**, sur le modèle des personnes et des publications : édition, tutelles et formes de nom.
 - **Volet d'édition ouvert par une icône** sur la ligne, et sur la fiche à gauche du titre principal. Le titre ou le nom mène à la fiche.
-- **Lectures réservées** : les files de triage et les volets d'édition exigent le rôle admin, en lecture comme en écriture.
+- **Files de triage et volets d'édition** affichés en session admin seulement. Les lectures de l'API restent publiques : leurs données n'ont rien de confidentiel.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
 - **Files de triage en onglets de la liste publique**, affichés selon le rôle. Le bandeau des contributions orphelines suit la même règle.
 - **Restrictions publiques en facettes.** Chaque restriction de la liste publique devient une facette réglée par défaut, que la session admin peut retirer : éditeurs et publications en série sans publication, personnes exclues, inactives ou absentes de la base RH.
@@ -61,8 +61,6 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - [x] Tables `users`, `roles`, `user_roles` ; premier utilisateur admin déclaré dans les réglages (c74e9350c)
 - [x] Session contenant l'identifiant de l'utilisateur ; garde des écritures qui exige le rôle admin (c74e9350c)
 - [x] `/api/auth/check` rend l'utilisateur et ses rôles (c74e9350c)
-- [ ] Lectures des files de triage et des volets d'édition réservées au rôle admin dans l'API
-
 ### 2. Session et navigation
 
 - [x] État de session lu une fois dans le layout racine et partagé, à la place des appels de `admin/+layout.svelte` et de `persons/[id]` (d8d6c273d)
@@ -108,7 +106,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 ### 5. Documentation
 
-- [ ] Guide utilisateur : volet de la structure, entrées d'administration de la barre de navigation
+- [x] Guide utilisateur : volet de la structure, icône de volet des fiches, barre de navigation en session admin
 
 ## Questions ouvertes
 

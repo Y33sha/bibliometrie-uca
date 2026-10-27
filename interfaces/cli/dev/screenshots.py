@@ -50,12 +50,7 @@ SHOTS = [
     Shot("journal_dashboard", "journals/{serial}"),
     Shot("publisher_dashboard", "publishers/{publisher}"),
     Shot("subjects", "subjects"),
-    Shot(
-        "admin_structure_management",
-        "structures/{structure}?tab=management",
-        admin=True,
-        full_page=True,
-    ),
+    Shot("admin_structure_management", "structures?structure={structure}", admin=True),
     Shot("admin_config", "admin/config", admin=True, full_page=True),
     Shot("admin_addresses", "admin/addresses", admin=True),
     Shot("admin_feedback", "admin/feedback", admin=True),
