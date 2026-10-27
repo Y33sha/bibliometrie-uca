@@ -547,6 +547,12 @@
 		min-height: 20px;
 		background: var(--border);
 	}
+	/* Écran étroit : les contrôles passent à la ligne, un séparateur resterait seul en bout de ligne. */
+	@media (max-width: 820px) {
+		.sep {
+			display: none;
+		}
+	}
 	.sort-dir {
 		font-family: inherit;
 		font-size: 1rem;

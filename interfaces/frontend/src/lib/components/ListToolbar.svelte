@@ -158,6 +158,12 @@
 		flex: 1;
 		min-width: 220px;
 	}
+	/* Écran étroit : la recherche occupe toute la ligne, le compteur et les actions passent dessous. */
+	@media (max-width: 600px) {
+		.list-search {
+			flex-basis: 100%;
+		}
+	}
 	.filters-label {
 		font-size: 0.9rem;
 		color: var(--muted);
