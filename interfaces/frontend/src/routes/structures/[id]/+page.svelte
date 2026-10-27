@@ -274,7 +274,7 @@
 		<div class="tab-content">
 			<PublicationsListView
 				apiKey={`lab-${lab.id}-publications`}
-				context={{ kind: 'lab', id: lab.id, halCollection: lab.hal_collection ?? null }}
+				context={{ kind: 'lab', id: lab.id }}
 				basePath={`/structures/${labId}`}
 				perPage={50}
 			/>

@@ -6,7 +6,7 @@
 export type PublicationListContext =
 	| { kind: 'all' }
 	| { kind: 'subject'; id: number }
-	| { kind: 'lab'; id: number; halCollection: string | null }
+	| { kind: 'lab'; id: number }
 	| { kind: 'person'; id: number }
 	| { kind: 'serial'; id: number }
 	| { kind: 'publisher'; id: number }

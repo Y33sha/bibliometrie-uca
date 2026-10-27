@@ -136,8 +136,8 @@ class TestSearch:
 class TestHalStatusMultipleHalEntries:
     """Régression : une publi avec plusieurs entrées HAL (cas réel ~764 en
     base) ne doit pas tomber dans le filtre `hors_collection` dès qu'au moins
-    une de ses entrées HAL contient la collection du labo. Et le champ
-    `hal_collections` renvoyé doit fusionner les collections des entrées."""
+    une de ses entrées HAL contient la collection du labo. Le statut renvoyé
+    avec chaque publication suit la même règle que le filtre."""
 
     def test_publication_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
         """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
@@ -164,9 +164,8 @@ class TestHalStatusMultipleHalEntries:
         )
         assert publication not in [p.id for p in res.publications]
 
-    def test_hal_collections_unions_all_hal_entries(self, sa_sync_conn):
-        """`hal_collections` renvoyé par l'API = union des collections des
-        entrées HAL (pas une entrée arbitraire prise au hasard)."""
+    def test_listed_status_follows_the_filter_rule(self, sa_sync_conn):
+        """Le statut renvoyé avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
         publication = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, publication, lab)
@@ -176,6 +175,10 @@ class TestHalStatusMultipleHalEntries:
         _source_record(
             sa_sync_conn, publication, source_id="hal-PAU", hal_collections=["UPPA-DROIT"]
         )
+        sa_sync_conn.execute(
+            text("UPDATE publications SET oa_status = 'gold'::oa_type WHERE id = :id"),
+            {"id": publication},
+        )
 
         res = publications_queries(sa_sync_conn).list_publications(
             filters=PublicationFilters(lab_ids=[lab]),
@@ -184,7 +187,18 @@ class TestHalStatusMultipleHalEntries:
             sort="year_desc",
         )
         match = next(p for p in res.publications if p.id == publication)
-        assert set(match.hal_collections or []) == {"CMH", "AO-DROIT", "UPPA-DROIT"}
+        assert match.hal_status == "ok"
+
+    def test_status_is_absent_without_a_single_lab(self, sa_sync_conn):
+        lab = _lab(sa_sync_conn, hal_collection="CMH")
+        publication = insert_publication(sa_sync_conn, "Lab-less listing")
+        _attach(sa_sync_conn, publication, lab)
+        _source_record(sa_sync_conn, publication, source_id="hal-X", hal_collections=["CMH"])
+
+        res = publications_queries(sa_sync_conn).list_publications(
+            filters=PublicationFilters(), page=1, per_page=200, sort="year_desc"
+        )
+        assert all(p.hal_status is None for p in res.publications)
 
     def test_publication_only_outside_collection_is_hors_collection(self, sa_sync_conn):
         """Cas symétrique : si aucune entrée HAL n'est dans la collection,

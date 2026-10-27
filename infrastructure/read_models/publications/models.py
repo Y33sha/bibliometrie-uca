@@ -162,7 +162,8 @@ class PublicationListItem(BaseModel):
     apc: list[PublicationApcPayment] | None
     is_corresponding: bool | None
     contribution_id: int | None
-    hal_collections: list[str] | None
+    hal_status: str | None
+    """Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, quand la liste porte sur un seul laboratoire ; `None` sinon."""
 
 
 class PublicationListResponse(PaginatedResponse):

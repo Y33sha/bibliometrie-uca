@@ -41,7 +41,6 @@
 		// Champs présents quand l'API est appelée avec `person_id` (cf. routes /api/publications côté backend qui enrichit la réponse). Optionnels car non garantis hors contexte personne.
 		is_corresponding?: boolean | null;
 		contribution_id?: number | null;
-		hal_collections?: string[] | null;
 	};
 
 	// --- Props ---
@@ -81,19 +80,9 @@
 	// svelte-ignore state_referenced_locally
 	const restrictToPublications = context.kind === 'all';
 
-	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
-	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
-		ok:              { label: 'Texte',           css: 'hal-ok' },
-		notice:          { label: 'Notice',          css: 'hal-notice' },
-		hors_collection: { label: 'Hors collection', css: 'hal-hors-collection' },
-		hors_hal:        { label: 'Hors HAL',        css: 'hal-hors-hal' },
-	};
-	function computeHalStatus(p: Publication): HalStatus {
-		if (!p.hal_id) return 'hors_hal';
-		const labCol = context.kind === 'lab' ? context.halCollection : null;
-		if (!labCol || !p.hal_collections || !p.hal_collections.includes(labCol)) return 'hors_collection';
-		if (!p.oa_status || ['closed', 'unknown'].includes(p.oa_status)) return 'notice';
-		return 'ok';
+	// Libellé d'un statut de dépôt HAL, servi par l'API avec les options du filtre « Statuts HAL ».
+	function halStatusLabel(status: string): string {
+		return facets.options.halStatus?.find((o) => o.value === status)?.text ?? status;
 	}
 
 	// --- Column visibility ---
@@ -384,9 +373,7 @@
 					</td>{/if}
 					{#if col('license')}<td class="license-cell">{p.license ? (licenseNames[p.license] ?? p.license) : ''}</td>{/if}
 					{#if isLab && col('hal_status')}
-						{@const hs = computeHalStatus(p)}
-						{@const meta = HAL_STATUS_META[hs]}
-						<td><span class="hal-badge {meta.css}">{meta.label}</span></td>
+						<td>{#if p.hal_status}<span class="hal-badge hal-{p.hal_status}">{halStatusLabel(p.hal_status)}</span>{/if}</td>
 					{/if}
 					{#if col('sources')}<td class="links-cell">
 						{#if p.hal_id}
@@ -446,8 +433,8 @@
 	}
 	.hal-ok              { background: var(--success-light); color: var(--success); }
 	.hal-notice          { background: #fff3e0; color: #c77c00; }
-	.hal-hors-collection { background: #ffe8d6; color: #d35400; }
-	.hal-hors-hal        { background: var(--danger-light); color: var(--danger); }
+	.hal-hors_collection { background: #ffe8d6; color: #d35400; }
+	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }

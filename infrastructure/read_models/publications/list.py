@@ -182,6 +182,12 @@ class PublicationListQueries:
         offset = (page - 1) * per_page
         where_clause, binds = publication_filter_where(filters, context)
         order = _ORDER_MAP[sort]
+        # Le statut HAL se lit au regard d'un laboratoire : il est calculé quand la liste porte sur un seul.
+        hal_status = (
+            hal_status_expression(context.lab_hal_collection)
+            if len(filters.lab_ids) == 1
+            else WhereClause("NULL", {})
+        )
 
         # Quand la recherche match un sujet (cf. _search_clause), on remonte d'abord les publis dont le *titre* match — les correspondances purement via sujet sont reléguées en deuxième.
         if filters.search:
@@ -212,7 +218,8 @@ class PublicationListQueries:
                     pub.id AS publisher_id,
                     pub.name AS publisher_name,
                     src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id,
-                    src_ids.wos_id, src_ids.theses_id, src_ids.hal_collections,
+                    src_ids.wos_id, src_ids.theses_id,
+                    {hal_status.sql} AS hal_status,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
                     (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
@@ -267,10 +274,7 @@ class PublicationListQueries:
                 LEFT JOIN publishers pub ON pub.id = p.publisher_id
                 LEFT JOIN LATERAL (
                     SELECT
-                        {_SOURCE_ID_COLUMNS},
-                        (SELECT array_agg(DISTINCT col) FROM source_records sr2,
-                                unnest(COALESCE(sr2.hal_collections, '{{}}'::text[])) AS col
-                         WHERE sr2.publication_id = p.id AND sr2.source = '{Source.HAL.value}') AS hal_collections
+                        {_SOURCE_ID_COLUMNS}
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
                 WHERE {where_clause}
@@ -279,6 +283,7 @@ class PublicationListQueries:
             """),
             {
                 **binds,
+                **hal_status.binds,
                 "focus_person": filters.person_id,
                 "person_lab_a4": filters.person_id,
                 "apc_perimeter_ids": perimeter_structure_ids,
@@ -315,7 +320,7 @@ class PublicationListQueries:
                 apc=r.apc_details,
                 is_corresponding=r.is_corresponding,
                 contribution_id=r.contribution_id,
-                hal_collections=r.hal_collections,
+                hal_status=r.hal_status,
             )
             for r in rows
         ]

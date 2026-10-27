@@ -4705,8 +4705,8 @@ export interface components {
             is_corresponding: boolean | null;
             /** Contribution Id */
             contribution_id: number | null;
-            /** Hal Collections */
-            hal_collections: string[] | null;
+            /** Hal Status */
+            hal_status: string | null;
             /**
              * Record Urls
              * @description Lien vers le portail de chaque source où la publication est présente.
