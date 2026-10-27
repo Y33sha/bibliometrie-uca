@@ -2,7 +2,7 @@
 	import type { Snippet } from 'svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 
-	// Barre d'outils d'une liste, collante sous le menu supérieur. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant suit, par exemple les filtres actifs.
+	// Barre d'outils d'une liste. Première ligne : recherche, nombre de résultats, export CSV et actions. Deuxième ligne : filtres. Le contenu enfant suit, par exemple les filtres actifs. La barre défile avec la page ; l'en-tête du tableau qui suit se colle sous le menu supérieur.
 	let {
 		search = $bindable(),
 		placeholder = 'Rechercher',
@@ -40,7 +40,7 @@
 	}
 </script>
 
-<div class="toolbar-card toolbar-sticky list-toolbar">
+<div class="toolbar-card list-toolbar">
 	<div class="toolbar">
 		{#if search !== undefined}
 			<input type="search" class="list-search" {placeholder} aria-label={placeholder} bind:value={search} oninput={onsearch} {onkeydown} />

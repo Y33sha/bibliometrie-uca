@@ -51,7 +51,7 @@
 	onMount(() => partners.load());
 </script>
 
-<div class="toolbar toolbar-card toolbar-sticky">
+<div class="toolbar toolbar-card">
 	<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facetOptions(partners.data?.years)} searchable bind:selected={selectedYears} onchange={onFilterChange} />
 	<FacetDropdown label={filterLabels.countries} options={facetOptions(partners.data?.countries)} searchable bind:selected={selectedCountries} onchange={onFilterChange} />
 	<FacetDropdown label={filterLabels.types} options={facetOptions(partners.data?.types)} bind:selected={selectedTypes} onchange={onFilterChange} />

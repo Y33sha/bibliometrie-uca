@@ -48,7 +48,7 @@
 		letter-spacing: 2px;
 	}
 	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
-	/* Au niveau des autres menus de la page (100), au-dessus de la barre de facettes collante (50). */
+	/* Au niveau des autres menus de la page (100). */
 	.column-menu-backdrop { position: fixed; inset: 0; z-index: 99; }
 	.column-menu {
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
