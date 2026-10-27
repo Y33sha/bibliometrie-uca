@@ -44,7 +44,6 @@
 	// Filtres de la liste des publications, hors contexte. La famille « Publications » est présélectionnée (cf. onMount).
 	const FILTERS = publicationFilters({ kind: 'all' });
 	let values = $state(initialValues(FILTERS));
-	let search = $state('');
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
 	let yearChart: Chart | null = null;
@@ -169,8 +168,6 @@
 	function chartParams(): URLSearchParams {
 		const p = new URLSearchParams();
 		appendFilterParams(FILTERS, values, p);
-		const q = search.trim();
-		if (q) p.set('search', q);
 		return p;
 	}
 
@@ -186,7 +183,6 @@
 		basePath: '/stats',
 		filters: {
 			...urlFilterDefs(FILTERS),
-			search: { type: 'single', urlKey: 'search' },
 			indicator: { type: 'single', urlKey: 'indicator', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
@@ -199,7 +195,6 @@
 	function syncUrl() {
 		urlFilters.syncUrl(() => ({
 			...urlState(FILTERS, values),
-			search,
 			indicator,
 			groupBy,
 			chartMode,
@@ -210,13 +205,8 @@
 	}
 
 	// --- Derived: publications link ---
-	// Les filtres et la recherche passent tels quels : les deux pages partagent le registre des filtres.
-	const pubsUrl = $derived.by(() => {
-		const p = transferParams(FILTERS, values);
-		const q = search.trim();
-		if (q) p.set('search', q);
-		return resolve('publications') + '?' + paramsToQuery(p);
-	});
+	// Les filtres passent tels quels : les deux pages partagent le registre des filtres.
+	const pubsUrl = $derived(resolve('publications') + '?' + paramsToQuery(transferParams(FILTERS, values)));
 
 	// Filtres courants sérialisés : pilotent la carte des collaborations, qui suit les mêmes filtres que le graphe mais ignore l'axe, le mode et la pagination.
 	const collabParams = $derived(chartParams().toString());
@@ -442,14 +432,12 @@
 		syncUrl();
 		refresh();
 	}
-	const onSearchInput = urlFilters.debouncedSearch(onFilterChange);
 
 	onMount(async () => {
 		// Restore state from URL params
 		const u = new URLSearchParams(window.location.search);
 		const restored = urlFilters.restoreFromUrl(u);
 		restoreValues(FILTERS, restored, values);
-		if (restored.search) search = restored.search as string;
 		if (restored.indicator !== undefined) indicator = restored.indicator as string;
 		if (restored.groupBy !== undefined) groupBy = restored.groupBy as string;
 		if (restored.chartMode !== undefined) chartMode = restored.chartMode as 'absolu' | 'part';
@@ -457,11 +445,15 @@
 		if (restored.chartSort !== undefined) chartSort = restored.chartSort as string;
 		if (restored.chartSortDir !== undefined) chartSortDir = restored.chartSortDir as 'desc' | 'asc';
 
-		// Un lien venu de la liste peut contenir un filtre propre à un laboratoire ou à une personne : il est annoncé, puis retiré.
+		// Un lien venu de la liste peut contenir une recherche, ou un filtre propre à un laboratoire ou à une personne : ils sont annoncés, puis retirés.
 		const ignored = ignoredFilters(FILTERS, values);
-		if (ignored.length) {
-			const names = ignored.map((f) => `« ${f.label} »`).join(', ');
-			toast(`${ignored.length > 1 ? 'Filtres non pris en compte' : 'Filtre non pris en compte'} : ${names}`, 'warning', 6000);
+		const term = u.get('search')?.trim();
+		const lost = [
+			...ignored.map((f) => `filtre « ${f.label} »`),
+			...(term ? [`recherche « ${term} »`] : []),
+		];
+		if (lost.length) {
+			toast(`Non pris en compte dans les statistiques : ${lost.join(', ')}`, 'warning', 6000);
 			for (const f of ignored) clearValue(f, values);
 			syncUrl();
 		}
@@ -543,11 +535,7 @@
 </div>
 <!-- Ligne 2 : filtres, ceux de la liste des publications. -->
 <div class="stats-filters">
-	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={chartParams} onchange={onFilterChange}>
-		{#snippet leading()}
-			<input type="search" class="stats-search" placeholder="Rechercher par titre ou sujet" aria-label="Rechercher par titre ou sujet" bind:value={search} oninput={onSearchInput} />
-		{/snippet}
-	</PublicationFilterBar>
+	<PublicationFilterBar filters={FILTERS} bind:values options={facets.options} sourceCounts={facets.sourceCounts} buildParams={chartParams} onchange={onFilterChange} />
 	<ActiveFilterBar filters={FILTERS} bind:values options={facets.options} onchange={onFilterChange} />
 </div>
 
@@ -595,7 +583,6 @@
 		gap: 8px;
 		margin-bottom: 16px;
 	}
-	.stats-search { min-width: 220px; }
 	.groupby {
 		font-size: 0.9rem;
 		color: var(--muted);

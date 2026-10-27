@@ -1,5 +1,4 @@
 <script lang="ts">
-	import type { Snippet } from 'svelte';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
 	import EntityFilter from '#lib/components/EntityFilter.svelte';
@@ -24,7 +23,6 @@
 		sourceCounts,
 		buildParams,
 		onchange,
-		leading,
 	}: {
 		filters: ListFilter[];
 		values: FilterValues;
@@ -36,8 +34,6 @@
 		buildParams: () => URLSearchParams;
 		/** Appelé après chaque changement de filtre. */
 		onchange: () => void;
-		/** Contrôles placés en tête de la barre principale. */
-		leading?: Snippet;
 	} = $props();
 
 	// svelte-ignore state_referenced_locally
@@ -62,7 +58,6 @@
 
 <div class="toolbar">
 	<span class="filters-label">Filtrer par&nbsp;:</span>
-	{@render leading?.()}
 	{#each sections.primary as f (f.key)}
 		{#if isShown(f, optionCount)}{@render filterControl(f)}{/if}
 	{/each}
