@@ -74,6 +74,17 @@
 		width: 12px;
 		height: 12px;
 	}
+	/* Dans un tableau, le lien reste repérable sans dominer le titre : fond clair et filet, plein au survol. */
+	a.access-btn.compact {
+		background: var(--accent-light);
+		color: var(--accent);
+		border: 1px solid color-mix(in srgb, var(--accent) 35%, white);
+	}
+	a.access-btn.compact:hover {
+		background: var(--accent);
+		border-color: var(--accent);
+		color: white;
+	}
 	.access-unavailable {
 		background: var(--border);
 		color: var(--text-secondary);
