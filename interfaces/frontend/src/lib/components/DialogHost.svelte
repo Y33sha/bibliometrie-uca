@@ -70,9 +70,8 @@
 	.toast-info {
 		background: var(--accent);
 	}
+	/* Orange assombri : le texte blanc y reste lisible (contraste d'environ 5:1). */
 	.toast-warning {
-		background: var(--warning-light);
-		color: var(--warning-text);
-		border: 1px solid var(--warning);
+		background: color-mix(in srgb, var(--attention) 85%, black);
 	}
 </style>
