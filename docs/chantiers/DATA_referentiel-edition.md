@@ -17,9 +17,11 @@ Base locale au 2026-10-27 : 10 871 revues, 6 872 éditeurs.
 
 ### Éditeurs
 
-- 1 602 publications, dans 445 revues, ont un éditeur différent de celui de leur revue.
-- 4 765 publications ont un éditeur différent du titulaire du préfixe de leur DOI : 4 134 préfixes Crossref, 631 préfixes DataCite. `publications.publisher_id` est défini comme le titulaire du préfixe du DOI Crossref, à défaut l'éditeur des enregistrements sources.
 - Deux noms normalisés sont partagés par deux éditeurs.
+- 631 publications à DOI DataCite ont un éditeur différent du titulaire du préfixe. Ce titulaire désigne parfois le même éditeur sous un autre nom :
+  - « Classiques Garnier » (14001), titulaire « Librairie Classiques Garnier » (82736), préfixes `10.15122` et `10.48611` ;
+  - « INRAE » (13895) et « National Research Institute for Agriculture, Food and Environment » (83482), titulaire « Institut National de Recherche pour l'Agriculture, l'Alimentation et l'Environnement » (76867).
+- Des noms d'éditeur contiennent un lieu ou un directeur d'ouvrage : « Paris: Classiques Garnier » (14077), « A. Hatzenberger dir., Classiques Garnier » (84199).
 
 ### Titres de revue
 
@@ -52,8 +54,9 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 ### Phase 2 — Éditeurs
 
-- [ ] Divergences entre éditeur de la publication, éditeur de la revue et titulaire du préfixe : audit, classement par cause
-- [ ] Mesure des doublons d'éditeurs sous des noms différents
+- [ ] Doublons d'éditeurs que révèle le titulaire DataCite du préfixe
+- [ ] Lieu et directeur d'ouvrage dans les noms d'éditeur
+- [ ] Mesure des autres doublons d'éditeurs sous des noms différents
 
 ### Phase 3 — Titres de revue
 
