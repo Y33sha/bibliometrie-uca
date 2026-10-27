@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -157,19 +158,19 @@
 <div class="toolbar toolbar-card toolbar-sticky">
 	<input
 		type="search"
-		placeholder="Rechercher dans les noms…"
+		placeholder="Rechercher dans les noms"
 		bind:value={search}
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
 	<FacetDropdown
-		label="Types"
+		label={filterLabels.types}
 		options={facets.options.publisherTypes}
 		bind:selected={selectedPublisherTypes}
 		onchange={onFilterChange}
 	/>
 	<FacetDropdown
-		label="Pays"
+		label={filterLabels.countries}
 		options={facets.options.countries}
 		searchable
 		bind:selected={selectedCountries}
@@ -193,14 +194,14 @@
 			<th class="sortable" onclick={() => setSort('name')}>
 				Nom <SortChevron direction={sortDirection(currentSort, 'name')} />
 			</th>
-			<th>Type</th>
-			<th>Pays</th>
+			<th>{columnLabels.type}</th>
+			<th>{columnLabels.country}</th>
 			<th>Préfixes DOI</th>
 			<th class="num sortable" onclick={() => setSort('serials')}>
 				Publications en série <SortChevron direction={sortDirection(currentSort, 'serials')} />
 			</th>
 			<th class="num sortable" onclick={() => setSort('publications')}>
-				Publis <SortChevron direction={sortDirection(currentSort, 'publications')} />
+				{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} />
 			</th>
 			{#if actionCell}<th>{actionColumnHeader}</th>{/if}
 		</tr>

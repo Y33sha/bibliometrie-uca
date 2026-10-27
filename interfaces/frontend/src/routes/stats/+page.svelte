@@ -22,6 +22,7 @@
 		publicationsDocTypes,
 		docTypeFilterToken,
 		docTypeFilterFromToken,
+		filterLabels,
 	} from '#lib/labels.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
@@ -626,31 +627,31 @@
 <div class="toolbar facets-row">
 	<span class="facets-label">Filtrer par&nbsp;:</span>
 	{#if facetKeys.has('year')}
-		<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} bind:selected={selectedYears} onchange={onFilterChange} />
 	{/if}
 	{#if facetKeys.has('lab')}
-		<FacetDropdown label="Laboratoires" options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.labs} options={facets.options.labs} searchable bind:selected={selectedLabs} onchange={onFilterChange} />
 	{/if}
 	{#if facetKeys.has('oa_voie')}
-		<FacetDropdown label="Voies OA" options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.oaStatuses} options={facets.options.oa} bind:selected={selectedOa} onchange={onFilterChange} />
 	{/if}
 	{#if facetKeys.has('doc_type')}
-		<FacetDropdown label="Types" options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.types} options={facets.options.docTypes} groups={docTypeFamilies.map((f) => ({ label: f.label, values: f.types }))} bind:selected={selectedDocTypes} onchange={onFilterChange} />
 	{/if}
 	{#if facetKeys.has('serial')}
-		<EntityFilter label="Revue" endpoint="/api/stats/facets" kind="serial" buildParams={chartParams} selected={selectedSerialId ? [selectedSerialId] : []} onchange={(ids) => onSerialFilter(ids[0] ?? null)} />
+		<EntityFilter label={filterLabels.serial} endpoint="/api/stats/facets" kind="serial" buildParams={chartParams} selected={selectedSerialId ? [selectedSerialId] : []} onchange={(ids) => onSerialFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('publisher')}
-		<EntityFilter label="Éditeur" endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
+		<EntityFilter label={filterLabels.publisher} endpoint="/api/stats/facets" kind="publisher" buildParams={chartParams} selected={selectedPublisherId ? [selectedPublisherId] : []} onchange={(ids) => onPublisherFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('partner')}
-		<EntityFilter label="Organisation partenaire" endpoint="/api/stats/facets" kind="partner" buildParams={chartParams} selected={selectedPartnerRor ? [selectedPartnerRor] : []} onchange={(ids) => onPartnerFilter(ids[0] ?? null)} />
+		<EntityFilter label={filterLabels.partner} endpoint="/api/stats/facets" kind="partner" buildParams={chartParams} selected={selectedPartnerRor ? [selectedPartnerRor] : []} onchange={(ids) => onPartnerFilter(ids[0] ?? null)} />
 	{/if}
 	{#if facetKeys.has('license')}
-		<FacetDropdown label="Licence" options={facets.options.licenses} bind:selected={selectedLicenses} onchange={onFilterChange} tooltip="Licence de la version éditeur" />
+		<FacetDropdown label={filterLabels.licenses} options={facets.options.licenses} bind:selected={selectedLicenses} onchange={onFilterChange} tooltip="Licence de la version éditeur" />
 	{/if}
 	{#if facetKeys.has('apc')}
-		<FacetDropdown label="APC" options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />
+		<FacetDropdown label={filterLabels.apc} options={facets.options.apc} bind:selected={selectedApc} onchange={onFilterChange} tooltip={"Pas d'info après 2024\nSans APC = ou APC non documentés"} />
 	{/if}
 </div>
 

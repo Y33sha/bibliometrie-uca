@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
@@ -151,16 +152,16 @@
 	<input
 		type="search"
 		class="search"
-		placeholder="Rechercher par titre ou ISBN…"
+		placeholder="Rechercher par titre ou ISBN"
 		bind:value={search}
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }}
 		oninput={onSearchInput}
 	/>
-	<FacetDropdown label="Types" options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
-	<FacetDropdown label="Années" allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+	<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
+	<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
 	{#if !publisherFixed}
 		<EntityFilter
-			label="Éditeur"
+			label={filterLabels.publisher}
 			endpoint="/api/monographs/facets"
 			kind="publisher"
 			buildParams={buildFilterParams}
@@ -185,13 +186,13 @@
 	<table class="data-table monographs-table">
 		<thead>
 			<tr>
-				<th class="sortable" onclick={() => setSort('title')}>Titre <SortChevron direction={sortDirection(currentSort, 'title')} /></th>
-				<th>Type</th>
-				<th class="num sortable" onclick={() => setSort('year')}>Année <SortChevron direction={sortDirection(currentSort, 'year')} /></th>
+				<th class="sortable" onclick={() => setSort('title')}>{columnLabels.title} <SortChevron direction={sortDirection(currentSort, 'title')} /></th>
+				<th>{columnLabels.type}</th>
+				<th class="num sortable" onclick={() => setSort('year')}>{columnLabels.year} <SortChevron direction={sortDirection(currentSort, 'year')} /></th>
 				<th>ISBN</th>
-				{#if !publisherFixed}<th>Éditeur</th>{/if}
+				{#if !publisherFixed}<th>{columnLabels.publisher}</th>{/if}
 				{#if !serialFixed}<th>Collection</th>{/if}
-				<th class="num sortable" onclick={() => setSort('publications')}>Publis <SortChevron direction={sortDirection(currentSort, 'publications')} /></th>
+				<th class="num sortable" onclick={() => setSort('publications')}>{columnLabels.publications} <SortChevron direction={sortDirection(currentSort, 'publications')} /></th>
 			</tr>
 		</thead>
 		<tbody>

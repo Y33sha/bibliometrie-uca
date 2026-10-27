@@ -341,3 +341,40 @@ export const contributionRoleLabels: Record<string, string> = {
 	jury_member: 'Examinateur',
 	other: 'Autre rôle',
 };
+
+/** En-têtes des colonnes communes à plusieurs listes. */
+export const columnLabels = {
+	type: 'Type',
+	year: 'Année',
+	title: 'Titre',
+	doi: 'DOI',
+	author: 'Auteur',
+	labs: 'Laboratoires',
+	serial: 'Revue',
+	publisher: 'Éditeur',
+	country: 'Pays',
+	address: 'Adresse',
+	apc: 'APC',
+	oaStatus: 'Voie OA',
+	license: 'Licence',
+	sources: 'Sources',
+	access: 'Accès',
+	publications: 'Publications',
+} as const;
+
+/** Noms des filtres communs à plusieurs listes : au pluriel pour un choix multiple, au singulier pour un choix unique. */
+export const filterLabels = {
+	types: 'Types',
+	years: 'Années',
+	labs: 'Laboratoires',
+	serial: 'Revue',
+	publisher: 'Éditeur',
+	author: 'Auteur',
+	partner: 'Organisation partenaire',
+	countries: 'Pays',
+	apc: 'APC',
+	oaStatuses: 'Voies OA',
+	licenses: 'Licences',
+	access: 'Accès',
+	sources: 'Sources',
+} as const;

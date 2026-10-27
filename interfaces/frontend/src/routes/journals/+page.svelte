@@ -209,7 +209,7 @@
 			floating
 			align="end"
 			minLength={2}
-			placeholder="Fusionner avec…"
+			placeholder="Fusionner avec"
 			search={mergeSearch.query}
 			onsearch={mergeSearch.setQuery}
 			loading={mergeSearch.loading}

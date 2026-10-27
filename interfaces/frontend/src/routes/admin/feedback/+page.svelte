@@ -8,7 +8,7 @@
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
-  import { structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
+  import { columnLabels, structDetectionClasses, structDetectionLabels } from "#lib/labels.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
@@ -313,7 +313,7 @@
       <button class="tab-btn" class:active={currentTab === "fn"} onclick={() => switchTab("fn")}> Faux négatifs </button>
       <button class="tab-btn" class:active={currentTab === "fp"} onclick={() => switchTab("fp")}> Faux positifs </button>
     </div>
-    <input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+    <input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
     <ResultCount {list} one="adresse" many="adresses" />
   </div>
 
@@ -322,8 +322,8 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th>Adresse</th>
-          <th class="num" style="width:60px">Publis</th>
+          <th>{columnLabels.address}</th>
+          <th class="num" style="width:60px">{columnLabels.publications}</th>
           <th style="width:200px">Structures liées</th>
           {#if currentTab === "fp"}
             <th style="width:280px">Forme ayant matché</th>
@@ -383,7 +383,7 @@
       <div class="picker-shortcuts">
         <button onclick={() => addCtxToForm("tutelles")}>{"\uD83D\uDD17"} tutelles</button>
       </div>
-      <input type="text" placeholder="Rechercher une structure..." bind:value={ctxSearch} use:autofocus />
+      <input type="text" placeholder="Rechercher une structure" bind:value={ctxSearch} use:autofocus />
       <div class="picker-results">
         {#each ctxFilteredStructures as s (s.id)}
           <button class="picker-item" onclick={() => addCtxToForm(s.id)}>

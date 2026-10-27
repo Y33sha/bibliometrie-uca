@@ -231,7 +231,7 @@
 </script>
 
 <div class="toolbar toolbar-card toolbar-sticky">
-	<input type="search" placeholder="Rechercher par nom..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<input type="search" placeholder="Rechercher par nom" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 	<PresenceFilterToggle
 		label="Identifiants"
 		items={IDENTIFIER_ITEMS}
@@ -239,8 +239,8 @@
 		counts={idCounts}
 		onchange={onFilterChange}
 	/>
-	<FacetDropdown label="Fonction" options={facets.options.roles} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
-	<FacetDropdown label="Département" options={facets.options.depts} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
+	<FacetDropdown label="Fonctions" options={facets.options.roles} searchable bind:selected={selectedRoles} onchange={onFilterChange} />
+	<FacetDropdown label="Départements" options={facets.options.depts} searchable bind:selected={selectedDepts} onchange={onFilterChange} />
 	<FacetDropdown label="Base RH" options={facets.options.rh} bind:selected={selectedRh} onchange={onFilterChange} />
 	{#if isAdmin()}
 		<PresenceFilterToggle

@@ -152,7 +152,7 @@
 			{:else}
 				<div class="dash-grid">
 					<div class="dash-card dash-card-wide">
-						<h3>Sujets dominants</h3>
+						<h3>Sujets principaux</h3>
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
@@ -161,7 +161,7 @@
 					</div>
 
 					<div class="dash-card">
-						<h3>Types de publications ({dashboard.total_publications})</h3>
+						<h3>Types de documents ({dashboard.total_publications})</h3>
 						{#if dashboard.doc_types.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}

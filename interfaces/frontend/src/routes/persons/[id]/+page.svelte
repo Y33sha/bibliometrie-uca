@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
+	import { columnLabels } from '#lib/labels.js';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { onMount } from 'svelte';
@@ -245,10 +246,10 @@
 					<table class="data-table">
 						<thead>
 							<tr>
-								<th style="width:160px">Auteur</th>
-								<th>Titre</th>
-								<th style="width:100px">Labo</th>
-								<th style="width:50px">Année</th>
+								<th style="width:160px">{columnLabels.author}</th>
+								<th>{columnLabels.title}</th>
+								<th style="width:100px">{columnLabels.labs}</th>
+								<th style="width:50px">{columnLabels.year}</th>
 							</tr>
 						</thead>
 						<tbody>
@@ -274,7 +275,7 @@
 				<table class="data-table">
 					<thead>
 						<tr>
-							<th>Adresse</th>
+							<th>{columnLabels.address}</th>
 							<th style="width:160px">Structures</th>
 						</tr>
 					</thead>

@@ -66,10 +66,10 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle("Manques collections HAL")}</title>
+	<title>{pageTitle("Publications absentes des collections HAL")}</title>
 </svelte:head>
 
-<h1>Manques collections HAL</h1>
+<h1>Publications absentes des collections HAL</h1>
 
 <div class="info-box">
 	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.

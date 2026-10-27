@@ -100,8 +100,8 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - **Un composant d'en-tête de page** pour les pages hors fiche d'entité : H1 et description facultative, une seule taille de titre.
 - **Un composant de barre d'outils de liste** : recherche, compteur, actions, facettes, filtres actifs. Même disposition et même largeur de recherche sur toutes les listes.
 - **Un registre de libellés** pour les facettes et les colonnes, lu par le menu de colonnes et par l'en-tête. Libellés entiers, sans abréviation. Facettes au pluriel.
-- **Un nom par page**, identique dans le menu, le H1 et le titre du navigateur.
-- **Placeholders** terminés par « … ».
+- **Un nom par page**, identique dans le menu, le H1 et le titre du navigateur. Le H1 et le titre d'une page Problèmes HAL comportent « HAL ». Les pages des structures et des personnes s'appellent « Labos » et « Chercheurs ».
+- **Placeholders** sans ponctuation finale.
 - **Un seul style d'identifiant**, en `--mono`, sur les listes comme dans les en-têtes d'entité.
 - **Un seul composant de barres horizontales** : `SubjectBars` sert aussi aux pays partenaires.
 - **Valeur absente** : cellule vide.
@@ -133,10 +133,11 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 3. Libellés
 
-- [ ] Registre des libellés de facettes et de colonnes ; menu de colonnes et en-têtes sur le registre
-- [ ] Un nom par page Problèmes HAL, sans abréviation au menu
-- [ ] « National » à la place de « Domestique » ; titres de dashboard identiques entre éditeur et publication en série
-- [ ] Placeholders
+- [x] Registre des libellés des colonnes et des filtres communs à plusieurs listes (`columnLabels`, `filterLabels` dans `lib/labels.ts`) ; menu de colonnes et en-têtes sur le registre
+- [x] Pages Problèmes HAL : « Comptes auteur en double », « Dépôts en double », « Publications absentes des collections », « Affiliations divergentes »
+- [x] Titres du navigateur et H1 « Labos » et « Chercheurs »
+- [x] « National » à la place de « Domestique » ; « Sujets principaux » et « Types de documents » sur les dashboards d'éditeur et de publication en série
+- [x] Placeholders
 
 ### 4. En-tête de page et barre d'outils
 

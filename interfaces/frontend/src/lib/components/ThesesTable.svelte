@@ -3,6 +3,7 @@
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import { columnLabels } from '#lib/labels.js';
 	import { asset, resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
@@ -71,14 +72,14 @@
 	const columnDefs = [
 		{ key: 'inscription', label: 'Inscription', fixed: true },
 		{ key: 'soutenance',  label: 'Soutenance',  fixed: true },
-		{ key: 'author',      label: 'Auteur',      fixed: true },
-		{ key: 'doi',         label: 'DOI' },
-		{ key: 'title',       label: 'Titre',       fixed: true },
+		{ key: 'author',      label: columnLabels.author,      fixed: true },
+		{ key: 'doi',         label: columnLabels.doi },
+		{ key: 'title',       label: columnLabels.title,       fixed: true },
 		{ key: 'status',      label: 'Statut',      fixed: true },
 		// svelte-ignore state_referenced_locally
-		...(showLabsColumn ? [{ key: 'labs', label: 'Laboratoire(s)', fixed: true }] : []),
-		{ key: 'sources',     label: 'Sources' },
-		{ key: 'access',      label: 'Accès',       fixed: true },
+		...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs, fixed: true }] : []),
+		{ key: 'sources',     label: columnLabels.sources },
+		{ key: 'access',      label: columnLabels.access,       fixed: true },
 	];
 	const cv = useColumnVisibility(columnDefs, ['sources']);
 	const col = cv.col;
@@ -102,20 +103,20 @@
 				class:active={soutSort !== null}
 				onclick={() => onToggleSort('soutenance')}
 			>Soutenance <SortChevron direction={soutSort} /></th>
-			<th class="col-author">Auteur</th>
-			{#if col('doi')}<th class="col-doi">DOI</th>{/if}
+			<th class="col-author">{columnLabels.author}</th>
+			{#if col('doi')}<th class="col-doi">{columnLabels.doi}</th>{/if}
 			<th
 				class="col-title sortable"
 				class:active={titleSort !== null}
 				onclick={() => onToggleSort('title')}
-			>Titre <SortChevron direction={titleSort} /></th>
+			>{columnLabels.title} <SortChevron direction={titleSort} /></th>
 			<th class="col-status">Statut</th>
 			{#if showLabsColumn}
-				<th class="col-labs">Laboratoire(s)</th>
+				<th class="col-labs">{columnLabels.labs}</th>
 			{/if}
-			{#if col('sources')}<th class="col-sources">Sources</th>{/if}
+			{#if col('sources')}<th class="col-sources">{columnLabels.sources}</th>{/if}
 			<th class="col-access col-menu-th">
-				Accès
+				{columnLabels.access}
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}

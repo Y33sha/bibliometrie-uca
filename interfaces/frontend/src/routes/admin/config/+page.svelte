@@ -423,7 +423,7 @@
         </span>
       {/each}
     </div>
-    <input id="perim-struct-search" type="search" placeholder="Rechercher une structure..." bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
+    <input id="perim-struct-search" type="search" placeholder="Rechercher une structure" bind:value={perimModal.structSearch} oninput={perimSearchStructures} autocomplete="off" />
     {#if perimModal.structResults.length > 0}
       <div class="perim-search-results">
         {#each perimModal.structResults.slice(0, 8) as s (s.id)}

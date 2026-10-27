@@ -8,6 +8,7 @@
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 
 	import type { components } from '#lib/api/schema.js';
@@ -199,8 +200,8 @@
 <h1>Attribution des pays aux adresses</h1>
 
 <div class="toolbar">
-	<input type="search" placeholder="Rechercher dans les adresses..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
-	<FacetDropdown label="Pays" options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
+	<input type="search" placeholder="Rechercher dans les adresses" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+	<FacetDropdown label={filterLabels.countries} options={countryOptions} searchable bind:selected={selectedCountry} onchange={onFilterChange} />
 	<span class="toolbar-spacer"></span>
 	<ResultCount {list} one="adresse" many="adresses" />
 </div>
@@ -231,9 +232,9 @@
 	<thead>
 		<tr>
 			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
-			<th style="width:55%">Adresse</th>
-			<th style="width:50px">Publis</th>
-			<th>Pays</th>
+			<th style="width:55%">{columnLabels.address}</th>
+			<th style="width:50px">{columnLabels.publications}</th>
+			<th>{columnLabels.country}</th>
 		</tr>
 	</thead>
 	<tbody>

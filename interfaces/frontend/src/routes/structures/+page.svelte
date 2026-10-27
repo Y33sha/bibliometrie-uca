@@ -1,5 +1,6 @@
 <script lang="ts">
 	import SortChevron from '#lib/components/SortChevron.svelte';
+	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
@@ -182,19 +183,19 @@
 </script>
 
 <svelte:head>
-	<title>{pageTitle('Structures')}</title>
+	<title>{pageTitle('Labos')}</title>
 </svelte:head>
 
-<h1 class="visually-hidden">Structures</h1>
+<h1 class="visually-hidden">Labos</h1>
 
 <div class="toolbar toolbar-card">
 	<input
 		type="search"
-		placeholder="Rechercher une structure..."
+		placeholder="Rechercher par nom ou acronyme"
 		bind:value={search}
 		onkeydown={(e) => { if (e.key === 'Escape') { search = ''; } }}
 	/>
-	<FacetDropdown label="Types" options={typeOptions} bind:selected={selectedTypes} />
+	<FacetDropdown label={filterLabels.types} options={typeOptions} bind:selected={selectedTypes} />
 	<FacetDropdown label="Tutelles" options={tutelleOptions} searchable bind:selected={selectedTutelles} />
 	{#if isAdmin()}
 		<FacetDropdown label="Périmètre" options={perimeterOptions} bind:selected={selectedPerimeters} />
@@ -208,7 +209,7 @@
 <table class="data-table">
 	<thead>
 		<tr>
-			{#if showTypeColumn}<th>Type</th>{/if}
+			{#if showTypeColumn}<th>{columnLabels.type}</th>{/if}
 			<th class="sortable" class:active={sortCol === 'acronym'} onclick={() => toggleSort('acronym')}>
 				Acronyme
 				<SortChevron direction={sortCol === 'acronym' ? (sortAsc ? 'asc' : 'desc') : null} />

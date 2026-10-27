@@ -149,7 +149,7 @@
 <!-- Add form row -->
 <div class="add-row">
   <input
-    placeholder="Nouvelle forme..."
+    placeholder="Nouvelle forme"
     bind:value={addFormText}
     onkeydown={(e) => {
       if (e.key === "Enter") {
@@ -201,7 +201,7 @@
       bind:element={ctxPickerEl}
       onpick={(cs) => onpickCtx(cs.id)}
       onclose={oncloseCtxPicker}
-      placeholder="Rechercher une structure…"
+      placeholder="Rechercher une structure"
     >
       {#snippet header()}
         <div class="ctx-picker-shortcuts">

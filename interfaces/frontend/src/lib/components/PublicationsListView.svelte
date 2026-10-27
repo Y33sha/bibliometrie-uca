@@ -33,9 +33,12 @@
 		type ListFilter,
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import { oaLabelsMap, oaStatusLabel } from '#lib/labels.js';
 	import { licenseLabels } from '#lib/licenses.js';
 	import {
+		columnLabels,
+		filterLabels,
+		oaLabelsMap,
+		oaStatusLabel,
 		docTypePlural,
 		docTypeFamilies,
 		publicationsDocTypes,
@@ -65,7 +68,7 @@
 	// - `/publications` (mode autonome avec sync URL ; en session admin, une icône ouvre le volet de la publication)
 	// - `/subjects/[id]?tab=publications` (filtre `subject_id` fixe)
 	// - `/structures/[id]?tab=publications` (filtre `lab_id` fixe + colonne Statut HAL)
-	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Corresp./Périmètre)
+	// - `/persons/[id]?tab=publications` (filtre `person_id` + facets Auteur correspondant/Périmètre)
 	// - `/journals/[id]?tab=publications` (filtre `serial_id` fixe)
 	// - `/publishers/[id]?tab=publications` (filtre `publisher_id` fixe)
 	// - `/monographs/[id]` (filtre `monograph_id` fixe)
@@ -149,23 +152,23 @@
 	// --- Column visibility ---
 	// Ordre des colonnes = ordre dans le tableau. Les colonnes optionnelles (hal_status, corr) ne sont incluses dans la liste que si la prop correspondante est activée — sinon l'utilisatrice n'a pas à les voir dans le menu de visibilité.
 	const columnDefs = [
-		{ key: 'type',       label: 'Type' },
-		{ key: 'year',       label: 'Année' },
-		{ key: 'doi',        label: 'DOI' },
-		{ key: 'title',      label: 'Titre',      fixed: true },
-		{ key: 'serial',    label: 'Revue' },
-		{ key: 'publisher',  label: 'Éditeur' },
+		{ key: 'type',       label: columnLabels.type },
+		{ key: 'year',       label: columnLabels.year },
+		{ key: 'doi',        label: columnLabels.doi },
+		{ key: 'title',      label: columnLabels.title, fixed: true },
+		{ key: 'serial',     label: columnLabels.serial },
+		{ key: 'publisher',  label: columnLabels.publisher },
 		// svelte-ignore state_referenced_locally
-		...(hasFixedLab ? [] : [{ key: 'labs', label: 'Labo(s)' }]),
+		...(hasFixedLab ? [] : [{ key: 'labs', label: columnLabels.labs }]),
 		// svelte-ignore state_referenced_locally
-		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Corresp.' }] : []),
-		{ key: 'apc',        label: 'APC' },
-		{ key: 'oa_status',  label: 'Voie OA' },
-		{ key: 'license',    label: 'Licence' },
+		...(showCorrespondingColumn ? [{ key: 'corr', label: 'Auteur correspondant' }] : []),
+		{ key: 'apc',        label: columnLabels.apc },
+		{ key: 'oa_status',  label: columnLabels.oaStatus },
+		{ key: 'license',    label: columnLabels.license },
 		// svelte-ignore state_referenced_locally
 		...(showHalStatusColumn ? [{ key: 'hal_status', label: 'Statut HAL' }] : []),
-		{ key: 'sources',    label: 'Sources' },
-		{ key: 'access',     label: 'Accès',      fixed: true },
+		{ key: 'sources',    label: columnLabels.sources },
+		{ key: 'access',     label: columnLabels.access, fixed: true },
 	];
 	const initialHidden = ['apc', 'oa_status', 'license', 'publisher', 'sources'];
 	// Libellés de la colonne Licence, servis par l'API.
@@ -186,7 +189,7 @@
 		{
 			key: 'docTypes',
 			control: 'checkbox',
-			label: 'Types',
+			label: filterLabels.types,
 			param: 'doc_type',
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
@@ -200,14 +203,14 @@
 		{
 			key: 'years',
 			control: 'checkbox',
-			label: 'Années',
+			label: filterLabels.years,
 			param: 'year',
 			facet: { type: 'simple', apiKey: 'years' },
 		},
 		{
 			key: 'labs',
 			control: 'checkbox',
-			label: 'Laboratoires',
+			label: filterLabels.labs,
 			param: 'lab_id',
 			facet: { type: 'labeled', apiKey: 'labs' },
 			searchable: true,
@@ -221,14 +224,14 @@
 		{
 			key: 'access',
 			control: 'checkbox',
-			label: 'Accès',
+			label: filterLabels.access,
 			param: 'access',
 			facet: { type: 'labeled', apiKey: 'access' },
 		},
 		{
 			key: 'halStatus',
 			control: 'checkbox',
-			label: 'Statut HAL',
+			label: 'Statuts HAL',
 			param: 'hal_status',
 			facet: { type: 'labeled', apiKey: 'hal_status' },
 			enabled: () => showHalStatusColumn,
@@ -237,7 +240,7 @@
 		{
 			key: 'serial',
 			control: 'entity',
-			label: 'Revue',
+			label: filterLabels.serial,
 			param: 'serial_id',
 			entity: 'serial',
 			group: 'Revue et éditeur',
@@ -247,7 +250,7 @@
 		{
 			key: 'publisher',
 			control: 'entity',
-			label: 'Éditeur',
+			label: filterLabels.publisher,
 			param: 'publisher_id',
 			entity: 'publisher',
 			group: 'Revue et éditeur',
@@ -257,7 +260,7 @@
 		{
 			key: 'apc',
 			control: 'checkbox',
-			label: 'APC',
+			label: filterLabels.apc,
 			param: 'has_apc',
 			facet: { type: 'labeled', apiKey: 'apc' },
 			group: 'Revue et éditeur',
@@ -267,7 +270,7 @@
 		{
 			key: 'oa',
 			control: 'checkbox',
-			label: 'Voies OA',
+			label: filterLabels.oaStatuses,
 			param: 'oa_status',
 			facet: { type: 'label_map', apiKey: 'oa_statuses', labels: oaLabelsMap },
 			group: 'Revue et éditeur',
@@ -276,7 +279,7 @@
 		{
 			key: 'license',
 			control: 'checkbox',
-			label: 'Licence',
+			label: filterLabels.licenses,
 			param: 'license',
 			facet: { type: 'labeled', apiKey: 'licenses' },
 			group: 'Revue et éditeur',
@@ -286,7 +289,7 @@
 		{
 			key: 'author',
 			control: 'entity',
-			label: 'Auteur',
+			label: filterLabels.author,
 			param: 'author_id',
 			entity: 'person',
 			group: 'Auteurs',
@@ -294,7 +297,7 @@
 		{
 			key: 'corresponding',
 			control: 'checkbox',
-			label: 'Corresp.',
+			label: 'Auteur correspondant',
 			param: 'is_corresponding',
 			facet: { type: 'label_map', apiKey: 'corresponding', labels: { yes: 'Oui', no: 'Non' } },
 			group: 'Auteurs',
@@ -317,7 +320,7 @@
 		{
 			key: 'partner',
 			control: 'entity',
-			label: 'Organisation partenaire',
+			label: filterLabels.partner,
 			param: 'partner_ror',
 			entity: 'partner',
 			group: 'Auteurs',
@@ -325,7 +328,7 @@
 		{
 			key: 'countries',
 			control: 'checkbox',
-			label: 'Pays',
+			label: filterLabels.countries,
 			param: 'country',
 			facet: {
 				type: 'labeled',
@@ -357,7 +360,7 @@
 		{
 			key: 'sources',
 			control: 'presence',
-			label: 'Sources',
+			label: filterLabels.sources,
 			param: 'source_filter',
 			group: 'Détails',
 			items: SOURCE_ITEMS,
@@ -567,7 +570,7 @@
 
 <div class="toolbar-card toolbar-sticky publication-toolbar">
 	<div class="toolbar publication-toolbar-main">
-		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet..." bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
+		<input type="search" class="publication-search" placeholder="Rechercher par titre ou sujet" bind:value={search} onkeydown={(e) => { if (e.key === 'Escape') { search = ''; onSearchInput(); } }} oninput={onSearchInput} />
 		<ResultCount list={listing} one="publication" many="publications" />
 		<a href={exportCsvUrl()} class="export-btn" download>Export CSV</a>
 		{#if showStatsLink}<a href={statsUrl} class="toolbar-action">Statistiques &rarr;</a>{/if}
@@ -614,27 +617,27 @@
 		<tr>
 			{#if onopenPublication}<th style="width:28px"></th>{/if}
 			{#if showAdminExclude}<th style="width:28px"></th>{/if}
-			{#if col('type')}<th style="width:80px">Type</th>{/if}
+			{#if col('type')}<th style="width:80px">{columnLabels.type}</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
-				An. <SortChevron direction={yearSort} />
+				{columnLabels.year} <SortChevron direction={yearSort} />
 			</th>{/if}
-			{#if col('doi')}<th style="width:28px">DOI</th>{/if}
+			{#if col('doi')}<th style="width:28px">{columnLabels.doi}</th>{/if}
 			<th class="sortable publication-col-title" class:active={titleSort !== null} onclick={() => toggleSort('title')}>
-				Titre <SortChevron direction={titleSort} />
+				{columnLabels.title} <SortChevron direction={titleSort} />
 			</th>
-			{#if col('serial')}<th class="publication-col-journal">Revue</th>{/if}
-			{#if col('publisher')}<th class="publication-col-journal">Éditeur</th>{/if}
-			{#if !hasFixedLab && col('labs')}<th style="width:80px">Labo(s)</th>{/if}
+			{#if col('serial')}<th class="publication-col-journal">{columnLabels.serial}</th>{/if}
+			{#if col('publisher')}<th class="publication-col-journal">{columnLabels.publisher}</th>{/if}
+			{#if !hasFixedLab && col('labs')}<th style="width:80px">{columnLabels.labs}</th>{/if}
 			{#if showCorrespondingColumn && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
-				APC <SortChevron direction={apcSort} />
+				{columnLabels.apc} <SortChevron direction={apcSort} />
 			</th>{/if}
-			{#if col('oa_status')}<th style="width:60px">Voie OA</th>{/if}
-			{#if col('license')}<th style="width:90px">Licence</th>{/if}
+			{#if col('oa_status')}<th style="width:60px">{columnLabels.oaStatus}</th>{/if}
+			{#if col('license')}<th style="width:90px">{columnLabels.license}</th>{/if}
 			{#if showHalStatusColumn && col('hal_status')}<th style="width:100px">Statut HAL</th>{/if}
-			{#if col('sources')}<th style="width:100px">Sources</th>{/if}
+			{#if col('sources')}<th style="width:100px">{columnLabels.sources}</th>{/if}
 			<th style="width:120px" class="col-menu-th">
-				Accès
+				{columnLabels.access}
 				<ColumnMenu columns={cv.columns} visibleColumns={cv.visibleColumns}
 					showMenu={cv.showMenu}
 					onToggle={cv.toggle}

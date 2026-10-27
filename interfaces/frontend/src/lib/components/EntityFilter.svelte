@@ -144,7 +144,7 @@
 	{#if open}
 		<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
 		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
-			<input type="text" class="facet-search" placeholder="Rechercher..." bind:value={query} oninput={onInput} />
+			<input type="text" class="facet-search" placeholder="Rechercher" bind:value={query} oninput={onInput} />
 			<div class="facet-options">
 				<label>
 					<input type={multiple ? 'checkbox' : 'radio'} checked={!selected.length} onchange={pickAll} />
