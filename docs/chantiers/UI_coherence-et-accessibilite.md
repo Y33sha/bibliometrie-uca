@@ -165,7 +165,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 7. Couleurs en dur
 
-- [ ] `PublicationHeader.svelte`, `DoughnutChart.svelte` et les 8 autres composants sur les variables
+- [x] `PublicationHeader.svelte`, `DoughnutChart.svelte` et les 8 autres composants sur les variables
 
 ### 8. Administration
 
