@@ -2,34 +2,35 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import cloud from 'd3-cloud';
-	import { chartColor } from '#lib/components/charts/palette.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type SubjectFrequency = components['schemas']['SubjectFrequency'];
 
 	interface CloudWord extends cloud.Word {
 		id: number;
+		/** Rang du sujet entre le moins et le plus fréquent, de 0 à 1, sur une échelle logarithmique. */
+		weight: number;
 	}
 
-	// Nuage des sujets les plus fréquents : la taille d'un mot croît avec le nombre de publications, sur une échelle logarithmique. Chaque mot mène à la fiche du sujet.
+	// Nuage des sujets les plus fréquents : la taille et la teinte d'un mot croissent avec le nombre de publications. Chaque mot mène à la fiche du sujet.
 	let { subjects }: { subjects: SubjectFrequency[] } = $props();
 
-	// Rangs de la palette des graphiques lisibles en texte sur fond clair : bleu, orange, vert, rouge, violet, brun.
-	const TEXT_COLORS = [0, 1, 2, 3, 4, 7];
-	const wordColor = (id: number) => chartColor(TEXT_COLORS[id % TEXT_COLORS.length]);
+	const MIN_SIZE = 11;
+	const MAX_SIZE = 32;
+	// Teinte d'un mot : de la plus claire (sujet le moins fréquent) au bleu-vert du site (le plus fréquent).
+	const wordColor = (weight: number) =>
+		`color-mix(in srgb, var(--accent) ${Math.round(45 + weight * 55)}%, var(--accent-soft))`;
 
 	let container: HTMLDivElement | undefined = $state();
 	let width = $state(800);
 	let height = $state(420);
 
-	function fontSizeFor(count: number, minCount: number, maxCount: number): number {
-		const minSize = 11;
-		const maxSize = 32;
-		if (maxCount === minCount) return (minSize + maxSize) / 2;
-		const t =
+	function weightFor(count: number, minCount: number, maxCount: number): number {
+		if (maxCount === minCount) return 0.5;
+		return (
 			(Math.log10(count + 1) - Math.log10(minCount + 1)) /
-			(Math.log10(maxCount + 1) - Math.log10(minCount + 1));
-		return minSize + t * (maxSize - minSize);
+			(Math.log10(maxCount + 1) - Math.log10(minCount + 1))
+		);
 	}
 
 	let placedWords = $state<CloudWord[]>([]);
@@ -44,11 +45,10 @@
 		const counts = subjects.map((s) => s.count);
 		const minCount = Math.min(...counts);
 		const maxCount = Math.max(...counts);
-		const words: CloudWord[] = subjects.map((s) => ({
-			text: s.label,
-			size: fontSizeFor(s.count, minCount, maxCount),
-			id: s.id,
-		}));
+		const words: CloudWord[] = subjects.map((s) => {
+			const weight = weightFor(s.count, minCount, maxCount);
+			return { text: s.label, size: MIN_SIZE + weight * (MAX_SIZE - MIN_SIZE), id: s.id, weight };
+		});
 
 		layoutDone = false;
 		cloud<CloudWord>()
@@ -102,7 +102,7 @@
 							text-anchor="middle"
 							font-family="system-ui, sans-serif"
 							font-size={w.size}
-							fill={wordColor(w.id)}
+							style:fill={wordColor(w.weight)}
 							transform={`translate(${w.x ?? 0}, ${w.y ?? 0})`}
 						>
 							{w.text}
@@ -126,6 +126,11 @@
 		display: block;
 		width: 100%;
 		height: auto;
+	}
+	/* Le survol atténue le mot, sans le souligner. */
+	a,
+	a:hover {
+		text-decoration: none;
 	}
 	text {
 		cursor: pointer;
