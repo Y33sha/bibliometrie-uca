@@ -40,7 +40,8 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - **L'administration est un état de la session.** Un seul site. Les pages communes ajoutent leurs fonctions d'administration quand l'utilisateur de la session a le rôle admin. Les pages propres à l'administration (pipeline, configuration, adresses, pays, files de triage) restent des pages à part, dans la même barre de navigation.
 - **Comptes : `users`, `roles`, `user_roles`.** La table `users` liste les utilisateurs autorisés. Les rôles sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
-- **Une page par structure**, sous la route `structures/[id]`. Un onglet « Gestion », réservé à l'admin, comporte l'édition, les tutelles et les formes de nom. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
+- **Une page par structure**, sous la route `structures/[id]`. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
+- **Volet d'édition de la structure**, sur le modèle des personnes et des publications : édition, tutelles et formes de nom.
 - **Volet d'édition ouvert par une icône** sur la ligne. Le titre ou le nom mène à la fiche.
 - **`admin/persons` repose sur `PersonsListView`**, enrichie des facettes d'administration.
 - **Files de triage en onglets de la liste publique**, affichés selon le rôle. Le bandeau des contributions orphelines suit la même règle.
@@ -87,6 +88,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - [x] Route `structures/[id]` et onglet « Gestion » ; suppression de `admin/structures/[id]` et de `laboratories/[id]`
 - [x] Liste unique sous `structures`, facette de type, création de structure selon le rôle ; suppression de `admin/structures` et de `laboratories`
+- [ ] Volet d'édition de la structure, ouvert par une icône sur la ligne ; suppression de l'onglet « Gestion »
 
 #### 3f. Personnes
 

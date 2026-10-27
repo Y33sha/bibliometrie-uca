@@ -154,6 +154,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - [ ] Liste des éditeurs : filets de la colonne des préfixes, valeur absente en cellule vide
 - [ ] Manques collections en tableau
 - [ ] Fiche publication : titres de section homogènes, bouton « Accès fermé »
+- [ ] Libellés du statut HAL de l'onglet Publications d'un labo servis par l'API : le badge de `PublicationsListView` répète `HAL_DEPOSIT_STATUS_LABELS`
 
 ### 6. Accessibilité restante
 
