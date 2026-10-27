@@ -179,11 +179,11 @@ $$;
 -- `alembic_version` dit quelle migration la base porte. Elle appartient aux migrations,
 -- que le pipeline ne joue pas.
 --
--- `forced_merges` et `forced_merge_source_records` gardent les fusions de publications
--- forcées par l'administration. Le pipeline les lit seulement.
+-- `manual_merges` et `manual_merge_source_records` gardent les fusions de publications
+-- décidées par l'administration. Le pipeline les lit seulement.
 REVOKE INSERT, UPDATE, DELETE, TRUNCATE
     ON ops.audit_log, ops.users, ops.roles, ops.user_roles, alembic_version,
-    publications.forced_merges, publications.forced_merge_source_records
+    publications.manual_merges, publications.manual_merge_source_records
     FROM bibliometrie_pipeline;
 
 -- Ce qui n'est délibérément pas accordé : la propriété des objets et `CREATE` sur les schémas,
