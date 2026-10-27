@@ -3675,8 +3675,6 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Outside Perimeter Collections */
-            outside_perimeter_collections: boolean;
             /**
              * Hal Links
              * @description Dépôts HAL de la publication, avec leur lien.

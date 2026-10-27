@@ -30,10 +30,7 @@ from infrastructure.read_models.hal_problems.models import (
     HalPublicationDetail,
     NoMissingCollections,
 )
-from infrastructure.read_models.perimeters.queries import (
-    get_persons_perimeter_root_ids,
-    get_persons_structure_ids_list,
-)
+from infrastructure.read_models.perimeters.queries import get_persons_structure_ids_list
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import usable_identifier
 
@@ -311,20 +308,6 @@ class HalProblemsQueries:
             for r in rows
         ]
 
-    def _perimeter_root_collections(self) -> list[str]:
-        """Collections HAL des structures racines du périmètre — celles de l'établissement.
-
-        Une racine sans collection n'en fournit aucune ; plusieurs racines fournissent chacune la sienne.
-        """
-        rows = self._conn.execute(
-            text("""
-                SELECT s.hal_collection FROM structures s
-                WHERE s.id = ANY(:ids) AND s.hal_collection IS NOT NULL
-            """),
-            {"ids": get_persons_perimeter_root_ids(self._conn)},
-        ).all()
-        return [r.hal_collection for r in rows]
-
     def hal_missing_collections(
         self, *, lab_id: int, page: int, per_page: int
     ) -> HalMissingCollectionsResponse | NoMissingCollections:
@@ -342,7 +325,6 @@ class HalProblemsQueries:
         binds: dict[str, object] = {
             "lab_arr": [lab_id],
             "col": col,
-            "root_cols": self._perimeter_root_collections(),
             "pg_limit": per_page,
             "pg_offset": offset,
         }
@@ -370,11 +352,7 @@ class HalProblemsQueries:
                 SELECT DISTINCT p.id, p.title, p.publication_year, p.doc_type::text AS doc_type,
                        p.doi,
                        (SELECT array_agg(sr2.source_id) FROM source_records sr2
-                        WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids,
-                       NOT EXISTS (SELECT 1 FROM source_records sr2
-                                   WHERE sr2.publication_id = p.id AND sr2.source = 'hal'
-                                     AND sr2.hal_collections && :root_cols
-                                  ) AS outside_perimeter_collections
+                        WHERE sr2.publication_id = p.id AND sr2.source = 'hal') AS halids
                 {base_where}
                 ORDER BY p.publication_year DESC NULLS LAST, p.id DESC
                 LIMIT :pg_limit OFFSET :pg_offset
@@ -389,7 +367,6 @@ class HalProblemsQueries:
                 doc_type=r.doc_type,
                 doi=r.doi,
                 halids=list(r.halids) if r.halids else None,
-                outside_perimeter_collections=r.outside_perimeter_collections,
             )
             for r in rows
         ]
@@ -578,7 +555,7 @@ class HalProblemsQueries:
             return result
         publications, truncated = _capped(result.publications)
         return csv_chunks(
-            ["Année", "Type", "Titre", "DOI", "Dépôts HAL", "Hors collections de l'établissement"],
+            ["Année", "Type", "Titre", "DOI", "Dépôts HAL"],
             (
                 [
                     p.publication_year or "",
@@ -586,7 +563,6 @@ class HalProblemsQueries:
                     to_plain_text(p.title),
                     _doi_url(p.doi),
                     " ".join(p.halids or []),
-                    "oui" if p.outside_perimeter_collections else "",
                 ]
                 for p in publications
             ),

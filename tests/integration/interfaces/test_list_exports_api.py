@@ -131,14 +131,7 @@ class TestMissingCollectionsExport:
             "/api/hal-problems/missing-collections/export.csv", params={"lab_id": lab_id}
         )
         assert r.status_code == 200
-        assert _rows(r.text)[0] == [
-            "Année",
-            "Type",
-            "Titre",
-            "DOI",
-            "Dépôts HAL",
-            "Hors collections de l'établissement",
-        ]
+        assert _rows(r.text)[0] == ["Année", "Type", "Titre", "DOI", "Dépôts HAL"]
 
 
 def test_exports_the_filtered_rows(client):

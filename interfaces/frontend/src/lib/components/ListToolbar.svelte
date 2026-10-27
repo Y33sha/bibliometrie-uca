@@ -15,6 +15,7 @@
 		exportUrl,
 		actions,
 		filters,
+		filtersLabel = 'Filtrer par',
 		activeFilters,
 		children,
 	}: {
@@ -33,6 +34,8 @@
 		exportUrl?: string;
 		actions?: Snippet;
 		filters?: Snippet;
+		/** Libellé placé devant les filtres. */
+		filtersLabel?: string;
 		/** Filtres actifs, au bas de la barre. */
 		activeFilters?: Snippet;
 		children?: Snippet;
@@ -115,7 +118,7 @@
 		</div>
 		{#if filters}
 			<div class="toolbar">
-				<span class="filters-label">Filtrer par&nbsp;:</span>
+				<span class="filters-label">{filtersLabel}&nbsp;:</span>
 				{@render filters()}
 			</div>
 		{/if}

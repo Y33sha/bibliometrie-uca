@@ -73,7 +73,7 @@
 	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.
 </PageHeader>
 
-<ListToolbar {list} one="publication" many="publications" exportUrl={selectedLabId ? withBase(`/api/hal-problems/missing-collections/export.csv?lab_id=${selectedLabId}`) : undefined}>
+<ListToolbar {list} one="publication" many="publications" filtersLabel="Laboratoire" exportUrl={selectedLabId ? withBase(`/api/hal-problems/missing-collections/export.csv?lab_id=${selectedLabId}`) : undefined}>
 	{#snippet filters()}
 		<select class="lab-select" aria-label="Laboratoire" bind:value={selectedLabId} onchange={onLabChange}>
 			{#each labs as lab}
@@ -96,7 +96,6 @@
 						<th>{columnLabels.doi}</th>
 						<th>{columnLabels.title}</th>
 						<th>Dépôts HAL</th>
-						<th title="Absente des collections HAL de l'établissement">Hors collections</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -112,9 +111,7 @@
 										<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
 									{/each}
 								</div>
-							</td>
-							<td>{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Oui</span>{/if}</td>
-						</tr>
+							</td>						</tr>
 					{/each}
 				</tbody>
 			</table>
@@ -126,10 +123,5 @@
 <style>
 	.lab-select {
 		max-width: 100%;
-	}
-	.badge-hors-uca {
-		display: inline-block; padding: 1px 8px; background: var(--attention-light);
-		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: var(--radius); font-size: 0.78rem;
-		color: var(--attention); font-weight: 600;
 	}
 </style>

@@ -157,7 +157,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 6. Accessibilité restante
 
-- [ ] Contrastes des pastilles de tutelle, des années, des badges « Soutenue » et « Hors collections »
+- [ ] Contrastes des pastilles de tutelle, des années et du badge « Soutenue »
 - [x] Nom accessible du `select` de Manques collections
 - [ ] Graphe des sujets sans éléments focusables imbriqués
 - [ ] Titres de section des fiches en H2
