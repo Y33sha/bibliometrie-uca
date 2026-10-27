@@ -357,7 +357,7 @@
   .container {
     max-width: 1400px;
     margin: 0 auto;
-    padding: 24px;
+    padding: 24px var(--page-gutter);
   }
   /* Cible du lien d'évitement : le focus s'y pose sans contour, la zone n'étant pas un contrôle. */
   .container:focus {
