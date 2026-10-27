@@ -27,20 +27,21 @@
 </div>
 
 <style>
+  /* Une seule ligne : les cellules rétrécissent quand la largeur manque. */
   .ribbon {
     display: flex;
     align-items: center;
     gap: 3px;
-    flex-wrap: wrap;
   }
   .cell {
-    width: 15px;
-    height: 15px;
+    flex: 0 1 15px;
+    min-width: 0;
+    aspect-ratio: 1;
     border-radius: var(--radius);
     border: 1.5px solid;
-    flex: none;
   }
   .sep {
+    flex: none;
     width: 1px;
     height: 15px;
     background: var(--muted);

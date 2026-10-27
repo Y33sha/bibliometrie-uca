@@ -170,7 +170,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 ### 8. Administration
 
 - [x] En-tête de page ; noms de page (« Logs » et « Pipeline »)
-- [x] Pipeline, Affiliations, Qualité de la détection sans cartes ; Configuration alignée à gauche ; Affiliations sans défilement interne
+- [x] Pipeline, Affiliations, Qualité de la détection sans cartes ; Configuration en pleine largeur ; Affiliations sans défilement interne ; phases d'un run sur une ligne
 - [x] Fil d'Ariane sur Contributions orphelines
 - [x] Chiffres clés de Qualité de la détection en `KeyFigures` ; format des nombres
 - [ ] Contrôles stylés ; sélecteur de pays par ligne, boutons de rejet et de validation
