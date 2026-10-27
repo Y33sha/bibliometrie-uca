@@ -74,16 +74,13 @@
 		width: 12px;
 		height: 12px;
 	}
-	/* Dans un tableau, le lien reste repérable sans dominer le titre : fond clair et filet, plein au survol. */
+	/* Dans un tableau : teal intermédiaire, un peu plus soutenu au survol. */
 	a.access-btn.compact {
-		background: var(--accent-light);
+		background: color-mix(in srgb, var(--accent-mid) 25%, white);
 		color: var(--accent);
-		border: 1px solid color-mix(in srgb, var(--accent) 35%, white);
 	}
 	a.access-btn.compact:hover {
-		background: var(--accent);
-		border-color: var(--accent);
-		color: white;
+		background: color-mix(in srgb, var(--accent-mid) 35%, white);
 	}
 	.access-unavailable {
 		background: var(--border);
