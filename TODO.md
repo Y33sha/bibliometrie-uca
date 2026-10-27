@@ -6,7 +6,6 @@
 * [ ] chercher dans ScanR par hal-id? (généraliser cross-import à tous les identifiants et toutes les sources)
 * [ ] API de détail des thèses (https://theses.fr/api/v1/theses/these/{nnt}): utiliser le champ cas (cas1 à cas6) pour distinguer les thèses sous embargo vs fermées sur décision du déposant. (+ récupérer champ langue)
 ## Suite du traitement
-* [ ] enrich_journals_from_openalex: montants APC par journal jamais remis à jour. Probablement pas utile de les moissonner.
 * [ ] doaj_payload: garder ou virer?
 * [ ] réévaluer l'utilité du flag in_perimeter sur la table publications
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
