@@ -39,6 +39,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 ## Décisions
 
 - **L'administration est un état de la session.** Un seul site. Les pages communes ajoutent leurs fonctions d'administration quand l'utilisateur de la session a le rôle admin. Les pages propres à l'administration (pipeline, configuration, adresses, pays, files de triage) restent des pages à part, dans la même barre de navigation.
+- **Repère visuel du mode admin** : barre de navigation claire en session admin, foncée sinon.
 - **Comptes : `users`, `roles`, `user_roles`.** La table `users` liste les utilisateurs autorisés. Les rôles sont propres à l'application. La session désigne l'utilisateur. Les droits viennent de ses rôles.
 - **Une page par structure**, sous la route `structures/[id]`. Les libellés « Labos » et « Chercheurs » sont indépendants des routes.
 - **Volet d'édition de la structure**, sur le modèle des personnes et des publications : édition, tutelles et formes de nom.
@@ -65,6 +66,7 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 - [x] État de session lu une fois dans le layout racine et partagé, à la place des appels de `admin/+layout.svelte` et de `persons/[id]` (d8d6c273d)
 - [x] Une seule barre de navigation ; entrées d'administration affichées selon le rôle ; suppression des liens « Admin » et « Public » (d8d6c273d)
 - [x] Retour à la page de départ après connexion (d8d6c273d)
+- [x] Barre de navigation claire en session admin
 
 ### 3. Référentiels communs
 
@@ -106,5 +108,4 @@ Dans un onglet, l'entité de la fiche est un filtre fixe, sans contrôle (`fixed
 
 - **Listes d'entités liées.** Piste : la fiche garde ce qui caractérise l'entité (en-tête, dashboard, graphe des sujets, collaborations, adresses). Les listes liées deviennent des liens vers la liste générale filtrée, filtre visible et supprimable. La liste générale propose les fonctions liées à un contexte quand ce contexte est seul sélectionné : statut HAL pour un seul laboratoire, correspondance, périmètre et exclusion pour une seule personne. La même règle dirait quels filtres la page Statistiques reçoit de la liste ([Statistiques](archived/2026-10-27_METIER_statistiques.md)). Coût : la liste générale affiche l'en-tête de la liste, et l'en-tête de l'entité disparaît ; un bandeau de contexte peut le remplacer.
 - **Lectures réservées.** Les files de triage et les volets d'édition exigent-ils le rôle admin en lecture ?
-- **Repère visuel du mode admin.** La barre d'administration a sa couleur (`--nav-admin`). La garder pour la session ouverte, ou signaler la session autrement.
 - **Comptes** : page de gestion des utilisateurs, rôles autres qu'admin.
