@@ -500,7 +500,12 @@ serial_name_forms = Table(
     Column("form_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
-    UniqueConstraint("form_normalized", "publisher_id", name="uq_serial_name_forms_form_publisher"),
+    UniqueConstraint(
+        "form_normalized",
+        "publisher_id",
+        name="uq_serial_name_forms_form_publisher",
+        postgresql_nulls_not_distinct=True,
+    ),
     schema="publishing",
 )
 

@@ -166,6 +166,20 @@ class TestFindOrCreateSerial:
         assert n == 1
         assert found is not None
 
+    def test_forme_sans_editeur_enregistree_une_fois(self, sa_sync_conn, gateway):
+        """Régression : la contrainte d'unicité comptait deux éditeurs nuls comme différents, et chaque rattachement par ISSN ajoutait la forme."""
+        serial_id = _find_or_create("Viatica", issn="0028-0836", repo=gateway)
+        for _ in range(3):
+            assert _find_or_create("Viatica", issn="0028-0836", repo=gateway) == serial_id
+        assert (
+            _fetch_one(
+                sa_sync_conn,
+                "SELECT count(*) AS n FROM serial_name_forms WHERE serial_id = :id",
+                id=serial_id,
+            ).n
+            == 1
+        )
+
     def test_enriches_metadata_on_match(self, sa_sync_conn, gateway, publisher_store):
         """Une revue trouvée par ISSN reçoit l'ISSN qu'elle n'a pas. L'éditeur du document s'enregistre avec la forme de nom, la revue n'en reçoit pas."""
         existing = _serial(sa_sync_conn, issn="0028-0836")
