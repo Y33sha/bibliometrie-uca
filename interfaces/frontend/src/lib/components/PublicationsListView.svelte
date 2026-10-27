@@ -444,7 +444,7 @@
 	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
 
 	/* Bouton exclure (admin, person) */
-	.exclude-cell { padding: 0 2px !important; text-align: center; vertical-align: middle; }
+	.exclude-cell { padding-left: 2px; padding-right: 2px; text-align: center; }
 	.exclude-btn {
 		background: none; border: none; cursor: pointer;
 		color: var(--text-faint); font-size: 0.85rem; padding: 2px 4px;
