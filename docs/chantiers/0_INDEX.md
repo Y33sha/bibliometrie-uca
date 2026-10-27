@@ -5,13 +5,13 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
+- [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 
 ### Non commencé
 
 - [Administration intégrée au site, navigation entre entités liées](UI_administration-et-navigation.md)
 - [Cohérence graphique, responsivité et accessibilité du frontend](UI_coherence-et-accessibilite.md)
 - [Contenu des dashboards de structure et de personne](METIER_dashboards.md)
-- [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
