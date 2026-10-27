@@ -52,6 +52,7 @@ dev = [
     "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
     "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
     "mkdocstrings-python==2.0.10", # référence du code dans le site, générée depuis les docstrings
+    "playwright==1.58.0",          # captures d'écran du guide utilisateur (interfaces/cli/dev/screenshots.py)
 ]
 
 [tool.setuptools]
