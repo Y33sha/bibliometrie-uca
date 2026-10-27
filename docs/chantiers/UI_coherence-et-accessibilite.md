@@ -141,7 +141,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 
 ### 4. En-tête de page et barre d'outils
 
-- [ ] Composant d'en-tête de page : Sujets, Problèmes HAL, administration
+- [ ] Composant d'en-tête de page : Problèmes HAL, administration
 - [x] Composant de barre d'outils : toutes les listes, pages Problèmes HAL comprises ; champ « Occurrences min » au style des contrôles
 - [ ] Export CSV de chaque liste, API comprise
 

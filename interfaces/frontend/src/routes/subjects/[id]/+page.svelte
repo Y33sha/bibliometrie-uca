@@ -87,7 +87,7 @@
     <div class="entity-header">
       <h1 class="entity-title">{data.subject.label}</h1>
       <div class="entity-meta">
-        {data.subject.usage_count.toLocaleString("fr-FR")} publications · {data.neighbors.length} sujets associés
+        {data.subject.usage_count.toLocaleString("fr-FR")} publications
       </div>
     </div>
     <TabNav

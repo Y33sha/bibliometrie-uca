@@ -46,41 +46,39 @@
   });
 </script>
 
-<PageHeader title="Sujets">
-  Liste de tous les sujets observés sur les publications, triés par nombre d'occurrences. Cliquer sur un sujet pour explorer ses voisins par co-occurrence.
-</PageHeader>
+<PageHeader title="Sujets" hidden />
 
-  <ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets">
-    {#snippet filters()}
-      <label class="min-count">
-        Occurrences minimales
-        <input type="number" min="1" bind:value={minCount} onchange={onMinCountChange} />
-      </label>
-    {/snippet}
-  </ListToolbar>
+<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets">
+  {#snippet filters()}
+    <label class="min-count">
+      Occurrences minimales
+      <input type="number" min="1" bind:value={minCount} onchange={onMinCountChange} />
+    </label>
+  {/snippet}
+</ListToolbar>
 
-  <ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
-    <table class="data-table">
-      <thead>
+<ListStatus {list} emptyText="Aucun sujet ne correspond à ces critères.">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Libellé</th>
+        <th class="num">Occurrences</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each list.items as s (s.id)}
         <tr>
-          <th>Libellé</th>
-          <th class="num">Occurrences</th>
+          <td>
+            <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
+          </td>
+          <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
         </tr>
-      </thead>
-      <tbody>
-        {#each list.items as s (s.id)}
-          <tr>
-            <td>
-              <a href={resolve(`subjects/${s.id}`)}>{s.label}</a>
-            </td>
-            <td class="num">{s.usage_count.toLocaleString("fr-FR")}</td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
+      {/each}
+    </tbody>
+  </table>
 
-    <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
-  </ListStatus>
+  <Pagination page={list.page} pages={list.pages} onchange={list.goToPage} />
+</ListStatus>
 
 <style>
   .min-count {
