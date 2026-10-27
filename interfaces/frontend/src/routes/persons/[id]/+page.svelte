@@ -183,9 +183,9 @@
 						? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }]
 						: []}
 				>
-					{#snippet subjects({ wide })}
+					{#snippet subjects()}
 						{#if dashboardLoaded}
-							<div class="dash-card" class:dash-card-wide={wide}>
+							<div class="dash-card">
 								<h2>Sujets principaux</h2>
 								<SubjectsCloud subjects={dashSubjects} />
 							</div>

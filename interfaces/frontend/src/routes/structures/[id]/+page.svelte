@@ -209,8 +209,8 @@
 						? [{ value: rhPersonsCount.toLocaleString('fr-FR'), label: 'personnes (SI RH)' }]
 						: []}
 				>
-					{#snippet subjects({ wide })}
-						<div class="dash-card" class:dash-card-wide={wide}>
+					{#snippet subjects()}
+						<div class="dash-card">
 							<h2>Sujets principaux</h2>
 							<SubjectsCloud subjects={dashSubjects} />
 						</div>

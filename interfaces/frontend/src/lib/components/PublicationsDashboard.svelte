@@ -36,8 +36,8 @@
 		countries?: boolean;
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
 		figures?: Figure[];
-		/** Bloc des sujets, fourni par la page. `wide` : le bloc occupe toute la largeur. */
-		subjects?: Snippet<[{ wide: boolean }]>;
+		/** Bloc des sujets, fourni par la page, à côté des publications par année. */
+		subjects?: Snippet;
 	} = $props();
 
 	let loaded = $state(false);
@@ -128,6 +128,7 @@
 			<h2>Publications par année</h2>
 			<StackedBarChart labels={yearLabels} series={accessSeries} />
 		</div>
+		{@render subjects?.()}
 		<div class="dash-card">
 			<h2>Types de documents</h2>
 			<BarChart
@@ -150,8 +151,6 @@
 				/>
 			</div>
 		{/if}
-		<!-- Les sujets complètent la ligne des pays partenaires, ou occupent seuls la leur. -->
-		{@render subjects?.({ wide: topCountries.length === 0 })}
 	</div>
 {/if}
 
