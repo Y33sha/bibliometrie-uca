@@ -7,9 +7,22 @@
 	import { api } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import { setQueryParam } from '#lib/url.js';
+	import { onMount } from 'svelte';
 
-	// Onglets de la session admin : la liste, puis la file des fusions suspectes.
+	// Onglets de la session admin : la liste, puis la file des fusions suspectes. L'onglet ouvert se garde dans l'URL (`?tab=`).
+	const QUEUES = ['suspect-merges'];
 	let tab = $state('all');
+
+	function selectTab(t: string) {
+		tab = t;
+		void setQueryParam('tab', t === 'all' ? null : t);
+	}
+
+	onMount(() => {
+		const t = new URLSearchParams(window.location.search).get('tab');
+		if (isAdmin() && t && QUEUES.includes(t)) tab = t;
+	});
 	let suspectMergeCount = $state(0);
 
 	$effect(() => {
@@ -32,7 +45,7 @@
 			{ key: 'suspect-merges', label: 'Fusions suspectes', count: suspectMergeCount },
 		]}
 		active={tab}
-		onselect={(key) => (tab = key)}
+		onselect={selectTab}
 	/>
 {/if}
 
