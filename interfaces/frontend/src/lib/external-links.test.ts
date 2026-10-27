@@ -38,10 +38,11 @@ const HOTES_AFFICHABLES = new Set([
 ]);
 
 /* Expressions admises dans un attribut `href`. Les fonctions de composition écrivent l'hôte ;
- * les valeurs internes désignent une route de l'application. */
+ * les valeurs internes désignent une route de l'application. `exportUrl` est l'export CSV que
+ * la barre d'outils reçoit de sa liste, composé sous le préfixe de l'API. */
 const COMPOSITION =
 	/^(halPersonUrl|halUrl|halCollectionUrl|rorFullUrl|crossrefMemberUrl|exportCsvUrl|relHref)\(/;
-const INTERNE = /^(pubsUrl|statsUrl)$/;
+const INTERNE = /^(pubsUrl|statsUrl|exportUrl)$/;
 /* `resolve` compose un chemin de l'application sous le préfixe de déploiement ; `loginUrl` y
  * ajoute la page de retour après connexion. */
 const ROUTE = /^(resolve|loginUrl)\(/;
