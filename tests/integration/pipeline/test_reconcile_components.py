@@ -103,23 +103,26 @@ class TestUniverse:
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
         dirty = _source_record(
-            conn, publication_a, source_id="a", external_ids={"hal_id": ["hal-1"]}
+            conn, publication_a, source_id="a", external_ids={"hal_id": ["hal-01000001"]}
         )
         neighbor = _source_record(
             conn,
             publication_b,
             source_id="b",
             marked=False,
-            external_ids={"hal_id": ["hal-1", "hal-2"]},
+            external_ids={"hal_id": ["hal-01000001", "hal-01000002"]},
         )
         assert _universe(conn) == {dirty, neighbor}
 
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
         """La clé HAL d'un enregistrement source est le premier identifiant qu'il liste : les suivants ne relient rien."""
         conn = sa_sync_conn
-        dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
+        dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-01000002"]})
         _source_record(
-            conn, source_id="b", marked=False, external_ids={"hal_id": ["hal-1", "hal-2"]}
+            conn,
+            source_id="b",
+            marked=False,
+            external_ids={"hal_id": ["hal-01000001", "hal-01000002"]},
         )
         assert _universe(conn) == {dirty}
 
@@ -332,11 +335,12 @@ class TestEndToEnd:
         conn = sa_sync_conn
         publication_a = _seed_publication(conn, doi="10.1/x")
         publication_b = _seed_publication(conn, doi="10.2/y")
+        hal_id = {"hal_id": ["hal-01000001"]}
         source_record_a = _source_record(
-            conn, publication_a, source_id="a", doi="10.1/x", external_ids={"hal_id": ["hal-1"]}
+            conn, publication_a, source_id="a", doi="10.1/x", external_ids=hal_id
         )
         source_record_b = _source_record(
-            conn, publication_b, source_id="b", doi="10.2/y", external_ids={"hal_id": ["hal-1"]}
+            conn, publication_b, source_id="b", doi="10.2/y", external_ids=hal_id
         )
 
         reconcile(conn, logger)
