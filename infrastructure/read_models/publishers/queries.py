@@ -1,10 +1,13 @@
 """Query services pour les éditeurs (table `publishers`)."""
 
+from collections.abc import Iterator
+
 from sqlalchemy import Connection, Row, text
 
 from domain.normalize import normalize_text
 from domain.publishers.publisher import PUBLISHER_TYPE_LABELS_FR, PUBLISHER_TYPES
 from infrastructure.read_models._common import FacetOption, YesNoCount
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
 from infrastructure.read_models.publishers.models import (
     DocTypeCount,
@@ -90,6 +93,11 @@ _PUBLISHER_COLUMNS = f"""
 """.strip()
 
 
+def _list_sql(where: str, sort: PublisherSort) -> str:
+    """Requête triée de la liste des éditeurs, sans pagination."""
+    return f"SELECT {_PUBLISHER_COLUMNS} FROM publishers p WHERE {where} ORDER BY {_SORT_MAP[sort]}"
+
+
 def _row_to_list_item(row: Row[tuple[object, ...]]) -> PublisherListItem:
     return PublisherListItem(**_row_to_publisher(row).model_dump())
 
@@ -124,16 +132,9 @@ class PublisherQueries:
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP[sort]
         offset = (page - 1) * per_page
         rows = self._conn.execute(
-            text(f"""
-                SELECT {_PUBLISHER_COLUMNS}
-                FROM publishers p
-                WHERE {where}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
+            text(f"{_list_sql(where, sort)} LIMIT :pg_limit OFFSET :pg_offset"),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
         return PublisherListResponse(
@@ -141,6 +142,33 @@ class PublisherQueries:
             page=page,
             per_page=per_page,
             publishers=[_row_to_list_item(r) for r in rows],
+        )
+
+    def export_publishers_csv(
+        self, *, filters: PublisherFilters, sort: PublisherSort
+    ) -> Iterator[str]:
+        """Export CSV de la liste des éditeurs, aux filtres et au tri de la liste.
+
+        La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
+        """
+        where, binds = _build_publisher_where(filters)
+        rows, truncated = fetch_export_rows(
+            self._conn, _list_sql(where, sort), binds, name="éditeurs"
+        )
+        return csv_chunks(
+            ["Nom", "Type", "Pays", "Préfixes DOI", "Publications en série", "Publications"],
+            (
+                [
+                    r.name,
+                    PUBLISHER_TYPE_LABELS_FR.get(r.publisher_type, r.publisher_type),
+                    (r.country or "").upper(),
+                    " ".join(p["prefix"] for p in r.doi_prefixes),
+                    r.serial_count,
+                    r.publication_count,
+                ]
+                for r in rows
+            ),
+            truncated=truncated,
         )
 
     def publishers_facets(self, *, filters: PublisherFilters) -> PublishersFacetsResponse:

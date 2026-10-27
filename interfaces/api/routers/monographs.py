@@ -1,9 +1,10 @@
 """Router des monographies : liste, facettes et fiche. Sert `/api/monographs/*`.
 
-Les chemins littéraux `/facets` et `/facets/entities` précèdent `/{monograph_id}`, qui l'accepterait sinon comme identifiant.
+Les chemins littéraux `/export.csv`, `/facets` et `/facets/entities` précèdent `/{monograph_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from domain.merge import MergedEntity
 from infrastructure.read_models._common import EntityFacetResponse
@@ -17,10 +18,12 @@ from infrastructure.read_models.monographs.models import (
     MonographSort,
 )
 from infrastructure.read_models.monographs.queries import MonographQueries
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, monograph_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_int_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/monographs", tags=["monographs"])
 
@@ -56,6 +59,22 @@ def list_monographs(
 ) -> MonographListResponse:
     """Liste paginée des monographies, avec leur éditeur, leur collection et le nombre de publications qu'elles contiennent."""
     return queries.list_monographs(filters=filters, sort=sort, page=page, per_page=per_page)
+
+
+@router.get("/export.csv")
+def export_monographs_csv(
+    sort: MonographSort = "publications_desc",
+    filters: MonographFilters = Depends(monograph_filters),
+    queries: MonographQueries = Depends(monograph_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV de la liste des monographies, aux filtres et au tri de la liste."""
+    return csv_response(
+        queries.export_monographs_csv(filters=filters, sort=sort),
+        filename="monographies.csv",
+        slot=slot,
+    )
 
 
 @router.get("/facets", response_model=MonographsFacetsResponse)

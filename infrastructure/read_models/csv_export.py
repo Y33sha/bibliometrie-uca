@@ -1,10 +1,13 @@
 """Écriture des exports CSV des listes : assainissement des cellules, plafond de lignes, rendu par blocs."""
 
 import csv
+import logging
 from collections.abc import Iterable, Iterator, Sequence
 from typing import cast
 
-from sqlalchemy import Row
+from sqlalchemy import Connection, Row, text
+
+logger = logging.getLogger(__name__)
 
 # Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui
 # commence par l'un d'eux est évaluée à l'ouverture du fichier — avec le contenu qu'une
@@ -100,6 +103,22 @@ def cap_export_rows(
     if len(rows) <= cap:
         return rows, False
     return rows[:cap], True
+
+
+def fetch_export_rows(
+    conn: Connection, sql: str, binds: dict[str, object], *, name: str
+) -> tuple[Sequence[Row[tuple[object, ...]]], bool]:
+    """Lignes d'un export, ramenées au plafond, et si la coupe a eu lieu.
+
+    `sql` est une requête triée, sans clause LIMIT. `name` désigne l'export dans l'avertissement journalisé lors d'une coupe.
+    """
+    rows = conn.execute(
+        text(f"{sql} LIMIT :export_limit"), {**binds, "export_limit": MAX_EXPORT_ROWS + 1}
+    ).all()
+    rows, truncated = cap_export_rows(rows, MAX_EXPORT_ROWS)
+    if truncated:
+        logger.warning("Export des %s tronqué au plafond de %d lignes", name, MAX_EXPORT_ROWS)
+    return rows, truncated
 
 
 def csv_chunks(

@@ -16,6 +16,8 @@
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Serial = components['schemas']['SerialListItem'];
@@ -77,6 +79,12 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
+	}
+
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
+		return withBase(`/api/serials/export.csv?${paramsToQuery(params)}`);
 	}
 
 	const serials = usePaginatedFetch<Serial>({
@@ -184,7 +192,7 @@
 	});
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher par titre ou ISSN" onsearch={onSearchInput} list={serials} one="publication en série" many="publications en série">
+<ListToolbar bind:search placeholder="Rechercher par titre ou ISSN" onsearch={onSearchInput} list={serials} one="publication en série" many="publications en série" exportUrl={exportCsvUrl()}>
 	{#snippet filters()}
 		{#if !publisherFixed}
 			<EntityFilter

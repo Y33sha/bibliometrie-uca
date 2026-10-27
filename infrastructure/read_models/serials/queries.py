@@ -1,6 +1,7 @@
 """Query services pour les revues (table `serials`)."""
 
 from collections import Counter, defaultdict
+from collections.abc import Iterator
 
 from sqlalchemy import Connection, Row, text
 
@@ -26,6 +27,7 @@ from infrastructure.read_models._common import (
     FacetOption,
     YesNoCount,
 )
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.doaj_links import resolve_doaj_url
 from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.filters import entity_subjects_sql, publication_in_perimeter
@@ -64,6 +66,17 @@ _SERIAL_DETAIL_COLUMNS = f"""
     {_SERIAL_LIST_COLUMNS},
     j.openalex_id, j.oa_model, j.is_academic
 """
+
+
+def _list_sql(where: str, sort: SerialSort) -> str:
+    """Requête triée de la liste des publications en série, sans pagination."""
+    return f"""
+        SELECT {_SERIAL_LIST_COLUMNS}
+        FROM serials j
+        LEFT JOIN publishers p ON p.id = j.publisher_id
+        WHERE {where}
+        ORDER BY {_SORT_MAP[sort]}
+    """
 
 
 def _serial_list_item(row: Row[tuple[object, ...]]) -> SerialListItem:
@@ -319,17 +332,9 @@ class SerialQueries:
         ).one()
         total = total_row.total
 
-        order = _SORT_MAP[sort]
         offset = (page - 1) * per_page
         rows = self._conn.execute(
-            text(f"""
-                SELECT {_SERIAL_LIST_COLUMNS}
-                FROM serials j
-                LEFT JOIN publishers p ON p.id = j.publisher_id
-                WHERE {where}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
+            text(f"{_list_sql(where, sort)} LIMIT :pg_limit OFFSET :pg_offset"),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
         return SerialListResponse(
@@ -337,6 +342,31 @@ class SerialQueries:
             page=page,
             per_page=per_page,
             serials=[_serial_list_item(r) for r in rows],
+        )
+
+    def export_serials_csv(self, *, filters: SerialFilters, sort: SerialSort) -> Iterator[str]:
+        """Export CSV de la liste des publications en série, aux filtres et au tri de la liste.
+
+        La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
+        """
+        where, binds = _build_serial_where(filters)
+        rows, truncated = fetch_export_rows(
+            self._conn, _list_sql(where, sort), binds, name="publications en série"
+        )
+        return csv_chunks(
+            ["Titre", "ISSN", "Éditeur", "Type", "DOAJ", "Publications"],
+            (
+                [
+                    r.title,
+                    " ".join(r.issns),
+                    r.publisher_name or "",
+                    SERIAL_TYPE_LABELS_FR.get(r.serial_type, "") if r.serial_type else "",
+                    "oui" if r.is_in_doaj else "",
+                    r.publication_count,
+                ]
+                for r in rows
+            ),
+            truncated=truncated,
         )
 
     def serials_facets(self, *, filters: SerialFilters) -> SerialsFacetsResponse:

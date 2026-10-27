@@ -14,6 +14,8 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Monograph = components['schemas']['MonographListItem'];
@@ -66,6 +68,12 @@
 		const q = search.trim();
 		if (q) params.set('search', q);
 		return params;
+	}
+
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
+		return withBase(`/api/monographs/export.csv?${paramsToQuery(params)}`);
 	}
 
 	const monographs = usePaginatedFetch<Monograph>({
@@ -148,7 +156,7 @@
 	});
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher par titre ou ISBN" onsearch={onSearchInput} list={monographs} one="monographie" many="monographies">
+<ListToolbar bind:search placeholder="Rechercher par titre ou ISBN" onsearch={onSearchInput} list={monographs} one="monographie" many="monographies" exportUrl={exportCsvUrl()}>
 	{#snippet filters()}
 		<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
 		<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />

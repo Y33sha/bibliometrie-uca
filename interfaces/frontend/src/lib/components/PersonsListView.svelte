@@ -13,6 +13,8 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 
 	type IdState = 'all' | 'yes' | 'no';
 
@@ -89,6 +91,14 @@
 		if (selectedRh.length === 1) params.set('has_rh', selectedRh[0]);
 		if (labId != null) params.set('lab_id', String(labId));
 		return params;
+	}
+
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		const q = search.trim();
+		if (q) params.set('search', q);
+		params.set('sort', currentSort);
+		return withBase(`/api/persons/export.csv?${paramsToQuery(params)}`);
 	}
 
 	const dir = usePaginatedFetch<PersonRow>({
@@ -230,7 +240,7 @@
 	});
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher par nom" onsearch={onSearchInput} list={dir} one="personne" many="personnes">
+<ListToolbar bind:search placeholder="Rechercher par nom" onsearch={onSearchInput} list={dir} one="personne" many="personnes" exportUrl={exportCsvUrl()}>
 	{#snippet filters()}
 		<PresenceFilterToggle
 			label="Identifiants"

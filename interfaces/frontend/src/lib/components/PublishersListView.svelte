@@ -16,6 +16,8 @@
 	import { crossrefMemberIds, crossrefMemberUrl } from '#lib/sources.svelte.js';
 	import { isAdmin } from '#lib/session.svelte.js';
 	import { nextSort, sortDirection } from '#lib/sort.js';
+	import { withBase } from '#lib/paths.js';
+	import { paramsToQuery } from '#lib/utils.js';
 	import type { components } from '#lib/api/schema.js';
 
 	type Publisher = components['schemas']['PublisherListItem'];
@@ -131,6 +133,14 @@
 		publishers.load();
 	}
 
+	function exportCsvUrl(): string {
+		const params = buildFilterParams();
+		params.set('sort', currentSort);
+		const q = search.trim();
+		if (q) params.set('search', q);
+		return withBase(`/api/publishers/export.csv?${paramsToQuery(params)}`);
+	}
+
 	function publisherTypeLabel(value: string | null): string {
 		if (!value) return '';
 		const opt = facets.options.publisherTypes.find((o) => o.value === value);
@@ -155,7 +165,7 @@
 	});
 </script>
 
-<ListToolbar bind:search placeholder="Rechercher dans les noms" onsearch={onSearchInput} list={publishers} one="éditeur" many="éditeurs">
+<ListToolbar bind:search placeholder="Rechercher dans les noms" onsearch={onSearchInput} list={publishers} one="éditeur" many="éditeurs" exportUrl={exportCsvUrl()}>
 	{#snippet filters()}
 		<FacetDropdown
 			label={filterLabels.types}

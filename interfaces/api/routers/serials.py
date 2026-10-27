@@ -1,11 +1,12 @@
 """Router des revues : listes, recherche, édition, fusion. Sert `/api/serials/*`.
 
-Les chemins littéraux — `/oa-models`, `/types`, `/facets` — précèdent `/{serial_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux — `/oa-models`, `/types`, `/facets`, `/export.csv` — précèdent `/{serial_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from application.ports.repositories.serial_repository import SerialUpdate
 from application.services.serials import SerialService
@@ -30,6 +31,7 @@ from infrastructure.read_models.serials.models import (
 )
 from infrastructure.read_models.serials.queries import SerialQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, serial_queries, serial_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_vocabulary_csv
@@ -43,6 +45,7 @@ from interfaces.api.models import (
     TotalCountResponse,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/serials", tags=["serials"])
 
@@ -128,6 +131,22 @@ def list_serials(
     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
     """
     return queries.list_serials(filters=filters, sort=sort, page=page, per_page=per_page)
+
+
+@router.get("/export.csv")
+def export_serials_csv(
+    sort: SerialSort = "title_asc",
+    filters: SerialFilters = Depends(serial_filters),
+    queries: SerialQueries = Depends(serial_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV de la liste des revues, aux filtres et au tri de la liste."""
+    return csv_response(
+        queries.export_serials_csv(filters=filters, sort=sort),
+        filename="publications-en-serie.csv",
+        slot=slot,
+    )
 
 
 # ── Files de triage ──────────────────────────────────────────────

@@ -1,7 +1,10 @@
 """Liste des personnes + autocomplete + lecture d'une personne (sync)."""
 
+from collections.abc import Iterator
+
 from sqlalchemy import Connection, Row, text
 
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import (
     WhereClause,
     assemble_where,
@@ -45,6 +48,39 @@ def _contribution_counts_sql(*, lab_scoped: bool) -> str:
         (SELECT COUNT(*) FROM contributions a
          WHERE a.person_id = p.id AND {has_author_role("a")} AND a.in_perimeter = TRUE{scope}
         ) AS in_perimeter_contribution_count
+    """
+
+
+def _person_where(filters: PersonFilters) -> tuple[str, dict[str, object]]:
+    """Clause WHERE de la liste des personnes, sur les alias `p` (`persons`) et `prh` (`hr_records`)."""
+    clauses: list[WhereClause | None] = [
+        person_search_clause(filters.search),
+        person_department_clause(filters.departments),
+        person_role_clause(filters.roles),
+        person_has_identifier_clause("orcid", filters.has_orcid),
+        person_has_identifier_clause("idhal", filters.has_idhal),
+        person_has_identifier_clause("idref", filters.has_idref),
+        person_has_rh_clause(filters.has_rh),
+        person_has_pending_name_forms_clause(filters.has_pending_forms),
+        person_has_pending_identifiers_clause(filters.has_pending_identifiers),
+        person_exclusion_clause(filters.exclusions),
+        person_active_clause(filters.active),
+        person_in_lab_clause(filters.lab_id),
+    ]
+    return assemble_where(clauses)
+
+
+def _list_sql(filters: PersonFilters, where_sql: str, sort: str) -> str:
+    """Requête triée de la liste des personnes, sans pagination."""
+    return f"""
+        SELECT p.id, p.last_name, p.first_name,
+            prh.role_title, prh.department_name, prh.start_date, prh.end_date,
+            (prh.id IS NOT NULL) AS has_rh, p.exclusion,
+            {_contribution_counts_sql(lab_scoped=filters.lab_id is not None)}
+        FROM persons p
+        LEFT JOIN hr_records prh ON prh.person_id = p.id
+        WHERE {where_sql}
+        ORDER BY {persons_sort_clause(sort)}
     """
 
 
@@ -106,23 +142,7 @@ class PersonListQueries:
         L'annuaire public et la liste d'administration sont deux appels de cette lecture : le premier écarte les personnes rejetées et se restreint à un laboratoire, le second garde tout et ajoute les filtres des files à confirmer.
         """
         offset = (page - 1) * per_page
-        clauses: list[WhereClause | None] = [
-            person_search_clause(filters.search),
-            person_department_clause(filters.departments),
-            person_role_clause(filters.roles),
-            person_has_identifier_clause("orcid", filters.has_orcid),
-            person_has_identifier_clause("idhal", filters.has_idhal),
-            person_has_identifier_clause("idref", filters.has_idref),
-            person_has_rh_clause(filters.has_rh),
-            person_has_pending_name_forms_clause(filters.has_pending_forms),
-            person_has_pending_identifiers_clause(filters.has_pending_identifiers),
-            person_exclusion_clause(filters.exclusions),
-            person_active_clause(filters.active),
-            person_in_lab_clause(filters.lab_id),
-        ]
-
-        where_sql, binds = assemble_where(clauses)
-        order = persons_sort_clause(sort)
+        where_sql, binds = _person_where(filters)
 
         count_row = self._conn.execute(
             text(
@@ -134,17 +154,7 @@ class PersonListQueries:
         total = count_row.total
 
         rows = self._conn.execute(
-            text(f"""
-                SELECT p.id, p.last_name, p.first_name,
-                    prh.role_title, prh.department_name, prh.start_date, prh.end_date,
-                    (prh.id IS NOT NULL) AS has_rh, p.exclusion,
-                    {_contribution_counts_sql(lab_scoped=filters.lab_id is not None)}
-                FROM persons p
-                LEFT JOIN hr_records prh ON prh.person_id = p.id
-                WHERE {where_sql}
-                ORDER BY {order}
-                LIMIT :pg_limit OFFSET :pg_offset
-            """),
+            text(f"{_list_sql(filters, where_sql, sort)} LIMIT :pg_limit OFFSET :pg_offset"),
             {**binds, "pg_limit": per_page, "pg_offset": offset},
         ).all()
         # Tous les identifiants de chaque personne, rejetés compris, avec leur type et leur statut : chaque vue filtre selon ses besoins.
@@ -152,6 +162,50 @@ class PersonListQueries:
         persons = [_person_out(r, by_person.get(r.id, [])) for r in rows]
 
         return PersonListResponse(total=total, page=page, per_page=per_page, persons=persons)
+
+    def export_persons_csv(self, *, filters: PersonFilters, sort: str) -> Iterator[str]:
+        """Export CSV de la liste des personnes, aux filtres et au tri de la liste.
+
+        Les identifiants exportés sont ceux de l'annuaire public : ORCID, idHAL et IdRef, sans les attributions rejetées. La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
+        """
+        where_sql, binds = _person_where(filters)
+        rows, truncated = fetch_export_rows(
+            self._conn, _list_sql(filters, where_sql, sort), binds, name="personnes"
+        )
+        by_person = person_identifiers(self._conn, [r.id for r in rows], public_only=True)
+
+        def values(person_id: int, id_type: str) -> str:
+            found = {i.id_value for i in by_person.get(person_id, []) if i.id_type == id_type}
+            return " ".join(sorted(found))
+
+        return csv_chunks(
+            [
+                "Nom",
+                "Prénom",
+                "RH",
+                "ORCID",
+                "idHAL",
+                "IdRef",
+                "Fonction",
+                "Département",
+                "Publications",
+            ],
+            (
+                [
+                    r.last_name,
+                    r.first_name,
+                    "oui" if r.has_rh else "",
+                    values(r.id, "orcid"),
+                    values(r.id, "idhal"),
+                    values(r.id, "idref"),
+                    r.role_title or "",
+                    r.department_name or "",
+                    r.contribution_count,
+                ]
+                for r in rows
+            ),
+            truncated=truncated,
+        )
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
         """Formes de nom d'une personne, avec leur état d'arbitrage.

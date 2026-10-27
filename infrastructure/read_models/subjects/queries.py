@@ -3,8 +3,11 @@
 Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subjects_queries.py`).
 """
 
+from collections.abc import Iterator
+
 from sqlalchemy import Connection, Row, text
 
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.subjects.models import (
     SubjectDetailResponse,
     SubjectListItem,
@@ -27,6 +30,16 @@ def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[
     return where, binds
 
 
+def _list_sql(where: str) -> str:
+    """Requête triée de la liste des sujets, sans pagination : les plus fréquents d'abord."""
+    return f"""
+        SELECT id, label, language, usage_count
+        FROM subjects
+        WHERE {where}
+        ORDER BY usage_count DESC, lower(label)
+    """
+
+
 def _subject_list_item(row: Row[tuple[object, ...]]) -> SubjectListItem:
     return SubjectListItem(
         id=row.id, label=row.label, language=row.language, usage_count=row.usage_count
@@ -44,13 +57,7 @@ class SubjectsQueries:
     ) -> SubjectListResponse:
         where, binds = _search_clause(search, min_usage_count)
         rows = self._conn.execute(
-            text(f"""
-                SELECT id, label, language, usage_count
-                FROM subjects
-                WHERE {where}
-                ORDER BY usage_count DESC, lower(label)
-                LIMIT :lim OFFSET :off
-            """),
+            text(f"{_list_sql(where)} LIMIT :lim OFFSET :off"),
             {**binds, "lim": per_page, "off": (page - 1) * per_page},
         ).all()
         items = [_subject_list_item(r) for r in rows]
@@ -63,6 +70,19 @@ class SubjectsQueries:
             .n
         )
         return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
+
+    def export_subjects_csv(self, *, search: str | None, min_usage_count: int) -> Iterator[str]:
+        """Export CSV de la liste des sujets, aux filtres et au tri de la liste.
+
+        La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
+        """
+        where, binds = _search_clause(search, min_usage_count)
+        rows, truncated = fetch_export_rows(self._conn, _list_sql(where), binds, name="sujets")
+        return csv_chunks(
+            ["Libellé", "Langue", "Occurrences"],
+            ([r.label, r.language or "", r.usage_count] for r in rows),
+            truncated=truncated,
+        )
 
     def get_subject_detail(
         self, subject_id: int, *, neighbors_limit: int, min_cooccurrence_count: int

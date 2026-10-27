@@ -10,7 +10,7 @@ from domain.dates import today
 from domain.publications.doc_types import DocType
 from domain.structures.ror import ROR_TYPE_LABELS_FR, RorType
 from infrastructure.read_models._common import DashboardOa, FacetOption, PublicationYearCount
-from infrastructure.read_models.csv_export import csv_chunks
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.filters import (
     OA_DASHBOARD_COLS_SQL,
     OWN_RORS_SQL,
@@ -307,16 +307,18 @@ class StructuresQueries:
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
         where, binds = _structure_where(filters)
-        rows = self._conn.execute(
-            text(f"""
+        rows, truncated = fetch_export_rows(
+            self._conn,
+            f"""
                 SELECT s.structure_type::text AS type, s.acronym, s.name,
                        {_TUTELLE_LABELS} AS tutelles, s.ror_id, s.hal_collection
                 FROM structures s
                 WHERE {where}
                 ORDER BY {_STRUCTURE_SORT[sort]}
-            """),
+            """,
             binds,
-        ).all()
+            name="structures",
+        )
         return csv_chunks(
             ["Type", "Acronyme", "Nom", "Tutelles", "ROR", "Collection HAL"],
             (
@@ -330,6 +332,7 @@ class StructuresQueries:
                 ]
                 for r in rows
             ),
+            truncated=truncated,
         )
 
     def get_structure_detail(self, structure_id: int) -> StructureDetailResponse | None:

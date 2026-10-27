@@ -1,10 +1,11 @@
 """Adapter de lecture des monographies : liste paginée et fiche d'une monographie."""
 
+from collections.abc import Iterator
 from typing import Literal
 
 from sqlalchemy import Connection, Row, text
 
-from domain.normalize import normalize_text
+from domain.normalize import normalize_text, to_plain_text
 from domain.publications.identifiers import isbn_search_prefix
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models._common import (
@@ -12,6 +13,7 @@ from infrastructure.read_models._common import (
     EntityFacetResponse,
     FacetOption,
 )
+from infrastructure.read_models.csv_export import csv_chunks, fetch_export_rows
 from infrastructure.read_models.entity_facet import entity_name_clause
 from infrastructure.read_models.monographs.models import (
     MONOGRAPH_KINDS,
@@ -77,6 +79,11 @@ def _where(
     return " AND ".join(parts) or "TRUE", binds
 
 
+def _list_sql(where: str, sort: MonographSort) -> str:
+    """Requête triée de la liste des monographies, sans pagination."""
+    return f"SELECT {_COLUMNS} {_FROM} WHERE {where} ORDER BY {_SORT_MAP[sort]}"  # noqa: S608
+
+
 def _item(row: Row[tuple[object, ...]]) -> MonographListItem:
     return MonographListItem.model_validate(row._mapping)
 
@@ -98,14 +105,39 @@ class MonographQueries:
             )
         )
         rows = self._conn.execute(
-            text(
-                f"SELECT {_COLUMNS} {_FROM} WHERE {where}"  # noqa: S608
-                f" ORDER BY {_SORT_MAP[sort]} LIMIT :limit OFFSET :offset"
-            ),
+            text(f"{_list_sql(where, sort)} LIMIT :limit OFFSET :offset"),
             {**binds, "limit": per_page, "offset": (page - 1) * per_page},
         ).all()
         return MonographListResponse(
             total=total, page=page, per_page=per_page, monographs=[_item(r) for r in rows]
+        )
+
+    def export_monographs_csv(
+        self, *, filters: MonographFilters, sort: MonographSort
+    ) -> Iterator[str]:
+        """Export CSV de la liste des monographies, aux filtres et au tri de la liste.
+
+        La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
+        """
+        where, binds = _where(filters)
+        rows, truncated = fetch_export_rows(
+            self._conn, _list_sql(where, sort), binds, name="monographies"
+        )
+        return csv_chunks(
+            ["Titre", "Type", "Année", "ISBN", "Éditeur", "Collection", "Publications"],
+            (
+                [
+                    to_plain_text(r.title),
+                    "Actes" if r.proceedings else "Livre",
+                    r.year or "",
+                    " ".join(i for i in (r.isbn, r.eisbn) if i),
+                    r.publisher_name or "",
+                    r.journal_title or "",
+                    r.publication_count,
+                ]
+                for r in rows
+            ),
+            truncated=truncated,
         )
 
     def monographs_facets(self, *, filters: MonographFilters) -> MonographsFacetsResponse:

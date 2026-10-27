@@ -2,10 +2,11 @@
 
 Les lectures passent par `PersonsQueries`, les écritures par le service `PersonService`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
 
-L'ordre de déclaration porte une contrainte : les chemins littéraux — `/search`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
+L'ordre de déclaration obéit à une contrainte : les chemins littéraux — `/search`, `/export.csv`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from application.services.persons import PersonService
 from domain.merge import MergedEntity
@@ -31,6 +32,7 @@ from infrastructure.read_models.persons.models import (
 )
 from infrastructure.read_models.persons.queries import PersonsQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, person_service, persons_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
@@ -58,6 +60,7 @@ from interfaces.api.params import (
     TextParam,
     TopSubjectsLimit,
 )
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/persons", tags=["persons"])
 
@@ -132,6 +135,22 @@ def list_persons(
     L'annuaire public et la liste de curation appellent tous deux cette lecture, avec des filtres différents.
     """
     return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
+
+
+@router.get("/export.csv")
+def export_persons_csv(
+    sort: PersonSort = Query("name_asc"),
+    filters: PersonFilters = Depends(person_filters),
+    queries: PersonsQueries = Depends(persons_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV de la liste des personnes, aux filtres et au tri de la liste."""
+    return csv_response(
+        queries.export_persons_csv(filters=filters, sort=sort),
+        filename="chercheurs.csv",
+        slot=slot,
+    )
 
 
 @router.get("/facets", response_model=PersonsFacetsResponse)

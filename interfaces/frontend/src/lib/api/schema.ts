@@ -1008,6 +1008,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Persons Csv
+         * @description Export CSV de la liste des personnes, aux filtres et au tri de la liste.
+         */
+        get: operations["export_persons_csv_api_persons_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/facets": {
         parameters: {
             query?: never;
@@ -1922,6 +1942,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publishers/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Publishers Csv
+         * @description Export CSV de la liste des éditeurs, aux filtres et au tri de la liste.
+         */
+        get: operations["export_publishers_csv_api_publishers_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publishers": {
         parameters: {
             query?: never;
@@ -2146,6 +2186,26 @@ export interface paths {
          *     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
          */
         get: operations["list_serials_api_serials_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/serials/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Serials Csv
+         * @description Export CSV de la liste des revues, aux filtres et au tri de la liste.
+         */
+        get: operations["export_serials_csv_api_serials_export_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2456,6 +2516,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/monographs/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Monographs Csv
+         * @description Export CSV de la liste des monographies, aux filtres et au tri de la liste.
+         */
+        get: operations["export_monographs_csv_api_monographs_export_csv_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/monographs/facets": {
         parameters: {
             query?: never;
@@ -2590,6 +2670,26 @@ export interface paths {
          * @description Liste paginée des sujets, les plus portés par des publications d'abord.
          */
         get: operations["list_subjects_api_subjects_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subjects/export.csv": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Subjects Csv
+         * @description Export CSV de la liste des sujets, aux filtres et au tri de la liste.
+         */
+        get: operations["export_subjects_csv_api_subjects_export_csv_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -7610,6 +7710,49 @@ export interface operations {
             };
         };
     };
+    export_persons_csv_api_persons_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "name_asc" | "name_desc" | "contributions_asc" | "contributions_desc" | "in_perimeter_contributions_asc" | "in_perimeter_contributions_desc" | "dept_asc" | "dept_desc" | "role_asc" | "role_desc";
+                search?: string;
+                department?: string;
+                role?: string;
+                has_orcid?: boolean | null;
+                has_idhal?: boolean | null;
+                has_idref?: boolean | null;
+                has_rh?: boolean | null;
+                has_pending_forms?: boolean | null;
+                has_pending_identifiers?: boolean | null;
+                exclusion?: string;
+                active?: boolean | null;
+                lab_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     persons_facets_api_persons_facets_get: {
         parameters: {
             query?: {
@@ -9002,6 +9145,41 @@ export interface operations {
             };
         };
     };
+    export_publishers_csv_api_publishers_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "name_asc" | "name_desc" | "serials_asc" | "serials_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                publisher_type?: string;
+                country?: string;
+                has_publications?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_publishers_api_publishers_get: {
         parameters: {
             query?: {
@@ -9353,6 +9531,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SerialListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_serials_csv_api_serials_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "title_asc" | "title_desc" | "publisher_asc" | "publisher_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                publisher_id?: number | null;
+                serial_type?: string;
+                is_in_doaj?: boolean | null;
+                oa_model?: string;
+                has_publications?: boolean | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
@@ -9764,6 +9979,42 @@ export interface operations {
             };
         };
     };
+    export_monographs_csv_api_monographs_export_csv_get: {
+        parameters: {
+            query?: {
+                sort?: "title_asc" | "title_desc" | "year_asc" | "year_desc" | "publications_asc" | "publications_desc";
+                search?: string;
+                type?: string;
+                year?: string;
+                publisher_id?: number | null;
+                serial_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     monographs_facets_api_monographs_facets_get: {
         parameters: {
             query?: {
@@ -9973,6 +10224,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SubjectListResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_subjects_csv_api_subjects_export_csv_get: {
+        parameters: {
+            query?: {
+                /** @description Recherche sur le libellé, insensible à la casse et aux accents */
+                search?: string | null;
+                /** @description Nombre minimal de publications portant le sujet */
+                min_count?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

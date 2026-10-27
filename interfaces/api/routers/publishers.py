@@ -1,9 +1,10 @@
 """Router des éditeurs : listes, recherche, édition, fusion. Sert `/api/publishers/*`.
 
-Les chemins littéraux — `/types`, `/facets` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux — `/types`, `/facets`, `/export.csv` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from application.ports.repositories.publisher_repository import PublisherUpdate
 from application.services.publishers import PublisherService
@@ -19,6 +20,7 @@ from infrastructure.read_models.publishers.models import (
 )
 from infrastructure.read_models.publishers.queries import PublisherQueries
 from infrastructure.read_models.subjects.models import SubjectFrequency
+from interfaces.api.csv_export import csv_response
 from interfaces.api.deps import entity_detail, publisher_queries, publisher_service
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import parse_str_csv, parse_vocabulary_csv
@@ -30,6 +32,7 @@ from interfaces.api.models import (
     PublisherMergeBlockedResponse,
 )
 from interfaces.api.params import TOP_SUBJECTS_LIMIT, SearchTerm, TopSubjectsLimit
+from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
 
 router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 
@@ -73,6 +76,22 @@ def publishers_facets(
     Convention partagée avec `/api/serials/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
     """
     return queries.publishers_facets(filters=filters)
+
+
+@router.get("/export.csv")
+def export_publishers_csv(
+    sort: PublisherSort = "name_asc",
+    filters: PublisherFilters = Depends(publisher_filters),
+    queries: PublisherQueries = Depends(publisher_queries),
+    _rate_limit: None = Depends(export_rate_limit),
+    slot: ExportSlot = Depends(export_slot),
+) -> StreamingResponse:
+    """Export CSV de la liste des éditeurs, aux filtres et au tri de la liste."""
+    return csv_response(
+        queries.export_publishers_csv(filters=filters, sort=sort),
+        filename="editeurs.csv",
+        slot=slot,
+    )
 
 
 @router.get("", response_model=PublisherListResponse)

@@ -4,6 +4,8 @@
   import { onMount } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
+  import { withBase } from "#lib/paths.js";
+  import { paramsToQuery } from "#lib/utils.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import type { components } from "#lib/api/schema.js";
@@ -14,19 +16,23 @@
   let minCount = $state(3);
   let searchTimer: ReturnType<typeof setTimeout> | undefined;
 
+  function buildFilterParams(): URLSearchParams {
+    const params = new URLSearchParams();
+    const q = search.trim();
+    if (q) params.set("search", q);
+    params.set("min_count", String(minCount));
+    return params;
+  }
+
   const list = usePaginatedFetch<SubjectListItem>({
     endpoint: "/api/subjects",
     itemsKey: "items",
     apiKey: "subjects",
     pageParam: null,
-    buildParams() {
-      const params = new URLSearchParams();
-      const q = search.trim();
-      if (q) params.set("search", q);
-      params.set("min_count", String(minCount));
-      return params;
-    },
+    buildParams: buildFilterParams,
   });
+
+  const exportUrl = $derived(withBase(`/api/subjects/export.csv?${paramsToQuery(buildFilterParams())}`));
 
   function onSearchInput() {
     if (searchTimer) clearTimeout(searchTimer);
@@ -48,7 +54,7 @@
 
 <PageHeader title="Sujets" hidden />
 
-<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets">
+<ListToolbar bind:search placeholder="Rechercher dans les libellés" onsearch={onSearchInput} {list} one="sujet" many="sujets" {exportUrl}>
   {#snippet filters()}
     <label class="min-count">
       Occurrences minimales
