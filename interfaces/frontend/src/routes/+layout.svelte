@@ -331,6 +331,12 @@
     letter-spacing: 1px;
     text-transform: uppercase;
   }
+  /* Une rubrique qui suit des entrées en est séparée par un filet. */
+  .nav-dropdown-group:not(:first-child) {
+    margin-top: 6px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
   .nav-dropdown-action {
     display: block;
     width: 100%;

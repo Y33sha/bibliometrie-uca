@@ -247,7 +247,7 @@
   onMount(load);
 </script>
 
-<PageHeader title="Configuration">Les modifications prennent effet au prochain lancement du pipeline.</PageHeader>
+<PageHeader title="Configuration" />
 
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
