@@ -204,7 +204,7 @@
 </div>
 
 <div class="batch-bar">
-	<select bind:value={batchCountry}>
+	<select class="select" aria-label="Pays à ajouter" bind:value={batchCountry}>
 		<option value="">— Choisir un pays à ajouter —</option>
 		{#each countries as c}
 			<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
@@ -230,7 +230,7 @@
 		<tr>
 			<th style="width:30px"><input type="checkbox" checked={allSelected} onchange={toggleAll} /></th>
 			<th style="width:55%">{columnLabels.address}</th>
-			<th style="width:50px">{columnLabels.publications}</th>
+			<th style="width:110px">{columnLabels.publications}</th>
 			<th>{columnLabels.country}</th>
 		</tr>
 	</thead>
@@ -256,8 +256,8 @@
 								<span class="proposal-methods">{methodsLabel(p.methods)}</span>
 							</button>
 						{/each}
-						<select class="add-country" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
-							<option value="">+</option>
+						<select class="select add-country" aria-label="Ajouter un pays" onchange={(e) => { const v = (e.target as HTMLSelectElement).value; if (v) { addCountry(a.id, v); (e.target as HTMLSelectElement).value = ''; } }}>
+							<option value="">+ Pays</option>
 							{#each countries as c}
 								<option value={c.code}>{c.name} ({c.code.toUpperCase()})</option>
 							{/each}
@@ -282,7 +282,6 @@
 		padding: 8px 12px; margin-bottom: 10px;
 		background: var(--accent-light); border-radius: var(--radius); font-size: 0.9rem;
 	}
-	.batch-bar select { padding: 5px 8px; font-size: 0.85rem; border: 1px solid var(--border); border-radius: var(--radius); }
 	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
 	.proposal-tag {
 		display: inline-flex; align-items: center; gap: 4px;
@@ -308,8 +307,5 @@
 		color: var(--muted); font-size: 0.8rem; padding: 0 1px; line-height: 1;
 	}
 	.tag-remove:hover { color: var(--danger); }
-	.add-country {
-		padding: 2px 4px; border: 1px solid var(--border); border-radius: var(--radius);
-		font-size: 0.75rem; width: 32px; color: var(--muted); cursor: pointer;
-	}
+	.add-country { width: 7rem; height: 26px; font-size: 0.8rem; color: var(--muted); }
 </style>

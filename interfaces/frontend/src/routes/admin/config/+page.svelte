@@ -364,7 +364,7 @@
           <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
         </span>
         <select
-          class="config-select"
+          class="select"
           aria-label="Périmètre : {role.label}"
           value={item.value}
           onchange={async (e) => {
@@ -567,13 +567,6 @@
   }
   .picker-item:hover {
     background: var(--accent-light);
-  }
-  .config-select {
-    padding: 3px 6px;
-    font-size: 0.9rem;
-    font-family: inherit;
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
   }
   /* Libellé de phase : le pointillé + le curseur d'aide signalent l'infobulle de description. */
   .role-phase {

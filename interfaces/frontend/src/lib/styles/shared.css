@@ -180,6 +180,23 @@
 	background-color: var(--hover);
 }
 
+/* Menu déroulant natif hors barre d'outils : champ bordé, flèche dessinée. */
+.select {
+	appearance: none;
+	height: 32px;
+	padding: 0 28px 0 10px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
+	font: inherit;
+	font-size: 0.9rem;
+	color: var(--text);
+	cursor: pointer;
+}
+.select:hover {
+	border-color: var(--accent);
+}
+
 /* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
 .toolbar .btn:not(.btn-sm) {
 	padding: 6px 10px;
@@ -1287,19 +1304,7 @@ a.badge-doaj:hover {
 	border-color: color-mix(in srgb, var(--accent), black 20%);
 }
 
-/* Boutons outline (petits boutons icône ✕ ✓) */
-.btn-danger-outline {
-	background: var(--card);
-	color: var(--danger);
-	border-color: var(--danger);
-}
-
-.btn-danger-outline:hover {
-	background: var(--danger);
-	color: white;
-	border-color: var(--danger);
-}
-
+/* Bouton de validation bordé de vert, rempli au survol. */
 .btn-confirm-outline {
 	background: var(--card);
 	color: var(--success);
@@ -1557,7 +1562,6 @@ button.status-chip {
 button.status-chip:hover {
 	filter: brightness(0.97);
 }
-/* Bouton icône carré ; compose avec .btn + une variante outline (.btn-confirm-outline / .btn-danger-outline). */
 /* Bouton d'ajout discret (« + Ajouter ») : texte en couleur d'accent, fond au survol. */
 .btn-add {
 	height: 28px;
@@ -1598,6 +1602,10 @@ button.status-chip:hover {
 .icon-btn-danger:hover:not(:disabled) {
 	background: var(--danger-light);
 	color: var(--danger);
+}
+.icon-btn-success:hover:not(:disabled) {
+	background: var(--success-light);
+	color: var(--success);
 }
 .icon-btn:disabled {
 	opacity: 0.4;

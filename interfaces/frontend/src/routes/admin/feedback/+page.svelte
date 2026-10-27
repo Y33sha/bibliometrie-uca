@@ -281,7 +281,7 @@
 
   <!-- Toolbar -->
   <div class="toolbar">
-    <select class="structure-filter" value={currentStructureId ?? ""} onchange={onStructureChange}>
+    <select aria-label="Structure" value={currentStructureId ?? ""} onchange={onStructureChange}>
       {#each structureGroups as [type, group] (type)}
         <optgroup label={structureGroupLabel(type)}>
           {#each group as s (s.id)}
@@ -388,16 +388,6 @@
   /* Toolbar */
   .toolbar {
     margin-bottom: 16px;
-  }
-  .structure-filter {
-    padding: 6px 10px;
-    border: 1px solid var(--accent);
-    border-radius: var(--radius);
-    font-size: 0.95rem;
-    font-weight: 600;
-    color: var(--accent);
-    background: var(--card);
-    font-family: inherit;
   }
 
   .toolbar-sep {

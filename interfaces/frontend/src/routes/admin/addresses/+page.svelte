@@ -2,6 +2,7 @@
 	import { institution, loadInstitution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -409,9 +410,10 @@
 <div class="page-addresses">
 	<!-- Structure selection + feedback button -->
 	<div class="structure-bar">
-		<span class="structure-label">Structure :</span>
+		<span class="structure-label" id="structure-label">Structure&nbsp;:</span>
 		<select
-			class="structure-filter"
+			class="select"
+			aria-labelledby="structure-label"
 			value={currentStructureId ?? ''}
 			onchange={onStructureChange}
 		>
@@ -444,6 +446,7 @@
 			<label class="scope-field">
 				Détection
 				<select
+					class="select"
 					value={currentDetected}
 					onchange={(e) => { currentDetected = (e.target as HTMLSelectElement).value; onFilterChange(); }}
 				>
@@ -455,6 +458,7 @@
 			<label class="scope-field">
 				Validation
 				<select
+					class="select"
 					value={currentValidation}
 					onchange={(e) => { currentValidation = (e.target as HTMLSelectElement).value; onFilterChange(); }}
 				>
@@ -471,7 +475,7 @@
 		{#each textPredicates as tp, i (i)}
 			<div class="filters-row predicate-row">
 				<span class="pred-type">Texte</span>
-				<select value={tp.mode} onchange={(e) => setTextMode(i, (e.target as HTMLSelectElement).value)}>
+				<select class="select" aria-label="Condition sur le texte" value={tp.mode} onchange={(e) => setTextMode(i, (e.target as HTMLSelectElement).value)}>
 					<option value="contains">contient</option>
 					<option value="not_contains">ne contient pas</option>
 				</select>
@@ -485,7 +489,7 @@
 					onkeydown={(e) => { if (e.key === 'Escape') { onTextTermInput(i, ''); } }}
 					oninput={(e) => onTextTermInput(i, (e.target as HTMLInputElement).value)}
 				/>
-				<button class="pred-remove" title="Retirer ce filtre" onclick={() => removeTextPredicate(i)}>&#x2717;</button>
+				<IconButton icon="reject" label="Retirer ce filtre" onclick={() => removeTextPredicate(i)} />
 			</div>
 		{/each}
 
@@ -493,7 +497,7 @@
 		{#each structurePredicates as sp, i (i)}
 			<div class="filters-row predicate-row">
 				<span class="pred-type">Structure</span>
-				<select value={sp.operator} onchange={(e) => setStructureOperator(i, (e.target as HTMLSelectElement).value)}>
+				<select class="select" aria-label="Condition sur les structures" value={sp.operator} onchange={(e) => setStructureOperator(i, (e.target as HTMLSelectElement).value)}>
 					<option value="recognized">reconnue comme l'une de</option>
 					<option value="not_recognized">non reconnue comme aucune de</option>
 				</select>
@@ -505,7 +509,8 @@
 						</span>
 					{/each}
 					<select
-						class="struct-add"
+						class="select"
+						aria-label="Ajouter une structure"
 						value=""
 						onchange={(e) => {
 							const el = e.target as HTMLSelectElement;
@@ -523,7 +528,7 @@
 						{/each}
 					</select>
 				</div>
-				<button class="pred-remove" title="Retirer cette ligne" onclick={() => removeStructurePredicate(i)}>&#x2717;</button>
+				<IconButton icon="reject" label="Retirer ce filtre" onclick={() => removeStructurePredicate(i)} />
 			</div>
 		{/each}
 
@@ -539,9 +544,9 @@
 		<div class="batch-bar">
 			<span>{selectedCount} sélectionnée{selectedCount > 1 ? 's' : ''}</span>
 			<div class="batch-actions">
-				<button onclick={() => batchReview(false)}>&#x2717; Rejeter</button>
-				<button onclick={() => batchReview(true)}>&#x2713; Relier</button>
-				<button onclick={() => batchReview(null)}>&#x21BA; Reset</button>
+				<button onclick={() => batchReview(false)}>Rejeter</button>
+				<button onclick={() => batchReview(true)}>Relier</button>
+				<button onclick={() => batchReview(null)}>Réinitialiser</button>
 				<button onclick={clearSelection}>Annuler</button>
 			</div>
 		</div>
@@ -589,13 +594,13 @@
 						</button>
 						<div class="addr-actions" role="group" aria-label="Lien de l'adresse à la structure">
 							{#if addr.is_confirmed !== false}
-								<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
+								<IconButton icon="reject" label="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)} />
 							{/if}
 							{#if addr.is_confirmed !== true}
-								<button class="btn btn-sm btn-confirm-outline" title="Relier à la structure" onclick={() => reviewAddr(addr.id, true)}>&#x2713;</button>
+								<IconButton icon="confirm" label="Relier à la structure" onclick={() => reviewAddr(addr.id, true)} />
 							{/if}
 							{#if addr.is_confirmed !== null}
-								<button class="btn btn-sm btn-reset" title="Reset" onclick={() => reviewAddr(addr.id, null)}>&#x21BA;</button>
+								<IconButton icon="reset" label="Réinitialiser" onclick={() => reviewAddr(addr.id, null)} />
 							{/if}
 						</div>
 					</div>
@@ -691,17 +696,6 @@
 		color: var(--success);
 	}
 
-	.structure-filter {
-		padding: 6px 10px;
-		border: 1px solid var(--accent);
-		border-radius: var(--radius);
-		font-size: 0.95rem;
-		font-family: inherit;
-		background: var(--card);
-		font-weight: 600;
-		color: var(--accent);
-	}
-
 	/* Filtres composables */
 	.filters-zone {
 		border: 1px solid var(--border);
@@ -712,14 +706,6 @@
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
-	}
-	.filters-zone select {
-		padding: 6px 10px;
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		font-size: 0.95rem;
-		font-family: inherit;
-		background: var(--card);
 	}
 	.filters-row {
 		display: flex;
@@ -787,22 +773,6 @@
 		line-height: 1;
 	}
 	.struct-chip button:hover {
-		color: var(--danger);
-	}
-	.struct-add {
-		font-size: 0.85rem;
-	}
-	.pred-remove {
-		border: 1px solid var(--border);
-		background: var(--card);
-		color: var(--muted);
-		border-radius: var(--radius);
-		cursor: pointer;
-		padding: 2px 7px;
-		line-height: 1;
-	}
-	.pred-remove:hover {
-		border-color: var(--danger);
 		color: var(--danger);
 	}
 	.add-row {
@@ -953,15 +923,6 @@
 	}
 	.publication-meta-inline a {
 		margin-left: 6px;
-	}
-
-	/* Buttons (page-specific) */
-	.btn-reset {
-		color: var(--muted);
-	}
-	.btn-reset:hover {
-		background: var(--hover);
-		border-color: var(--muted);
 	}
 
 	/* Batch bar */
