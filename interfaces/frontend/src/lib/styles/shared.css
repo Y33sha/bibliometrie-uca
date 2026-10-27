@@ -1407,6 +1407,24 @@ button.entity-link {
 .detail-label {
 	margin: 0 0 9px;
 }
+/* Section en ligne : le titre dans une colonne de largeur fixe, le contenu à sa droite. Les contenus de sections voisines s'alignent. Sur écran étroit, le titre repasse au-dessus. */
+.detail-section.detail-row {
+	display: grid;
+	grid-template-columns: 13rem minmax(0, 1fr);
+	align-items: baseline;
+	column-gap: 16px;
+}
+.detail-row .detail-label {
+	margin: 0;
+}
+@media (max-width: 600px) {
+	.detail-section.detail-row {
+		grid-template-columns: minmax(0, 1fr);
+	}
+	.detail-row .detail-label {
+		margin-bottom: 9px;
+	}
+}
 .detail-tags {
 	display: flex;
 	flex-wrap: wrap;

@@ -13,7 +13,7 @@
 </script>
 
 {#if structureIds.length > 0}
-  <div class="detail-section">
+  <div class="detail-section detail-row">
     <SectionLabel icon="building" text="Structures liées" />
     <div class="detail-tags">
       {#each structureIds as sid (sid)}

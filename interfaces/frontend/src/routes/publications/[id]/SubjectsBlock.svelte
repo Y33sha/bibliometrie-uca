@@ -15,29 +15,29 @@
   }
 </script>
 
-{#if subjects.length > 0 || keywords.length > 0}
+{#if subjects.length > 0}
   <div class="detail-section">
     <SectionLabel icon="tag" text="Sujets" />
-    {#if subjects.length > 0}
-      <div class="detail-tags">
-        {#each subjects as s (s.id)}
-          <a href={resolve(`subjects/${s.id}`)} title={tooltip(s)}>{s.label}</a>
-        {/each}
-      </div>
-    {/if}
-    {#if keywords.length > 0}
-      <div class="detail-sublabel">Mots-clés libres</div>
-      <div class="detail-tags">
-        {#each shownKeywords as kw (kw)}
-          <span class="detail-tag free-keyword">{kw}</span>
-        {/each}
-        {#if keywords.length > KEYWORD_CAP}
-          <button type="button" class="btn-add" onclick={() => (showAllKeywords = !showAllKeywords)}>
-            {showAllKeywords ? "Réduire" : `Voir les ${keywords.length} mots-clés`}
-          </button>
-        {/if}
-      </div>
-    {/if}
+    <div class="detail-tags">
+      {#each subjects as s (s.id)}
+        <a href={resolve(`subjects/${s.id}`)} title={tooltip(s)}>{s.label}</a>
+      {/each}
+    </div>
+  </div>
+{/if}
+{#if keywords.length > 0}
+  <div class="detail-section">
+    <SectionLabel icon="tag" text="Mots-clés libres" />
+    <div class="detail-tags">
+      {#each shownKeywords as kw (kw)}
+        <span class="detail-tag free-keyword">{kw}</span>
+      {/each}
+      {#if keywords.length > KEYWORD_CAP}
+        <button type="button" class="btn-add" onclick={() => (showAllKeywords = !showAllKeywords)}>
+          {showAllKeywords ? "Réduire" : `Voir les ${keywords.length} mots-clés`}
+        </button>
+      {/if}
+    </div>
   </div>
 {/if}
 

@@ -82,8 +82,11 @@
 	a.access-btn.compact:hover {
 		background: color-mix(in srgb, var(--accent-mid) 35%, white);
 	}
+	/* Sans lien d'accès : un état, écrit en texte avec son icône, et non un bouton. */
 	.access-unavailable {
-		background: var(--border);
+		justify-content: flex-start;
+		height: auto;
+		background: none;
 		color: var(--text-secondary);
 		font-weight: 600;
 		cursor: default;
