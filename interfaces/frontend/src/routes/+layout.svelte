@@ -187,9 +187,17 @@
     width: auto;
     margin-right: 10px;
   }
+  /* Couleurs de la barre en variables : la session admin les redéfinit (barre claire, repère du mode d'administration). */
   .site-header {
-    background: var(--nav-public);
-    color: white;
+    --nav-bg: var(--nav-public);
+    --nav-menu-bg: var(--nav-public-menu);
+    --nav-fg: white;
+    --nav-fg-soft: rgba(255, 255, 255, 0.85);
+    --nav-hover: rgba(255, 255, 255, 0.1);
+    --nav-active: rgba(255, 255, 255, 0.14);
+    --nav-rule: rgba(255, 255, 255, 0.15);
+    background: var(--nav-bg);
+    color: var(--nav-fg);
     padding: 0 24px;
     display: flex;
     align-items: center;
@@ -201,10 +209,14 @@
     z-index: 300;
   }
   .site-header.admin {
-    background: var(--nav-admin);
-  }
-  .site-header.admin .nav-dropdown-menu {
-    background: var(--nav-admin-menu);
+    --nav-bg: var(--nav-admin);
+    --nav-menu-bg: var(--nav-admin-menu);
+    --nav-fg: var(--accent);
+    --nav-fg-soft: var(--accent);
+    --nav-hover: color-mix(in srgb, var(--accent) 8%, transparent);
+    --nav-active: color-mix(in srgb, var(--accent) 14%, transparent);
+    --nav-rule: color-mix(in srgb, var(--accent) 20%, transparent);
+    box-shadow: inset 0 -1px 0 var(--nav-rule);
   }
   .nav-toggle {
     display: none;
@@ -233,7 +245,7 @@
   /* Rubrique : pastille arrondie, fond plus clair pour la rubrique active. */
   .nav-link {
     white-space: nowrap;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--nav-fg-soft);
     text-decoration: none;
     font-size: 0.92rem;
     font-weight: 500;
@@ -249,8 +261,8 @@
     transition: background 0.15s, color 0.15s;
   }
   .nav-link:hover {
-    color: white;
-    background: rgba(255, 255, 255, 0.1);
+    color: var(--nav-fg);
+    background: var(--nav-hover);
   }
   .nav-icon {
     display: inline-flex;
@@ -259,16 +271,16 @@
   }
   .nav-link.active,
   .nav-dropdown.active > .nav-link {
-    color: white;
-    background: rgba(255, 255, 255, 0.14);
+    color: var(--nav-fg);
+    background: var(--nav-active);
   }
   .nav-switch-link {
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--nav-fg-soft);
     font-size: 0.85rem;
     margin-left: 12px;
   }
   .nav-switch-link:hover {
-    color: white;
+    color: var(--nav-fg);
   }
   .nav-dropdown {
     position: relative;
@@ -296,7 +308,7 @@
     top: 100%;
     left: 0;
     padding: 4px 0;
-    background: var(--nav-public-menu);
+    background: var(--nav-menu-bg);
     border-radius: 0 0 var(--radius) var(--radius);
     min-width: 170px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
@@ -306,16 +318,16 @@
     display: block;
     white-space: nowrap;
     padding: 8px 16px;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--nav-fg-soft);
     text-decoration: none;
     font-size: 0.92rem;
   }
   .nav-dropdown-menu a:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    background: var(--nav-hover);
+    color: var(--nav-fg);
   }
   .nav-dropdown-menu a.active {
-    color: white;
+    color: var(--nav-fg);
     font-weight: 600;
   }
   .nav-dropdown-menu-right {
@@ -325,7 +337,7 @@
   .nav-dropdown-group {
     display: block;
     padding: 8px 16px 2px;
-    color: rgba(255, 255, 255, 0.8);
+    color: var(--nav-fg-soft);
     font-size: 0.72rem;
     font-weight: 600;
     letter-spacing: 1px;
@@ -335,7 +347,7 @@
   .nav-dropdown-group:not(:first-child) {
     margin-top: 6px;
     padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.15);
+    border-top: 1px solid var(--nav-rule);
   }
   .nav-dropdown-action {
     display: block;
@@ -343,15 +355,15 @@
     padding: 8px 16px;
     border: none;
     background: none;
-    color: rgba(255, 255, 255, 0.85);
+    color: var(--nav-fg-soft);
     font-family: inherit;
     font-size: 0.92rem;
     text-align: left;
     cursor: pointer;
   }
   .nav-dropdown-action:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    background: var(--nav-hover);
+    color: var(--nav-fg);
   }
 
   .container {
@@ -406,12 +418,9 @@
       align-items: stretch;
       height: auto;
       padding: 4px 0;
-      background: var(--nav-public);
+      background: var(--nav-bg);
       box-shadow: 0 6px 14px rgba(0, 0, 0, 0.25);
       z-index: 200;
-    }
-    .site-header.admin .site-nav {
-      background: var(--nav-admin);
     }
     .site-nav.open {
       display: flex;
@@ -447,7 +456,7 @@
     }
     .nav-switch-link {
       margin-left: 0;
-      border-top: 1px solid rgba(255, 255, 255, 0.15);
+      border-top: 1px solid var(--nav-rule);
     }
   }
 </style>

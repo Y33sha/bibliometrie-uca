@@ -29,7 +29,7 @@ Audit du 2026-10-26 : parcours Playwright en 1440, 800 et 390 px de large, audit
 - Dashboards : « Types de publications » (éditeur) ou « Types de documents » (publication en série) ; « Sujets dominants » ou « Sujets principaux ».
 - Trois noms pour une page Problèmes HAL : menu « Doublons auteurs », H1 « Doublons d'auteurs HAL », titre du navigateur « Doublons comptes HAL ». De même, menu « Affiliations suspectes » et H1 « Conflits d'affiliations HAL ».
 - Abréviations au menu : « Doublons publis », « Manques collections ».
-- Titres du navigateur « Structures » et « Personnes », menu « Labos » et « Chercheurs » (voir [Administration et navigation](UI_administration-et-navigation.md), question « Vocabulaire des listes »).
+- Titres du navigateur « Structures » et « Personnes », menu « Labos » et « Chercheurs » (voir [Administration et navigation](2026-10-27_UI_administration-et-navigation.md), question « Vocabulaire des listes »).
 - Anneau des collaborations : « Domestique » pour « National ».
 
 **Composants.**

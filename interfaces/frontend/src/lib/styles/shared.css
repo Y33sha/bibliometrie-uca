@@ -30,8 +30,8 @@
 	/* Barre de navigation */
 	--nav-public: #246868;
 	--nav-public-menu: #1d5a5a; /* sous-menus déroulants */
-	--nav-admin: #1f5f5f;
-	--nav-admin-menu: #2a6c6c;
+	--nav-admin: #e6f2f2;       /* session admin : barre claire, texte en --accent */
+	--nav-admin-menu: #ffffff;
 
 	/* États */
 	--success: #25734a;        /* contraste de 4,5:1 au moins en texte sur --success-light */
@@ -467,6 +467,10 @@
 
 .data-table tbody tr:hover td {
 	background: var(--surface-hover);
+}
+/* Ligne dont le volet est ouvert. */
+.data-table tr.active-row td {
+	background: var(--accent-light);
 }
 
 /* Icônes d'action d'une ligne (modifier, supprimer, exclure, ouvrir le volet) : estompées au repos, en pleine couleur au survol de la ligne ou au focus clavier, sur les écrans à pointeur. Les boutons à libellé restent lisibles. */

@@ -93,7 +93,7 @@ Permet d'affiner la liste des formes de nom par structure, pour améliorer progr
 
 ![Affiliations des adresses](../../img/screenshots/admin_addresses.png)
 
-- Contrôle qualité: visualiser les divergences entre détection automatisée et contrôle manuel => permet de repérer les formes de nom non détectées (à ajouter dans l'onglet « Gestion » de la structure) ou trop permissives (à supprimer, ou ajouter contexte plus contraignant).
+- Contrôle qualité: visualiser les divergences entre détection automatisée et contrôle manuel => permet de repérer les formes de nom non détectées (à ajouter dans le volet de la structure) ou trop permissives (à supprimer, ou ajouter contexte plus contraignant).
 
 ![Qualité de la détection](../../img/screenshots/admin_feedback.png)
 

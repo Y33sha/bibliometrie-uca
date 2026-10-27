@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bAFCqnO8EqiN3V070440VwNl5gVXQfKPwfhEvbi5XEDXvjBb6AZRZT9L2eaTyzq
+\restrict hFFRcR1YaID4fXS71HwzxbyHS8W27GKrjKptYCb5KW40px0CWb3frOvKcA0U386
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -992,7 +992,7 @@ CREATE TABLE publications.aligned_source_contributions (
 -- Name: TABLE aligned_source_contributions; Type: COMMENT; Schema: publications; Owner: -
 --
 
-COMMENT ON TABLE publications.aligned_source_contributions IS 'Appartenance d''une contribution source à son groupe. method : origine du lien. score et margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité de l''affectation.';
+COMMENT ON TABLE publications.aligned_source_contributions IS 'Appartenance d''une contribution source à sa contribution. method : origine du lien. score et margin, en bits, pour method = model : poids de Fellegi-Sunter du lien, et écart à la meilleure autre possibilité de l''affectation.';
 
 
 --
@@ -1018,7 +1018,7 @@ WITH (fillfactor='90');
 -- Name: TABLE contributions; Type: COMMENT; Schema: publications; Owner: -
 --
 
-COMMENT ON TABLE publications.contributions IS 'Contributions sources d''un même auteur dans une publication, avec au maximum une contribution source par enregistrement source. reference_position : position dans la liste la plus longue. Une personne correspond au maximum à un groupe par publication.';
+COMMENT ON TABLE publications.contributions IS 'Contributions sources d''un même auteur dans une publication, avec au maximum une contribution source par enregistrement source. reference_position : position dans la liste la plus longue. Une personne a au maximum une contribution par publication.';
 
 
 --
@@ -1499,6 +1499,61 @@ CREATE SEQUENCE publications.contributions_id_seq
 --
 
 ALTER SEQUENCE publications.contributions_id_seq OWNED BY publications.contributions.id;
+
+
+--
+-- Name: manual_merge_source_records; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.manual_merge_source_records (
+    manual_merge_id integer NOT NULL,
+    source public.source_type NOT NULL,
+    source_id text NOT NULL
+);
+
+
+--
+-- Name: TABLE manual_merge_source_records; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.manual_merge_source_records IS 'Enregistrements sources d''une fusion manuelle, par clé naturelle. La réconciliation les réunit dans une même publication.';
+
+
+--
+-- Name: manual_merges; Type: TABLE; Schema: publications; Owner: -
+--
+
+CREATE TABLE publications.manual_merges (
+    id integer NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: TABLE manual_merges; Type: COMMENT; Schema: publications; Owner: -
+--
+
+COMMENT ON TABLE publications.manual_merges IS 'Fusions de publications décidées par l''administration.';
+
+
+--
+-- Name: manual_merges_id_seq; Type: SEQUENCE; Schema: publications; Owner: -
+--
+
+CREATE SEQUENCE publications.manual_merges_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: manual_merges_id_seq; Type: SEQUENCE OWNED BY; Schema: publications; Owner: -
+--
+
+ALTER SEQUENCE publications.manual_merges_id_seq OWNED BY publications.manual_merges.id;
 
 
 --
@@ -2524,7 +2579,7 @@ UNION
 -- Name: VIEW known_dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI des notices, DOI liés, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de la notice, ou la publication d''origine de la relation ; NULL pour une notice orpheline.';
+COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI des enregistrements sources, DOI liés, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
 
 
 --
@@ -3002,6 +3057,13 @@ ALTER TABLE ONLY publications.contributions ALTER COLUMN id SET DEFAULT nextval(
 
 
 --
+-- Name: manual_merges id; Type: DEFAULT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.manual_merges ALTER COLUMN id SET DEFAULT nextval('publications.manual_merges_id_seq'::regclass);
+
+
+--
 -- Name: publications id; Type: DEFAULT; Schema: publications; Owner: -
 --
 
@@ -3337,6 +3399,22 @@ ALTER TABLE ONLY publications.contributions
 
 ALTER TABLE ONLY publications.contributions
     ADD CONSTRAINT contributions_publication_person_uq UNIQUE (publication_id, person_id);
+
+
+--
+-- Name: manual_merge_source_records manual_merge_source_records_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.manual_merge_source_records
+    ADD CONSTRAINT manual_merge_source_records_pkey PRIMARY KEY (manual_merge_id, source, source_id);
+
+
+--
+-- Name: manual_merges manual_merges_pkey; Type: CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.manual_merges
+    ADD CONSTRAINT manual_merges_pkey PRIMARY KEY (id);
 
 
 --
@@ -4054,6 +4132,13 @@ CREATE INDEX contributions_person_id_idx ON publications.contributions USING btr
 --
 
 CREATE INDEX idx_contribution_structures_structure_id ON publications.contribution_structures USING btree (structure_id);
+
+
+--
+-- Name: idx_manual_merge_source_records_source_record; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_manual_merge_source_records_source_record ON publications.manual_merge_source_records USING btree (source, source_id);
 
 
 --
@@ -4920,6 +5005,14 @@ ALTER TABLE ONLY publications.contributions
 
 
 --
+-- Name: manual_merge_source_records manual_merge_source_records_manual_merge_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
+--
+
+ALTER TABLE ONLY publications.manual_merge_source_records
+    ADD CONSTRAINT manual_merge_source_records_manual_merge_id_fkey FOREIGN KEY (manual_merge_id) REFERENCES publications.manual_merges(id) ON DELETE CASCADE;
+
+
+--
 -- Name: publication_relations publication_relations_from_publication_id_fkey; Type: FK CONSTRAINT; Schema: publications; Owner: -
 --
 
@@ -5379,5 +5472,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bAFCqnO8EqiN3V070440VwNl5gVXQfKPwfhEvbi5XEDXvjBb6AZRZT9L2eaTyzq
+\unrestrict hFFRcR1YaID4fXS71HwzxbyHS8W27GKrjKptYCb5KW40px0CWb3frOvKcA0U386
 

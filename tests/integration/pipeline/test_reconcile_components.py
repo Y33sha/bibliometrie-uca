@@ -9,6 +9,7 @@ from functools import partial
 from sqlalchemy import bindparam, text
 
 from domain.merge import MergedEntity
+from domain.publications.reconciliation import manual_merge_tokens
 from domain.source_records.keys import project_confirmation_keys
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.reconciliation import (
@@ -16,6 +17,7 @@ from pipeline.transformation.publications.reconciliation import (
     mark_for_reconciliation,
     mark_publication_siblings,
     reconcile,
+    reconcile_source_records,
     snapshot_queued_source_records,
 )
 from pipeline.transformation.publications.store import PublicationStore
@@ -57,6 +59,21 @@ def _source_record_state(conn, source_record_id) -> tuple:
         text("SELECT publication_id FROM source_records WHERE id = :id"), {"id": source_record_id}
     ).scalar_one()
     return publication_id, source_record_id in queued(conn, Queue.SOURCE_RECORD_KEYS)
+
+
+def _manual_merge(conn, source_record_ids) -> int:
+    """Enregistre une fusion manuelle des enregistrements sources `source_record_ids`, par leur clé naturelle. Rend son identifiant."""
+    manual_merge_id = conn.execute(
+        text("INSERT INTO manual_merges DEFAULT VALUES RETURNING id")
+    ).scalar_one()
+    conn.execute(
+        text(
+            "INSERT INTO manual_merge_source_records (manual_merge_id, source, source_id) "
+            "SELECT :merge, source, source_id FROM source_records WHERE id = ANY(:ids)"
+        ).bindparams(bindparam("ids")),
+        {"merge": manual_merge_id, "ids": list(source_record_ids)},
+    )
+    return manual_merge_id
 
 
 def _universe(conn) -> set[int]:
@@ -126,6 +143,23 @@ class TestUniverse:
             doc_type="thesis",
             marked=False,
         )
+        assert _universe(conn) == {dirty, neighbor}
+
+    def test_neighbor_by_manual_merge(self, sa_sync_conn_owner):
+        """Deux enregistrements sources sans clé de confirmation commune, désignés par une même fusion manuelle."""
+        conn = sa_sync_conn_owner
+        dirty = _source_record(conn, _seed_publication(conn), source_id="a", doi="10.1/x")
+        neighbor = _source_record(
+            conn,
+            _seed_publication(conn),
+            source_id="b",
+            source="hal",
+            external_ids={"hal_id": ["hal-04263452"]},
+            marked=False,
+        )
+        _source_record(conn, _seed_publication(conn), source_id="c", marked=False)
+        _manual_merge(conn, [dirty, neighbor])
+
         assert _universe(conn) == {dirty, neighbor}
 
     def test_dirty_orphan_included(self, sa_sync_conn):
@@ -314,6 +348,108 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_b)[1] is False
 
 
+class TestManualMerge:
+    def test_publications_without_shared_key_merged_into_doi_carrier(self, sa_sync_conn_owner):
+        """Un article à DOI et le dépôt HAL sans DOI de cet article, au titre différent : la fusion manuelle les réunit dans la publication qui a le DOI."""
+        conn = sa_sync_conn_owner
+        with_doi = _seed_publication(conn, doi="10.64628/aak.7y96696up")
+        without_doi = _seed_publication(conn)
+        crossref = _source_record(
+            conn, with_doi, source="crossref", source_id="crossref", doi="10.64628/aak.7y96696up"
+        )
+        hal = _source_record(
+            conn,
+            without_doi,
+            source="hal",
+            source_id="hal-04263452",
+            external_ids={"hal_id": ["hal-04263452"]},
+        )
+        _manual_merge(conn, [crossref, hal])
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, crossref) == (with_doi, False)
+        assert _source_record_state(conn, hal) == (with_doi, False)
+        assert not _publication_exists(conn, without_doi)
+        assert redirect_of(conn, MergedEntity.PUBLICATION, without_doi) == with_doi
+
+    def test_publications_with_distinct_dois_kept_apart(self, sa_sync_conn_owner):
+        """La fusion manuelle respecte la règle « un DOI, une œuvre »."""
+        conn = sa_sync_conn_owner
+        publication_a = _seed_publication(conn, doi="10.1/x")
+        publication_b = _seed_publication(conn, doi="10.2/y")
+        source_record_a = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        source_record_b = _source_record(conn, publication_b, source_id="b", doi="10.2/y")
+        _manual_merge(conn, [source_record_a, source_record_b])
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, source_record_a)[0] == publication_a
+        assert _source_record_state(conn, source_record_b)[0] == publication_b
+
+
+class TestReconcileSourceRecords:
+    def test_merges_the_neighborhood_of_the_listed_source_records(self, sa_sync_conn_owner):
+        """La liste suffit : les enregistrements sources rattachés aux mêmes publications et leurs voisins entrent dans la passe."""
+        conn = sa_sync_conn_owner
+        with_doi = _seed_publication(conn, doi="10.1/x")
+        without_doi = _seed_publication(conn)
+        crossref = _source_record(
+            conn, with_doi, source="crossref", source_id="c", doi="10.1/x", marked=False
+        )
+        hal = _source_record(
+            conn,
+            without_doi,
+            source="hal",
+            source_id="hal-04263452",
+            external_ids={"hal_id": ["hal-04263452"]},
+            marked=False,
+        )
+        sibling = _source_record(
+            conn,
+            without_doi,
+            source_id="W1",
+            external_ids={"hal_id": ["hal-04263452"]},
+            marked=False,
+        )
+        _manual_merge(conn, [crossref, hal])
+
+        applied = reconcile_source_records(conn, [hal])
+
+        assert {_source_record_state(conn, i)[0] for i in (crossref, hal, sibling)} == {with_doi}
+        assert not _publication_exists(conn, without_doi)
+        assert applied.survivors == {with_doi}
+        assert applied.changed == {with_doi}
+        assert with_doi in queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
+
+    def test_leaves_the_queue_untouched(self, sa_sync_conn):
+        """Les marquages de la file restent en place, pour le prochain passage du pipeline."""
+        conn = sa_sync_conn
+        listed = _source_record(conn, _seed_publication(conn), source_id="a", marked=False)
+        queued_elsewhere = _source_record(conn, _seed_publication(conn), source_id="b")
+
+        reconcile_source_records(conn, [listed])
+
+        assert queued(conn, Queue.SOURCE_RECORD_KEYS) & {listed, queued_elsewhere} == {
+            queued_elsewhere
+        }
+
+    def test_refreshes_the_consolidated_metadata(self, sa_sync_conn):
+        """La publication conservée reprend ses métadonnées de ses sources."""
+        conn = sa_sync_conn
+        publication = _seed_publication(conn)
+        source_record = _source_record(
+            conn, publication, source_id="a", title="Titre de la source", marked=False
+        )
+
+        reconcile_source_records(conn, [source_record])
+
+        title = conn.execute(
+            text("SELECT title FROM publications WHERE id = :id"), {"id": publication}
+        ).scalar_one()
+        assert title == "Titre de la source"
+
+
 class TestMetadataBlock:
     LONG = "une communication scientifique au titre assez long"
 
@@ -435,8 +571,8 @@ class TestUniverseMatchesPythonTokens:
     des enregistrements sources dont les tokens Python intersectent les siens.
     """
 
-    def test_sql_universe_matches_python_token_linkage(self, sa_sync_conn):
-        conn = sa_sync_conn
+    def test_sql_universe_matches_python_token_linkage(self, sa_sync_conn_owner):
+        conn = sa_sync_conn_owner
         long_a, long_b = "a" * 40, "b" * 40
         len30 = "c" * 30  # juste SOUS le seuil strict > 30 → pas de token metadata_block
         ids = [
@@ -495,7 +631,10 @@ class TestUniverseMatchesPythonTokens:
             _source_record(conn, source_id="s1", title_normalized=len30, marked=False),
             _source_record(conn, source_id="s2", title_normalized=len30, marked=False),
             _source_record(conn, source_id="lone", title_normalized="zz", marked=False),
+            _source_record(conn, source_id="mm1", title_normalized="yy", marked=False),
+            _source_record(conn, source_id="mm2", title_normalized="xx", marked=False),
         ]
+        manual_merge = _manual_merge(conn, ids[-2:])
         rows = {
             r.id: r
             for r in conn.execute(
@@ -512,6 +651,8 @@ class TestUniverseMatchesPythonTokens:
             ).tokens()
             for i, r in rows.items()
         }
+        for i in ids[-2:]:
+            toks[i] |= manual_merge_tokens([manual_merge])
         seeded = set(ids)
         for i in ids:
             clear(conn, Queue.SOURCE_RECORD_KEYS)

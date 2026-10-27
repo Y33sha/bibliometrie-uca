@@ -1211,6 +1211,34 @@ publications_detail = Table(
 )
 
 
+manual_merges = Table(
+    "manual_merges",
+    metadata,
+    Column("id", Integer, primary_key=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    comment="Fusions de publications décidées par l'administration.",
+    schema="publications",
+)
+
+
+# La clé naturelle maintient le verdict quand un enregistrement source disparaît puis réapparaît.
+manual_merge_source_records = Table(
+    "manual_merge_source_records",
+    metadata,
+    Column("manual_merge_id", Integer, nullable=False),
+    Column("source", source_type_enum, nullable=False),
+    Column("source_id", Text, nullable=False),
+    PrimaryKeyConstraint(
+        "manual_merge_id", "source", "source_id", name="manual_merge_source_records_pkey"
+    ),
+    comment=(
+        "Enregistrements sources d'une fusion manuelle, par clé naturelle. "
+        "La réconciliation les réunit dans une même publication."
+    ),
+    schema="publications",
+)
+
+
 source_records = Table(
     "source_records",
     metadata,

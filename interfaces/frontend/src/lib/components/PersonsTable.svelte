@@ -129,7 +129,6 @@
 	.rh-col { width: 28px; padding-right: 0; text-align: center; }
 	.rh-col :global(.rh-check) { margin-left: 0; }
 	.panel-col { width: 28px; padding-right: 0; }
-	tr.active-row td { background: var(--accent-light); }
 	tr.excluded { opacity: 0.45; }
 	tr.excluded:hover { opacity: 0.7; }
 	tr.excluded .person-link { text-decoration: line-through; }

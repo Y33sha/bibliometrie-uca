@@ -2,16 +2,12 @@
 
 ## Structures
 
-### Liste `/structures`
+`/structures`, en session d'administration
 
-En session d'administration, la liste des structures permet d'en créer.
-
-### Détails `/structures/{id}`, onglet « Gestion »
-
-Gestion des structures, de leurs relations et de leurs formes de nom :
+La liste des structures permet d'en créer. L'icône d'une ligne, ou celle placée à gauche du nom sur la fiche d'une structure, ouvre un volet de gestion de la structure :
 
 - **Détails** : nom, acronyme, identifiant ROR, collection HAL, identifiants dans les sources ;
-- **Tutelles** ;
+- **Tutelles** : un clic sur une tutelle ouvre son volet ;
 - **Formes de nom**, pour l'identification des structures dans les adresses.
 
 ![Gestion d'une structure](../../img/screenshots/admin_structure_management.png)
@@ -22,7 +18,7 @@ Gestion des structures, de leurs relations et de leurs formes de nom :
 
 La liste des personnes ajoute les facettes Exclusion, Activité et À confirmer, et les onglets de triage : formes ambiguës, conflits d'identifiant, doublons par nom.
 
-Dans toute liste de personnes, l'icône d'une ligne ouvre un volet de gestion de la personne :
+Dans toute liste de personnes, l'icône d'une ligne ouvre un volet de gestion de la personne. La même icône figure à gauche du nom, sur la fiche d'une personne.
 
 - **Édition du nom**.
 - **Exclusion** : écarter une fausse entité (mauvais parsing, noms d'équipes de recherche…) ou une personne rattachée au périmètre par erreur.
@@ -46,7 +42,7 @@ La recherche affiche le département RH, à défaut l'identifiant interne, pour 
 
 La liste des publications ajoute l'onglet « Fusions suspectes ».
 
-Dans toute liste de publications ou de thèses, l'icône d'une ligne ouvre un volet qui confronte les métadonnées de chaque source, une colonne par source : identifiants, titre, type, année, revue et ISSN, éditeur, conteneur, volume, numéro, pages, langue, statut OA. Un champ absent de toutes les sources n'a pas de ligne. Une ligne surlignée signale des valeurs différentes selon les sources. Sous la revue et l'éditeur du référentiel figure, en gris, le nom donné par la source quand il diffère. Sous la langue figure la valeur de la source quand la normalisation l'a changée. Un Ctrl+clic sur le titre ouvre la fiche publique.
+Dans toute liste de publications ou de thèses, l'icône d'une ligne ouvre un volet de la publication. La même icône figure à gauche du titre, sur la fiche d'une publication. Le volet confronte les métadonnées de chaque source, une colonne par source : identifiants, titre, type, année, revue et ISSN, éditeur, conteneur, volume, numéro, pages, langue, statut OA. Un champ absent de toutes les sources n'a pas de ligne. Une ligne surlignée signale des valeurs différentes selon les sources. Sous la revue et l'éditeur du référentiel figure, en gris, le nom donné par la source quand il diffère. Sous la langue figure la valeur de la source quand la normalisation l'a changée. Un Ctrl+clic sur le titre ouvre la fiche publique.
 
 ![Fusions suspectes](../../img/screenshots/admin_publications.png)
 

@@ -5,11 +5,11 @@
 	import { resolve } from '$app/paths';
 	import { api } from '#lib/api/index.js';
 	import { isAdmin } from '#lib/session.svelte.js';
-	import { setQueryParam } from '#lib/url.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import PersonCurationDrawer from '#lib/components/persons/PersonCurationDrawer.svelte';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import { useTabParam } from '#lib/composables/useTabParam.svelte.js';
 	import AmbiguousFormsList from './AmbiguousFormsList.svelte';
 	import IdentifierConflictsList from './IdentifierConflictsList.svelte';
 	import NameDuplicatesList from './NameDuplicatesList.svelte';
@@ -18,7 +18,7 @@
 
 	type TabKey = 'all' | 'ambiguous-forms' | 'identifier-conflicts' | 'name-duplicates';
 	const QUEUES: TabKey[] = ['ambiguous-forms', 'identifier-conflicts', 'name-duplicates'];
-	let tab = $state<TabKey>('all');
+	const tab = useTabParam(QUEUES, isAdmin);
 	let ambiguousCount = $state(0);
 	let identifierConflictCount = $state(0);
 	let nameDuplicateCount = $state(0);
@@ -54,10 +54,9 @@
 	}
 
 	function selectTab(t: TabKey) {
-		tab = t;
+		tab.select(t);
 		// Compteur « Doublons par nom » paresseux : sa détection (4 self-joins sur les personnes) coûte ~3 s, on ne la paie qu'à l'ouverture de l'onglet.
 		if (t === 'name-duplicates') loadNameDuplicateCount();
-		void setQueryParam('tab', t === 'all' ? null : t);
 	}
 
 	/* ── Volet ── */
@@ -72,14 +71,11 @@
 
 	onMount(() => {
 		if (!isAdmin()) return;
-		const params = new URLSearchParams(window.location.search);
-		const t = params.get('tab');
-		if (QUEUES.includes(t as TabKey)) tab = t as TabKey;
 		loadOrphanCount();
 		loadAmbiguousCount();
 		loadIdentifierConflictCount();
 		// Compteur « Doublons par nom » : seulement si l'onglet est l'onglet courant ; sinon il se charge à l'ouverture de l'onglet (cf. `selectTab`).
-		if (tab === 'name-duplicates') loadNameDuplicateCount();
+		if (tab.current === 'name-duplicates') loadNameDuplicateCount();
 	});
 </script>
 
@@ -93,16 +89,16 @@
 			{ key: 'identifier-conflicts', label: "Conflits d'identifiant", count: identifierConflictCount },
 			{ key: 'name-duplicates', label: 'Doublons par nom', count: nameDuplicateCount },
 		]}
-		active={tab}
+		active={tab.current}
 		onselect={(key) => selectTab(key as TabKey)}
 	/>
 {/if}
 
-{#if tab === 'ambiguous-forms'}
+{#if tab.current === 'ambiguous-forms'}
 	<AmbiguousFormsList onopenPerson={drawer.open} onchange={loadAmbiguousCount} reloadKey={reloadFiles} />
-{:else if tab === 'identifier-conflicts'}
+{:else if tab.current === 'identifier-conflicts'}
 	<IdentifierConflictsList onopenPerson={drawer.open} onchange={loadIdentifierConflictCount} reloadKey={reloadFiles} />
-{:else if tab === 'name-duplicates'}
+{:else if tab.current === 'name-duplicates'}
 	<NameDuplicatesList onopenPerson={drawer.open} onchange={loadNameDuplicateCount} reloadKey={reloadFiles} />
 {:else}
 	{#if isAdmin() && orphanCount > 0}

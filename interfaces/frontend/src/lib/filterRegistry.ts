@@ -148,7 +148,8 @@ export function checkboxSummary(filter: CheckboxFilter, selected: string[], opti
 			rest = rest.filter((v) => !g.values.includes(v));
 		}
 	}
-	for (const v of rest) parts.push(text.get(v) ?? v);
+	// Options pas encore chargées : « … » à la place de la valeur brute (un identifiant).
+	for (const v of rest) parts.push(text.get(v) ?? (options.length ? v : '…'));
 	return summarizeParts(parts);
 }
 

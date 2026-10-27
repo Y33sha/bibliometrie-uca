@@ -14,7 +14,7 @@
 
 **Une conception antérieure** esquisse des « contrôles admin » sur le modèle opt-out : le pipeline fusionne d'office, l'administration contrôle a posteriori.
 - Détecteur de fusions suspectes : recouvrement d'auteurs faible ou nul, titre court ou générique, `container_title` divergent pour les chapitres, groupe anormalement gros.
-- Verdicts ancrés sur les `source_records`, jamais sur les `publications`, dont l'identifiant change à chaque réconciliation : un discriminant de scission (valeurs différentes ⇒ jamais dans le même groupe) et un jeton de fusion forcée (valeur commune ⇒ même groupe), branchés sur les mécanismes de regroupement existants.
+- Verdicts ancrés sur les `source_records`, jamais sur les `publications`, dont l'identifiant change à chaque réconciliation : un discriminant de scission (valeurs différentes ⇒ jamais dans le même groupe) et un jeton de fusion (valeur commune ⇒ même groupe), branchés sur les mécanismes de regroupement existants.
 
 **Fusion erronée par une déclaration DataCite.** Une copie de repository du DESY (`10.3204/pubdb-2019-03026`) concerne la production de paires de squarks bottom. Elle déclare `IsVariantFormOf` vers un article sur la production W±Z (`10.1140/epjc/s10052-019-7027-6`). La correction des métadonnées lui donne le DOI de cet article, donc elle rejoint sa publication.
 
@@ -27,6 +27,8 @@
 
 **OpenAlex renseigne `container_title` avec le nom du repository** pour 17 345 enregistrements sources, plus de la moitié de ceux où il fournit un conteneur : « HAL (Le Centre pour la Communication Scientifique Directe) ». Le volet affiche cette valeur, et un détecteur fondé sur le conteneur la remonte. Relève de la correction des métadonnées, hors du périmètre de ce chantier.
 
+**Les dépôts HAL des articles de The Conversation** omettent souvent le DOI et ajoutent « The Conversation » au titre. 25 dépôts HAL sans DOI ont un titre qui commence par celui d'un article The Conversation (préfixe `10.64628`) rattaché à une autre publication. Retirer ce suffixe relève de la correction des métadonnées, hors du périmètre de ce chantier.
+
 ## Décisions
 
 - **Une page `admin/publications`**, dans le menu « Référentiels », affiche la liste des publications de la page publique (`PublicationsListView`), inchangée.
@@ -36,6 +38,10 @@
 - **Le premier détecteur mesure le recouvrement des noms d'auteurs** entre les enregistrements sources d'un même groupe.
 - **La taille du groupe ne fait pas un signal par elle-même.** Un jeu de données de plusieurs centaines de pièces se regroupe correctement. Le signal reste à évaluer hors `dataset` et `software`.
 - **Les titres identiques ne font pas une file de triage** : 5 063 publications, sans discriminant.
+- **Les verdicts s'ancrent sur la clé naturelle `(source, source_id)` des enregistrements sources** : elle survit à la suppression puis à la réapparition d'un enregistrement source.
+- **Une fusion manuelle pose un jeton de fusion** sur tous les enregistrements sources des deux publications. La réconciliation lit ce jeton comme une clé de confirmation. Il équivaut aux arêtes affirmées de CRISalid (voir le [benchmark](archived/2026-10-12_benchmark-pipelines.md)).
+- **La fusion manuelle est refusée entre deux publications à DOI distincts**, en vertu de la règle « un DOI, une œuvre ». Ces cas relèvent d'une correction de DOI.
+- **La fusion manuelle prend effet immédiatement**, comme la fusion des revues, des éditeurs et des personnes. Les sujets, les pays, le statut OA et les relations suivent au prochain passage du pipeline.
 - **Veto sur le lien entre une contribution source et une structure.** Un auteur parti garde dans HAL une affiliation obsolète. Sa contribution source HAL fait entrer dans le périmètre une publication faite ailleurs. La personne est bien l'auteur, et du périmètre pour d'autres publications : le rejet du lien personne–publication et l'exclusion de la personne sont inadaptés. Le veto vise le lien entre la contribution source et la structure, stable dans le temps. Un groupe de contributions sources est recalculé à chaque passage.
 
 ## Phasage
@@ -46,7 +52,7 @@
 - [x] Liste des publications (a85c42ed).
 - [x] Emplacement des onglets, avec la liste pour premier onglet : composant `HubTabs`, partagé avec le référentiel Personnes (13b4ed89).
 - [x] Suppression de `admin/duplicates`, de son entrée de menu, et de la lecture des paires candidates (point d'entrée, port, adaptateur, tests, doc) (a85c42ed).
-- [x] Suppression de la fusion et de la distinction manuelles, sans effet durable : points d'entrée, client, services, erreur `DistinctDoiError`, table `distinct_publications` (b52fb3d6).
+- [x] Suppression des actions fusionner et déclarer distinctes de `admin/duplicates`, sans effet durable : points d'entrée, client, services, erreur `DistinctDoiError`, table `distinct_publications` (b52fb3d6).
 
 ### 2. Volet
 
@@ -64,11 +70,17 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 
 ### 4. Verdicts durables
 
-- [ ] Modèle de persistance des verdicts de scission et de fusion forcée, relu par la réconciliation.
+- [x] Tables des fusions manuelles, ancrées sur `(source, source_id)` (4523e022c).
+- [x] Jeton de fusion lu par la réconciliation : un bras du voisinage, une clé de confirmation (6d7c53b69).
+- [x] Réconciliation ciblée sur une liste d'enregistrements sources, hors de la file (0ef354ac6).
+- [ ] Fusion manuelle exposée par `pipeline/public.py` : jeton, réconciliation ciblée, métadonnées consolidées, réalignement des auteurs de la publication conservée, périmètre et compteurs. Les contributions de la publication absorbée gardent leur rattachement aux personnes.
+- [ ] Volet : doublons potentiels par similarité de titre, champ « Fusionner » (identifiant, DOI ou titre).
+- [ ] Interdiction de fusion, relue par la réconciliation.
+- [ ] Ancrage de `persons.rejected_contributions` sur `(source, source_id)`.
 - [ ] Veto de l'administration sur un lien entre contribution source et structure, relu par le calcul du périmètre. Action dans le volet.
 
 ## Questions ouvertes
 
 - **Auteurs** : comment les présenter dans le volet ? La comparaison des sources de la page publique y a sa place, mais l'alignement par position devient illisible au-delà de quatre ou cinq sources.
 - **Disposition du volet** : une colonne par enregistrement source et une ligne par champ, à l'essai. À partir de combien d'enregistrements sources la disposition inverse devient-elle plus lisible ? Largeur ?
-- **Verdicts** : discriminant de scission et jeton de fusion forcée ancrés sur les enregistrements sources, comme dans la conception antérieure ? Ce choix touche le schéma et la réconciliation. Le jeton de fusion forcée équivaut aux arêtes affirmées de CRISalid (voir le [benchmark](archived/2026-10-12_benchmark-pipelines.md)).
+- **Interdiction de fusion** : forme du verdict, et son effet sur deux enregistrements sources qui partagent un DOI.

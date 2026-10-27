@@ -9,7 +9,6 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { goto } from '$app/navigation';
 	import { api, ApiError, structures as structuresApi } from '#lib/api/index.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
@@ -22,6 +21,9 @@
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { STRUCTURE_TYPES } from '#lib/structureTypes.js';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
+	import StructureDrawer from './StructureDrawer.svelte';
 	import StructureFormModal from './StructureFormModal.svelte';
 	import { API_SOURCES, ROR_FORMAT_ERROR, buildApiIds, normalizeRorId } from './types';
 
@@ -118,6 +120,9 @@
 		return withBase(`/api/structures/export.csv?${paramsToQuery(params)}`);
 	}
 
+	// Volet d'édition d'une structure, en session admin : ouvert tant que `?structure=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('structure', isAdmin);
+
 	// Le type s'affiche dès que la liste mêle plusieurs types.
 	const showTypeColumn = $derived(selectedTypes.length !== 1);
 
@@ -173,7 +178,8 @@
 		try {
 			const created = (await structuresApi.create(data)) as { id: number };
 			createModalOpen = false;
-			goto(resolve(`structures/${created.id}?tab=management`));
+			list.load();
+			drawer.open(created.id);
 		} catch (e: any) {
 			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
 			toast('Erreur: ' + msg, 'error');
@@ -224,6 +230,7 @@
 <table class="data-table">
 	<thead>
 		<tr>
+			{#if isAdmin()}<th class="row-actions"></th>{/if}
 			{#if showTypeColumn}<th>{columnLabels.type}</th>{/if}
 			<th class="sortable" class:active={sortDirection(currentSort, 'acronym') !== null} onclick={() => toggleSort('acronym')}>
 				Acronyme
@@ -243,10 +250,15 @@
 	</thead>
 	<tbody>
 		{#if list.items.length === 0}
-			<TableStatusRow loading={list.loading} error={list.error} colspan={showTypeColumn ? 6 : 5} emptyText="Aucune structure ne correspond aux filtres." />
+			<TableStatusRow loading={list.loading} error={list.error} colspan={5 + (showTypeColumn ? 1 : 0) + (isAdmin() ? 1 : 0)} emptyText="Aucune structure ne correspond aux filtres." />
 		{/if}
 		{#each list.items as s (s.id)}
-			<tr>
+			<tr class:active-row={s.id === drawer.id}>
+				{#if isAdmin()}
+					<td class="row-actions">
+						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(s.id)} />
+					</td>
+				{/if}
 				{#if showTypeColumn}
 					<td><span class="structure-type structure-type-{s.type}">{s.type}</span></td>
 				{/if}
@@ -285,6 +297,10 @@
 
 <Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 
+{#if drawer.id !== null}
+	<StructureDrawer id={drawer.id} onclose={() => drawer.open(null)} onchange={() => list.load()} onopenStructure={drawer.open} />
+{/if}
+
 {#if createModalOpen}
 	<StructureFormModal
 		editMode={false}
@@ -306,6 +322,9 @@
 	}
 	.acronym-cell {
 		white-space: nowrap;
+	}
+	.row-actions {
+		width: 1%;
 	}
 	.acronym-cell .entity-link {
 		font-weight: 600;

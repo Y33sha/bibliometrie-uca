@@ -246,6 +246,12 @@ describe('filterRegistry', () => {
 		expect(summarizeParts(['2024', '2023', '2022', '2021'])).toBe('2024, 2023 +2');
 	});
 
+	it('affiche « … » à la place de la valeur brute tant que les options chargent', () => {
+		expect(checkboxSummary(types, ['article', 'book'], [])).toBe('Publications');
+		expect(checkboxSummary(types, ['thesis'], [])).toBe('…');
+		expect(checkboxSummary(types, ['inconnu'], [{ value: 'article', text: 'Articles' }])).toBe('inconnu');
+	});
+
 	it('résume un filtre de présence', () => {
 		expect(presenceSummary(sources, { hal: 'yes', wos: 'no', oa: 'all' })).toBe('avec HAL, sans WoS');
 	});

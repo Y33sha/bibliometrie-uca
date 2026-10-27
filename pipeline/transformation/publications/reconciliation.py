@@ -10,16 +10,25 @@ Les `contributions` sont laissées à la phase `contributions` (`insert_missing`
 
 Voisinage 1-hop, pas de fermeture transitive : l'invariant du marquage garantit que toute arête neuve a une extrémité marquée (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
+`reconcile_source_records` applique la même passe à une liste d'enregistrements sources, hors de la file : l'administration l'appelle après une fusion manuelle.
+
 Tâche `publications.reconcile`.
 """
 
 import logging
 import time
+from collections.abc import Sequence
 from typing import NamedTuple
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.publications.reconciliation import ReconcileMember, WorkGroup, plan_reconciliation
+from domain.publications.reconciliation import (
+    ReconcileMember,
+    ReconcilePlan,
+    WorkGroup,
+    manual_merge_tokens,
+    plan_reconciliation,
+)
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -48,7 +57,7 @@ class ReconcileRow(NamedTuple):
     """Projection d'une `source_record` du voisinage : clés + publication courante.
 
     `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
-    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve)."""
+    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve) ; `manual_merge_ids` = fusions manuelles qui désignent l'enregistrement source."""
 
     id: int
     doi: str | None
@@ -59,6 +68,7 @@ class ReconcileRow(NamedTuple):
     publication_year: int | None
     publication_doi: str | None
     in_perimeter: bool
+    manual_merge_ids: list[int]
 
 
 # Relevé de la file `source_record_keys_queue`.
@@ -72,7 +82,10 @@ _COLS = (
     "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
-    "WHERE sc.source_record_id = {a}.id AND sc.in_perimeter) AS in_perimeter"
+    "WHERE sc.source_record_id = {a}.id AND sc.in_perimeter) AS in_perimeter, "
+    "ARRAY(SELECT mm.manual_merge_id FROM manual_merge_source_records mm "
+    "WHERE mm.source = {a}.source AND mm.source_id = {a}.source_id "
+    "ORDER BY mm.manual_merge_id) AS manual_merge_ids"
 )
 
 # Premier identifiant HAL que liste une `source_record` : sa clé de fusion HAL.
@@ -98,7 +111,7 @@ _UNIVERSE_SQL = text(f"""
         LEFT JOIN publications p ON p.id = sr.publication_id
     )
     SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, publication_year,
-           publication_doi, in_perimeter
+           publication_doi, in_perimeter, manual_merge_ids
     FROM dirty
     UNION
     -- DOI : égalité directe (la colonne est toujours normalisée minuscule par `clean_doi` à
@@ -129,6 +142,14 @@ _UNIVERSE_SQL = text(f"""
     WHERE d.doc_type IS NOT NULL
       AND length(d.title_normalized) > {DISCRIMINANT_TITLE_MIN_LENGTH}
       AND d.publication_year IS NOT NULL
+    UNION
+    -- Fusion manuelle : les enregistrements sources désignés par une même fusion manuelle.
+    SELECT {_COLS.format(a="o")}
+    FROM dirty d
+    JOIN manual_merge_source_records m ON m.manual_merge_id = ANY(d.manual_merge_ids)
+    JOIN source_records o ON o.source = m.source AND o.source_id = m.source_id
+    LEFT JOIN publications p ON p.id = o.publication_id
+    WHERE cardinality(d.manual_merge_ids) > 0
 """)
 
 
@@ -186,6 +207,24 @@ def snapshot_queued_source_records(conn: Connection) -> list[int]:
     )
 
 
+def snapshot_source_records(conn: Connection, source_record_ids: Sequence[int]) -> None:
+    """Relève les enregistrements sources `source_record_ids` et ceux rattachés à leurs publications, dans la table du relevé de la file. La file reste intacte."""
+    conn.execute(text(f"DROP TABLE IF EXISTS pg_temp.{_SNAPSHOT}"))
+    conn.execute(
+        text(f"""
+            CREATE TEMP TABLE {_SNAPSHOT} AS
+            SELECT id FROM source_records WHERE id = ANY(:ids)
+            UNION
+            SELECT o.id FROM source_records o
+            WHERE o.publication_id IN (
+                SELECT publication_id FROM source_records WHERE id = ANY(:ids)
+            )
+        """),  # noqa: S608
+        {"ids": list(source_record_ids)},
+    )
+    conn.execute(text(f"ALTER TABLE {_SNAPSHOT} ADD PRIMARY KEY (id)"))
+
+
 def delete_processed_marks(conn: Connection) -> None:
     """Supprime de la file les marquages relevés par `snapshot_queued_source_records`, puis le relevé."""
     delete_processed(conn, Queue.SOURCE_RECORD_KEYS, _SNAPSHOT)
@@ -193,7 +232,7 @@ def delete_processed_marks(conn: Connection) -> None:
 
 
 def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
-    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
+    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) ou une fusion manuelle avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
     rows = conn.execute(_UNIVERSE_SQL).all()
     return [
         ReconcileRow(
@@ -206,6 +245,7 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
             r.publication_year,
             r.publication_doi,
             r.in_perimeter,
+            r.manual_merge_ids,
         )
         for r in rows
     ]
@@ -280,7 +320,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
         publication_id=row.publication_id,
         publication_doi=row.publication_doi,
         effective_doi=keys.doi,
-        tokens=keys.tokens(),
+        tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
         publication_year=row.publication_year,
@@ -327,6 +367,101 @@ class ReconcileStats(NamedTuple):
     detached: int = 0
 
 
+class AppliedReconciliation(NamedTuple):
+    """Effet d'une réconciliation appliquée.
+
+    `survivors` = publications auxquelles des enregistrements sources sont rattachés ; `changed` = publications conservées qui gagnent ou perdent un enregistrement source ; `created` = publications créées, dont `splits` par une scission.
+    """
+
+    survivors: frozenset[int]
+    changed: frozenset[int]
+    created: int
+    splits: int
+
+
+def _plan(conn: Connection) -> tuple[ReconcilePlan, dict[int, ReconcileRow]]:
+    """Planifie la réconciliation du voisinage des enregistrements sources relevés. Rend le plan et les lignes du voisinage par enregistrement source."""
+    rows = fetch_reconciliation_universe(conn)
+    publication_sizes = fetch_publication_sizes(
+        conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
+    )
+    plan = plan_reconciliation(
+        (_member(row) for row in rows),
+        existing_publication_by_doi=fetch_publication_ids_by_doi(conn),
+        publication_sizes=publication_sizes,
+    )
+    return plan, {row.id: row for row in rows}
+
+
+def _apply(
+    conn: Connection, plan: ReconcilePlan, rows_by_source_record: dict[int, ReconcileRow]
+) -> AppliedReconciliation:
+    """Applique le plan : rattachements, détachements, dissolutions. Les publications conservées restent à rafraîchir."""
+    survivors: set[int] = set()
+    # Publications qui gagnent ou perdent un enregistrement source.
+    membership_changed: set[int] = set()
+    created = 0
+    splits = 0
+
+    # 1. Groupes : rattacher chaque enregistrement source à son ancre, ou à une publication créée — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante.
+    for group in plan.groups:
+        target = group.target_publication_id
+        if target is None:
+            from_existing = any(
+                rows_by_source_record[source_record].publication_id is not None
+                for source_record in group.source_record_ids
+            )
+            target = _create_new_publication(conn, group, rows_by_source_record)
+            created += 1
+            if from_existing:
+                splits += 1
+        repoint_source_records(conn, list(group.source_record_ids), target)
+        survivors.add(target)
+        for source_record in group.source_record_ids:
+            if (previous := rows_by_source_record[source_record].publication_id) != target:
+                membership_changed.update(p for p in (previous, target) if p is not None)
+
+    # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
+    # deviennent orphelins. Leur ancienne publication est recalculée, et supprimée si elle
+    # reste sans source.
+    if plan.detached:
+        detach_source_records(conn, list(plan.detached))
+        membership_changed.update(
+            p
+            for source_record in plan.detached
+            if (p := rows_by_source_record[source_record].publication_id) is not None
+        )
+        for publication_id in sorted(
+            {
+                p
+                for source_record in plan.detached
+                if (p := rows_by_source_record[source_record].publication_id) is not None
+            }
+            - survivors
+        ):
+            with savepoint(conn):
+                lifecycle.refresh(conn, publication_id)
+
+    # 3. Dissolutions, avant les survivants : la suppression libère le DOI qu'un survivant
+    # reprend, que la contrainte unique refuserait sinon.
+    for dissolved in plan.dissolved:
+        lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
+
+    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
+    return AppliedReconciliation(
+        survivors=frozenset(survivors),
+        changed=frozenset(membership_changed - dissolved_ids),
+        created=created,
+        splits=splits,
+    )
+
+
+def _refresh(conn: Connection, publication_id: int) -> None:
+    """Recalcule les métadonnées consolidées d'une publication depuis ses sources."""
+    with savepoint(conn):
+        lifecycle.refresh(conn, publication_id)
+
+
 def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False) -> ReconcileStats:
     """Planifie et applique la réconciliation du voisinage des enregistrements sources en file, puis supprime les marquages traités. Rend un bilan à zéro si la file est vide. Le commit est à la charge de l'appelant.
 
@@ -349,17 +484,7 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
         "reconstruction complète" if rebuild else "nouveaux ou mis à jour",
     )
     with waiting(BRANCH, logger) as line:
-        rows = fetch_reconciliation_universe(conn)
-        rows_by_source_record = {row.id: row for row in rows}
-        existing_publication_by_doi = fetch_publication_ids_by_doi(conn)
-        publication_sizes = fetch_publication_sizes(
-            conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
-        )
-        plan = plan_reconciliation(
-            (_member(row) for row in rows),
-            existing_publication_by_doi=existing_publication_by_doi,
-            publication_sizes=publication_sizes,
-        )
+        plan, rows_by_source_record = _plan(conn)
         # Le plan sépare déjà les publications à créer de celles qu'un groupe rejoint.
         to_create = sum(1 for g in plan.groups if g.target_publication_id is None)
         existing = len(plan.groups) - to_create
@@ -369,79 +494,45 @@ def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False
             f"{quantity(len(plan.dissolved), 'doublon')} à fusionner)"
         )
 
-    survivors: set[int] = set()
-    # Publications qui gagnent ou perdent un enregistrement source.
-    membership_changed: set[int] = set()
-    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
-    created = 0
-    splits = 0
-
     t0 = time.perf_counter()
     with waiting(f"{LAST_BRANCH}application", logger) as line:
-        # 1. Groupes : rattacher chaque enregistrement source à son ancre, ou à une publication créée — orphelins in-périmètre, ou partition perdante d'un split = scission d'une publication existante.
-        for group in plan.groups:
-            target = group.target_publication_id
-            if target is None:
-                from_existing = any(
-                    rows_by_source_record[source_record].publication_id is not None
-                    for source_record in group.source_record_ids
-                )
-                target = _create_new_publication(conn, group, rows_by_source_record)
-                created += 1
-                if from_existing:
-                    splits += 1
-            repoint_source_records(conn, list(group.source_record_ids), target)
-            survivors.add(target)
-            for source_record in group.source_record_ids:
-                if (previous := rows_by_source_record[source_record].publication_id) != target:
-                    membership_changed.update(p for p in (previous, target) if p is not None)
-
-        # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
-        # deviennent orphelins. Leur ancienne publication est recalculée, et supprimée si elle
-        # reste sans source.
-        if plan.detached:
-            detach_source_records(conn, list(plan.detached))
-            membership_changed.update(
-                p
-                for source_record in plan.detached
-                if (p := rows_by_source_record[source_record].publication_id) is not None
-            )
-            for publication_id in sorted(
-                {
-                    p
-                    for source_record in plan.detached
-                    if (p := rows_by_source_record[source_record].publication_id) is not None
-                }
-                - survivors
-            ):
-                with savepoint(conn):
-                    lifecycle.refresh(conn, publication_id)
-
-        # 3. Dissolutions, avant les survivants : la suppression libère le DOI qu'un survivant
-        # reprend, que la contrainte unique refuserait sinon.
-        for dissolved in plan.dissolved:
-            lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
-
+        applied = _apply(conn, plan, rows_by_source_record)
         line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
 
     # 4. Rafraîchir les survivants : métadonnées recomputées depuis leurs sources.
-    survivor_ids = sorted(survivors)
+    survivor_ids = sorted(applied.survivors)
     step(logger, "Recalcul des métadonnées consolidées")
     with track_progress(len(survivor_ids), LAST_BRANCH.rstrip(), logger) as progress:
         for publication_id in survivor_ids:
             progress.advance()
-            with savepoint(conn):
-                lifecycle.refresh(conn, publication_id)
+            _refresh(conn, publication_id)
 
     # 5. Les publications qui gagnent ou perdent un enregistrement source regroupent leurs contributions sources.
-    mark_publications_for_grouping(conn, sorted(membership_changed - dissolved_ids))
+    mark_publications_for_grouping(conn, sorted(applied.changed))
     delete_processed_marks(conn)
     return ReconcileStats(
         processed=len(dirty_ids),
-        publications=len(survivors),
-        created=created,
-        existing=len(survivors) - created,
+        publications=len(applied.survivors),
+        created=applied.created,
+        existing=len(applied.survivors) - applied.created,
         merges=len(plan.dissolved),
-        splits=splits,
+        splits=applied.splits,
         detached=len(plan.detached),
     )
+
+
+def reconcile_source_records(
+    conn: Connection, source_record_ids: Sequence[int]
+) -> AppliedReconciliation:
+    """Réconcilie le voisinage des enregistrements sources `source_record_ids`, hors de la file, et recalcule les métadonnées consolidées des publications conservées. Le commit est à la charge de l'appelant.
+
+    Les publications qui gagnent ou perdent un enregistrement source sont marquées pour le groupement des auteurs.
+    """
+    snapshot_source_records(conn, source_record_ids)
+    plan, rows_by_source_record = _plan(conn)
+    applied = _apply(conn, plan, rows_by_source_record)
+    for publication_id in sorted(applied.survivors):
+        _refresh(conn, publication_id)
+    mark_publications_for_grouping(conn, sorted(applied.changed))
+    conn.execute(text(f"DROP TABLE {_SNAPSHOT}"))
+    return applied

@@ -69,14 +69,25 @@
 
   // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
   let sharing = $state<SharingPerson[]>([]);
-  // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre.
-  let nameForms = $state<NameFormSummary[]>([]);
+  // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre. `null` tant qu'elles chargent.
+  let nameForms = $state<NameFormSummary[] | null>(null);
+  // Personne des données affichées : à un changement de personne, les données de la précédente disparaissent pendant le chargement ; après une écriture sur la même personne, elles restent affichées.
+  let loadedId: number | null = null;
 
   async function loadDetails() {
-    [sharing, nameForms] = await Promise.all([
-      api<SharingPerson[]>(`/api/persons/${person.id}/sharing-name-forms`),
-      api<NameFormSummary[]>(`/api/persons/${person.id}/name-forms`)
+    const id = person.id;
+    if (id !== loadedId) {
+      sharing = [];
+      nameForms = null;
+      loadedId = id;
+    }
+    const [s, f] = await Promise.all([
+      api<SharingPerson[]>(`/api/persons/${id}/sharing-name-forms`),
+      api<NameFormSummary[]>(`/api/persons/${id}/name-forms`)
     ]);
+    if (id !== person.id) return;
+    sharing = s;
+    nameForms = f;
   }
 
   $effect(() => {
@@ -208,7 +219,11 @@
 
     <section class="drawer-section">
       <h3>Formes de nom</h3>
-      <NameFormsList personId={person.id} {nameForms} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
+      {#if nameForms === null}
+        <span class="forms-loading">Chargement…</span>
+      {:else}
+        <NameFormsList personId={person.id} {nameForms} onopenDetail={onopenDetach} onsetStatus={onsetFormStatus} />
+      {/if}
     </section>
 
     {#if sharing.length}
@@ -370,6 +385,10 @@
     letter-spacing: 0.04em;
     color: var(--muted);
     margin: 0 0 8px;
+  }
+  .forms-loading {
+    font-size: 0.85rem;
+    color: var(--muted);
   }
   .sharing-list {
     display: flex;
