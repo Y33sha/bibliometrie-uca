@@ -2,6 +2,8 @@
 	import { institution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
+	import DoiLink from '#lib/components/DoiLink.svelte';
+	import { columnLabels } from '#lib/labels.js';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { withBase } from '#lib/paths.js';
 	import { resolve } from '$app/paths';
@@ -85,27 +87,37 @@
 	<div class="loading">Chargement…</div>
 {:else if selectedLabId}
 	<ListStatus {list} emptyText="Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})">
-		<div class="publication-list">
-			{#each list.items as pub}
-				<div class="publication-card">
-					<div class="publication-meta-line">
-						{#if pub.publication_year}<span class="meta-badge">{pub.publication_year}</span>{/if}
-						{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}
-						{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Hors collections de l'établissement</span>{/if}
-						<a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a>
-					</div>
-					<div class="hal-list">
-						{#if pub.hal_links.length}
-							{#each pub.hal_links as link (link.source_id)}
-								<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
-							{/each}
-						{/if}
-						{#if pub.doi}
-							<span class="doi-ref">DOI : <a href="https://doi.org/{pub.doi}" target="_blank" rel="noopener">{pub.doi}</a></span>
-						{/if}
-					</div>
-				</div>
-			{/each}
+		<div class="table-scroll">
+			<table class="data-table">
+				<thead>
+					<tr>
+						<th>{columnLabels.type}</th>
+						<th>{columnLabels.year}</th>
+						<th>{columnLabels.doi}</th>
+						<th>{columnLabels.title}</th>
+						<th>Dépôts HAL</th>
+						<th title="Absente des collections HAL de l'établissement">Hors collections</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each list.items as pub (pub.id)}
+						<tr>
+							<td>{#if pub.doc_type}<DocTypePill docType={pub.doc_type} />{/if}</td>
+							<td>{pub.publication_year ?? ''}</td>
+							<td>{#if pub.doi}<DoiLink doi={pub.doi} />{/if}</td>
+							<td><a href={resolve(`publications/${pub.id}`)} class="publication-title"><PublicationTitle titre={pub.title} /></a></td>
+							<td>
+								<div class="id-list">
+									{#each pub.hal_links as link (link.source_id)}
+										<a href={link.record_url} target="_blank" rel="noopener" class="id-badge">{link.source_id}</a>
+									{/each}
+								</div>
+							</td>
+							<td>{#if pub.outside_perimeter_collections}<span class="badge-hors-uca">Oui</span>{/if}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
 		</div>
 		<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 	</ListStatus>
@@ -115,23 +127,9 @@
 	.lab-select {
 		max-width: 100%;
 	}
-	.publication-list { display: flex; flex-direction: column; gap: 8px; }
-	.publication-card {
-		background: var(--card);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		padding: 10px 14px;
-	}
-	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-	.meta-badge { flex-shrink: 0; }
 	.badge-hors-uca {
 		display: inline-block; padding: 1px 8px; background: var(--attention-light);
 		border: 1px solid color-mix(in srgb, var(--attention) 40%, white); border-radius: var(--radius); font-size: 0.78rem;
-		color: var(--attention); font-weight: 600; flex-shrink: 0;
+		color: var(--attention); font-weight: 600;
 	}
-	.hal-list {
-		display: flex; flex-wrap: wrap; gap: 6px;
-		align-items: center; margin-top: 6px; padding-left: 20px;
-	}
-	.doi-ref { font-size: 0.82rem; color: var(--muted); }
 </style>
