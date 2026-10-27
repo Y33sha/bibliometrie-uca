@@ -458,7 +458,7 @@
     margin: 16px 0 6px;
   }
 
-  /* Une grille par section : libellés dans une colonne de largeur fixe, valeurs et boutons alignés d'une ligne à l'autre. Réglages séparés par des filets. */
+  /* Une grille par section : libellés dans une colonne de largeur fixe, valeurs alignées d'une ligne à l'autre. Réglages séparés par des filets. */
   .config-grid {
     display: grid;
     grid-template-columns: minmax(0, 22rem) auto 1fr;
@@ -474,6 +474,10 @@
     min-height: 44px;
     padding: 4px 0;
     border-bottom: 1px solid var(--border-subtle);
+  }
+  /* Bouton de modification au bord droit de la ligne. */
+  .config-row > :global(.icon-btn) {
+    justify-self: end;
   }
   .config-row:last-child {
     border-bottom: none;
