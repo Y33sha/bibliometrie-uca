@@ -108,17 +108,6 @@ export const docTypeFamilyOf: Record<string, string> = Object.fromEntries(
 export const publicationsDocTypes: string[] =
 	docTypeFamilies.find((f) => f.key === 'publications')?.types ?? [];
 
-/**
- * Sérialisation du filtre de types dans l'URL. Une sélection vide signifie « tous les types » (aucun filtre) : on l'écrit avec le token `all` pour la distinguer de l'absence de filtre (qui, elle, déclenche le défaut « publications »). Même convention que le filtre `has_rh` de l'annuaire.
- */
-export const DOC_TYPE_FILTER_ALL = 'all';
-export function docTypeFilterToken(selected: string[]): string {
-	return selected.length ? selected.join(',') : DOC_TYPE_FILTER_ALL;
-}
-export function docTypeFilterFromToken(raw: string): string[] {
-	return raw === DOC_TYPE_FILTER_ALL ? [] : raw.split(',');
-}
-
 /** Couleur de chaque licence, dans l'ordre d'affichage : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). `none` désigne une publication sans licence connue. */
 export const licenseColors: Record<string, string> = {
 	'public-domain': '#2e669e',

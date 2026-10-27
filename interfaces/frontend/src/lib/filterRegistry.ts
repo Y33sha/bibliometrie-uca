@@ -53,6 +53,22 @@ export interface PresenceFilter extends BaseFilter {
 
 export type ListFilter = CheckboxFilter | EntityChoiceFilter | PresenceFilter;
 
+/** Jeton d'URL d'une sélection vide, qui retient toutes les valeurs. */
+export const ALL_TOKEN = 'all';
+
+/**
+ * Forme d'URL d'une sélection explicite : les valeurs séparées par des virgules, ou `all` pour une sélection vide.
+ *
+ * Une page distingue ainsi « toutes les valeurs » de l'absence du paramètre, qui lui laisse appliquer sa sélection par défaut. `defaultValue` est la forme que l'URL de la page omet.
+ */
+export function explicitSelectionUrl(defaultValue: string): NonNullable<CheckboxFilter['url']> {
+	return {
+		encode: (selected) => (selected.length ? selected.join(',') : ALL_TOKEN),
+		decode: (raw) => (raw === ALL_TOKEN ? [] : raw.split(',')),
+		defaultValue,
+	};
+}
+
 /** Valeurs des filtres, par type de contrôle et par clé. Un filtre d'entité porte des ids : un au plus en choix simple. */
 export interface FilterValues {
 	checkbox: Record<string, string[]>;

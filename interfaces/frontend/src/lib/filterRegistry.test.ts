@@ -6,6 +6,7 @@ import {
 	checkboxSummary,
 	clearValue,
 	encodePresence,
+	explicitSelectionUrl,
 	facetDefs,
 	filterSections,
 	initialValues,
@@ -150,6 +151,14 @@ describe('filterRegistry', () => {
 			lab_id: '7',
 			source_filter: 'hal_yes',
 		});
+	});
+
+	it('écrit une sélection explicite, `all` pour une sélection vide', () => {
+		const url = explicitSelectionUrl('all');
+		expect(url.encode([])).toBe('all');
+		expect(url.encode(['2023', '2024'])).toBe('2023,2024');
+		expect(url.decode('all')).toEqual([]);
+		expect(url.decode('2023,2024')).toEqual(['2023', '2024']);
 	});
 
 	it('signale les filtres sélectionnés que la page ne propose pas', () => {

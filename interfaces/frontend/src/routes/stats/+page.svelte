@@ -49,7 +49,6 @@
 	let yearChart: Chart | null = null;
 	// Dernières lignes du pivot renvoyées par l'API : source du tracé, réutilisée par les contrôles d'affichage (mode, tri, page) qui re-tracent sans re-solliciter le serveur.
 	let pivotRows: Record<string, unknown>[] = [];
-	let initialYearsApplied = false;
 
 	// --- Pivot : un indicateur (mesure et ventilation) + un axe de comparaison facultatif. ---
 	let pivotSchema = $state<components['schemas']['PivotSchemaResponse'] | null>(null);
@@ -183,6 +182,8 @@
 		basePath: '/stats',
 		filters: {
 			...urlFilterDefs(FILTERS),
+			// La page a ses années par défaut : « toutes les années » s'écrit donc dans l'URL.
+			years: { type: 'single', urlKey: 'year', defaultValue: '' },
 			indicator: { type: 'single', urlKey: 'indicator', defaultValue: 'doc_type_grouped' },
 				groupBy: { type: 'single', urlKey: 'group_by', defaultValue: 'year' },
 				chartMode: { type: 'single', urlKey: 'mode', defaultValue: 'absolu' },
@@ -469,12 +470,12 @@
 		}
 
 		await facets.load();
+		// Années par défaut : les années récentes, seulement quand l'URL ne fixe pas les années. Le jeton `all` (toutes les années, par exemple depuis la liste) les laisse vides.
 		const yearOptions = facets.options.years ?? [];
-		if (!initialYearsApplied && values.checkbox.years.length === 0 && yearOptions.length > 0) {
+		if (!u.has('year') && yearOptions.length > 0) {
 			values.checkbox.years = defaultYears(yearOptions.map((o) => o.value), new Date().getFullYear());
 			syncUrl();
 		}
-		initialYearsApplied = true;
 		refresh();
 	});
 </script>

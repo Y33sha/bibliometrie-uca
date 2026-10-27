@@ -3,7 +3,7 @@
  *
  * Le contexte fixe le filtre de son entité. Il active les filtres propres à l'entité : le statut HAL pour un laboratoire, la correspondance et le périmètre pour une personne.
  */
-import type { ListFilter } from '#lib/filterRegistry.js';
+import { ALL_TOKEN, explicitSelectionUrl, type ListFilter } from '#lib/filterRegistry.js';
 import { SOURCE_ITEMS } from '#lib/filterItems.js';
 import { institution } from '#lib/institution.svelte.js';
 import {
@@ -12,8 +12,6 @@ import {
 	docTypePlural,
 	docTypeFamilies,
 	publicationsDocTypes,
-	docTypeFilterToken,
-	docTypeFilterFromToken,
 } from '#lib/labels.js';
 import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
 
@@ -28,11 +26,7 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
-			url: {
-				encode: docTypeFilterToken,
-				decode: docTypeFilterFromToken,
-				defaultValue: publicationsDocTypes.join(','),
-			},
+			url: explicitSelectionUrl(publicationsDocTypes.join(',')),
 		},
 		{
 			key: 'years',
@@ -40,6 +34,8 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			label: filterLabels.years,
 			param: 'year',
 			facet: { type: 'simple', apiKey: 'years' },
+			// Un lien vers la page Statistiques écrit `all` : elle applique alors ses années par défaut seulement à l'ouverture sans paramètre `year`.
+			url: explicitSelectionUrl(ALL_TOKEN),
 		},
 		{
 			key: 'labs',
