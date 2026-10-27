@@ -5,7 +5,6 @@
 ### En cours
 
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
-- [Page Statistiques : filtres communs avec la liste des publications, indicateurs](METIER_statistiques.md)
 
 ### Non commencé
 
@@ -21,6 +20,7 @@
 
 ## Chantiers archivés
 
+- 2026-10-27 — [Page Statistiques : filtres communs avec la liste des publications, indicateurs](archived/2026-10-27_METIER_statistiques.md)
 - 2026-10-26 — [Simplification des services applicatifs et de leurs ports](archived/2026-10-26_CODE_simplification-services.md)
 - 2026-10-25 — [Refonte visuelle du frontend](archived/2026-10-25_UI_refonte-visuelle.md)
 - 2026-10-25 — [Collaborations entre structures](archived/2026-10-25_DATA_collaborations-structures.md)

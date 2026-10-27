@@ -6,24 +6,16 @@
 
 `/stats`
 
-Tableaux de bord :
-- répartition par [voie *open access*](../glossaire.md#voies-open-access) par année (graphique exportable en png);
-- répartition par éditeur (liste);
-- répartition par revue (liste).
+Graphique exportable en png. L'indicateur choisit ce que montre chaque barre :
+- nombre de publications par type de production, par accès, par [voie *open access*](../glossaire.md#voies-open-access) ou par licence ;
+- montant des APC payées par l'établissement, par voie *open access* ;
+- collaborations internationales, sur une carte.
 
-Mesure : nombre de publications, ou montant des APC payées par l'établissement.
+Les barres se comparent par année, laboratoire, éditeur, revue ou [organisation partenaire](../glossaire.md#organisation-partenaire), en nombre ou en part.
 
-Filtrable par:
-- année de publication,
-- laboratoire,
-- voie *open access*,
-- licence de la version éditeur,
-- paiement d'APC,
-- éditeur, revue, [organisation partenaire](../glossaire.md#organisation-partenaire).
+Les filtres sont ceux de la liste des publications, sauf la recherche, le statut HAL, l'auteur correspondant et le périmètre. Par défaut, la page retient la famille « Publications » et les années récentes.
 
-L'éditeur, la revue et l'organisation partenaire servent aussi d'axe de comparaison.
-
-Restreint aux publications de type article et *review*.<!--TODO: glossaire? et voir si d'autres types sont pertinents--> Quels que soient les filtres en place, un bouton "Voir les publications" donne accès à la liste complète des publications concernées.
+Le bouton « Voir les publications » ouvre la liste sous les mêmes filtres. En sens inverse, le bouton « Statistiques » de la liste ouvre la page sous les filtres de la liste ; une notification nomme ceux que la page ne prend pas en compte.
 
 ![OA Stats](../img/screenshots/stats_oa_status.png)
 
