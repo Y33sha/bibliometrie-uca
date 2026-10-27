@@ -37,7 +37,7 @@
 			type: 'bar',
 			data: {
 				labels,
-				datasets: [{ label: datasetLabel, data: values, backgroundColor: barColor, borderRadius: 3 }]
+				datasets: [{ label: datasetLabel, data: values, backgroundColor: barColor }]
 			},
 			options: {
 				indexAxis: horizontal ? 'y' : 'x',

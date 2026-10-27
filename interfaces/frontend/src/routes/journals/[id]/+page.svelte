@@ -11,7 +11,7 @@
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
 	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
-	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import type { components } from '#lib/api/schema.js';
 
 	type SerialDetail = components['schemas']['SerialDetailResponse'];
@@ -188,7 +188,7 @@
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
-							<SubjectBars {subjects} />
+							<SubjectsCloud {subjects} />
 						{/if}
 					</div>
 

@@ -10,7 +10,7 @@
 	import { titleCase, formatDate } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import IdentifiersCell from '#lib/components/IdentifiersCell.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -178,16 +178,19 @@
 					context={{ kind: 'person', id: profile.id }}
 					apiKey="person-detail-dashboard"
 					thesesFigure={false}
+					countries={false}
 					figures={thesesCount > 0
 						? [{ value: thesesCount.toLocaleString('fr-FR'), label: 'thèses (direction ou jury)' }]
 						: []}
 				>
-					{#if dashboardLoaded}
-						<div class="dash-card dash-card-wide">
-							<h2>Sujets principaux</h2>
-							<SubjectBars subjects={dashSubjects} />
-						</div>
-					{/if}
+					{#snippet subjects({ wide })}
+						{#if dashboardLoaded}
+							<div class="dash-card" class:dash-card-wide={wide}>
+								<h2>Sujets principaux</h2>
+								<SubjectsCloud subjects={dashSubjects} />
+							</div>
+						{/if}
+					{/snippet}
 				</PublicationsDashboard>
 			{/if}
 		</div>

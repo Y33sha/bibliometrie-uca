@@ -48,7 +48,7 @@
 	--tooltip-bg: #333;
 
 	/* Open access. Une variable nommée d'après une valeur de `oa_status` est lue par `oaStatusColor()`. */
-	--open: #2e9b4f;       /* ouvert, toutes voies confondues */
+	--open: #5cb87a;       /* ouvert, toutes voies confondues */
 	--open-text: #22743c;  /* assombri, lisible en texte sur fond clair */
 	--embargoed: #d29a1e;
 	--closed: #4b5260;

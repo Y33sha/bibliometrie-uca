@@ -5,6 +5,7 @@
 	import KeyFigures from '#lib/components/KeyFigures.svelte';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
+	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { publicationsDocTypes } from '#lib/labels.js';
@@ -22,18 +23,21 @@
 		context,
 		apiKey,
 		thesesFigure = true,
+		countries = true,
 		figures = [],
-		children,
+		subjects,
 	}: {
 		context: PublicationListContext;
 		/** Préfixe des clés de requête. */
 		apiKey: string;
 		/** Affiche le nombre de thèses parmi les chiffres clés. */
 		thesesFigure?: boolean;
+		/** Affiche les pays partenaires. */
+		countries?: boolean;
 		/** Chiffres clés propres à la page, après ceux du dashboard. */
 		figures?: Figure[];
-		/** Blocs propres à la page, après ceux du dashboard. */
-		children?: Snippet;
+		/** Bloc des sujets, fourni par la page. `wide` : le bloc occupe toute la largeur. */
+		subjects?: Snippet<[{ wide: boolean }]>;
 	} = $props();
 
 	let loaded = $state(false);
@@ -109,7 +113,7 @@
 	);
 
 	const typeValues = $derived(orderedPivotValues('doc_type_grouped', types));
-	const topCountries = $derived((collab?.rows ?? []).slice(0, 5));
+	const topCountries = $derived(countries ? (collab?.rows ?? []).slice(0, 5) : []);
 </script>
 
 {#if !loaded}
@@ -140,12 +144,14 @@
 				<BarChart
 					labels={topCountries.map((c) => countryName(c.code) ?? c.code.toUpperCase())}
 					values={topCountries.map((c) => c.value)}
+					color={cssVar('doctype-article')}
 					datasetLabel="Publications"
 					horizontal
 				/>
 			</div>
 		{/if}
-		{@render children?.()}
+		<!-- Les sujets complètent la ligne des pays partenaires, ou occupent seuls la leur. -->
+		{@render subjects?.({ wide: topCountries.length === 0 })}
 	</div>
 {/if}
 

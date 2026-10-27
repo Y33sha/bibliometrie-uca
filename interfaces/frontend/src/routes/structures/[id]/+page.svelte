@@ -7,7 +7,7 @@
 	import { rorShortId, rorFullUrl } from '#lib/utils.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import PublicationsDashboard from '#lib/components/PublicationsDashboard.svelte';
-	import SubjectBars from '#lib/components/SubjectBars.svelte';
+	import SubjectsCloud from '#lib/components/SubjectsCloud.svelte';
 	import PersonsListView from '#lib/components/PersonsListView.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TabNav from '#lib/components/TabNav.svelte';
@@ -209,10 +209,12 @@
 						? [{ value: rhPersonsCount.toLocaleString('fr-FR'), label: 'personnes (SI RH)' }]
 						: []}
 				>
-					<div class="dash-card dash-card-wide">
-						<h2>Sujets principaux</h2>
-						<SubjectBars subjects={dashSubjects} />
-					</div>
+					{#snippet subjects({ wide })}
+						<div class="dash-card" class:dash-card-wide={wide}>
+							<h2>Sujets principaux</h2>
+							<SubjectsCloud subjects={dashSubjects} />
+						</div>
+					{/snippet}
 				</PublicationsDashboard>
 			{/if}
 		</div>
