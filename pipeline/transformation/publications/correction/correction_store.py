@@ -286,10 +286,15 @@ class SourceRecordCorrectionStore:
                     FROM sr_eff
                     WHERE doc_type = '{DocType.DATASET.value}' AND eff_doi IS NOT NULL
                 ),
+                unresolved_dois AS (
+                    SELECT id_value AS d FROM failed_lookups
+                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
+                ),
                 -- La cible reste attachée à l'enregistrement source DataCite dont les `related_identifiers`
                 -- la mentionnent : la règle de même œuvre lit le type de cet enregistrement, et les
                 -- autres enregistrements au même DOI suivent la décision du groupe. Quand un enregistrement
-                -- mentionne plusieurs cibles, la version (concept) prime sur la variante.
+                -- mentionne plusieurs cibles, la version (concept) prime sur la variante. Une cible que
+                -- doi.org ne connaît pas est écartée.
                 same_work AS (
                     SELECT DISTINCT ON (declarant_id)
                            declarant_id, secondary_doi, canonical_doi, same_work_case
@@ -325,13 +330,10 @@ class SourceRecordCorrectionStore:
                           AND lower(rel->>'doi') <> sr.eff_doi
                           AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
                     ) s
+                    WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
                     ORDER BY declarant_id,
                              same_work_case = '{DoiClusterCase.DATACITE_VERSION_TO_CONCEPT.value}' DESC,
                              canonical_doi
-                ),
-                unresolved_dois AS (
-                    SELECT id_value AS d FROM failed_lookups
-                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
                 ),
                 -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref,
                 -- les deux ayant des contributions sources individuelles.

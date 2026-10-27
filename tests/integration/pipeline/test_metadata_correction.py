@@ -582,6 +582,28 @@ def test_une_copie_de_l_article_fait_converger_ses_voisines(sa_sync_conn):
     assert (_doi(conn, copie), _doi(conn, oa)) == ("10.1007/article", "10.1007/article")
 
 
+def test_une_cible_inconnue_de_doi_org_ne_remplace_pas_le_doi(sa_sync_conn):
+    """Régression : une copie de repository prenait le DOI de l'article qu'elle déclare, que doi.org ne connaît pas, et le reprenait à chaque passage."""
+    conn = sa_sync_conn
+    stash = {"doi": {"raw": "10.15120/gsi-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}}
+    copie = _seed_datacite(
+        conn,
+        source_id="copie",
+        doi="10.1103/inconnu",
+        doc_type="article",
+        relations=[("IsVariantFormOf", "10.1103/inconnu")],
+        corrections=stash,
+    )
+    conn.execute(
+        text(
+            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
+            " VALUES ('doi_org', 'doi', '10.1103/inconnu', now())"
+        )
+    )
+    assert _apply_cluster(conn) == 1
+    assert _doi(conn, copie) == "10.15120/gsi-1"
+
+
 def test_la_version_prime_sur_la_variante(sa_sync_conn):
     """Un enregistrement source qui mentionne un concept et une variante converge sur le concept."""
     conn = sa_sync_conn
