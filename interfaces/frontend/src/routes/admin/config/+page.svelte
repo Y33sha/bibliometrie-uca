@@ -139,6 +139,7 @@
   const CAPS = [
     { key: "fetch_missing_max_per_source", label: "Imports par DOI : max par source" },
     { key: "unpaywall_max_per_run", label: "Unpaywall" },
+    { key: "sudoc_max_per_run", label: "Sudoc : revues vérifiées" },
   ];
   const CAP_KEYS = new Set(CAPS.map((cap) => cap.key));
 

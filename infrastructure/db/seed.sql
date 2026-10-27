@@ -7,14 +7,15 @@
 
 BEGIN;
 
--- config (8 lignes)
-DELETE FROM config WHERE (key NOT IN ('perimeter_extraction', 'perimeter_persons')) AND (key) NOT IN (('doaj_refresh_after_days'), ('fetch_missing_max_per_source'), ('fetch_missing_retry_after_days'), ('fetch_stale_after_days'), ('laboratories_display_types'), ('pipeline_start_year_full'), ('unpaywall_max_per_run'), ('unpaywall_recheck_after_days'));
+-- config (9 lignes)
+DELETE FROM config WHERE (key NOT IN ('perimeter_extraction', 'perimeter_persons')) AND (key) NOT IN (('doaj_refresh_after_days'), ('fetch_missing_max_per_source'), ('fetch_missing_retry_after_days'), ('fetch_stale_after_days'), ('laboratories_display_types'), ('pipeline_start_year_full'), ('sudoc_max_per_run'), ('unpaywall_max_per_run'), ('unpaywall_recheck_after_days'));
 INSERT INTO config (key, value, description) VALUES ('doaj_refresh_after_days', '30', 'Délai, en jours, avant de télécharger de nouveau le fichier du DOAJ.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_max_per_source', '10000', 'Nombre maximum de DOI interrogés par source cible à la phase fetch_missing, par run. 0 = illimité.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('fetch_missing_retry_after_days', '30', 'Délai, en jours, avant de chercher de nouveau un identifiant introuvable dans une source. L''échec sur un identifiant natif de la source est définitif.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('fetch_stale_after_days', '30', 'Délai, en jours, au-delà duquel un document non revu est interrogé de nouveau à sa source.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('laboratories_display_types', '["labo"]', 'Types de structure affichés sur la page publique des laboratoires') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('pipeline_start_year_full', '2017', 'Mode full/monthly : extraire depuis cette année (incluse) jusqu''à l''année courante. Année absolue (ancre fixe), pas un offset — rétention cumulative.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
+INSERT INTO config (key, value, description) VALUES ('sudoc_max_per_run', '10000', 'Nombre maximum de revues vérifiées dans le Sudoc par run. 0 = illimité.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('unpaywall_max_per_run', '10000', 'Nombre maximum de DOI vérifiés auprès d''Unpaywall par run. 0 = illimité.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('unpaywall_recheck_after_days', '15', 'Délai, en jours, avant de vérifier de nouveau le statut open access d''une publication auprès d''Unpaywall.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 
