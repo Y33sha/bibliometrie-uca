@@ -2,13 +2,7 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from domain.publications.doc_types import DOC_TYPES
-from domain.publications.metadata import OA_STATUSES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
-from infrastructure.read_models.publications.models import (
-    LICENSE_FILTER_VALUES,
-    PublicationFilters,
-)
 from infrastructure.read_models.stats.models import (
     CollaborationsResponse,
     PivotResponse,
@@ -17,76 +11,48 @@ from infrastructure.read_models.stats.models import (
 )
 from infrastructure.read_models.stats.queries import StatsQueries
 from interfaces.api.deps import stats_queries
-from interfaces.api.filters import TOGGLE_VALUES, parse_int_csv, parse_ror_csv, parse_vocabulary_csv
 from interfaces.api.params import SearchTerm
+from interfaces.api.publication_filters import StatsFilters
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
 
-def stats_filters(
-    lab_id: str = Query(""),
-    year: str = Query(""),
-    publisher_id: int | None = Query(None),
-    serial_id: int | None = Query(None),
-    partner_ror: str = Query(""),
-    oa_status: str = Query(""),
-    license_: str = Query("", alias="license"),
-    has_apc: str = Query(""),
-    doc_type: str = Query(""),
-) -> PublicationFilters:
-    """Dépendance : assemble les filtres communs des endpoints stats depuis les query params, en listes séparées par des virgules.
-
-    `oa_status`, `license`, `has_apc` et `doc_type` sont pris dans leur vocabulaire fermé (mêmes valeurs que la liste des publications) ; une valeur inconnue rend 422.
-    """
-    return PublicationFilters(
-        lab_ids=parse_int_csv(lab_id, param="lab_id"),
-        years=parse_int_csv(year, param="year"),
-        publisher_id=publisher_id,
-        serial_id=serial_id,
-        partner_rors=parse_ror_csv(partner_ror, param="partner_ror"),
-        oa_status=parse_vocabulary_csv(oa_status, allowed=OA_STATUSES, param="oa_status"),
-        license=parse_vocabulary_csv(license_, allowed=LICENSE_FILTER_VALUES, param="license"),
-        has_apc=parse_vocabulary_csv(has_apc, allowed=TOGGLE_VALUES, param="has_apc"),
-        doc_types=parse_vocabulary_csv(doc_type, allowed=DOC_TYPES, param="doc_type"),
-    )
-
-
 @router.get("/facets", response_model=StatsFacetsResponse)
 def stats_facets(
-    filters: PublicationFilters = Depends(stats_filters),
+    filters: StatsFilters,
     queries: StatsQueries = Depends(stats_queries),
 ) -> StatsFacetsResponse:
     """Décomptes par option des facettes des tableaux de bord.
 
     Chaque facette écarte sa propre dimension de la clause WHERE : son décompte annonce le nombre de publications atteignables si l'option était cochée ou décochée.
     """
-    return queries.stats_facets(filters=filters)
+    return queries.stats_facets(filters=filters.to_filters())
 
 
 @router.get("/facets/entities", response_model=EntityFacetResponse)
 def stats_entity_facet(
+    filters: StatsFilters,
     kind: EntityKind = Query(...),
     entity_search: SearchTerm = "",
-    filters: PublicationFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> EntityFacetResponse:
     """Facette contextuelle des éditeurs, des revues ou des organisations partenaires : les premières entités sous les filtres actifs, avec leur décompte.
 
     Les entités sont corrélées entre elles. `entity_search` cherche dans leurs noms.
     """
-    return queries.stats_entity_facet(kind=kind, search=entity_search, filters=filters)
+    return queries.stats_entity_facet(kind=kind, search=entity_search, filters=filters.to_filters())
 
 
 @router.get("/collaborations", response_model=CollaborationsResponse)
 def collaborations(
-    filters: PublicationFilters = Depends(stats_filters),
+    filters: StatsFilters,
     queries: StatsQueries = Depends(stats_queries),
 ) -> CollaborationsResponse:
     """Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
 
     Le décompte se lit dans la colonne `countries` des publications, le pays domestique écarté.
     """
-    return queries.collaborations(filters=filters)
+    return queries.collaborations(filters=filters.to_filters())
 
 
 @router.get("/pivot/schema", response_model=PivotSchemaResponse)
@@ -99,13 +65,15 @@ def pivot_schema(
 
 @router.get("/pivot", response_model=PivotResponse)
 def pivot(
+    filters: StatsFilters,
     indicator: str = Query("doc_type_grouped"),
     compare: str = Query(""),
-    filters: PublicationFilters = Depends(stats_filters),
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotResponse:
     """Agrégation d'un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.
 
     Un indicateur inconnu ou un axe non comparable donnent un 422.
     """
-    return queries.indicator_pivot(indicator=indicator, compare=compare, filters=filters)
+    return queries.indicator_pivot(
+        indicator=indicator, compare=compare, filters=filters.to_filters()
+    )

@@ -71,6 +71,27 @@ class TestPivot:
         assert r.status_code == 422
 
 
+class TestStatsAcceptListFilters:
+    """Les statistiques lisent les filtres de la liste, sauf ceux qui supposent un seul laboratoire ou une personne."""
+
+    @pytest.mark.parametrize(
+        ("param", "value"),
+        [("access", "inconnu"), ("source_filter", "inconnu"), ("subject_id", "x")],
+    )
+    def test_reads_list_filters(self, client, param, value):
+        r = client.get("/api/stats/pivot", params={param: value})
+        assert r.status_code == 422
+
+    def test_accepts_search_country_and_author(self, client):
+        params = {"search": "quantum", "country": "de", "author_id": "1", "lab_id": "none"}
+        assert client.get("/api/stats/pivot", params=params).status_code == 200
+
+    @pytest.mark.parametrize("param", ["hal_status", "is_corresponding", "in_perimeter"])
+    def test_ignores_context_filters(self, client, param):
+        r = client.get("/api/stats/pivot", params={param: "inconnu"})
+        assert r.status_code == 200
+
+
 class TestStatsClosedVocabularyFilters:
     """Les filtres partagés `oa_status` et `doc_type` refusent une valeur hors vocabulaire.
 
