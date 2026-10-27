@@ -159,7 +159,7 @@
 <ListToolbar bind:search placeholder="Rechercher par titre ou ISBN" onsearch={onSearchInput} list={monographs} one="monographie" many="monographies" exportUrl={exportCsvUrl()}>
 	{#snippet filters()}
 		<FacetDropdown label={filterLabels.types} options={facets.options.kinds} bind:selected={selectedKinds} onchange={onFilterChange} />
-		<FacetDropdown label={filterLabels.years} allLabel="Toutes" options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
+		<FacetDropdown label={filterLabels.years} options={facets.options.years} searchable bind:selected={selectedYears} onchange={onFilterChange} />
 		{#if !publisherFixed}
 			<EntityFilter
 				label={filterLabels.publisher}

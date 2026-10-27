@@ -13,19 +13,18 @@
 		label: string;
 		options: FacetOption[];
 		searchable?: boolean;
+		/** Valeurs cochées. Une sélection vide ne filtre rien. */
 		selected?: string[];
-		allLabel?: string;
 		tooltip?: string;
 		/** Regroupe les options sous des en-têtes (ex. familles de doc_types). Les options hors groupe sont rendues sans en-tête à la fin ; le regroupement est purement visuel, la sélection fonctionne à l'identique. */
 		groups?: { label: string; values: string[] }[];
 		onchange?: (selected: string[]) => void;
 	}
 
-	let { label, options, searchable = false, selected = $bindable([]), allLabel = 'Tous', tooltip, groups, onchange }: Props = $props();
+	let { label, options, searchable = false, selected = $bindable([]), tooltip, groups, onchange }: Props = $props();
 
 	let open = $state(false);
 	let filterText = $state('');
-	let allMode = $state(true);
 
 	const instanceId = Symbol();
 
@@ -35,43 +34,14 @@
 			: options
 	);
 
-	const isAllSelected = $derived(allMode && selected.length === 0);
-
-	function toggleAll() {
-		if (allMode) {
-			// Décoche « Tous » → tout décocher visuellement
-			allMode = false;
-			selected = [];
-			// Pas d'onchange : le filtre ne change pas (vide = aucun filtre)
-		} else {
-			// Coche « Tous » → retour à tout
-			const hadFilter = selected.length > 0;
-			allMode = true;
-			selected = [];
-			if (hadFilter) onchange?.(selected);
-		}
-	}
-
 	function toggle(value: string) {
-		if (allMode) {
-			// En mode « tous » → décocher celui-ci = sélectionner tout sauf lui
-			allMode = false;
-			selected = options.filter((o) => o.value !== value).map((o) => o.value);
-		} else if (selected.includes(value)) {
-			selected = selected.filter((v) => v !== value);
-			// Pas de bascule auto vers allMode quand vide
-		} else {
-			selected = [...selected, value];
-			if (selected.length === options.length) {
-				allMode = true;
-				selected = [];
-			}
-		}
+		selected = selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value];
 		onchange?.(selected);
 	}
 
-	function isChecked(value: string): boolean {
-		return allMode || selected.includes(value);
+	function clear() {
+		selected = [];
+		onchange?.(selected);
 	}
 
 	function handleClickOutside() {
@@ -96,7 +66,7 @@
 
 {#snippet optionRow(opt: FacetOption)}
 	<label>
-		<input type="checkbox" checked={isChecked(opt.value)} onchange={() => toggle(opt.value)} />
+		<input type="checkbox" checked={selected.includes(opt.value)} onchange={() => toggle(opt.value)} />
 		<span class="facet-option-text" title={opt.text}>{opt.text}</span>{#if opt.count != null}<span class="facet-count">{opt.count}</span>{/if}
 	</label>
 {/snippet}
@@ -115,8 +85,6 @@
 				return;
 			}
 			window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
-			// La sélection change aussi hors du panneau (URL, barre des filtres actifs) : « Tous » est coché quand elle est vide.
-			allMode = selected.length === 0;
 			open = true;
 			filterText = '';
 		}}
@@ -140,11 +108,10 @@
 					bind:value={filterText}
 				/>
 			{/if}
+			{#if selected.length}
+				<button type="button" class="facet-clear" onclick={clear}>Effacer</button>
+			{/if}
 			<div class="facet-options">
-				<label>
-					<input type="checkbox" checked={isAllSelected} onchange={toggleAll} />
-					<span style="font-weight:500">{allLabel}</span>
-				</label>
 				{#if groups}
 					{#each groups as g (g.label)}
 						{@const opts = filteredOptions.filter((o) => g.values.includes(o.value))}

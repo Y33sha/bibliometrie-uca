@@ -98,15 +98,6 @@
 		}
 	}
 
-	function pickAll(e: Event & { currentTarget: HTMLInputElement }) {
-		// « Tous » sans sélection reste coché : il n'y a rien à retirer.
-		if (!selected.length) {
-			e.currentTarget.checked = true;
-			return;
-		}
-		pick(null);
-	}
-
 	function openPanel() {
 		window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
 		open = true;
@@ -145,11 +136,10 @@
 		<!-- svelte-ignore a11y_no_static_element_interactions a11y_click_events_have_key_events -->
 		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
 			<input type="text" class="facet-search" placeholder="Rechercher" bind:value={query} oninput={onInput} />
+			{#if selected.length}
+				<button type="button" class="facet-clear" onclick={() => pick(null)}>Effacer</button>
+			{/if}
 			<div class="facet-options">
-				<label>
-					<input type={multiple ? 'checkbox' : 'radio'} checked={!selected.length} onchange={pickAll} />
-					<span style="font-weight:500">Tous</span>
-				</label>
 				{#each selectedOutside as id (id)}
 					<label>
 						<input

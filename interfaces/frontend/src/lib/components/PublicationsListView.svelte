@@ -242,7 +242,7 @@
 			if (restored.currentPage) listing.page = restored.currentPage as number;
 		}
 
-		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle (et non un filtre caché), donc la facet « Types » la reflète ; cocher d'autres types ou « Tous » l'élargit. Le token `all` dans l'URL (« Tous » explicite) laisse la sélection vide.
+		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle, donc la facette « Types » la reflète ; cocher d'autres types l'élargit, « Effacer » la vide. Le jeton `all` dans l'URL laisse la sélection vide.
 		if (restrictToPublications && !(urlSync && page.url.searchParams.has('doc_type'))) {
 			values.checkbox.docTypes = [...publicationsDocTypes];
 		}

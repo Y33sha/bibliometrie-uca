@@ -464,7 +464,7 @@
 			pivotSchema = await api<components['schemas']['PivotSchemaResponse']>('/api/stats/pivot/schema');
 		} catch { pivotSchema = null; }
 
-		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne porte pas de filtre de types ; le token `all` (sélection « Tous » explicite) le laisse vide.
+		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne porte pas de filtre de types ; le jeton `all` (sélection vide explicite) le laisse vide.
 		if (!u.has('doc_type')) {
 			values.checkbox.docTypes = [...publicationsDocTypes];
 		}

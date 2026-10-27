@@ -261,7 +261,7 @@
 				onchange={onFilterChange}
 			/>
 			<FacetDropdown label="Activité" options={activityOptions} bind:selected={selectedActivity} onchange={onFilterChange} />
-			<FacetDropdown label="Exclusion" options={exclusionOptions} allLabel="Toutes" bind:selected={selectedExclusions} onchange={onFilterChange} />
+			<FacetDropdown label="Exclusion" options={exclusionOptions} bind:selected={selectedExclusions} onchange={onFilterChange} />
 		{/if}
 	{/snippet}
 </ListToolbar>
