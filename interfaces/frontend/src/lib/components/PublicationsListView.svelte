@@ -436,8 +436,8 @@
 		white-space: nowrap;
 	}
 	.hal-ok              { background: var(--success-light); color: var(--success); }
-	.hal-notice          { background: #fff3e0; color: #c77c00; }
-	.hal-hors_collection { background: #ffe8d6; color: #d35400; }
+	.hal-notice          { background: var(--warning-light); color: var(--warning-text); }
+	.hal-hors_collection { background: var(--attention-light); color: var(--attention); }
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */

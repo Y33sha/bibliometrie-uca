@@ -5,12 +5,12 @@
 	import { resolve } from '$app/paths';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { docTypeLabel, issnLabel, oaStatusLabel } from '#lib/labels.js';
+	import { docTypeColorVar, docTypeLabel, issnLabel, oaStatusLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/cssVar.js';
+	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
 	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import type { components } from '#lib/api/schema.js';
 
@@ -42,6 +42,7 @@
 		(dashboard?.doc_types ?? []).map((d) => ({
 			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
 			value: d.count,
+			color: cssVar(docTypeColorVar(d.doc_type ?? 'misc')),
 			expected: d.expected
 		}))
 	);

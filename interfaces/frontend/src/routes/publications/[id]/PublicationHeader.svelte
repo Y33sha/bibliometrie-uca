@@ -200,48 +200,48 @@
   }
   /* Niveaux : la couleur porte sur le filet, l'icône et le libellé ; le titre reste lisible. */
   .tier-danger {
-    background: #fef3f2;
-    border-left-color: #d92d20;
+    background: var(--danger-light);
+    border-left-color: var(--danger);
   }
   .tier-danger .rel-icon,
   .tier-danger .rel-kind {
-    color: #b42318;
+    color: var(--danger);
   }
   .tier-danger:hover {
-    background: #fee4e2;
+    background: color-mix(in srgb, var(--danger) 14%, white);
   }
   .tier-warning {
-    background: #fffaeb;
-    border-left-color: #f79009;
+    background: var(--warning-light);
+    border-left-color: var(--warning);
   }
   .tier-warning .rel-icon,
   .tier-warning .rel-kind {
-    color: #b54708;
+    color: var(--warning-text);
   }
   .tier-warning:hover {
-    background: #fef0c7;
+    background: color-mix(in srgb, var(--warning) 20%, white);
   }
   .tier-parent {
-    background: #eef4f5;
-    border-left-color: #15616d;
+    background: var(--accent-light);
+    border-left-color: var(--accent);
   }
   .tier-parent .rel-icon,
   .tier-parent .rel-kind {
-    color: #15616d;
+    color: var(--accent);
   }
   .tier-parent:hover {
-    background: #e1edef;
+    background: color-mix(in srgb, var(--accent) 14%, white);
   }
   .tier-secondary {
-    background: #f5f6f7;
-    border-left-color: #98a2b3;
+    background: var(--surface);
+    border-left-color: var(--text-faint);
   }
   .tier-secondary .rel-icon,
   .tier-secondary .rel-kind {
-    color: #667085;
+    color: var(--muted);
   }
   .tier-secondary:hover {
-    background: #eceef0;
+    background: var(--hover);
   }
 
   .publication-journal-line {

@@ -275,15 +275,15 @@
     white-space: nowrap;
   }
   .match-badge.word {
-    background: #e8f0e8;
-    color: #2e6b2e;
+    background: var(--success-light);
+    color: var(--success);
   }
   .match-badge.substr {
-    background: #f0f0f0;
-    color: #888;
+    background: var(--border-subtle);
+    color: var(--muted);
   }
   .match-badge.excluding {
-    background: #e65100;
+    background: var(--attention);
     color: white;
   }
   .ctx-tag {

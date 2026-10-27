@@ -5,6 +5,8 @@
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
+	import { chartColor } from '#lib/components/charts/palette.js';
+	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
@@ -15,8 +17,7 @@
 		oaStatusLabel,
 		docTypePlural,
 		docTypeFamilies,
-		docTypeGroupedColors,
-		licenseColors,
+		docTypeGroupColorVar,
 		licenseOrder,
 		publicationsDocTypes,
 	} from '#lib/labels.js';
@@ -92,7 +93,6 @@
 	const OA_ACCESS_STATUS: Record<string, string> = {
 		ouvert: 'open', embargo: 'embargoed', ferme: 'closed', indetermine: 'unknown',
 	};
-	const PALETTE = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#ff9da7', '#9c755f', '#bab0ac', '#edc948'];
 
 	function dimCard(dim: string): string {
 		return pivotSchema?.dimensions.find((d) => d.key === dim)?.cardinality ?? 'low';
@@ -107,11 +107,11 @@
 		return value;
 	}
 	function dimColor(dim: string, value: string, idx: number): string {
-		if (dim === 'oa_voie') return oaStatusColor(value) ?? PALETTE[idx % PALETTE.length];
-		if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? PALETTE[idx % PALETTE.length];
-		if (dim === 'doc_type_grouped') return docTypeGroupedColors[value] ?? PALETTE[idx % PALETTE.length];
-		if (dim === 'license') return licenseColors[value] ?? PALETTE[idx % PALETTE.length];
-		return PALETTE[idx % PALETTE.length];
+		if (dim === 'oa_voie') return oaStatusColor(value) ?? chartColor(idx);
+		if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? chartColor(idx);
+		if (dim === 'doc_type_grouped') return cssVar(docTypeGroupColorVar(value));
+		if (dim === 'license') return cssVar(`license-${value}`) || chartColor(idx);
+		return chartColor(idx);
 	}
 	function orderedValues(dim: string, rows: Record<string, unknown>[]): string[] {
 		const present = rows.map((r) => String(r[dim]));
@@ -298,7 +298,7 @@
 			yearChart = new Chart(chartCanvas, {
 				type: 'pie',
 				plugins: [whiteBgPlugin],
-				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: '#fff', borderWidth: 1 }] },
+				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: cssVar('card'), borderWidth: 1 }] },
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,
@@ -316,7 +316,7 @@
 							}
 						},
 						datalabels: {
-							color: '#fff',
+							color: (ctx) => readableOn(colors[ctx.dataIndex], cssVar('text')),
 							font: { size: 13, weight: 'bold' },
 							formatter: (val: number, ctx) => {
 								const total = sliceTotal(ctx);
@@ -371,7 +371,7 @@
 								}
 					},
 					datalabels: {
-								color: '#fff',
+								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssVar('text')),
 								font: { size: 13, weight: 'bold' },
 								formatter: (val: number, ctx) => {
 									const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
@@ -423,7 +423,7 @@
 			if (!chartWhiteBg) return;
 			const { ctx, width, height } = chart;
 			ctx.save();
-			ctx.fillStyle = '#ffffff';
+			ctx.fillStyle = cssVar('card');
 			ctx.fillRect(0, 0, width, height);
 			ctx.restore();
 		}

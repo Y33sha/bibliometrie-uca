@@ -41,7 +41,7 @@
 	--warning: #d4a017;
 	--warning-light: #fef8e8;
 	--warning-text: #856404;    /* assombri, lisible en texte sur fond clair */
-	--attention: #e65100;       /* élément à traiter : orphelin, hors collection, exclusion */
+	--attention: #b84000;       /* élément à traiter : orphelin, hors collection, exclusion ; contraste de 4,5:1 au moins en texte sur --attention-light */
 	--attention-light: #fff3e0;
 
 	/* Infobulles */
@@ -60,6 +60,47 @@
 	--bronze-text: #9a5a1e; /* assombri, lisible en texte sur fond clair */
 	--green: #5ec62c;
 	--green-text: #3f7a28;  /* assombri, lisible en texte sur fond clair */
+
+	/* Graphiques : couleurs des séries sans couleur propre, dans l'ordre d'attribution (`chartColor()`). */
+	--chart-1: #4e79a7;
+	--chart-2: #f28e2b;
+	--chart-3: #59a14f;
+	--chart-4: #e15759;
+	--chart-5: #b07aa1;
+	--chart-6: #76b7b2;
+	--chart-7: #ff9da7;
+	--chart-8: #9c755f;
+	--chart-9: #bab0ac;
+	--chart-10: #edc948;
+
+	/* Types de document, par clé de groupement de la page Statistiques (`docTypeColorVar()`). */
+	--doctype-article: #2f7ed8;
+	--doctype-review: #1f5c9e;
+	--doctype-preprints: #b3d9f5;
+	--doctype-conference_paper: #b18fcf;
+	--doctype-book: #ffa93b;
+	--doctype-book_chapter: #f4c430;
+	--doctype-data_paper: #66bb6a;
+	--doctype-theses: #c0392b;
+	--doctype-data: #43a047;
+	--doctype-misc: #cfd3d6;
+
+	/* Licences : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). */
+	--license-public-domain: #2e669e;
+	--license-cc-by: #2e9e4a;
+	--license-licence-ouverte: #43ad5c;
+	--license-open-source: #5bb873;
+	--license-cc-by-sa: #7cc36b;
+	--license-cc-by-nd: #a7d35c;
+	--license-cc-by-nc: #c8d84d;
+	--license-cc-by-nc-sa: #e1cf45;
+	--license-cc-by-nc-nd: #efb93e;
+	--license-publisher-open: #ee9f3a;
+	--license-other-oa: #f3c98d;
+	--license-repository-distribution: #9db4c4;
+	--license-other: #bdbdbd;
+	--license-all-rights-reserved: #7a7a7a;
+	--license-none: #3c3c3c;
 
 	/* Polices */
 	--font: "Source Sans 3", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -833,6 +874,11 @@ a.id-badge.id-confirmed:hover {
 
 .source-datacite:hover {
 	background: #c6e8e0;
+}
+
+/* Le logo de Zenodo est blanc : sa pastille prend le bleu de Zenodo. */
+.tag-zenodo {
+	background: #0047a8;
 }
 
 .source-placeholder {

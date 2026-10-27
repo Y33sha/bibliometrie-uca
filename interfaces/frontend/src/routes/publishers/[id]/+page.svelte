@@ -4,13 +4,13 @@
 	import { page } from '$app/state';
 	import { onMount, tick } from 'svelte';
 	import { api, apiDetail } from '#lib/api/index.js';
-	import { docTypeLabel, oaStatusLabel } from '#lib/labels.js';
+	import { docTypeColorVar, docTypeLabel, oaStatusLabel } from '#lib/labels.js';
 	import TabNav from '#lib/components/TabNav.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
 	import MonographsListView from '#lib/components/MonographsListView.svelte';
 	import DoughnutChart from '#lib/components/charts/DoughnutChart.svelte';
-	import { oaStatusColor } from '#lib/components/charts/cssVar.js';
+	import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
 	import SubjectBars from '#lib/components/SubjectBars.svelte';
 	import type { components } from '#lib/api/schema.js';
 
@@ -38,11 +38,12 @@
 	// Label FR du publisher_type, affiché dans l'en-tête de la page.
 	let publisherTypeLabels: Record<string, string> = $state({});
 
-	// Distributions en segments pour les doughnuts (palette neutre ; pas de notion d'« attendu » au niveau éditeur, agrégat multi-revues).
+	// Distributions en segments pour les doughnuts, chaque type dans sa couleur. Pas de notion d'« attendu » au niveau éditeur, agrégat multi-revues.
 	const docTypeSegments = $derived(
 		(dashboard?.doc_types ?? []).map((d) => ({
 			label: d.doc_type ? docTypeLabel(d.doc_type) : '(non renseigné)',
-			value: d.count
+			value: d.count,
+			color: cssVar(docTypeColorVar(d.doc_type ?? 'misc'))
 		}))
 	);
 	const oaStatusSegments = $derived(

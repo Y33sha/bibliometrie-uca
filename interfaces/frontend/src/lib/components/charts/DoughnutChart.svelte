@@ -1,13 +1,14 @@
 <script lang="ts">
 	import { cssVar } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
+	import { chartColor } from '#lib/components/charts/palette.js';
 	import type { LegendItem } from 'chart.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
 	export type DoughnutSegment = {
 		label: string;
 		value: number;
-		/** Couleur explicite (ex. statut OA sémantique) ; sinon palette tournante. */
+		/** Couleur explicite (ex. statut OA sémantique) ; sinon celle de la palette des graphiques, selon le rang du segment. */
 		color?: string;
 		/** Quand `flagAnomalies` est actif, un segment `expected === false` est stylé en alerte. */
 		expected?: boolean;
@@ -23,20 +24,6 @@
 		height?: number;
 	} = $props();
 
-	// Palette neutre tournante pour les distributions sans couleur sémantique (doc_types, serial_types). Stable par position.
-	const PALETTE = [
-		'#2f8a8a',
-		'#2a7d4f',
-		'#b08900',
-		'#7c3aed',
-		'#0369a1',
-		'#be123c',
-		'#b45309',
-		'#0f766e',
-		'#9333ea',
-		'#64748b'
-	];
-
 	let canvas = $state<HTMLCanvasElement | undefined>();
 	let chart: Chart | null = null;
 
@@ -46,7 +33,7 @@
 
 	function colorFor(seg: DoughnutSegment, index: number): string {
 		if (isAnomaly(seg)) return cssVar('danger');
-		return seg.color ?? PALETTE[index % PALETTE.length];
+		return seg.color ?? chartColor(index);
 	}
 
 	function render() {
