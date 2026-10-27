@@ -43,7 +43,7 @@ Les chiffres clés actuels (total, part en open access, thèses) renseignent peu
 
 ### Dashboards d'éditeur et de revue
 
-- [ ] Blocs communs (types de documents, open access) servis par le moteur des statistiques, sur le même corpus ; blocs propres conservés (types de publications en série, statuts attendus selon le modèle de la revue)
+- [x] Dashboards d'éditeur et de revue servis par `PublicationsDashboard`, publications par année découpées par modèle open access, sans pays partenaires ; valeurs inattendues d'une revue retirées (sujet d'audit de qualité)
 
 ## Questions ouvertes
 
