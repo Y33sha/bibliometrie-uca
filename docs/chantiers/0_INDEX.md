@@ -6,6 +6,7 @@
 
 - [Preprints et versions d'une publication](DATA_preprints-et-versions.md)
 - [Audit de la qualité de la résolution des personnes](DATA_audit-qualite-resolution-personnes.md)
+- [Qualité du référentiel de l'édition](DATA_referentiel-edition.md)
 
 ### Non commencé
 
