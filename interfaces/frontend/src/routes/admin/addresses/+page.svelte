@@ -567,41 +567,30 @@
 				</div>
 				{#each addresses as addr (addr.id)}
 					<div class={cardClass(addr)}>
-						<div
-							class="addr-header"
-							onclick={() => toggleDetail(addr.id)}
-							role="button"
-							tabindex="0"
-							onkeydown={(e) => {
-								if (e.key === 'Enter' || e.key === ' ') toggleDetail(addr.id);
-							}}
-						>
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
+						<div class="addr-header">
 							<input
 								type="checkbox"
+								aria-label="Sélectionner l'adresse"
 								checked={selectedIds.has(addr.id)}
-								onclick={(e) => {
-									e.stopPropagation();
-									toggleSelect(addr.id);
-								}}
+								onchange={() => toggleSelect(addr.id)}
 							/>
-							<div>
+							<button
+								type="button"
+								class="addr-toggle"
+								aria-expanded={expandedId === addr.id}
+								onclick={() => toggleDetail(addr.id)}
+							>
 								<div class="addr-text">{addr.raw_text}</div>
 								<div class="addr-meta">
 									<span class="publication-count-tag"
-										>{addr.publication_count} publi{addr.publication_count > 1 ? 's' : ''}</span
+										>{addr.publication_count} publication{addr.publication_count > 1 ? 's' : ''}</span
 									>
 									{#each addr.structures || [] as s}
 										<span class={structTagClass(s)}>{structureLabel(s)}</span>
 									{/each}
 								</div>
-							</div>
-							<!-- svelte-ignore a11y_click_events_have_key_events -->
-							<div
-								class="addr-actions"
-								onclick={(e) => e.stopPropagation()}
-								role="group"
-							>
+							</button>
+							<div class="addr-actions" role="group" aria-label="Lien de l'adresse à la structure">
 								{#if addr.is_confirmed !== false}
 									<button class="btn btn-sm btn-danger-outline" title="Rejeter le lien" onclick={() => reviewAddr(addr.id, false)}>&#x2717;</button>
 								{/if}
@@ -879,7 +868,6 @@
 
 	.addr-header {
 		padding: 8px 12px;
-		cursor: pointer;
 		display: grid;
 		grid-template-columns: 28px 1fr auto;
 		gap: 10px;
@@ -887,6 +875,16 @@
 	}
 	.addr-header:hover {
 		background: var(--surface-hover);
+	}
+	/* Texte de l'adresse : bouton qui déplie ses publications, sans apparence de bouton. */
+	.addr-toggle {
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		color: inherit;
+		text-align: left;
+		cursor: pointer;
 	}
 
 	.addr-text {

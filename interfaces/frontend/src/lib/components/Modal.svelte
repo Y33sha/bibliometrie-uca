@@ -22,6 +22,12 @@
 	} = $props();
 
 	let dialog: HTMLDivElement | undefined = $state();
+	let overlay: HTMLDivElement | undefined = $state();
+
+	// Un appui sur le fond de cette modale la ferme. Une modale ouverte par-dessus a son propre fond : un appui sur elle laisse celle-ci ouverte.
+	function onpointerdown(e: PointerEvent): void {
+		if (e.target === overlay) onclose();
+	}
 
 	// Focus le premier champ de saisie à l'ouverture, pour démarrer la frappe sans cliquer ; à défaut (modale sans champ) le conteneur, qui capte échap. Trap complet de Tab non implémenté (usage admin).
 	onMount(() => {
@@ -47,10 +53,9 @@
 	}
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window {onkeydown} {onpointerdown} />
 
-<!-- svelte-ignore a11y_no_static_element_interactions -->
-<div class="modal-overlay" onclick={onclose} role="presentation">
+<div class="modal-overlay" role="presentation" bind:this={overlay}>
 	<div
 		class="modal-content"
 		style:max-width={maxWidth}
@@ -59,7 +64,6 @@
 		aria-label={title}
 		tabindex="-1"
 		bind:this={dialog}
-		onclick={(e) => e.stopPropagation()}
 	>
 		{#if title}<h3>{title}</h3>{/if}
 		{@render children()}

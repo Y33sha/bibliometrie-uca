@@ -296,11 +296,6 @@
 />
 
 <style>
-	/* Assez large pour que le texte indicatif du champ tienne en entier. */
-	.toolbar input[type='search'] {
-		width: 280px;
-	}
-
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
 	.muted { color: var(--muted); }

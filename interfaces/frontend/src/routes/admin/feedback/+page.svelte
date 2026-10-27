@@ -195,9 +195,11 @@
 
   function handleOutsideClick(event: MouseEvent) {
     if (!ctxPicker) return;
-    const target = event.target as HTMLElement;
+    // Le chemin du clic est figé à sa production : un clic sur un résultat que le rendu retire ensuite compte bien comme intérieur.
+    const path = event.composedPath();
     const picker = document.getElementById("form-ctx-picker");
-    if (picker && !picker.contains(target) && !target.classList.contains("form-action")) {
+    const onTrigger = path.some((n) => n instanceof HTMLElement && n.classList.contains("form-action"));
+    if (picker && !path.includes(picker) && !onTrigger) {
       closeCtxPicker();
     }
   }
@@ -375,7 +377,7 @@
 
   <!-- Context picker -->
   {#if ctxPicker}
-    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onclick={(e) => e.stopPropagation()} onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog">
+    <div class="ctx-picker-inline" id="form-ctx-picker" style="top:{ctxPicker.y}px;left:{ctxPicker.x}px" onkeydown={(e) => { if (e.key === 'Escape') { e.preventDefault(); closeCtxPicker(); } }} role="dialog" aria-label="Contexte contraignant" tabindex="-1">
       <div class="picker-shortcuts">
         <button onclick={() => addCtxToForm("tutelles")}>{"\uD83D\uDD17"} tutelles</button>
       </div>

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
 	import { anchored } from '#lib/actions/anchored.js';
+	import { useFacetPanel } from '#lib/composables/useFacetPanel.svelte.js';
 	import Tooltip from '#lib/components/Tooltip.svelte';
 
 	export interface FacetOption {
@@ -23,10 +23,9 @@
 
 	let { label, options, searchable = false, selected = $bindable([]), tooltip, groups, onchange }: Props = $props();
 
-	let open = $state(false);
+	const panel = useFacetPanel();
+	const facetRoot = panel.root;
 	let filterText = $state('');
-
-	const instanceId = Symbol();
 
 	const filteredOptions = $derived(
 		filterText
@@ -44,25 +43,7 @@
 		onchange?.(selected);
 	}
 
-	function handleClickOutside() {
-		open = false;
-	}
-
-	function handleFacetClose(e: Event) {
-		if ((e as CustomEvent).detail !== instanceId) {
-			open = false;
-		}
-	}
-
-	onMount(() => {
-		window.addEventListener('facet-close', handleFacetClose);
-	});
-	onDestroy(() => {
-		window.removeEventListener('facet-close', handleFacetClose);
-	});
 </script>
-
-<svelte:window onclick={handleClickOutside} />
 
 {#snippet optionRow(opt: FacetOption)}
 	<label>
@@ -71,35 +52,29 @@
 	</label>
 {/snippet}
 
-<div class="facet">
+<div class="facet" use:facetRoot>
 	<!-- L'infobulle se masque quand le panneau est ouvert. -->
-	<Tooltip text={open ? '' : (tooltip ?? '')}>
+	<Tooltip text={panel.open ? '' : (tooltip ?? '')}>
 	<button
 		type="button"
 		class="facet-btn"
 		class:has-selection={selected.length > 0}
-		onclick={(e) => {
-			e.stopPropagation();
-			if (open) {
-				open = false;
-				return;
-			}
-			window.dispatchEvent(new CustomEvent('facet-close', { detail: instanceId }));
-			open = true;
-			filterText = '';
+		aria-expanded={panel.open}
+		onclick={() => {
+			if (!panel.open) filterText = '';
+			panel.toggle();
 		}}
 	>
 		<span class="facet-label">{label}</span>
 		{#if selected.length > 0}
 			<span class="facet-badge">{selected.length}</span>
 		{/if}
-		<span class="chevron" class:up={open} aria-hidden="true"></span>
+		<span class="chevron" class:up={panel.open} aria-hidden="true"></span>
 	</button>
 	</Tooltip>
 
-	{#if open}
-		<!-- svelte-ignore a11y_no_static_element_interactions -->
-		<div class="facet-panel" use:anchored onclick={(e) => e.stopPropagation()}>
+	{#if panel.open}
+		<div class="facet-panel" use:anchored>
 			{#if searchable}
 				<input
 					type="text"
