@@ -2,7 +2,6 @@
   import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
-  import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { latestRequest } from "#lib/api/index.js";
   import type { components } from "#lib/api/schema.js";
@@ -50,10 +49,6 @@
     const id = subjectId;
     loadFor(id, NEIGHBORS_LIMIT, MIN_COOCCURRENCE);
   });
-
-  function onNeighborSelect(id: number) {
-    goto(resolve(`subjects/${id}`));
-  }
 
   // Tableau des sujets associés, trié par publications en commun par défaut. Spécificité : part des publications du sujet associé qui portent aussi le sujet de la page.
   type NeighborSort = "common" | "specificity" | "total";
@@ -112,7 +107,6 @@
               subject={data.subject}
               neighbors={data.neighbors}
               links={data.neighbor_links}
-              onSelect={onNeighborSelect}
             />
           {/key}
 
