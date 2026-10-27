@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
@@ -270,7 +271,7 @@
 {/if}
 
 <ListStatus {list} emptyText="Aucune contribution orpheline{search.trim() || selectedLabs.length ? ' pour ce filtre' : ''}.">
-	<div class="table-scroll">
+	<TableScroll>
 		<table class="data-table">
 			<thead>
 				<tr>
@@ -338,7 +339,7 @@
 				{/each}
 			</tbody>
 		</table>
-	</div>
+	</TableScroll>
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>

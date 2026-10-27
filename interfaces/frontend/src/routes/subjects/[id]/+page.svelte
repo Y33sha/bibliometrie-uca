@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TableScroll from '#lib/components/TableScroll.svelte';
   import Breadcrumb from "#lib/components/Breadcrumb.svelte";
   import { pageTitle } from "#lib/institution.svelte.js";
   import { page } from "$app/state";
@@ -111,7 +112,7 @@
           {/key}
 
           <h2 class="section-title">Sujets associés</h2>
-          <div class="table-scroll">
+          <TableScroll>
             <table class="data-table">
               <thead>
                 <tr>
@@ -148,7 +149,7 @@
                 {/each}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         {/if}
       </div>
     {:else}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
@@ -97,7 +98,7 @@
 	const titleSort = $derived(sortDirection(sort, 'title'));
 </script>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table theses-table">
 	<thead>
 		<tr>
@@ -187,7 +188,7 @@
 		{/each}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <style>
 	.panel-col { width: 28px; padding-right: 0; }

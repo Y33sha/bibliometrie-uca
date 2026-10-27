@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
@@ -47,7 +48,7 @@
 <ListToolbar {list} one="publication" many="publications" exportUrl={withBase('/api/hal-problems/affiliation-conflicts/export.csv')} />
 
 <ListStatus {list} emptyText="Aucun conflit détecté">
-	<div class="table-scroll">
+	<TableScroll>
 		<table class="data-table">
 			<thead>
 				<tr>
@@ -78,6 +79,6 @@
 				{/each}
 			</tbody>
 		</table>
-	</div>
+	</TableScroll>
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>

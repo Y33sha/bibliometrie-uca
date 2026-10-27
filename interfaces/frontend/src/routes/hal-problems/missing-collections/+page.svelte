@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { institution } from '#lib/institution.svelte.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
@@ -87,7 +88,7 @@
 	<div class="loading">Chargement…</div>
 {:else if selectedLabId}
 	<ListStatus {list} emptyText="Aucune publication manquante pour {selectedLab?.acronym ?? ''} (collection {selectedLab?.hal_collection ?? ''})">
-		<div class="table-scroll">
+		<TableScroll>
 			<table class="data-table">
 				<thead>
 					<tr>
@@ -115,7 +116,7 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
+		</TableScroll>
 		<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 	</ListStatus>
 {/if}

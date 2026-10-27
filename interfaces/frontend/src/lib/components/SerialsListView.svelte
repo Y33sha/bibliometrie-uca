@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
@@ -229,7 +230,7 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table journals-table">
 	<thead>
 		<tr>
@@ -283,7 +284,7 @@
 		{/if}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <Pagination
 	page={serials.page}

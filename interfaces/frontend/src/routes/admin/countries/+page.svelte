@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
@@ -225,7 +226,7 @@
 	{/if}
 </div>
 
-<div class="table-scroll">
+<TableScroll>
 	<table class="data-table addr-table">
 		<thead>
 			<tr>
@@ -273,7 +274,7 @@
 			{/if}
 		</tbody>
 	</table>
-</div>
+</TableScroll>
 
 <Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 

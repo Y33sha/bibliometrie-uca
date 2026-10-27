@@ -1,4 +1,5 @@
 <script lang="ts">
+  import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import { onMount } from "svelte";
@@ -319,7 +320,7 @@
 
 <h3 class="subsection-title">Définition des périmètres</h3>
 <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<div class="table-scroll">
+<TableScroll>
   <table class="data-table perimeters-table">
     <thead>
       <tr>
@@ -351,7 +352,7 @@
       {/each}
     </tbody>
   </table>
-</div>
+</TableScroll>
 <div class="perim-new">
   <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
 </div>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
+	import { scrollFade } from '#lib/actions/scrollFade.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { withBase } from '#lib/paths.js';
@@ -71,7 +73,7 @@
 	{/if}
 </PageHeader>
 
-<div class="tabs">
+<div class="tabs" use:scrollFade>
 	<button class="tab" class:active={activeTab === 'doi'} onclick={() => switchTab('doi')}>
 		Par DOI{doi.items.length ? ` (${doi.total})` : ''}
 	</button>
@@ -89,7 +91,7 @@
 
 {#if activeTab === 'doi'}
 	<ListStatus list={doi} emptyText="Aucun doublon par DOI">
-		<div class="table-scroll">
+		<TableScroll>
 			<table class="data-table">
 				<thead>
 					<tr>
@@ -116,7 +118,7 @@
 					{/each}
 				</tbody>
 			</table>
-		</div>
+		</TableScroll>
 		<Pagination page={doi.page} pages={doi.pages} onchange={(p) => { doi.goToPage(p); syncUrl(); }} />
 	</ListStatus>
 

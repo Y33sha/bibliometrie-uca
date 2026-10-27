@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
@@ -219,7 +220,7 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table">
 	<thead>
 		<tr>
@@ -280,7 +281,7 @@
 		{/each}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 

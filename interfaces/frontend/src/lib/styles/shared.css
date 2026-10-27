@@ -387,6 +387,20 @@
 	}
 }
 
+/* Bord estompé d'un conteneur à défilement horizontal, du côté où le contenu continue (action `scrollFade`). */
+.fade-start,
+.fade-end {
+	--fade-start: 0px;
+	--fade-end: 0px;
+	mask-image: linear-gradient(to right, transparent, #000 var(--fade-start), #000 calc(100% - var(--fade-end)), transparent);
+}
+.fade-start {
+	--fade-start: 40px;
+}
+.fade-end {
+	--fade-end: 40px;
+}
+
 /* ── Nombre de résultats (barre d'outils) ── */
 .count {
 	margin-left: auto;
@@ -700,10 +714,11 @@
 	font-weight: 600;
 }
 
-/* ── Pub table column widths ── */
-/* width: 100% sur le th = idiome HTML table « cette colonne absorbe tout le restant » : les autres colonnes gardent leur largeur, le titre prend la place résiduelle. */
+/* ── Largeurs des colonnes du tableau des publications ── */
+/* width: 100% sur le th = idiome HTML table « cette colonne absorbe tout le restant » : les autres colonnes gardent leur largeur, le titre prend la place résiduelle. Sur écran étroit, la largeur minimale élargit le tableau, qui défile, plutôt que de réduire le titre à quelques mots par ligne. */
 .publication-col-title {
 	width: 100%;
+	min-width: 240px;
 }
 
 /* Min-width : `width` seul est une simple hint en table-layout: auto et la colonne Titre (width: 100%) la grignoterait jusqu'à la min-content-width (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width` est la seule contrainte que l'auto-layout respecte vraiment. */

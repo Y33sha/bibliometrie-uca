@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
 	import AccessButton from '#lib/components/AccessButton.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
@@ -270,7 +271,7 @@
 	{/snippet}
 </ListToolbar>
 
-<div class="table-scroll">
+<TableScroll>
 <table class="data-table publication-table">
 	<thead>
 		<tr>
@@ -383,7 +384,7 @@
 		{/if}
 	</tbody>
 </table>
-</div>
+</TableScroll>
 
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
 

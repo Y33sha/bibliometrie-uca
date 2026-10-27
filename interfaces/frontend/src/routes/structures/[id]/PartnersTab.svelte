@@ -1,4 +1,5 @@
 <script lang="ts">
+	import TableScroll from '#lib/components/TableScroll.svelte';
 	import { onMount } from 'svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
@@ -58,7 +59,7 @@
 	<ResultCount list={partners} one="organisation partenaire" many="organisations partenaires" />
 </div>
 
-<div class="table-scroll">
+<TableScroll>
 	<table class="data-table">
 		<thead>
 			<tr>
@@ -84,7 +85,7 @@
 			{/if}
 		</tbody>
 	</table>
-</div>
+</TableScroll>
 
 <Pagination
 	page={partners.page}
