@@ -1,4 +1,5 @@
 <script lang="ts">
+	import EntityMetaItem from '#lib/components/EntityMetaItem.svelte';
 	import Breadcrumb from '#lib/components/Breadcrumb.svelte';
 	import { pageTitle } from '#lib/institution.svelte.js';
 	import { page } from '$app/state';
@@ -150,31 +151,33 @@
 		</h1>
 		<div class="entity-meta">
 			{#if lab.ror_id}
-				<span class="entity-meta-label">ROR</span>
-				<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
-					{rorShortId(lab.ror_id)}
-				</a>
+				<EntityMetaItem label="ROR">
+					<a href={rorFullUrl(lab.ror_id)} target="_blank" rel="noopener" class="id-badge">
+						{rorShortId(lab.ror_id)}
+					</a>
+				</EntityMetaItem>
 			{/if}
 			{#if lab.rnsr_id}
-				<span class="entity-meta-label">RNSR</span>
-				<span class="id-badge">{lab.rnsr_id}</span>
+				<EntityMetaItem label="RNSR"><span class="id-badge">{lab.rnsr_id}</span></EntityMetaItem>
 			{/if}
 			{#if lab.hal_collection}
-				<span class="entity-meta-label">HAL</span>
-				<a
-					href="https://hal.science/{lab.hal_collection}"
-					target="_blank"
-					rel="noopener"
-					class="id-badge"
-				>
-					{lab.hal_collection}
-				</a>
+				<EntityMetaItem label="HAL">
+					<a
+						href="https://hal.science/{lab.hal_collection}"
+						target="_blank"
+						rel="noopener"
+						class="id-badge"
+					>
+						{lab.hal_collection}
+					</a>
+				</EntityMetaItem>
 			{/if}
 			{#if tutelles.length}
-				<span class="entity-meta-label">Tutelles</span>
-				{#each tutelles as t (t.id)}
-					<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
-				{/each}
+				<EntityMetaItem label="Tutelles">
+					{#each tutelles as t (t.id)}
+						<span class="entity-tag entity-tag-accent">{structureLabel(t)}</span>
+					{/each}
+				</EntityMetaItem>
 			{/if}
 		</div>
 	</div>

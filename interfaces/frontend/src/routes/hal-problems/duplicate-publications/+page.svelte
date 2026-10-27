@@ -1,6 +1,6 @@
 <script lang="ts">
 	import TableScroll from '#lib/components/TableScroll.svelte';
-	import { scrollFade } from '#lib/actions/scrollFade.js';
+	import { horizontalOverflow } from '#lib/actions/horizontalOverflow.js';
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import ListToolbar from '#lib/components/ListToolbar.svelte';
 	import { withBase } from '#lib/paths.js';
@@ -73,7 +73,7 @@
 	{/if}
 </PageHeader>
 
-<div class="tabs" use:scrollFade>
+<div class="tabs" use:horizontalOverflow>
 	<button class="tab" class:active={activeTab === 'doi'} onclick={() => switchTab('doi')}>
 		Par DOI{doi.items.length ? ` (${doi.total})` : ''}
 	</button>

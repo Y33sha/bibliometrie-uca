@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { setQueryParam } from '#lib/url.js';
-	import { scrollFade } from '#lib/actions/scrollFade.js';
+	import { horizontalOverflow } from '#lib/actions/horizontalOverflow.js';
 
 	export interface TabDef {
 		id: string;
@@ -41,7 +41,7 @@
 	}
 </script>
 
-<div class="tabs" use:scrollFade>
+<div class="tabs" use:horizontalOverflow>
 	{#each tabs as t (t.id)}
 		<button class="tab" class:active={activeTab === t.id} onclick={() => switchTab(t.id)}>
 			{t.label}

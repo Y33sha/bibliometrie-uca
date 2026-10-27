@@ -1,13 +1,16 @@
 import type { Action } from 'svelte/action';
 
 /**
- * Estompe les bords d'un conteneur à défilement horizontal du côté où le contenu continue : classes `fade-start` et `fade-end`, mises en forme par `shared.css`.
+ * Signale par des classes le débordement horizontal d'un conteneur, mises en forme par `shared.css` :
+ * - `overflowing` quand le contenu est plus large que le conteneur ;
+ * - `fade-start` et `fade-end` du côté où le contenu continue, pour en estomper le bord.
  *
  * Les classes suivent le défilement, la taille du conteneur et celle de son contenu.
  */
-export const scrollFade: Action<HTMLElement> = (node) => {
+export const horizontalOverflow: Action<HTMLElement> = (node) => {
 	const update = () => {
 		const max = node.scrollWidth - node.clientWidth;
+		node.classList.toggle('overflowing', max > 1);
 		node.classList.toggle('fade-start', node.scrollLeft > 1);
 		node.classList.toggle('fade-end', node.scrollLeft < max - 1);
 	};
