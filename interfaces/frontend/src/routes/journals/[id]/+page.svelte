@@ -183,7 +183,7 @@
 			{:else}
 				<div class="dash-grid">
 					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
+						<h2>Sujets principaux</h2>
 						{#if subjects.length === 0}
 							<p class="muted">Aucun sujet (les sujets génériques sont exclus du top).</p>
 						{:else}
@@ -192,7 +192,7 @@
 					</div>
 
 					<div class="dash-card">
-						<h3>Types de documents ({dashboard.total_publications})</h3>
+						<h2>Types de documents ({dashboard.total_publications})</h2>
 						{#if dashboard.doc_types.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}
@@ -201,7 +201,7 @@
 					</div>
 
 					<div class="dash-card">
-						<h3>Statuts Open Access</h3>
+						<h2>Statuts Open Access</h2>
 						{#if dashboard.oa_statuses.length === 0}
 							<p class="muted">Aucune publication rattachée.</p>
 						{:else}
@@ -211,12 +211,12 @@
 
 					{#if journal.doaj_payload}
 						<div class="dash-card dash-card-wide">
-							<h3>
+							<h2>
 								Données DOAJ
 								{#if journal.doaj_imported_at}
 									<span class="muted small">(import {formatDate(journal.doaj_imported_at)})</span>
 								{/if}
-							</h3>
+							</h2>
 							<dl class="doaj-fields">
 								{#each READABLE_DOAJ_FIELDS as f (f.key)}
 									{#if journal.doaj_payload[f.key]}

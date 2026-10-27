@@ -234,15 +234,15 @@
 				/>
 				<div class="dash-grid">
 					<div class="dash-card">
-						<h3>Publications par année</h3>
+						<h2>Publications par année</h2>
 						<PublicationsByYearChart data={dashPubsByYear} />
 					</div>
 					<div class="dash-card">
-						<h3>Open access</h3>
+						<h2>Open access</h2>
 						<OaBar oa={dashOa} />
 					</div>
 					<div class="dash-card">
-						<h3>Collaborations internationales (articles)</h3>
+						<h2>Collaborations internationales (articles)</h2>
 						<DoughnutChart segments={collabSegments} />
 						{#if dashCollab.total_articles > 0}
 							<div class="dash-summary">
@@ -252,7 +252,7 @@
 						{/if}
 					</div>
 					<div class="dash-card">
-						<h3>Top 5 pays partenaires (articles)</h3>
+						<h2>Top 5 pays partenaires (articles)</h2>
 						<BarChart
 							labels={dashTopCountries.map((c) => c.name)}
 							values={dashTopCountries.map((c) => c.count)}
@@ -261,7 +261,7 @@
 						/>
 					</div>
 					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
+						<h2>Sujets principaux</h2>
 						<SubjectBars subjects={dashSubjects} />
 					</div>
 				</div>

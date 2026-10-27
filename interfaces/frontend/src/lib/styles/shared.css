@@ -956,7 +956,7 @@ a.structure-tag:hover {
 .dash-card {
 	min-width: 0; /* autorise la cellule de grille à rétrécir sous la largeur du canvas */
 }
-.dash-card h3 {
+.dash-card h2 {
 	margin: 0 0 20px;
 	padding-bottom: 6px;
 	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
@@ -1033,7 +1033,7 @@ a.badge-doaj:hover {
 
 /* ── Titre de section : petites capitales en couleur d'accent ── */
 .section-title,
-.dash-card h3,
+.dash-card h2,
 .detail-label {
 	color: var(--accent);
 	font-size: 0.8rem;

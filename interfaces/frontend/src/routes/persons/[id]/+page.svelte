@@ -196,15 +196,15 @@
 				/>
 				<div class="dash-grid">
 					<div class="dash-card">
-						<h3>Publications par année</h3>
+						<h2>Publications par année</h2>
 						<PublicationsByYearChart data={dashPubsByYear} />
 					</div>
 					<div class="dash-card">
-						<h3>Open access</h3>
+						<h2>Open access</h2>
 						<OaBar oa={dashOa} />
 					</div>
 					<div class="dash-card dash-card-wide">
-						<h3>Sujets principaux</h3>
+						<h2>Sujets principaux</h2>
 						<SubjectBars subjects={dashSubjects} />
 					</div>
 				</div>
@@ -235,7 +235,7 @@
 				<div class="no-results">Aucune thèse liée</div>
 			{:else}
 				{#each thesesSections as section (section.role)}
-					<h3 class="thesis-role-heading">{section.label}</h3>
+					<h2 class="thesis-role-heading">{section.label}</h2>
 					<table class="data-table">
 						<thead>
 							<tr>
