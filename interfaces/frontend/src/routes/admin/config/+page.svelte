@@ -262,143 +262,145 @@
   </span>
 {/snippet}
 
-<!-- ═══ ANNÉES ═══ -->
-<h2 class="section-title">Options d'extraction</h2>
-<div class="config-grid">
-  {#each ["pipeline_start_year_full"] as key}
-    {@const item = configByKey(key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">Année de début</span>
-        {#if editingKey === key}
-          {@render inlineEdit(key)}
-        {:else}
-          <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
-          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
-        {/if}
-      </div>
-    {/if}
-  {/each}
-  {#each CAPS as cap (cap.key)}
-    {@const item = configByKey(cap.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{cap.label}</span>
-        {#if editingKey === cap.key}
-          {@render inlineEdit(cap.key)}
-        {:else}
-          <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
-          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(cap.key)} />
-        {/if}
-      </div>
-    {/if}
-  {/each}
-</div>
+<div class="config-page">
+  <!-- ═══ ANNÉES ═══ -->
+  <h2 class="section-title">Options d'extraction</h2>
+  <div class="config-grid">
+    {#each ["pipeline_start_year_full"] as key}
+      {@const item = configByKey(key)}
+      {#if item}
+        <div class="config-row">
+          <span class="config-label">Année de début</span>
+          {#if editingKey === key}
+            {@render inlineEdit(key)}
+          {:else}
+            <span class="config-value-inline">{typeof item.value === "number" ? yearsLabel(item.value) : item.value}</span>
+            <IconButton icon="edit" label="Modifier" onclick={() => startEdit(key)} />
+          {/if}
+        </div>
+      {/if}
+    {/each}
+    {#each CAPS as cap (cap.key)}
+      {@const item = configByKey(cap.key)}
+      {#if item}
+        <div class="config-row">
+          <span class="config-label">{cap.label}</span>
+          {#if editingKey === cap.key}
+            {@render inlineEdit(cap.key)}
+          {:else}
+            <span class="config-value-inline">{typeof item.value === "number" ? capLabel(item.value) : item.value}</span>
+            <IconButton icon="edit" label="Modifier" onclick={() => startEdit(cap.key)} />
+          {/if}
+        </div>
+      {/if}
+    {/each}
+  </div>
 
-<!-- ═══ DÉLAIS ═══ -->
-<h2 class="section-title">Délais de réinterrogation</h2>
-<p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
-<div class="config-grid">
-  {#each DELAYS as delay (delay.key)}
-    {@const item = configByKey(delay.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">{delay.label}</span>
-        {#if editingKey === delay.key}
-          {@render inlineEdit(delay.key)}
-        {:else}
-          <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
-          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(delay.key)} />
-        {/if}
-      </div>
-    {/if}
-  {/each}
-</div>
+  <!-- ═══ DÉLAIS ═══ -->
+  <h2 class="section-title">Délais de réinterrogation</h2>
+  <p class="info-box">Au-delà de ces délais, le pipeline interroge de nouveau la source.</p>
+  <div class="config-grid">
+    {#each DELAYS as delay (delay.key)}
+      {@const item = configByKey(delay.key)}
+      {#if item}
+        <div class="config-row">
+          <span class="config-label">{delay.label}</span>
+          {#if editingKey === delay.key}
+            {@render inlineEdit(delay.key)}
+          {:else}
+            <span class="config-value-inline">{typeof item.value === "number" ? delayLabel(item.value) : item.value}</span>
+            <IconButton icon="edit" label="Modifier" onclick={() => startEdit(delay.key)} />
+          {/if}
+        </div>
+      {/if}
+    {/each}
+  </div>
 
-<!-- ═══ PÉRIMÈTRES ═══ -->
-<h2 class="section-title">Périmètres</h2>
+  <!-- ═══ PÉRIMÈTRES ═══ -->
+  <h2 class="section-title">Périmètres</h2>
 
-<h3 class="subsection-title">Définition des périmètres</h3>
-<p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
-<TableScroll>
-  <table class="data-table perimeters-table">
-    <thead>
-      <tr>
-        <th>Code</th>
-        <th>Nom</th>
-        <th class="perim-structs">Structures racines</th>
-        <th class="num">Total</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {#each perimeters as perim (perim.id)}
+  <h3 class="subsection-title">Définition des périmètres</h3>
+  <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
+  <TableScroll>
+    <table class="data-table perimeters-table">
+      <thead>
         <tr>
-          <td class="perim-code">{perim.code}</td>
-          <td class="perim-name">{perim.name}</td>
-          <td class="perim-structs">
-            <div class="perimeter-rules">
-              {#each perim.structures as struct (struct.id)}
-                <span class="tag">{structureLabel(struct)}</span>
-              {/each}
-            </div>
-          </td>
-          <td class="num">{perim.structure_count}</td>
-          <td class="perim-actions">
-            <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
-            <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
-          </td>
+          <th>Code</th>
+          <th>Nom</th>
+          <th class="perim-structs">Structures racines</th>
+          <th class="num">Total</th>
+          <th></th>
         </tr>
-      {/each}
-    </tbody>
-  </table>
-</TableScroll>
-<div class="perim-new">
-  <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
-</div>
+      </thead>
+      <tbody>
+        {#each perimeters as perim (perim.id)}
+          <tr>
+            <td class="perim-code">{perim.code}</td>
+            <td class="perim-name">{perim.name}</td>
+            <td class="perim-structs">
+              <div class="perimeter-rules">
+                {#each perim.structures as struct (struct.id)}
+                  <span class="tag">{structureLabel(struct)}</span>
+                {/each}
+              </div>
+            </td>
+            <td class="num">{perim.structure_count}</td>
+            <td class="perim-actions">
+              <IconButton icon="edit" label="Modifier le périmètre" onclick={() => openPerimEdit(perim)} />
+              <IconButton icon="delete" label="Supprimer le périmètre" onclick={() => deletePerimeter(perim.id)} />
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </TableScroll>
+  <div class="perim-new">
+    <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
+  </div>
 
-<h3 class="subsection-title">Rôle des périmètres</h3>
-<div class="config-grid">
-  {#each PERIMETER_ROLES as role (role.key)}
-    {@const item = configByKey(role.key)}
-    {#if item}
-      <div class="config-row">
-        <span class="config-label">
-          <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
-        </span>
-        <select
-          class="select"
-          aria-label="Périmètre : {role.label}"
-          value={item.value}
-          onchange={async (e) => {
-            const target = e.target as HTMLSelectElement;
-            try {
-              await configApi.setValue(role.key, target.value);
-              await load();
-            } catch {}
-          }}
-        >
-          {#each perimeters as p (p.id)}
-            <option value={p.code}>{p.name} ({p.code})</option>
-          {/each}
-        </select>
+  <h3 class="subsection-title">Rôle des périmètres</h3>
+  <div class="config-grid">
+    {#each PERIMETER_ROLES as role (role.key)}
+      {@const item = configByKey(role.key)}
+      {#if item}
+        <div class="config-row">
+          <span class="config-label">
+            <Tooltip text={role.hint}><span class="role-phase">{role.label}</span></Tooltip>
+          </span>
+          <select
+            class="select"
+            aria-label="Périmètre : {role.label}"
+            value={item.value}
+            onchange={async (e) => {
+              const target = e.target as HTMLSelectElement;
+              try {
+                await configApi.setValue(role.key, target.value);
+                await load();
+              } catch {}
+            }}
+          >
+            {#each perimeters as p (p.id)}
+              <option value={p.code}>{p.name} ({p.code})</option>
+            {/each}
+          </select>
+        </div>
+      {/if}
+    {/each}
+  </div>
+
+  <!-- ═══ AFFICHAGE ═══ -->
+  <h2 class="section-title">Affichage</h2>
+  <div class="config-grid">
+    <div class="config-row">
+      <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
+      <div class="type-checks">
+        {#each STRUCTURE_TYPES as t (t.value)}
+          <label class="type-check">
+            <input type="checkbox" checked={labDisplayTypes.includes(t.value)} onchange={() => toggleLabType(t.value)} />
+            {t.label}
+          </label>
+        {/each}
       </div>
-    {/if}
-  {/each}
-</div>
-
-<!-- ═══ AFFICHAGE ═══ -->
-<h2 class="section-title">Affichage</h2>
-<div class="config-grid">
-  <div class="config-row">
-    <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
-    <div class="type-checks">
-      {#each STRUCTURE_TYPES as t (t.value)}
-        <label class="type-check">
-          <input type="checkbox" checked={labDisplayTypes.includes(t.value)} onchange={() => toggleLabType(t.value)} />
-          {t.label}
-        </label>
-      {/each}
     </div>
   </div>
 </div>
@@ -436,6 +438,10 @@
 {/if}
 
 <style>
+  .config-page {
+    max-width: 800px;
+    margin-inline: auto;
+  }
   .section-title {
     margin: 24px 0 8px;
   }
@@ -452,19 +458,19 @@
     margin: 16px 0 6px;
   }
 
-  /* Une liste par section, réglages séparés par des filets. */
+  /* Une grille par section : libellés dans une colonne de largeur fixe, valeurs et boutons alignés d'une ligne à l'autre. Réglages séparés par des filets. */
   .config-grid {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: minmax(0, 22rem) auto 1fr;
+    column-gap: 16px;
     margin-bottom: 8px;
   }
-  /* Libellés dans une colonne de largeur fixe : la valeur et son bouton suivent le libellé, alignés d'une ligne à l'autre. */
   .config-row {
+    grid-column: 1 / -1;
     display: grid;
-    grid-template-columns: minmax(0, 22rem) auto auto;
-    justify-content: start;
+    grid-template-columns: subgrid;
     align-items: center;
-    column-gap: 16px;
+    justify-items: start;
     min-height: 44px;
     padding: 4px 0;
     border-bottom: 1px solid var(--border-subtle);
