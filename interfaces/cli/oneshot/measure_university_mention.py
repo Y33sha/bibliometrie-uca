@@ -13,7 +13,7 @@ Chaque rapprochement reçoit un état :
 - `contribution sans personne` ;
 - `contribution d'une autre personne`.
 
-Le rapport donne les volumes par état, source, structure et année, en distinguant les noms qui désignent une seule personne. Tous les rapprochements s'écrivent dans un CSV, et un échantillon de noms univoques dans un second, pour le contrôle des homonymes à la main. Lecture seule sur la base.
+Le rapport est une page HTML, `data/measures/university_mention.html`, construite sur le gabarit `measure_university_mention.html`. Elle donne les volumes par état, source, structure, type de document et année, la liste des travaux de chaque personne, et un échantillon de noms univoques pour le contrôle des homonymes à la main. Les rapprochements où la personne figure déjà dans la publication sont seulement comptés. Lecture seule sur la base.
 
 Usage :
     python -m interfaces.cli.oneshot.measure_university_mention [--tolerance 1] [--sample 50]
@@ -22,10 +22,10 @@ Usage :
 from __future__ import annotations
 
 import argparse
-import csv
+import json
 import os
 import random
-from collections import Counter
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -38,8 +38,8 @@ from infrastructure.sql_fragments import active_name_form
 log = setup_logger("measure_university_mention", os.path.dirname(__file__))
 
 _MEASURES = Path("data/measures")
+_TEMPLATE = Path(__file__).with_suffix(".html")
 _SOURCES = ("openalex", "wos", "crossref", "datacite")
-_TOP = 20
 
 _ALREADY_PRESENT = "personne déjà dans la publication"
 _UNIQUE = "nom univoque"
@@ -174,104 +174,51 @@ def _work_key(row: dict[str, Any]) -> str:
     return f"sr{row['source_record_id']}"
 
 
-def _log_tally(title: str, tally: Counter[Any]) -> None:
-    log.info("  %s : %d", title, sum(tally.values()))
-    for key, n in sorted(tally.items(), key=lambda kv: (-kv[1], str(kv[0]))):
-        log.info("    %-60s %7d", key, n)
-
-
 def _structure_labels(conn: Connection) -> dict[int, str]:
     rows = conn.execute(text("SELECT id, coalesce(acronym, name) AS label FROM structures"))
     return {r.id: r.label for r in rows}
 
 
-def _report(rows: list[dict[str, Any]], labels: dict[int, str], rh_persons: int) -> None:
-    missing = [r for r in rows if r["state"] != _ALREADY_PRESENT]
-    log.info(
-        "─── Rapprochements : %d, dont %d hors des publications de la personne ───",
-        len(rows),
-        len(missing),
+def _perimeter_names(conn: Connection) -> dict[str, str]:
+    rows = conn.execute(
+        text("""
+            SELECT c.key, p.name FROM config c
+            JOIN perimeters p ON p.code = c.value #>> '{}'
+            WHERE c.key IN ('perimeter_extraction', 'perimeter_persons')
+        """)
     )
-    _log_tally("par état et nom", Counter(f"{r['state']} · {_name_kind(r)}" for r in rows))
+    return {r.key: r.name for r in rows}
 
-    log.info("─── Hors des publications de la personne ───")
-    works = {(r["person_id"], _work_key(r)) for r in missing}
-    unique_works = {(r["person_id"], _work_key(r)) for r in missing if _name_kind(r) == _UNIQUE}
-    log.info(
-        "  couples (personne, travail) : %d, dont %d par un nom univoque",
-        len(works),
-        len(unique_works),
+
+def _page_row(r: dict[str, Any], labels: dict[int, str]) -> dict[str, Any]:
+    return {
+        "person_id": r["person_id"],
+        "person": f"{r['last_name']} {r['first_name']}",
+        "department": r["department_name"],
+        "role": r["role_title"],
+        "period": [r["start_date"], r["end_date"]],
+        "work": _work_key(r),
+        "unique": _name_kind(r) == _UNIQUE,
+        "state": r["state"],
+        "source": r["source"],
+        "year": r["publication_year"],
+        "doc_type": r["doc_type"],
+        "doi": r["doi"],
+        "title": r["title"],
+        "publication_id": r["publication_id"],
+        "publication_in_perimeter": r["publication_in_perimeter"],
+        "raw_author": r["raw_author"],
+        "structures": [labels.get(s, str(s)) for s in r["structure_ids"]],
+        "addresses": r["addresses"],
+    }
+
+
+def _write_page(path: Path, payload: dict[str, Any]) -> None:
+    data = json.dumps(payload, ensure_ascii=False, default=str).replace("</", "<\\/")
+    path.write_text(
+        _TEMPLATE.read_text(encoding="utf-8").replace("__DATA__", data), encoding="utf-8"
     )
-    persons = {r["person_id"] for r in missing}
-    log.info("  personnes RH concernées : %d sur %d", len(persons), rh_persons)
-    _log_tally("par source", Counter(r["source"] for r in missing))
-    _log_tally("par type de document", Counter(r["doc_type"] for r in missing))
-    _log_tally(
-        "par structure citée",
-        Counter(labels.get(s, str(s)) for r in missing for s in r["structure_ids"]),
-    )
-    _log_tally("par année", Counter(r["publication_year"] for r in missing))
-    _log_tally(
-        "publication dans le périmètre",
-        Counter(
-            "sans publication"
-            if r["publication_id"] is None
-            else str(r["publication_in_perimeter"])
-            for r in missing
-        ),
-    )
-
-    by_person = Counter(
-        f"{r['last_name']} {r['first_name']} ({r['department_name'] or '?'})"
-        for r in {
-            (r["person_id"], _work_key(r)): r for r in missing if _name_kind(r) == _UNIQUE
-        }.values()
-    )
-    log.info("  personnes aux nombres de travaux les plus élevés, noms univoques :")
-    for label, n in by_person.most_common(_TOP):
-        log.info("    %-60s %7d", label, n)
-
-
-_CSV_FIELDS = (
-    "state",
-    "name_kind",
-    "person_id",
-    "last_name",
-    "first_name",
-    "department_name",
-    "role_title",
-    "start_date",
-    "end_date",
-    "source",
-    "source_record_id",
-    "publication_id",
-    "publication_in_perimeter",
-    "publication_year",
-    "doc_type",
-    "doi",
-    "title",
-    "raw_author",
-    "name_form",
-    "form_persons",
-    "rh_candidates",
-    "structures",
-    "addresses",
-)
-
-
-def _write_csv(path: Path, rows: list[dict[str, Any]], labels: dict[int, str]) -> None:
-    with path.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=_CSV_FIELDS, extrasaction="ignore")
-        writer.writeheader()
-        for r in rows:
-            writer.writerow(
-                {
-                    **r,
-                    "name_kind": _name_kind(r),
-                    "structures": ", ".join(labels.get(s, str(s)) for s in r["structure_ids"]),
-                }
-            )
-    log.info("Écrit : %s (%d lignes)", path, len(rows))
+    log.info("Écrit : %s", path)
 
 
 def main() -> int:
@@ -296,18 +243,41 @@ def main() -> int:
         log.info("Lecture des rapprochements…")
         rows = [dict(r._mapping) for r in conn.execute(text(_MATCHES))]
         labels = _structure_labels(conn)
+        perimeters = _perimeter_names(conn)
 
     rows.sort(
         key=lambda r: (r["last_name"], r["first_name"], r["person_id"], r["publication_year"] or 0)
     )
-    _report(rows, labels, rh_persons)
+    missing = [r for r in rows if r["state"] != _ALREADY_PRESENT]
+    present = [r for r in rows if r["state"] == _ALREADY_PRESENT]
+    log.info(
+        "Rapprochements : %d, dont %d hors des publications de la personne.",
+        len(rows),
+        len(missing),
+    )
+    pool = [i for i, r in enumerate(missing) if _name_kind(r) == _UNIQUE]
+    rng = random.Random(args.seed)  # noqa: S311 - tirage reproductible d'un échantillon
+    sample = sorted(rng.sample(pool, min(args.sample, len(pool))))
 
     _MEASURES.mkdir(parents=True, exist_ok=True)
-    _write_csv(_MEASURES / "university_mention_matches.csv", rows, labels)
-    pool = [r for r in rows if r["state"] != _ALREADY_PRESENT and _name_kind(r) == _UNIQUE]
-    rng = random.Random(args.seed)  # noqa: S311 - tirage reproductible d'un échantillon
-    sample = rng.sample(pool, min(args.sample, len(pool)))
-    _write_csv(_MEASURES / "university_mention_sample.csv", sample, labels)
+    _write_page(
+        _MEASURES / "university_mention.html",
+        {
+            "date": datetime.now(UTC).date(),
+            "tolerance": args.tolerance,
+            "sources": _SOURCES,
+            "extraction_perimeter": perimeters.get("perimeter_extraction"),
+            "persons_perimeter": perimeters.get("perimeter_persons"),
+            "rh_persons": rh_persons,
+            "candidates": candidates,
+            "present": {
+                "unique": sum(_name_kind(r) == _UNIQUE for r in present),
+                "ambiguous": sum(_name_kind(r) == _AMBIGUOUS for r in present),
+            },
+            "rows": [_page_row(r, labels) for r in missing],
+            "sample": sample,
+        },
+    )
     return 0
 
 

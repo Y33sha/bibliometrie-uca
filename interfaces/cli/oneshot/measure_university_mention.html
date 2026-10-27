@@ -1,0 +1,274 @@
+<title>Signatures sans l'université</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Rapport d'audit : bandeau de chiffres, filtres, répartitions en grille, puis liste des personnes dépliable et échantillon de contrôle. */
+:root {
+  --bg: #f5f7f7;
+  --surface: #ffffff;
+  --fg: #172322;
+  --muted: #5b6b69;
+  --line: #d9e1e0;
+  --accent: #0e6b66;
+  --accent-soft: #d8ecea;
+  --warn: #9a5b00;
+  --warn-soft: #f6e7cf;
+  --display: "Source Serif 4", Georgia, serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1716; --surface: #16211f; --fg: #e3ecea; --muted: #93a5a2; --line: #2a3a38;
+    --accent: #5cc2b9; --accent-soft: #1d3a37; --warn: #e8b265; --warn-soft: #3a2c16;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1716; --surface: #16211f; --fg: #e3ecea; --muted: #93a5a2; --line: #2a3a38;
+  --accent: #5cc2b9; --accent-soft: #1d3a37; --warn: #e8b265; --warn-soft: #3a2c16;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15px; line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 64px;
+}
+main { max-width: 1120px; margin: 0 auto; display: grid; gap: 40px; }
+h1, h2 { font-family: var(--display); font-weight: 600; text-wrap: balance; margin: 0; }
+h1 { font-size: 2rem; line-height: 1.15; }
+h2 { font-size: 1.35rem; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 72ch; }
+header { display: grid; gap: 12px; }
+.label { font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 600; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 4px; align-content: start; }
+.kpi .num { font-size: 1.8rem; font-weight: 500; line-height: 1.1; }
+.kpi p { color: var(--muted); font-size: .85rem; }
+
+.filters { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; padding: 10px 0; border-block: 1px solid var(--line);
+  position: sticky; top: env(safe-area-inset-top, 0px); background: var(--bg); z-index: 5; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.filters label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.filters input[type="search"] { font: inherit; padding: 4px 8px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--fg); min-width: 0; width: 220px; max-width: 100%; }
+input:focus-visible, button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+section { display: grid; gap: 16px; }
+.tallies { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px 32px; }
+.tally { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.bar { display: grid; grid-template-columns: minmax(0, 12rem) 1fr 4.5rem; gap: 10px; align-items: center; font-size: .88rem; }
+.bar span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar .track { height: 8px; background: var(--accent-soft); border-radius: 2px; overflow: hidden; }
+.bar .fill { height: 100%; background: var(--accent); }
+.bar .num { text-align: right; }
+
+.persons { display: grid; gap: 0; border-top: 1px solid var(--line); }
+details.person { border-bottom: 1px solid var(--line); }
+details.person > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 4rem minmax(0, 1.2fr); gap: 12px; padding: 10px 4px; align-items: baseline; }
+details.person > summary::-webkit-details-marker { display: none; }
+details.person > summary:hover { background: var(--accent-soft); }
+.who { font-weight: 600; }
+.who::before { content: "▸"; display: inline-block; width: 1.1em; color: var(--muted); }
+details[open] .who::before { content: "▾"; }
+.dept { color: var(--muted); font-size: .88rem; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip { font-size: .75rem; padding: 1px 7px; border-radius: 10px; background: var(--accent-soft); color: var(--fg); white-space: nowrap; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.works { padding: 4px 0 16px 1.1em; }
+
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+th { text-align: left; font-weight: 600; color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+td.addr { color: var(--muted); font-size: .8rem; max-width: 34ch; }
+td .title { display: block; }
+a { color: var(--accent); }
+.empty { color: var(--muted); padding: 12px 0; }
+.note { color: var(--muted); font-size: .88rem; max-width: 80ch; }
+
+@media (max-width: 640px) {
+  details.person > summary { grid-template-columns: minmax(0, 1fr) 3rem; }
+  details.person > summary .dept, details.person > summary .chips { grid-column: 1 / -1; }
+  .bar { grid-template-columns: minmax(0, 8rem) 1fr 3.5rem; }
+}
+</style>
+
+<main>
+  <header>
+    <span class="label">Audit · signatures institutionnelles</span>
+    <h1>Signatures sans l'université</h1>
+    <p class="lede" id="lede"></p>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="filters">
+    <label><input type="checkbox" id="f-unique" checked> Noms univoques seulement</label>
+    <label><input type="checkbox" id="f-dataset" checked> Exclure les datasets</label>
+    <input type="search" id="f-search" placeholder="Filtrer par nom ou département" aria-label="Filtrer par nom ou département">
+  </div>
+
+  <section>
+    <h2>Répartitions</h2>
+    <p class="note">Comptes en contributions sources : un même travail compte une fois par source.</p>
+    <div class="tallies" id="tallies"></div>
+  </section>
+
+  <section>
+    <h2>Personnes</h2>
+    <p class="note">Travaux hors des publications de la personne. Un travail réunit les enregistrements sources d'une même publication, ou d'un même DOI.</p>
+    <div class="persons" id="persons"></div>
+  </section>
+
+  <section>
+    <h2>Échantillon de contrôle</h2>
+    <p class="note" id="sample-note"></p>
+    <div class="scroll"><table id="sample"></table></div>
+  </section>
+</main>
+
+<script id="data" type="application/json">__DATA__</script>
+<script>
+const D = JSON.parse(document.getElementById("data").textContent);
+const fmt = n => n.toLocaleString("fr-FR");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const NO_PUBLICATION = "sans publication";
+const NO_PERSON = "contribution sans personne";
+
+document.getElementById("lede").textContent =
+  `Contributions sources hors du périmètre ${D.persons_perimeter}, dont une adresse cite une structure du périmètre ${D.extraction_perimeter} hors ${D.persons_perimeter}, ` +
+  `rapprochées par le nom des ${fmt(D.rh_persons)} personnes RH. Période : de l'année qui suit l'arrivée à la fin du contrat, plus ${D.tolerance} an. ` +
+  `Sources : ${D.sources.join(", ")}. ${fmt(D.candidates)} contributions sources examinées. ` +
+  `${fmt(D.present.unique + D.present.ambiguous)} rapprochements concernent une publication où la personne figure déjà : ils sont exclus. Base locale, ${D.date}.`;
+
+const els = {
+  unique: document.getElementById("f-unique"),
+  dataset: document.getElementById("f-dataset"),
+  search: document.getElementById("f-search"),
+};
+
+function filtered() {
+  const q = els.search.value.trim().toLowerCase();
+  return D.rows.filter(r =>
+    (!els.unique.checked || r.unique) &&
+    (!els.dataset.checked || r.doc_type !== "dataset") &&
+    (!q || r.person.toLowerCase().includes(q) || (r.department || "").toLowerCase().includes(q)));
+}
+
+function works(rows) {
+  const map = new Map();
+  for (const r of rows) {
+    const key = r.person_id + "|" + r.work;
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(r);
+  }
+  return map;
+}
+
+function tally(values) {
+  const c = new Map();
+  for (const v of values) c.set(v, (c.get(v) || 0) + 1);
+  return [...c.entries()];
+}
+
+function renderKpis(rows) {
+  const w = [...works(rows).values()];
+  const persons = new Set(rows.map(r => r.person_id)).size;
+  const byState = s => w.filter(group => group.some(r => r.state === s)).length;
+  const kpis = [
+    [w.length, "travaux absents des publications de la personne"],
+    [persons, `personnes RH concernées, sur ${fmt(D.rh_persons)}`],
+    [byState(NO_PUBLICATION), "travaux sans publication en base"],
+    [byState(NO_PERSON), "travaux en base, contribution sans personne"],
+  ];
+  document.getElementById("kpis").innerHTML = kpis.map(([n, label]) =>
+    `<div class="kpi"><span class="num">${fmt(n)}</span><p>${esc(label)}</p></div>`).join("");
+}
+
+function renderTallies(rows) {
+  const groups = [
+    ["État", tally(rows.map(r => r.state)), "count"],
+    ["Structure citée", tally(rows.flatMap(r => r.structures)), "count"],
+    ["Source", tally(rows.map(r => r.source)), "count"],
+    ["Type de document", tally(rows.map(r => r.doc_type)), "count"],
+    ["Publication", tally(rows.map(r => r.publication_id == null ? "sans publication" : r.publication_in_perimeter ? "dans le périmètre" : "hors périmètre")), "count"],
+    ["Année", tally(rows.map(r => r.year ?? "?")), "key"],
+  ];
+  document.getElementById("tallies").innerHTML = groups.map(([title, entries, order]) => {
+    entries.sort(order === "key" ? (a, b) => String(b[0]).localeCompare(String(a[0])) : (a, b) => b[1] - a[1]);
+    const max = Math.max(1, ...entries.map(e => e[1]));
+    const bars = entries.map(([k, n]) =>
+      `<div class="bar"><span title="${esc(k)}">${esc(k)}</span><span class="track"><span class="fill" style="width:${(100 * n / max).toFixed(1)}%;display:block"></span></span><span class="num">${fmt(n)}</span></div>`).join("");
+    return `<div class="tally"><span class="label">${esc(title)}</span>${bars || '<p class="empty">Aucune ligne.</p>'}</div>`;
+  }).join("");
+}
+
+function workRow(group) {
+  const r = group[0];
+  const title = r.doi ? `<a class="title" href="https://doi.org/${esc(r.doi)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : `<span class="title">${esc(r.title)}</span>`;
+  const sources = [...new Set(group.map(g => g.source))].join(", ");
+  const states = [...new Set(group.map(g => g.state))].join(", ");
+  return `<tr><td class="num">${esc(r.year)}</td><td>${title}</td><td>${esc(sources)}<br><span class="dept">${esc(r.doc_type)}</span></td>` +
+    `<td>${esc(r.raw_author)}</td><td>${esc(states)}</td><td class="addr">${esc(r.addresses)}</td></tr>`;
+}
+
+const WORK_HEAD = "<tr><th>Année</th><th>Titre</th><th>Source</th><th>Auteur dans la source</th><th>État</th><th>Adresses</th></tr>";
+
+function renderPersons(rows) {
+  const byPerson = new Map();
+  for (const [key, group] of works(rows)) {
+    const id = group[0].person_id;
+    if (!byPerson.has(id)) byPerson.set(id, []);
+    byPerson.get(id).push(group);
+  }
+  const list = [...byPerson.values()].sort((a, b) => b.length - a.length || a[0][0].person.localeCompare(b[0][0].person));
+  const html = list.map(groups => {
+    const p = groups[0][0];
+    const count = s => groups.filter(g => g.some(r => r.state === s)).length;
+    const ambiguous = groups.filter(g => g.some(r => !r.unique)).length;
+    const chips = [
+      [count(NO_PUBLICATION), "sans publication", ""],
+      [count(NO_PERSON), "sans personne", ""],
+      [ambiguous, "nom ambigu", "warn"],
+    ].filter(c => c[0]).map(([n, label, cls]) => `<span class="chip ${cls}">${fmt(n)} ${label}</span>`).join("");
+    groups.sort((a, b) => (b[0].year ?? 0) - (a[0].year ?? 0));
+    const period = `${(p.period[0] || "?").slice(0, 4)} – ${(p.period[1] || "").slice(0, 4) || "en poste"}`;
+    return `<details class="person"><summary><span class="who">${esc(p.person)}</span>` +
+      `<span class="dept">${esc(p.department || "?")} · ${esc(period)}</span>` +
+      `<span class="num">${fmt(groups.length)}</span><span class="chips">${chips}</span></summary>` +
+      `<div class="works scroll"><table>${WORK_HEAD}${groups.map(workRow).join("")}</table></div></details>`;
+  }).join("");
+  document.getElementById("persons").innerHTML = html || '<p class="empty">Aucune personne pour ces filtres.</p>';
+}
+
+function renderSample() {
+  const rows = D.sample.map(i => D.rows[i]);
+  document.getElementById("sample-note").textContent =
+    `${rows.length} contributions sources tirées au hasard parmi les noms univoques, sans filtre. Pour chacune : la personne RH est-elle bien l'auteur ?`;
+  document.getElementById("sample").innerHTML =
+    "<tr><th>Personne RH</th><th>Département</th><th>Année</th><th>Titre</th><th>Auteur dans la source</th><th>Source</th><th>Adresses</th></tr>" +
+    rows.map(r => {
+      const title = r.doi ? `<a href="https://doi.org/${esc(r.doi)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : esc(r.title);
+      return `<tr><td>${esc(r.person)}</td><td class="dept">${esc(r.department || "?")}</td><td class="num">${esc(r.year)}</td>` +
+        `<td>${title}</td><td>${esc(r.raw_author)}</td><td>${esc(r.source)}<br><span class="dept">${esc(r.doc_type)}</span></td><td class="addr">${esc(r.addresses)}</td></tr>`;
+    }).join("");
+}
+
+function render() {
+  const rows = filtered();
+  renderKpis(rows);
+  renderTallies(rows);
+  renderPersons(rows);
+}
+
+for (const el of [els.unique, els.dataset]) el.addEventListener("change", render);
+els.search.addEventListener("input", render);
+render();
+renderSample();
+</script>
