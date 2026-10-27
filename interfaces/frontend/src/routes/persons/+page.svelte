@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
+	import { institution } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, ApiError, persons as personsApi } from '#lib/api/index.js';
@@ -277,11 +278,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle('Chercheurs')}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Chercheurs</h1>
+<PageHeader title="Chercheurs" hidden />
 
 {#if isAdmin()}
 	<HubTabs

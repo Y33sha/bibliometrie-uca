@@ -1,6 +1,6 @@
 <script lang="ts">
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, ApiError, publishers as publishersApi } from '#lib/api/index.js';
@@ -118,11 +118,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Éditeurs")}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Éditeurs</h1>
+<PageHeader title="Éditeurs" hidden />
 
 {#if blockingSerials}
 	<div class="blocking-panel" role="alert">

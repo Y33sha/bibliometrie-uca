@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
@@ -59,19 +59,13 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Dépôts HAL en double")}</title>
-</svelte:head>
-
-<h1>Dépôts HAL en double</h1>
-
-<div class="info-box">
+<PageHeader title="Dépôts HAL en double">
 	{#if activeTab === 'doi'}
 		Dépôts HAL avec DOI identique. Soit dépôts en doublon, soit DOI erroné.
 	{:else}
 		Doublons possibles : dépôts HAL avec titre, année, type et nombre d'auteurs cohérents.
 	{/if}
-</div>
+</PageHeader>
 
 <div class="tabs">
 	<button class="tab" class:active={activeTab === 'doi'} onclick={() => switchTab('doi')}>

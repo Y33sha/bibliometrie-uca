@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import { institution } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
@@ -36,15 +37,9 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Affiliations HAL divergentes")}</title>
-</svelte:head>
-
-<h1>Affiliations HAL divergentes</h1>
-
-<div class="info-box">
+<PageHeader title="Affiliations HAL divergentes">
 	Publications affiliées à {institution.name} dans HAL mais pas dans une autre source. La publication est présente dans au moins une source non-HAL avec des adresses, mais sans signature {institution.name} à la même position d'auteur.
-</div>
+</PageHeader>
 
 <div class="toolbar">
 	<ResultCount {list} one="publication" many="publications" />

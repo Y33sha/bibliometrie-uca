@@ -1,7 +1,7 @@
 <script lang="ts">
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import { page } from '$app/state';
 	import { setQueryParam } from '#lib/url.js';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import PublicationsListView from '#lib/components/PublicationsListView.svelte';
 	import PublicationDrawer from './PublicationDrawer.svelte';
@@ -30,11 +30,7 @@
 	}
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Publications")}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Publications</h1>
+<PageHeader title="Publications" hidden />
 
 {#if isAdmin()}
 	<HubTabs

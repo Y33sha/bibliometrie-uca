@@ -1,7 +1,7 @@
 <script lang="ts">
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
-	import { pageTitle } from '#lib/institution.svelte.js';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { goto } from '$app/navigation';
@@ -182,11 +182,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle('Labos')}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Labos</h1>
+<PageHeader title="Labos" hidden />
 
 <div class="toolbar toolbar-card">
 	<input

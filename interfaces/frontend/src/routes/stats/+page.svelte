@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { pageTitle } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import { onMount, tick } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
@@ -553,11 +553,7 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Statistiques")}</title>
-</svelte:head>
-
-<h1 class="visually-hidden">Statistiques</h1>
+<PageHeader title="Statistiques" hidden />
 
 <div class="stats-page">
 <!-- Ligne 1 : contrôles du pivot + onglets -->

@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { institution, pageTitle } from '#lib/institution.svelte.js';
+	import { institution } from '#lib/institution.svelte.js';
+	import PageHeader from '#lib/components/PageHeader.svelte';
 	import DocTypePill from '#lib/components/DocTypePill.svelte';
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
@@ -65,15 +66,9 @@
 	});
 </script>
 
-<svelte:head>
-	<title>{pageTitle("Publications absentes des collections HAL")}</title>
-</svelte:head>
-
-<h1>Publications absentes des collections HAL</h1>
-
-<div class="info-box">
+<PageHeader title="Publications absentes des collections HAL">
 	Publications présentes dans OpenAlex ou WoS avec signature d'un labo {institution.name}, et présentes dans HAL mais absentes de la collection HAL de ce labo.
-</div>
+</PageHeader>
 
 <div class="toolbar">
 	<select class="lab-select" bind:value={selectedLabId} onchange={onLabChange}>

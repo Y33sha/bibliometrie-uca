@@ -1,7 +1,7 @@
 <script lang="ts">
   import RhCheck from "#lib/components/RhCheck.svelte";
   import ResultCount from "#lib/components/ResultCount.svelte";
-  import { pageTitle } from "#lib/institution.svelte.js";
+  import PageHeader from "#lib/components/PageHeader.svelte";
   import { resolve } from "$app/paths";
   import { replaceQuery } from "#lib/url.js";
   import { page } from "$app/state";
@@ -34,13 +34,9 @@
   });
 </script>
 
-<svelte:head>
-  <title>{pageTitle("Comptes auteur HAL en double")}</title>
-</svelte:head>
-
-<h1>Comptes auteur HAL en double</h1>
-
-<div class="info-box">Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.</div>
+<PageHeader title="Comptes auteur HAL en double">
+  Personnes liées à au moins deux personId distincts. Soit doublons d'auteurs, soit publications attribuées à un auteur homonyme.
+</PageHeader>
 
 <div class="toolbar">
   <ResultCount {list} one="personne" many="personnes" />
