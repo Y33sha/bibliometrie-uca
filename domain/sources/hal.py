@@ -15,7 +15,7 @@ HAL_DEPOSIT_STATUSES: tuple[str, ...] = ("ok", "notice", "hors_collection", "hor
 
 # Libellés d'affichage des statuts, partagés par la facette et l'export.
 HAL_DEPOSIT_STATUS_LABELS: dict[str, str] = {
-    "ok": "OK",
+    "ok": "Texte",
     "notice": "Notice",
     "hors_collection": "Hors collection",
     "hors_hal": "Hors HAL",

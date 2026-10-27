@@ -136,7 +136,7 @@
 
 	type HalStatus = 'ok' | 'notice' | 'hors_collection' | 'hors_hal';
 	const HAL_STATUS_META: Record<HalStatus, { label: string; css: string }> = {
-		ok:              { label: 'OK',              css: 'hal-ok' },
+		ok:              { label: 'Texte',           css: 'hal-ok' },
 		notice:          { label: 'Notice',          css: 'hal-notice' },
 		hors_collection: { label: 'Hors collection', css: 'hal-hors-collection' },
 		hors_hal:        { label: 'Hors HAL',        css: 'hal-hors-hal' },
