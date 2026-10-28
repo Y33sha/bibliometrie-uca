@@ -45,6 +45,11 @@
 		onchange?.(states);
 	}
 
+	function clear() {
+		states = {};
+		onchange?.(states);
+	}
+
 	function stateOf(key: string): ToggleState {
 		return states[key] || 'all';
 	}
@@ -89,6 +94,9 @@
 
 	{#if panel.open}
 		<div class="facet-panel" use:anchored>
+			{#if activeCount > 0}
+				<button type="button" class="facet-clear" onclick={clear}>Effacer</button>
+			{/if}
 			{#each items as item (item.key)}
 				{@const state = stateOf(item.key)}
 				{@const c = countFor(item.key, state)}
