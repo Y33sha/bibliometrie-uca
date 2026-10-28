@@ -62,6 +62,11 @@ function hasLatex(s: string): boolean {
 	return false;
 }
 
+/* Dédouble les barres obliques d'une formule échappée deux fois par sa source (`\\rm{K}`) : toutes ses commandes y sont précédées de deux barres. Une formule qui contient une commande à barre simple garde ses `\\`, sauts de ligne d'un tableau ou d'un environnement. */
+function undoubleBackslashes(tex: string): string {
+	return /(^|[^\\])\\[a-zA-Z]/.test(tex) ? tex : tex.replace(/\\\\/g, '\\');
+}
+
 /* Rend les segments LaTeX via KaTeX. Le texte qui les entoure passe par la liste blanche plutôt
  * que par un échappement en bloc : un résumé qui porte à la fois des paragraphes et une formule
  * garde les deux. Les segments de prose, eux, gardent leurs dollars — ce sont des caractères du
@@ -78,7 +83,7 @@ function renderLatex(s: string, allowedTags: Set<string>): string {
 		if (isProse(content)) {
 			parts.push(escapeHtml(m[0]));
 		} else {
-			const tex = content.trim().replace(/\\\\/g, '\\');
+			const tex = undoubleBackslashes(content.trim());
 			try {
 				parts.push(katex.renderToString(tex, {
 					displayMode: false,

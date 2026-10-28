@@ -56,6 +56,11 @@ describe('sanitizeTitle', () => {
 		expect(result).not.toContain('\\\\rm');
 	});
 
+	it("garde les sauts de ligne d'un tableau dans une formule à commandes simples", () => {
+		const result = sanitizeTitle('$$ \\begin{array}{l}a=1,\\\\ b=2\\end{array} $$');
+		expect(result.match(/<mtr>/g)?.length).toBe(2);
+	});
+
 	it('gère le MathML avec préfixe mml:', () => {
 		const result = sanitizeTitle('Test <mml:math><mml:mi>x</mml:mi></mml:math>');
 		// Le préfixe mml: doit être supprimé pour le rendu natif
