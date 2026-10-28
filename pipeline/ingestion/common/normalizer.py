@@ -166,7 +166,7 @@ class SourceNormalizer(ABC):
         record = replace(self.source_record(row, doc, containers), publisher_id=publisher_id)
         source_record_id = self._record_store.upsert_source_record(record)
         self._location_store.replace_locations(
-            source_record_id, [*self.locations(doc), *identifier_locations(record.external_ids)]
+            source_record_id, [*self.locations(doc), *identifier_locations(record.identifiers)]
         )
         sync_source_contributions(
             self._contribution_store,

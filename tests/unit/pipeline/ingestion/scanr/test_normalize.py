@@ -25,7 +25,7 @@ from pipeline.ingestion.scanr.normalize import (
     scanr_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import staging_row
+from tests.helpers.normalize_doubles import external_ids_of, staging_row
 
 _NO_CONTAINERS = Containers(serial_id=None, monograph_id=None)
 
@@ -111,13 +111,13 @@ class TestScanrSourceRecordExternalIds:
         }
         captured = self._call(doc)
         assert captured.doi == "10.1/primary"
-        assert captured.external_ids["related_dois"] == ["10.2/anie"]
+        assert external_ids_of(captured)["related_dois"] == ["10.2/anie"]
 
     def test_related_dois_absent_when_only_primary(self):
         doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
         captured = self._call(doc)
         assert captured.doi == "10.1/primary"
-        assert "related_dois" not in (captured.external_ids or {})
+        assert "related_dois" not in external_ids_of(captured)
 
 
 # ── build_scanr_author_records (parsing pur) ─────────────────────
@@ -339,7 +339,7 @@ class TestScanrSourceRecordMetadonnees:
         assert record.raw_doc_type == "journal-article"
         assert record.doi == "10.1/a"
         assert record.oa_status == "closed"
-        assert "nnt" not in (record.external_ids or {})
+        assert "nnt" not in external_ids_of(record)
         assert record.container_title is None  # la revue est créée : son titre n'est pas recopié
         assert record.raw_language is None  # la source ne l'expose pas
 
@@ -354,7 +354,7 @@ class TestScanrSourceRecordMetadonnees:
         """La source encode les thèses en préfixant leur numéro national."""
         record = scanr_source_record({}, 1, "these2021CLFAC030", _NO_CONTAINERS)
 
-        assert record.external_ids == {"nnt": "2021CLFAC030"}
+        assert external_ids_of(record) == {"nnt": "2021CLFAC030"}
 
 
 class TestScanrSourceRecordIdentifiants:
@@ -364,7 +364,7 @@ class TestScanrSourceRecordIdentifiants:
     def test_identifiant_pubmed(self):
         document = self._call({"externalIds": [{"type": "pmid", "id": "12345678"}]})
 
-        assert document.external_ids == {"pmid": "12345678"}
+        assert external_ids_of(document) == {"pmid": "12345678"}
 
     def test_identifiants_incomplets_ignores(self):
         """Une entrée sans type ni valeur ne désigne rien."""
@@ -372,12 +372,12 @@ class TestScanrSourceRecordIdentifiants:
             {"externalIds": ["pas un objet", {"type": "hal"}, {"id": "hal-1"}, {}]}
         )
 
-        assert document.external_ids is None
+        assert external_ids_of(document) == {}
 
     def test_registre_inconnu_ignore(self):
         document = self._call({"externalIds": [{"type": "openalex", "id": "W1"}]})
 
-        assert document.external_ids is None
+        assert external_ids_of(document) == {}
 
 
 class TestScanrSourceRecordChamps:
@@ -489,7 +489,7 @@ class TestScanrNormalizer:
         assert document.title == "Un titre"
         assert (document.serial_id, document.monograph_id) == (3, 5)
         assert document.container_title is None
-        assert document.external_ids == {"nnt": "2021CLFAC030"}
+        assert external_ids_of(document) == {"nnt": "2021CLFAC030"}
 
     @pytest.mark.parametrize(
         ("raw", "attendu"),

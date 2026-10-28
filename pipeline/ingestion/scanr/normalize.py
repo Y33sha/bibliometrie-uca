@@ -14,7 +14,11 @@ from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.doc_types import map_doc_type
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
@@ -33,7 +37,7 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.scanr.payload import (
     derive_scanr_oa_status,
-    extract_nnt_from_scanr_id,
+    scanr_derived_identifier,
     select_leaf_affiliations,
     split_scanr_concepts,
 )
@@ -156,6 +160,27 @@ def get_oa_status(doc: Mapping[str, JsonValue]) -> str | None:
 # =============================================================
 
 
+# Type d'identifiant de chaque type d'`externalIds` lu.
+_EXTERNAL_ID_TYPES = {
+    "doi": SourceIdentifierType.DOI,
+    "hal": SourceIdentifierType.HAL_ID,
+    "pmid": SourceIdentifierType.PMID,
+}
+
+
+def scanr_identifiers(doc: Mapping[str, JsonValue], scanr_id: str) -> tuple[SourceIdentifier, ...]:
+    """Identifiants d'un document ScanR. Ceux de ses `externalIds` sont secondaires. L'identifiant que contient l'identifiant ScanR est dérivé (`scanr_derived_identifier`)."""
+    identifiers: list[SourceIdentifier] = []
+    for entry in as_sequence(doc.get("externalIds")):
+        eid = as_mapping(entry)
+        id_type = _EXTERNAL_ID_TYPES.get((as_str(eid.get("type")) or "").lower())
+        if id_type and (value := as_str(eid.get("id"))):
+            identifiers.append(SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY))
+    if derived := scanr_derived_identifier(scanr_id):
+        identifiers.append(derived)
+    return tuple(identifiers)
+
+
 def scanr_source_record(  # noqa: C901
     doc: Mapping[str, JsonValue],
     staging_id: int,
@@ -164,36 +189,9 @@ def scanr_source_record(  # noqa: C901
 ) -> SourceRecordUpsert:
     """Enregistrement source ScanR d'un document.
 
-    Le NNT vient de l'identifiant ScanR (`scanr_id`). Le titre du contenant (`source.title`) est gardé seulement en l'absence de revue. L'API ScanR n'expose pas la langue.
+    Le titre du contenant (`source.title`) est gardé seulement en l'absence de revue. L'API ScanR n'expose pas la langue.
     """
     doi = extract_doi(doc)
-    ext: dict[str, JsonValue] = {}
-    if nnt := extract_nnt_from_scanr_id(scanr_id):
-        ext[ExternalIdType.NNT] = nnt
-    # hal_id et related_dois multivalués : un document ScanR peut référencer plusieurs dépôts HAL et plusieurs DOI (preprint/dépôt/édition).
-    hal_ids: list[str] = []
-    dois: list[str] = []
-    for entry in as_sequence(doc.get("externalIds")):
-        eid = as_mapping(entry)
-        etype = as_str(eid.get("type"))
-        value = as_str(eid.get("id"))
-        if not etype or not value:
-            continue
-        etype = etype.lower()
-        if etype == "hal" and value not in hal_ids:
-            hal_ids.append(value)
-        elif etype == "pmid":
-            ext[ExternalIdType.PMID] = value
-        elif etype == "doi" and (entry_doi := clean_doi(value)) and entry_doi not in dois:
-            dois.append(entry_doi)
-    if hal_ids:
-        ext[ExternalIdType.HAL_ID] = hal_ids
-    # related_dois = DOI secondaires (autres que le primaire, qui vit sur `doi`).
-    # Le doiUrl ScanR est toujours redondant avec un externalIds type=doi.
-    if related_dois := [d for d in dois if d != doi]:
-        ext[ExternalIdType.RELATED_DOIS] = related_dois
-    external_ids = ext if ext else None
-
     abstract = as_str(as_mapping(doc.get("summary")).get("default"))
 
     kw_val = as_mapping(doc.get("keywords")).get("default")
@@ -243,7 +241,7 @@ def scanr_source_record(  # noqa: C901
         source_id=scanr_id,
         staging_id=staging_id,
         doi=doi,
-        external_ids=external_ids,
+        identifiers=scanr_identifiers(doc, scanr_id),
         title=get_title(doc) or "",
         publication_year=as_int(doc.get("year")),
         raw_doc_type=as_str(doc.get("type")),

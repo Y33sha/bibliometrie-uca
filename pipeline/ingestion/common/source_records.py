@@ -5,8 +5,8 @@ Un enregistrement source est la vue normalisée d'un import : le dernier import 
 L'écriture concerne seulement les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes de la file `source_record_keys_queue`, où chaque écriture met la ligne. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
 """
 
+import json
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import date
 
@@ -19,7 +19,8 @@ from domain.publications.metadata import normalized_title
 from domain.publishers.attribution import source_record_has_publisher
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
-from domain.source_records.external_ids import normalize_external_ids
+from domain.source_records.external_ids import external_ids_from_identifiers
+from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
 from domain.source_records.languages import language_code
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
@@ -35,7 +36,7 @@ class SourceRecordUpsert:
 
     Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas d'indicateur de citation, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
 
-    Quatre colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
+    Cinq colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`), `language` de `raw_language` (`language_code`) et `external_ids` de `identifiers`. `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
     """
 
     # Clé de l'enregistrement source
@@ -46,7 +47,8 @@ class SourceRecordUpsert:
 
     # Rattachement
     doi: str | None = None
-    external_ids: JsonValue = None
+    identifiers: tuple[SourceIdentifier, ...] = ()
+    """Identifiants de l'enregistrement source, avec leur rôle, écrits dans `source_record_identifiers`. L'écriture les normalise et en déduit `external_ids`."""
 
     # Métadonnées bibliographiques
     title: str
@@ -87,13 +89,13 @@ class SourceRecordUpsert:
     source_extras: JsonValue = None
 
 
-_FIELDS = fields(SourceRecordUpsert)
+_FIELDS = tuple(f for f in fields(SourceRecordUpsert) if f.name != "identifiers")
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes
 # calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` est inséré et
 # réécrit sans autre geste, en phase avec le contrat.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
-_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language")
+_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language", "external_ids")
 
 # Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `corrections` se vide : les
 # valeurs d'origine qu'il garde viennent de l'import précédent, et la phase `metadata_correction` refait ses
@@ -102,7 +104,7 @@ _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id")
 
 # Colonnes JSONB : les champs annotés `JsonValue` (les `list[str]` sont des `text[]`,
 # hors JSONB). Un champ JSONB ajouté au contrat est typé sans autre geste.
-_JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
+_JSONB_COLUMNS = (*(f.name for f in _FIELDS if f.type is JsonValue), "external_ids")
 
 # Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
 _ENUM_CASTS = {"doc_type": "doc_type", "license": "license_type"}
@@ -131,8 +133,20 @@ _UPSERT_SQL = text(
 ).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
 
 
+_DELETE_IDENTIFIERS = text(
+    "DELETE FROM source_record_identifiers WHERE source_record_id = :source_record_id"
+)
+
+_INSERT_IDENTIFIERS = text("""
+    INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role)
+    SELECT :source_record_id, CAST(i.id_type AS source_identifier_type), i.id_value,
+           CAST(i.role AS source_identifier_role)
+    FROM jsonb_to_recordset(CAST(:identifiers AS jsonb)) AS i(id_type text, id_value text, role text)
+""")
+
+
 class SourceRecordStore:
-    """Écriture des `source_records`. Les formes de `language_forms` se chargent à la première écriture."""
+    """Écriture des `source_records` et de leurs identifiants. Les formes de `language_forms` se chargent à la première écriture."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -152,8 +166,26 @@ class SourceRecordStore:
             params["container_title"] = None
         params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
         params["language"] = language_code(row.raw_language, self._forms())
-        params["external_ids"] = _external_ids(row)
-        return scalar_int(self._conn.execute(_UPSERT_SQL, params))
+        identifiers = _identifiers(row)
+        params["external_ids"] = external_ids_from_identifiers(identifiers, row.doi)
+        source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))
+        self._write_identifiers(source_record_id, identifiers)
+        return source_record_id
+
+    def _write_identifiers(
+        self, source_record_id: int, identifiers: tuple[SourceIdentifier, ...]
+    ) -> None:
+        """Remplace les identifiants de l'enregistrement source. Chaque identifiant écrit est actif."""
+        self._conn.execute(_DELETE_IDENTIFIERS, {"source_record_id": source_record_id})
+        if identifiers:
+            rows = [
+                {"id_type": i.id_type.value, "id_value": i.value, "role": i.role.value}
+                for i in identifiers
+            ]
+            self._conn.execute(
+                _INSERT_IDENTIFIERS,
+                {"source_record_id": source_record_id, "identifiers": json.dumps(rows)},
+            )
 
     def _forms(self) -> dict[str, str]:
         if self._language_forms is None:
@@ -184,31 +216,20 @@ def fetch_language_forms(conn: Connection) -> dict[str, str]:
     return {r.form_normalized: r.language_code for r in rows}
 
 
-def _external_ids(row: SourceRecordUpsert) -> dict[str, JsonValue]:
-    """`external_ids` normalisé, objet JSON vide à défaut : la colonne est `NOT NULL` et contrainte à un objet. Chaque entrée écartée est journalisée."""
-    if row.external_ids is None:
-        return {}
-    if not isinstance(row.external_ids, Mapping):
+def _identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, ...]:
+    """Identifiants normalisés de la ligne (`normalize_identifiers`). Chaque identifiant écarté est journalisé."""
+    identifiers, rejected = normalize_identifiers(row.identifiers)
+    for identifier in rejected:
         # Lignes de détail : le terminal les masque, le journal les garde.
         logger.warning(
-            "external_ids écarté (%s %s) : objet attendu, reçu %r",
+            "Identifiant écarté (%s %s) : %s = %r",
             row.source,
             row.source_id,
-            row.external_ids,
+            identifier.id_type,
+            identifier.value,
             extra={"detail": True},
         )
-        return {}
-    clean, rejected = normalize_external_ids(row.external_ids)
-    for entry in rejected:
-        logger.warning(
-            "external_ids écarté (%s %s) : %s = %r",
-            row.source,
-            row.source_id,
-            entry.key,
-            entry.value,
-            extra={"detail": True},
-        )
-    return clean
+    return identifiers
 
 
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:

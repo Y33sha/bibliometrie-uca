@@ -1,10 +1,14 @@
-"""Clés de la colonne JSONB `source_records.external_ids` et normalisation de ses valeurs à l'écriture."""
+"""Clés de la colonne JSONB `source_records.external_ids`, déduite à l'écriture des identifiants de l'enregistrement source."""
 
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
 from enum import StrEnum
 
-from domain.publications.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    identifier_normalizer,
+)
 from domain.types import JsonValue
 
 
@@ -34,70 +38,49 @@ MULTIVALUED_ID_TYPES = frozenset(
 )
 
 
-def _via[VO](try_parse: Callable[[str], VO | None]) -> Callable[[str], str | None]:
-    def normalize(raw: str) -> str | None:
-        vo = try_parse(raw)
-        return str(vo) if vo is not None else None
-
-    return normalize
-
+# Type d'identifiant d'enregistrement source de chaque clé.
+_IDENTIFIER_TYPES: dict[ExternalIdType, SourceIdentifierType] = {
+    ExternalIdType.HAL_ID: SourceIdentifierType.HAL_ID,
+    ExternalIdType.NNT: SourceIdentifierType.NNT,
+    ExternalIdType.PMID: SourceIdentifierType.PMID,
+    ExternalIdType.PMCID: SourceIdentifierType.PMCID,
+    ExternalIdType.ARXIV_ID: SourceIdentifierType.ARXIV_ID,
+    ExternalIdType.RELATED_DOIS: SourceIdentifierType.DOI,
+    ExternalIdType.ISBN: SourceIdentifierType.ISBN,
+    ExternalIdType.EISBN: SourceIdentifierType.EISBN,
+}
 
 # Normalisation d'une valeur par type ; `None` signale une valeur invalide.
 _NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
-    ExternalIdType.HAL_ID: _via(HALId.try_parse),
-    ExternalIdType.NNT: _via(NNT.try_parse),
-    ExternalIdType.PMID: _via(PMID.try_parse),
-    ExternalIdType.PMCID: _via(PMCID.try_parse),
-    ExternalIdType.ARXIV_ID: _via(ArxivId.try_parse),
-    ExternalIdType.RELATED_DOIS: _via(DOI.try_parse),
-    ExternalIdType.ISBN: _via(ISBN.try_parse),
-    ExternalIdType.EISBN: _via(ISBN.try_parse),
+    key: identifier_normalizer(id_type) for key, id_type in _IDENTIFIER_TYPES.items()
 }
+
+_KEYS = {id_type: key for key, id_type in _IDENTIFIER_TYPES.items()}
+
+
+def external_ids_from_identifiers(
+    identifiers: Iterable[SourceIdentifier], doi: str | None
+) -> dict[str, JsonValue]:
+    """`external_ids` des identifiants normalisés d'un enregistrement source, dans leur ordre.
+
+    `related_dois` reçoit les DOI autres que `doi`. Un type à valeur unique reçoit la valeur de son rôle le plus fort, dans l'ordre de `SourceIdentifierRole`, et la première à rôle égal.
+    """
+    roles = tuple(SourceIdentifierRole)
+    lists: dict[str, list[JsonValue]] = {}
+    scalars: dict[str, SourceIdentifier] = {}
+    for identifier in identifiers:
+        if identifier.id_type is SourceIdentifierType.DOI and identifier.value == doi:
+            continue
+        key = _KEYS[identifier.id_type]
+        if key in MULTIVALUED_ID_TYPES:
+            lists.setdefault(key.value, []).append(identifier.value)
+        elif (kept := scalars.get(key.value)) is None or roles.index(identifier.role) < roles.index(
+            kept.role
+        ):
+            scalars[key.value] = identifier
+    return {**{key: i.value for key, i in scalars.items()}, **lists}
 
 
 def external_id_normalizer(id_type: ExternalIdType) -> Callable[[str], str | None]:
     """Fonction qui rend la forme normalisée d'une valeur de type `id_type`, ou `None` si elle est invalide."""
     return _NORMALIZERS[id_type]
-
-
-@dataclass(frozen=True, slots=True)
-class RejectedExternalId:
-    """Entrée écartée d'un `external_ids` : clé hors de `ExternalIdType`, ou valeur invalide pour son type."""
-
-    key: str
-    value: JsonValue
-
-
-def normalize_external_ids(
-    raw: Mapping[str, JsonValue],
-) -> tuple[dict[str, JsonValue], tuple[RejectedExternalId, ...]]:
-    """Normalise un `external_ids` et retourne les entrées écartées.
-
-    Chaque valeur passe par le value object de son type. Une valeur invalide est écartée, de même qu'une clé hors de `ExternalIdType`. Un type multivalué accepte une valeur isolée et devient une liste dédoublonnée. Un type sans valeur valide est absent du résultat. Idempotent.
-    """
-    clean: dict[str, JsonValue] = {}
-    rejected: list[RejectedExternalId] = []
-    for key, value in raw.items():
-        try:
-            id_type = ExternalIdType(key)
-        except ValueError:
-            rejected.append(RejectedExternalId(key, value))
-            continue
-        normalize = _NORMALIZERS[id_type]
-        values = value if isinstance(value, list) else [value]
-        kept: list[str] = []
-        for v in values:
-            normalized = normalize(v) if isinstance(v, str) else None
-            if normalized is None:
-                if v is not None:
-                    rejected.append(RejectedExternalId(key, v))
-            elif normalized not in kept:
-                kept.append(normalized)
-        if not kept:
-            continue
-        if id_type in MULTIVALUED_ID_TYPES:
-            clean[id_type.value] = list(kept)
-        else:
-            clean[id_type.value] = kept[0]
-            rejected.extend(RejectedExternalId(key, v) for v in kept[1:])
-    return clean, tuple(rejected)

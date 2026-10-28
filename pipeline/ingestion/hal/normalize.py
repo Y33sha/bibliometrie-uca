@@ -26,7 +26,12 @@ from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
 from domain.source_records.doc_types import map_doc_type
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    isbn_role,
+)
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.locations import LocationFacts
@@ -154,29 +159,37 @@ def page_range(page_s: str | None, raw_doc_type: str | None) -> PageRange:
     return parse_pages(page_s)
 
 
-def build_hal_external_ids(
+def build_hal_identifiers(
     doc: Mapping[str, JsonValue], hal_id: str, nnt: str | None
-) -> dict[str, JsonValue]:
-    """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
+) -> tuple[SourceIdentifier, ...]:
+    """Identifiants d'un dépôt HAL. Le `hal_id` est primaire, les autres sont secondaires, sauf l'ISBN de l'ouvrage qui contient le document (`isbn_role`).
 
-    `hal_id` est redondant avec `source_id` comme clé, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedId_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    Le PMID vient de `pubmedId_s`, les PMCID et identifiants arXiv des liens externes (`linkExtUrl_s`).
     """
-    external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
+    secondary = SourceIdentifierRole.SECONDARY
+    identifiers = [
+        SourceIdentifier(SourceIdentifierType.HAL_ID, hal_id, SourceIdentifierRole.PRIMARY)
+    ]
+    if doi := clean_doi(hal_text_field(doc.get("doiId_s"))):
+        identifiers.append(SourceIdentifier(SourceIdentifierType.DOI, doi, secondary))
     if nnt:
-        external_ids[ExternalIdType.NNT] = nnt
-    if isbns := parse_tei_isbns(hal_text_field(doc.get("label_xml"))):
-        external_ids[ExternalIdType.ISBN] = isbns
+        identifiers.append(SourceIdentifier(SourceIdentifierType.NNT, nnt, secondary))
+    role = isbn_role(get_doc_type(doc), "hal")
+    identifiers += (
+        SourceIdentifier(SourceIdentifierType.ISBN, isbn, role)
+        for isbn in parse_tei_isbns(hal_text_field(doc.get("label_xml")))
+    )
     if pmid := normalize_pmid(hal_text_field(doc.get("pubmedId_s"))):
-        external_ids[ExternalIdType.PMID] = pmid
+        identifiers.append(SourceIdentifier(SourceIdentifierType.PMID, pmid, secondary))
     raw = doc.get("linkExtUrl_s")
     link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)
     for entry in link_urls:
         url = hal_text_field(entry)
-        if ExternalIdType.PMCID not in external_ids and (pmcid := normalize_pmcid(url)):
-            external_ids[ExternalIdType.PMCID] = pmcid
-        if ExternalIdType.ARXIV_ID not in external_ids and (arxiv_id := normalize_arxiv_id(url)):
-            external_ids[ExternalIdType.ARXIV_ID] = arxiv_id
-    return external_ids
+        if pmcid := normalize_pmcid(url):
+            identifiers.append(SourceIdentifier(SourceIdentifierType.PMCID, pmcid, secondary))
+        if arxiv_id := normalize_arxiv_id(url):
+            identifiers.append(SourceIdentifier(SourceIdentifierType.ARXIV_ID, arxiv_id, secondary))
+    return tuple(identifiers)
 
 
 def hal_source_record(
@@ -195,8 +208,6 @@ def hal_source_record(
 
     # Collections : `collCode_s` du raw_data (liste complète des collections du record).
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
-
-    external_ids = build_hal_external_ids(doc, hal_id, nnt)
 
     # Abstract
     abstract = hal_text_field(doc.get("abstract_s"))
@@ -229,7 +240,7 @@ def hal_source_record(
         source_id=hal_id,
         staging_id=staging_id,
         doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
-        external_ids=external_ids,
+        identifiers=build_hal_identifiers(doc, hal_id, nnt),
         title=get_title(doc),
         publication_year=as_int(doc.get("producedDateY_i")),
         raw_doc_type=doc_type,

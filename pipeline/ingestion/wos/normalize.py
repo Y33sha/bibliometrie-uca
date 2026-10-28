@@ -11,6 +11,12 @@ from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
 from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    isbn_role,
+)
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs, at_path
@@ -444,6 +450,22 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
 # =============================================================
 
 
+def wos_identifiers(rec: Mapping[str, JsonValue]) -> tuple[SourceIdentifier, ...]:
+    """Identifiants d'un record WoS. Le DOI est secondaire, le rôle des ISBN suit le type du record (`isbn_role`)."""
+    role = isbn_role(as_str(rec.get("doc_type")), "wos")
+    external_ids = as_mapping(rec.get("external_ids"))
+    identifiers: list[SourceIdentifier] = []
+    if doi := as_str(rec.get("doi")):
+        identifiers.append(
+            SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)
+        )
+    for id_type in (SourceIdentifierType.ISBN, SourceIdentifierType.EISBN):
+        identifiers += (
+            SourceIdentifier(id_type, isbn, role) for isbn in as_strs(external_ids.get(id_type))
+        )
+    return tuple(identifiers)
+
+
 def wos_source_record(
     rec: Mapping[str, JsonValue], staging_id: int, containers: Containers
 ) -> SourceRecordUpsert:
@@ -453,7 +475,7 @@ def wos_source_record(
         source_id=as_str(rec.get("ut")) or "",
         staging_id=staging_id,
         doi=as_str(rec.get("doi")),
-        external_ids=dict(as_mapping(rec.get("external_ids"))) or None,
+        identifiers=wos_identifiers(rec),
         title=as_str(rec.get("title")) or "",
         publication_year=as_int(rec.get("publication_year")),
         raw_doc_type=as_str(rec.get("doc_type")),

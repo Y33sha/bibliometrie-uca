@@ -91,10 +91,12 @@ def get_container(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str 
 
 
 def get_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
-    """ISBN du document : ceux de ses identifiants (`identifiers`, `alternateIdentifiers`) et des `relatedIdentifiers` de type ISBN, et celui du conteneur quand son identifiant en est un.
+    """ISBN du document (`own_isbns`), puis ceux de l'ouvrage qui le contient (`host_isbns`), dédoublonnés."""
+    return list(dict.fromkeys([*own_isbns(attributes), *host_isbns(attributes)]))
 
-    Un livre porte son ISBN parmi ses identifiants ; un chapitre porte celui de son livre en `IsPartOf`. DataCite ne dit pas le support.
-    """
+
+def own_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
+    """ISBN des identifiants du document (`identifiers`, `alternateIdentifiers`). L'ISBN d'un livre figure parmi ses identifiants. DataCite ne dit pas le support."""
     isbns: list[str] = []
     for key, value_key, type_key in (
         ("identifiers", "identifier", "identifierType"),
@@ -104,6 +106,12 @@ def get_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
             entry = as_mapping(identifier)
             if (as_str(entry.get(type_key)) or "").upper() == "ISBN":
                 isbns += find_isbns(as_str(entry.get(value_key)))
+    return isbns
+
+
+def host_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
+    """ISBN des `relatedIdentifiers` de type ISBN et du conteneur quand son identifiant en est un. L'ISBN du livre d'un chapitre figure en `IsPartOf`."""
+    isbns: list[str] = []
     for related in as_sequence(attributes.get("relatedIdentifiers")):
         entry = as_mapping(related)
         if (as_str(entry.get("relatedIdentifierType")) or "").upper() == "ISBN":
@@ -111,7 +119,7 @@ def get_isbns(attributes: Mapping[str, JsonValue]) -> list[str]:
     container = as_mapping(attributes.get("container"))
     if (as_str(container.get("identifierType")) or "").upper() == "ISBN":
         isbns += find_isbns(as_str(container.get("identifier")))
-    return list(dict.fromkeys(isbns))
+    return isbns
 
 
 def get_container_pages(attributes: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
@@ -283,7 +291,7 @@ _CORPUS_RELATION_TYPES = frozenset(
 def extract_related_dois(attributes: Mapping[str, JsonValue], self_doi: str) -> list[str]:
     """DOI secondaires à rapatrier dans le corpus, hors DOI primaire, dédupliqués.
 
-    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente `external_ids.related_dois`, que la phase `fetch_missing` cherche dans chaque source. La liste typée complète vit dans `source_extras.related_identifiers`.
+    Filtré sur `_CORPUS_RELATION_TYPES` (versions / formes / parties / suppléments) — pas les citations. Alimente les identifiants liés, que la phase `fetch_missing` cherche dans chaque source. La liste typée complète vit dans `source_extras.related_identifiers`.
     """
     self_doi_clean = clean_doi(self_doi)
     out: list[str] = []

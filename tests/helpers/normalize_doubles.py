@@ -3,9 +3,18 @@
 Un normalizer verse ses documents dans `source_records`, écrit leurs contributions sources, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
 """
 
+from domain.source_records.external_ids import external_ids_from_identifiers
+from domain.source_records.identifiers import normalize_identifiers
+from domain.types import JsonValue
 from pipeline.ingestion.common.source_contribution_store import StoredSourceContributionRow
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
+
+
+def external_ids_of(record: SourceRecordUpsert) -> dict[str, JsonValue]:
+    """`external_ids` que l'écriture déduit des identifiants de `record`."""
+    identifiers, _ = normalize_identifiers(record.identifiers)
+    return external_ids_from_identifiers(identifiers, record.doi)
 
 
 def staging_row(

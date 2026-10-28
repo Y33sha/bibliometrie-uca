@@ -1,4 +1,4 @@
-"""Lecture des enregistrements sources ScanR par la normalisation : affiliations feuilles, NNT, concepts, statut open access.
+"""Lecture des enregistrements sources ScanR par la normalisation : affiliations feuilles, identifiants, concepts, statut open access.
 
 Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé)."""
 
@@ -6,6 +6,11 @@ import re
 from collections.abc import Mapping
 
 from domain.publications.identifiers import NNT
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 
 # Types des concepts ScanR (`domains`). Les vedettes sudoc (RAMEAU) relèvent d'un vocabulaire contrôlé. Les concepts wikidata, que ScanR détecte dans le texte, et les mots-clés sont des mots-clés libres.
@@ -36,6 +41,24 @@ def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
     match = _THESIS_ID_RE.match(scanr_id or "")
     nnt = NNT.try_parse(match.group(1)) if match else None
     return str(nnt) if nnt else None
+
+
+# Préfixe d'un identifiant ScanR qui contient l'identifiant d'un enregistrement d'une autre source, et type de cet identifiant.
+_DERIVED_PREFIXES = (
+    ("doi", SourceIdentifierType.DOI),
+    ("hal", SourceIdentifierType.HAL_ID),
+    ("pmid", SourceIdentifierType.PMID),
+)
+
+
+def scanr_derived_identifier(scanr_id: str) -> SourceIdentifier | None:
+    """Identifiant dérivé d'un enregistrement source ScanR, que contient son identifiant ScanR : `doi10.1/x`, `halhal-01234567`, `nnt2019clfad020`, `pmid28493063`."""
+    if nnt := extract_nnt_from_scanr_id(scanr_id):
+        return SourceIdentifier(SourceIdentifierType.NNT, nnt, SourceIdentifierRole.DERIVED)
+    for prefix, id_type in _DERIVED_PREFIXES:
+        if scanr_id.startswith(prefix):
+            return SourceIdentifier(id_type, scanr_id[len(prefix) :], SourceIdentifierRole.DERIVED)
+    return None
 
 
 def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:

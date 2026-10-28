@@ -4,6 +4,11 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from infrastructure.db.queues import Queue
 from pipeline.ingestion.common.source_records import (
     SourceRecordStore,
@@ -27,6 +32,26 @@ def _row(staging_id: int, **overrides) -> SourceRecordUpsert:
         "raw_doc_type": "thesis",
     }
     return SourceRecordUpsert(**{**defaults, **overrides})
+
+
+def _identifier(
+    id_type: SourceIdentifierType,
+    value: str,
+    role: SourceIdentifierRole = SourceIdentifierRole.SECONDARY,
+) -> SourceIdentifier:
+    return SourceIdentifier(id_type, value, role)
+
+
+def _identifiers(conn, source_record_id: int) -> list[tuple[str, str, str]]:
+    """Identifiants écrits de l'enregistrement source : type, valeur, rôle."""
+    rows = conn.execute(
+        text("""
+            SELECT id_type::text, id_value, role::text FROM source_record_identifiers
+            WHERE source_record_id = :id ORDER BY id_type, id_value
+        """),
+        {"id": source_record_id},
+    )
+    return [tuple(r) for r in rows]
 
 
 class TestUpsertSourceRecord:
@@ -174,9 +199,7 @@ class TestUpsertSourceRecord:
     def test_external_ids_defaults_to_empty_object(self, sa_sync_conn):
         """La colonne est `NOT NULL` et contrainte à un objet JSON."""
         staging_id = _thesis_staging(sa_sync_conn)
-        source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
-            _row(staging_id, external_ids=None)
-        )
+        source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(_row(staging_id))
         assert (
             sa_sync_conn.execute(
                 text("SELECT external_ids FROM source_records WHERE id = :id"),
@@ -201,28 +224,61 @@ class TestUpsertSourceRecord:
             "Type de document inconnu (theses 2023ABC001) : 'StudyRegistration'"
         ]
 
-    def test_external_ids_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
-        """Chaque valeur passe par son value object. Une valeur invalide ou une clé inconnue est écartée et journalisée."""
+    def test_identifiers_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
+        """Chaque valeur passe par son value object. Une valeur invalide est écartée et journalisée. `external_ids` se déduit des identifiants écrits."""
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
             _row(
                 staging_id,
-                external_ids={
-                    "hal_id": ["HAL-04123456v2", "10995/102143"],
-                    "nnt": "2023abc001",
-                    "pmc": "PMC9016621",
-                },
+                identifiers=(
+                    _identifier(
+                        SourceIdentifierType.NNT, "2023abc001", SourceIdentifierRole.PRIMARY
+                    ),
+                    _identifier(SourceIdentifierType.HAL_ID, "HAL-04123456v2"),
+                    _identifier(SourceIdentifierType.HAL_ID, "10995/102143"),
+                ),
             ),
         )
+        assert _identifiers(sa_sync_conn, source_record_id) == [
+            ("hal_id", "hal-04123456", "secondary"),
+            ("nnt", "2023ABC001", "primary"),
+        ]
         assert sa_sync_conn.execute(
             text("SELECT external_ids FROM source_records WHERE id = :id"),
             {"id": source_record_id},
         ).scalar_one() == {"hal_id": ["hal-04123456"], "nnt": "2023ABC001"}
-        logged = [r.getMessage() for r in caplog.records if "external_ids écarté" in r.getMessage()]
-        assert logged == [
-            "external_ids écarté (theses 2023ABC001) : hal_id = '10995/102143'",
-            "external_ids écarté (theses 2023ABC001) : pmc = 'PMC9016621'",
-        ]
+        logged = [r.getMessage() for r in caplog.records if "Identifiant écarté" in r.getMessage()]
+        assert logged == ["Identifiant écarté (theses 2023ABC001) : hal_id = '10995/102143'"]
+
+    def test_reimport_replaces_identifiers(self, sa_sync_conn):
+        """Le dernier import fait autorité. Un identifiant retiré par une règle de correction redevient actif."""
+        staging_id = _thesis_staging(sa_sync_conn)
+        store = SourceRecordStore(sa_sync_conn)
+        source_record_id = store.upsert_source_record(
+            _row(staging_id, identifiers=(_identifier(SourceIdentifierType.PMID, "1"),))
+        )
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_record_identifiers SET removed_by = 'X' WHERE source_record_id = :id"
+            ),
+            {"id": source_record_id},
+        )
+        store.upsert_source_record(
+            _row(
+                staging_id,
+                identifiers=(
+                    _identifier(SourceIdentifierType.PMID, "1"),
+                    _identifier(SourceIdentifierType.PMID, "2"),
+                ),
+            )
+        )
+        assert sa_sync_conn.execute(
+            text("""
+                SELECT id_value, removed_by FROM source_record_identifiers
+                WHERE source_record_id = :id ORDER BY id_value
+            """),
+            {"id": source_record_id},
+        ).all() == [("1", None), ("2", None)]
 
 
 class TestPublisher:

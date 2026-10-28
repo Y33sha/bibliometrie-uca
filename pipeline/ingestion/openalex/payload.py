@@ -10,6 +10,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from domain.publications.identifiers import (
+    extract_doi_from_url,
     extract_hal_id_from_url,
     is_hal_host,
     normalize_arxiv_id,
@@ -18,7 +19,11 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 from domain.publications.metadata import OaStatus
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.types import JsonValue, as_mapping, as_str
 from domain.urls import is_host, url_host
 
@@ -221,35 +226,39 @@ def map_openalex_oa_status(raw: str | None) -> str | None:
 # =============================================================
 
 
-def extract_external_ids_from_urls(urls: list[str]) -> dict[str, str | list[str]]:
-    """Extrait les identifiants exposés dans une liste d'URLs.
-
-    Reconnait HAL (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv.
-
-    `hal_id` est **multivalué** : une œuvre peut référencer plusieurs dépôts HAL (chapitres, versions, doublons), tous collectés (liste dédupliquée, ordre d'apparition). Les autres clés sont 1:1 avec un document → premier match gagnant (l'ordre des URLs est significatif : le caller choisit typiquement landing_page_url avant pdf_url).
-
-    Les fonctions de lecture d'ID par URL (PMID/PMCID/arXiv/HAL) vivent dans `domain.publications.identifiers` (neutres, réutilisés par HAL).
-
-    Pas de normalisation du NNT ici (à l'inverse de `extract_nnt_from_location`) — lecture opportuniste depuis une URL, la normalisation est laissée au caller.
-    """
-    external_ids: dict[str, str | list[str]] = {}
-    hal_ids: list[str] = []
+def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
+    """Identifiants secondaires exposés dans une liste d'URLs, dans leur ordre : `hal_id` (préfixes `hal-`/`tel-`/`halshs-`…), NNT (URLs `theses.fr/<NNT>`), PMID (PubMed), PMCID et arXiv."""
+    identifiers: list[SourceIdentifier] = []
     for url in urls:
-        if (hal_id := extract_hal_id_from_url(url)) and hal_id not in hal_ids:
-            hal_ids.append(hal_id)
-        if ExternalIdType.NNT not in external_ids:
-            m = _THESES_FR_URL_RE.search(url)
-            if m:
-                external_ids[ExternalIdType.NNT] = m.group(1)
-        if ExternalIdType.PMID not in external_ids:
-            if pmid := normalize_pmid(url):
-                external_ids[ExternalIdType.PMID] = pmid
-        if ExternalIdType.PMCID not in external_ids:
-            if pmcid := normalize_pmcid(url):
-                external_ids[ExternalIdType.PMCID] = pmcid
-        if ExternalIdType.ARXIV_ID not in external_ids:
-            if arxiv_id := normalize_arxiv_id(url):
-                external_ids[ExternalIdType.ARXIV_ID] = arxiv_id
-    if hal_ids:
-        external_ids[ExternalIdType.HAL_ID] = hal_ids
-    return external_ids
+        for id_type, value in (
+            (SourceIdentifierType.HAL_ID, extract_hal_id_from_url(url)),
+            (
+                SourceIdentifierType.NNT,
+                m.group(1) if (m := _THESES_FR_URL_RE.search(url)) else None,
+            ),
+            (SourceIdentifierType.PMID, normalize_pmid(url)),
+            (SourceIdentifierType.PMCID, normalize_pmcid(url)),
+            (SourceIdentifierType.ARXIV_ID, normalize_arxiv_id(url)),
+        ):
+            if value:
+                identifiers.append(SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY))
+    return identifiers
+
+
+def openalex_derived_identifier(primary: OpenalexLocation | None) -> SourceIdentifier | None:
+    """Identifiant de la localisation principale d'un work : NNT d'une localisation theses.fr, sinon premier `hal_id`, DOI, PMCID, PMID ou identifiant arXiv de sa page ou de son identifiant de localisation."""
+    if primary is None:
+        return None
+    if is_theses_fr_location(primary) and (nnt := extract_nnt_from_location(primary)):
+        return SourceIdentifier(SourceIdentifierType.NNT, nnt, SourceIdentifierRole.DERIVED)
+    for id_type, extract in (
+        (SourceIdentifierType.HAL_ID, extract_hal_id_from_url),
+        (SourceIdentifierType.DOI, extract_doi_from_url),
+        (SourceIdentifierType.PMCID, normalize_pmcid),
+        (SourceIdentifierType.PMID, normalize_pmid),
+        (SourceIdentifierType.ARXIV_ID, normalize_arxiv_id),
+    ):
+        for raw in (primary.landing_page_url, primary.location_id):
+            if value := extract(raw):
+                return SourceIdentifier(id_type, value, SourceIdentifierRole.DERIVED)
+    return None

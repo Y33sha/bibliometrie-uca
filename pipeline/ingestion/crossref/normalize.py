@@ -18,10 +18,15 @@ from domain.publications.licenses import crossref_license
 from domain.serials.containers import ContainerDescription, ContainerRole, container_role
 from domain.serials.series import split_collection_and_volume
 from domain.source_records.biblio import PageRange, compact_biblio, parse_pages
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    isbn_role,
+)
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
-from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs, as_text
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_text
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
@@ -120,12 +125,8 @@ def get_language(msg: Mapping[str, JsonValue]) -> str | None:
     return None
 
 
-def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Identifiants secondaires (ISBN). DOI vit dans la colonne dédiée.
-
-    `isbn-type` donne le support de chaque ISBN : celui de l'édition électronique va sous `eisbn`. Un ISBN sans support déclaré reste sous `isbn`.
-    """
-    ext: dict[str, JsonValue] = {}
+def get_isbns(msg: Mapping[str, JsonValue]) -> tuple[list[str], list[str]]:
+    """ISBN imprimés ou sans support déclaré, puis ISBN électroniques. `isbn-type` donne le support de chaque ISBN."""
     electronic = {
         value
         for entry in as_sequence(msg.get("isbn-type"))
@@ -133,11 +134,22 @@ def get_external_ids(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | Non
         and as_str(as_mapping(entry).get("type")) == "electronic"
     }
     isbns = [s for s in as_sequence(msg.get("ISBN")) if isinstance(s, str)]
-    if print_isbns := [s for s in isbns if s not in electronic]:
-        ext[ExternalIdType.ISBN] = print_isbns
-    if online := [s for s in isbns if s in electronic]:
-        ext[ExternalIdType.EISBN] = online
-    return ext or None
+    return [s for s in isbns if s not in electronic], [s for s in isbns if s in electronic]
+
+
+def crossref_identifiers(msg: Mapping[str, JsonValue], doi: str) -> tuple[SourceIdentifier, ...]:
+    """Identifiants d'une œuvre Crossref. Le DOI est primaire, le rôle des ISBN suit le type de l'œuvre (`isbn_role`)."""
+    role = isbn_role(
+        crossref_raw_doc_type(msg),
+        "crossref",
+        declares_conference=extract_crossref_conference(msg) is not None,
+    )
+    isbns, eisbns = get_isbns(msg)
+    return (
+        SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.PRIMARY),
+        *(SourceIdentifier(SourceIdentifierType.ISBN, isbn, role) for isbn in isbns),
+        *(SourceIdentifier(SourceIdentifierType.EISBN, isbn, role) for isbn in eisbns),
+    )
 
 
 def page_range(page: str | None, article_number: str | None) -> PageRange:
@@ -187,7 +199,7 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     conference = extract_crossref_conference(msg)
     titles = _container_titles(msg)
     issns = crossref_issns(msg)
-    external_ids = get_external_ids(msg) or {}
+    isbns, eisbns = get_isbns(msg)
     role = container_role(raw_type, "crossref", declares_conference=conference is not None)
     collection_title = book_title = None
     if role is ContainerRole.BOOK:
@@ -209,8 +221,8 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
         collection_title=collection_title,
         book_title=book_title,
         issns=issns,
-        isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
-        eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
+        isbns=tuple(isbns),
+        eisbns=tuple(eisbns),
         year=get_publication_year(msg),
     )
 
@@ -315,7 +327,7 @@ def crossref_source_record(
         source_id=doi,
         staging_id=staging_id,
         doi=doi,
-        external_ids=get_external_ids(msg),
+        identifiers=crossref_identifiers(msg, doi),
         title=title,
         publication_year=publication_year,
         raw_doc_type=crossref_raw_doc_type(msg),
