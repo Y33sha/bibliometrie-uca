@@ -333,8 +333,6 @@ exclude_lines = [
 
 # Pyrefly : vérificateur de types. Lancement : `uv run pyrefly check`.
 [tool.pyrefly]
-# Interpréteur des images de production (cf. `scripts/versions-des-images.sh`).
-python-version = "3.14.0"
 # Système des images de production. Sans ce réglage, pyrefly lancé sous Windows rejette les appels POSIX (`signal.SIGKILL`).
 python-platform = "linux"
 project-excludes = [
