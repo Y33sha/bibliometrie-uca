@@ -40,7 +40,7 @@
   const authors = $derived(data ? authorRows(records, data.source_contributions) : []);
 </script>
 
-<Drawer width="1200px" {onclose}>
+<Drawer width="max(1200px, 67vw)" {onclose}>
   {#snippet head()}
     {#if data}
       <a
