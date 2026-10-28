@@ -41,6 +41,8 @@ class SourceProfile:
     opt_in: bool = False
     # Moissonnée par le mode quotidien, depuis le dernier moissonnage quotidien réussi.
     incremental: bool = False
+    # Compile les enregistrements d'autres sources (dépôts HAL, Crossref, PubMed). Un enregistrement source de cette source vaut par les liens et les identifiants qu'il cite.
+    aggregator: bool = False
 
 
 PROFILES: dict[Source, SourceProfile] = {
@@ -58,6 +60,7 @@ PROFILES: dict[Source, SourceProfile] = {
         harvested=True,
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID}),
+        aggregator=True,
     ),
     Source.WOS: SourceProfile(label="WoS", harvested=True, doi_searchable=True, opt_in=True),
     Source.SCANR: SourceProfile(
@@ -65,6 +68,7 @@ PROFILES: dict[Source, SourceProfile] = {
         harvested=True,
         doi_searchable=True,
         person_identifiers=frozenset({PersonIdentifierType.ORCID, PersonIdentifierType.IDREF}),
+        aggregator=True,
     ),
     # Son API se requête par NNT, pas par DOI.
     Source.THESES: SourceProfile(label="theses.fr", harvested=True),
@@ -154,6 +158,7 @@ DOI_SEARCHABLE_SOURCES: tuple[Source, ...] = tuple(
 PERSON_SEARCHED_SOURCES: tuple[Source, ...] = tuple(
     s for s, p in PROFILES.items() if p.person_identifiers
 )
+AGGREGATOR_SOURCES: frozenset[Source] = frozenset(s for s, p in PROFILES.items() if p.aggregator)
 
 # Registre des DOI, interrogé pour vérifier qu'un DOI existe. Il figure parmi les sources des recherches infructueuses, sans fournir d'enregistrements sources.
 DOI_ORG = "doi_org"

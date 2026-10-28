@@ -31,6 +31,7 @@ class CorrectionKey(StrEnum):
     DOC_TYPE = "doc_type"
     OA_STATUS = "oa_status"
     EXTERNAL_IDS = "external_ids"
+    URLS = "urls"
     DOI = "doi"
     REMOVED_EXTERNAL_IDS = "removed_external_ids"
     """Identifiants externes partagés avec une autre œuvre, retirés (`removal_entry`)."""
@@ -39,7 +40,12 @@ class CorrectionKey(StrEnum):
 
 # Clés que pose chaque sous-étape de `metadata_correction`. Chaque sous-étape réécrit les siennes et garde les autres (`other_entries`).
 UNARY_KEYS = frozenset(
-    {CorrectionKey.DOC_TYPE, CorrectionKey.OA_STATUS, CorrectionKey.EXTERNAL_IDS}
+    {
+        CorrectionKey.DOC_TYPE,
+        CorrectionKey.OA_STATUS,
+        CorrectionKey.EXTERNAL_IDS,
+        CorrectionKey.URLS,
+    }
 )
 CLUSTER_KEYS = frozenset({CorrectionKey.DOI, CorrectionKey.REMOVED_EXTERNAL_IDS})
 SERIAL_BY_DOI_KEYS = frozenset({CorrectionKey.SERIAL_ID})

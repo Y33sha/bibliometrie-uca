@@ -804,13 +804,17 @@ TASKS: tuple[Task, ...] = (
             "publishers.publisher_type",
             "language_forms",
             "source_contributions.source_record_id",
+            # Dépôts HAL introuvables dans HAL.
+            "failed_lookups",
         ),
         writes=(
             "source_records.doc_type",
             "source_records.oa_status",
             "source_records.language",
             "source_records.external_ids",
+            "source_records.urls",
             "source_records.corrections",
+            "source_record_locations",
             "source_record_keys_queue",
         ),
         # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
@@ -859,6 +863,30 @@ TASKS: tuple[Task, ...] = (
             "publication_contributions_queue",
         ),
         previous_run=("source_records",),
+    ),
+    _task(
+        "metadata_correction.matchable",
+        "metadata_correction",
+        reads=(
+            *(
+                f"source_records.{column}"
+                for column in (
+                    "id",
+                    "source",
+                    "source_id",
+                    "doi",
+                    "title_normalized",
+                    "urls",
+                    "external_ids",
+                    "corrections",
+                    "is_matchable",
+                )
+            ),
+            # Dépôts HAL introuvables dans HAL.
+            "failed_lookups",
+        ),
+        writes=("source_records.is_matchable", "source_record_keys_queue"),
+        previous_run=("source_records.is_matchable",),
     ),
     _task(
         "publications.reconcile",

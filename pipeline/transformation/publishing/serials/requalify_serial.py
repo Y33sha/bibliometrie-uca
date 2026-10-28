@@ -21,7 +21,7 @@ def correct_serial_records(conn: Connection, serial_id: int) -> int:
         row.source_id: row
         for row in store.fetch_for_unary_correction_by_hal_ids(hal_origin_ids(rows))
     }
-    updates = compute_updates(rows, hal_rows)
+    updates = compute_updates(rows, hal_rows, store.fetch_missing_hal_ids())
     return store.persist_corrections(updates)
 
 

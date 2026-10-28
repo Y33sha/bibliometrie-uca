@@ -23,7 +23,10 @@ from infrastructure.db.rows import rows_as
 from infrastructure.raw_store import RawStore, get_raw_store
 from pipeline.ingestion.adapters import ADAPTERS
 from pipeline.ingestion.common.change_detection import change_detection_hash
-from pipeline.ingestion.common.failed_lookups import forget_failed_doi_lookups
+from pipeline.ingestion.common.failed_lookups import (
+    forget_failed_doi_lookups,
+    forget_failed_hal_id_lookup,
+)
 from pipeline.ingestion.common.fingerprint import stable_json_bytes
 from pipeline.ingestion.common.source_records import delete_source_record_of_staging
 
@@ -146,9 +149,9 @@ class StagingStore:
         entry_mode: StagingEntryMode = StagingEntryMode.BULK,
         listed: bool = True,
     ) -> UpsertOutcome | None:
-        """Écrit un document de `source`, identifié par l'adaptateur de la source, et efface les recherches par DOI que ses DOI démentent.
+        """Écrit un document de `source`, identifié par l'adaptateur de la source, et efface les recherches infructueuses que le document dément.
 
-        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Rend `None` pour un document sans identifiant, qui n'est pas écrit.
+        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Rend `None` pour un document sans identifiant, qui n'est pas écrit.
         """
         adapter = ADAPTERS[Source(source)]
         identity = adapter.identify(record)
@@ -168,6 +171,8 @@ class StagingStore:
         forget_failed_doi_lookups(self._conn, source, identity.dois)
         if PROFILES[Source(source)].registration_agency is not None:
             forget_failed_doi_lookups(self._conn, DOI_ORG, identity.dois)
+        if source == Source.HAL:
+            forget_failed_hal_id_lookup(self._conn, identity.source_id)
         return UpsertOutcome.of(inserted=inserted, changed=changed)
 
     def complete_authors(

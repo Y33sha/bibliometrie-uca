@@ -31,6 +31,7 @@ def test_tally_corrections_compte_les_regles():
                 "thesis",
                 None,
                 {},
+                None,
                 {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
             ),
         ),
@@ -41,6 +42,7 @@ def test_tally_corrections_compte_les_regles():
                 "media",
                 "green",
                 {},
+                None,
                 {
                     "doc_type": stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
                     "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
@@ -48,7 +50,7 @@ def test_tally_corrections_compte_les_regles():
             ),
         ),
         # correction défaite : mise à jour sans règle
-        CorrectionUpdate(4, CorrectedSourceRecord("article", None, {}, {})),
+        CorrectionUpdate(4, CorrectedSourceRecord("article", None, {}, None, {})),
     ]
     corrected, rule_counts = tally_corrections(updates)
     assert corrected == 2
@@ -279,6 +281,8 @@ def test_preserves_unmanaged_corrections_keys():
 def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog):
     """Une correction défaite donne une mise à jour, sans compter comme une correction."""
     queries = MagicMock()
+    queries.fetch_missing_hal_ids.return_value = frozenset()
+    queries.delete_missing_hal_locations.return_value = 0
     queries.fetch_for_unary_correction.return_value = [
         _source_record(
             id=1,
@@ -294,6 +298,61 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
     assert "  ├─ 1 document à corriger" in caplog.messages
 
 
+# ── Dépôts HAL introuvables ─────────────────────────────────────────────────────────
+
+
+def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
+    """Régression : l'enregistrement OpenAlex W4287257393 citait le seul dépôt hal-03178520, introuvable dans HAL."""
+    row = _source_record(
+        external_ids={"hal_id": ["hal-03178520", "hal-03263588"], "pmid": "1"},
+        urls=["https://hal.science/hal-03178520", "https://hal.inrae.fr/hal-03263588/document"],
+    )
+    upd = compute_update(row, missing_hal_ids={"hal-03178520"})
+    assert upd is not None
+    assert upd.corrected.external_ids == {"hal_id": ["hal-03263588"], "pmid": "1"}
+    assert upd.corrected.urls == ["https://hal.inrae.fr/hal-03263588/document"]
+    assert upd.corrected.corrections["urls"] == stash_entry(
+        row.facts.urls, "HAL_DEPOSIT_MISSING_TO_REMOVED"
+    )
+    assert tally_corrections([upd]) == (1, {"HAL_DEPOSIT_MISSING_TO_REMOVED": 1})
+
+    corrected = _source_record(
+        external_ids=upd.corrected.external_ids,
+        urls=upd.corrected.urls,
+        corrections=upd.corrected.corrections,
+    )
+    assert compute_update(corrected, missing_hal_ids={"hal-03178520"}) is None
+
+
+def test_dernier_depot_hal_introuvable_vide_les_liens():
+    row = _source_record(
+        external_ids={"hal_id": ["hal-03178520"]}, urls=["https://hal.science/hal-03178520"]
+    )
+    upd = compute_update(row, missing_hal_ids={"hal-03178520"})
+    assert upd is not None
+    assert upd.corrected.external_ids == {}
+    assert upd.corrected.urls is None
+
+
+def test_depot_hal_retrouve_restaure_identifiants_et_liens():
+    raw_ids = {"hal_id": ["hal-03178520"]}
+    raw_urls = ["https://hal.science/hal-03178520"]
+    rule = "HAL_DEPOSIT_MISSING_TO_REMOVED"
+    corrected = _source_record(
+        external_ids={},
+        urls=None,
+        corrections={
+            "external_ids": stash_entry(raw_ids, rule),
+            "urls": stash_entry(raw_urls, rule),
+        },
+    )
+    upd = compute_update(corrected)
+    assert upd is not None
+    assert upd.corrected.external_ids == raw_ids
+    assert upd.corrected.urls == raw_urls
+    assert upd.corrected.corrections == {}
+
+
 # ── Enregistrements sources ScanR issues d'un dépôt HAL ─────────────────────────────
 
 
@@ -302,7 +361,7 @@ def test_scanr_from_hal_takes_corrected_hal_type():
     hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
 
-    updates = compute_updates([hal, scanr], {"hal-04565713": hal})
+    updates = compute_updates([hal, scanr], {"hal-04565713": hal}, frozenset())
 
     (scanr_update,) = [u for u in updates if u.id == 2]
     assert scanr_update.corrected.doc_type == "poster"
@@ -314,13 +373,13 @@ def test_scanr_from_hal_takes_corrected_hal_type():
 
 def test_scanr_without_hal_deposit_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
-    assert compute_updates([scanr], {}) == []
+    assert compute_updates([scanr], {}, frozenset()) == []
 
 
 def test_scanr_from_another_origin_keeps_its_type():
     scanr = _source_record(id=2, source="scanr", source_id="doi10.1/x", doc_type="other")
     hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
-    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal})] == []
+    assert [u.id for u in compute_updates([scanr], {"hal-04565713": hal}, frozenset())] == []
 
 
 def test_hal_origin_ids():

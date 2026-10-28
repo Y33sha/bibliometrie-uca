@@ -5,7 +5,7 @@ Les journaux sont typés à ce stade : la phase tourne après `publishing`. La c
 
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from dataclasses import dataclass
 
 from sqlalchemy import Connection
@@ -28,8 +28,9 @@ from pipeline.transformation.publications.correction.correction_store import (
 def compute_updates(
     rows: list[UnaryCorrectionRow],
     hal_rows: Mapping[str, UnaryCorrectionRow],
+    missing_hal_ids: Set[str],
 ) -> list[CorrectionUpdate]:
-    """Mises à jour à persister pour `rows`. `hal_rows` : enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR de `rows`."""
+    """Mises à jour à persister pour `rows`. `hal_rows` : enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR de `rows`. `missing_hal_ids` : dépôts HAL introuvables dans HAL."""
     updates: list[CorrectionUpdate] = []
     for row in rows:
         origin = (
@@ -39,7 +40,7 @@ def compute_updates(
             else None
         )
         origin_doc_type = corrected_doc_type(origin.facts, origin.corrections) if origin else None
-        if (update := compute_update(row, origin_doc_type)) is not None:
+        if (update := compute_update(row, origin_doc_type, missing_hal_ids)) is not None:
             updates.append(update)
     return updates
 
@@ -59,10 +60,15 @@ def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
 def compute_update(
     row: UnaryCorrectionRow,
     origin_doc_type: str | None = None,
+    missing_hal_ids: Set[str] = frozenset(),
 ) -> CorrectionUpdate | None:
     """Mise à jour de la correction unaire d'une `source_record` (`correct_source_record`), ou `None` si rien ne change. `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu."""
     corrected = correct_source_record(
-        row.facts, row.external_ids, row.corrections, origin_doc_type=origin_doc_type
+        row.facts,
+        row.external_ids,
+        row.corrections,
+        origin_doc_type=origin_doc_type,
+        missing_hal_ids=missing_hal_ids,
     )
     return CorrectionUpdate(row.id, corrected) if corrected is not None else None
 
@@ -77,17 +83,18 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """`(source_records corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires."""
+    """`(source_records corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires. Une règle qui corrige plusieurs champs d'une `source_record` compte une fois."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:
-        fired = False
+        fired: set[str] = set()
         for field in UNARY_KEYS:
             entry = update.corrected.corrections.get(field)
             rule = entry.get(CORRECTED_BY) if isinstance(entry, dict) else None
             if isinstance(rule, str):
-                rule_counts[rule] = rule_counts.get(rule, 0) + 1
-                fired = True
+                fired.add(rule)
+        for rule in fired:
+            rule_counts[rule] = rule_counts.get(rule, 0) + 1
         if fired:
             corrected += 1
     return corrected, rule_counts
@@ -105,10 +112,18 @@ def run(
     logger.info("%s%s %s", BRANCH, quantity(len(rows), "document"), inflect(len(rows), "examiné"))
 
     hal_rows = {row.source_id: row for row in rows if row.facts.source == "hal"}
-    updates = compute_updates(rows, hal_rows)
+    missing_hal_ids = store.fetch_missing_hal_ids()
+    updates = compute_updates(rows, hal_rows, missing_hal_ids)
     corrected, rule_counts = tally_corrections(updates)
     logger.info("%s%s à corriger", BRANCH, quantity(corrected, "document"))
 
     persist_in_batches(conn, updates, store.persist_corrections)
+    removed = store.delete_missing_hal_locations()
+    logger.info(
+        "%s%s de dépôts HAL introuvables %s",
+        BRANCH,
+        quantity(removed, "localisation"),
+        inflect(removed, "retirée"),
+    )
     logger.info("%sTerminé en %.1fs", LAST_BRANCH, time.perf_counter() - t0)
     return UnaryCorrectionStats(len(rows), corrected, rule_counts)

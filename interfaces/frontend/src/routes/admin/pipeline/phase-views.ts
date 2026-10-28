@@ -162,6 +162,7 @@ export const PHASE_VIEWS: Record<string, PhaseView> = {
         { key: "serial_by_doi", label: "Rattachement à la publication en série (par DOI)" },
         { key: "unary", label: "Corrections à l'unité" },
         { key: "cluster", label: "Corrections par grappe" },
+        { key: "matchable", label: "Mise à l'écart de la réconciliation" },
       ],
     },
     tables: [

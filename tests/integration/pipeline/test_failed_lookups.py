@@ -9,6 +9,7 @@ from pipeline.ingestion.common.failed_lookups import (
     pending_failed_lookup_sql,
     record_failed_lookup,
 )
+from pipeline.ingestion.common.staging import StagingStore
 
 
 def _count(conn) -> int:
@@ -98,3 +99,11 @@ class TestForgetFailedDoiLookups:
         record_failed_lookup(sa_sync_conn, "scanr", "doi", "10.1234/x")
         forget_failed_doi_lookups(sa_sync_conn, "scanr", [None, ""])
         assert _count(sa_sync_conn) == 1
+
+    def test_un_depot_rendu_par_hal_quitte_la_table(self, sa_sync_conn):
+        record_failed_lookup(sa_sync_conn, "hal", "hal_id", "hal-03178520")
+        record_failed_lookup(sa_sync_conn, "hal", "hal_id", "hal-05524892")
+        StagingStore(sa_sync_conn).stage("hal", {"halId_s": "hal-03178520", "title_s": ["T"]})
+        assert sa_sync_conn.execute(
+            text("SELECT id_value FROM failed_lookups")
+        ).scalars().all() == ["hal-05524892"]

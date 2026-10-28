@@ -9,7 +9,7 @@
 - **skip** : une partition d'orphelins sans aucun membre in-périmètre → rien n'est créé, ils restent orphelins.
 - **merge / split** : partitions étalées sur plusieurs publications / publication qui contient plusieurs partitions (cf. ci-dessous).
 
-**Exclusion.** Un enregistrement source écarté (`is_excluded_source_record` : préfixe DOI exclu, titre de paratexte) n'entre dans aucune partition. Matérialisé, il est détaché de sa publication.
+**Exclusion.** Un enregistrement source écarté (`domain.publications.scope.is_matchable`) n'entre dans aucune partition. Matérialisé, il est détaché de sa publication.
 
 **Ancre = porteur du DOI.** Pour une partition de DOI `X`, l'ancre est la publication qui **a déjà** `doi=X` (`publication_doi`), départage `min(publication_id)` si plusieurs l'ont (doublons hérités), fallback `min(source_record_id)` parmi les enregistrements sources **matérialisés** de la partition. Si aucun enregistrement source n'a de publication (partition d'orphelins) : pas d'ancre existante → **create** (si in-périmètre) ou **skip**. Les corrections à la main restent sur l'ancre (la publication qui a le DOI). L'ancre est orthogonale au clustering (elle ne décide que *quel id survit*, pas *quels enregistrements sources sont ensemble*).
 
@@ -25,7 +25,7 @@ from typing import NamedTuple
 
 from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES, is_excluded_source_record
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 
 # Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
 MANUAL_MERGE_KEY = "manual_merge"
@@ -42,7 +42,7 @@ def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str,
 class ReconcileMember:
     """Un enregistrement source du voisinage de réconciliation.
 
-    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) et jetons de fusion manuelle (`manual_merge_tokens`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de l'enregistrement source, **`None` s'il est orphelin** (pas encore matérialisé) ; `publication_doi` = DOI de cette publication courante (`None` s'il est orphelin) ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre ; `title_normalized` / `publication_year` = métadonnées minimales requises pour matérialiser une publication neuve ; `doc_type` = type de l'enregistrement source.
+    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) et jetons de fusion manuelle (`manual_merge_tokens`) ; `matchable` = l'enregistrement source entre dans la réconciliation (`is_matchable`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de l'enregistrement source, **`None` s'il est orphelin** (pas encore matérialisé) ; `publication_doi` = DOI de cette publication courante (`None` s'il est orphelin) ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre ; `title_normalized` / `publication_year` = métadonnées minimales requises pour matérialiser une publication neuve ; `doc_type` = type de l'enregistrement source.
 
     `in_perimeter`, `title_normalized`, `publication_year` et `doc_type` n'ont de rôle que pour la **création** : ils décident create vs skip pour une partition d'orphelins ; l'année décide create vs détachement pour une partition qui perd sa publication.
     """
@@ -56,16 +56,12 @@ class ReconcileMember:
     title_normalized: str | None = None
     publication_year: int | None = None
     doc_type: str | None = None
+    matchable: bool = True
 
     @property
     def can_found_publication(self) -> bool:
         """L'enregistrement source est in-périmètre et d'un type du périmètre métier."""
         return self.in_perimeter and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
-
-    @property
-    def excluded(self) -> bool:
-        """L'enregistrement source est écarté de la réconciliation (`is_excluded_source_record`)."""
-        return is_excluded_source_record(self.effective_doi, self.title_normalized)
 
     @property
     def materializable(self) -> bool:
@@ -99,7 +95,7 @@ class DissolvedPublication:
 class ReconcilePlan:
     """Plan de réconciliation : groupes à matérialiser, publications dissoutes, `source_records` à détacher de leur publication.
 
-    Deux cas de détachement : un enregistrement source écarté (`ReconcileMember.excluded`) ; une partition qui a perdu la revendication de sa publication et dont aucun membre n'a d'année, donc qui ne peut pas fonder une publication neuve. Les membres détachés deviennent orphelins.
+    Deux cas de détachement : un enregistrement source écarté (`ReconcileMember.matchable` faux) ; une partition qui a perdu la revendication de sa publication et dont aucun membre n'a d'année, donc qui ne peut pas fonder une publication neuve. Les membres détachés deviennent orphelins.
     """
 
     groups: tuple[WorkGroup, ...]
@@ -205,7 +201,7 @@ def plan_reconciliation(
     """
     members = list(members)
     by_doi = existing_publication_by_doi or {}
-    excluded = {m.source_record_id for m in members if m.excluded}
+    excluded = {m.source_record_id for m in members if not m.matchable}
     admitted = [m for m in members if m.source_record_id not in excluded]
     claims = [c for part in _partitions(admitted) if (c := _claim(part, by_doi)) is not None]
 
@@ -216,7 +212,7 @@ def plan_reconciliation(
     awarded: set[int] = set()
     groups: list[WorkGroup] = []
     detached: list[int] = sorted(
-        m.source_record_id for m in members if m.excluded and m.publication_id is not None
+        m.source_record_id for m in members if not m.matchable and m.publication_id is not None
     )
     target_of_source_record: dict[int, int | None] = {}
     for claim in sorted(

@@ -1,6 +1,6 @@
 """Journal des recherches infructueuses de la phase `fetch_missing` (table `failed_lookups`).
 
-Une ligne par identifiant cherché en vain dans une source, ou auprès de doi.org (`DOI_ORG` : DOI que doi.org ne connaît pas). `record_failed_lookup` inscrit l'échec, `forget_failed_doi_lookups` efface les échecs démentis, `pending_failed_lookup_sql` écarte des sélections les identifiants en attente ou absents de leur registre. Le commit est à la charge de l'appelant.
+Une ligne par identifiant cherché en vain dans une source, ou auprès de doi.org (`DOI_ORG` : DOI que doi.org ne connaît pas). `record_failed_lookup` inscrit l'échec, `forget_failed_doi_lookups` et `forget_failed_hal_id_lookup` effacent les échecs démentis, `pending_failed_lookup_sql` écarte des sélections les identifiants en attente ou absents de leur registre. Le commit est à la charge de l'appelant.
 """
 
 from collections.abc import Sequence
@@ -9,7 +9,7 @@ from typing import Literal
 from sqlalchemy import Connection, text
 
 from domain.publications.identifiers import clean_doi
-from domain.sources.registry import REGISTRY_LOOKUPS
+from domain.sources.registry import REGISTRY_LOOKUPS, Source
 
 LookupIdType = Literal["doi", "hal_id", "nnt"]
 """Types d'identifiants cherchés par la phase `fetch_missing`, contraints par `failed_lookups_id_type_check`."""
@@ -33,10 +33,11 @@ def record_failed_lookup(
     conn.execute(_RECORD_SQL, {"source": source, "id_type": id_type, "id_value": id_value})
 
 
-_FORGET_DOIS_SQL = text(
+_FORGET_SQL = text(
     """
     DELETE FROM failed_lookups
-    WHERE source = CAST(:source AS lookup_source) AND id_type = 'doi' AND id_value = ANY(:dois)
+    WHERE source = CAST(:source AS lookup_source) AND id_type = :id_type
+      AND id_value = ANY(:values)
     """
 )
 
@@ -48,7 +49,12 @@ def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str 
     """
     cleaned = [clean for doi in dois if (clean := clean_doi(doi))]
     if cleaned:
-        conn.execute(_FORGET_DOIS_SQL, {"source": source, "dois": cleaned})
+        conn.execute(_FORGET_SQL, {"source": source, "id_type": "doi", "values": cleaned})
+
+
+def forget_failed_hal_id_lookup(conn: Connection, hal_id: str) -> None:
+    """Efface l'échec de la recherche du dépôt `hal_id` dans HAL : HAL rend le dépôt. Ne commit pas."""
+    conn.execute(_FORGET_SQL, {"source": Source.HAL.value, "id_type": "hal_id", "values": [hal_id]})
 
 
 def pending_failed_lookup_sql(*, source_sql: str, id_type: LookupIdType, value_sql: str) -> str:

@@ -226,10 +226,9 @@ class TestEndToEnd:
         """Régression : une publication faite de copies GRESIS (DOI 10.60692) est supprimée, ses enregistrements sources restent orphelins."""
         conn = sa_sync_conn
         publication = _seed_publication(conn)
-        openalex = _source_record(conn, publication, source_id="a", doi="10.60692/m2raz-tjw54")
-        datacite = _source_record(
-            conn, publication, source="datacite", source_id="b", doi="10.60692/m2raz-tjw54"
-        )
+        gresis = partial(_source_record, doi="10.60692/m2raz-tjw54", is_matchable=False)
+        openalex = gresis(conn, publication, source_id="a")
+        datacite = gresis(conn, publication, source="datacite", source_id="b")
 
         stats = reconcile(conn, logger)
 
@@ -245,7 +244,12 @@ class TestEndToEnd:
         publication_b = _seed_publication(conn)
         payment = insert_apc_payment(conn, publication_id=publication_b, open_access_fee=True)
         paratext = _source_record(
-            conn, publication_b, source_id="c", title="Index", title_normalized="index"
+            conn,
+            publication_b,
+            source_id="c",
+            title="Index",
+            title_normalized="index",
+            is_matchable=False,
         )
         source_record_a = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
         source_record_b = _source_record(conn, publication_b, source_id="b", doi="10.1/x")

@@ -1,7 +1,7 @@
 """Tests du périmètre des publications."""
 
 from domain.publications.metadata import normalized_title
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES, is_excluded_source_record
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES, MatchabilityFacts, is_matchable
 
 
 class TestOutOfScopeDocTypes:
@@ -19,25 +19,61 @@ class TestOutOfScopeDocTypes:
         assert isinstance(OUT_OF_SCOPE_DOC_TYPES, frozenset)
 
 
-class TestIsExcludedSourceRecord:
+def _facts(
+    source="hal",
+    source_id="hal-04000000",
+    *,
+    raw_doi=None,
+    doi=None,
+    title="observation of",
+    urls=(),
+    external_ids=None,
+):
+    return MatchabilityFacts(source, source_id, raw_doi, doi, title, list(urls), external_ids or {})
+
+
+class TestIsMatchable:
     def test_gresis_doi_is_excluded(self):
         """Régression : les copies GRESIS d'enregistrements OpenAlex (DOI 10.60692) dédoublaient les publications de revue."""
-        assert is_excluded_source_record(
-            "10.60692/m2raz-tjw54", "lasing in optically induced gap states"
-        )
+        gresis = "10.60692/m2raz-tjw54"
+        assert not is_matchable(_facts("datacite", gresis, raw_doi=gresis, doi=gresis), set())
+
+    def test_gresis_doi_nulled_by_correction_is_still_excluded(self):
+        assert not is_matchable(_facts("datacite", raw_doi="10.60692/m2raz-tjw54"), set())
 
     def test_paratext_title_is_excluded(self):
-        assert is_excluded_source_record(
-            "10.1007/978-3-030-1_1", normalized_title("List of Contributors")
-        )
-        assert is_excluded_source_record(None, normalized_title("README.txt"))
-        assert is_excluded_source_record(None, normalized_title("Table des matières"))
+        for title in ("List of Contributors", "README.txt", "Table des matières"):
+            assert not is_matchable(_facts(title=normalized_title(title)), set())
 
     def test_authored_front_text_is_kept(self):
         """Une introduction ou une préface est un texte d'auteur."""
-        assert not is_excluded_source_record(None, normalized_title("Introduction"))
-        assert not is_excluded_source_record(None, normalized_title("Préface"))
+        assert is_matchable(_facts(title=normalized_title("Introduction")), set())
+        assert is_matchable(_facts(title=normalized_title("Préface")), set())
 
     def test_ordinary_record_is_kept(self):
-        assert not is_excluded_source_record("10.1103/physrevlett.132.081802", "observation of")
-        assert not is_excluded_source_record(None, None)
+        assert is_matchable(_facts(doi="10.1103/physrevlett.132.081802"), set())
+        assert is_matchable(_facts(title=None), set())
+
+    def test_aggregator_record_without_doi_link_or_key_is_excluded(self):
+        """Régression : un enregistrement OpenAlex fait du seul dépôt HAL introuvable hal-03178520 formait une publication à part."""
+        assert not is_matchable(_facts("openalex", "W4287257393"), {"hal-03178520"})
+
+    def test_aggregator_record_with_link_or_key_is_kept(self):
+        assert is_matchable(_facts("openalex", "W1", doi="10.1/x"), set())
+        assert is_matchable(_facts("openalex", "W1", urls=["https://doaj.org/article/1"]), set())
+        assert is_matchable(
+            _facts("scanr", "pmid28065458", external_ids={"pmid": "28065458"}), set()
+        )
+
+    def test_related_doi_alone_does_not_keep_an_aggregator_record(self):
+        """Un DOI apparenté désigne une autre œuvre."""
+        record = _facts("openalex", "W1", external_ids={"related_dois": ["10.1/x"]})
+        assert not is_matchable(record, set())
+
+    def test_record_of_another_source_without_link_is_kept(self):
+        assert is_matchable(_facts("wos", "WOS:000123"), set())
+
+    def test_scanr_record_from_missing_hal_deposit_is_excluded(self):
+        record = _facts("scanr", "halhal-05524892", doi="10.1/x", external_ids={"pmid": "1"})
+        assert not is_matchable(record, {"hal-05524892"})
+        assert is_matchable(record, set())
