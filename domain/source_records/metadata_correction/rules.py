@@ -18,8 +18,7 @@ from domain.normalize import normalize_text
 from domain.publications.doc_types import DocType
 from domain.publishers.publisher import PublisherType
 from domain.serials.serial import OaModel, SerialType
-from domain.source_records.external_ids import ExternalIdType
-from domain.types import JsonValue
+from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,8 +282,8 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
     # par titre) → `article`. Avec un DOI ABES ou aucun DOI, le `serial_id` est parasite (la version
     # publiée d'une conflation) : le type reste thèse, le nettoyage du serial_id relève des relations.
     # Placée APRÈS les règles URL : un enregistrement source theses.fr/DUMAS reste thèse/mémoire (l'URL est le signal
-    # fort). Le nullage des clés-thèse (NNT, hal_id `tel-`/`dumas-`) de la conflation est traité à
-    # part (mutation `external_ids`, hors DSL colonne).
+    # fort). Le retrait des identifiants de thèse (NNT, hal_id `tel-`/`dumas-`) de la conflation est
+    # traité à part (`is_dissertation_identifier`), hors DSL colonne.
     MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE: {
         "applies_to": {
             "doc_type": frozenset({DocType.THESIS, DocType.ONGOING_THESIS, DocType.MEMOIR}),
@@ -599,24 +598,13 @@ def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
 _DISSERTATION_HALID_PREFIXES = ("tel-", "dumas-")
 
 
-def strip_dissertation_keys(external_ids: dict[str, JsonValue]) -> dict[str, JsonValue]:
-    """Retire d'un `external_ids` les clés propres aux **dissertations**, erronées sur une `source_record` article (conflation thèse↔article publié : OpenAlex/ScanR fusionnent une thèse et son article dans un seul enregistrement, en gardant le `nnt` / les hal_id `tel-`/`dumas-` de la thèse).
-
-    Retire `nnt` et les `hal_id` préfixés `tel-`/`dumas-` (en conservant les autres hal_id, qui pointent l'article). Pur. Le caller n'appelle cette fonction que sur les `source_records` corrigées thèse→article (`THESIS_WITH_SERIAL_TO_ARTICLE`).
-    """
-    result = {k: v for k, v in external_ids.items() if k != ExternalIdType.NNT}
-    hal_ids = result.get(ExternalIdType.HAL_ID)
-    if isinstance(hal_ids, list):
-        kept = [
-            h
-            for h in hal_ids
-            if not (isinstance(h, str) and h.startswith(_DISSERTATION_HALID_PREFIXES))
-        ]
-        if kept:
-            result[ExternalIdType.HAL_ID] = kept
-        else:
-            result.pop(ExternalIdType.HAL_ID, None)
-    return result
+def is_dissertation_identifier(identifier: SourceIdentifier) -> bool:
+    """Indique si l'identifiant est propre à une **dissertation** : un NNT, ou un `hal_id` préfixé `tel-`/`dumas-`. Sur un enregistrement source corrigé thèse→article (`THESIS_WITH_SERIAL_TO_ARTICLE`), il est erroné : OpenAlex et ScanR fusionnent une thèse et son article dans un seul enregistrement, en gardant les identifiants de la thèse."""
+    if identifier.id_type is SourceIdentifierType.NNT:
+        return True
+    return identifier.id_type is SourceIdentifierType.HAL_ID and identifier.value.startswith(
+        _DISSERTATION_HALID_PREFIXES
+    )
 
 
 def origin_doc_type_correction(

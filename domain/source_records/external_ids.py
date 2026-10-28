@@ -5,8 +5,9 @@ from enum import StrEnum
 
 from domain.source_records.identifiers import (
     SourceIdentifier,
-    SourceIdentifierRole,
     SourceIdentifierType,
+    active,
+    by_role,
     identifier_normalizer,
 )
 from domain.types import JsonValue
@@ -61,24 +62,21 @@ _KEYS = {id_type: key for key, id_type in _IDENTIFIER_TYPES.items()}
 def external_ids_from_identifiers(
     identifiers: Iterable[SourceIdentifier], doi: str | None
 ) -> dict[str, JsonValue]:
-    """`external_ids` des identifiants normalisés d'un enregistrement source, dans leur ordre.
+    """`external_ids` des identifiants actifs et normalisés d'un enregistrement source, triés par rôle puis par valeur (`by_role`).
 
-    `related_dois` reçoit les DOI autres que `doi`. Un type à valeur unique reçoit la valeur de son rôle le plus fort, dans l'ordre de `SourceIdentifierRole`, et la première à rôle égal.
+    `related_dois` reçoit les DOI autres que `doi`. Un type à valeur unique reçoit sa première valeur.
     """
-    roles = tuple(SourceIdentifierRole)
     lists: dict[str, list[JsonValue]] = {}
-    scalars: dict[str, SourceIdentifier] = {}
-    for identifier in identifiers:
+    scalars: dict[str, JsonValue] = {}
+    for identifier in by_role(active(identifiers)):
         if identifier.id_type is SourceIdentifierType.DOI and identifier.value == doi:
             continue
         key = _KEYS[identifier.id_type]
         if key in MULTIVALUED_ID_TYPES:
             lists.setdefault(key.value, []).append(identifier.value)
-        elif (kept := scalars.get(key.value)) is None or roles.index(identifier.role) < roles.index(
-            kept.role
-        ):
-            scalars[key.value] = identifier
-    return {**{key: i.value for key, i in scalars.items()}, **lists}
+        else:
+            scalars.setdefault(key.value, identifier.value)
+    return {**scalars, **lists}
 
 
 def external_id_normalizer(id_type: ExternalIdType) -> Callable[[str], str | None]:

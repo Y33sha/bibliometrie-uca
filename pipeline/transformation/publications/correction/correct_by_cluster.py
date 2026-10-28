@@ -7,9 +7,9 @@ Corrige le DOI de certaines source_records afin de provoquer leur fusion en phas
 
 Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur tous les enregistrements sources qui le citent.
 
-Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec les enregistrements sources qui le perdent, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Les valeurs retirées sont notées sous `corrections.removed_external_ids`, que la sous-étape unaire réapplique.
+Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec les enregistrements sources qui le perdent, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI nullé compris, est inscrit dans `source_record_identifiers.removed_by`. `external_ids` se déduit des identifiants actifs.
 
-Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`corrections.doi`) et des identifiants d'avant retrait, donc une `source_record` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
+Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`corrections.doi`) et de tous les identifiants de la table, donc une `source_record` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
 """
 
 import logging
@@ -25,13 +25,18 @@ from domain.source_records.corrections import (
     CorrectionKey,
     other_entries,
     raw_value,
-    removal_entry,
     stash_entry,
-    with_values_restored,
-    without_values,
+)
+from domain.source_records.external_ids import external_ids_from_identifiers
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierType,
+    active,
+    with_removals,
 )
 from domain.source_records.metadata_correction.shared_doi import (
     ConfirmationIdRemoval,
+    DoiClusterCase,
     DoiClusterDecision,
     DoiClusterMember,
     confirmation_id_removals,
@@ -39,7 +44,6 @@ from domain.source_records.metadata_correction.shared_doi import (
     resolve_cluster_doi_corrections,
     source_record_own_ids,
 )
-from domain.types import JsonValue
 from pipeline.runtime.observability.log_format import BRANCH, LAST_BRANCH, inflect, quantity, step
 from pipeline.transformation.publications.correction.correction_batches import persist_in_batches
 from pipeline.transformation.publications.correction.correction_store import (
@@ -48,12 +52,13 @@ from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
 
+# Règles de retrait d'identifiants de la sous-étape cluster : ses cas.
+CLUSTER_IDENTIFIER_RULES = frozenset(case.value for case in DoiClusterCase)
 
-def _base_external_ids(row: DoiClusterRow) -> dict[str, JsonValue]:
-    """Identifiants externes de l'enregistrement source avant le retrait par cluster : ceux que l'étape unaire a écrits, valeurs retirées au run précédent restaurées."""
-    return with_values_restored(
-        row.external_ids, row.corrections.get(CorrectionKey.REMOVED_EXTERNAL_IDS)
-    )
+
+def _base_identifiers(row: DoiClusterRow) -> list[SourceIdentifier]:
+    """Identifiants actifs de l'enregistrement source avant le retrait par cluster : ceux que l'étape unaire laisse actifs."""
+    return active(with_removals(row.identifiers, CLUSTER_IDENTIFIER_RULES, {}))
 
 
 def _compute_update(
@@ -61,32 +66,34 @@ def _compute_update(
     decision: DoiClusterDecision | None,
     removal: ConfirmationIdRemoval | None = None,
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une `source_record` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. `removal` retire des identifiants externes, notés sous `CorrectionKey.REMOVED_EXTERNAL_IDS` ; sans retrait, les valeurs retirées au run précédent sont restaurées. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
+    """État cible d'une `source_record` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. Un DOI nullé est retiré des identifiants, sous le cas de la décision. `removal` retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
     raw_doi = raw_value(row.corrections, CorrectionKey.DOI, row.doi)
     corrections = other_entries(row.corrections, CLUSTER_KEYS)
 
+    removals: dict[tuple[SourceIdentifierType, str], str] = {}
     if decision is None or decision.target_doi == raw_doi:
         new_doi = raw_doi
     else:
         new_doi = decision.target_doi
         corrections[CorrectionKey.DOI] = stash_entry(raw_doi, decision.case.value)
+        if new_doi is None and raw_doi is not None:
+            removals[(SourceIdentifierType.DOI, raw_doi)] = decision.case.value
 
-    base = _base_external_ids(row)
-    new_external_ids = base
     if removal is not None:
-        entry = removal_entry(
-            {k: base[k] for k in removal.removed if k in base}, removal.removed, removal.case.value
-        )
-        new_external_ids = without_values(base, entry)
-        corrections[CorrectionKey.REMOVED_EXTERNAL_IDS] = entry
+        for id_type, values in removal.removed.items():
+            for value in values:
+                removals.setdefault((SourceIdentifierType(id_type), value), removal.case.value)
+    identifiers = with_removals(row.identifiers, CLUSTER_IDENTIFIER_RULES, removals)
+    external_ids = external_ids_from_identifiers(identifiers, raw_doi)
 
     if (
         new_doi == row.doi
-        and new_external_ids == row.external_ids
+        and external_ids == row.external_ids
         and corrections == row.corrections
+        and identifiers == row.identifiers
     ):
         return None
-    return DoiCorrectionUpdate(row.id, new_doi, corrections, new_external_ids)
+    return DoiCorrectionUpdate(row.id, new_doi, corrections, external_ids, identifiers)
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
@@ -106,7 +113,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
                 m.title_normalized,
                 m.canonical_doi,
                 m.same_work_case,
-                confirmation_ids(_base_external_ids(m)),
+                confirmation_ids(_base_identifiers(m)),
                 source_record_own_ids(m.source, m.source_id),
                 m.source,
                 frozenset(m.author_names),
@@ -156,7 +163,14 @@ def run(
 
     updates = compute_updates(rows)
     logger.info("%s%s à appliquer", BRANCH, quantity(len(updates), "correction"))
-    removals = sum(1 for u in updates if CorrectionKey.REMOVED_EXTERNAL_IDS in u.corrections)
+    removals = sum(
+        1
+        for u in updates
+        if any(
+            i.removed_by in CLUSTER_IDENTIFIER_RULES and i.id_type is not SourceIdentifierType.DOI
+            for i in u.identifiers
+        )
+    )
     logger.info(
         "%sidentifiants partagés avec une autre œuvre retirés de %s",
         BRANCH,

@@ -2,10 +2,13 @@
 
 import datetime
 import json
+from collections.abc import Sequence
 
 from sqlalchemy import Connection
 
+from domain.source_records.identifiers import SourceIdentifier
 from infrastructure.db.queues import Queue
+from pipeline.ingestion.common.source_records import replace_identifiers
 from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
@@ -44,13 +47,14 @@ def insert_source_record(
     embargo_until: datetime.date | None = None,
     marked: bool = True,
     external_ids: dict[str, object] | None = None,
+    identifiers: Sequence[SourceIdentifier] = (),
     biblio: dict[str, object] | None = None,
     source_extras: dict[str, object] | None = None,
     topics: object = None,
     corrections: dict[str, object] | None = None,
     is_matchable: bool = True,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `identifiers` s'écrivent dans `source_record_identifiers`. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
     source_record_id = insert_row(
         conn,
         "source_records",
@@ -90,6 +94,8 @@ def insert_source_record(
             ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"
         ),
     )
+    if identifiers:
+        replace_identifiers(conn, {source_record_id: identifiers})
     if marked:
         mark(conn, Queue.SOURCE_RECORD_KEYS, [source_record_id])
     return source_record_id

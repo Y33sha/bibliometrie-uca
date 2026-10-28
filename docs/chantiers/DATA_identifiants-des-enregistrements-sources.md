@@ -47,8 +47,11 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 - L'identifiant dérivé est un identifiant d'un type de la table :
   - chez ScanR, l'identifiant que contient l'identifiant ScanR (`doi…`, `hal…`, `nnt…`, `pmid…`) ;
   - chez OpenAlex, l'identifiant de la localisation principale (`primary_location`). Le DOI du work est secondaire quand il diffère de cet identifiant.
+- Un ISBN est secondaire pour un livre et lié pour un autre document. DataCite distingue les ISBN du document de ceux de son conteneur.
 - Les identifiants OpenAlex et WoS restent seulement dans `source_id`.
-- Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts.
+- Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts à partir de tous les identifiants de la table. Chaque sous-étape réécrit seulement les statuts de ses règles. Un identifiant retiré par la règle d'une autre sous-étape reste retiré.
+- `metadata_correction` écrit `external_ids` à partir des identifiants actifs. `corrections` garde seulement les valeurs d'origine des colonnes.
+- Un DOI mis à nul par la correction par DOI partagé est retiré dans la table. Le DOI concept substitué à un DOI de version reste seulement dans la colonne `doi`.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
@@ -66,6 +69,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 - [ ] Retraits de la correction unaire (clés de thèse, dépôts HAL introuvables) en statuts.
 - [ ] Retraits de la correction par DOI partagé en statuts.
 - [ ] `is_matchable` calculé depuis la table.
+- [ ] Suppression des formats de retrait dans `corrections` (`external_ids`, `removed_external_ids`).
 
 ### Phase 3 — Rapprochement
 
@@ -81,7 +85,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 
 ### Phase 5 — Retrait de `external_ids`
 
-- [ ] Suppression de la colonne et des formats de retrait dans `corrections`.
+- [ ] Suppression de la colonne.
 
 ### Phase 6 — DOI bioRxiv et medRxiv
 
@@ -95,4 +99,4 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 
 - Place de la suppression de la colonne `doi` dans le phasage.
 - Identifiants HAL secondaires : réintégration au rapprochement sous condition, au vu de la mesure de la phase 3.
-- Rôle de l'ISBN : identifiant du document pour un ouvrage, identifiant d'une œuvre apparentée pour un chapitre.
+- DOI de version et pièces de dataset : écartés de la réconciliation (`is_matchable`) au lieu de la substitution du DOI concept ou du DOI du dataset parent. Le DOI concept ou le dataset parent est parfois absent de la base.

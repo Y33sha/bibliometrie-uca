@@ -2,6 +2,11 @@
 
 from domain.publications.metadata import normalized_title
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES, MatchabilityFacts, is_matchable
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 
 
 class TestOutOfScopeDocTypes:
@@ -27,9 +32,13 @@ def _facts(
     doi=None,
     title="observation of",
     urls=(),
-    external_ids=None,
+    identifiers=(),
 ):
-    return MatchabilityFacts(source, source_id, raw_doi, doi, title, list(urls), external_ids or {})
+    return MatchabilityFacts(source, source_id, raw_doi, doi, title, list(urls), list(identifiers))
+
+
+def _id(id_type, value, removed_by=None):
+    return SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY, removed_by)
 
 
 class TestIsMatchable:
@@ -62,18 +71,30 @@ class TestIsMatchable:
         assert is_matchable(_facts("openalex", "W1", doi="10.1/x"), set())
         assert is_matchable(_facts("openalex", "W1", urls=["https://doaj.org/article/1"]), set())
         assert is_matchable(
-            _facts("scanr", "pmid28065458", external_ids={"pmid": "28065458"}), set()
+            _facts(
+                "scanr", "pmid28065458", identifiers=[_id(SourceIdentifierType.PMID, "28065458")]
+            ),
+            set(),
         )
 
     def test_related_doi_alone_does_not_keep_an_aggregator_record(self):
         """Un DOI apparenté désigne une autre œuvre."""
-        record = _facts("openalex", "W1", external_ids={"related_dois": ["10.1/x"]})
+        record = _facts("openalex", "W1", identifiers=[_id(SourceIdentifierType.DOI, "10.1/x")])
         assert not is_matchable(record, set())
+
+    def test_removed_key_does_not_keep_an_aggregator_record(self):
+        removed = _id(SourceIdentifierType.HAL_ID, "hal-03178520", "HAL_DEPOSIT_MISSING_TO_REMOVED")
+        assert not is_matchable(_facts("openalex", "W1", identifiers=[removed]), set())
 
     def test_record_of_another_source_without_link_is_kept(self):
         assert is_matchable(_facts("wos", "WOS:000123"), set())
 
     def test_scanr_record_from_missing_hal_deposit_is_excluded(self):
-        record = _facts("scanr", "halhal-05524892", doi="10.1/x", external_ids={"pmid": "1"})
+        record = _facts(
+            "scanr",
+            "halhal-05524892",
+            doi="10.1/x",
+            identifiers=[_id(SourceIdentifierType.PMID, "1")],
+        )
         assert not is_matchable(record, {"hal-05524892"})
         assert is_matchable(record, set())

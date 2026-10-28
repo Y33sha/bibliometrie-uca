@@ -74,12 +74,22 @@ class TestExternalIdsFromIdentifiers:
         ]
         assert external_ids_from_identifiers(identifiers, "10.1/x") == {"related_dois": ["10.2/y"]}
 
-    def test_types_multivalues_dans_l_ordre(self):
+    def test_types_multivalues_tries_par_role_puis_par_valeur(self):
         identifiers = [
+            SourceIdentifier(T.HAL_ID, "hal-3", R.SECONDARY),
             SourceIdentifier(T.HAL_ID, "hal-2", R.SECONDARY),
-            SourceIdentifier(T.HAL_ID, "hal-1", R.DERIVED),
+            SourceIdentifier(T.HAL_ID, "hal-9", R.DERIVED),
         ]
-        assert external_ids_from_identifiers(identifiers, None) == {"hal_id": ["hal-2", "hal-1"]}
+        assert external_ids_from_identifiers(identifiers, None) == {
+            "hal_id": ["hal-9", "hal-2", "hal-3"]
+        }
+
+    def test_identifiant_retire_absent(self):
+        identifiers = [
+            SourceIdentifier(T.HAL_ID, "hal-1", R.SECONDARY, "HAL_DEPOSIT_MISSING_TO_REMOVED"),
+            SourceIdentifier(T.HAL_ID, "hal-2", R.SECONDARY),
+        ]
+        assert external_ids_from_identifiers(identifiers, None) == {"hal_id": ["hal-2"]}
 
     def test_type_a_valeur_unique_prend_le_role_le_plus_fort(self):
         identifiers = [

@@ -13,7 +13,7 @@ La décision est **agnostique de la source** : le caller applicatif regroupe par
 """
 
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from itertools import combinations
 from typing import NamedTuple
@@ -21,10 +21,10 @@ from typing import NamedTuple
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import NNT, HALId, meme_registrant
 from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifier
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
-from domain.types import JsonValue
 
 
 class DoiClusterCase(StrEnum):
@@ -101,7 +101,7 @@ class DoiClusterMember(NamedTuple):
     title_normalized: str | None
     canonical_doi: str | None = None
     same_work_case: DoiClusterCase | None = None
-    # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants externes, par type.
+    # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type.
     confirmation_ids: Mapping[str, tuple[str, ...]] = {}
     # Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr.
     own_ids: Mapping[str, tuple[str, ...]] = {}
@@ -119,7 +119,7 @@ class DoiClusterDecision(NamedTuple):
 
 
 class ConfirmationIdRemoval(NamedTuple):
-    """Identifiants externes retirés d'un membre qui garde le DOI partagé : par type, les valeurs qu'il partage avec un membre qui perd le DOI."""
+    """Identifiants retirés d'un membre qui garde le DOI partagé : par type, les valeurs qu'il partage avec un membre qui perd le DOI."""
 
     id: int
     removed: dict[str, list[str]]
@@ -137,15 +137,13 @@ DIVERGENCE_CASES: frozenset[DoiClusterCase] = frozenset(
 )
 
 
-def confirmation_ids(external_ids: Mapping[str, JsonValue]) -> dict[str, tuple[str, ...]]:
-    """Valeurs des clés de confirmation d'un `external_ids`, par type."""
-    out: dict[str, tuple[str, ...]] = {}
-    for id_type in CONFIRMATION_ID_TYPES:
-        value = external_ids.get(id_type)
-        values = value if isinstance(value, list) else [value]
-        if kept := tuple(v for v in values if isinstance(v, str)):
-            out[id_type.value] = kept
-    return out
+def confirmation_ids(identifiers: Iterable[SourceIdentifier]) -> dict[str, tuple[str, ...]]:
+    """Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) parmi `identifiers`, par type."""
+    out: dict[str, list[str]] = {}
+    for identifier in identifiers:
+        if identifier.id_type in CONFIRMATION_ID_TYPES:
+            out.setdefault(identifier.id_type.value, []).append(identifier.value)
+    return {id_type: tuple(values) for id_type, values in out.items()}
 
 
 def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, ...]]:
@@ -165,7 +163,7 @@ def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, .
 def confirmation_id_removals(
     group: list[DoiClusterMember], decisions: list[DoiClusterDecision]
 ) -> list[ConfirmationIdRemoval]:
-    """Retraits d'identifiants externes après une divergence (`DIVERGENCE_CASES`).
+    """Retraits d'identifiants après une divergence (`DIVERGENCE_CASES`).
 
     Une clé de confirmation partagée avec un membre qui perd le DOI appartient à cette autre œuvre : le membre qui garde le DOI la perd. Sans quoi la clé réunirait encore les deux œuvres, par exemple le dépôt HAL d'une communication que l'enregistrement source OpenAlex du volume d'actes recopie. Une valeur propre à un membre qui garde le DOI (`own_ids`) reste en place.
     """

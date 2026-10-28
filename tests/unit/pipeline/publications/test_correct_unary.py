@@ -4,8 +4,16 @@ import logging
 from unittest.mock import MagicMock
 
 from domain.source_records.corrections import stash_entry
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.metadata_correction.rules import MetadataForCorrection
-from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
+from domain.source_records.metadata_correction.source_record import (
+    CorrectedSourceRecord,
+    UnaryCorrection,
+)
 from pipeline.transformation.publications.correction.correct_unary import (
     compute_update,
     compute_updates,
@@ -27,30 +35,38 @@ def test_tally_corrections_compte_les_regles():
     updates = [
         CorrectionUpdate(
             2,
-            CorrectedSourceRecord(
-                "thesis",
-                None,
-                {},
-                None,
-                {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
+            UnaryCorrection(
+                CorrectedSourceRecord(
+                    "thesis",
+                    None,
+                    {},
+                    None,
+                    {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
+                ),
+                (),
             ),
         ),
         # deux champs corrigés sur un même enregistrement source → 1 enregistrement source, 2 déclenchements
         CorrectionUpdate(
             3,
-            CorrectedSourceRecord(
-                "media",
-                "green",
-                {},
-                None,
-                {
-                    "doc_type": stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
-                    "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
-                },
+            UnaryCorrection(
+                CorrectedSourceRecord(
+                    "media",
+                    "green",
+                    {},
+                    None,
+                    {
+                        "doc_type": stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
+                        "oa_status": stash_entry("closed", "EMBARGO_EXPIRED_TO_GREEN"),
+                    },
+                ),
+                (),
             ),
         ),
         # correction défaite : mise à jour sans règle
-        CorrectionUpdate(4, CorrectedSourceRecord("article", None, {}, None, {})),
+        CorrectionUpdate(
+            4, UnaryCorrection(CorrectedSourceRecord("article", None, {}, None, {}), ())
+        ),
     ]
     corrected, rule_counts = tally_corrections(updates)
     assert corrected == 2
@@ -61,12 +77,28 @@ def test_tally_corrections_compte_les_regles():
     }
 
 
-_ROW_FIELDS = ("id", "source_id", "external_ids", "corrections")
+_ROW_FIELDS = ("id", "source_id", "external_ids", "corrections", "identifiers")
+
+
+def _ids(id_type, *values, removed_by=None):
+    return tuple(
+        SourceIdentifier(id_type, v, SourceIdentifierRole.SECONDARY, removed_by) for v in values
+    )
+
+
+def _hal(*values, removed_by=None):
+    return _ids(SourceIdentifierType.HAL_ID, *values, removed_by=removed_by)
 
 
 def _source_record(**overrides: object) -> UnaryCorrectionRow:
     """Ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles."""
-    row: dict[str, object] = {"id": 1, "source_id": "W1", "external_ids": {}, "corrections": {}}
+    row: dict[str, object] = {
+        "id": 1,
+        "source_id": "W1",
+        "external_ids": {},
+        "corrections": {},
+        "identifiers": (),
+    }
     facts: dict[str, object] = {
         "source": "openalex",
         "title": "Un titre quelconque",
@@ -94,8 +126,8 @@ def test_thesis_with_serial_id_and_publisher_doi_is_mistyped_article():
     # (préfixe ≠ registre de thèses) → article.
     upd = _update(_source_record(doc_type="thesis", serial_id=42, doi="10.1016/j.ex.2020.01.001"))
     assert upd is not None
-    assert upd.corrected.doc_type == "article"
-    assert upd.corrected.corrections == {
+    assert upd.corrected.columns.doc_type == "article"
+    assert upd.corrected.columns.corrections == {
         "doc_type": {"raw": "thesis", "corrected_by": "THESIS_WITH_SERIAL_TO_ARTICLE"}
     }
 
@@ -115,74 +147,78 @@ def test_real_thesis_without_serial_id_untouched():
     assert _update(_source_record(doc_type="thesis", serial_id=None)) is None
 
 
-def test_retrait_par_cluster_reapplique():
+def test_retrait_par_cluster_garde():
     """L'étape unaire garde le retrait d'identifiants noté par l'étape cluster : aucune mise à jour."""
-    removal = {
-        "removed_external_ids": {
-            "before": {"hal_id": ["hal-1", "hal-2"]},
-            "removed": {"hal_id": ["hal-1"]},
-            "corrected_by": "ACTES_VS_COMMUNICATION",
-        }
-    }
-    assert _update(_source_record(external_ids={"hal_id": ["hal-2"]}, corrections=removal)) is None
+    identifiers = (*_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"), *_hal("hal-2"))
+    row = _source_record(external_ids={"hal_id": ["hal-2"]}, identifiers=identifiers)
+    assert _update(row) is None
 
 
 def test_retrait_par_cluster_compose_avec_la_conflation_these():
-    removal = {
-        "removed_external_ids": {
-            "before": {"hal_id": ["tel-01", "hal-99", "hal-5"]},
-            "removed": {"hal_id": ["hal-5"]},
-            "corrected_by": "ACTES_VS_COMMUNICATION",
-        }
-    }
     upd = _update(
         _source_record(
             doc_type="thesis",
             serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
-            external_ids={"hal_id": ["tel-01", "hal-99", "hal-5"]},
-            corrections=removal,
+            external_ids={"hal_id": ["hal-99", "tel-01"]},
+            identifiers=(
+                *_hal("tel-01", "hal-99"),
+                *_hal("hal-5", removed_by="ACTES_VS_COMMUNICATION"),
+            ),
         )
     )
     assert upd is not None
-    assert upd.corrected.external_ids == {"hal_id": ["hal-99"]}
-    assert upd.corrected.corrections["removed_external_ids"] == removal["removed_external_ids"]
+    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-99"]}
+    assert [i.removed_by for i in upd.corrected.identifiers] == [
+        "THESIS_WITH_SERIAL_TO_ARTICLE",
+        None,
+        "ACTES_VS_COMMUNICATION",
+    ]
 
 
 def test_thesis_to_article_strips_dissertation_keys():
     # Conflation : l'enregistrement source corrigé thèse→article perd le NNT et les hal_id tel-/dumas-,
-    # garde les autres hal_id (article) et les autres clés. Brut stashé pour réversibilité.
+    # garde les autres hal_id (article) et les autres identifiants.
     upd = _update(
         _source_record(
             doc_type="thesis",
             serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
-            external_ids={"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
+            identifiers=(
+                *_ids(SourceIdentifierType.NNT, "2020X"),
+                *_hal("tel-01", "hal-99"),
+                *_ids(SourceIdentifierType.PMID, "123"),
+            ),
         )
     )
     assert upd is not None
-    assert upd.corrected.doc_type == "article"
-    assert upd.corrected.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
-    assert upd.corrected.corrections["external_ids"] == {
-        "raw": {"nnt": "2020X", "hal_id": ["tel-01", "hal-99"], "pmid": "123"},
-        "corrected_by": "THESIS_WITH_SERIAL_TO_ARTICLE",
+    assert upd.corrected.columns.doc_type == "article"
+    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
+    assert {i.value: i.removed_by for i in upd.corrected.identifiers} == {
+        "2020X": "THESIS_WITH_SERIAL_TO_ARTICLE",
+        "tel-01": "THESIS_WITH_SERIAL_TO_ARTICLE",
+        "hal-99": None,
+        "123": None,
     }
+    assert tally_corrections([upd]) == (1, {"THESIS_WITH_SERIAL_TO_ARTICLE": 1})
 
 
 def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
-    # Mistype pur (pas de clé-thèse) : external_ids inchangé, pas de stash.
+    # Mistype pur (pas d'identifiant de thèse) : external_ids et identifiants inchangés.
+    identifiers = _ids(SourceIdentifierType.PMID, "123")
     upd = _update(
         _source_record(
             doc_type="thesis",
             serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
             external_ids={"pmid": "123"},
+            identifiers=identifiers,
         )
     )
     assert upd is not None
-    assert upd.corrected.doc_type == "article"
-    assert upd.corrected.external_ids == {"pmid": "123"}
-    assert "external_ids" not in upd.corrected.corrections
+    assert upd.corrected.columns.doc_type == "article"
+    assert upd.corrected.columns.external_ids == {"pmid": "123"}
+    assert upd.corrected.identifiers == identifiers
 
 
 def test_serial_id_wins_over_theses_fr_url_conflation():
@@ -198,15 +234,18 @@ def test_serial_id_wins_over_theses_fr_url_conflation():
         )
     )
     assert upd is not None
-    assert upd.corrected.doc_type == "article"
-    assert upd.corrected.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
+    assert upd.corrected.columns.doc_type == "article"
+    assert (
+        upd.corrected.columns.corrections["doc_type"]["corrected_by"]
+        == "THESIS_WITH_SERIAL_TO_ARTICLE"
+    )
 
 
 def test_serial_media_corrects_and_stashes_the_value_before_correction():
     upd = _update(_source_record(source="hal", doc_type="article", serial_type="media"))
     assert upd is not None
-    assert upd.corrected.doc_type == "media"
-    assert upd.corrected.corrections == {
+    assert upd.corrected.columns.doc_type == "media"
+    assert upd.corrected.columns.corrections == {
         "doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
     }
 
@@ -214,8 +253,8 @@ def test_serial_media_corrects_and_stashes_the_value_before_correction():
 def test_theses_fr_url_corrects_doc_type_and_stashes_raw():
     upd = _update(_source_record(doc_type="article", urls=["https://theses.fr/2020ABCD"]))
     assert upd is not None
-    assert upd.corrected.doc_type == "thesis"
-    assert upd.corrected.corrections == {
+    assert upd.corrected.columns.doc_type == "thesis"
+    assert upd.corrected.columns.corrections == {
         "doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"}
     }
 
@@ -239,16 +278,16 @@ def test_self_heals_when_rule_no_longer_applies():
     )
     upd = _update(source_record)
     assert upd is not None
-    assert upd.corrected.doc_type == "article"
-    assert upd.corrected.corrections == {}
+    assert upd.corrected.columns.doc_type == "article"
+    assert upd.corrected.columns.corrections == {}
 
 
 def test_expired_embargo_promotes_oa_status_to_green():
     # oa_status `embargoed` + embargo expiré (calculé au fetch) → `green`, brut stashé.
     upd = _update(_source_record(oa_status="embargoed", embargo_expired=True))
     assert upd is not None
-    assert upd.corrected.oa_status == "green"
-    assert upd.corrected.corrections["oa_status"] == {
+    assert upd.corrected.columns.oa_status == "green"
+    assert upd.corrected.columns.corrections["oa_status"] == {
         "raw": "embargoed",
         "corrected_by": "EMBARGO_EXPIRED_TO_GREEN",
     }
@@ -272,7 +311,7 @@ def test_preserves_unmanaged_corrections_keys():
     )
     upd = _update(source_record)
     assert upd is not None
-    assert upd.corrected.corrections == {
+    assert upd.corrected.columns.corrections == {
         "doi": {"raw": "10.1/book", "corrected_by": "OUVRAGE_VS_CHAPITRE"},
         "doc_type": {"raw": "article", "corrected_by": "THESES_FR_URL_TO_THESIS"},
     }
@@ -305,52 +344,57 @@ def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
     """Régression : l'enregistrement OpenAlex W4287257393 citait le seul dépôt hal-03178520, introuvable dans HAL."""
     row = _source_record(
         external_ids={"hal_id": ["hal-03178520", "hal-03263588"], "pmid": "1"},
+        identifiers=(
+            *_hal("hal-03178520", "hal-03263588"),
+            *_ids(SourceIdentifierType.PMID, "1"),
+        ),
         urls=["https://hal.science/hal-03178520", "https://hal.inrae.fr/hal-03263588/document"],
     )
     upd = compute_update(row, missing_hal_ids={"hal-03178520"})
     assert upd is not None
-    assert upd.corrected.external_ids == {"hal_id": ["hal-03263588"], "pmid": "1"}
-    assert upd.corrected.urls == ["https://hal.inrae.fr/hal-03263588/document"]
-    assert upd.corrected.corrections["urls"] == stash_entry(
+    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-03263588"], "pmid": "1"}
+    assert upd.corrected.columns.urls == ["https://hal.inrae.fr/hal-03263588/document"]
+    assert upd.corrected.columns.corrections["urls"] == stash_entry(
         row.facts.urls, "HAL_DEPOSIT_MISSING_TO_REMOVED"
     )
     assert tally_corrections([upd]) == (1, {"HAL_DEPOSIT_MISSING_TO_REMOVED": 1})
 
     corrected = _source_record(
-        external_ids=upd.corrected.external_ids,
-        urls=upd.corrected.urls,
-        corrections=upd.corrected.corrections,
+        external_ids=upd.corrected.columns.external_ids,
+        identifiers=upd.corrected.identifiers,
+        urls=upd.corrected.columns.urls,
+        corrections=upd.corrected.columns.corrections,
     )
     assert compute_update(corrected, missing_hal_ids={"hal-03178520"}) is None
 
 
 def test_dernier_depot_hal_introuvable_vide_les_liens():
     row = _source_record(
-        external_ids={"hal_id": ["hal-03178520"]}, urls=["https://hal.science/hal-03178520"]
+        external_ids={"hal_id": ["hal-03178520"]},
+        identifiers=_hal("hal-03178520"),
+        urls=["https://hal.science/hal-03178520"],
     )
     upd = compute_update(row, missing_hal_ids={"hal-03178520"})
     assert upd is not None
-    assert upd.corrected.external_ids == {}
-    assert upd.corrected.urls is None
+    assert upd.corrected.columns.external_ids == {}
+    assert upd.corrected.columns.urls is None
 
 
 def test_depot_hal_retrouve_restaure_identifiants_et_liens():
-    raw_ids = {"hal_id": ["hal-03178520"]}
     raw_urls = ["https://hal.science/hal-03178520"]
     rule = "HAL_DEPOSIT_MISSING_TO_REMOVED"
     corrected = _source_record(
         external_ids={},
+        identifiers=_hal("hal-03178520", removed_by=rule),
         urls=None,
-        corrections={
-            "external_ids": stash_entry(raw_ids, rule),
-            "urls": stash_entry(raw_urls, rule),
-        },
+        corrections={"urls": stash_entry(raw_urls, rule)},
     )
     upd = compute_update(corrected)
     assert upd is not None
-    assert upd.corrected.external_ids == raw_ids
-    assert upd.corrected.urls == raw_urls
-    assert upd.corrected.corrections == {}
+    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-03178520"]}
+    assert upd.corrected.identifiers == _hal("hal-03178520")
+    assert upd.corrected.columns.urls == raw_urls
+    assert upd.corrected.columns.corrections == {}
 
 
 # ── Enregistrements sources ScanR issues d'un dépôt HAL ─────────────────────────────
@@ -364,9 +408,9 @@ def test_scanr_from_hal_takes_corrected_hal_type():
     updates = compute_updates([hal, scanr], {"hal-04565713": hal}, frozenset())
 
     (scanr_update,) = [u for u in updates if u.id == 2]
-    assert scanr_update.corrected.doc_type == "poster"
+    assert scanr_update.corrected.columns.doc_type == "poster"
     assert (
-        scanr_update.corrected.corrections["doc_type"]["corrected_by"]
+        scanr_update.corrected.columns.corrections["doc_type"]["corrected_by"]
         == "SCANR_FROM_HAL_TO_HAL_TYPE"
     )
 

@@ -1,7 +1,7 @@
 """Types et rôles des identifiants de `source_record_identifiers`, et normalisation des identifiants d'un enregistrement source."""
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable, Mapping, Set
+from dataclasses import dataclass, replace
 from enum import StrEnum
 
 from domain.publications.identifiers import DOI, ISBN, NNT, PMCID, PMID, ArxivId, HALId
@@ -46,11 +46,41 @@ _ROLE_RANK = {role: rank for rank, role in enumerate(SourceIdentifierRole)}
 
 @dataclass(frozen=True, slots=True)
 class SourceIdentifier:
-    """Identifiant d'un enregistrement source, avec son rôle."""
+    """Identifiant d'un enregistrement source, avec son rôle. `removed_by` : règle de correction qui le retire, `None` pour un identifiant actif."""
 
     id_type: SourceIdentifierType
     value: str
     role: SourceIdentifierRole
+    removed_by: str | None = None
+
+    @property
+    def key(self) -> tuple[SourceIdentifierType, str]:
+        """Type et valeur, qui identifient l'identifiant dans son enregistrement source."""
+        return self.id_type, self.value
+
+
+def by_role(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
+    """Identifiants triés par rôle, dans l'ordre de `SourceIdentifierRole`, puis par valeur."""
+    return sorted(identifiers, key=lambda i: (_ROLE_RANK[i.role], i.value))
+
+
+def active(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
+    """Identifiants qu'aucune règle de correction ne retire."""
+    return [i for i in identifiers if i.removed_by is None]
+
+
+def with_removals(
+    identifiers: Iterable[SourceIdentifier],
+    owned_rules: Set[str],
+    removals: Mapping[tuple[SourceIdentifierType, str], str],
+) -> tuple[SourceIdentifier, ...]:
+    """Identifiants dont les retraits par les règles de `owned_rules` sont recalculés : `removals` donne la règle qui retire chaque identifiant, par type et valeur. Un identifiant retiré par une autre règle reste retiré."""
+    return tuple(
+        i
+        if i.removed_by is not None and i.removed_by not in owned_rules
+        else replace(i, removed_by=removals.get(i.key))
+        for i in identifiers
+    )
 
 
 def isbn_role(

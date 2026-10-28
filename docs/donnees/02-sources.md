@@ -23,6 +23,7 @@ Schéma PostgreSQL `sources`.
 | Table | Contenu | Contrainte |
 |---|---|---|
 | `source_records` | Métadonnées typées : titre, type de document, année, DOI, identifiants externes, revue, éditeur, statut d'accès, langue. Champs propres à certaines sources : résumé, mots-clés, thématiques, données bibliographiques, collections HAL, embargo, rétractation. `raw_doc_type` et `raw_language` : valeurs dans le vocabulaire de la source. `corrections` : valeurs d'origine des métadonnées corrigées. `is_matchable` : faux pour un enregistrement source écarté de la réconciliation. `publication_id` : publication de rattachement | Un enregistrement source par source et identifiant |
+| `source_record_identifiers` | Identifiants d'un enregistrement source : type, valeur, rôle (primaire, dérivé, secondaire ou lié). `removed_by` : règle de correction qui retire l'identifiant | Un identifiant par type et valeur, au plus un identifiant dérivé |
 | `source_record_locations` | Copies du document : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, [plateforme](07-publishing.md) | Une copie par URL |
 
 **Contributions sources**

@@ -4,6 +4,11 @@ import logging
 
 from sqlalchemy import text
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.reconciliation import reconcile
 from tests.integration.helpers.publications import insert_publication
@@ -48,6 +53,10 @@ def _seed_openalex(conn, publication_id=None, *, hal_ids=(_MISSING,), urls=(_MIS
         publication_year=2021,
         doc_type="preprint",
         external_ids={"hal_id": list(hal_ids)},
+        identifiers=[
+            SourceIdentifier(SourceIdentifierType.HAL_ID, h, SourceIdentifierRole.SECONDARY)
+            for h in hal_ids
+        ],
         urls=list(urls),
     )
     for url in urls:

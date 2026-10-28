@@ -7,6 +7,11 @@ from functools import partial
 from sqlalchemy import text
 
 from domain.dates import today
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.correction import serial_by_doi
 from pipeline.transformation.publications.correction.correct_by_cluster import compute_updates
@@ -218,6 +223,7 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
     jid = _seed_serial(conn, "journal")
     # DOI d'éditeur (préfixe ≠ registre de thèses) : signe la version publiée → la conflation
     # thèse↔article bascule en `article`. (Avec un DOI ABES ou sans DOI, le type resterait thèse.)
+    secondary = SourceIdentifierRole.SECONDARY
     source_record = insert_source_record(
         conn,
         source="openalex",
@@ -226,7 +232,12 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
         doi="10.1016/j.ex.2020.01.001",
         doc_type="thesis",
         serial_id=jid,
-        external_ids={"nnt": "2020CLFAC001", "hal_id": ["tel-01", "hal-99"]},
+        external_ids={"nnt": "2020CLFAC001", "hal_id": ["hal-99", "tel-01"]},
+        identifiers=[
+            SourceIdentifier(SourceIdentifierType.NNT, "2020CLFAC001", secondary),
+            SourceIdentifier(SourceIdentifierType.HAL_ID, "tel-01", secondary),
+            SourceIdentifier(SourceIdentifierType.HAL_ID, "hal-99", secondary),
+        ],
     )
 
     assert _apply(conn) == 1
@@ -237,15 +248,19 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
     assert row.doc_type == "article"  # mistype corrigé
     assert row.external_ids == {"hal_id": ["hal-99"]}  # nnt + tel- retirés, hal- gardé
     assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
-    assert row.corrections["external_ids"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
-    # Réversibilité : le brut external_ids est reconstructible.
-    raw_nnt = conn.execute(
-        text(
-            "SELECT corrections->'external_ids'->'raw'->>'nnt' FROM source_records WHERE id = :id"
-        ),
+    # Réversibilité : les identifiants retirés restent dans la table, avec leur règle.
+    removed = conn.execute(
+        text("""
+            SELECT id_value, removed_by FROM source_record_identifiers
+            WHERE source_record_id = :id ORDER BY id_value
+        """),
         {"id": source_record},
-    ).scalar_one()
-    assert raw_nnt == "2020CLFAC001"
+    ).all()
+    assert removed == [
+        ("2020CLFAC001", "THESIS_WITH_SERIAL_TO_ARTICLE"),
+        ("hal-99", None),
+        ("tel-01", "THESIS_WITH_SERIAL_TO_ARTICLE"),
+    ]
 
 
 def test_expired_embargo_promoted_to_green(sa_sync_conn):
