@@ -1,9 +1,6 @@
 name: Versions de langage
 description: >-
-  Lit dans la description de construction de production la version de Python et celle de Node,
-  pour que l'intégration continue installe les interpréteurs que l'image livre plutôt que de les
-  redéclarer. Le `Dockerfile` porte ces versions en clair, l'épinglage par empreinte l'exigeant ;
-  elles n'ont donc à être écrites nulle part ailleurs.
+  Lit dans la description de construction de production les versions de Python, de Node et de uv, pour que l'intégration continue installe celles que l'image livre. Le `Dockerfile` les écrit en clair, l'épinglage par empreinte l'exigeant ; elles ne sont écrites nulle part ailleurs.
 
 outputs:
   python:
@@ -12,6 +9,9 @@ outputs:
   node:
     description: Version de Node de l'étape de construction du frontend.
     value: ${{ steps.lire.outputs.node }}
+  uv:
+    description: Version de uv de l'étape qui installe les dépendances Python.
+    value: ${{ steps.lire.outputs.uv }}
 
 runs:
   using: composite

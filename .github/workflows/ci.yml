@@ -20,7 +20,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18@sha256:edb0c08dc33befd0262ab3b5cf1c4f3f8cfd8b09e88c05b45adee29d6761ddb6
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -59,11 +59,14 @@ jobs:
         with:
           python-version: ${{ steps.versions.outputs.python }}
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ steps.versions.outputs.uv }}
+
       # `--locked` : versions de `uv.lock`, celles du Dockerfile ; échoue si `uv.lock` ne suit plus `pyproject.toml`.
       - name: Install dependencies
-        run: |
-          pip install --no-cache-dir uv
-          uv sync --locked
+        run: uv sync --locked
 
       - name: Dependency hygiene (deptry)
         run: uv run deptry .
@@ -162,9 +165,13 @@ jobs:
         with:
           python-version: ${{ steps.versions.outputs.python }}
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: ${{ steps.versions.outputs.uv }}
+
       - name: schema.ts suit le contrat OpenAPI
         run: |
-          pip install --no-cache-dir uv
           uv sync --locked --no-dev
           uv run python -m interfaces.cli.dev.dump_openapi /tmp/openapi.json
           ( cd interfaces/frontend && npx openapi-typescript /tmp/openapi.json -o /tmp/schema.ts )
