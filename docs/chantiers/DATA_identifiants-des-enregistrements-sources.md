@@ -89,9 +89,9 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 ### Phase 4 — Autres lectures
 
-- [ ] `fetch_missing` et `candidate_dois`.
-- [ ] Relations entre publications.
-- [ ] Modèles de lecture de l'API et affichage.
+- [x] `fetch_missing` et `candidate_dois` (3f932bce4).
+- [x] Relations entre publications (d985bbb41).
+- [x] Modèles de lecture de l'API et affichage (1bb499b59).
 
 ### Phase 5 — Retrait de `external_ids`
 
