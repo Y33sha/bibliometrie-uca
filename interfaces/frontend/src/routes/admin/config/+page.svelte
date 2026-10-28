@@ -2,6 +2,8 @@
   import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
+  import TabNav from "#lib/components/TabNav.svelte";
+  import { page } from "$app/state";
   import { onMount } from "svelte";
   import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
@@ -148,6 +150,8 @@
   const MIN_YEAR = 1970;
   const MAX_YEAR = 2100;
 
+  const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");
+
   const SITE_TITLE_KEY = "site_title";
   /** Clés dont la valeur est un texte libre, enregistré tel quel. */
   const TEXT_KEYS = new Set([SITE_TITLE_KEY]);
@@ -262,6 +266,14 @@
 {/snippet}
 
 <div class="config-page">
+  <TabNav
+    tabs={[
+      { id: "pipeline", label: "Pipeline" },
+      { id: "display", label: "Affichage" },
+    ]}
+  />
+
+  {#if activeTab === "pipeline"}
   <!-- ═══ ANNÉES ═══ -->
   <h2 class="section-title">Options d'extraction</h2>
   <div class="config-grid">
@@ -386,9 +398,7 @@
       {/if}
     {/each}
   </div>
-
-  <!-- ═══ AFFICHAGE ═══ -->
-  <h2 class="section-title">Affichage</h2>
+  {:else}
   <div class="config-grid">
     {#if siteTitleItem}
       <div class="config-row">
@@ -417,6 +427,7 @@
       </div>
     </div>
   </div>
+  {/if}
 </div>
 
 {#if perimModal}
