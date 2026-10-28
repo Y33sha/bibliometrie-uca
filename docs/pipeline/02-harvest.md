@@ -1,6 +1,6 @@
 # Moissonnage
 
-*À jour le 2026-10-26.*
+*À jour le 2026-10-28.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
@@ -39,7 +39,7 @@ Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, Sca
 
 Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishing.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe est sans agence attend le run suivant.
 
-**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. Un DOI absent de son agence d'enregistrement (Crossref, DataCite) est soumis à doi.org. La phase `metadata_correction` retire les DOI que doi.org ne connaît pas. L'échec est définitif pour un identifiant absent du registre qui l'attribue : hal-id dans HAL, NNT dans theses.fr, DOI inconnu de doi.org. Les autres identifiants sont cherchés de nouveau au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant. Un document écrit dans `staging`, par quelque voie que ce soit, efface les échecs que ses DOI démentent dans sa source, et auprès de doi.org pour une agence d'enregistrement.
+**Recherches infructueuses.** Chaque identifiant cherché en vain est inscrit dans `failed_lookups`. Un DOI absent de son agence d'enregistrement (Crossref, DataCite) est soumis à doi.org. La phase `metadata_correction` retire les DOI que doi.org ne connaît pas et les dépôts HAL introuvables dans HAL. L'échec est définitif pour un identifiant absent du registre qui l'attribue : hal-id dans HAL, NNT dans theses.fr, DOI inconnu de doi.org. Les autres identifiants sont cherchés de nouveau au terme du délai `fetch_missing_retry_after_days` (30 jours par défaut, réglable dans `admin/config`). Une requête en échec (erreur réseau ou HTTP) ne prouve pas l'absence : l'identifiant est cherché de nouveau au run suivant. Un document écrit dans `staging`, par quelque voie que ce soit, efface les échecs que ses DOI démentent dans sa source, et auprès de doi.org pour une agence d'enregistrement. Un dépôt HAL écrit dans `staging` efface l'échec de la recherche de son identifiant.
 
 
 ## Documents périmés et disparus (`fetch_stale`)

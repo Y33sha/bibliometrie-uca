@@ -1,6 +1,6 @@
 # Enregistrements sources
 
-*À jour le 2026-10-26.*
+*À jour le 2026-10-28.*
 
 Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref ou DataCite. Une contribution source est un auteur tel que la source le donne dans un enregistrement source. Ces tables conservent ce que dit chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
 
@@ -22,7 +22,7 @@ Schéma PostgreSQL `sources`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `source_records` | Métadonnées typées : titre, type de document, année, DOI, identifiants externes, revue, éditeur, statut d'accès, langue. Champs propres à certaines sources : résumé, mots-clés, thématiques, données bibliographiques, collections HAL, embargo, rétractation. `raw_doc_type` et `raw_language` : valeurs dans le vocabulaire de la source. `corrections` : valeurs d'origine des métadonnées corrigées. `publication_id` : publication de rattachement | Un enregistrement source par source et identifiant |
+| `source_records` | Métadonnées typées : titre, type de document, année, DOI, identifiants externes, revue, éditeur, statut d'accès, langue. Champs propres à certaines sources : résumé, mots-clés, thématiques, données bibliographiques, collections HAL, embargo, rétractation. `raw_doc_type` et `raw_language` : valeurs dans le vocabulaire de la source. `corrections` : valeurs d'origine des métadonnées corrigées. `is_matchable` : faux pour un enregistrement source écarté de la réconciliation. `publication_id` : publication de rattachement | Un enregistrement source par source et identifiant |
 | `source_record_locations` | Copies du document : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, [plateforme](07-publishing.md) | Une copie par URL |
 
 **Contributions sources**
