@@ -270,7 +270,7 @@ max-complexity = 15
 # `httpx2` est le client HTTP unique du projet, encadré par des délais d'expiration, des tentatives bornées, un disjoncteur et une liste blanche d'hôtes.
 "urllib.request".msg = "Le client HTTP du projet est httpx2, et le trafic sortant appartient au pipeline (pipeline/ingestion)."
 
-# L'engine unique du projet choisit l'identité de connexion selon le processus et installe le suivi du DML. Exceptions dans `per-file-ignores`.
+# L'engine unique du projet choisit le rôle PostgreSQL selon le processus et installe le suivi du DML. Exceptions dans `per-file-ignores`.
 "sqlalchemy.create_engine".msg = "L'engine du projet se construit dans infrastructure/db/engine.py, et s'obtient par get_sync_engine."
 
 # Le type JSONB de SQLAlchemy écrit `None` en JSON `null`, que les contraintes et les index sur NULL ignorent.
