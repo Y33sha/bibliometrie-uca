@@ -4,7 +4,8 @@
 --
 -- SQL pur, sans commande psql : `alembic/env.py` l'applique après toute migration jouée,
 -- et `roles.sql` l'inclut après avoir créé les rôles. Les droits d'une base suivent ainsi la
--- version de son schéma : une table recréée par une migration retrouve les siens.
+-- version de son schéma : une table recréée par une migration retrouve les siens. Une
+-- modification de ce fichier atteint les bases existantes par une migration, vide au besoin.
 --
 -- Les ordres s'appliquent sous le propriétaire du schéma — `ALTER DEFAULT PRIVILEGES` ne porte
 -- que sur les objets créés par le rôle courant. Le fichier se rejoue sans dommage : chaque
