@@ -6,10 +6,11 @@ from domain.platforms.registry import HAL
 from domain.publications.access import Access, access, access_url
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.external_ids import ExternalIdType, external_ids_from_identifiers
 from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
@@ -28,7 +29,7 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns, corrected_by
+from infrastructure.sql_fragments import active_issns, corrected_by, raw_column
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
@@ -124,21 +125,27 @@ def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[Sourc
 def get_publication_external_identifiers(
     conn: Connection, publication_id: int
 ) -> list[ExternalIdentifierOut]:
-    """Identifiants externes (arXiv, PMID, PMCID, NNT) agrégés depuis les `external_ids` des `source_records` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`.
+    """Identifiants externes (PMID, NNT) agrégés depuis les identifiants actifs des `source_records` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`. La valeur d'un enregistrement source est celle qu'`external_ids_from_identifiers` retient.
 
     Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`, couvert par le lien source HAL)."""
     rows = conn.execute(
-        text("""
-            SELECT sr.source::text, sr.source_id, sr.external_ids FROM source_records sr
-            WHERE sr.publication_id = :pid AND sr.external_ids IS NOT NULL
-        """),
+        text(f"""
+            SELECT sr.source::text AS source, sr.source_id,
+                   {identifiers_json_sql("sr.id")} AS identifiers,
+                   {raw_column("doi", "sr")} AS raw_doi
+            FROM source_records sr
+            WHERE sr.publication_id = :pid
+        """),  # noqa: S608 — fragments rendus depuis des alias de la requête
         {"pid": publication_id},
     ).all()
-    nnt_covered_by_theses = {source_id for source, source_id, _ in rows if source == "theses"}
+    nnt_covered_by_theses = {r.source_id for r in rows if r.source == "theses"}
+    identifiers_by_record = [
+        external_ids_from_identifiers(parse_identifiers(r.identifiers), r.raw_doi) for r in rows
+    ]
     out: list[ExternalIdentifierOut] = []
     for id_type, key in _EXTERNAL_IDENTIFIER_KEYS:
         seen: set[str] = set()
-        for _source, _source_id, external_ids in rows:
+        for external_ids in identifiers_by_record:
             value = external_ids.get(key)
             if not (isinstance(value, str) and value) or value in seen:
                 continue

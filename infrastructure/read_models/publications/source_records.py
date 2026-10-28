@@ -5,6 +5,8 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, Row, text
 
 from domain.source_records.biblio import BiblioKey, JournalKey
+from domain.source_records.external_ids import external_ids_from_identifiers
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.publications.models import (
     PublicationSourcesResponse,
@@ -15,10 +17,12 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
     source_contribution_structure_ids,
 )
+from infrastructure.sql_fragments import raw_column
 
 
-def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
-    """Valeurs textuelles de `external_ids`, en listes : une valeur isolée devient une liste d'un élément."""
+def _identifiers(r: Row[tuple[object, ...]]) -> dict[str, list[str]]:
+    """Identifiants actifs de l'enregistrement source, par clé d'`external_ids` (`external_ids_from_identifiers`), en listes : une valeur isolée devient une liste d'un élément."""
+    external_ids = external_ids_from_identifiers(parse_identifiers(r.identifiers), r.raw_doi)
     out: dict[str, list[str]] = {}
     for key, value in external_ids.items():
         values = value if isinstance(value, list) else [value]
@@ -50,7 +54,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         source=r.source,
         source_id=r.source_id,
         doi=r.doi,
-        identifiers=_identifiers(r.external_ids),
+        identifiers=_identifiers(r),
         title=r.title,
         title_normalized=r.title_normalized,
         doc_type=r.doc_type,
@@ -133,8 +137,10 @@ class PublicationSourceRecordQueries:
         if title is None:
             return None
         rows = self._conn.execute(
-            text("""
-                SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi, sr.external_ids,
+            text(f"""
+                SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi,
+                       {identifiers_json_sql("sr.id")} AS identifiers,
+                       {raw_column("doi", "sr")} AS raw_doi,
                        sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
@@ -148,7 +154,7 @@ class PublicationSourceRecordQueries:
                 LEFT JOIN languages lang ON lang.code = sr.language
                 WHERE sr.publication_id = :pid
                 ORDER BY sr.source, sr.source_id
-            """),
+            """),  # noqa: S608 — fragments rendus depuis des alias de la requête
             {"pid": publication_id},
         ).all()
         source_contributions = _source_contributions(self._conn, publication_id)

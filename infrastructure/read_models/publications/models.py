@@ -395,7 +395,9 @@ class SourceRecordMetadataOut(BaseModel):
     source: str
     source_id: str
     doi: str | None
-    identifiers: dict[str, list[str]]  # `external_ids` hors ISSN, chaque valeur en liste
+    identifiers: dict[
+        str, list[str]
+    ]  # identifiants actifs, par clé d'`external_ids`, chaque valeur en liste
     title: str
     title_normalized: str | None  # forme de comparaison du titre
     doc_type: str | None
