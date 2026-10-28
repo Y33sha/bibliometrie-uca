@@ -9,6 +9,7 @@ Base locale au 2026-10-25 : 74 585 publications, 734 400 liens publication–suj
 - **Publications sans sujet** : 1 626.
 - **Sujet incohérent avec la revue** : signal inexploité. Les sujets DOAJ sont connus pour 2 325 revues sur 10 860 (`serials.doaj_payload`).
 - **Hiérarchie.** `subjects` porte un libellé, sans vocabulaire ni parent. La chaîne domain → field → subfield → topic d'OpenAlex et le chemin des domaines HAL existent seulement dans `source_records.topics`. Le libellé ne suffit pas à situer un sujet OpenAlex : « Social Sciences » est domain et field ; « Biochemistry », « Genetics », « Pharmacology » sont des subfields de deux fields différents. Le normalizer OpenAlex écarte les identifiants. 3 001 libellés sont partagés entre plusieurs sources, donc fusionnés en un sujet.
+- **MeSH.** Aucun sujet MeSH. Le moissonnage OpenAlex omet le champ `mesh` des works (`pipeline/ingestion/openalex/api.py`). PubMed n'est pas moissonné.
 - **Besoins de l'interface.** Les graphiques de sujets demandent une couleur par grand domaine, et de pouvoir écarter les niveaux hauts, qui encombrent sans informer.
 
 ### Constats de l'exploration (corpus de 46 000 publications)
@@ -170,6 +171,7 @@ Les pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - [ ] Stock HAL : script oneshot qui relit les mots-clés TEI dans le raw store
 - [ ] Extracteurs (`subject_extractors.py`) : chaque sujet rendu avec son vocabulaire, son code, son niveau et son parent ; domaines HAL par leur code, OpenAlex par ses identifiants, vedettes RAMEAU de ScanR et de theses.fr par leur PPN, discipline de theses.fr par son libellé ; extracteur WoS retiré
 - [ ] Ingestion de la phase `subjects` par (vocabulaire, code) ; reconstruction du stock
+- [ ] Vocabulaire MeSH, avec code, niveau et parent comme les autres vocabulaires ; source à choisir
 - [ ] Rattachement des domaines de haut niveau de chaque vocabulaire à la palette commune : codes HAL, mots-clés des disciplines theses.fr (correspondances du prototype de vote)
 - [ ] Interface : couleur par domaine de haut niveau dans les graphiques de sujets ; domains OpenAlex écartés
 - [ ] Documentation : `docs/agregats/subjects.md`, `docs/donnees/03-publications.md`
@@ -197,4 +199,5 @@ Les pistes n'opèrent pas au même grain. Elles peuvent se combiner.
 - **Doublons à l'affichage** : une cinquantaine de libellés communs à deux vocabulaires (« Informatique », domaine HAL et discipline de thèse), et des homonymes internes à OpenAlex (« Biochemistry », subfield de deux fields). À regrouper à l'affichage s'ils gênent.
 - **Niveaux écartés des graphiques** au-delà des domains OpenAlex : fields, premier niveau HAL.
 - **Provenance des sujets ISTEX**, si les classifieurs donnent des sujets aux publications qui n'en ont pas : l'énumération `source_type` de `publication_subjects.source` ne la prévoit pas.
+- **Source du MeSH** : champ `mesh` d'OpenAlex, renseigné pour les publications indexées dans PubMed, ou moissonnage de PubMed. Un descripteur MeSH occupe plusieurs positions dans l'arborescence : `subjects` lui donne un seul parent.
 - **Specter2** : variante du modèle (`allenai/specter2_base`, `proximity`, `classification`), exécution (locale sur CPU ou GPU, ou hébergée), persistance des vecteurs (pgvector ou fichier numpy). 74 600 publications à encoder.

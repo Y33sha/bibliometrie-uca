@@ -31,6 +31,10 @@ OpenAlex retire les apostrophes. 106 titres de revue ont la forme « Annales d E
 
 `publications.container_title` est renseigné pour 39 690 publications, dont 10 202 à revue et 8 876 à monographie. OpenAlex y met le nom d'un repository : « HAL (Le Centre pour la Communication Scientifique Directe) » pour 28 846 de ses 52 116 enregistrements sources à conteneur, puis arXiv, theses.fr, Figshare, Zenodo.
 
+### Listes de revues
+
+Aucune table ne rattache une revue à une liste de référence : revues indexées dans le WoS, revues de confiance recommandées par la conférence des doyens de médecine.
+
 ### Administration
 
 Les personnes et les publications ont un volet latéral (`PersonDrawer`, `PublicationDrawer`). Les pages Éditeurs et Revues (`publishers/`, `journals/`) ouvrent une page par entité.
@@ -71,7 +75,13 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 
 - [ ] Volet latéral des pages Éditeurs et Revues
 
-### Phase 6 — Fin de chantier
+### Phase 6 — Listes de revues
+
+- [ ] Modélisation : table des listes, table de liaison entre revues et listes
+- [ ] Source de chaque liste (question 4)
+- [ ] Mise à jour de chaque liste (question 5)
+
+### Phase 7 — Fin de chantier
 
 - [ ] Mise à jour de la documentation
 
@@ -80,3 +90,5 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 1. Régime de `serial_name_forms` : recalcul à chaque passage de `publishing` à partir des colonnes de `source_records` et du titre du référentiel, ou accumulation avec purge. Avec le recalcul, deux revues qui produisent le même couple (forme, éditeur) demandent un départage. Celui de la recherche donne la revue à ISSN électronique actif, puis le plus petit identifiant.
 2. Éditeur déduit du DOI : report dans `publishing` une fois les préfixes résolus, ou résolution du préfixe dès `normalize`. Destination : `source_records.publisher_id`, le nom brut restant dans sa colonne, ou la forme de nom seule.
 3. Migration `c8e3f1a6d924` : sa première étape supprime une forme sans éditeur quand aucun enregistrement source sans éditeur ne désigne sa revue. Le lien exact passe par `normalize_text`, hors de portée du SQL pur. Garder cette étape, ou la retirer au profit de la purge de la phase 1.
+4. Source de chaque liste : fichier publié par l'organisme, API ou saisie dans l'administration. Accès à la liste des revues indexées dans le WoS après la résiliation de l'abonnement.
+5. Mise à jour d'une liste : import complet qui la remplace, ajouts et retraits datés, ou liste posée une fois. Rattachement d'une entrée à une revue : par ISSN, par titre à défaut. Sort des entrées sans revue dans le référentiel.
