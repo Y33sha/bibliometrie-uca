@@ -11,6 +11,7 @@ export { api, apiDetail, cancel, latestRequest, post, put, patch, del, ApiError,
 
 export * as auth from './auth';
 export * as persons from './persons';
+export * as publications from './publications';
 export * as contributions from './contributions';
 export * as serials from './serials';
 export * as publishers from './publishers';

@@ -4,6 +4,7 @@
   import type { components } from "#lib/api/schema.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import PublicationMergeSection from "#lib/components/publications/PublicationMergeSection.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { contributionRoleLabels } from "#lib/labels.js";
@@ -12,13 +13,27 @@
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
 
-  let { publicationId, onclose }: { publicationId: number; onclose: () => void } = $props();
+  // `onopen` ouvre le volet d'une autre publication : la publication conservée par une fusion.
+  let {
+    publicationId,
+    onclose,
+    onopen,
+  }: { publicationId: number; onclose: () => void; onopen: (publicationId: number) => void } =
+    $props();
 
   let data = $state<PublicationSources | null>(null);
   let failure = $state<string | null>(null);
+  // Incrémenté après une fusion qui conserve cette publication, pour relire ses enregistrements sources.
+  let version = $state(0);
+
+  function merged(keptId: number) {
+    if (keptId === publicationId) version++;
+    else onopen(keptId);
+  }
 
   $effect(() => {
     const id = publicationId;
+    void version;
     data = null;
     failure = null;
     api<PublicationSources>(`/api/publications/${id}/sources`)
@@ -159,6 +174,7 @@
         {/each}
       </tbody>
     </table>
+    <PublicationMergeSection {publicationId} onmerged={merged} />
   {/if}
 </Drawer>
 
