@@ -273,9 +273,9 @@ class SourceRecordOut(BaseModel):
 
 
 class ExternalIdentifierOut(BaseModel):
-    """Identifiant externe agrégé d'une publication (PMID, NNT), pour la sidebar."""
+    """Identifiant d'une publication ou d'un enregistrement source : type de `source_record_identifiers` et valeur."""
 
-    type: str  # "pmid" | "nnt"
+    type: str
     value: str
 
 
@@ -395,9 +395,7 @@ class SourceRecordMetadataOut(BaseModel):
     source: str
     source_id: str
     doi: str | None
-    identifiers: dict[
-        str, list[str]
-    ]  # identifiants actifs, par clé d'`external_ids`, chaque valeur en liste
+    identifiers: list[ExternalIdentifierOut]  # identifiants actifs, hors DOI de la colonne `doi`
     title: str
     title_normalized: str | None  # forme de comparaison du titre
     doc_type: str | None

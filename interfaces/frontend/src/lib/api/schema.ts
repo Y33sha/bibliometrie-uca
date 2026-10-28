@@ -3435,7 +3435,7 @@ export interface components {
         };
         /**
          * ExternalIdentifierOut
-         * @description Identifiant externe agrégé d'une publication (PMID, NNT), pour la sidebar.
+         * @description Identifiant d'une publication ou d'un enregistrement source : type de `source_record_identifiers` et valeur.
          */
         ExternalIdentifierOut: {
             /** Type */
@@ -5348,9 +5348,7 @@ export interface components {
             /** Doi */
             doi: string | null;
             /** Identifiers */
-            identifiers: {
-                [key: string]: string[];
-            };
+            identifiers: components["schemas"]["ExternalIdentifierOut"][];
             /** Title */
             title: string;
             /** Title Normalized */

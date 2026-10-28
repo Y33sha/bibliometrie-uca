@@ -41,7 +41,7 @@ const IDENTIFIER_LABELS: Record<string, string> = {
 	pmcid: 'PMCID',
 	arxiv_id: 'arXiv',
 	isbn: 'ISBN',
-	related_dois: 'DOI apparentés',
+	doi: 'DOI apparentés',
 };
 
 function rank(source: string): number {
@@ -81,14 +81,15 @@ function referentialCell(
 
 /** Types d'identifiants portés par au moins un enregistrement : ceux de `IDENTIFIER_LABELS` dans leur ordre, puis les autres par ordre alphabétique. */
 function identifierTypes(records: SourceRecord[]): string[] {
-	const present = new Set(records.flatMap((r) => Object.keys(r.identifiers)));
+	const present = new Set(records.flatMap((r) => r.identifiers.map((i) => i.type)));
 	const known = Object.keys(IDENTIFIER_LABELS).filter((t) => present.has(t));
 	const others = [...present].filter((t) => !(t in IDENTIFIER_LABELS)).sort();
 	return [...known, ...others];
 }
 
 function identifierField(type: string): Field {
-	const values = (r: SourceRecord) => r.identifiers[type] ?? [];
+	const values = (r: SourceRecord) =>
+		r.identifiers.filter((i) => i.type === type).map((i) => i.value);
 	return {
 		key: `identifier:${type}`,
 		label: IDENTIFIER_LABELS[type] ?? type,

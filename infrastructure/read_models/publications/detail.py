@@ -6,11 +6,10 @@ from domain.platforms.registry import HAL
 from domain.publications.access import Access, access, access_url
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
-from domain.source_records.external_ids import ExternalIdType, external_ids_from_identifiers
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
-from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
@@ -29,7 +28,7 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns, corrected_by, raw_column
+from infrastructure.sql_fragments import active_issns, corrected_by
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
@@ -99,11 +98,8 @@ def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo
     return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
 
 
-# Identifiants de bases qui référencent la publication, exposés en sidebar, ordre d'affichage. `hal_id` est exclu (déjà couvert par le lien source HAL) ; `related_dois` aussi (signal de dédup, pas un identifiant à afficher). arXiv et PMCID désignent des copies, qui sont des localisations.
-_EXTERNAL_IDENTIFIER_KEYS = (
-    ("pmid", ExternalIdType.PMID),
-    ("nnt", ExternalIdType.NNT),
-)
+# Identifiants de bases qui référencent la publication, exposés en sidebar, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, qui sont des localisations.
+_EXTERNAL_IDENTIFIER_TYPES = (SourceIdentifierType.PMID, SourceIdentifierType.NNT)
 
 # Sources dont l'enregistrement est la page du DOI, déjà affiché.
 _DOI_SOURCES = frozenset({Source.CROSSREF, Source.DATACITE})
@@ -125,35 +121,29 @@ def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[Sourc
 def get_publication_external_identifiers(
     conn: Connection, publication_id: int
 ) -> list[ExternalIdentifierOut]:
-    """Identifiants externes (PMID, NNT) agrégés depuis les identifiants actifs des `source_records` de la publication, dédupliqués, dans l'ordre `_EXTERNAL_IDENTIFIER_KEYS`. La valeur d'un enregistrement source est celle qu'`external_ids_from_identifiers` retient.
+    """PMID et NNT actifs des `source_records` de la publication, sans doublon, dans l'ordre `_EXTERNAL_IDENTIFIER_TYPES` puis par valeur.
 
     Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`, couvert par le lien source HAL)."""
     rows = conn.execute(
-        text(f"""
-            SELECT sr.source::text AS source, sr.source_id,
-                   {identifiers_json_sql("sr.id")} AS identifiers,
-                   {raw_column("doi", "sr")} AS raw_doi
+        text("""
+            SELECT DISTINCT i.id_type::text AS id_type, i.id_value
             FROM source_records sr
-            WHERE sr.publication_id = :pid
-        """),  # noqa: S608 — fragments rendus depuis des alias de la requête
-        {"pid": publication_id},
+            JOIN source_record_identifiers i ON i.source_record_id = sr.id
+            WHERE sr.publication_id = :pid AND i.removed_by IS NULL
+              AND i.id_type::text = ANY(:types)
+              AND NOT EXISTS (
+                  SELECT 1 FROM source_records t
+                  WHERE t.publication_id = sr.publication_id AND t.source = 'theses'
+                    AND i.id_type = 'nnt' AND t.source_id = i.id_value
+              )
+        """),
+        {"pid": publication_id, "types": [str(t) for t in _EXTERNAL_IDENTIFIER_TYPES]},
     ).all()
-    nnt_covered_by_theses = {r.source_id for r in rows if r.source == "theses"}
-    identifiers_by_record = [
-        external_ids_from_identifiers(parse_identifiers(r.identifiers), r.raw_doi) for r in rows
+    order = [str(t) for t in _EXTERNAL_IDENTIFIER_TYPES]
+    return [
+        ExternalIdentifierOut(type=r.id_type, value=r.id_value)
+        for r in sorted(rows, key=lambda r: (order.index(r.id_type), r.id_value))
     ]
-    out: list[ExternalIdentifierOut] = []
-    for id_type, key in _EXTERNAL_IDENTIFIER_KEYS:
-        seen: set[str] = set()
-        for external_ids in identifiers_by_record:
-            value = external_ids.get(key)
-            if not (isinstance(value, str) and value) or value in seen:
-                continue
-            if id_type == "nnt" and value in nnt_covered_by_theses:
-                continue
-            seen.add(value)
-            out.append(ExternalIdentifierOut(type=id_type, value=value))
-    return out
 
 
 def get_publication_subjects(conn: Connection, publication_id: int) -> list[SubjectOut]:

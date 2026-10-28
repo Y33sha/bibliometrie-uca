@@ -4,6 +4,11 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from tests.integration.helpers.alignment import align_source_contributions
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
@@ -66,21 +71,37 @@ class TestGetPublicationSources:
             "Nature Publishing Group",
         )
 
-    def test_identifiers_as_lists_of_non_empty_strings(self, sa_sync_conn):
+    def test_active_identifiers_besides_the_doi_column(self, sa_sync_conn):
+        """Le DOI de la colonne `doi` a sa propre ligne ; un identifiant retiré n'est pas exposé."""
         publication = insert_publication(sa_sync_conn)
+        secondary = SourceIdentifierRole.SECONDARY
         _source_record(
             sa_sync_conn,
             publication,
             source="crossref",
             source_id="10.1/x",
-            external_ids={
-                "pmid": "123",
-                "isbn": ["978-2", "978-3"],
-                "arxiv_id": "",
-            },
+            doi="10.1/x",
+            identifiers=[
+                SourceIdentifier(SourceIdentifierType.DOI, "10.1/x", SourceIdentifierRole.PRIMARY),
+                SourceIdentifier(SourceIdentifierType.DOI, "10.2/y", SourceIdentifierRole.RELATED),
+                SourceIdentifier(SourceIdentifierType.PMID, "123", secondary),
+                SourceIdentifier(SourceIdentifierType.ISBN, "978-3", secondary),
+                SourceIdentifier(SourceIdentifierType.ISBN, "978-2", secondary),
+                SourceIdentifier(
+                    SourceIdentifierType.HAL_ID,
+                    "hal-01",
+                    secondary,
+                    "HAL_DEPOSIT_MISSING_TO_REMOVED",
+                ),
+            ],
         )
         [record] = _records(sa_sync_conn, publication)
-        assert record.identifiers == {"pmid": ["123"], "isbn": ["978-2", "978-3"]}
+        assert [(i.type, i.value) for i in record.identifiers] == [
+            ("doi", "10.2/y"),
+            ("pmid", "123"),
+            ("isbn", "978-2"),
+            ("isbn", "978-3"),
+        ]
 
     def test_bibliographic_fields(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
