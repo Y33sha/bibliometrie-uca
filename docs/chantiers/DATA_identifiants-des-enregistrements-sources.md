@@ -95,7 +95,7 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 ### Phase 5 — Retrait de `external_ids`
 
-- [ ] Suppression de la colonne.
+- [x] Suppression de la colonne (77739fdaa).
 
 ### Phase 6 — DOI bioRxiv et medRxiv
 
