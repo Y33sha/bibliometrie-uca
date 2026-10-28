@@ -8,16 +8,12 @@
 - Fixture `breaker` qui pose le circuit-breaker d'une source de test, sous lequel toute requête HTTP doit s'exécuter.
 - Fixture `http_mock` qui sert les requêtes HTTP sortantes depuis des
   routes déclarées, sans laisser un appel réel partir.
-- Sur Windows, impose la WindowsSelectorEventLoopPolicy : psycopg3
-  async refuse le ProactorEventLoop (défaut Windows depuis Python 3.8).
 
 Le setup de la base de test et la fixture `db` sont dans
 `tests/integration/conftest.py` — ils ne se déclenchent que si on
 cible `tests/integration/` (ou `tests/` complet).
 """
 
-import asyncio
-import sys
 from collections.abc import Iterator
 from unittest.mock import patch
 
@@ -26,9 +22,6 @@ import pytest
 
 from pipeline.http.circuit_breaker import SourceCircuitBreaker, source_circuit_breaker
 from tests.helpers.http_mock import HttpMock
-
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 def pytest_configure(config):
