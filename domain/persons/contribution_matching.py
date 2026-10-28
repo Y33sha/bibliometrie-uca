@@ -82,6 +82,13 @@ _REASON_BY_IDENTIFIER: dict[PersonIdentifierType, ContributionMatchReason] = {
     PersonIdentifierType.IDREF: ContributionMatchReason.IDREF,
 }
 
+MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
+    ContributionMatchReason.MANUAL,
+    *(_REASON_BY_IDENTIFIER[id_type] for id_type in IDENTIFIER_ORDER),
+    *NAME_MATCH_REASONS,
+)
+"""Signaux de rattachement dans l'ordre où la décision les essaie : épinglage, identifiants du plus fiable au moins fiable, nom."""
+
 
 @dataclass(frozen=True)
 class AlignedSourceContribution:
