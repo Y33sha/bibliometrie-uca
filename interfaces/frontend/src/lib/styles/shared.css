@@ -32,16 +32,19 @@
 	--border: #e3e6ea;
 	--border-subtle: #eef0f2;  /* séparateurs légers */
 
+	/* Teinte du site, angle OKLCH en degrés : l'accent et la barre de navigation en dérivent. Chaque couleur fixe sa luminosité et sa saturation. */
+	--brand-hue: 196;
+
 	/* Accent */
-	--accent: #1f5f5f;         /* texte, bouton plein, titres de section */
-	--accent-mid: #2f8a8a;     /* trait d'onglet actif, focus */
-	--accent-light: #e6f2f2;   /* fond de pastille, encart */
-	--accent-soft: #a9d0d0;    /* barre de graphique atténuée (année en cours) */
+	--accent: oklch(0.446 0.064 var(--brand-hue));       /* texte, bouton plein, titres de section */
+	--accent-mid: oklch(0.581 0.084 var(--brand-hue));   /* trait d'onglet actif, focus */
+	--accent-light: oklch(0.952 0.013 var(--brand-hue)); /* fond de pastille, encart */
+	--accent-soft: oklch(0.83 0.041 var(--brand-hue));   /* barre de graphique atténuée (année en cours) */
 
 	/* Barre de navigation */
-	--nav-public: #246868;
-	--nav-public-menu: #1d5a5a; /* sous-menus déroulants */
-	--nav-admin: #e6f2f2;       /* session admin : barre claire, texte en --accent */
+	--nav-public: oklch(0.475 0.067 var(--brand-hue));
+	--nav-public-menu: oklch(0.429 0.061 var(--brand-hue)); /* sous-menus déroulants */
+	--nav-admin: var(--accent-light);                      /* session admin : barre claire, texte en --accent */
 	--nav-admin-menu: #ffffff;
 
 	/* États */

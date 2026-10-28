@@ -5,7 +5,7 @@
 	import KeyFigures from '#lib/components/KeyFigures.svelte';
 	import BarChart from '#lib/components/charts/BarChart.svelte';
 	import StackedBarChart from '#lib/components/charts/StackedBarChart.svelte';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { publicationsDocTypes } from '#lib/labels.js';
@@ -158,7 +158,7 @@
 				<BarChart
 					labels={topCountries.map((c) => countryName(c.code) ?? c.code.toUpperCase())}
 					values={topCountries.map((c) => c.value)}
-					color={cssVar('doctype-article')}
+					color={cssColor('doctype-article')}
 					datasetLabel="Publications"
 					horizontal
 				/>

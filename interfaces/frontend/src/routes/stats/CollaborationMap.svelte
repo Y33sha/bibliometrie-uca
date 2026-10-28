@@ -6,7 +6,7 @@
 	import world from 'world-atlas/countries-110m.json';
 	import { alpha2ToNumeric, countryName, numericToAlpha2 } from '#lib/countryNames.js';
 	import { latestRequest } from '#lib/api/index.js';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import type { components } from '#lib/api/schema.js';
 
 	Chart.register(ChoroplethController, GeoFeature, ColorScale, ProjectionScale);
@@ -108,7 +108,7 @@
 					color: {
 						axis: 'x',
 						interpolate: tealScale(),
-						missing: cssVar('surface'),
+						missing: cssColor('surface'),
 						min: 0,
 						max: colorMax,
 						ticks: { precision: 0 },
@@ -132,7 +132,7 @@
 
 	/** Dégradé du teal clair (`--accent-light`) au teal foncé (`--accent`), pour l'échelle de couleur de la carte. */
 	function tealScale(): (t: number) => string {
-		const hex = (name: string) => cssVar(name).replace('#', '');
+		const hex = (name: string) => cssColor(name).replace('#', '');
 		const rgb = (h: string) => [0, 2, 4].map((k) => parseInt(h.slice(k, k + 2), 16));
 		const [from, to] = [rgb(hex('accent-light')), rgb(hex('accent'))];
 		return (t) => `rgb(${from.map((c, k) => Math.round(c + (to[k] - c) * t)).join(', ')})`;

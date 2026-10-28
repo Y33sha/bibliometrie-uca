@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart } from '#lib/components/charts/chart.js';
-	import { cssVar, fontSize } from '#lib/components/charts/cssVar.js';
+	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
@@ -235,7 +235,7 @@
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssVar('accent'),
+			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent'),
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
@@ -255,7 +255,7 @@
 			yearChart = new Chart(chartCanvas, {
 				type: 'pie',
 				plugins: [whiteBgPlugin],
-				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: cssVar('card'), borderWidth: 1 }] },
+				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: cssColor('card'), borderWidth: 1 }] },
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,
@@ -273,7 +273,7 @@
 							}
 						},
 						datalabels: {
-							color: (ctx) => readableOn(colors[ctx.dataIndex], cssVar('text')),
+							color: (ctx) => readableOn(colors[ctx.dataIndex], cssColor('text')),
 							font: { weight: 'bold' },
 							formatter: (val: number, ctx) => {
 								const total = sliceTotal(ctx);
@@ -328,7 +328,7 @@
 								}
 					},
 					datalabels: {
-								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssVar('text')),
+								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssColor('text')),
 								font: { weight: 'bold' },
 								formatter: (val: number, ctx) => {
 									const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
@@ -380,7 +380,7 @@
 			if (!chartWhiteBg) return;
 			const { ctx, width, height } = chart;
 			ctx.save();
-			ctx.fillStyle = cssVar('card');
+			ctx.fillStyle = cssColor('card');
 			ctx.fillRect(0, 0, width, height);
 			ctx.restore();
 		}

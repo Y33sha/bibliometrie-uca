@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
 	let {
@@ -29,7 +29,7 @@
 			chart = null;
 		}
 		if (!canvas || values.length === 0) return;
-		const barColor = color ?? cssVar('accent-mid');
+		const barColor = color ?? cssColor('accent-mid');
 		const valueScale = { beginAtZero: true, ticks: { precision: 0 } };
 		const categoryScale = { grid: { display: false } };
 
