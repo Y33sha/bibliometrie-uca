@@ -1,6 +1,6 @@
 """Clés de la colonne JSONB `source_records.external_ids`, déduite à l'écriture des identifiants de l'enregistrement source."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Iterable
 from enum import StrEnum
 
 from domain.source_records.identifiers import (
@@ -8,7 +8,6 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
     active,
     by_role,
-    identifier_normalizer,
 )
 from domain.types import JsonValue
 
@@ -51,11 +50,6 @@ _IDENTIFIER_TYPES: dict[ExternalIdType, SourceIdentifierType] = {
     ExternalIdType.EISBN: SourceIdentifierType.EISBN,
 }
 
-# Normalisation d'une valeur par type ; `None` signale une valeur invalide.
-_NORMALIZERS: dict[ExternalIdType, Callable[[str], str | None]] = {
-    key: identifier_normalizer(id_type) for key, id_type in _IDENTIFIER_TYPES.items()
-}
-
 _KEYS = {id_type: key for key, id_type in _IDENTIFIER_TYPES.items()}
 
 
@@ -77,8 +71,3 @@ def external_ids_from_identifiers(
         else:
             scalars.setdefault(key.value, identifier.value)
     return {**scalars, **lists}
-
-
-def external_id_normalizer(id_type: ExternalIdType) -> Callable[[str], str | None]:
-    """Fonction qui rend la forme normalisée d'une valeur de type `id_type`, ou `None` si elle est invalide."""
-    return _NORMALIZERS[id_type]

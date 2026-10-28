@@ -1,22 +1,32 @@
 """Tests unitaires de `domain.source_records.keys.project_confirmation_keys`.
 
-Garde le contrat de la projection partagée : extraction et normalisation des clés de confirmation (DOI / NNT / PMID / arXiv ID / HAL), token métadonnée `metadata_block`, et tolérance aux `external_ids` malformés.
+Garde le contrat de la projection partagée : DOI de la colonne, clé de chaque type d'identifiant (rôle le plus fort, puis plus petite valeur, parmi les identifiants actifs), token métadonnée `metadata_block`.
 """
 
 from __future__ import annotations
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     ConfirmationKeys,
     project_confirmation_keys,
 )
 
+T, R = SourceIdentifierType, SourceIdentifierRole
 
-def _keys(doi=None, external_ids=None, doc_type=None, title_normalized=None, publication_year=None):
-    """Appel avec valeurs par défaut neutres (non-thèse, sans titre/année)."""
-    return project_confirmation_keys(
-        doi, external_ids, doc_type, title_normalized, publication_year
-    )
+
+def _keys(doi=None, identifiers=(), doc_type=None, title_normalized=None, publication_year=None):
+    """Appel avec valeurs par défaut neutres (sans titre/année)."""
+    return project_confirmation_keys(doi, identifiers, doc_type, title_normalized, publication_year)
+
+
+def _none(**overrides):
+    keys = dict.fromkeys(("doi", "nnt", "pmid", "arxiv_id", "hal_id", "metadata_block"))
+    return ConfirmationKeys(**{**keys, **overrides})
 
 
 class TestDoi:
@@ -24,60 +34,51 @@ class TestDoi:
         """Le DOI de colonne est normalisé (casse, suffixe de version strippé)."""
         assert _keys("10.1234/ABC.v2").doi == "10.1234/abc"
 
-    def test_doi_read_from_column_ignores_external_ids(self):
-        """Le DOI vient de la colonne nue ; les `external_ids` (ici des DOI secondaires) ne
-        servent jamais de clé de confirmation — la substitution concept est déjà persistée en
-        colonne par `metadata_correction`."""
-        keys = _keys("10.5281/zenodo.10", {"related_dois": ["10.5281/zenodo.999"]})
-        assert keys.doi == "10.5281/zenodo.10"
+    def test_doi_identifiers_are_no_keys(self):
+        """Le DOI vient de la colonne nue : un DOI de la table ne sert pas de clé."""
+        keys = _keys(
+            "10.5281/zenodo.10", [SourceIdentifier(T.DOI, "10.5281/zenodo.999", R.RELATED)]
+        )
+        assert keys == _none(doi="10.5281/zenodo.10")
 
     def test_no_doi(self):
-        assert _keys(None, None).doi is None
+        assert _keys(None).doi is None
 
     def test_blank_doi_dropped(self):
         """Un DOI vide / espaces seuls est écarté (le VO le rejette)."""
         assert _keys("   ").doi is None
 
 
-class TestNnt:
-    def test_nnt_normalized_uppercase(self):
-        assert _keys(None, {"nnt": "2021clfac030"}).nnt == "2021CLFAC030"
+class TestIdentifiers:
+    def test_one_key_per_type(self):
+        identifiers = [
+            SourceIdentifier(T.NNT, "2021CLFAC030", R.PRIMARY),
+            SourceIdentifier(T.PMID, "12345", R.SECONDARY),
+            SourceIdentifier(T.ARXIV_ID, "2301.12345", R.DERIVED),
+            SourceIdentifier(T.ISBN, "9780306406157", R.SECONDARY),
+        ]
+        assert _keys(None, identifiers) == _none(
+            nnt="2021CLFAC030", pmid="12345", arxiv_id="2301.12345"
+        )
 
-    def test_nnt_absent(self):
-        assert _keys(None, {"pmid": "12345"}).nnt is None
+    def test_strongest_role_then_smallest_value(self):
+        """La clé HAL est le `hal_id` dérivé ; à rôle égal, la plus petite valeur. Les autres ne relient rien."""
+        identifiers = [
+            SourceIdentifier(T.HAL_ID, "hal-00000001", R.SECONDARY),
+            SourceIdentifier(T.HAL_ID, "hal-04123456", R.DERIVED),
+            SourceIdentifier(T.PMID, "2", R.SECONDARY),
+            SourceIdentifier(T.PMID, "1", R.SECONDARY),
+        ]
+        keys = _keys(None, identifiers)
+        assert (keys.hal_id, keys.pmid) == ("hal-04123456", "1")
+        assert ("hal_id", "hal-00000001") not in keys.tokens()
 
-
-class TestPmid:
-    def test_pmid_from_external_ids(self):
-        assert _keys(None, {"pmid": "12345"}).pmid == "12345"
-
-    def test_pmid_extracted_from_url(self):
-        keys = _keys(None, {"pmid": "https://pubmed.ncbi.nlm.nih.gov/12345"})
-        assert keys.pmid == "12345"
-
-
-class TestArxivId:
-    def test_arxiv_id_from_external_ids(self):
-        assert _keys(None, {"arxiv_id": "2301.12345"}).arxiv_id == "2301.12345"
-
-    def test_arxiv_id_absent(self):
-        assert _keys(None, {"pmid": "12345"}).arxiv_id is None
-
-
-class TestHalId:
-    def test_first_listed_hal_id_normalized(self):
-        """La clé HAL est le premier identifiant listé, normalisé (sans version). Les suivants ne fusionnent rien."""
-        keys = _keys(None, {"hal_id": ["hal-04123456v2", "tel-00112233"]})
-        assert keys.hal_id == "hal-04123456"
-        assert ("hal_id", "tel-00112233") not in keys.tokens()
-
-    def test_invalid_first_element_gives_no_key(self):
-        """Seul le premier élément compte : malformé, il ne donne aucune clé HAL."""
-        assert _keys(None, {"hal_id": ["bogus", "hal-04123456"]}).hal_id is None
-
-    def test_hal_id_not_a_list_ignored(self):
-        """`hal_id` non-liste (forme inattendue) → ignoré, pas de crash."""
-        assert _keys(None, {"hal_id": "hal-04123456"}).hal_id is None
+    def test_removed_identifier_is_no_key(self):
+        identifiers = [
+            SourceIdentifier(T.HAL_ID, "hal-04123456", R.PRIMARY, "HAL_DEPOSIT_MISSING_TO_REMOVED"),
+            SourceIdentifier(T.HAL_ID, "hal-00000001", R.SECONDARY),
+        ]
+        assert _keys(None, identifiers).hal_id == "hal-00000001"
 
 
 class TestMetadataBlock:
@@ -123,23 +124,9 @@ class TestMetadataBlock:
         assert keys.metadata_block is None
 
 
-class TestMalformedExternalIds:
-    def test_none_external_ids(self):
-        assert _keys("10.1/x") == ConfirmationKeys(
-            doi="10.1/x", nnt=None, pmid=None, arxiv_id=None, hal_id=None, metadata_block=None
-        )
-
-    def test_non_str_values_ignored(self):
-        """`external_ids` peut porter des listes (issn/isbn) ou None : ignorés sans crash."""
-        keys = _keys(None, {"issn": ["0028-0836"], "nnt": None, "pmid": "12345"})
-        assert keys == ConfirmationKeys(
-            doi=None, nnt=None, pmid="12345", arxiv_id=None, hal_id=None, metadata_block=None
-        )
-
-
 class TestTokens:
     def test_tokens_namespaced_by_type(self):
-        keys = ConfirmationKeys(
+        keys = _none(
             doi="d",
             nnt="n",
             pmid="p",
@@ -159,13 +146,7 @@ class TestTokens:
         )
 
     def test_absent_keys_produce_no_token(self):
-        keys = ConfirmationKeys(
-            doi="d", nnt=None, pmid=None, arxiv_id=None, hal_id=None, metadata_block=None
-        )
-        assert keys.tokens() == frozenset({("doi", "d")})
+        assert _none(doi="d").tokens() == frozenset({("doi", "d")})
 
     def test_no_keys_empty_token_set(self):
-        empty = ConfirmationKeys(
-            doi=None, nnt=None, pmid=None, arxiv_id=None, hal_id=None, metadata_block=None
-        )
-        assert empty.tokens() == frozenset()
+        assert _none().tokens() == frozenset()

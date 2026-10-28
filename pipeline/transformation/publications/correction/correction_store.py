@@ -17,8 +17,6 @@ from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.identifiers import (
     SourceIdentifier,
-    SourceIdentifierRole,
-    SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
@@ -38,6 +36,7 @@ from domain.sources.registry import DOI_ORG, Source
 from domain.types import JsonValue
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.db.rows import rows_as
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.db.tables import source_records
 from infrastructure.sql_fragments import (
     corrected,
@@ -174,30 +173,6 @@ assert set(_FACTS) == {f.name for f in fields(MetadataForCorrection)}, (
     "projection des faits désynchronisée de MetadataForCorrection"
 )
 
-# Identifiants de l'enregistrement source `{source_record}`, avec leur statut, en tableau JSON.
-_IDENTIFIERS_SQL = """
-    COALESCE((
-        SELECT jsonb_agg(jsonb_build_object(
-            'id_type', i.id_type, 'value', i.id_value, 'role', i.role, 'removed_by', i.removed_by
-        ) ORDER BY i.id_type, i.id_value)
-        FROM source_record_identifiers i WHERE i.source_record_id = {source_record}
-    ), '[]'::jsonb)
-"""
-
-
-def _identifiers(raw: list[dict[str, str | None]]) -> tuple[SourceIdentifier, ...]:
-    """Identifiants lus par `_IDENTIFIERS_SQL`."""
-    return tuple(
-        SourceIdentifier(
-            SourceIdentifierType(str(i["id_type"])),
-            str(i["value"]),
-            SourceIdentifierRole(str(i["role"])),
-            i["removed_by"],
-        )
-        for i in raw
-    )
-
-
 _UPDATE_STATUSES = text("""
     UPDATE source_record_identifiers i SET removed_by = s.removed_by
     FROM jsonb_to_recordset(CAST(:rows AS jsonb))
@@ -228,7 +203,7 @@ def _persist_statuses(
 # Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
     SELECT sr.id, sr.source_id, sr.external_ids, sr.corrections,
-           {_IDENTIFIERS_SQL.format(source_record="sr.id")} AS identifiers,
+           {identifiers_json_sql("sr.id")} AS identifiers,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
     FROM source_records sr
     LEFT JOIN serials j ON j.id = sr.serial_id
@@ -246,7 +221,7 @@ def _unary_rows(rows: Iterable[Row[tuple[object, ...]]]) -> list[UnaryCorrection
             external_ids=r.external_ids,
             corrections=r.corrections,
             facts=MetadataForCorrection(**{name: r._mapping[name] for name in _FACTS}),
-            identifiers=_identifiers(r.identifiers),
+            identifiers=parse_identifiers(r.identifiers),
         )
         for r in rows
     ]
@@ -366,7 +341,7 @@ class SourceRecordCorrectionStore:
                 SELECT id, is_matchable, source::text AS source, source_id,
                        {raw_column("doi", "source_records")} AS raw_doi, doi, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
-                       {_IDENTIFIERS_SQL.format(source_record="source_records.id")} AS identifiers
+                       {identifiers_json_sql("source_records.id")} AS identifiers
                 FROM source_records
             """)
         )
@@ -381,7 +356,7 @@ class SourceRecordCorrectionStore:
                     r.doi,
                     r.title_normalized,
                     r.urls,
-                    _identifiers(r.identifiers),
+                    parse_identifiers(r.identifiers),
                 ),
             )
             for r in rows
@@ -551,7 +526,7 @@ class SourceRecordCorrectionStore:
                 )
                 SELECT sr.id, sr.doc_type, sr.doi, sr.title_normalized, sr.corrections,
                        sr.external_ids, sr.source::text AS source, sr.source_id,
-                       {_IDENTIFIERS_SQL.format(source_record="sr.id")} AS identifiers,
+                       {identifiers_json_sql("sr.id")} AS identifiers,
                        sr.eff_doi AS raw_doi,
                        sw.canonical_doi, sw.same_work_case,
                        sr.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
@@ -579,7 +554,7 @@ class SourceRecordCorrectionStore:
                 same_work_case=_cluster_case(row.same_work_case),
                 unresolved=row.unresolved,
                 external_ids=row.external_ids,
-                identifiers=_identifiers(row.identifiers),
+                identifiers=parse_identifiers(row.identifiers),
                 source=row.source,
                 source_id=row.source_id,
                 author_names=tuple(row.author_names),

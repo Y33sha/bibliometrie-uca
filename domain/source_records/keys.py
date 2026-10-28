@@ -2,25 +2,22 @@
 
 Une *clé de confirmation* est un attribut cross-source par lequel deux `source_records` attestent du même document. Deux familles :
 
-- **Identifiants** : DOI, NNT, HAL ID, PMID, arXiv ID — égalité directe. Un enregistrement source qui liste plusieurs identifiants HAL a pour clé le premier, dans l'ordre d'`external_ids` (par rôle, puis par valeur) : le sien pour un enregistrement source HAL, le dépôt dont il est tiré pour un enregistrement source ScanR ou OpenAlex, à défaut le premier dépôt qu'il cite.
+- **Identifiants** : DOI de la colonne `doi`, NNT, HAL ID, PMID, arXiv ID de `source_record_identifiers` — égalité directe. Pour chaque type, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`), celui que retient `external_ids`. Pour un `hal_id` : le sien pour un enregistrement source HAL, le dépôt dont il est tiré pour un enregistrement source ScanR ou OpenAlex, à défaut le premier dépôt qu'il cite.
 - **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<publication_year>")`, pour **tout** `doc_type` (empiriquement ~99 % de même-œuvre par type au-delà du seuil de longueur de titre). Le `doc_type` dans la clé impose l'égalité de type (« un DOI, une œuvre » étendu au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; `thesis` et `ongoing_thesis` ne co-bloquent jamais (leurs années diffèrent — inscription vs soutenance). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur), qui exigeraient un second accord pairwise, relèvent d'un mécanisme distinct.
 
 La projection est la définition Python des clés de confirmation. La réconciliation des publications (`pipeline/transformation/publications/reconciliation.py`) la consomme. Son voisinage SQL (`_UNIVERSE_SQL`) réécrit ces clés ; `TestUniverseMatchesPythonTokens` vérifie que les deux concordent.
 
-Un identifiant de `external_ids` devient une clé de confirmation par son ajout à `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Le voisinage SQL d'un identifiant scalaire en dérive. Une clé composite demande son calcul dans `project_confirmation_keys` et sa branche dans `_UNIVERSE_SQL`. `run_pipeline --only publications --rebuild-publications` applique une clé au stock.
+Un type d'identifiant devient une clé de confirmation par son ajout à `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Le voisinage SQL en dérive. Une clé composite demande son calcul dans `project_confirmation_keys` et sa branche dans `_UNIVERSE_SQL`. `run_pipeline --only publications --rebuild-publications` applique une clé au stock.
 
-Les valeurs sont lues sur la `source_record` **corrigée** (colonnes typées + `external_ids`), déjà normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`). Les identifiants repassent par le normaliseur de leur type : idempotent sur des valeurs propres, forme canonique unique quel que soit l'appelant. Le DOI lu est la colonne nue (concept Zenodo déjà substitué en amont par `metadata_correction`) : la projection ignore Zenodo.
+Les valeurs sont lues sur la `source_record` **corrigée** : colonnes typées et identifiants actifs, déjà normalisés (phase `normalize`) puis corrigés (phase `metadata_correction`). Le DOI lu est la colonne nue (concept Zenodo déjà substitué en amont par `metadata_correction`) : la projection ignore Zenodo.
 """
 
-from collections.abc import Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass, fields
 
 from domain.publications.identifiers import DOI
-from domain.source_records.external_ids import (
-    MULTIVALUED_ID_TYPES,
-    ExternalIdType,
-    external_id_normalizer,
-)
+from domain.source_records.external_ids import MULTIVALUED_ID_TYPES, ExternalIdType
+from domain.source_records.identifiers import SourceIdentifier, active, by_role
 
 # Types d'`external_ids` par lesquels deux `source_records` désignent le même document. Le DOI (colonne dédiée) et le token métadonnée sont les autres familles de clés de confirmation.
 CONFIRMATION_ID_TYPES = (
@@ -45,7 +42,7 @@ DISCRIMINANT_TITLE_MIN_LENGTH = 30
 class ConfirmationKeys:
     """Clés de confirmation portées par une `source_record`, normalisées.
 
-    Chaque clé est au plus unitaire ; `hal_id` est le premier identifiant HAL que liste la `source_record`. Les identifiants sont des chaînes canoniques (forme produite par les VO), prêtes pour les lookups `find_by_*`. `metadata_block` = `"<doc_type>|<title_normalized>|<publication_year>"` pour toute `source_record` à `doc_type` présent et titre assez long. Une clé absente vaut `None`.
+    Chaque clé est au plus unitaire (`confirmation_identifiers`). Les identifiants ont la forme que produisent leurs value objects. `metadata_block` = `"<doc_type>|<title_normalized>|<publication_year>"` pour toute `source_record` à `doc_type` présent et titre assez long. Une clé absente vaut `None`.
     """
 
     doi: str | None
@@ -71,35 +68,26 @@ assert set(_KEY_NAMES) == {"doi", "metadata_block", *CONFIRMATION_ID_TYPES}, (
 )
 
 
-# Nom, normaliseur et multivaluation de chaque identifiant de confirmation.
-_CONFIRMATION_IDS = tuple(
-    (str(t), external_id_normalizer(t), t in MULTIVALUED_ID_TYPES) for t in CONFIRMATION_ID_TYPES
-)
-
-
-def _confirmation_ids(ids: Mapping[str, object]) -> dict[str, str | None]:
-    """Valeur normalisée de chaque identifiant de confirmation de `ids`. Un type multivalué a pour valeur le premier élément de sa liste."""
-    values: dict[str, str | None] = {}
-    for name, normalize, multivalued in _CONFIRMATION_IDS:
-        raw = ids.get(name)
-        if multivalued:
-            raw = raw[0] if isinstance(raw, list) and raw else None
-        values[name] = normalize(raw) if isinstance(raw, str) else None
-    return values
+def confirmation_identifiers(identifiers: Iterable[SourceIdentifier]) -> dict[str, str | None]:
+    """Clé de chaque type de `CONFIRMATION_ID_TYPES` : l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`). Un type sans identifiant actif vaut `None`."""
+    keys: dict[str, str | None] = dict.fromkeys(map(str, CONFIRMATION_ID_TYPES))
+    for identifier in by_role(active(identifiers)):
+        if keys.get(identifier.id_type.value, "") is None:
+            keys[identifier.id_type.value] = identifier.value
+    return keys
 
 
 def project_confirmation_keys(
     doi: str | None,
-    external_ids: Mapping[str, object] | None,
+    identifiers: Iterable[SourceIdentifier],
     doc_type: str | None,
     title_normalized: str | None,
     publication_year: int | None,
 ) -> ConfirmationKeys:
     """Extrait les clés de confirmation normalisées d'une `source_record`.
 
-    Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). Une valeur d'identifiant malformée est écartée silencieusement, comme une clé absente. `metadata_block` est posée pour toute `source_record` à `doc_type` présent, `publication_year` présent et `title_normalized` plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`.
+    Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). `identifiers` sont les identifiants de l'enregistrement source, avec leur rôle et leur statut (`confirmation_identifiers`). `metadata_block` est posée pour toute `source_record` à `doc_type` présent, `publication_year` présent et `title_normalized` plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`.
     """
-    ids: Mapping[str, object] = external_ids if isinstance(external_ids, Mapping) else {}
     doi_vo = DOI.try_parse(doi) if isinstance(doi, str) else None
     metadata_block = (
         f"{doc_type}|{title_normalized}|{publication_year}"
@@ -112,5 +100,5 @@ def project_confirmation_keys(
     return ConfirmationKeys(
         doi=str(doi_vo) if doi_vo else None,
         metadata_block=metadata_block,
-        **_confirmation_ids(ids),
+        **confirmation_identifiers(identifiers),
     )
