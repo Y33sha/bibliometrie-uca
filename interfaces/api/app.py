@@ -1,8 +1,8 @@
-"""Bibliométrie UCA — application FastAPI : point d'assemblage de la surface HTTP.
+"""Application FastAPI : assemblage de la surface HTTP.
 
-Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares (authentification des écritures, mesure de durée), les routers, et le service du frontend buildé.
+Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares, les routers et le service du frontend buildé.
 
-Lancement en développement : `bash start.sh`, qui démarre uvicorn sur le port `API_PORT` et le serveur de développement du frontend.
+Lancement en développement : `bash start.sh`.
 """
 
 import logging
@@ -44,8 +44,7 @@ from interfaces.api.route_path import RootPath, route_path
 from interfaces.api.session import check_auth_config
 from interfaces.api.spa import BUILD_DIR, SPAStaticFiles
 
-# Configure le root logger (format JSON par défaut, texte si LOG_FORMAT=text).
-# À faire AVANT l'import des routers qui peuvent créer leur propre logger.
+# Configure le root logger avant l'import des routers, qui créent leur propre logger.
 configure_root_logging()
 
 from interfaces.api.routers import (  # noqa: E402
@@ -74,9 +73,6 @@ logger = logging.getLogger(__name__)
 
 
 # ----- Lifespan -----
-#
-# Construit l'engine SQLAlchemy au démarrage et le libère à l'arrêt.
-# Les routes le consomment via `DbConn`.
 
 
 @asynccontextmanager
@@ -94,13 +90,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# Préfixe de déploiement (par exemple `/bibliometrie` en production), vide à la racine. Le
-# routage l'ôte du chemin quand il y est, et laisse intact un chemin dont le reverse proxy l'a
-# retiré (cf. `route_path`).
+# Préfixe de déploiement (`/bibliometrie` en production), vide pour un service à la racine. Cf. `route_path`.
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 
-# Docs interactives coupées par défaut (`expose_api_docs`) : elles cartographient toute la
-# surface d'API, admin comprise. Activées en développement, absentes en production.
+# Docs interactives activées par `expose_api_docs`, en développement seulement : elles décrivent toute l'API, admin comprise.
 _expose_docs = settings.expose_api_docs
 app = FastAPI(
     title="Bibliométrie",
@@ -113,16 +106,9 @@ app = FastAPI(
 
 # ----- Exception handlers -----
 #
-# Les services lèvent des exceptions métier (domain.errors) sans connaître HTTP.
-# Ces handlers font le mapping erreur → statut + corps à l'exécution. Le contrat
-# (quel statut, quel corps) se déclare, lui, sur la route via `responses={}` :
-# les erreurs à corps trivial se contentent de `{detail}`, les deux à corps
-# structuré passent par un modèle publié (`interfaces/api/models/errors.py`).
+# Traduisent les exceptions métier (`domain.errors`) en statut HTTP. Chaque route déclare ses statuts d'erreur dans `responses={}` ; les corps structurés ont leur modèle dans `interfaces/api/models/errors.py`.
 #
-# Une requête que le serveur interprète sans pouvoir la traiter reçoit 422, quelle
-# que soit la couche qui prononce le refus : validation d'un paramètre, règle du
-# domaine, valeur que la base ne peut pas représenter. C'est aussi le code que rend
-# la validation native de FastAPI. Le 409 est réservé au heurt avec l'état courant.
+# 422 : requête bien formée que le serveur refuse (paramètre, règle du domaine, valeur non représentable en base), comme la validation native de FastAPI. 409 : conflit avec l'état courant.
 
 
 @app.exception_handler(NotFoundError)
@@ -160,16 +146,16 @@ async def conflict_handler(request: Request, exc: ConflictError) -> JSONResponse
 
 @app.exception_handler(DomainError)
 async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
-    # Filet de sécurité pour une DomainError non spécialisée ci-dessus.
+    # Sous-classe de DomainError sans handler dédié.
     logger.warning("DomainError non mappée : %s", exc)
     return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
-    """Traduit une violation de contrainte d'intégrité en 409, plutôt qu'un 500 opaque.
+    """Traduit une violation de contrainte (clé étrangère, unicité, CHECK) en 409.
 
-    Couvre uniformément toute écriture qui heurte une contrainte de la base sur une requête bien formée : clé étrangère vers une entité inexistante, doublon sur un index unique, condition CHECK non tenue. Le détail SQL reste au log — il expose la structure interne et n'éclaire pas l'appelant.
+    Le détail SQL reste au journal : il expose la structure interne de la base.
     """
     logger.warning("Violation d'intégrité sur %s %s : %s", request.method, request.url.path, exc)
     return JSONResponse(
@@ -180,11 +166,9 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
 
 @app.exception_handler(DataError)
 async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
-    """Traduit en 422 une valeur que le driver refuse d'envoyer à la base, et laisse le reste en 500.
+    """Traduit en 422 une valeur que le driver refuse d'envoyer à la base (octet NUL, par exemple), et laisse le reste en 500.
 
-    Le driver écarte certaines valeurs avant tout envoi, l'octet NUL au premier chef : PostgreSQL ne l'accepte dans aucun champ texte. Ces refus se reconnaissent à l'absence de `sqlstate`, que seul le serveur renseigne. Le contrat des routes écarte déjà de telles valeurs (`TextParam`) ; ce filet couvre ce qu'il ne borne pas — corps de requête, paramètre déclaré sans le type annoté.
-
-    Une erreur portant un `sqlstate` vient du serveur : la valeur a traversé la validation et rompu au moment de la requête. C'est un contrôle manquant en amont, que le 500 et son journal donnent à voir.
+    Un refus du driver se reconnaît à l'absence de `sqlstate`, que seul le serveur renseigne. `TextParam` écarte ces valeurs des paramètres de route ; ce handler couvre les corps de requête et les paramètres déclarés sans `TextParam`. Une erreur avec `sqlstate` signale un contrôle manquant en amont : elle reste en 500.
     """
     if getattr(exc.orig, "sqlstate", None) is not None:
         raise exc
@@ -230,18 +214,16 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
 
 # ----- Middleware -----
 #
-# Starlette empile les middlewares dans l'ordre inverse de leur déclaration : le dernier
-# déclaré enveloppe les précédents, et voit donc toutes les réponses, y compris celles qu'un
-# middleware intérieur compose sans laisser passer la requête.
+# Starlette empile les middlewares dans l'ordre inverse de leur déclaration : le dernier déclaré enveloppe les précédents et voit leurs réponses.
 
 
 @app.middleware("http")
 async def read_only_guard_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """Déclare la requête de lecture, pour le garde-fou qui refuse qu'une connexion pouvant écrire la serve.
+    """Marque une requête de lecture, pour le garde-fou qui interdit de la servir sur une connexion pouvant écrire.
 
-    Déclaré en premier, donc posé au plus près de la route : la déclaration couvre le traitement de la requête, où les connexions s'ouvrent.
+    Déclaré en premier, donc au plus près de la route, où les connexions s'ouvrent.
     """
     if request.method not in READ_ONLY_METHODS:
         return await call_next(request)
@@ -251,14 +233,14 @@ async def read_only_guard_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Protège les endpoints d'écriture (POST/PUT/DELETE/PATCH), hors authentification : 401 sans session valide, 403 sans le rôle admin.
+    """Protège les endpoints d'écriture, hors `/api/auth/` : 401 sans session valide, 403 sans le rôle admin.
 
-    Journalise les actions admin réussies (statut < 400) sous le record structuré `admin_action`, qui porte l'utilisateur, la méthode, le chemin et le statut. Le chemin journalisé est celui du routage, indépendant du préfixe sous lequel l'application est servie : une même action porte le même nom d'un déploiement à l'autre.
+    Journalise chaque action admin réussie dans un record `admin_action` (utilisateur, méthode, chemin, statut). Le chemin est celui du routage, sans le préfixe de déploiement.
     """
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
         return await call_next(request)
 
-    # Chemin privé du préfixe de déploiement, celui sur lequel le routage apparie ses routes.
+    # Chemin sans le préfixe de déploiement.
     path = route_path(request.scope)
     if path.startswith("/api/auth/"):
         return await call_next(request)
@@ -269,8 +251,7 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
     if not user.is_admin:
         return JSONResponse(status_code=403, content={"detail": "Droits insuffisants"})
 
-    # Session d'audit de la requête : les services y rangent leurs événements (`emit_event`),
-    # que `db_conn` écrit dans `audit_log` avant son commit.
+    # Utilisateur des événements d'audit émis par les services (`emit_event`). `db_conn` écrit ces événements dans `audit_log` avant son commit.
     token_ctx = audit_log.set_current_user(user.login)
     try:
         response = await call_next(request)
@@ -294,11 +275,9 @@ async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) 
 async def pagination_bounds_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """Refuse une lecture paginée dont le décalage dépasse `MAX_PAGINATION_OFFSET`.
+    """Refuse, sur toutes les routes, une lecture paginée dont le décalage dépasse `MAX_PAGINATION_OFFSET`.
 
-    La garde est posée au niveau du transport plutôt que route par route : les listes déclarent leur pagination chacune de leur côté, et une route ajoutée plus tard hérite du plafond sans intervention. Le coût d'une lecture profonde tient au produit du rang par la taille de page, non au rang seul — c'est donc le décalage qui se borne.
-
-    Le recours qu'annonce le refus est le filtrage, seul moyen de rapprocher les lignes visées du début du résultat : l'export porte le même plafond et ne rend pas davantage.
+    L'export a le même plafond : le refus oriente vers le filtrage.
     """
     plafond = settings.max_pagination_offset
     offset = requested_offset(request.query_params)
@@ -320,11 +299,9 @@ async def pagination_bounds_middleware(
 async def read_rate_limit_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """Plafonne les lectures d'une même adresse, sur l'ensemble des points d'entrée de l'API.
+    """Plafonne le nombre de lectures d'une même adresse IP sur les routes `/api/`.
 
-    Le plafond de lignes borne ce qu'une lecture coûte ; celui-ci borne ce que leur répétition coûte. Un point d'entrée en lecture ajouté plus tard en hérite sans intervention.
-
-    Les fichiers de l'interface sortent du décompte : une page en tire des dizaines, sans toucher la base.
+    Les fichiers de l'interface sont exclus du décompte : une page en charge des dizaines sans toucher la base.
     """
     if request.method != "GET" or not route_path(request.scope).startswith("/api/"):
         return await call_next(request)
@@ -338,9 +315,9 @@ async def read_rate_limit_middleware(
 
 @app.middleware("http")
 async def timing_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record structuré `request_completed`.
+    """Mesure la durée de chaque requête, pose l'en-tête `X-Response-Time` et journalise un record `request_completed`.
 
-    Déclaré après les middlewares qui composent un refus sans laisser passer la requête, il les enveloppe donc et voit leurs réponses : les refus d'authentification, de pagination et de plafond de lectures paraissent au journal comme les requêtes servies. Un refus qui n'y paraîtrait pas serait invisible — un moissonnage bridé par le plafond ne laisserait aucune trace.
+    Déclaré après les middlewares de refus (authentification, pagination, plafond de lectures) : il journalise aussi leurs refus.
     """
     start = time.perf_counter()
     response = await call_next(request)
@@ -362,40 +339,29 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 # En-têtes de sécurité posés sur toute réponse. HSTS relève du reverse-proxy TLS.
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # interdit le MIME-sniffing
-    "X-Frame-Options": "DENY",  # anti-clickjacking (l'appli ne s'iframe jamais)
+    "X-Frame-Options": "DENY",  # anti-clickjacking
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    # Retire à la page l'accès aux capteurs et périphériques du navigateur. Aucune n'en
-    # demande ; le déclarer ferme la porte à du code qui parviendrait à s'exécuter dans la page.
+    # Retire l'accès aux capteurs et périphériques du navigateur, dont aucune page ne se sert.
     "Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
-    # Isole le contexte de navigation : une page ouverte depuis l'application — fiche HAL,
-    # profil ORCID, identifiant ROR — perd la référence vers celle qui l'a ouverte. `rel="noopener"`
-    # pose la même garantie lien par lien ; celle-ci vaut pour tous, sans dépendre de l'attribut.
+    # Une page ouverte depuis l'application (fiche HAL, profil ORCID…) n'a pas de référence vers l'application (`window.opener`).
     "Cross-Origin-Opener-Policy": "same-origin",
-    # Refuse aux autres sites le chargement des ressources de l'application : une requête sans
-    # CORS — image, script, cadre — venue d'une origine tierce n'obtient rien. L'interface, qui
-    # appelle son API en mode CORS, n'est pas concernée : la règle ne porte que sur les requêtes
-    # qui se dispensent de la négociation d'origine.
+    # Refuse aux autres origines le chargement des ressources de l'application hors CORS (image, script, cadre).
     "Cross-Origin-Resource-Policy": "same-origin",
 }
 
 _FRAME_ANCESTORS = "frame-ancestors 'none'"
-"""Politique de sécurité de contenu posée sur toute réponse : la page ne peut être insérée dans le cadre d'un autre site.
+"""Politique de sécurité de contenu des réponses hors API : aucun autre site ne peut les insérer dans un cadre.
 
-La directive n'a d'effet qu'en en-tête : une politique portée par une balise `<meta>` l'ignore. C'est ce qui la distingue de la politique des pages du frontend, que le générateur du frontend compose page par page — elle y autorise nommément les scripts de l'application par leur empreinte, ce que le serveur ne saurait pas reproduire. Les deux politiques s'appliquent alors ensemble sur une page, et une réponse doit satisfaire l'une comme l'autre ; celle-ci ne déclarant que `frame-ancestors`, elle ne restreint rien de ce que l'autre autorise.
+`frame-ancestors` agit seulement en en-tête HTTP. Le reste de la politique des pages est dans leur balise `<meta>`, composée par le build du frontend ; les deux politiques s'appliquent ensemble.
 """
 
 _API_CSP = f"default-src 'none'; base-uri 'none'; form-action 'none'; {_FRAME_ANCESTORS}"
-"""Politique des réponses de l'API, qui ne rendent que du JSON : aucune ressource, d'aucune sorte, d'aucune origine.
-
-Une réponse d'API n'est pas un document, et rien n'oblige un navigateur à la traiter comme telle : une navigation directe vers un point d'entrée, une réponse d'erreur, un point d'entrée qui rendrait un jour autre chose que du JSON. `X-Content-Type-Options` retire au navigateur la liberté de réinterpréter le type déclaré ; celle-ci retire au document qu'il en ferait quand même le droit de charger ou d'exécuter quoi que ce soit.
-"""
+"""Politique des réponses de l'API : aucune ressource chargée, d'aucune origine, si un navigateur affiche la réponse comme un document."""
 
 _NO_STORE = "no-store"
-"""Interdiction de conserver une copie de la réponse, adressée à tout cache du chemin.
+"""Interdit à tout cache de conserver une réponse de l'API.
 
-Faute de consigne, un cache applique ses propres heuristiques et peut ranger une réponse pour la resservir à un autre appelant. Or une même adresse d'API ne rend pas toujours le même corps : la configuration se restreint à une liste blanche de clés sans session et s'ouvre avec, sur la même URL. Un cache partagé — le reverse-proxy, un proxy d'entreprise sur le chemin — qui garderait la réponse servie à une session ouverte la rendrait ensuite à un appelant anonyme.
-
-L'interface, elle, garde son cache : ses fichiers portent leur empreinte dans leur nom, et c'est ce qui rend une page rapide au second chargement.
+Une même URL d'API rend un corps différent selon la session (la configuration, par exemple) : un cache partagé servirait à un appelant anonyme la réponse destinée à une session admin.
 """
 
 
@@ -403,7 +369,7 @@ L'interface, elle, garde son cache : ses fichiers portent leur empreinte dans le
 async def security_headers_middleware(
     request: Request, call_next: RequestResponseEndpoint
 ) -> Response:
-    """Pose les en-têtes de sécurité (anti-sniffing, anti-clickjacking, politique de référent, politique de sécurité de contenu) sur chaque réponse, et l'interdiction de mise en cache sur les réponses de l'API."""
+    """Pose les en-têtes de sécurité sur chaque réponse, et `Cache-Control: no-store` sur les réponses de l'API."""
     response = await call_next(request)
     for name, value in _SECURITY_HEADERS.items():
         response.headers.setdefault(name, value)
@@ -421,15 +387,9 @@ app.add_middleware(CancelOnDisconnect)
 
 # ----- CORS -----
 #
-# Origines énumérées par `cors_origins`, qui refuse le joker : les appels portent le cookie de
-# session, et `*` reviendrait à autoriser toute origine à s'en servir. Vide en production, où le
-# frontend est servi par l'API elle-même ; renseigné en développement, le serveur de
-# développement du frontend vivant sur un autre port.
+# Origines listées par `cors_origins`, sans joker : les appels envoient le cookie de session. Vide en production, où l'API sert le frontend ; renseigné en développement, où le frontend a son propre serveur.
 #
-# Déclaré après eux, donc posé à leur extérieur : les refus que composent les middlewares
-# ci-dessus — 401 d'authentification, 429 des plafonds, 422 de pagination — portent alors les
-# en-têtes CORS comme les autres réponses. Sans cela, le navigateur d'une origine autorisée les
-# reçoit comme une erreur CORS opaque au lieu de leur code, et le message de refus est perdu.
+# Posé à l'extérieur des middlewares de refus : leurs réponses (401, 422, 429) reçoivent les en-têtes CORS, et le navigateur en lit le code.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -438,8 +398,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Déclaré en dernier, donc posé le plus à l'extérieur : tout middleware trouve le préfixe dans la
-# requête.
+# Déclaré en dernier, donc posé le plus à l'extérieur : tout middleware trouve le préfixe dans la requête.
 app.add_middleware(RootPath, root_path=ROOT_PATH)
 
 
@@ -468,11 +427,8 @@ app.include_router(sources.router)
 
 # ----- Frontend SPA (prod) -----
 #
-# En prod, le frontend buildé (adapter-static) est servi par FastAPI : la SPA
-# (ssr=false) vit dans interfaces/frontend/build.
-# Monté en dernier — catch-all — pour que les routes /api/* matchent d'abord.
-# Absent en dev (vite sert le frontend) : on ne monte que si le build existe.
-# Sans mesure de couverture : la branche prise dépend de la présence du build, un fait
-# d'environnement — un même relevé ne peut pas emprunter les deux.
+# En production, FastAPI sert le frontend buildé (`interfaces/frontend/build`). Monté en dernier, pour que les routes `/api/*` passent d'abord. En développement, vite sert le frontend et le build est absent.
+#
+# Hors couverture : la branche prise dépend de la présence du build.
 if BUILD_DIR.is_dir():  # pragma: no cover
     app.mount("/", SPAStaticFiles(directory=BUILD_DIR, html=True), name="spa")

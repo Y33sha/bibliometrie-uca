@@ -1,8 +1,6 @@
-"""Dépendances partagées des routers : factories DB, tâches de fond, réglages du serveur.
+"""Composition root de l'API : dépendances des routers (connexion de la requête, adaptateurs de lecture, services d'écriture, utilisateur de la session) et tâches de fond.
 
-`DbConn` fournit aux routes la connexion de la requête, sur laquelle les factories construisent les adaptateurs de lecture et les services d'écriture.
-
-Le jeton de session appartient à `session.py` ; ce module en tire l'utilisateur et ses rôles, lus dans `ops.users`.
+`DbConn` fournit la connexion de la requête ; les factories construisent sur elle les adaptateurs et les services.
 """
 
 import logging
@@ -78,10 +76,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_admin_user() -> str:
-    """Username admin attendu (depuis `infrastructure.settings`).
-
-    Exposé en `Depends(...)` pour que les routers n'importent pas `infrastructure.settings` directement (tenu par un contrat import-linter).
-    """
+    """Login de l'administrateur, lu dans les réglages. Exposé en dépendance : les routers n'importent pas `infrastructure`."""
     return settings.admin_user
 
 
@@ -94,9 +89,9 @@ def _session_user(token: str | None, conn: Connection) -> SessionUser | None:
 
 
 def load_session_user(token: str | None) -> SessionUser | None:
-    """Utilisateur de la session portée par `token`, avec ses rôles. `None` sans jeton valide, ou pour un login absent de `ops.users`.
+    """Utilisateur de la session du jeton `token`, avec ses rôles. `None` sans jeton valide, ou pour un login absent de `ops.users`.
 
-    Ouvre sa propre connexion, en lecture seule : le middleware des écritures l'appelle avant que la requête ait la sienne.
+    Ouvre sa propre connexion, en lecture seule : le middleware d'authentification l'appelle avant l'ouverture de la connexion de la requête.
     """
     with get_sync_engine().connect() as conn:
         conn.execution_options(postgresql_readonly=True)
@@ -112,16 +107,14 @@ def ensure_admin_user() -> None:
 # ----- Factories DB -----
 
 
-# Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante, qui traverse donc les mêmes dépendances. `OPTIONS` n'atteint aucune route — le contrôle préalable reçoit sa réponse du middleware CORS, et une requête nue tombe en 405 — et figure ici pour la route qui viendrait à le déclarer.
+# Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante.
 READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _open_connection(request: Request) -> Connection:
-    """Connexion tirée de l'engine, avec les caractéristiques de la requête en cours.
+    """Connexion pour la requête en cours. Toute connexion ouverte pendant une requête passe par cette fonction (`db_conn`, `connection_factory`).
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`). La connexion est annulable par la déconnexion du client (`CancelOnDisconnect`).
-
-    Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
+    Sur une méthode de lecture, la transaction est en lecture seule (PostgreSQL refuse toute écriture), a une durée maximale par requête SQL (`api_read_statement_timeout_s`), et s'annule à la déconnexion du client (`CancelOnDisconnect`).
     """
     conn = get_sync_engine().connect()
     if request.method in READ_ONLY_METHODS:
@@ -136,21 +129,17 @@ def _open_connection(request: Request) -> Connection:
 
 
 def connection_factory(request: Request) -> Callable[[], Connection]:
-    """Fabrique de connexions supplémentaires, sous les mêmes caractéristiques que celle de la requête.
+    """Fabrique de connexions supplémentaires, avec les caractéristiques de la connexion de la requête.
 
-    Sert la lecture qui répartit son travail sur plusieurs connexions — les facettes de publications, calculées en parallèle. L'adapter la reçoit par sa construction au lieu d'atteindre l'engine : la lecture seule vaut alors pour toute connexion née pendant la requête, et un contrat d'import tient les adapters à l'écart de l'engine.
-
-    L'appelant referme chaque connexion qu'il ouvre, `Connection` étant son propre gestionnaire de contexte.
+    Sert les lectures parallélisées (facettes de publications). L'appelant ferme chaque connexion qu'il ouvre.
     """
     return lambda: _open_connection(request)
 
 
 def db_conn(request: Request) -> Iterator[Connection]:
-    """Connexion de la requête, servie aux routes par `DbConn`. Sa transaction est celle de la requête.
+    """Connexion de la requête, servie aux routes par `DbConn`. Toutes les dépendances de la requête la partagent.
 
-    Une requête d'écriture qui aboutit est committée en sortie, avec les événements d'audit qu'elle a émis (`record_pending_events`) ; une exception l'annule. Cette sortie précède l'envoi de la réponse (`scope="function"`) : un GET ou une tâche de fond déclenchés ensuite lisent l'état committé. Les services ne committent pas ; le pipeline et les scripts committent eux-mêmes.
-
-    Toute dépendance qui en dérive (repositories et query adapters) partage la même connexion. Sur une méthode de lecture, la connexion s'ouvre en lecture seule (cf. `_open_connection`).
+    Une requête d'écriture qui aboutit est committée avec ses événements d'audit (`record_pending_events`) ; une exception l'annule. Le commit précède l'envoi de la réponse (`scope="function"`) : une requête ou une tâche de fond lancée ensuite lit l'état committé. Les services ne committent pas.
     """
     with _open_connection(request) as conn:
         try:
@@ -163,8 +152,7 @@ def db_conn(request: Request) -> Iterator[Connection]:
             conn.commit()
 
 
-# Seule déclaration de la connexion de la requête. Une déclaration d'un autre scope ouvrirait une
-# seconde connexion, avec sa propre transaction.
+# Seule déclaration de la connexion de la requête. Une déclaration d'un autre scope ouvrirait une seconde connexion, avec sa propre transaction.
 DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
 
 
@@ -172,10 +160,7 @@ DbConn = Annotated[Connection, Depends(db_conn, scope="function")]
 
 
 def session_user(request: Request, conn: DbConn) -> SessionUser | None:
-    """Utilisateur de la session en cours, ou `None`, sans jamais refuser l'appel.
-
-    Sert les lectures dont le contenu dépend de l'appelant : la configuration, dont une part est réservée à l'administration, et l'état de la session.
-    """
+    """Utilisateur de la session en cours, ou `None`. Sert les lectures dont le contenu dépend de l'appelant (configuration, état de la session)."""
     return _session_user(request.cookies.get("session"), conn)
 
 
@@ -267,8 +252,7 @@ def subjects_queries(conn: DbConn) -> SubjectsQueries:
 
 
 # ----- Écritures -----
-# Un service par agrégat, construit sur la connexion reçue : celle de la requête pour une route,
-# celle de la tâche de fond pour une tâche de fond, celle du script pour un script.
+# Un service par agrégat, construit sur la connexion reçue (requête, tâche de fond ou script).
 
 
 def address_service(conn: DbConn) -> AddressService:
@@ -345,11 +329,9 @@ def structure_service(conn: DbConn) -> StructureService:
 
 
 def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
-    """Exécute `work` sur une connexion à elle, hors du cycle de requête.
+    """Exécute `work` dans sa propre transaction, hors du cycle de requête, et journalise son exception éventuelle.
 
-    Une tâche de fond s'exécute pendant l'envoi de la réponse, en parallèle de la requête qui l'a enregistrée : la connexion de celle-ci appartient à un autre contexte, et la partager laisserait une transaction ouverte (idle in transaction). `engine.begin()` commite en sortie, annule sur exception, et ferme dans les deux cas.
-
-    L'exception est piégée et loguée : une tâche de fond n'a personne à qui la remonter, la réponse étant partie. `work` voit les écritures de la requête, committées avant l'envoi de sa réponse.
+    Partager la connexion de la requête laisserait une transaction ouverte (idle in transaction). `work` voit les écritures de la requête, committées avant l'envoi de la réponse.
     """
     try:
         with get_sync_engine().begin() as conn:
@@ -367,10 +349,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
 
 
 def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
-    """Tâche de fond : propage `in_perimeter` après une review d'affiliation.
-
-    Le recalcul peut toucher des dizaines de milliers de `source_contributions`, d'où son décorrélage de la réponse admin.
-    """
+    """Tâche de fond : propage `in_perimeter` après une review d'affiliation. Le recalcul peut toucher des dizaines de milliers de contributions sources."""
     _run_detached(
         "propagation d'in_perimeter",
         lambda conn: address_service(conn).propagate_in_perimeter_for_addresses(address_ids),
