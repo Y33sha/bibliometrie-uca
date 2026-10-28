@@ -24,5 +24,6 @@
 * [ ] stats en compte fractionnaire vs compte entier
 * [ ] mettre en place des slugs pour les URL?
 * [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
+* [ ] icônes des licences
 
 # Cas particuliers, bizarreries à élucider
