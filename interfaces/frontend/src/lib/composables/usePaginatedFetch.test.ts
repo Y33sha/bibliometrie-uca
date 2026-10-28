@@ -11,6 +11,7 @@ vi.mock('#lib/api/index.js', async () => ({
 	api: (...args: unknown[]) => apiSpy(...args),
 	cancel: (key: string) => cancelSpy(key),
 	ApiError: (await import('../api/client')).ApiError,
+	errorMessage: (await import('../api/client')).errorMessage,
 }));
 const gotoSpy = vi.fn(async (..._args: unknown[]) => {});
 vi.mock('$app/navigation', () => ({ goto: (...args: unknown[]) => gotoSpy(...args) }));
