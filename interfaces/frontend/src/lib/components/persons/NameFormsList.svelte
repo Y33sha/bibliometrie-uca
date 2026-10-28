@@ -1,5 +1,6 @@
 <script lang="ts">
   import StatusToggles from "#lib/components/StatusToggles.svelte";
+  import RejectedFold from "./RejectedFold.svelte";
   import type { NameForm } from "./types";
 
   let {
@@ -21,14 +22,6 @@
 
   const activeForms = $derived(nameForms.filter((nf) => nf.status !== "rejected"));
   const rejectedForms = $derived(nameForms.filter((nf) => nf.status === "rejected"));
-
-  let showRejected = $state(false);
-
-  // Les formes rejetées se replient à chaque changement de personne.
-  $effect(() => {
-    void personId;
-    showRejected = false;
-  });
 
   // Une forme dérivée du nom canonique (source 'persons') est confirmée d'office et le recompute la rétablirait : pas d'action de statut dessus.
   function isCanonical(nf: NameForm): boolean {
@@ -89,17 +82,13 @@
 {/if}
 
 {#if rejectedForms.length}
-  <details class="rejected-forms" bind:open={showRejected}>
-    <summary>
-      {showRejected ? "masquer les formes rejetées" : "afficher les formes rejetées"}
-      <span class="chevron" class:up={showRejected} aria-hidden="true"></span>
-    </summary>
+  <RejectedFold {personId} label="les formes rejetées">
     <div class="forms-list">
       {#each rejectedForms as nf}
         {@render formRow(nf)}
       {/each}
     </div>
-  </details>
+  </RejectedFold>
 {/if}
 
 <style>
@@ -133,24 +122,5 @@
     background: var(--warning-light);
     padding: 1px 7px;
     border-radius: var(--radius-pill);
-  }
-  .rejected-forms {
-    margin-top: 8px;
-  }
-  .rejected-forms summary {
-    /* Retire le triangle natif : la flèche fait partie du libellé. */
-    list-style: none;
-    cursor: pointer;
-    font-size: 0.75rem;
-    color: var(--muted);
-  }
-  .rejected-forms summary::-webkit-details-marker {
-    display: none;
-  }
-  .rejected-forms summary:hover {
-    color: var(--accent);
-  }
-  .rejected-forms[open] summary {
-    margin-bottom: 4px;
   }
 </style>
