@@ -14,16 +14,23 @@ Les identifiants d'un enregistrement source sont dans la colonne `doi` et dans l
 
 Valeurs en base au 2026-10-28. Le DOI principal est dans la colonne `doi` pour toutes les sources.
 
-| Type | Source : origine (valeurs) | Clé de rapprochement | Rôle |
-|---|---|---|---|
-| `hal_id` | HAL : `halId_s` (64 791) ; OpenAlex : URL et identifiant des localisations (73 211, dont 3 679 enregistrements sources à plusieurs valeurs) ; ScanR : `externalIds` de type `hal` (64 947, dont 2 281 enregistrements sources à plusieurs valeurs) | premier seulement | premier : document ; suivants : secondaire |
-| `nnt` | HAL : `nntId_s` (2 794) ; OpenAlex : URL theses.fr (2 247) ; ScanR : identifiant ScanR (4 029) ; theses.fr : identifiant (5 066) | oui | document |
-| `pmid` | OpenAlex : URL PubMed (16 995) ; ScanR : `externalIds` de type `pmid` (10 469) ; HAL : `pubmedId_s` (0) | oui | document |
-| `pmcid` | HAL : `linkExtUrl_s` (2 556) ; OpenAlex : URL PMC (7 433) | non | document |
-| `arxiv_id` | HAL : `linkExtUrl_s` (3 603) ; OpenAlex : URL arXiv (7 299) | oui | document |
-| `related_dois` | OpenAlex : DOI des localisations autres que le DOI principal (15 141, dont 4 295 arXiv et 2 366 Zenodo) ; ScanR : `externalIds` de type `doi` autres que le DOI principal (1 278) ; DataCite : `relatedIdentifiers` de version, de forme, de partie et de supplément (17 806) | non | œuvre apparentée |
-| `isbn` | HAL : `idno` du TEI (4 242) ; Crossref : ISBN imprimé ou sans support (2 942) ; WoS (2 145) ; DataCite : identifiants et `IsPartOf` (628) | non | selon le type de document |
-| `eisbn` | Crossref : ISBN électronique (2 639) ; WoS (2) | non | selon le type de document |
+| Type | Source : origine (valeurs) | Rapprochement actuel |
+|---|---|---|
+| `hal_id` | HAL : `halId_s` (64 791) ; OpenAlex : URL et identifiant des localisations (73 211, dont 3 679 enregistrements sources à plusieurs valeurs) ; ScanR : `externalIds` de type `hal` (64 947, dont 2 281 enregistrements sources à plusieurs valeurs) | premier seulement |
+| `nnt` | HAL : `nntId_s` (2 794) ; OpenAlex : URL theses.fr (2 247) ; ScanR : identifiant ScanR (4 029) ; theses.fr : identifiant (5 066) | oui |
+| `pmid` | OpenAlex : URL PubMed (16 995) ; ScanR : `externalIds` de type `pmid` (10 469) ; HAL : `pubmedId_s` (0) | oui |
+| `pmcid` | HAL : `linkExtUrl_s` (2 556) ; OpenAlex : URL PMC (7 433) | non |
+| `arxiv_id` | HAL : `linkExtUrl_s` (3 603) ; OpenAlex : URL arXiv (7 299) | oui |
+| `related_dois` | OpenAlex : DOI des localisations autres que le DOI principal (15 141, dont 4 295 arXiv et 2 366 Zenodo) ; ScanR : `externalIds` de type `doi` autres que le DOI principal (1 278) ; DataCite : `relatedIdentifiers` de version, de forme, de partie et de supplément (17 806) | non |
+| `isbn` | HAL : `idno` du TEI (4 242) ; Crossref : ISBN imprimé ou sans support (2 942) ; WoS (2 145) ; DataCite : identifiants et `IsPartOf` (628) | non |
+| `eisbn` | Crossref : ISBN électronique (2 639) ; WoS (2) | non |
+
+Localisation principale d'un échantillon de 10 000 works OpenAlex :
+
+- DOI égal au DOI du work : 59 % ;
+- HAL, work sans DOI : 26 % ;
+- HAL, arXiv ou autre dépôt, work avec un DOI pris dans une autre localisation : 8,4 % ;
+- autre dépôt sans DOI, ou MAG : 5,4 %.
 
 Les enregistrements sources à ISBN sont surtout des chapitres (4 922), des communications (2 397) et des livres (1 368). Deux enregistrements sources WoS ont un PMID absent de la normalisation WoS.
 
@@ -32,10 +39,15 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 ## Décisions
 
 - Une table relie un enregistrement source à un identifiant : type, valeur, rôle, statut. Les identifiants d'une publication se déduisent de ses enregistrements sources.
-- Rôle d'un identifiant :
-  - identifiant du document, clé de rapprochement ;
-  - identifiant secondaire du document, hors rapprochement : identifiants HAL après le premier chez OpenAlex et ScanR. Ces agrégateurs réunissent parfois des dépôts HAL de publications distinctes ;
-  - identifiant d'une œuvre apparentée : DOI apparenté, ISBN de l'ouvrage hôte.
+- Rôle d'un identifiant dans un enregistrement source :
+  - primaire : identifiant de l'enregistrement dans la source, soit le DOI chez Crossref et DataCite, le `hal_id` chez HAL, le NNT chez theses.fr ;
+  - dérivé : identifiant de l'enregistrement d'une autre source dont la source tire le sien. Un enregistrement source a au plus un identifiant dérivé ;
+  - secondaire : identifiant que la source attribue au même document ;
+  - lié : identifiant d'un document lié, par exemple un DOI apparenté ou l'ISBN de l'ouvrage hôte.
+- L'identifiant dérivé est un identifiant d'un type de la table :
+  - chez ScanR, l'identifiant que contient l'identifiant ScanR (`doi…`, `hal…`, `nnt…`, `pmid…`) ;
+  - chez OpenAlex, l'identifiant de la localisation principale (`primary_location`). Le DOI du work est secondaire quand il diffère de cet identifiant.
+- Les identifiants OpenAlex et WoS restent seulement dans `source_id`.
 - Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` reste en place.
@@ -58,6 +70,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 
 - [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs du document.
 - [ ] Mesure des paires de publications reliées par un identifiant HAL secondaire.
+- [ ] Identifiants retenus pour le rapprochement, après mesure des conséquences de chaque rôle.
 
 ### Phase 4 — Autres lectures
 
