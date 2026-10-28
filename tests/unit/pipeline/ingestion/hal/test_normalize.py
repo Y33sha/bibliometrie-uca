@@ -244,7 +244,6 @@ class TestGetLocations:
             "https://hal.science/hal-01/document",
             True,
         )
-        assert location.platform.openalex_id == "S4306402512"
 
     def test_depot_sans_fichier_ferme(self):
         [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)

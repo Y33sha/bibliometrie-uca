@@ -18,7 +18,7 @@ from sqlalchemy import Connection, Row, text
 from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
 from domain.dates import today
 from domain.platforms.platform import PlatformType
-from domain.platforms.registry import known_platform_of_source, preprint_servers_of_prefix
+from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
@@ -502,11 +502,12 @@ class OpenScienceReport:
                        WHERE sr.publication_id = p.id AND sr.doi IS NOT NULL
                    ) AS prefixes,
                    ARRAY(
-                       SELECT DISTINCT pl.openalex_id FROM source_records sr
+                       SELECT DISTINCT ARRAY[l.url, COALESCE(pl.openalex_id, '')]
+                       FROM source_records sr
                        JOIN source_record_locations l ON l.source_record_id = sr.id
-                       JOIN platforms pl ON pl.id = l.platform_id
-                       WHERE sr.publication_id = p.id AND pl.openalex_id IS NOT NULL
-                   ) AS platform_sources
+                       LEFT JOIN platforms pl ON pl.id = l.platform_id
+                       WHERE sr.publication_id = p.id
+                   ) AS copies
             FROM ({LAB_PUBLICATIONS}) p
             WHERE p.publication_year BETWEEN :year - :span + 1 AND :year AND p.doc_type = 'preprint'
             """,
@@ -517,8 +518,7 @@ class OpenScienceReport:
             return f"## Preprints\n\nAucun preprint sur {period}."
         by_year = Counter(r.year for r in rows)
         by_platform = Counter(
-            preprint_server(r.prefixes, r.platform_sources) or "Autre plateforme ou archive"
-            for r in rows
+            preprint_server(r.prefixes, r.copies) or "Autre plateforme ou archive" for r in rows
         )
         return (
             "## Preprints\n\n"
@@ -622,10 +622,10 @@ def _with_identifier(id_type: str) -> str:
                 WHERE pi.id_type = '{id_type}' AND pi.status <> 'rejected')"""
 
 
-def preprint_server(prefixes: Sequence[str], platform_sources: Sequence[str]) -> str | None:
-    """Serveur de preprints d'une publication, d'après la source OpenAlex des plateformes de ses localisations, à défaut d'après les préfixes de ses DOI."""
-    for source in sorted(platform_sources):
-        known = known_platform_of_source(source)
+def preprint_server(prefixes: Sequence[str], copies: Sequence[Sequence[str]]) -> str | None:
+    """Serveur de preprints d'une publication, d'après ses copies (URL et source OpenAlex, vide à défaut), à défaut d'après les préfixes de ses DOI."""
+    for url, source in sorted((url, source) for url, source in copies):
+        known = known_platform_of_copy(url, source or None)
         if known and known.platform_type is PlatformType.PREPRINT_SERVER:
             return known.name
     for prefix in sorted(prefixes):

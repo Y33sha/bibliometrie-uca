@@ -10,9 +10,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from domain.persons.contributor_name import ContributorName
-from domain.platforms.registry import HAL
 from domain.serials.issns import SerialIssn
-from pipeline.ingestion.common.locations import LocationFacts, known_platform_facts
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.scanr.normalize import (
@@ -540,7 +539,6 @@ class TestGetLocations:
             url="https://hal.science/hal-02494286",
             version="submittedVersion",
             is_oa=True,
-            platform=known_platform_facts(HAL),
         )
         assert landing == LocationFacts(url="http://doi.org/10.1016/j.foodchem.2020.126376")
 
@@ -557,7 +555,6 @@ class TestGetLocations:
                 url="https://hal.science/halshs-01774949",
                 pdf_url="https://shs.hal.science/halshs-01774949/document",
                 is_oa=True,
-                platform=known_platform_facts(HAL),
             )
         ]
 

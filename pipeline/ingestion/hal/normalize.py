@@ -11,7 +11,6 @@ from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
 from domain.persons.contributor_name import ContributorName
-from domain.platforms.registry import HAL
 from domain.publications.contribution_roles import map_role
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
@@ -30,7 +29,7 @@ from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.common.locations import LocationFacts, known_platform_facts
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -137,7 +136,6 @@ def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> l
             pdf_url=file_main,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
             is_oa=file_main is not None and embargo_until is None,
-            platform=known_platform_facts(HAL),
         )
     ]
 

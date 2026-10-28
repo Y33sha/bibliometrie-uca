@@ -6,10 +6,9 @@ from urllib.parse import urlsplit
 from domain.countries import normalize_country_code
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
-from domain.platforms.registry import HAL
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.identifiers import clean_doi, extract_hal_id_from_url, is_hal_host
+from domain.publications.identifiers import clean_doi, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -20,7 +19,7 @@ from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts, known_platform_facts
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
@@ -110,12 +109,6 @@ def _address(url: str) -> str:
     return f"{parts.netloc.removeprefix('www.')}{parts.path.rstrip('/')}"
 
 
-def _platform(url: str) -> PlatformFacts | None:
-    """Plateforme HAL pour une adresse d'un portail HAL. ScanR ne nomme pas les autres plateformes."""
-    host = urlsplit(url).hostname
-    return known_platform_facts(HAL) if host and is_hal_host(host) else None
-
-
 def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
     """La copie ouverte (`oaEvidence`), puis la page du document (`landingPage`) quand elle désigne une autre adresse.
 
@@ -144,11 +137,10 @@ def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
                 if host_type == "publisher"
                 else None,
                 is_oa=True,
-                platform=_platform(url),
             )
         )
     if landing and all(_address(landing) != _address(loc.url) for loc in locations):
-        locations.append(LocationFacts(url=landing, platform=_platform(landing)))
+        locations.append(LocationFacts(url=landing))
     return locations
 
 

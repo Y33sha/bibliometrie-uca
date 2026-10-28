@@ -1,6 +1,6 @@
 # HAL
 
-*À jour le 2026-10-13.*
+*À jour le 2026-10-28.*
 
 https://hal.science/
 
@@ -20,7 +20,7 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 ## Données récupérées
 
 - **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` du TEI `label_xml`, seul endroit où HAL le donne), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
-- **Localisation** (`source_record_locations`) : la page du dépôt (`uri_s`) et le fichier déposé (`fileMain_s`), avec sa licence, sur la plateforme HAL. La copie est ouverte quand un fichier est déposé ; un dépôt sans fichier, qui renvoie seulement vers un autre emplacement, est fermé.
+- **Localisation** (`source_record_locations`) : la page du dépôt (`uri_s`) et le fichier déposé (`fileMain_s`), avec sa licence. La copie est ouverte quand un fichier est déposé ; un dépôt sans fichier, qui renvoie seulement vers un autre emplacement, est fermé.
 - **Auteurs** : nom complet, hal_person_id, idHAL, ORCID et IdRef si présents
 - **Affiliations** : structures HAL directes de chaque auteur et leur ROR, lus dans le TEI. HAL donne des structures de son référentiel, sans texte d'affiliation : les contributions sources HAL sont sans adresse.
 

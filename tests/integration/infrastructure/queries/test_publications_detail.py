@@ -4,12 +4,11 @@ import json
 
 from sqlalchemy import text
 
-from domain.platforms.registry import ARXIV, HAL
 from infrastructure.read_models.publications.detail import (
     get_publication_external_identifiers,
     get_publication_subjects,
 )
-from pipeline.ingestion.common.locations import LocationFacts, LocationStore, known_platform_facts
+from pipeline.ingestion.common.locations import LocationFacts, LocationStore
 from tests.integration.helpers.alignment import (
     add_aligned_source_contribution,
     align_source_contributions,
@@ -231,21 +230,14 @@ class TestAccessAndReferences:
         store = LocationStore(sa_sync_conn)
         store.replace_locations(
             hal,
-            [
-                LocationFacts(
-                    "https://hal.science/hal-1", is_oa=True, platform=known_platform_facts(HAL)
-                )
-            ],
+            [LocationFacts("https://hal.science/hal-1", is_oa=True)],
         )
         store.replace_locations(
             openalex,
             [
                 LocationFacts("https://doi.org/10.1/abc", version="publishedVersion", is_oa=False),
                 LocationFacts(
-                    "https://arxiv.org/abs/2401.001",
-                    version="submittedVersion",
-                    is_oa=True,
-                    platform=known_platform_facts(ARXIV),
+                    "https://arxiv.org/abs/2401.001", version="submittedVersion", is_oa=True
                 ),
             ],
         )

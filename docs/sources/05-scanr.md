@@ -18,7 +18,7 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 ## Données récupérées
 
 - **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
-- **Localisations** (`source_record_locations`) : la copie ouverte (`oaEvidence`), avec son PDF, sa version et son accès, puis la page du document (`landingPage`) quand elle désigne une autre adresse. Seul un portail HAL donne une plateforme (HAL).
+- **Localisations** (`source_record_locations`) : la copie ouverte (`oaEvidence`), avec son PDF, sa version et son accès, puis la page du document (`landingPage`) quand elle désigne une autre adresse.
 - **Journal/éditeur** : titre, ISSN, eISSN, éditeur. Pour une thèse ou une habilitation, le titre de la source est l'université de soutenance : il ne donne ni publication en série ni titre de conteneur.
 - **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, on ne conserve que les feuilles), ORCID et IdRef si présents. Une affiliation avec `structId` est une fiche du référentiel HAL : elle donne une structure HAL à la contribution source. Une affiliation sans `structId` est un texte d'affiliation : elle donne une adresse.
 

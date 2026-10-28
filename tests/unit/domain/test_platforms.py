@@ -9,7 +9,9 @@ from domain.platforms.registry import (
     HAL,
     KNOWN_PLATFORMS,
     is_publisher_platform_prefix,
+    known_platform_of_copy,
     known_platform_of_source,
+    known_platform_of_url,
     preprint_servers_of_prefix,
 )
 
@@ -58,3 +60,52 @@ class TestKnownPlatforms:
             for prefix in p.doi_prefixes
         }
         assert all(not preprint_servers_of_prefix(prefix) for prefix in publisher)
+
+
+class TestKnownPlatformOfUrl:
+    @pytest.mark.parametrize(
+        ("url", "expected"),
+        [
+            ("https://hal.science/hal-02494286", "HAL"),
+            ("https://hal.inrae.fr/hal-03019769/document", "HAL"),
+            ("https://dumas.ccsd.cnrs.fr/dumas-01", "HAL"),
+            ("https://export.arxiv.org/abs/2108.03135", "arXiv"),
+            ("https://www.ncbi.nlm.nih.gov/pmc/articles/PMC1/", "PubMed Central"),
+            ("https://pmc.ncbi.nlm.nih.gov/articles/PMC1/", "PubMed Central"),
+            ("https://journals.openedition.org/pistes/5513", "OpenEdition"),
+            ("https://shs.cairn.info/revue-x", "Cairn"),
+            ("https://doi.org/10.48550/arxiv.2108.03135", "arXiv"),
+            ("https://dx.doi.org/10.2139/ssrn.1", "SSRN"),
+        ],
+    )
+    def test_plateforme_reconnue(self, url, expected):
+        known = known_platform_of_url(url)
+        assert known is not None
+        assert known.name == expected
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://pubmed.ncbi.nlm.nih.gov/1",  # fiche de catalogue
+            "https://doi.org/10.1101/2020.01.01.1",  # préfixe commun à bioRxiv et medRxiv
+            "https://osf.io/esfm6",  # hôte de plusieurs serveurs
+            "https://doi.org/10.1016/j.x.2020.1",
+            "https://www.mdpi.com/1/2/3",
+        ],
+    )
+    def test_plateforme_inconnue(self, url):
+        assert known_platform_of_url(url) is None
+
+    def test_l_url_prime_sur_la_source_openalex(self):
+        """OpenAlex range sous HAL des copies d'OpenEdition."""
+        known = known_platform_of_copy(
+            "https://journals.openedition.org/pistes/5513", "S4306402512"
+        )
+        assert known is not None
+        assert known.name == "OpenEdition"
+
+    def test_la_source_openalex_departage_les_serveurs_d_osf(self):
+        known = known_platform_of_copy("https://osf.io/esfm6", "S4306401687")
+        assert known is not None
+        assert known.name == "PsyArXiv"
+        assert known_platform_of_copy("https://osf.io/esfm6", None) is None
