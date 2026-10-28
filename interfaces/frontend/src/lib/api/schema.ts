@@ -5086,7 +5086,7 @@ export interface components {
          * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`.
          * @enum {string}
          */
-        SerialType: "journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
+        SerialType: "journal" | "data_journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
         /**
          * SerialTypeChange
          * @description Valeur de `serial_type` dont la modale admin demande l'impact avant de confirmer l'édition.
