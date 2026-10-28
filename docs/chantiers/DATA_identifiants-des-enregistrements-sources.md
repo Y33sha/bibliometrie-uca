@@ -85,7 +85,7 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 - [x] Mesure des paires de publications reliées par un identifiant actif, selon son rôle.
 - [x] Mesure des publications scindées quand seuls les identifiants primaires et dérivés sont des clés.
-- [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs, avec les clés d'`external_ids`.
+- [x] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs, avec les clés d'`external_ids` (34ab26da6).
 
 ### Phase 4 — Autres lectures
 
