@@ -1,3 +1,6 @@
+python -m interfaces.cli.oneshot.renormalize_duplicate_mathml_abstracts
+run_pipeline --from normalize --sources crossref,openalex
+
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Extraction
@@ -17,8 +20,6 @@
 * [ ] récupérer date de publication complète au lieu de l'année seule
 * [ ] "Additional file" sur figshare: comment regrouper les pièces liées à un même article?
 * [ ] posters et communications réunis sous un même DOI
-## Corrections
-* [ ] typage data_paper automatisé par journal (ex. *Scientific Data*; créer un journal_type dédié?); chercher aussi "dataset" dans les titres
 * [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
 * [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 
@@ -29,7 +30,6 @@
 ## Publique
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories; `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne); impact (citations, fwci, top10)
-* [ ] affichage LaTeX+mml en double dans les résumés
 
 # Cas particuliers, bizarreries à élucider
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"
