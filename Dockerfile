@@ -55,10 +55,6 @@ RUN apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# `uv sync --frozen` plus bas installe exactement les versions de uv.lock, celles sur lesquelles
-# l'intégration exécute ses tests et ses analyses.
-COPY --from=uv /uv /usr/local/bin/uv
-
 # L'installation des dépendances passant par `uv`, l'image n'a pas d'emploi pour pip, que l'image
 # de base préinstalle. Le retirer ôte de l'exécution un installateur de paquets, et avec lui les
 # dépendances qu'il embarque — que l'analyse d'image compte parmi les paquets présents, et qui
@@ -72,12 +68,18 @@ COPY domain/          ./domain/
 COPY infrastructure/  ./infrastructure/
 COPY interfaces/      ./interfaces/
 
+# `uv sync --frozen` installe exactement les versions de uv.lock, celles sur lesquelles
+# l'intégration exécute ses tests et ses analyses. Le binaire uv est monté pour cette seule
+# instruction : l'image finale ne le contient pas, et l'analyse d'image ne compte pas ses
+# dépendances.
+#
 # `--no-cache` : le cache que l'installation remplit ne resservirait qu'à une installation
 # ultérieure, qui n'a pas lieu dans l'image. Sans lui, l'image transporte les archives des
 # paquets en plus des paquets eux-mêmes, et les fait passer sous l'analyse d'image.
-RUN uv sync --frozen --no-dev --no-cache
+RUN --mount=from=uv,source=/uv,target=/usr/local/bin/uv \
+    uv sync --frozen --no-dev --no-cache
 
-# Ajouter le venv de uv au PATH (évite `uv run` à chaque invocation).
+# Le venv créé par uv, en tête du PATH.
 ENV PATH="/app/.venv/bin:${PATH}"
 
 # Frontend buildé (servi par l'API via SPAStaticFiles)
