@@ -724,8 +724,10 @@ def test_dataset_piece_not_merged_when_parent_absent(sa_sync_conn):
 # ── Sous-étape cluster : fichier complémentaire figshare → collection de l'article ──
 
 
-def _seed_figshare(conn, *, source_id, doi, title_normalized, source="datacite", year=2023):
-    """Enregistrement source figshare typé dataset, sans relation déclarée."""
+def _seed_figshare(
+    conn, *, source_id, doi, title_normalized, source="datacite", year=2023, doc_type="dataset"
+):
+    """Enregistrement source figshare, sans relation déclarée."""
     return insert_source_record(
         conn,
         source=source,
@@ -733,7 +735,7 @@ def _seed_figshare(conn, *, source_id, doi, title_normalized, source="datacite",
         title=title_normalized,
         title_normalized=title_normalized,
         doi=doi,
-        doc_type="dataset",
+        doc_type=doc_type,
         publication_year=year,
     )
 
@@ -774,6 +776,32 @@ def test_figshare_additional_file_converges_to_collection_of_same_title(sa_sync_
             "raw": "10.6084/m9.figshare.23538907",
             "corrected_by": "DATACITE_PACKAGE_PIECE",
         }
+
+
+def test_figshare_additional_file_converges_whatever_its_source_and_type(sa_sync_conn):
+    """Une pièce que seul OpenAlex donne, et une pièce que DataCite type `media`, rejoignent la collection."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
+    )
+    openalex_only = _seed_figshare(
+        conn,
+        source="openalex",
+        source_id="W-f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    media = _seed_figshare(
+        conn,
+        source_id="f2",
+        doi="10.6084/m9.figshare.23538910",
+        title_normalized=f"additional file 2 of {_ARTICLE}",
+        doc_type="media",
+    )
+
+    assert _apply_cluster(conn) == 2
+    for source_record in (openalex_only, media):
+        assert _doi(conn, source_record) == "10.6084/m9.figshare.c.6702115"
 
 
 def test_figshare_additional_file_stays_without_collection(sa_sync_conn):

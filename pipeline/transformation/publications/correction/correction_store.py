@@ -420,7 +420,8 @@ class SourceRecordCorrectionStore:
                         UNION ALL
                         -- Fichier complémentaire figshare « Additional file N of T » → collection
                         -- figshare de titre T, sans relation déclarée : la seule collection dataset
-                        -- de même titre et de même année.
+                        -- de même titre et de même année. Le DOI et le titre désignent la pièce,
+                        -- quels que soient sa source et son type.
                         SELECT
                             sr.id AS declarant_id,
                             sr.eff_doi AS secondary_doi,
@@ -432,9 +433,7 @@ class SourceRecordCorrectionStore:
                                  sr.title_normalized, '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}', ''
                              )
                          AND c.publication_year = sr.publication_year
-                        WHERE sr.source = '{Source.DATACITE.value}'
-                          AND sr.doc_type = '{DocType.DATASET.value}'
-                          AND sr.eff_doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
+                        WHERE sr.eff_doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
                           AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
