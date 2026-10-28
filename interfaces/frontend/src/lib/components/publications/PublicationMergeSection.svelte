@@ -41,7 +41,6 @@
   const candidates = $derived(searching ? search.results : (similar ?? []));
 
   function conflictText(conflicts: number): string {
-    if (conflicts === 0) return "Aucun conflit d'auteurs.";
     if (conflicts === 1)
       return "1 contribution désigne deux personnes différentes : elle restera sans personne jusqu'au prochain passage du pipeline.";
     return `${conflicts} contributions désignent chacune deux personnes différentes : elles resteront sans personne jusqu'au prochain passage du pipeline.`;
@@ -56,9 +55,15 @@
         preview.publication_id === publicationId
           ? "Cette publication est conservée."
           : `La publication n° ${preview.publication_id} est conservée.`;
+      // Une ligne par information ; la modale rend les sauts de ligne.
+      const lines = [
+        `Fusionner avec la publication n° ${candidate.publication_id} (« ${candidate.title} ») ?`,
+        kept,
+        ...(preview.conflicts > 0 ? [conflictText(preview.conflicts)] : []),
+      ];
       const confirmed = await confirmDialog({
         title: "Fusionner les publications",
-        message: `Fusionner avec la publication n° ${candidate.publication_id} (« ${candidate.title} ») ? ${kept} ${conflictText(preview.conflicts)}`,
+        message: lines.join("\n\n"),
         confirmLabel: "Fusionner",
         danger: preview.conflicts > 0,
       });
