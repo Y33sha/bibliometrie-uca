@@ -116,6 +116,11 @@ _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
 }
 
 
+def identifier_normalizer(id_type: SourceIdentifierType) -> Callable[[str], str | None]:
+    """Fonction qui rend la forme normalisée d'une valeur de type `id_type`, ou `None` si elle est invalide."""
+    return _NORMALIZERS[id_type]
+
+
 def normalize_identifiers(
     identifiers: Iterable[SourceIdentifier],
 ) -> tuple[tuple[SourceIdentifier, ...], tuple[SourceIdentifier, ...]]:

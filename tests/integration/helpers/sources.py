@@ -4,10 +4,11 @@ import datetime
 import json
 from collections.abc import Sequence
 
-from sqlalchemy import Connection, text
+from sqlalchemy import Connection
 
 from domain.source_records.identifiers import SourceIdentifier
 from infrastructure.db.queues import Queue
+from pipeline.ingestion.common.source_records import replace_identifiers
 from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.queues import mark
 from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, perimeter_evidence
@@ -15,30 +16,6 @@ from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, 
 
 def _jsonb(value: object) -> str | None:
     return json.dumps(value) if value is not None else None
-
-
-def insert_identifiers(
-    conn: Connection, source_record_id: int, identifiers: Sequence[SourceIdentifier]
-) -> None:
-    """Écrit les identifiants de l'enregistrement source, avec leur rôle et leur statut."""
-    conn.execute(
-        text("""
-            INSERT INTO source_record_identifiers
-                (source_record_id, id_type, id_value, role, removed_by)
-            VALUES (:id, CAST(:id_type AS source_identifier_type), :value,
-                    CAST(:role AS source_identifier_role), :removed_by)
-        """),
-        [
-            {
-                "id": source_record_id,
-                "id_type": i.id_type.value,
-                "value": i.value,
-                "role": i.role.value,
-                "removed_by": i.removed_by,
-            }
-            for i in identifiers
-        ],
-    )
 
 
 def insert_source_record(
@@ -77,7 +54,7 @@ def insert_source_record(
     corrections: dict[str, object] | None = None,
     is_matchable: bool = True,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `identifiers` s'écrivent dans `source_record_identifiers`, avec leur statut. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `identifiers` s'écrivent dans `source_record_identifiers`. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
     source_record_id = insert_row(
         conn,
         "source_records",
@@ -118,7 +95,7 @@ def insert_source_record(
         ),
     )
     if identifiers:
-        insert_identifiers(conn, source_record_id, identifiers)
+        replace_identifiers(conn, {source_record_id: identifiers})
     if marked:
         mark(conn, Queue.SOURCE_RECORD_KEYS, [source_record_id])
     return source_record_id
