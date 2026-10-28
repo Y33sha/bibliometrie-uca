@@ -1,3 +1,24 @@
+<script lang="ts" module>
+	import { columnLabels } from '#lib/labels.js';
+	import { useColumnVisibility, type ColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
+
+	/** Visibilité des colonnes du tableau, tenue par la vue qui l'affiche : l'export CSV émet les mêmes colonnes. */
+	export function useThesisColumns(showLabsColumn: boolean): ColumnVisibility {
+		const columnDefs = [
+			{ key: 'inscription', label: 'Inscription' },
+			{ key: 'soutenance',  label: 'Soutenance' },
+			{ key: 'author',      label: columnLabels.author },
+			{ key: 'doi',         label: columnLabels.doi },
+			{ key: 'title',       label: columnLabels.title,       fixed: true },
+			{ key: 'status',      label: 'Statut' },
+			...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs }] : []),
+			{ key: 'sources',     label: columnLabels.sources },
+			{ key: 'access',      label: columnLabels.access,       fixed: true },
+		];
+		return useColumnVisibility('thesis-table-columns', columnDefs, ['sources']);
+	}
+</script>
+
 <script lang="ts">
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
@@ -6,12 +27,10 @@
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
-	import { columnLabels } from '#lib/labels.js';
 	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import { sortDirection } from '#lib/sort.js';
 	import type { components, operations } from '#lib/api/schema.js';
 
@@ -49,7 +68,7 @@
 		error = null,
 		sort,
 		onToggleSort,
-		showLabsColumn = false,
+		columns: cv,
 		onopen,
 		activeId = null,
 	}: {
@@ -59,7 +78,8 @@
 		error?: string | null;
 		sort: PublicationSort;
 		onToggleSort: (column: ThesisSortColumn) => void;
-		showLabsColumn?: boolean;
+		/** Visibilité des colonnes, créée par `useThesisColumns`. */
+		columns: ColumnVisibility;
 		/** Ouvre le volet de la thèse. Fourni, il ajoute en tête de ligne une icône qui l'appelle. */
 		onopen?: (publicationId: number) => void;
 		/** Thèse dont le volet est ouvert, dont la ligne est mise en évidence. */
@@ -77,20 +97,7 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	const columnDefs = [
-		{ key: 'inscription', label: 'Inscription' },
-		{ key: 'soutenance',  label: 'Soutenance' },
-		{ key: 'author',      label: columnLabels.author },
-		{ key: 'doi',         label: columnLabels.doi },
-		{ key: 'title',       label: columnLabels.title,       fixed: true },
-		{ key: 'status',      label: 'Statut' },
-		// svelte-ignore state_referenced_locally
-		...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs }] : []),
-		{ key: 'sources',     label: columnLabels.sources },
-		{ key: 'access',      label: columnLabels.access,       fixed: true },
-	];
-	const cv = useColumnVisibility('thesis-table-columns', columnDefs, ['sources']);
-	const col = cv.col;
+	const col = (key: string) => cv.col(key);
 
 	const inscrSort = $derived(sortDirection(sort, 'inscription'));
 	const soutSort = $derived(sortDirection(sort, 'soutenance'));

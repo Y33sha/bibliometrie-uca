@@ -227,7 +227,7 @@ export interface paths {
         };
         /**
          * Export Theses Csv
-         * @description Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+         * @description Export CSV de la page thèses, fidèle au tableau affiché : mêmes filtres, même tri, et mêmes colonnes que celles listées dans `columns`.
          *
          *     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
          *
@@ -314,6 +314,26 @@ export interface paths {
          * @description Métadonnées de chaque enregistrement source de la publication, toutes sources confondues.
          */
         get: operations["get_publication_sources_api_publications__publication_id__sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/merge-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Merge Candidates
+         * @description Publications fusionnables avec la publication, dix au plus. Sans `q` : les titres proches du sien. Avec `q` : la publication de cet identifiant, de ce DOI, ou les titres proches de `q`. Les publications à DOI distinct sont écartées.
+         */
+        get: operations["get_merge_candidates_api_publications__publication_id__merge_candidates_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3819,6 +3839,26 @@ export interface components {
             person_id_b: number;
         };
         /**
+         * MergeCandidateOut
+         * @description Publication fusionnable avec une autre. `similarity` : similarité trigramme de son titre normalisé avec le titre de référence. `sources` : sources de ses enregistrements sources.
+         */
+        MergeCandidateOut: {
+            /** Publication Id */
+            publication_id: number;
+            /** Title */
+            title: string;
+            /** Publication Year */
+            publication_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Similarity */
+            similarity: number;
+            /** Sources */
+            sources: string[];
+        };
+        /**
          * MergeRequest
          * @description Fusionne l'entité `source_id` dans celle désignée par le chemin.
          */
@@ -6259,6 +6299,7 @@ export interface operations {
                 source_filter?: string;
                 doc_type?: string;
                 sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc";
+                columns?: string;
             };
             header?: never;
             path?: never;
@@ -6387,6 +6428,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicationSourcesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_merge_candidates_api_publications__publication_id__merge_candidates_get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path: {
+                publication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeCandidateOut"][];
                 };
             };
             /** @description Validation Error */

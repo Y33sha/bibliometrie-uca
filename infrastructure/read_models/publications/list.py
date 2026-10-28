@@ -25,7 +25,6 @@ from infrastructure.read_models.publications.filtering import (
     publication_filter_where,
 )
 from infrastructure.read_models.publications.models import (
-    EXPORT_COLUMNS,
     PublicationFilters,
     PublicationListItem,
     PublicationListResponse,
@@ -62,15 +61,20 @@ _APC_SORT = (
 
 
 def _thesis_author(column: str) -> str:
-    """Sous-requête scalaire : `column` lu sur l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou si aucune contribution d'auteur n'a de personne."""
+    """Sous-requête scalaire : `column` lu sur l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou si aucune contribution d'auteur n'a de personne.
+
+    L'ordre sur `person_id` désigne la même personne à chaque appel. La contribution se lit dans l'index unique `(publication_id, person_id)`, puis la personne par sa clé primaire : une jointure laisse le planificateur parcourir un index entier à chaque ligne."""
     return f"""(SELECT {column}
-                 FROM contributions ath
-                 JOIN persons pe ON pe.id = ath.person_id
+                 FROM persons pe
                  WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
-                   AND ath.publication_id = p.id
-                   AND {has_author_role("ath")}
-                 ORDER BY ath.id
-                 LIMIT 1)"""
+                   AND pe.id = (
+                     SELECT ath.person_id
+                     FROM contributions ath
+                     WHERE ath.publication_id = p.id
+                       AND ath.person_id IS NOT NULL
+                       AND {has_author_role("ath")}
+                     ORDER BY ath.person_id
+                     LIMIT 1))"""
 
 
 def _perimeter_labs(*, person_filter: bool = False) -> str:
@@ -109,6 +113,14 @@ _ORDER_MAP = {
 def _plain_text(s: str | None) -> str:
     """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur n'interprète pas le balisage — il l'afficherait tel quel dans la cellule."""
     return to_plain_text(s)
+
+
+def _emitted_columns(spec: list[tuple[str, str]], columns: list[str]) -> list[tuple[str, str]]:
+    """Colonnes `(clé, en-tête)` de `spec` à émettre, dans l'ordre d'affichage : celles listées dans `columns`, toutes si `columns` est vide. Titre et accès toujours présents."""
+    if not columns:
+        return spec
+    requested = {*columns, "title", "access"}
+    return [(key, header) for key, header in spec if key in requested]
 
 
 def _publication_lines(
@@ -151,22 +163,12 @@ def _publication_lines(
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
-def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) -> Iterator[str]:
+def _these_lines(
+    rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
+) -> Iterator[str]:
     """Lignes CSV de l'export des thèses, en-tête comprise."""
     writer = CsvWriter()
-    yield writer.header(
-        [
-            "Inscription",
-            "Soutenance",
-            "Année",
-            "Statut",
-            "Titre",
-            "DOI",
-            "Laboratoires",
-            "Sources",
-            "Accès",
-        ]
-    )
+    yield writer.header([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
         sources = _source_links(
@@ -178,19 +180,18 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
             },
             row.oa_status,
         )
-        yield writer.line(
-            [
-                row.date_inscription or "",
-                row.date_soutenance or "",
-                row.publication_year or "",
-                _THESES_STATUS_LABELS.get(row.doc_type, row.doc_type or ""),
-                _plain_text(row.title),
-                doi_url,
-                row.labs or "",
-                json.dumps(sources, ensure_ascii=False) if sources else "",
-                access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",
-            ]
-        )
+        cell = {
+            "Inscription": row.date_inscription or "",
+            "Soutenance": row.date_soutenance or "",
+            "Auteur": row.thesis_author_name.title() if row.thesis_author_name else "",
+            "DOI": doi_url,
+            "Titre": _plain_text(row.title),
+            "Statut": _THESES_STATUS_LABELS.get(row.doc_type, row.doc_type or ""),
+            "Laboratoires": row.labs or "",
+            "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
+            "Accès": access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",
+        }
+        yield writer.line([cell[header] for _, header in emitted])
 
     if truncated:
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
@@ -353,13 +354,10 @@ class PublicationListQueries:
         where_clause, binds = publication_filter_where(filters, context)
         order = _ORDER_MAP[sort]
 
-        # Titre et accès toujours présents. `columns` vide => toutes.
-        requested = set(columns) if columns else set(EXPORT_COLUMNS)
-        requested |= {"title", "access"}
         # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
         hal_status = (
             hal_status_expression(context.lab_hal_collection)
-            if "hal_status" in requested
+            if not columns or "hal_status" in columns
             else WhereClause("NULL", {})
         )
 
@@ -411,8 +409,7 @@ class PublicationListQueries:
                 filters,
             )
 
-        # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage.
-        spec: list[tuple[str, str]] = [
+        spec = [
             ("type", "Type"),
             ("year", "Année"),
             ("doi", "DOI"),
@@ -428,14 +425,16 @@ class PublicationListQueries:
             ("sources", "Sources"),
             ("access", "Accès"),
         ]
-        emitted = [(key, header) for key, header in spec if key in requested]
+        return chunked(
+            _publication_lines(rows, _emitted_columns(spec, columns), truncated=truncated)
+        )
 
-        return chunked(_publication_lines(rows, emitted, truncated=truncated))
+    def export_theses_csv(
+        self, *, filters: PublicationFilters, sort: str, columns: list[str]
+    ) -> Iterator[str]:
+        """Export CSV de la page thèses, qui reflète le tableau affiché : mêmes filtres, même tri, mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et accès toujours présents.
 
-    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> Iterator[str]:
-        """Export CSV dédié à la page thèses.
-
-        Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
+        Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
         where_clause, binds = publication_filter_where(filters, filter_context(self._conn, filters))
@@ -450,6 +449,7 @@ class PublicationListQueries:
                     p.oa_status::text AS oa_status, p.best_copy_url,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
+                    {_thesis_author("pe.first_name || ' ' || pe.last_name")} AS thesis_author_name,
                     src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                     (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                              ORDER BY COALESCE(s.acronym, s.name))
@@ -478,4 +478,18 @@ class PublicationListQueries:
                 filters,
             )
 
-        return chunked(_these_lines(rows, truncated=truncated))
+        emitted = _emitted_columns(
+            [
+                ("inscription", "Inscription"),
+                ("soutenance", "Soutenance"),
+                ("author", "Auteur"),
+                ("doi", "DOI"),
+                ("title", "Titre"),
+                ("status", "Statut"),
+                ("labs", "Laboratoires"),
+                ("sources", "Sources"),
+                ("access", "Accès"),
+            ],
+            columns,
+        )
+        return chunked(_these_lines(rows, emitted, truncated=truncated))

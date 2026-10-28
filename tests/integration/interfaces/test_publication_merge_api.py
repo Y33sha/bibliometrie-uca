@@ -1,4 +1,4 @@
-"""Fusion manuelle de deux publications : POST /api/publications/{id}/merge et /merge-preview, sous le rôle de l'API."""
+"""Fusion manuelle de deux publications : GET /api/publications/{id}/merge-candidates, POST /api/publications/{id}/merge et /merge-preview, sous le rôle de l'API."""
 
 from tests.integration.helpers.contributions import upsert_contributor_information_on_cursor
 from tests.integration.helpers.db import owner_pool
@@ -96,3 +96,39 @@ class TestPreview:
         assert r.json()["conflicts"] == 1
         assert _exists(a)
         assert _exists(b)
+
+
+def _titled_publication(title: str, doi: str | None = None) -> int:
+    publication = seed_publication(title, doc_type="article")
+    if doi:
+        with owner_pool() as cur:
+            cur.execute("UPDATE publications SET doi = %s WHERE id = %s", (doi, publication))
+    return publication
+
+
+class TestCandidates:
+    def test_similar_titles_without_conflicting_doi(self, client):
+        tag = uniq("x", sep="")
+        title = f"au rugby comment arbitres et joueurs s adaptent {tag}"
+        publication = _titled_publication(title, doi=f"10.64628/{tag}")
+        similar = _titled_publication(f"{title} the conversation")
+        other_doi = _titled_publication(title, doi=f"10.9/{tag}")
+
+        r = client.get(f"/api/publications/{publication}/merge-candidates")
+
+        assert r.status_code == 200
+        ids = [c["publication_id"] for c in r.json()]
+        assert similar in ids
+        assert other_doi not in ids
+
+    def test_search_by_doi(self, client):
+        tag = uniq("x", sep="")
+        publication = _titled_publication(f"premier titre {tag}")
+        target = _titled_publication(f"second titre {tag}", doi=f"10.64628/{tag}")
+
+        r = client.get(
+            f"/api/publications/{publication}/merge-candidates",
+            params={"q": f"https://doi.org/10.64628/{tag.upper()}"},
+        )
+
+        assert [c["publication_id"] for c in r.json()] == [target]

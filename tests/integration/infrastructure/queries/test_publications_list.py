@@ -258,6 +258,7 @@ class TestThesesExport:
             publications_queries(sa_sync_conn).export_theses_csv(
                 filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
                 sort="soutenance_desc",
+                columns=[],
             )
         )
 
@@ -284,12 +285,35 @@ class TestThesesExport:
             publications_queries(sa_sync_conn).export_theses_csv(
                 filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
                 sort="soutenance_desc",
+                columns=[],
             )
         )
 
         header, line = csv_text.lstrip("﻿").splitlines()[:2]
         assert header.split(",")[-1] == "Accès"
         assert line.split(",")[-1] == "https://theses.hal.science/tel-1"
+
+    def test_emits_the_visible_columns_in_table_order(self, sa_sync_conn):
+        """Les colonnes demandées, plus le titre et l'accès, dans l'ordre du tableau ; l'auteur est écrit comme à l'affichage."""
+        lab = _lab(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn, "Ma these", doc_type="thesis")
+        author = insert_person(sa_sync_conn, "DUPONT", first_name="jean")
+        contribution = insert_contribution(
+            sa_sync_conn, publication, person_id=author, in_perimeter=True, roles=["author"]
+        )
+        add_contribution_structure(sa_sync_conn, contribution, lab)
+
+        csv_text = "".join(
+            publications_queries(sa_sync_conn).export_theses_csv(
+                filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
+                sort="soutenance_desc",
+                columns=["status", "author"],
+            )
+        )
+
+        header, line = csv_text.lstrip("﻿").splitlines()[:2]
+        assert header == "Auteur,Titre,Statut,Accès"
+        assert line.startswith("Jean Dupont,Ma these,Soutenue,")
 
 
 class TestThesesSort:
@@ -517,6 +541,7 @@ class TestExportsRunTheirQueryBeforeStreaming:
             chunks = publications_queries(conn).export_theses_csv(
                 filters=PublicationFilters(doc_types=["thesis"]),
                 sort="soutenance_desc",
+                columns=[],
             )
         assert "Soutenance" in "".join(chunks)
 

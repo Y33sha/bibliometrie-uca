@@ -6,6 +6,7 @@ Le package est organisé par thème, une classe par module :
 - `detail` : détail d'une publication
 - `source_records` : enregistrements sources et contributions sources d'une publication
 - `suspect_merges` : file des fusions suspectes
+- `merge_candidates` : candidats à la fusion manuelle avec une publication
 
 `PublicationsQueries` réunit ces classes.
 """
@@ -17,6 +18,7 @@ from sqlalchemy import Connection
 from infrastructure.read_models.publications.detail import PublicationDetailQueries
 from infrastructure.read_models.publications.facets import PublicationFacetQueries
 from infrastructure.read_models.publications.list import PublicationListQueries
+from infrastructure.read_models.publications.merge_candidates import MergeCandidateQueries
 from infrastructure.read_models.publications.source_records import PublicationSourceRecordQueries
 from infrastructure.read_models.publications.suspect_merges import SuspectMergeQueries
 
@@ -27,6 +29,7 @@ class PublicationsQueries(
     PublicationDetailQueries,
     PublicationSourceRecordQueries,
     SuspectMergeQueries,
+    MergeCandidateQueries,
 ):
     """Lectures sur les publications.
 

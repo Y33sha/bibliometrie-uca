@@ -17,6 +17,8 @@ from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
+    THESIS_EXPORT_COLUMNS,
+    MergeCandidateOut,
     PublicationDetailResponse,
     PublicationFilters,
     PublicationListResponse,
@@ -115,11 +117,12 @@ def export_theses_csv(
     source_filter: str = Query(""),
     doc_type: str = Query(""),
     sort: PublicationSort = Query("soutenance_desc"),
+    columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+    """Export CSV de la page thèses, fidèle au tableau affiché : mêmes filtres, même tri, et mêmes colonnes que celles listées dans `columns`.
 
     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
 
@@ -139,7 +142,13 @@ def export_theses_csv(
         or ["thesis", "ongoing_thesis"],
     )
     return csv_response(
-        queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv", slot=slot
+        queries.export_theses_csv(
+            filters=filters,
+            sort=sort,
+            columns=parse_vocabulary_csv(columns, allowed=THESIS_EXPORT_COLUMNS, param="columns"),
+        ),
+        filename="theses.csv",
+        slot=slot,
     )
 
 
@@ -181,6 +190,16 @@ def get_publication_sources(
     if sources is None:
         raise HTTPException(status_code=404, detail="Publication introuvable")
     return sources
+
+
+@router.get("/{publication_id}/merge-candidates", response_model=list[MergeCandidateOut])
+def get_merge_candidates(
+    publication_id: int,
+    q: SearchTerm = "",
+    queries: PublicationsQueries = Depends(publications_queries),
+) -> list[MergeCandidateOut]:
+    """Publications fusionnables avec la publication, dix au plus. Sans `q` : les titres proches du sien. Avec `q` : la publication de cet identifiant, de ce DOI, ou les titres proches de `q`. Les publications à DOI distinct sont écartées."""
+    return queries.merge_candidates(publication_id, q)
 
 
 @router.post("/{publication_id}/merge-preview", response_model=PublicationMergeResult)

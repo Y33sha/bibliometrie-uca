@@ -29,6 +29,8 @@ function browserStorage(): ColumnStorage | null {
 	return typeof localStorage === 'undefined' ? null : localStorage;
 }
 
+export type ColumnVisibility = ReturnType<typeof useColumnVisibility>;
+
 export function useColumnVisibility(
 	storageKey: string,
 	columns: ColumnDef[],

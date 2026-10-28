@@ -56,6 +56,22 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
 )
 
 
+# Vocabulaire des colonnes que l'export des thèses sait émettre, aux règles de `EXPORT_COLUMNS`.
+THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
+    {
+        "inscription",
+        "soutenance",
+        "author",
+        "doi",
+        "title",
+        "status",
+        "labs",
+        "sources",
+        "access",
+    }
+)
+
+
 # Vocabulaire du filtre par licence de la version éditeur : les licences du domaine, et `none` pour une publication sans licence connue.
 NO_LICENSE = "none"
 LICENSE_FILTER_VALUES: frozenset[str] = frozenset({*License, NO_LICENSE})
@@ -467,3 +483,15 @@ class SuspectMergeOut(BaseModel):
 
 class SuspectMergesResponse(PaginatedResponse):
     publications: list[SuspectMergeOut]
+
+
+class MergeCandidateOut(BaseModel):
+    """Publication fusionnable avec une autre. `similarity` : similarité trigramme de son titre normalisé avec le titre de référence. `sources` : sources de ses enregistrements sources."""
+
+    publication_id: int
+    title: str
+    publication_year: int | None
+    doc_type: str
+    doi: str | None
+    similarity: float
+    sources: list[str]
