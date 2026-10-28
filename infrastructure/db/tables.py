@@ -58,6 +58,7 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.serials.serial import OA_MODELS, SERIAL_TYPES
+from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -1379,6 +1380,43 @@ source_records = Table(
         "jsonb_typeof(corrections) = 'object'",
         name="source_records_corrections_is_object",
     ),
+    schema="sources",
+)
+
+
+source_identifier_type_enum = PgEnum(
+    *SourceIdentifierType, name="source_identifier_type", create_type=False
+)
+source_identifier_role_enum = PgEnum(
+    *SourceIdentifierRole, name="source_identifier_role", create_type=False
+)
+
+source_record_identifiers = Table(
+    "source_record_identifiers",
+    metadata,
+    Column("source_record_id", Integer, nullable=False),
+    Column("id_type", source_identifier_type_enum, nullable=False),
+    Column("id_value", Text, nullable=False, comment="Forme normalisée de l'identifiant."),
+    Column(
+        "role",
+        source_identifier_role_enum,
+        nullable=False,
+        comment=(
+            "primary : identifiant de l'enregistrement dans la source. derived : identifiant de "
+            "l'enregistrement d'une autre source dont la source tire le sien. secondary : "
+            "identifiant que la source attribue au même document. related : identifiant d'un "
+            "document lié."
+        ),
+    ),
+    Column(
+        "removed_by",
+        Text,
+        comment="Règle de correction qui retire l'identifiant. NULL : identifiant actif.",
+    ),
+    PrimaryKeyConstraint(
+        "source_record_id", "id_type", "id_value", name="source_record_identifiers_pkey"
+    ),
+    comment="Identifiants d'un enregistrement source, réécrits à chaque normalisation.",
     schema="sources",
 )
 
