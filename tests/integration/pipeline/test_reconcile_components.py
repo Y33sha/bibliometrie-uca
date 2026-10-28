@@ -21,6 +21,7 @@ from pipeline.transformation.publications.reconciliation import (
     snapshot_queued_source_records,
 )
 from pipeline.transformation.publications.store import PublicationStore
+from tests.integration.helpers.publications import insert_apc_payment
 from tests.integration.helpers.queues import clear, mark, queued
 from tests.integration.helpers.redirects import redirect_of
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
@@ -220,6 +221,48 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_other)[0] == publication_b
         assert _publication_exists(conn, publication_b)
         assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) is None
+
+    def test_publication_of_excluded_records_only_is_deleted(self, sa_sync_conn):
+        """Régression : une publication faite de copies GRESIS (DOI 10.60692) est supprimée, ses enregistrements sources restent orphelins."""
+        conn = sa_sync_conn
+        publication = _seed_publication(conn)
+        openalex = _source_record(conn, publication, source_id="a", doi="10.60692/m2raz-tjw54")
+        datacite = _source_record(
+            conn, publication, source="datacite", source_id="b", doi="10.60692/m2raz-tjw54"
+        )
+
+        stats = reconcile(conn, logger)
+
+        assert not _publication_exists(conn, publication)
+        assert _source_record_state(conn, openalex) == (None, False)
+        assert _source_record_state(conn, datacite) == (None, False)
+        assert stats.detached == 2
+
+    def test_merged_publication_with_excluded_record_hands_over_to_successor(self, sa_sync_conn):
+        """La publication absorbée perd aussi un enregistrement source de paratexte. Elle est dissoute : ses paiements APC et son identifiant passent à l'ancre."""
+        conn = sa_sync_conn
+        publication_a = _seed_publication(conn)
+        publication_b = _seed_publication(conn)
+        payment = insert_apc_payment(conn, publication_id=publication_b, open_access_fee=True)
+        paratext = _source_record(
+            conn, publication_b, source_id="c", title="Index", title_normalized="index"
+        )
+        source_record_a = _source_record(conn, publication_a, source_id="a", doi="10.1/x")
+        source_record_b = _source_record(conn, publication_b, source_id="b", doi="10.1/x")
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, paratext) == (None, False)
+        assert _source_record_state(conn, source_record_a)[0] == publication_a
+        assert _source_record_state(conn, source_record_b)[0] == publication_a
+        assert not _publication_exists(conn, publication_b)
+        assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) == publication_a
+        assert (
+            conn.execute(
+                text("SELECT publication_id FROM apc_payments WHERE id = :id"), {"id": payment}
+            ).scalar_one()
+            == publication_a
+        )
 
     def test_les_publications_touchees_regroupent_leurs_contributions_sources(self, sa_sync_conn):
         """La publication qui reçoit un enregistrement source et celle qui en perd un sont à regrouper. Une publication dont l'enregistrement source réexaminé reste en place ne l'est pas."""

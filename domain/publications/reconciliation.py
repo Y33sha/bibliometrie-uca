@@ -9,6 +9,8 @@
 - **skip** : une partition d'orphelins sans aucun membre in-périmètre → rien n'est créé, ils restent orphelins.
 - **merge / split** : partitions étalées sur plusieurs publications / publication qui contient plusieurs partitions (cf. ci-dessous).
 
+**Exclusion.** Un enregistrement source écarté (`is_excluded_source_record` : préfixe DOI exclu, titre de paratexte) n'entre dans aucune partition. Matérialisé, il est détaché de sa publication.
+
 **Ancre = porteur du DOI.** Pour une partition de DOI `X`, l'ancre est la publication qui **a déjà** `doi=X` (`publication_doi`), départage `min(publication_id)` si plusieurs l'ont (doublons hérités), fallback `min(source_record_id)` parmi les enregistrements sources **matérialisés** de la partition. Si aucun enregistrement source n'a de publication (partition d'orphelins) : pas d'ancre existante → **create** (si in-périmètre) ou **skip**. Les corrections à la main restent sur l'ancre (la publication qui a le DOI). L'ancre est orthogonale au clustering (elle ne décide que *quel id survit*, pas *quels enregistrements sources sont ensemble*).
 
 **Cannot-link DOI** (décision « un DOI, une œuvre ») : deux DOI non-nuls distincts ne fusionnent jamais. Dans une composante multi-DOI, chaque DOI est sa propre partition ; les enregistrements sources **sans DOI** y sont **résiduels** (laissés tels quels, inertes).
@@ -23,7 +25,7 @@ from typing import NamedTuple
 
 from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
-from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
+from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES, is_excluded_source_record
 
 # Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
 MANUAL_MERGE_KEY = "manual_merge"
@@ -61,6 +63,11 @@ class ReconcileMember:
         return self.in_perimeter and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
 
     @property
+    def excluded(self) -> bool:
+        """L'enregistrement source est écarté de la réconciliation (`is_excluded_source_record`)."""
+        return is_excluded_source_record(self.effective_doi, self.title_normalized)
+
+    @property
     def materializable(self) -> bool:
         """L'enregistrement source a les métadonnées minimales d'une publication (`has_minimal_publication_metadata`)."""
         return has_minimal_publication_metadata(self.title_normalized, self.publication_year)
@@ -92,7 +99,7 @@ class DissolvedPublication:
 class ReconcilePlan:
     """Plan de réconciliation : groupes à matérialiser, publications dissoutes, `source_records` à détacher de leur publication.
 
-    Une partition détachée a perdu la revendication de sa publication, et aucun de ses membres n'a d'année : elle ne peut pas fonder une publication neuve. Ses membres deviennent orphelins.
+    Deux cas de détachement : un enregistrement source écarté (`ReconcileMember.excluded`) ; une partition qui a perdu la revendication de sa publication et dont aucun membre n'a d'année, donc qui ne peut pas fonder une publication neuve. Les membres détachés deviennent orphelins.
     """
 
     groups: tuple[WorkGroup, ...]
@@ -198,15 +205,19 @@ def plan_reconciliation(
     """
     members = list(members)
     by_doi = existing_publication_by_doi or {}
-    claims = [c for part in _partitions(members) if (c := _claim(part, by_doi)) is not None]
+    excluded = {m.source_record_id for m in members if m.excluded}
+    admitted = [m for m in members if m.source_record_id not in excluded]
+    claims = [c for part in _partitions(admitted) if (c := _claim(part, by_doi)) is not None]
 
     # Attribution gloutonne : revendications de publication existante d'abord (forte, puis min_source_record), puis
     # les créations (`preferred=None`). La première à revendiquer une publication la garde ; les suivantes,
     # comme les créations, prennent une nouvelle publication (`target=None`).
-    by_id = {m.source_record_id: m for m in members}
+    by_id = {m.source_record_id: m for m in admitted}
     awarded: set[int] = set()
     groups: list[WorkGroup] = []
-    detached: list[int] = []
+    detached: list[int] = sorted(
+        m.source_record_id for m in members if m.excluded and m.publication_id is not None
+    )
     target_of_source_record: dict[int, int | None] = {}
     for claim in sorted(
         claims, key=lambda c: (c.preferred is None, not c.strong, c.min_source_record)
@@ -226,7 +237,8 @@ def plan_reconciliation(
     # Publications dissoutes : publication courante qui ne survit comme ancre d'aucun groupe et ne retient aucun
     # enregistrement source résiduel. Successeur = l'ancre où la partition de son plus petit enregistrement source a abouti.
     # Les orphelins, sans publication, sont ignorés ici.
-    assigned = {i for claim in claims for i in claim.source_record_ids}
+    # Les enregistrements sources écartés quittent leur publication : ils ne la retiennent pas.
+    assigned = {i for claim in claims for i in claim.source_record_ids} | excluded
     universe_publication_ids = {m.publication_id for m in members if m.publication_id is not None}
     residual_publication_ids = {
         m.publication_id
@@ -243,11 +255,15 @@ def plan_reconciliation(
     }
     dissolved: list[DissolvedPublication] = []
     for publication_id in sorted(universe_publication_ids - awarded - residual_publication_ids):
-        anchor_source_record = min(
-            (m for m in members if m.publication_id == publication_id),
+        # Une publication dont tous les enregistrements sources sont écartés n'a pas de successeur.
+        anchor = min(
+            (m for m in admitted if m.publication_id == publication_id),
             key=lambda m: m.source_record_id,
-        ).source_record_id
-        successor = target_of_source_record.get(anchor_source_record)
+            default=None,
+        )
+        if anchor is None:
+            continue
+        successor = target_of_source_record.get(anchor.source_record_id)
         if successor is not None and successor != publication_id:
             dissolved.append(DissolvedPublication(publication_id, successor))
 

@@ -421,9 +421,11 @@ def _apply(
             if (previous := rows_by_source_record[source_record].publication_id) != target:
                 membership_changed.update(p for p in (previous, target) if p is not None)
 
-    # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
-    # deviennent orphelins. Leur ancienne publication est recalculée, et supprimée si elle
-    # reste sans source.
+    # 2. Détachements : les enregistrements sources écartés et les membres d'une partition qui ne
+    # peut fonder aucune publication deviennent orphelins. Leur ancienne publication est
+    # recalculée, et supprimée si elle reste sans source. Une publication dissoute est laissée à
+    # l'étape 3, qui redirige ses paiements APC avant de la supprimer.
+    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     if plan.detached:
         detach_source_records(conn, list(plan.detached))
         membership_changed.update(
@@ -438,6 +440,7 @@ def _apply(
                 if (p := rows_by_source_record[source_record].publication_id) is not None
             }
             - survivors
+            - dissolved_ids
         ):
             with savepoint(conn):
                 lifecycle.refresh(conn, publication_id)
@@ -447,7 +450,6 @@ def _apply(
     for dissolved in plan.dissolved:
         lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
 
-    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     return AppliedReconciliation(
         survivors=frozenset(survivors),
         changed=frozenset(membership_changed - dissolved_ids),

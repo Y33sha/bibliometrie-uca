@@ -4,7 +4,7 @@
 
 Une publication est la référence unifiée d'un document. Elle réunit les enregistrements sources qui décrivent ce document, quelle que soit leur source. Les jeux de données, les logiciels et les thèses sont aussi des publications. Le pipeline calcule chaque publication à partir de ses enregistrements sources.
 
-Une publication a au moins un enregistrement source, un type de document admissible et une contribution rattachée à une personne. Le pipeline supprime les autres.
+Une publication a au moins un enregistrement source, un type de document admissible et une contribution rattachée à une personne. Le pipeline supprime les autres. Les enregistrements sources de paratexte (index, listes d'auteurs, tables des matières) et ceux dont le préfixe DOI est exclu restent hors des publications.
 
 ## Tables
 
