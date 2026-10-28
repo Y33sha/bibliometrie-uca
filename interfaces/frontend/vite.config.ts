@@ -1,5 +1,6 @@
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { defaultClientConditions } from 'vite';
 import { defineConfig } from 'vitest/config';
 import { csp } from './csp.js';
 import { loadProjectEnv } from './project-env.js';
@@ -59,6 +60,8 @@ export default defineConfig({
 			}
 		}
 	},
+	// Sous vitest, Svelte résout sa version navigateur : les tests de composants appellent `mount`.
+	resolve: process.env.VITEST ? { conditions: ['browser', ...defaultClientConditions] } : undefined,
 	test: {
 		include: ['src/**/*.test.ts', 'project-env.test.ts'],
 	}
