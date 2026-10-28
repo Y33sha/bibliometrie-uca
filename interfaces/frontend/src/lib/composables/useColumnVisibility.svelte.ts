@@ -1,7 +1,7 @@
 /**
- * Composable pour la visibilité des colonnes d'un tableau de publications.
+ * Composable pour la visibilité des colonnes d'un tableau.
  *
- * - Clé de stockage partagée entre toutes les pages (publication-table-columns)
+ * - Clé de stockage propre à chaque tableau, partagée par toutes les pages qui l'affichent
  * - Colonnes fixes (non décochables) définies par `fixed: true`
  * - Colonnes masquées par défaut via `defaultHidden`
  * - Chaque page passe ses propres définitions de colonnes
@@ -11,8 +11,6 @@
  * s'éprouvent sans simuler de navigateur. `null` désactive la persistance — cas d'un rendu hors
  * navigateur, où l'API n'existe pas.
  */
-
-const STORAGE_KEY = 'publication-table-columns';
 
 export interface ColumnDef {
 	key: string;
@@ -32,6 +30,7 @@ function browserStorage(): ColumnStorage | null {
 }
 
 export function useColumnVisibility(
+	storageKey: string,
 	columns: ColumnDef[],
 	defaultHidden: string[] = [],
 	storage: ColumnStorage | null = browserStorage(),
@@ -42,7 +41,7 @@ export function useColumnVisibility(
 
 	function load(): string[] {
 		try {
-			const stored = storage?.getItem(STORAGE_KEY);
+			const stored = storage?.getItem(storageKey);
 			if (stored) {
 				const parsed = JSON.parse(stored) as string[];
 				// Garder uniquement les clés connues de cette page + toujours inclure les fixes
@@ -65,7 +64,7 @@ export function useColumnVisibility(
 			// Réinsérer dans l'ordre d'origine
 			visibleColumns = allKeys.filter(k => k === key || visibleColumns.includes(k));
 		}
-		storage?.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
+		storage?.setItem(storageKey, JSON.stringify(visibleColumns));
 	}
 
 	function col(key: string): boolean {
@@ -76,7 +75,7 @@ export function useColumnVisibility(
 		const toAdd = keys.filter(k => allKeys.includes(k) && !visibleColumns.includes(k));
 		if (toAdd.length) {
 			visibleColumns = allKeys.filter(k => visibleColumns.includes(k) || toAdd.includes(k));
-			storage?.setItem(STORAGE_KEY, JSON.stringify(visibleColumns));
+			storage?.setItem(storageKey, JSON.stringify(visibleColumns));
 		}
 	}
 

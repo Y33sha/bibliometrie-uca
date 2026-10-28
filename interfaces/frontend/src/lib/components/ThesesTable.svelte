@@ -77,20 +77,19 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	// La visibilité des colonnes est partagée avec la liste des publications : seules DOI et Sources sont optionnelles.
 	const columnDefs = [
-		{ key: 'inscription', label: 'Inscription', fixed: true },
-		{ key: 'soutenance',  label: 'Soutenance',  fixed: true },
-		{ key: 'author',      label: columnLabels.author,      fixed: true },
+		{ key: 'inscription', label: 'Inscription' },
+		{ key: 'soutenance',  label: 'Soutenance' },
+		{ key: 'author',      label: columnLabels.author },
 		{ key: 'doi',         label: columnLabels.doi },
 		{ key: 'title',       label: columnLabels.title,       fixed: true },
-		{ key: 'status',      label: 'Statut',      fixed: true },
+		{ key: 'status',      label: 'Statut' },
 		// svelte-ignore state_referenced_locally
-		...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs, fixed: true }] : []),
+		...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs }] : []),
 		{ key: 'sources',     label: columnLabels.sources },
 		{ key: 'access',      label: columnLabels.access,       fixed: true },
 	];
-	const cv = useColumnVisibility(columnDefs, ['sources']);
+	const cv = useColumnVisibility('thesis-table-columns', columnDefs, ['sources']);
 	const col = cv.col;
 
 	const inscrSort = $derived(sortDirection(sort, 'inscription'));
@@ -103,25 +102,25 @@
 	<thead>
 		<tr>
 			{#if onopen}<th class="panel-col"></th>{/if}
-			<th
+			{#if col('inscription')}<th
 				class="col-date sortable"
 				class:active={inscrSort !== null}
 				onclick={() => onToggleSort('inscription')}
-			>Inscription <SortChevron direction={inscrSort} /></th>
-			<th
+			>Inscription <SortChevron direction={inscrSort} /></th>{/if}
+			{#if col('soutenance')}<th
 				class="col-date sortable"
 				class:active={soutSort !== null}
 				onclick={() => onToggleSort('soutenance')}
-			>Soutenance <SortChevron direction={soutSort} /></th>
-			<th class="col-author">{columnLabels.author}</th>
+			>Soutenance <SortChevron direction={soutSort} /></th>{/if}
+			{#if col('author')}<th class="col-author">{columnLabels.author}</th>{/if}
 			{#if col('doi')}<th class="col-doi">{columnLabels.doi}</th>{/if}
 			<th
 				class="col-title sortable"
 				class:active={titleSort !== null}
 				onclick={() => onToggleSort('title')}
 			>{columnLabels.title} <SortChevron direction={titleSort} /></th>
-			<th class="col-status">Statut</th>
-			{#if showLabsColumn}
+			{#if col('status')}<th class="col-status">Statut</th>{/if}
+			{#if col('labs')}
 				<th class="col-labs">{columnLabels.labs}</th>
 			{/if}
 			{#if col('sources')}<th class="col-sources">{columnLabels.sources}</th>{/if}
@@ -147,33 +146,33 @@
 						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopen(t.id)} />
 					</td>
 				{/if}
-				<td class="col-date">
+				{#if col('inscription')}<td class="col-date">
 					{#if insc}<span class="date-month">{insc.month}</span> {insc.year}{/if}
-				</td>
-				<td class="col-date">
+				</td>{/if}
+				{#if col('soutenance')}<td class="col-date">
 					{#if sout}<span class="date-month">{sout.month}</span> {sout.year}{/if}
-				</td>
-				<td class="col-author">
+				</td>{/if}
+				{#if col('author')}<td class="col-author">
 					{#if t.thesis_author_person_id}
 						<a href={resolve(`persons/${t.thesis_author_person_id}`)}>{titleCase(t.thesis_author_name)}</a>
 					{:else if t.thesis_author_name}
 						{titleCase(t.thesis_author_name)}
 					{/if}
-				</td>
+				</td>{/if}
 				{#if col('doi')}<td class="col-doi">
 					{#if t.doi}<DoiLink doi={t.doi} />{/if}
 				</td>{/if}
 				<td class="col-title">
 					<a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a>
 				</td>
-				<td class="col-status">
+				{#if col('status')}<td class="col-status">
 					{#if t.doc_type === 'thesis'}
 						<span class="status-badge soutenue">Soutenue</span>
 					{:else if t.doc_type === 'ongoing_thesis'}
 						<span class="status-badge en-cours">En cours</span>
 					{/if}
-				</td>
-				{#if showLabsColumn}
+				</td>{/if}
+				{#if col('labs')}
 					<td class="col-labs">
 						{#each t.lab_items || [] as lab}
 							<a href={resolve(`structures/${lab.id}?tab=theses`)} class="lab-tag">{lab.label}</a>

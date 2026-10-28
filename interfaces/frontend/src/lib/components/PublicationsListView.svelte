@@ -111,7 +111,7 @@
 	// Libellés de la colonne Licence, servis par l'API.
 	let licenseNames = $state<Record<string, string>>({});
 	if (isLab) initialHidden.push('hal_status');
-	const cv = useColumnVisibility(columnDefs, initialHidden);
+	const cv = useColumnVisibility('publication-table-columns', columnDefs, initialHidden);
 	const col = cv.col;
 
 	// --- Filtres ---
