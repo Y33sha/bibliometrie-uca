@@ -55,7 +55,7 @@ _PHASE_IO: dict[str, _PhaseIo] = {
             "staging",
             "failed_lookups",
             "source_records.source",
-            "source_records.external_ids",
+            "source_record_identifiers",
             "source_records.publication_id",
             "publications.in_perimeter",
         ),
@@ -64,6 +64,7 @@ _PHASE_IO: dict[str, _PhaseIo] = {
             "staging",
             "failed_lookups",
             "source_records",
+            "source_record_identifiers",
             "publications.in_perimeter",
         ),
     ),
@@ -231,6 +232,7 @@ TASKS: tuple[Task, ...] = (
             # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
             reads=(
                 "source_records.doi",
+                "source_records.corrections",
                 "source_records.publication_year",
                 "publication_relations",
                 *(("doi_prefixes.ra",) if PROFILES[source].registration_agency else ()),
@@ -285,6 +287,7 @@ TASKS: tuple[Task, ...] = (
                 "staging.processed",
                 "staging.raw_data",
                 "source_records",
+                "source_record_identifiers",
                 "source_record_locations",
                 "platforms",
                 "source_contributions",
@@ -328,6 +331,7 @@ TASKS: tuple[Task, ...] = (
         # La suppression d'un enregistrement source emporte ses localisations, ses contributions sources, leurs adresses, ROR et structures HAL, et les décisions qui les visent.
         writes=(
             "source_records.id",
+            "source_record_identifiers",
             "source_record_locations",
             "source_record_keys_queue",
             "publication_contributions_queue",
@@ -461,11 +465,12 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "doi_prefixes.id",
             "source_records.doi",
-            "source_records.external_ids",
+            "source_records.corrections",
+            "source_record_identifiers",
             "publication_relations",
         ),
         writes=("doi_prefixes.id", "doi_prefixes.ra"),
-        previous_run=("source_records", "publication_relations"),
+        previous_run=("source_records", "source_record_identifiers", "publication_relations"),
         network="doi.org",
     ),
     _task(
@@ -604,6 +609,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_year",
             "source_records.doi",
             "source_records.publication_id",
+            "source_record_identifiers",
             # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
             "unpaywall",
         ),
@@ -620,6 +626,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.language",
             "source_records.external_ids",
             "source_records.corrections",
+            "source_record_identifiers.removed_by",
             "publications",
             "publications_detail",
             "publishers.publication_count",
@@ -630,6 +637,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.publication_id",
             "source_records.serial_id",
             "source_records.doi",
+            "source_record_identifiers.removed_by",
             "unpaywall",
         ),
     ),
@@ -804,6 +812,7 @@ TASKS: tuple[Task, ...] = (
             "publishers.publisher_type",
             "language_forms",
             "source_contributions.source_record_id",
+            "source_record_identifiers",
             # Dépôts HAL introuvables dans HAL.
             "failed_lookups",
         ),
@@ -814,12 +823,14 @@ TASKS: tuple[Task, ...] = (
             "source_records.external_ids",
             "source_records.urls",
             "source_records.corrections",
+            "source_record_identifiers.removed_by",
             "source_record_locations",
             "source_record_keys_queue",
         ),
         # Les référentiels vides, supprimés plus loin, ne sont référencés par aucun enregistrement source : la correction ne les atteint pas.
         previous_run=(
             "source_records",
+            "source_record_identifiers.removed_by",
             "serials.serial_type",
             "serials.oa_model",
             "serials.is_in_doaj",
@@ -846,6 +857,7 @@ TASKS: tuple[Task, ...] = (
                 "publication_id",
             )
         )
+        + ("source_record_identifiers",)
         # DOI que doi.org ne connaît pas.
         + ("failed_lookups",)
         # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
@@ -859,10 +871,11 @@ TASKS: tuple[Task, ...] = (
             "source_records.doi",
             "source_records.external_ids",
             "source_records.corrections",
+            "source_record_identifiers.removed_by",
             "source_record_keys_queue",
             "publication_contributions_queue",
         ),
-        previous_run=("source_records",),
+        previous_run=("source_records", "source_record_identifiers.removed_by"),
     ),
     _task(
         "metadata_correction.matchable",
@@ -877,11 +890,11 @@ TASKS: tuple[Task, ...] = (
                     "doi",
                     "title_normalized",
                     "urls",
-                    "external_ids",
                     "corrections",
                     "is_matchable",
                 )
             ),
+            "source_record_identifiers",
             # Dépôts HAL introuvables dans HAL.
             "failed_lookups",
         ),
@@ -893,6 +906,7 @@ TASKS: tuple[Task, ...] = (
         "publications",
         reads=(
             "source_records",
+            "source_record_identifiers",
             "source_record_keys_queue",
             "source_contributions.in_perimeter",
             "manual_merge_source_records",
