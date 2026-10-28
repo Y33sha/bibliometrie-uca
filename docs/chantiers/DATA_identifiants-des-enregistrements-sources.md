@@ -97,15 +97,20 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 - [x] Suppression de la colonne (77739fdaa).
 
-### Phase 6 — DOI bioRxiv et medRxiv
+### Phase 6 — Retrait de la colonne `doi`
+
+- [ ] Place du DOI concept substitué à un DOI de version.
+- [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.
+- [ ] Suppression de la colonne.
+
+### Phase 7 — DOI bioRxiv et medRxiv
 
 - [ ] DOI bioRxiv et medRxiv (préfixe 10.1101) exposés par les sources, par exemple dans les localisations OpenAlex (publication 2757).
 
-### Phase 7 — Documentation
+### Phase 8 — Documentation
 
 - [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
 
-- Place de la suppression de la colonne `doi` dans le phasage.
 - DOI de version et pièces de dataset : écartés de la réconciliation (`is_matchable`) au lieu de la substitution du DOI concept ou du DOI du dataset parent. Le DOI concept ou le dataset parent est parfois absent de la base.
