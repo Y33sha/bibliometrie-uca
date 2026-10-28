@@ -52,7 +52,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     margin-bottom: 8px;
   }
   .ov {

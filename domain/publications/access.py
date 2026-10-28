@@ -2,7 +2,7 @@
 
 Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL. Quand une plateforme décrit elle-même la publication (HAL pour HAL), sa description décide de l'ouverture de ses copies : les copies que les autres sources lui attribuent sont écartées.
 
-Une plateforme du registre (`domain.platforms.registry`) se reconnaît par sa source OpenAlex et porte le nom du registre. Une autre plateforme porte le nom que lui donne la source.
+Une plateforme du registre (`domain.platforms.registry`) se reconnaît par l'URL de la copie ou par sa source OpenAlex, et prend le nom du registre. Une autre plateforme prend le nom que lui donne la source.
 
 Seule une copie à adresse `http` ou `https` compte : l'adresse vient des sources, et alimente un lien. La meilleure copie est l'adresse d'accès. Une copie désignée par le DOI de la publication peut l'être, mais ne figure pas parmi les liens : le DOI est affiché à part. Une copie désignée par un autre DOI figure parmi les liens seulement si une plateforme l'héberge.
 
@@ -13,7 +13,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from urllib.parse import unquote, urlsplit
 
-from domain.platforms.registry import KnownPlatform, known_platform_of_source
+from domain.platforms.registry import KnownPlatform
 from domain.publications.metadata import OA_OPEN_STATUSES, OaStatus
 
 _DOI_HOSTS = frozenset({"doi.org", "dx.doi.org"})
@@ -30,9 +30,9 @@ class Copy:
     version: str | None
     is_oa: bool | None
     platform: str | None
-    """Nom de la plateforme qui héberge la copie."""
-    platform_openalex_id: str | None
-    """Source OpenAlex de la plateforme."""
+    """Nom de la plateforme qui héberge la copie : celui de la liste pour une plateforme connue, sinon celui que donne la source."""
+    known_platform: KnownPlatform | None
+    """Plateforme de la liste qui héberge la copie (`known_platform_of_copy`)."""
     described_by_platform: bool
     """La copie vient de l'enregistrement source que la plateforme donne elle-même."""
     arrival: int
@@ -59,15 +59,9 @@ def _host(copy: Copy) -> str:
     return urlsplit(copy.url).hostname or copy.url
 
 
-def _known_platform(copy: Copy) -> KnownPlatform | None:
-    if copy.platform_openalex_id is None:
-        return None
-    return known_platform_of_source(copy.platform_openalex_id)
-
-
 def _label(copy: Copy) -> str:
-    if known := _known_platform(copy):
-        return known.name
+    if copy.known_platform:
+        return copy.known_platform.name
     return copy.platform or _host(copy).removeprefix("www.")
 
 
@@ -102,7 +96,7 @@ def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
     return Access(
         url=ranked[0].url if ranked else None,
         links=[
-            AccessLink(label, copy.url, _known_platform(copy) is not None)
+            AccessLink(label, copy.url, copy.known_platform is not None)
             for label, copy in best.items()
         ],
     )

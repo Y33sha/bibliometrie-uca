@@ -7,6 +7,8 @@ Règle 2 : contournement des hooks git (`--no-verify` & co), au commit comme au 
 
 Règle 3 : indexation globale (`git add .`, `-A`, `-u`, `git commit -a`). Elle embarque les modifications d'autrui — l'utilisateur, ou un autre agent — présentes dans l'arbre de travail.
 
+Règle 4 : commit par chemins. Tout `git commit` nomme ses chemins après `--`. Une indexation (`git add`, `git rm`, `git mv`, `git apply --cached` ou `--index`) est suivie, dans la même commande, d'un commit par chemins. Un index laissé plein est embarqué par le commit d'un autre agent.
+
 Installation : .claude/settings.json
 
 {
@@ -56,6 +58,15 @@ PROMISCUOUS_RE = re.compile(
     r"|\bgit\s+checkout\s+--\s+\.(?=\s|$)"
     r"|\bgit\s+reset\s+--hard\b"
 )
+
+
+# --- Règle 4 : commit par chemins -----------------------------------------
+
+GIT_PREFIX = r"\bgit\s+(?:-C\s+\S+\s+)*"
+STAGING_RE = re.compile(GIT_PREFIX + r"(?:(?:add|rm|mv)\b|apply\b[^\n]*?--(?:cached|index)\b)")
+COMMIT_RE = re.compile(GIT_PREFIX + r"commit\b")
+# Le message d'un commit peut tenir sur plusieurs lignes : les chemins se cherchent dans tout le reste de la commande.
+PATHS_RE = re.compile(r"\s--\s+\S")
 
 
 def strip_heredocs(cmd: str) -> str:
@@ -168,6 +179,30 @@ def check_promiscuous(cmd: str) -> int | None:
     )
 
 
+def check_commit_by_path(cmd: str) -> int | None:
+    commits = list(COMMIT_RE.finditer(cmd))
+    for m in commits:
+        if not PATHS_RE.search(cmd, m.end()):
+            return decide(
+                "deny",
+                "Commande refusée : `git commit` sans chemins. Commite TOUJOURS par "
+                "chemins : `git commit -m \"...\" -- chemin/a.py chemin/b.ts`. Un commit "
+                "sans chemins embarque tout l'index, y compris ce qu'une autre session "
+                "y a mis.",
+            )
+    staging = STAGING_RE.search(cmd)
+    if staging and not any(m.start() > staging.start() for m in commits):
+        return decide(
+            "deny",
+            "Commande refusée : indexation sans commit. Ne laisse jamais l'index "
+            "plein : une autre session commiterait ton travail, ou toi le sien.\n"
+            "Commite par chemins : `git commit -m \"...\" -- chemins`. Un fichier "
+            "nouveau s'indexe dans la même commande que son commit : "
+            "`git add -- nouveau.py && git commit -m \"...\" -- nouveau.py autre.py`.",
+        )
+    return None
+
+
 def main() -> int:
     try:
         payload = json.load(sys.stdin)
@@ -187,6 +222,7 @@ def main() -> int:
         check_cd(segs),
         check_bypass(cmd),
         check_promiscuous(cmd),
+        check_commit_by_path(cmd),
     ):
         if result is not None:
             return result

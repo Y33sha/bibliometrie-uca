@@ -176,7 +176,7 @@
   }
   .graph-legend {
     margin: 0 0 8px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
   }
   .spec-cell {

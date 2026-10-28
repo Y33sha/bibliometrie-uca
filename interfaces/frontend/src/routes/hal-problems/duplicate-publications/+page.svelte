@@ -167,13 +167,13 @@
 {/snippet}
 
 <style>
-	.data-table td { font-size: 0.9rem; }
+	.data-table td { font-size: var(--fs-md); }
 	.meta-table td { width: 50%; }
 
 	.hal-list { display: flex; flex-direction: column; gap: 4px; }
 	.meta-table .hal-list { margin-top: 6px; }
 	.hal-row { display: flex; gap: 8px; align-items: center; white-space: nowrap; }
 	.publication-meta-line { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 3px; }
-	.hal-details { font-size: 0.8rem; color: var(--text-secondary); }
-	.container-title { font-size: 0.82rem; color: var(--muted); margin-top: 2px; font-style: italic; }
+	.hal-details { font-size: var(--fs-sm); color: var(--text-secondary); }
+	.container-title { font-size: var(--fs-sm); color: var(--muted); margin-top: 2px; font-style: italic; }
 </style>

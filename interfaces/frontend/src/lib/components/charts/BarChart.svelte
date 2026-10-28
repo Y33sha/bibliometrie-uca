@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { Chart } from '#lib/components/charts/chart.js';
 
 	let {
@@ -29,7 +29,7 @@
 			chart = null;
 		}
 		if (!canvas || values.length === 0) return;
-		const barColor = color ?? cssVar('accent-mid');
+		const barColor = color ?? cssColor('accent-mid');
 		const valueScale = { beginAtZero: true, ticks: { precision: 0 } };
 		const categoryScale = { grid: { display: false } };
 
@@ -47,7 +47,7 @@
 				layout: { padding: horizontal ? { right: 32 } : { top: 20 } },
 				plugins: {
 					legend: { display: false },
-					datalabels: { anchor: 'end', align: 'end', font: { weight: 600, size: 11 } }
+					datalabels: { anchor: 'end', align: 'end', font: { weight: 600 } }
 				},
 				scales: horizontal
 					? { x: valueScale, y: categoryScale }
@@ -76,16 +76,18 @@
 <div class="chart-wrap" style="height: {height}px">
 	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
-<table class="visually-hidden">
-	<thead>
-		<tr><td></td><th scope="col">{datasetLabel || 'Nombre'}</th></tr>
-	</thead>
-	<tbody>
-		{#each labels as label, i (i)}
-			<tr><th scope="row">{label}</th><td>{values[i]}</td></tr>
-		{/each}
-	</tbody>
-</table>
+<div class="visually-hidden">
+	<table>
+		<thead>
+			<tr><td></td><th scope="col">{datasetLabel || 'Nombre'}</th></tr>
+		</thead>
+		<tbody>
+			{#each labels as label, i (i)}
+				<tr><th scope="row">{label}</th><td>{values[i]}</td></tr>
+			{/each}
+		</tbody>
+	</table>
+</div>
 
 <style>
 	.chart-wrap {

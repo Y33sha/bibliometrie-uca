@@ -53,7 +53,7 @@ HAL_FIELDS = [
     "label_s",
     "collCode_s",
     "nntId_s",
-    "pubmedid_s",
+    "pubmedId_s",
     "abstract_s",
     "keyword_s",
     # Domaines CCSD : `<code>_FacetSep_<libellé racine>/…/<libellé feuille>`, qui

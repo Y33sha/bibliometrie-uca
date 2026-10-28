@@ -1,10 +1,9 @@
-import { api, ApiError, cancel } from '#lib/api/index.js';
+import { api, cancel, errorMessage } from '#lib/api/index.js';
 import { dropPageParam, isPageOutOfRange } from '#lib/pagination.js';
 
-/** Message affiché à la place d'une liste dont le chargement échoue : le `detail` de la réponse en erreur, sinon son statut HTTP. */
+/** Message affiché à la place d'une liste dont le chargement échoue (`errorMessage`). */
 function loadErrorMessage(e: unknown): string {
-	if (e instanceof ApiError) return `Chargement impossible : ${e.detailMessage ?? `erreur ${e.status}`}`;
-	return 'Chargement impossible';
+	return `Chargement impossible : ${errorMessage(e)}`;
 }
 
 /**

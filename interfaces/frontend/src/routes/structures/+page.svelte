@@ -9,7 +9,7 @@
 	import { onMount } from 'svelte';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
-	import { api, ApiError, structures as structuresApi } from '#lib/api/index.js';
+	import { api, structures as structuresApi, errorMessage } from '#lib/api/index.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
@@ -180,9 +180,8 @@
 			createModalOpen = false;
 			list.load();
 			drawer.open(created.id);
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur: ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur: ' + errorMessage(e), 'error');
 		}
 	}
 

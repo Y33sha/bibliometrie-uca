@@ -106,14 +106,14 @@
     text-decoration: underline;
   }
   .meta {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .stats {
     display: flex;
     flex-wrap: wrap;
     gap: 4px 14px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     margin-top: 4px;
   }
@@ -126,7 +126,7 @@
     flex-wrap: wrap;
     gap: 6px 12px;
     margin-top: 6px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
   .source-record {
     display: inline-flex;

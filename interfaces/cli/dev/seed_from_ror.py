@@ -13,7 +13,13 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from domain.config import PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY
+from domain.config import (
+    BRAND_HUE_KEY,
+    DEFAULT_BRAND_HUE,
+    PERIMETER_EXTRACTION_KEY,
+    PERIMETER_PERSONS_KEY,
+    SITE_TITLE_KEY,
+)
 from domain.normalize import normalize_text
 from domain.structures.identifiers import normalize_ror_id
 from domain.structures.name_forms import is_short_form
@@ -57,6 +63,10 @@ _PERIMETER_DESCRIPTIONS = {
     PERIMETER_EXTRACTION_KEY: "Périmètre pour déterminer les structures à interroger lors de l'extraction",
     PERIMETER_PERSONS_KEY: "Périmètre pour la création des personnes",
 }
+_SITE_TITLE_DESCRIPTION = (
+    "Titre de l'application. Vide : « Bibliométrie » suivi du nom de l'établissement."
+)
+_BRAND_HUE_DESCRIPTION = "Teinte de l'interface : angle OKLCH en degrés, de 0 à 359."
 
 
 @dataclass(frozen=True)
@@ -237,6 +247,10 @@ def build_institution_seed(
         {"key": key, "value": perimeter_code, "description": description}
         for key, description in _PERIMETER_DESCRIPTIONS.items()
     ]
+    config.append({"key": SITE_TITLE_KEY, "value": "", "description": _SITE_TITLE_DESCRIPTION})
+    config.append(
+        {"key": BRAND_HUE_KEY, "value": DEFAULT_BRAND_HUE, "description": _BRAND_HUE_DESCRIPTION}
+    )
 
     rows_by_table = {
         "structures": structures,

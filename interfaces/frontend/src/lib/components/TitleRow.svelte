@@ -13,6 +13,7 @@
 
 <style>
 	.title-row {
+		position: relative;
 		display: flex;
 		align-items: flex-start;
 		gap: 10px;
@@ -21,5 +22,14 @@
 	.title-row > :global(.icon-btn) {
 		flex: none;
 		margin-top: 4px;
+	}
+	/* Écran large : l'icône se place dans la marge, à gauche du titre, qui reste aligné sur le contenu. */
+	@media (min-width: 1440px) {
+		.title-row > :global(.icon-btn) {
+			position: absolute;
+			top: 0;
+			right: 100%;
+			margin-right: 8px;
+		}
 	}
 </style>

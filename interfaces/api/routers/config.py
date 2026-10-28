@@ -42,7 +42,7 @@ def list_config(
 
 @router.get("/institution", response_model=InstitutionOut)
 def institution(queries: PerimetersQueries = Depends(perimeters_queries)) -> InstitutionOut:
-    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes."""
+    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application."""
     return queries.institution()
 
 

@@ -10,6 +10,10 @@ beforeAll(() => {
 			disconnect() {}
 		},
 	);
+	// jsdom ignore l'API popover.
+	HTMLElement.prototype.showPopover = vi.fn(function (this: HTMLElement) {
+		this.dataset.popoverOpen = '';
+	});
 });
 
 /** Ancre de 100 × 20 px dont le haut est à `top`, et panneau de 150 px de haut. */
@@ -30,6 +34,14 @@ describe('anchored', () => {
 		expect(panel.style.position).toBe('fixed');
 		expect(panel.style.top).toBe('124px');
 		expect(panel.style.left).toBe('50px');
+		action.destroy();
+	});
+
+	it('affiche le panneau dans la couche supérieure', () => {
+		const panel = setup(100);
+		const action = anchored(panel);
+		expect(panel.getAttribute('popover')).toBe('manual');
+		expect(panel.dataset.popoverOpen).toBe('');
 		action.destroy();
 	});
 

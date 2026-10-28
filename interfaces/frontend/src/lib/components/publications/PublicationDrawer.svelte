@@ -4,6 +4,7 @@
   import type { components } from "#lib/api/schema.js";
   import Drawer from "#lib/components/Drawer.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
+  import PublicationMergeSection from "#lib/components/publications/PublicationMergeSection.svelte";
   import SourceTag from "#lib/components/SourceTag.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { contributionRoleLabels } from "#lib/labels.js";
@@ -12,13 +13,27 @@
 
   type PublicationSources = components["schemas"]["PublicationSourcesResponse"];
 
-  let { publicationId, onclose }: { publicationId: number; onclose: () => void } = $props();
+  // `onopen` ouvre le volet d'une autre publication : la publication conservée par une fusion.
+  let {
+    publicationId,
+    onclose,
+    onopen,
+  }: { publicationId: number; onclose: () => void; onopen: (publicationId: number) => void } =
+    $props();
 
   let data = $state<PublicationSources | null>(null);
   let failure = $state<string | null>(null);
+  // Incrémenté après une fusion qui conserve cette publication, pour relire ses enregistrements sources.
+  let version = $state(0);
+
+  function merged(keptId: number) {
+    if (keptId === publicationId) version++;
+    else onopen(keptId);
+  }
 
   $effect(() => {
     const id = publicationId;
+    void version;
     data = null;
     failure = null;
     api<PublicationSources>(`/api/publications/${id}/sources`)
@@ -40,7 +55,7 @@
   const authors = $derived(data ? authorRows(records, data.source_contributions) : []);
 </script>
 
-<Drawer width="1200px" {onclose}>
+<Drawer width="max(1200px, 67vw)" {onclose}>
   {#snippet head()}
     {#if data}
       <a
@@ -159,6 +174,7 @@
         {/each}
       </tbody>
     </table>
+    <PublicationMergeSection {publicationId} onmerged={merged} />
   {/if}
 </Drawer>
 
@@ -166,7 +182,7 @@
   .drawer-title {
     color: inherit;
     text-decoration: none;
-    font-size: 1.05rem;
+    font-size: var(--fs-base);
     font-weight: 600;
   }
   .drawer-title:hover {
@@ -175,7 +191,7 @@
   }
   .comparison {
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     min-width: 100%;
   }
   .comparison th,
@@ -244,14 +260,14 @@
   .record-id {
     font-weight: 400;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
   .absent {
     color: var(--text-faint);
   }
   .note {
     color: var(--muted);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     margin-top: 2px;
   }
   .failure {
@@ -271,7 +287,7 @@
     left: 0;
     width: calc(var(--position-gutter) - 6px);
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
@@ -287,7 +303,7 @@
   .countries,
   .roles {
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 4px;
   }
 

@@ -11,7 +11,6 @@ from defusedxml.common import DefusedXmlException
 
 from domain.dates import today
 from domain.persons.contributor_name import ContributorName
-from domain.platforms.registry import HAL
 from domain.publications.contribution_roles import map_role
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import (
@@ -30,7 +29,7 @@ from domain.source_records.doc_types import map_doc_type
 from domain.source_records.external_ids import ExternalIdType
 from domain.structures.identifiers import parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
-from pipeline.ingestion.common.locations import LocationFacts, known_platform_facts
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -137,7 +136,6 @@ def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> l
             pdf_url=file_main,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
             is_oa=file_main is not None and embargo_until is None,
-            platform=known_platform_facts(HAL),
         )
     ]
 
@@ -161,14 +159,14 @@ def build_hal_external_ids(
 ) -> dict[str, JsonValue]:
     """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
 
-    `hal_id` est redondant avec `source_id` comme clé, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    `hal_id` est redondant avec `source_id` comme clé, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedId_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
     external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
     if nnt:
         external_ids[ExternalIdType.NNT] = nnt
     if isbns := parse_tei_isbns(hal_text_field(doc.get("label_xml"))):
         external_ids[ExternalIdType.ISBN] = isbns
-    if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
+    if pmid := normalize_pmid(hal_text_field(doc.get("pubmedId_s"))):
         external_ids[ExternalIdType.PMID] = pmid
     raw = doc.get("linkExtUrl_s")
     link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)

@@ -1,3 +1,24 @@
+<script lang="ts" module>
+	import { columnLabels } from '#lib/labels.js';
+	import { useColumnVisibility, type ColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
+
+	/** Visibilité des colonnes du tableau, tenue par la vue qui l'affiche : l'export CSV émet les mêmes colonnes. */
+	export function useThesisColumns(showLabsColumn: boolean): ColumnVisibility {
+		const columnDefs = [
+			{ key: 'inscription', label: 'Inscription' },
+			{ key: 'soutenance',  label: 'Soutenance' },
+			{ key: 'author',      label: columnLabels.author },
+			{ key: 'doi',         label: columnLabels.doi },
+			{ key: 'title',       label: columnLabels.title,       fixed: true },
+			{ key: 'status',      label: 'Statut' },
+			...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs }] : []),
+			{ key: 'sources',     label: columnLabels.sources },
+			{ key: 'access',      label: columnLabels.access,       fixed: true },
+		];
+		return useColumnVisibility('thesis-table-columns', columnDefs, ['sources']);
+	}
+</script>
+
 <script lang="ts">
 	import TableScroll from '#lib/components/TableScroll.svelte';
 	import SourceLinks from '#lib/components/SourceLinks.svelte';
@@ -6,12 +27,10 @@
 	import ColumnMenu from '#lib/components/ColumnMenu.svelte';
 	import DoiLink from '#lib/components/DoiLink.svelte';
 	import SortChevron from '#lib/components/SortChevron.svelte';
-	import { columnLabels } from '#lib/labels.js';
 	import { resolve } from '$app/paths';
 	import { titleCase } from '#lib/utils.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
-	import { useColumnVisibility } from '#lib/composables/useColumnVisibility.svelte.js';
 	import { sortDirection } from '#lib/sort.js';
 	import type { components, operations } from '#lib/api/schema.js';
 
@@ -41,7 +60,7 @@
 		NonNullable<operations['list_publications_api_publications_get']['parameters']['query']>['sort']
 	>;
 
-	export type ThesisSortColumn = 'inscription' | 'soutenance' | 'title';
+	export type ThesisSortColumn = 'inscription' | 'soutenance' | 'author' | 'title' | 'labs';
 
 	let {
 		items,
@@ -49,7 +68,7 @@
 		error = null,
 		sort,
 		onToggleSort,
-		showLabsColumn = false,
+		columns: cv,
 		onopen,
 		activeId = null,
 	}: {
@@ -59,7 +78,8 @@
 		error?: string | null;
 		sort: PublicationSort;
 		onToggleSort: (column: ThesisSortColumn) => void;
-		showLabsColumn?: boolean;
+		/** Visibilité des colonnes, créée par `useThesisColumns`. */
+		columns: ColumnVisibility;
 		/** Ouvre le volet de la thèse. Fourni, il ajoute en tête de ligne une icône qui l'appelle. */
 		onopen?: (publicationId: number) => void;
 		/** Thèse dont le volet est ouvert, dont la ligne est mise en évidence. */
@@ -77,25 +97,13 @@
 		return { month: MONTHS[parseInt(m, 10) - 1] || '', year: y };
 	}
 
-	// La visibilité des colonnes est partagée avec la liste des publications : seules DOI et Sources sont optionnelles.
-	const columnDefs = [
-		{ key: 'inscription', label: 'Inscription', fixed: true },
-		{ key: 'soutenance',  label: 'Soutenance',  fixed: true },
-		{ key: 'author',      label: columnLabels.author,      fixed: true },
-		{ key: 'doi',         label: columnLabels.doi },
-		{ key: 'title',       label: columnLabels.title,       fixed: true },
-		{ key: 'status',      label: 'Statut',      fixed: true },
-		// svelte-ignore state_referenced_locally
-		...(showLabsColumn ? [{ key: 'labs', label: columnLabels.labs, fixed: true }] : []),
-		{ key: 'sources',     label: columnLabels.sources },
-		{ key: 'access',      label: columnLabels.access,       fixed: true },
-	];
-	const cv = useColumnVisibility(columnDefs, ['sources']);
-	const col = cv.col;
+	const col = (key: string) => cv.col(key);
 
 	const inscrSort = $derived(sortDirection(sort, 'inscription'));
 	const soutSort = $derived(sortDirection(sort, 'soutenance'));
+	const authorSort = $derived(sortDirection(sort, 'author'));
 	const titleSort = $derived(sortDirection(sort, 'title'));
+	const labsSort = $derived(sortDirection(sort, 'labs'));
 </script>
 
 <TableScroll>
@@ -103,27 +111,33 @@
 	<thead>
 		<tr>
 			{#if onopen}<th class="panel-col"></th>{/if}
-			<th
+			{#if col('inscription')}<th
 				class="col-date sortable"
 				class:active={inscrSort !== null}
 				onclick={() => onToggleSort('inscription')}
-			>Inscription <SortChevron direction={inscrSort} /></th>
-			<th
+			>Inscription <SortChevron direction={inscrSort} /></th>{/if}
+			{#if col('soutenance')}<th
 				class="col-date sortable"
 				class:active={soutSort !== null}
 				onclick={() => onToggleSort('soutenance')}
-			>Soutenance <SortChevron direction={soutSort} /></th>
-			<th class="col-author">{columnLabels.author}</th>
+			>Soutenance <SortChevron direction={soutSort} /></th>{/if}
+			{#if col('author')}<th
+				class="col-author sortable"
+				class:active={authorSort !== null}
+				onclick={() => onToggleSort('author')}
+			>{columnLabels.author} <SortChevron direction={authorSort} /></th>{/if}
 			{#if col('doi')}<th class="col-doi">{columnLabels.doi}</th>{/if}
 			<th
 				class="col-title sortable"
 				class:active={titleSort !== null}
 				onclick={() => onToggleSort('title')}
 			>{columnLabels.title} <SortChevron direction={titleSort} /></th>
-			<th class="col-status">Statut</th>
-			{#if showLabsColumn}
-				<th class="col-labs">{columnLabels.labs}</th>
-			{/if}
+			{#if col('status')}<th class="col-status">Statut</th>{/if}
+			{#if col('labs')}<th
+				class="col-labs sortable"
+				class:active={labsSort !== null}
+				onclick={() => onToggleSort('labs')}
+			>{columnLabels.labs} <SortChevron direction={labsSort} /></th>{/if}
 			{#if col('sources')}<th class="col-sources">{columnLabels.sources}</th>{/if}
 			<th class="col-access col-menu-th">
 				<ColumnMenu label={columnLabels.access} columns={cv.columns} visibleColumns={cv.visibleColumns}
@@ -147,33 +161,33 @@
 						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => onopen(t.id)} />
 					</td>
 				{/if}
-				<td class="col-date">
+				{#if col('inscription')}<td class="col-date">
 					{#if insc}<span class="date-month">{insc.month}</span> {insc.year}{/if}
-				</td>
-				<td class="col-date">
+				</td>{/if}
+				{#if col('soutenance')}<td class="col-date">
 					{#if sout}<span class="date-month">{sout.month}</span> {sout.year}{/if}
-				</td>
-				<td class="col-author">
+				</td>{/if}
+				{#if col('author')}<td class="col-author">
 					{#if t.thesis_author_person_id}
 						<a href={resolve(`persons/${t.thesis_author_person_id}`)}>{titleCase(t.thesis_author_name)}</a>
 					{:else if t.thesis_author_name}
 						{titleCase(t.thesis_author_name)}
 					{/if}
-				</td>
+				</td>{/if}
 				{#if col('doi')}<td class="col-doi">
 					{#if t.doi}<DoiLink doi={t.doi} />{/if}
 				</td>{/if}
 				<td class="col-title">
 					<a href={resolve(`publications/${t.id}`)}><PublicationTitle titre={t.title} /></a>
 				</td>
-				<td class="col-status">
+				{#if col('status')}<td class="col-status">
 					{#if t.doc_type === 'thesis'}
 						<span class="status-badge soutenue">Soutenue</span>
 					{:else if t.doc_type === 'ongoing_thesis'}
 						<span class="status-badge en-cours">En cours</span>
 					{/if}
-				</td>
-				{#if showLabsColumn}
+				</td>{/if}
+				{#if col('labs')}
 					<td class="col-labs">
 						{#each t.lab_items || [] as lab}
 							<a href={resolve(`structures/${lab.id}?tab=theses`)} class="lab-tag">{lab.label}</a>
@@ -194,7 +208,7 @@
 	.panel-col { width: 28px; padding-right: 0; }
 	.theses-table {
 		min-width: 720px;
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 	}
 
 	.col-author {
@@ -207,13 +221,13 @@
 	}
 	/* Taille propre aux cellules : l'en-tête garde la typographie commune des tableaux. */
 	td.col-author {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 	}
 	td.col-date {
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 	}
 	.col-date .date-month {
-		font-size: 0.75rem;
+		font-size: var(--fs-sm);
 		color: var(--muted);
 	}
 	.col-title {
@@ -238,7 +252,7 @@
 		white-space: nowrap;
 	}
 	.status-badge {
-		font-size: 0.75rem;
+		font-size: var(--fs-sm);
 		padding: 2px 6px;
 		border-radius: var(--radius);
 	}

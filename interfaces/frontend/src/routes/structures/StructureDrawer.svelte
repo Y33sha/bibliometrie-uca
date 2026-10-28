@@ -4,7 +4,7 @@
   import IconButton from "#lib/components/IconButton.svelte";
   import { onMount, onDestroy } from "svelte";
   import { resolve } from "$app/paths";
-  import { api, ApiError, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { api, errorMessage, nameForms, structures as structuresApi } from "#lib/api/index.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import {
     API_SOURCES,
@@ -210,12 +210,7 @@
         requires_context_of: ctx,
       });
     } catch (e) {
-      if (e instanceof ApiError) {
-        const detailMsg = (e.detail as { detail?: string })?.detail;
-        toast(detailMsg || `Erreur ${e.status}`, "error");
-        return;
-      }
-      toast((e as Error).message, "error");
+      toast(errorMessage(e), "error");
       return;
     }
     addFormText = "";
@@ -230,8 +225,7 @@
     try {
       await nameForms.remove(formId);
     } catch (e) {
-      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : (e as Error).message;
-      toast("Erreur suppression: " + msg, "error");
+      toast("Erreur suppression: " + errorMessage(e), "error");
       return;
     }
     await loadDetail();
@@ -391,9 +385,8 @@
       await loadDetail();
       refreshCache();
       onchange();
-    } catch (e: any) {
-      const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-      toast("Erreur: " + msg, "error");
+    } catch (e) {
+      toast("Erreur: " + errorMessage(e), "error");
     }
   }
 
@@ -553,7 +546,7 @@
     gap: 12px;
   }
   .drawer-name-link {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
     color: inherit;
     text-decoration: none;
   }
@@ -576,17 +569,17 @@
     align-items: center;
     gap: 14px;
     margin-bottom: 8px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .field-label {
     color: var(--muted);
     font-weight: 500;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
 
   .api-ids-display {
     margin-top: 8px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     display: flex;
     flex-wrap: wrap;
@@ -599,7 +592,7 @@
   .api-id-source {
     font-weight: 600;
     text-transform: uppercase;
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--muted);
   }
 </style>

@@ -131,7 +131,7 @@
     fill: var(--accent-mid);
   }
   .label {
-    font-size: 13px;
+    font-size: var(--fs-sm);
     fill: var(--text);
     /* Halo du fond de page : les libellés restent lisibles sur les liens. */
     paint-order: stroke;
@@ -144,7 +144,7 @@
     font-weight: 600;
   }
   .center-label {
-    font-size: 15px;
+    font-size: var(--fs-md);
     font-weight: 700;
     fill: var(--accent);
   }
@@ -157,7 +157,7 @@
     border-radius: var(--radius);
     background: var(--card);
     box-shadow: 0 6px 20px rgba(16, 24, 40, 0.14), 0 0 0 1px rgba(16, 24, 40, 0.06);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     line-height: 1.45;
     color: var(--text-secondary);
     pointer-events: none;

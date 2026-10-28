@@ -70,14 +70,15 @@
 		box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 	}
 	.login-card h1 {
-		font-size: 1.3rem;
+		font-family: var(--font-brand);
+		font-size: var(--fs-xl);
 		margin: 0 0 4px;
 		text-align: center;
 	}
 	.login-subtitle {
 		text-align: center;
 		color: var(--muted);
-		font-size: 0.95rem;
+		font-size: var(--fs-md);
 		margin: 0 0 20px;
 	}
 	.login-error {
@@ -85,7 +86,7 @@
 		color: var(--danger);
 		padding: 8px 12px;
 		border-radius: var(--radius);
-		font-size: 0.95rem;
+		font-size: var(--fs-md);
 		margin-bottom: 12px;
 		text-align: center;
 	}
@@ -95,7 +96,7 @@
 	}
 	label span {
 		display: block;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		font-weight: 500;
 		color: var(--muted);
 		margin-bottom: 4px;
@@ -105,7 +106,7 @@
 		padding: 8px 10px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
-		font-size: 1rem;
+		font-size: var(--fs-base);
 		font-family: inherit;
 		background: var(--card);
 	}
@@ -121,7 +122,7 @@
 		color: white;
 		border: none;
 		border-radius: var(--radius);
-		font-size: 1rem;
+		font-size: var(--fs-base);
 		font-weight: 500;
 		cursor: pointer;
 		font-family: inherit;

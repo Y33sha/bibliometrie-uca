@@ -27,7 +27,7 @@
 
 {#if persons.length > 0}
   <div class="detail-section detail-row">
-    <SectionLabel icon="person" text="Personnes liées" count={persons.length} />
+    <SectionLabel icon="person" text="Personnes liées" />
     <div class="detail-tags">
       {#each persons as a (a.person_id)}
         <a href={resolve(`persons/${a.person_id}`)}>

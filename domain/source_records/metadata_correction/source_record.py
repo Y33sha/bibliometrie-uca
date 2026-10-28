@@ -1,8 +1,9 @@
 """Correction unaire d'un enregistrement source : ses valeurs corrigées et la trace de ses corrections."""
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Set
 from typing import NamedTuple
 
+from domain.publications.identifiers import extract_hal_id_from_url
 from domain.source_records.corrections import (
     UNARY_KEYS,
     CorrectionKey,
@@ -12,6 +13,7 @@ from domain.source_records.corrections import (
     stash_entry,
     without_values,
 )
+from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
     MetadataForCorrection,
@@ -28,6 +30,7 @@ class CorrectedSourceRecord(NamedTuple):
     doc_type: str | None
     oa_status: str | None
     external_ids: dict[str, JsonValue]
+    urls: list[str] | None
     corrections: dict[str, JsonValue]
 
 
@@ -40,18 +43,33 @@ def corrected_doc_type(
     return corrected.value if corrected is not None else before.doc_type
 
 
+def _without_hal_ids(external_ids: dict[str, JsonValue], hal_ids: Set[str]) -> dict[str, JsonValue]:
+    """`external_ids` privé des identifiants HAL de `hal_ids`. Une liste vidée disparaît."""
+    cited = external_ids.get(ExternalIdType.HAL_ID)
+    if not isinstance(cited, list):
+        return external_ids
+    kept = [h for h in cited if h not in hal_ids]
+    if len(kept) == len(cited):
+        return external_ids
+    result = {k: v for k, v in external_ids.items() if k != ExternalIdType.HAL_ID}
+    if kept:
+        result[ExternalIdType.HAL_ID] = kept
+    return result
+
+
 def correct_source_record(
     facts: MetadataForCorrection,
     external_ids: dict[str, JsonValue],
     corrections: Mapping[str, JsonValue],
     *,
     origin_doc_type: str | None = None,
+    missing_hal_ids: Set[str] = frozenset(),
 ) -> CorrectedSourceRecord | None:
     """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` permet de reconstruire. Rend `None` si les valeurs courantes sont déjà les valeurs corrigées.
 
-    `facts`, `external_ids` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type.
+    `facts`, `external_ids` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type. `missing_hal_ids` : dépôts HAL introuvables dans HAL.
 
-    Une conflation thèse-article corrigée en article perd ses clés de thèse (`strip_dissertation_keys`). Les identifiants retirés par la sous-étape cluster restent retirés.
+    Une conflation thèse-article corrigée en article perd ses clés de thèse (`strip_dissertation_keys`). Les identifiants et les liens des dépôts de `missing_hal_ids` sont retirés. Les identifiants retirés par la sous-étape cluster restent retirés.
     """
     before = hydrate_raw_view(facts, corrections)
     corrected = effective_metadata(before)
@@ -83,10 +101,24 @@ def correct_source_record(
             new_corrections[CorrectionKey.EXTERNAL_IDS] = stash_entry(
                 raw_external_ids, thesis_to_article.value
             )
+
+    urls = before.urls
+    cited = raw_external_ids.get(ExternalIdType.HAL_ID)
+    if isinstance(cited, list) and not missing_hal_ids.isdisjoint(cited):
+        missing_rule = MetadataCorrectionRule.HAL_DEPOSIT_MISSING_TO_REMOVED.value
+        new_external_ids = _without_hal_ids(new_external_ids, missing_hal_ids)
+        new_corrections.setdefault(
+            CorrectionKey.EXTERNAL_IDS, stash_entry(raw_external_ids, missing_rule)
+        )
+        kept_urls = [u for u in urls or () if extract_hal_id_from_url(u) not in missing_hal_ids]
+        if len(kept_urls) != len(urls or ()):
+            urls = kept_urls or None
+            new_corrections[CorrectionKey.URLS] = stash_entry(before.urls, missing_rule)
+
     new_external_ids = without_values(
         new_external_ids, new_corrections.get(CorrectionKey.REMOVED_EXTERNAL_IDS)
     )
-    result = CorrectedSourceRecord(doc_type, oa_status, new_external_ids, new_corrections)
-    if result == (facts.doc_type, facts.oa_status, external_ids, dict(corrections)):
+    result = CorrectedSourceRecord(doc_type, oa_status, new_external_ids, urls, new_corrections)
+    if result == (facts.doc_type, facts.oa_status, external_ids, facts.urls, dict(corrections)):
         return None
     return result

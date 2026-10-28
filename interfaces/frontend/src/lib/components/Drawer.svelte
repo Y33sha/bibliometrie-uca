@@ -85,7 +85,7 @@
   .drawer-close {
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
     line-height: 1;
     cursor: pointer;
     color: var(--muted);

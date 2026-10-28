@@ -322,7 +322,7 @@
     border: 1px dashed var(--border);
     border-radius: var(--radius);
     background: none;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     color: var(--muted);
     font-family: inherit;
@@ -333,7 +333,7 @@
     border-color: var(--warning);
   }
   .merge-dept {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     margin-left: 6px;
   }
@@ -348,7 +348,7 @@
     opacity: 0.7;
   }
   .drawer-title {
-    font-size: 1.1rem;
+    font-size: var(--fs-lg);
   }
   .drawer-name-link {
     color: inherit;
@@ -381,11 +381,11 @@
     padding: 4px 6px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .exclusion-select {
     height: 28px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .exclusion-select.excluded {
@@ -396,7 +396,7 @@
     gap: 14px;
     align-items: center;
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     margin-bottom: 18px;
   }
   .drawer-section {
@@ -407,7 +407,7 @@
     grid-template-columns: auto 1fr;
     gap: 3px 12px;
     margin: 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
   .rh-info dt {
     color: var(--muted);
@@ -416,14 +416,14 @@
     margin: 0;
   }
   .drawer-section h3 {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--muted);
     margin: 0 0 8px;
   }
   .forms-loading {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .sharing-list {
@@ -437,7 +437,7 @@
     gap: 8px;
   }
   .sharing-name {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     background: none;
     border: none;
     padding: 0;
@@ -451,12 +451,12 @@
     text-decoration: underline;
   }
   .sharing-forms {
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .tag {
     display: inline-block;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     padding: 1px 7px;
     border-radius: var(--radius-pill);
     font-weight: 500;

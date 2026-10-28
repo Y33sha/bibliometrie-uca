@@ -48,6 +48,7 @@ def insert_source_record(
     source_extras: dict[str, object] | None = None,
     topics: object = None,
     corrections: dict[str, object] | None = None,
+    is_matchable: bool = True,
 ) -> int:
     """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
     source_record_id = insert_row(
@@ -83,6 +84,7 @@ def insert_source_record(
             "source_extras": _jsonb(source_extras),
             "topics": _jsonb(topics),
             "corrections": _jsonb(corrections),
+            "is_matchable": is_matchable,
         },
         dict.fromkeys(
             ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"

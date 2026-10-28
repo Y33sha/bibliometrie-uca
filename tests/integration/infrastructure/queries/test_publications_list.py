@@ -13,6 +13,7 @@ from tests.integration.helpers.contributions import contribution_id_of, insert_c
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
@@ -258,6 +259,7 @@ class TestThesesExport:
             publications_queries(sa_sync_conn).export_theses_csv(
                 filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
                 sort="soutenance_desc",
+                columns=[],
             )
         )
 
@@ -284,12 +286,139 @@ class TestThesesExport:
             publications_queries(sa_sync_conn).export_theses_csv(
                 filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
                 sort="soutenance_desc",
+                columns=[],
             )
         )
 
         header, line = csv_text.lstrip("﻿").splitlines()[:2]
         assert header.split(",")[-1] == "Accès"
         assert line.split(",")[-1] == "https://theses.hal.science/tel-1"
+
+    def test_emits_the_visible_columns_in_table_order(self, sa_sync_conn):
+        """Les colonnes demandées, plus le titre et l'accès, dans l'ordre du tableau ; l'auteur est écrit comme à l'affichage."""
+        lab = _lab(sa_sync_conn)
+        publication = insert_publication(sa_sync_conn, "Ma these", doc_type="thesis")
+        author = insert_person(sa_sync_conn, "DUPONT", first_name="jean")
+        contribution = insert_contribution(
+            sa_sync_conn, publication, person_id=author, in_perimeter=True, roles=["author"]
+        )
+        add_contribution_structure(sa_sync_conn, contribution, lab)
+
+        csv_text = "".join(
+            publications_queries(sa_sync_conn).export_theses_csv(
+                filters=PublicationFilters(lab_ids=[lab], doc_types=["thesis"]),
+                sort="soutenance_desc",
+                columns=["status", "author"],
+            )
+        )
+
+        header, line = csv_text.lstrip("﻿").splitlines()[:2]
+        assert header == "Auteur,Titre,Statut,Accès"
+        assert line.startswith("Jean Dupont,Ma these,Soutenue,")
+
+
+class TestThesesSort:
+    """Tri des thèses par auteur (nom puis prénom) et par laboratoires (premier libellé affiché), thèses sans valeur en dernier."""
+
+    def _seed(self, conn):
+        alpha, beta, gamma = (insert_structure(conn, code) for code in ("Alpha", "Beta", "Gamma"))
+        zola, abel = (
+            insert_person(conn, last_name, first_name=first_name)
+            for last_name, first_name in (("Zola", "Albert"), ("Abel", "Zoé"))
+        )
+        theses = []
+        for title, author, labs in (("T1", zola, (gamma, alpha)), ("T2", abel, (beta,))):
+            thesis = insert_publication(conn, title, doc_type="thesis", in_perimeter=True)
+            contribution = insert_contribution(
+                conn, thesis, person_id=author, in_perimeter=True, roles=["author"]
+            )
+            for lab in labs:
+                add_contribution_structure(conn, contribution, lab)
+            theses.append(thesis)
+        theses.append(insert_publication(conn, "T3", doc_type="thesis", in_perimeter=True))
+        return theses
+
+    def _sorted(self, conn, sort):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(doc_types=["thesis"]), page=1, per_page=50, sort=sort
+        )
+        return [p.id for p in res.publications]
+
+    def test_author_sort_reads_the_last_name(self, sa_sync_conn):
+        t1, t2, t3 = self._seed(sa_sync_conn)
+
+        assert self._sorted(sa_sync_conn, "author_asc") == [t2, t1, t3]
+        assert self._sorted(sa_sync_conn, "author_desc") == [t1, t2, t3]
+
+    def test_labs_sort_reads_the_first_label(self, sa_sync_conn):
+        t1, t2, t3 = self._seed(sa_sync_conn)
+
+        assert self._sorted(sa_sync_conn, "labs_asc") == [t1, t2, t3]
+        assert self._sorted(sa_sync_conn, "labs_desc") == [t2, t1, t3]
+
+
+class TestPublicationsSort:
+    """Tri des publications par revue, éditeur et laboratoires, sans égard à la casse, publications sans valeur en dernier."""
+
+    def _publication(self, conn, title, *, serial=None, publisher=None, labs=(), person=None):
+        serial_id = insert_serial(conn, serial) if serial else None
+        publication = insert_publication(conn, title, serial_id=serial_id, in_perimeter=True)
+        if publisher:
+            conn.execute(
+                text("UPDATE publications SET publisher_id = :pub WHERE id = :p"),
+                {"pub": insert_publisher(conn, publisher), "p": publication},
+            )
+        if labs:
+            contribution = insert_contribution(
+                conn,
+                publication,
+                person_id=person or insert_person(conn),
+                in_perimeter=True,
+                roles=["author"],
+            )
+            for lab in labs:
+                add_contribution_structure(conn, contribution, lab)
+        return publication
+
+    def _sorted(self, conn, sort, **filters):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(**filters), page=1, per_page=50, sort=sort
+        )
+        return [p.id for p in res.publications]
+
+    def test_serial_publisher_and_labs_sorts(self, sa_sync_conn):
+        alpha, beta, gamma = (insert_structure(sa_sync_conn, c) for c in ("Alpha", "Beta", "Gamma"))
+        p1 = self._publication(
+            sa_sync_conn, "P1", serial="zeta journal", publisher="Alpha Press", labs=(beta,)
+        )
+        p2 = self._publication(
+            sa_sync_conn, "P2", serial="Alpha Journal", publisher="beta press", labs=(gamma, alpha)
+        )
+        p3 = self._publication(sa_sync_conn, "P3")
+
+        assert self._sorted(sa_sync_conn, "serial_asc") == [p2, p1, p3]
+        assert self._sorted(sa_sync_conn, "serial_desc") == [p1, p2, p3]
+        assert self._sorted(sa_sync_conn, "publisher_asc") == [p1, p2, p3]
+        assert self._sorted(sa_sync_conn, "publisher_desc") == [p2, p1, p3]
+        assert self._sorted(sa_sync_conn, "labs_asc") == [p2, p1, p3]
+        assert self._sorted(sa_sync_conn, "labs_desc") == [p1, p2, p3]
+
+    def test_labs_sort_reads_the_labs_of_the_person(self, sa_sync_conn):
+        """Sur la vue d'une personne, la colonne n'affiche que ses laboratoires : le tri lit les mêmes."""
+        alpha, beta, zeta = (insert_structure(sa_sync_conn, c) for c in ("Alpha", "Beta", "Zeta"))
+        person = insert_person(sa_sync_conn, "Focus")
+        q1 = self._publication(sa_sync_conn, "Q1", labs=(zeta,), person=person)
+        contribution = insert_contribution(
+            sa_sync_conn,
+            q1,
+            person_id=insert_person(sa_sync_conn),
+            in_perimeter=True,
+            roles=["author"],
+        )
+        add_contribution_structure(sa_sync_conn, contribution, alpha)
+        q2 = self._publication(sa_sync_conn, "Q2", labs=(beta,), person=person)
+
+        assert self._sorted(sa_sync_conn, "labs_asc", person_id=person) == [q2, q1]
 
 
 class TestLabScope:
@@ -477,6 +606,7 @@ class TestExportsRunTheirQueryBeforeStreaming:
             chunks = publications_queries(conn).export_theses_csv(
                 filters=PublicationFilters(doc_types=["thesis"]),
                 sort="soutenance_desc",
+                columns=[],
             )
         assert "Soutenance" in "".join(chunks)
 

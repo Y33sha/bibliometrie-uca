@@ -210,7 +210,7 @@
         </div>
       {/snippet}
       {#snippet item(cs)}
-        <span class="structure-type structure-type-{cs.type}" style="font-size: 0.65rem;padding:0 5px">{cs.type}</span>
+        <span class="structure-type structure-type-{cs.type}" style="font-size: var(--fs-sm);padding:0 5px">{cs.type}</span>
         {cs.acronym ? cs.acronym + " — " : ""}{cs.name}
       {/snippet}
     </Picker>
@@ -225,14 +225,14 @@
     align-items: center;
     gap: 8px;
     margin: 16px 0 8px;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     font-weight: 600;
   }
   .count-pill {
     padding: 1px 8px;
     border-radius: var(--radius-pill);
     background: var(--surface);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--text-secondary);
   }
   .btn-help-icon {
@@ -258,9 +258,12 @@
   .forms-table .excluding {
     background: var(--attention-light);
   }
+  .forms-table tr.excluding:hover td {
+    background: color-mix(in srgb, var(--attention-light), var(--attention) 6%);
+  }
   .form-text {
     font-family: var(--mono);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
   .col-badge {
     width: 1px;
@@ -268,7 +271,7 @@
     padding-right: 0 !important;
   }
   .match-badge {
-    font-size: 0.65rem;
+    font-size: var(--fs-sm);
     padding: 1px 5px;
     border-radius: var(--radius);
     font-weight: 500;
@@ -287,7 +290,7 @@
     color: white;
   }
   .ctx-tag {
-    font-size: 0.7rem;
+    font-size: var(--fs-sm);
     padding: 1px 5px;
     border-radius: var(--radius);
     background: var(--warning-light);
@@ -300,7 +303,7 @@
     cursor: pointer;
     color: var(--danger);
     font-weight: bold;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     line-height: 1;
     background: none;
     border: none;
@@ -331,11 +334,11 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-family: var(--mono);
   }
   .checkbox-label {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     display: flex;
     align-items: center;
     gap: 3px;
@@ -345,7 +348,7 @@
   }
   .new-form-ctx {
     margin-top: 4px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
   .ctx-label-text {
     color: var(--muted);

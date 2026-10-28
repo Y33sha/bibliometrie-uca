@@ -68,12 +68,12 @@
   }
   .api-ids-section summary {
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     font-weight: 500;
   }
   .api-id-label {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     margin-top: 6px;
   }

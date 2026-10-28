@@ -1,6 +1,6 @@
 """Recherches dans HAL de la phase `fetch_missing` : par hal-id, et par NNT.
 
-Deux pistes, même forme : sélectionner les identifiants absents, puis les chercher par un pool de workers et écrire les documents trouvés. Le pool réel est exercé ; la sélection, la requête HTTP, l'écriture dans `staging` et l'inscription des échecs sont remplacées.
+Deux pistes, même forme : sélectionner les identifiants absents, puis les chercher par un pool de workers et écrire les documents trouvés. Le pool réel est exercé ; la sélection, la requête HTTP, l'écriture dans `staging`, l'inscription et l'effacement des échecs sont remplacés.
 """
 
 import logging
@@ -9,6 +9,7 @@ import pytest
 
 from pipeline.http.circuit_breaker import source_circuit_breaker
 from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
+from pipeline.ingestion.common import staging
 from pipeline.ingestion.common.staging import StagingStore
 from pipeline.ingestion.hal import fetch_missing
 from pipeline.ingestion.hal.fetch_missing import fetch_missing_hal_by_id, fetch_missing_hal_by_nnt
@@ -52,6 +53,12 @@ class _HalSimule:
         def record_failed_lookup(conn, source, id_type, id_value):
             self.echecs.append((id_type, id_value))
 
+        def forget_failed_hal_id_lookup(conn, hal_id):
+            self.oublies.append(hal_id)
+
+        self.oublies: list[str] = []
+        monkeypatch.setattr(staging, "forget_failed_hal_id_lookup", forget_failed_hal_id_lookup)
+
         monkeypatch.setattr(
             fetch_missing, "get_missing_hal_ids", lambda conn, *, retry_after_days: list(ids)
         )
@@ -71,6 +78,8 @@ class TestParHalId:
 
         assert (metrics.seen, metrics.new, metrics.extras["not_found"]) == (2, 1, 1)
         assert hal.echecs == [("hal_id", "hal-2")]
+        # Le dépôt rendu efface l'échec éventuel de sa recherche.
+        assert hal.oublies == ["hal-1"]
 
     async def test_hal_indisponible_ni_ecrit_ni_compte(self, monkeypatch):
         # Une source indisponible ne prouve pas l'absence : l'identifiant attend le run suivant.

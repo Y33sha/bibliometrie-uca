@@ -14,7 +14,7 @@ from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
 from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.source_extras import SourceExtra
-from domain.types import JsonValue, as_mapping, as_sequence, as_str
+from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AuthorBlock,
@@ -24,7 +24,11 @@ from pipeline.ingestion.common.source_records import (
     SourceRecordUpsert,
 )
 from pipeline.ingestion.common.staging import StagingRow
-from pipeline.ingestion.theses.payload import aggregate_thesis_persons, derive_theses_doc_type
+from pipeline.ingestion.theses.payload import (
+    aggregate_thesis_persons,
+    derive_theses_doc_type,
+    thesis_oa_status,
+)
 from pipeline.transformation.publishing.find_or_create import Containers
 
 # =============================================================
@@ -68,12 +72,13 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
     if di:
         source_extras[SourceExtra.DATE_INSCRIPTION] = di
 
-    if institution := thesis.get("etabSoutenanceN"):
-        source_extras[SourceExtra.ETABLISSEMENT] = institution
-    if institution_ppn := as_str(thesis.get("etabSoutenancePpn")):
+    institution = as_mapping(thesis.get("etabSoutenance"))
+    if institution_name := as_str(institution.get("nom")):
+        source_extras[SourceExtra.ETABLISSEMENT] = institution_name
+    if institution_ppn := as_str(institution.get("ppn")):
         source_extras[SourceExtra.ETABLISSEMENT_PPN] = institution_ppn
 
-    doctoral_schools = [as_mapping(e) for e in as_sequence(thesis.get("ecolesDoctorale"))]
+    doctoral_schools = [as_mapping(e) for e in as_sequence(thesis.get("ecolesDoctorales"))]
     doctoral_schools_clean = [
         {"nom": name, "ppn": as_str(e.get("ppn"))}
         for e in doctoral_schools
@@ -82,7 +87,7 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
     if doctoral_schools_clean:
         source_extras[SourceExtra.ECOLES_DOCTORALES] = doctoral_schools_clean
 
-    partners = [as_mapping(p) for p in as_sequence(thesis.get("partenairesDeRecherche"))]
+    partners = [as_mapping(p) for p in as_sequence(thesis.get("partenairesRecherche"))]
     partners_clean = [
         {"nom": name, "type": as_str(p.get("type")), "ppn": as_str(p.get("ppn")) or None}
         for p in partners
@@ -94,32 +99,48 @@ def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue
     return source_extras or None
 
 
+def _subject_labels(subjects: list[Mapping[str, JsonValue]], subject_type: str) -> list[str]:
+    """Libellés distincts des sujets de type `subject_type`, dans l'ordre."""
+    labels = (as_str(s.get("keyword")) for s in subjects if as_str(s.get("type")) == subject_type)
+    return list(dict.fromkeys(label for label in labels if label))
+
+
 def theses_source_record(
     thesis: Mapping[str, JsonValue],
     staging_id: int,
     theses_id: str,
 ) -> SourceRecordUpsert:
-    """Enregistrement source theses.fr d'une thèse.
+    """Enregistrement source theses.fr d'une thèse, d'après son détail.
 
-    Statut open access `closed`, sans conteneur ni langue. Le doc_type dépend de la présence d'une date de soutenance.
+    Sans conteneur. Le doc_type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue qui en a un.
     """
     nnt = normalize_nnt(as_str(thesis.get("nnt")))
     external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
 
-    # Keywords : sujets (mots-clés auteur)
-    subjects = as_sequence(thesis.get("sujets"))
-    keywords = [label for s in subjects if (label := as_str(as_mapping(s).get("libelle")))] or None
+    languages = [lang for lang in as_strs(thesis.get("langues")) if lang]
+    # Mots-clés de l'auteur et vedettes RAMEAU, par langue, dans l'ordre de `langues`.
+    subjects_by_language = as_mapping(thesis.get("mapSujets"))
+    subjects = [
+        as_mapping(s)
+        for lang in dict.fromkeys([*languages, *subjects_by_language])
+        for s in as_sequence(subjects_by_language.get(lang))
+    ]
+    keywords = _subject_labels(subjects, "sujet") or None
 
     # Topics : discipline + sujets Rameau
     topics: dict[str, JsonValue] = {}
     discipline = as_str(thesis.get("discipline"))
     if discipline:
         topics["discipline"] = discipline
-    rameau = as_sequence(thesis.get("sujetsRameau"))
-    rameau_list = [label for r in rameau if (label := as_str(as_mapping(r).get("libelle")))]
-    if rameau_list:
+    if rameau_list := _subject_labels(subjects, "sujetsRameau"):
         topics["rameau"] = rameau_list
     topics_json = topics if topics else None
+
+    abstracts = as_mapping(thesis.get("resumes"))
+    abstract = next(
+        (text for lang in [*languages, *abstracts] if (text := as_str(abstracts.get(lang)))),
+        None,
+    )
 
     return SourceRecordUpsert(
         source="theses",
@@ -133,10 +154,11 @@ def theses_source_record(
         serial_id=None,
         monograph_id=None,
         container_title=None,
-        raw_language=None,
+        raw_language=languages[0] if languages else None,
+        abstract=abstract,
         keywords=keywords,
         topics=topics_json,
-        oa_status="closed",
+        oa_status=thesis_oa_status(thesis),
         source_extras=_build_source_extras(thesis),
     )
 

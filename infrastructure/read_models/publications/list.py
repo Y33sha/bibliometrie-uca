@@ -25,7 +25,6 @@ from infrastructure.read_models.publications.filtering import (
     publication_filter_where,
 )
 from infrastructure.read_models.publications.models import (
-    EXPORT_COLUMNS,
     PublicationFilters,
     PublicationListItem,
     PublicationListResponse,
@@ -60,23 +59,90 @@ _APC_SORT = (
     "WHERE ap.publication_id = p.id)"
 )
 
-_ORDER_MAP = {
-    "year_desc": "p.publication_year DESC, p.title",
-    "year_asc": "p.publication_year ASC, p.title",
-    "title_asc": "p.title ASC",
-    "title_desc": "p.title DESC",
-    "apc_desc": f"{_APC_SORT} DESC, p.title",
-    "apc_asc": f"{_APC_SORT} ASC, p.title",
-    "soutenance_desc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title",
-    "soutenance_asc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} ASC NULLS LAST, p.title",
-    "inscription_desc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} DESC NULLS LAST, p.title",
-    "inscription_asc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} ASC NULLS LAST, p.title",
+
+def _thesis_author(column: str) -> str:
+    """Sous-requête scalaire : `column` lu sur l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou si aucune contribution d'auteur n'a de personne.
+
+    L'ordre sur `person_id` désigne la même personne à chaque appel. La contribution se lit dans l'index unique `(publication_id, person_id)`, puis la personne par sa clé primaire : une jointure laisse le planificateur parcourir un index entier à chaque ligne."""
+    return f"""(SELECT {column}
+                 FROM persons pe
+                 WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
+                   AND pe.id = (
+                     SELECT ath.person_id
+                     FROM contributions ath
+                     WHERE ath.publication_id = p.id
+                       AND ath.person_id IS NOT NULL
+                       AND {has_author_role("ath")}
+                     ORDER BY ath.person_id
+                     LIMIT 1))"""
+
+
+def _perimeter_labs(*, person_filter: bool = False, correlated: bool = True) -> str:
+    """Clauses FROM et WHERE des laboratoires des auteurs dans le périmètre (contribution aliasée `lc`, structure aliasée `s`). `correlated` les restreint à la publication `p`. `person_filter` les restreint aux contributions de la personne liée à `:lab_person`."""
+    publication_clause = "lc.publication_id = p.id AND" if correlated else ""
+    person_clause = "AND lc.person_id = :lab_person" if person_filter else ""
+    return f"""FROM contributions lc
+                 JOIN contribution_structures lcs ON lcs.contribution_id = lc.id
+                 JOIN structures s ON s.id = lcs.structure_id AND s.structure_type = '{StructureType.LABO.value}'
+                 WHERE {publication_clause} lc.in_perimeter = TRUE
+                   AND {has_author_role("lc")}
+                   {person_clause}"""
+
+
+# Expression triée par champ de `PublicationSort`, tris par jointure exceptés. Auteur de thèse trié par nom puis prénom.
+_SORT_FIELDS = {
+    "year": "p.publication_year",
+    "title": "p.title",
+    "apc": _APC_SORT,
+    "soutenance": source_extra(SourceExtra.DATE_SOUTENANCE, "p"),
+    "inscription": source_extra(SourceExtra.DATE_INSCRIPTION, "p"),
+    "author": _thesis_author("ROW(LOWER(pe.last_name), LOWER(pe.first_name))"),
 }
+
+# Jointure et expression triée des champs lus dans une autre table, sans égard à la casse. Une jointure coûte moins qu'une sous-requête par ligne sur la liste complète.
+_SORT_JOINS = {
+    "serial": (
+        "LEFT JOIN serials serial_sort ON serial_sort.id = p.serial_id",
+        "LOWER(serial_sort.title)",
+    ),
+    "publisher": (
+        "LEFT JOIN publishers publisher_sort ON publisher_sort.id = p.publisher_id",
+        "LOWER(publisher_sort.name)",
+    ),
+}
+
+
+def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
+    """Jointure à ajouter à la requête et clause ORDER BY de la clé `sort` (`<champ>_<sens>`). Valeurs absentes en dernier, titre en départage.
+
+    Les laboratoires se trient par le premier libellé affiché. `person_filter` les restreint à ceux de la personne liée à `:lab_person`, comme la colonne. Leur clé se calcule en une agrégation sur toutes les publications : une sous-requête par ligne coûte plusieurs secondes sur la liste complète."""
+    field, direction = sort.rsplit("_", 1)
+    join = ""
+    if field in _SORT_JOINS:
+        join, key = _SORT_JOINS[field]
+    elif field == "labs":
+        join = f"""LEFT JOIN (
+                    SELECT lc.publication_id, MIN(LOWER(COALESCE(s.acronym, s.name))) AS sort_key
+                    {_perimeter_labs(person_filter=person_filter, correlated=False)}
+                    GROUP BY lc.publication_id
+                ) labs_sort ON labs_sort.publication_id = p.id"""
+        key = "labs_sort.sort_key"
+    else:
+        key = _SORT_FIELDS[field]
+    return join, f"{key} {direction.upper()} NULLS LAST, p.title"
 
 
 def _plain_text(s: str | None) -> str:
     """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur n'interprète pas le balisage — il l'afficherait tel quel dans la cellule."""
     return to_plain_text(s)
+
+
+def _emitted_columns(spec: list[tuple[str, str]], columns: list[str]) -> list[tuple[str, str]]:
+    """Colonnes `(clé, en-tête)` de `spec` à émettre, dans l'ordre d'affichage : celles listées dans `columns`, toutes si `columns` est vide. Titre et accès toujours présents."""
+    if not columns:
+        return spec
+    requested = {*columns, "title", "access"}
+    return [(key, header) for key, header in spec if key in requested]
 
 
 def _publication_lines(
@@ -119,22 +185,12 @@ def _publication_lines(
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
 
 
-def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) -> Iterator[str]:
+def _these_lines(
+    rows: Sequence[Row[tuple[object, ...]]], emitted: list[tuple[str, str]], *, truncated: bool
+) -> Iterator[str]:
     """Lignes CSV de l'export des thèses, en-tête comprise."""
     writer = CsvWriter()
-    yield writer.header(
-        [
-            "Inscription",
-            "Soutenance",
-            "Année",
-            "Statut",
-            "Titre",
-            "DOI",
-            "Laboratoires",
-            "Sources",
-            "Accès",
-        ]
-    )
+    yield writer.header([header for _, header in emitted])
     for row in rows:
         doi_url = f"https://doi.org/{row.doi}" if row.doi else ""
         sources = _source_links(
@@ -146,19 +202,18 @@ def _these_lines(rows: Sequence[Row[tuple[object, ...]]], *, truncated: bool) ->
             },
             row.oa_status,
         )
-        yield writer.line(
-            [
-                row.date_inscription or "",
-                row.date_soutenance or "",
-                row.publication_year or "",
-                _THESES_STATUS_LABELS.get(row.doc_type, row.doc_type or ""),
-                _plain_text(row.title),
-                doi_url,
-                row.labs or "",
-                json.dumps(sources, ensure_ascii=False) if sources else "",
-                access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",
-            ]
-        )
+        cell = {
+            "Inscription": row.date_inscription or "",
+            "Soutenance": row.date_soutenance or "",
+            "Auteur": row.thesis_author_name.title() if row.thesis_author_name else "",
+            "DOI": doi_url,
+            "Titre": _plain_text(row.title),
+            "Statut": _THESES_STATUS_LABELS.get(row.doc_type, row.doc_type or ""),
+            "Laboratoires": row.labs or "",
+            "Sources": json.dumps(sources, ensure_ascii=False) if sources else "",
+            "Accès": access_url(row.best_copy_url, oa_status=row.oa_status, doi=row.doi) or "",
+        }
+        yield writer.line([cell[header] for _, header in emitted])
 
     if truncated:
         yield writer.truncation_notice(MAX_EXPORT_ROWS)
@@ -181,7 +236,7 @@ class PublicationListQueries:
         self._conn.execute(text("SET LOCAL jit = off"))
         offset = (page - 1) * per_page
         where_clause, binds = publication_filter_where(filters, context)
-        order = _ORDER_MAP[sort]
+        sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
         # Le statut HAL se lit au regard d'un laboratoire : il est calculé quand la liste porte sur un seul.
         hal_status = (
             hal_status_expression(context.lab_hal_collection)
@@ -201,12 +256,6 @@ class PublicationListQueries:
         ).one()
         total = count_row.total
 
-        # Sur la vue personne (person_id défini), restreindre la liste des labos affichée à ceux de la contribution de cette personne.
-        if filters.person_id:
-            person_lab_filter_a4 = "AND a4.person_id = :person_lab_a4"
-        else:
-            person_lab_filter_a4 = ""
-
         rows = self._conn.execute(
             text(f"""
                 SELECT
@@ -222,22 +271,8 @@ class PublicationListQueries:
                     {hal_status.sql} AS hal_status,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
-                    (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
-                        (SELECT pe.first_name || ' ' || pe.last_name
-                         FROM contributions ath
-                         JOIN persons pe ON pe.id = ath.person_id
-                         WHERE ath.publication_id = p.id
-                           AND {has_author_role("ath")}
-                         LIMIT 1)
-                     END) AS thesis_author_name,
-                    (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
-                        (SELECT ath.person_id
-                         FROM contributions ath
-                         WHERE ath.publication_id = p.id
-                           AND ath.person_id IS NOT NULL
-                           AND {has_author_role("ath")}
-                         LIMIT 1)
-                     END) AS thesis_author_person_id,
+                    {_thesis_author("pe.first_name || ' ' || pe.last_name")} AS thesis_author_name,
+                    {_thesis_author("pe.id")} AS thesis_author_person_id,
                     (SELECT a.is_corresponding FROM contributions a
                      WHERE a.publication_id = p.id AND a.person_id = :focus_person
                      LIMIT 1) AS is_corresponding,
@@ -247,12 +282,7 @@ class PublicationListQueries:
                     (SELECT json_agg(sub ORDER BY sub.label)
                      FROM (
                         SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
-                        FROM contributions a4
-                        JOIN contribution_structures aus4 ON aus4.contribution_id = a4.id
-                        JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                        WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
-                          AND {has_author_role("a4")}
-                          {person_lab_filter_a4}
+                        {_perimeter_labs(person_filter=bool(filters.person_id))}
                      ) sub
                     ) AS lab_items,
                     (SELECT json_agg(json_build_object(
@@ -277,6 +307,7 @@ class PublicationListQueries:
                         {_SOURCE_ID_COLUMNS}
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
+                {sort_join}
                 WHERE {where_clause}
                 ORDER BY {order}
                 LIMIT :pg_limit OFFSET :pg_offset
@@ -285,7 +316,7 @@ class PublicationListQueries:
                 **binds,
                 **hal_status.binds,
                 "focus_person": filters.person_id,
-                "person_lab_a4": filters.person_id,
+                "lab_person": filters.person_id,
                 "apc_perimeter_ids": perimeter_structure_ids,
                 "sort_search_pat": f"%{normalize_text(filters.search)}%" if filters.search else "",
                 "pg_limit": per_page,
@@ -344,22 +375,14 @@ class PublicationListQueries:
         self._conn.execute(text("SET LOCAL jit = off"))
         context = filter_context(self._conn, filters)
         where_clause, binds = publication_filter_where(filters, context)
-        order = _ORDER_MAP[sort]
+        sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
 
-        # Titre et accès toujours présents. `columns` vide => toutes.
-        requested = set(columns) if columns else set(EXPORT_COLUMNS)
-        requested |= {"title", "access"}
         # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
         hal_status = (
             hal_status_expression(context.lab_hal_collection)
-            if "hal_status" in requested
+            if not columns or "hal_status" in columns
             else WhereClause("NULL", {})
         )
-
-        if filters.person_id:
-            person_lab_filter_a3 = "AND a3.person_id = :person_lab_a3"
-        else:
-            person_lab_filter_a3 = ""
 
         rows = self._conn.execute(
             text(f"""
@@ -379,12 +402,7 @@ class PublicationListQueries:
                      LIMIT 1) AS is_corresponding,
                     (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                              ORDER BY COALESCE(s.acronym, s.name))
-                     FROM contributions a3
-                     JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
-                     JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                          AND {has_author_role("a3")}
-                       {person_lab_filter_a3}
+                     {_perimeter_labs(person_filter=bool(filters.person_id))}
                     ) AS labs
                 FROM publications p
                 LEFT JOIN serials j ON j.id = p.serial_id
@@ -394,13 +412,14 @@ class PublicationListQueries:
                         {_SOURCE_ID_COLUMNS}
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
+                {sort_join}
                 WHERE {where_clause}
                 ORDER BY {order}
                 LIMIT :export_limit
             """),
             {
                 **binds,
-                "person_lab_a3": filters.person_id,
+                "lab_person": filters.person_id,
                 "focus_person": filters.person_id,
                 **hal_status.binds,
                 "export_limit": MAX_EXPORT_ROWS + 1,
@@ -414,8 +433,7 @@ class PublicationListQueries:
                 filters,
             )
 
-        # Colonnes émises = colonnes visibles à l'affichage, dans l'ordre d'affichage.
-        spec: list[tuple[str, str]] = [
+        spec = [
             ("type", "Type"),
             ("year", "Année"),
             ("doi", "DOI"),
@@ -431,20 +449,20 @@ class PublicationListQueries:
             ("sources", "Sources"),
             ("access", "Accès"),
         ]
-        emitted = [(key, header) for key, header in spec if key in requested]
+        return chunked(
+            _publication_lines(rows, _emitted_columns(spec, columns), truncated=truncated)
+        )
 
-        return chunked(_publication_lines(rows, emitted, truncated=truncated))
+    def export_theses_csv(
+        self, *, filters: PublicationFilters, sort: str, columns: list[str]
+    ) -> Iterator[str]:
+        """Export CSV de la page thèses, qui reflète le tableau affiché : mêmes filtres, même tri, mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et accès toujours présents.
 
-    def export_theses_csv(self, *, filters: PublicationFilters, sort: str) -> Iterator[str]:
-        """Export CSV dédié à la page thèses.
-
-        Colonnes spécifiques à la thèse (Inscription, Soutenance, Statut, theses.fr). Tri par défaut `soutenance_desc` (cohérent avec l'affichage). Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
+        Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
         where_clause, binds = publication_filter_where(filters, filter_context(self._conn, filters))
-        order = _ORDER_MAP.get(
-            sort, f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title"
-        )
+        sort_join, order = _sort_clauses(sort)
 
         rows = self._conn.execute(
             text(f"""
@@ -453,14 +471,11 @@ class PublicationListQueries:
                     p.oa_status::text AS oa_status, p.best_copy_url,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
+                    {_thesis_author("pe.first_name || ' ' || pe.last_name")} AS thesis_author_name,
                     src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                     (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                              ORDER BY COALESCE(s.acronym, s.name))
-                     FROM contributions a3
-                     JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
-                     JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                          AND {has_author_role("a3")}
+                     {_perimeter_labs()}
                     ) AS labs
                 FROM publications p
                 LEFT JOIN LATERAL (
@@ -471,6 +486,7 @@ class PublicationListQueries:
                         max(CASE WHEN sr.source = '{Source.THESES.value}' THEN sr.source_id END) AS theses_id
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
+                {sort_join}
                 WHERE {where_clause}
                 ORDER BY {order}
                 LIMIT :export_limit
@@ -485,4 +501,18 @@ class PublicationListQueries:
                 filters,
             )
 
-        return chunked(_these_lines(rows, truncated=truncated))
+        emitted = _emitted_columns(
+            [
+                ("inscription", "Inscription"),
+                ("soutenance", "Soutenance"),
+                ("author", "Auteur"),
+                ("doi", "DOI"),
+                ("title", "Titre"),
+                ("status", "Statut"),
+                ("labs", "Laboratoires"),
+                ("sources", "Sources"),
+                ("access", "Accès"),
+            ],
+            columns,
+        )
+        return chunked(_these_lines(rows, emitted, truncated=truncated))

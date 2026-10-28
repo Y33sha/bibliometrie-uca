@@ -19,6 +19,7 @@ from application.services.config import ConfigService
 from application.services.contributions import ContributionService
 from application.services.perimeters import PerimeterService
 from application.services.persons import PersonService
+from application.services.publication_merge import PublicationMergeService
 from application.services.publishers import PublisherService
 from application.services.serials import SerialService
 from application.services.structures import StructureService
@@ -49,6 +50,7 @@ from infrastructure.repositories import (
     contribution_repository,
     perimeter_repository,
     person_repository,
+    publication_merge_repository,
     publisher_repository,
     serial_repository,
     structure_repository,
@@ -56,6 +58,7 @@ from infrastructure.repositories import (
 )
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
+from interfaces.api.disconnect_cancellation import request_cancellation
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.session import read_session
 from pipeline.public import (
@@ -63,6 +66,7 @@ from pipeline.public import (
     PerimeterStructures,
     PublicationCountRecompute,
     PublicationPerimeterRecompute,
+    PublicationRecompute,
     SerialRecompute,
     SourceContributionPerimeterRecompute,
 )
@@ -115,7 +119,7 @@ READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 def _open_connection(request: Request) -> Connection:
     """Connexion tirée de l'engine, avec les caractéristiques de la requête en cours.
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`). La connexion est annulable par la déconnexion du client (`CancelOnDisconnect`).
 
     Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
     """
@@ -125,6 +129,9 @@ def _open_connection(request: Request) -> Connection:
         conn.exec_driver_sql(
             f"SET LOCAL statement_timeout = '{settings.api_read_statement_timeout_s}s'"
         )
+        cancellation = request_cancellation(request)
+        if cancellation is not None:
+            cancellation.register(conn)
     return conn
 
 
@@ -299,6 +306,15 @@ def person_service(conn: DbConn) -> PersonService:
         persons=person_repository(conn),
         contributions=contribution_repository(conn),
         perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
+
+
+def publication_merge_service(conn: DbConn) -> PublicationMergeService:
+    return PublicationMergeService(
+        merges=publication_merge_repository(conn),
+        recompute=PublicationRecompute(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+        conn=conn,
     )
 
 

@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 from unittest.mock import MagicMock
 
+import pytest
+
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.theses.normalize import (
     ThesesNormalizer,
@@ -72,8 +74,10 @@ class TestBuildSourceMeta:
     def test_etablissement(self):
         meta = _build_source_extras(
             {
-                "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
-                "etabSoutenancePpn": "252404955",
+                "etabSoutenance": {
+                    "nom": "Université Clermont Auvergne (2021-...)",
+                    "ppn": "252404955",
+                }
             }
         )
         assert meta == {
@@ -86,9 +90,9 @@ class TestBuildSourceMeta:
             "dateSoutenance": "15/03/2024",
             "datePremiereInscriptionDoctorat": "10/09/2020",
             "discipline": "Informatique",
-            "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
-            "ecolesDoctorale": [{"nom": "EDSPI", "ppn": "1234"}, {"nom": "EDMS"}],
-            "partenairesDeRecherche": [
+            "etabSoutenance": {"nom": "Université Clermont Auvergne (2021-...)"},
+            "ecolesDoctorales": [{"nom": "EDSPI", "ppn": "1234"}, {"nom": "EDMS"}],
+            "partenairesRecherche": [
                 {"nom": "LIMOS", "type": "labo", "ppn": "035163569"},
                 {"nom": "LRL"},
             ],
@@ -108,17 +112,17 @@ class TestBuildSourceMeta:
         ]
 
     def test_filters_ecoles_without_nom(self):
-        meta = _build_source_extras({"ecolesDoctorale": [{"ppn": "123"}, {"nom": "EDSPI"}]})
+        meta = _build_source_extras({"ecolesDoctorales": [{"ppn": "123"}, {"nom": "EDSPI"}]})
         assert meta == {"ecoles_doctorales": [{"nom": "EDSPI", "ppn": None}]}
 
     def test_filters_partenaires_without_nom(self):
-        meta = _build_source_extras({"partenairesDeRecherche": [{"type": "x"}, {"nom": "LIMOS"}]})
+        meta = _build_source_extras({"partenairesRecherche": [{"type": "x"}, {"nom": "LIMOS"}]})
         assert meta == {"partenaires": [{"nom": "LIMOS", "type": None, "ppn": None}]}
 
     def test_entries_without_nom_give_none(self):
         thesis = {
-            "ecolesDoctorale": [{"nom": ""}, {"ppn": "123"}],
-            "partenairesDeRecherche": [{"type": "lab"}],
+            "ecolesDoctorales": [{"nom": ""}, {"ppn": "123"}],
+            "partenairesRecherche": [{"type": "lab"}],
         }
         assert _build_source_extras(thesis) is None
 
@@ -164,8 +168,22 @@ class TestThesesSourceRecord:
         assert self._call({}).external_ids is None
 
     def test_keywords_from_sujets(self):
-        thesis = {"sujets": [{"libelle": "machine learning"}, {"libelle": "NLP"}, {}]}
-        assert self._call(thesis).keywords == ["machine learning", "NLP"]
+        """Les mots-clés suivent l'ordre de `langues`."""
+        thesis = {
+            "langues": ["fr", "en"],
+            "mapSujets": {
+                "en": [
+                    {"keyword": "machine learning", "type": "sujet"},
+                    {"keyword": "apprentissage", "type": "sujet"},
+                ],
+                "fr": [
+                    {"keyword": "apprentissage", "type": "sujet"},
+                    {"keyword": "Apprentissage automatique", "type": "sujetsRameau"},
+                    {"type": "sujet"},
+                ],
+            },
+        }
+        assert self._call(thesis).keywords == ["apprentissage", "machine learning"]
 
     def test_no_keywords(self):
         assert self._call({}).keywords is None
@@ -176,7 +194,9 @@ class TestThesesSourceRecord:
     def test_topics_with_rameau(self):
         thesis = {
             "discipline": "Informatique",
-            "sujetsRameau": [{"libelle": "Apprentissage automatique"}, {}],
+            "mapSujets": {
+                "fr": [{"keyword": "Apprentissage automatique", "type": "sujetsRameau"}, {}]
+            },
         }
         assert self._call(thesis).topics == {
             "discipline": "Informatique",
@@ -193,6 +213,30 @@ class TestThesesSourceRecord:
     def test_title_empty_string_when_none(self):
         record = self._call({})
         assert record.title == ""
+
+    @pytest.mark.parametrize(
+        ("diffusion", "expected"),
+        [
+            ({"cas": "cas1", "accessible": "oui"}, "green"),
+            ({"cas": "cas3", "accessible": "oui"}, "green"),
+            ({"cas": "cas1", "accessible": "non"}, "embargoed"),
+            ({"cas": "cas4", "accessible": "non"}, "embargoed"),
+            ({"cas": "cas5", "accessible": "non"}, "closed"),
+            ({"cas": None, "accessible": "non"}, "closed"),  # thèse en cours
+        ],
+    )
+    def test_statut_open_access_selon_la_diffusion(self, diffusion, expected):
+        """Régression : toutes les thèses étaient `closed`, y compris les thèses en accès libre sur theses.fr."""
+        assert self._call(diffusion).oa_status == expected
+
+    def test_langue_et_resume_de_la_premiere_langue(self):
+        thesis = {"langues": ["en", "fr"], "resumes": {"fr": "Résumé.", "en": "Summary."}}
+        record = self._call(thesis)
+        assert (record.raw_language, record.abstract) == ("en", "Summary.")
+
+    def test_resume_d_une_autre_langue_a_defaut(self):
+        record = self._call({"langues": ["fr"], "resumes": {"en": "Summary."}})
+        assert record.abstract == "Summary."
 
 
 # ── build_theses_author_records ──────────────────────────────────
@@ -218,8 +262,8 @@ class TestBuildThesesAuthorRecords:
     def test_aucune_adresse(self):
         """Partenaires et établissement de soutenance restent dans `meta` : aucune contribution source ne reçoit d'adresse."""
         thesis = _these(
-            partenairesDeRecherche=[{"nom": "LIMOS"}],
-            etabSoutenanceN="Université Clermont Auvergne (2021-...)",
+            partenairesRecherche=[{"nom": "LIMOS"}],
+            etabSoutenance={"nom": "Université Clermont Auvergne (2021-...)"},
         )
         records = build_theses_author_records(extract_theses_author_block(thesis))
         assert all(r.addresses == [] for r in records)

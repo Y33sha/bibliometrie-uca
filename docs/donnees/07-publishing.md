@@ -1,6 +1,6 @@
 # Édition
 
-*À jour le 2026-10-26.*
+*À jour le 2026-10-28.*
 
 Les référentiels de l'édition décrivent où paraissent les publications. Une publication en série réunit des documents sous un même titre : revue, collection d'ouvrages, recueil d'actes, serveur de preprints, dépôt, média. Une monographie est un livre ou un volume d'actes. Un éditeur publie les documents et reçoit les frais de publication. Une plateforme héberge des copies sans les publier : entrepôt, serveur de preprints, plateforme d'éditeurs.
 
@@ -37,9 +37,9 @@ L'éditeur d'une publication est le titulaire du préfixe de son DOI Crossref, �
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `platforms` | Nom et type : entrepôt, serveur de preprints, plateforme d'éditeurs | Identifiant OpenAlex unique |
+| `platforms` | Plateformes que nomme OpenAlex : nom et type (entrepôt, serveur de preprints, plateforme d'éditeurs) | Identifiant OpenAlex unique |
 
-Une plateforme de la liste des plateformes connues (`domain/platforms/registry.py`) en prend le nom et le type. Une autre prend le nom que lui donne OpenAlex et le type entrepôt. Le préfixe DOI d'une plateforme d'éditeurs désigne la plateforme, jamais l'éditeur. Les copies hébergées sont les localisations des [enregistrements sources](02-sources.md).
+Une copie appartient à une plateforme de la liste des plateformes connues (`domain/platforms/registry.py`) d'après son hôte, le préfixe de son URL doi.org ou sa source OpenAlex. La lecture des copies établit ce rattachement, et la plateforme prend alors le nom et le type de la liste. Une autre plateforme prend le nom que lui donne OpenAlex et le type entrepôt. Le préfixe DOI d'une plateforme d'éditeurs désigne la plateforme, jamais l'éditeur. Les copies hébergées sont les localisations des [enregistrements sources](02-sources.md).
 
 ## Frais de publication
 

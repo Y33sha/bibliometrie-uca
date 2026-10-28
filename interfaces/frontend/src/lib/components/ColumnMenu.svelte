@@ -43,19 +43,18 @@
 	.column-menu-wrapper { position: relative; }
 	.column-menu-btn {
 		background: none; border: 1px solid var(--border); border-radius: var(--radius);
-		padding: 2px 8px; font-size: 1.1rem; cursor: pointer; color: var(--muted);
+		padding: 2px 8px; font-size: var(--fs-lg); cursor: pointer; color: var(--muted);
 		letter-spacing: 2px;
 	}
 	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
-	/* Au niveau des autres menus de la page (100). */
 	.column-menu {
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0; z-index: 100;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0;
 		min-width: 150px;
 	}
 	.column-menu label {
 		display: flex; align-items: center; gap: 6px;
-		padding: 4px 12px; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+		padding: 4px 12px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
 	}
 	.column-menu label:hover { background: var(--hover); }
 	.column-menu label.disabled { opacity: 0.5; cursor: default; }

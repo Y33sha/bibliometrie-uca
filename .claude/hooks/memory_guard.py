@@ -12,7 +12,7 @@ import json
 import re
 import sys
 
-PREFIX = "systemd-run --user --scope --quiet -p MemoryMax=4G -p MemorySwapMax=0"
+PREFIX = "systemd-run --user --scope --quiet -p MemoryMax=2G -p MemorySwapMax=0"
 
 # Programmes dont la mémoire est plafonnée : interpréteurs et lanceurs de tests ou de builds.
 HEAVY = re.compile(
@@ -48,7 +48,7 @@ def main() -> int:
     reason = (
         "Calcul non plafonné en mémoire. Préfixe la commande par :\n"
         f"  {PREFIX} <commande>\n"
-        "Le processus est tué s'il dépasse 4 Go, sans swap ; la machine reste utilisable."
+        "Le processus est tué s'il dépasse 2 Go, sans swap ; la machine reste utilisable."
     )
     print(
         json.dumps(

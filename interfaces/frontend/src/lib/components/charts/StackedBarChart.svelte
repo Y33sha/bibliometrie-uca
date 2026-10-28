@@ -61,22 +61,24 @@
 <div class="chart-wrap" style="height: {height}px">
 	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
-<table class="visually-hidden">
-	<thead>
-		<tr>
-			<td></td>
-			{#each series as s (s.label)}<th scope="col">{s.label}</th>{/each}
-		</tr>
-	</thead>
-	<tbody>
-		{#each labels as label, i (i)}
+<div class="visually-hidden">
+	<table>
+		<thead>
 			<tr>
-				<th scope="row">{label}</th>
-				{#each series as s (s.label)}<td>{s.values[i]}</td>{/each}
+				<td></td>
+				{#each series as s (s.label)}<th scope="col">{s.label}</th>{/each}
 			</tr>
-		{/each}
-	</tbody>
-</table>
+		</thead>
+		<tbody>
+			{#each labels as label, i (i)}
+				<tr>
+					<th scope="row">{label}</th>
+					{#each series as s (s.label)}<td>{s.values[i]}</td>{/each}
+				</tr>
+			{/each}
+		</tbody>
+	</table>
+</div>
 
 <style>
 	.chart-wrap {

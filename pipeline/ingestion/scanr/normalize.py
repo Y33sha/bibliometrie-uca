@@ -1,13 +1,14 @@
 """Normalisation des données ScanR : staging → tables structurées."""
 
 from collections.abc import Mapping
+from urllib.parse import urlsplit
 
 from domain.countries import normalize_country_code
 from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.identifiers import clean_doi
+from domain.publications.identifiers import clean_doi, extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -18,6 +19,7 @@ from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_int, as_mapping, as_sequence, as_str, as_strs
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import Document, PublisherFacts, SourceNormalizer
 from pipeline.ingestion.common.source_contributions import (
     AddressRecord,
@@ -99,6 +101,47 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
         issns=source_issns(unknown=as_strs(source.get("journalIssns"))),
         year=as_int(doc.get("year")),
     )
+
+
+def _address(url: str) -> str:
+    """Adresse comparable : sans schéma, sans `www.`, sans barre finale, en minuscules."""
+    parts = urlsplit(url.strip().lower())
+    return f"{parts.netloc.removeprefix('www.')}{parts.path.rstrip('/')}"
+
+
+def get_locations(doc: Mapping[str, JsonValue]) -> list[LocationFacts]:
+    """La copie ouverte (`oaEvidence`), puis la page du document (`landingPage`) quand elle désigne une autre adresse.
+
+    La page de la copie ouverte est `oaEvidence.landingPageUrl`, à défaut la page du document quand elle désigne le même dépôt HAL, à défaut `oaEvidence.url`. L'ouverture de la page du document est inconnue. Seule la licence d'une copie chez l'éditeur est normalisée, comme celle de l'enregistrement source.
+    """
+    landing = as_str(doc.get("landingPage"))
+    evidence = as_mapping(doc.get("oaEvidence"))
+    evidence_url = as_str(evidence.get("url"))
+    locations: list[LocationFacts] = []
+    if evidence_url:
+        landing_hal_id = extract_hal_id_from_url(landing)
+        url = as_str(evidence.get("landingPageUrl")) or evidence_url
+        if url == evidence_url and landing and landing_hal_id is not None:
+            if landing_hal_id == extract_hal_id_from_url(evidence_url):
+                url = landing
+        pdf_url = as_str(evidence.get("pdfUrl")) or evidence_url
+        if _address(pdf_url) == _address(url):
+            pdf_url = None
+        host_type = as_str(evidence.get("hostType"))
+        locations.append(
+            LocationFacts(
+                url=url,
+                pdf_url=pdf_url,
+                version=as_str(evidence.get("version")),
+                license=normalize_license(as_str(evidence.get("license")))
+                if host_type == "publisher"
+                else None,
+                is_oa=True,
+            )
+        )
+    if landing and all(_address(landing) != _address(loc.url) for loc in locations):
+        locations.append(LocationFacts(url=landing))
+    return locations
 
 
 def get_oa_status(doc: Mapping[str, JsonValue]) -> str | None:
@@ -334,6 +377,9 @@ class ScanrNormalizer(SourceNormalizer):
 
     def container_facts(self, doc: Document) -> ContainerDescription | None:
         return None if is_thesis(doc) else get_container_facts(doc)
+
+    def locations(self, doc: Document) -> list[LocationFacts]:
+        return get_locations(doc)
 
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers

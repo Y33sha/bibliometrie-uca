@@ -23,7 +23,9 @@ READ_ONLY_SQL_TRANSACTION = "25006"
 
 
 def _request(method: str) -> SimpleNamespace:
-    return SimpleNamespace(method=method, url=SimpleNamespace(path="/api/_probe"))
+    return SimpleNamespace(
+        method=method, url=SimpleNamespace(path="/api/_probe"), state=SimpleNamespace()
+    )
 
 
 @pytest.fixture

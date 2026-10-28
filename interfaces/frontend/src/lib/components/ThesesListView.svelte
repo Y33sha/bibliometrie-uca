@@ -7,7 +7,7 @@
 	import { filterLabels } from '#lib/labels.js';
 	import PresenceFilterToggle from '#lib/components/PresenceFilterToggle.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import ThesesTable from '#lib/components/ThesesTable.svelte';
+	import ThesesTable, { useThesisColumns } from '#lib/components/ThesesTable.svelte';
 	import type { PublicationSort, ThesisRow, ThesisSortColumn } from '#lib/components/ThesesTable.svelte';
 	import { nextSort } from '#lib/sort.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -37,6 +37,8 @@
 	} = $props();
 
 	const hasFixedLab = $derived(labId != null);
+	// svelte-ignore state_referenced_locally
+	const columns = useThesisColumns(!hasFixedLab);
 
 	// Volet d'une thèse, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL.
 	const drawer = useDrawerParam('publication', isAdmin);
@@ -156,12 +158,16 @@
 	});
 
 	function toggleSort(column: ThesisSortColumn) {
-		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
+		const dates: ThesisSortColumn[] = ['inscription', 'soutenance'];
+		currentSort = nextSort(currentSort, column, dates.includes(column) ? 'desc' : 'asc');
 		onFilterChange();
 	}
 
 	function exportCsvUrl(): string {
-		return withBase(`/api/publications/export-theses.csv?${paramsToQuery(buildFilterParams())}`);
+		const params = buildFilterParams();
+		// Colonnes visibles → le CSV reflète le tableau affiché.
+		params.set('columns', columns.visibleColumns.join(','));
+		return withBase(`/api/publications/export-theses.csv?${paramsToQuery(params)}`);
 	}
 
 	onMount(async () => {
@@ -205,7 +211,7 @@
 	{/snippet}
 </ListToolbar>
 
-<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} showLabsColumn={!hasFixedLab} onopen={isAdmin() ? drawer.open : undefined} activeId={drawer.id} />
+<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} {columns} onopen={isAdmin() ? drawer.open : undefined} activeId={drawer.id} />
 <Pagination
 	page={listing.page}
 	pages={listing.pages}
@@ -217,5 +223,5 @@
 />
 
 {#if drawer.id !== null}
-	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} />
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
 {/if}

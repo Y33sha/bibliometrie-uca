@@ -11,12 +11,14 @@ import {
 	oaLabelsMap,
 	docTypePlural,
 	docTypeFamilies,
-	publicationsDocTypes,
 } from '#lib/labels.js';
 import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
 
-/** Filtres des publications dans le contexte, dans l'ordre d'affichage. Un filtre sans `group` figure dans la barre principale. */
-export function publicationFilters(context: PublicationListContext): ListFilter[] {
+/** Filtres des publications dans le contexte, dans l'ordre d'affichage. Un filtre sans `group` figure dans la barre principale. `defaultDocTypes` : types que la page sélectionne quand l'URL ne fixe pas les types, et que son URL omet. */
+export function publicationFilters(
+	context: PublicationListContext,
+	defaultDocTypes: readonly string[] = [],
+): ListFilter[] {
 	return [
 		{
 			key: 'docTypes',
@@ -26,7 +28,7 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
-			url: explicitSelectionUrl(publicationsDocTypes.join(',')),
+			url: explicitSelectionUrl(defaultDocTypes.length ? defaultDocTypes.join(',') : ALL_TOKEN),
 		},
 		{
 			key: 'years',
@@ -36,6 +38,30 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			facet: { type: 'simple', apiKey: 'years' },
 			// Un lien vers la page Statistiques écrit `all` : elle applique alors ses années par défaut seulement à l'ouverture sans paramètre `year`.
 			url: explicitSelectionUrl(ALL_TOKEN),
+		},
+		{
+			key: 'languages',
+			control: 'checkbox',
+			label: 'Langues',
+			param: 'language',
+			facet: { type: 'labeled', apiKey: 'languages' },
+			searchable: true,
+		},
+		{
+			key: 'serial',
+			control: 'entity',
+			label: filterLabels.serial,
+			param: 'serial_id',
+			entity: 'serial',
+			fixed: () => contextEntityId(context, 'serial'),
+			showColumns: ['serial'],
+		},
+		{
+			key: 'author',
+			control: 'entity',
+			label: filterLabels.author,
+			param: 'author_id',
+			entity: 'person',
 		},
 		{
 			key: 'labs',
@@ -66,16 +92,6 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			facet: { type: 'labeled', apiKey: 'hal_status' },
 			enabled: () => context.kind === 'lab',
 			showColumns: ['hal_status'],
-		},
-		{
-			key: 'serial',
-			control: 'entity',
-			label: filterLabels.serial,
-			param: 'serial_id',
-			entity: 'serial',
-			group: 'Revue et éditeur',
-			fixed: () => contextEntityId(context, 'serial'),
-			showColumns: ['serial'],
 		},
 		{
 			key: 'publisher',
@@ -115,14 +131,6 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			group: 'Revue et éditeur',
 			tooltip: 'Licence de la version éditeur',
 			showColumns: ['license'],
-		},
-		{
-			key: 'author',
-			control: 'entity',
-			label: filterLabels.author,
-			param: 'author_id',
-			entity: 'person',
-			group: 'Auteurs',
 		},
 		{
 			key: 'corresponding',
@@ -166,15 +174,6 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 				transform: (c) => ({ value: c.value, text: `${c.label} (${c.value.toUpperCase()})`, count: c.count }),
 			},
 			group: 'Auteurs',
-			searchable: true,
-		},
-		{
-			key: 'languages',
-			control: 'checkbox',
-			label: 'Langues',
-			param: 'language',
-			facet: { type: 'labeled', apiKey: 'languages' },
-			group: 'Détails',
 			searchable: true,
 		},
 		{

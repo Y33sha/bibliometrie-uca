@@ -18,11 +18,14 @@ from pipeline.transformation.publications.correction.correct_unary import (
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
+from pipeline.transformation.publications.correction.matchable import (
+    compute_updates as compute_matchable_updates,
+)
 from pipeline.transformation.publications.reconciliation import reconcile
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
-    """Joue `metadata_correction` (unaire puis cluster) sur toutes les enregistrements sources, en place.
+    """Joue `metadata_correction` (unaire, cluster, puis `is_matchable`) sur toutes les enregistrements sources, en place.
 
     Compose fetch→compute→persist sans le `run()` applicatif : ce dernier batche et
     `conn.commit()` entre lots, ce qui casserait l'isolation transactionnelle du
@@ -33,13 +36,24 @@ def apply_metadata_corrections(conn: Connection) -> None:
     (phase `metadata_correction` avant phase `publications`).
     """
     queries = SourceRecordCorrectionStore(conn)
+    missing_hal_ids = queries.fetch_missing_hal_ids()
 
     unary_rows = queries.fetch_for_unary_correction()
-    unary_updates = [u for row in unary_rows if (u := compute_unary_update(row)) is not None]
+    unary_updates = [
+        u
+        for row in unary_rows
+        if (u := compute_unary_update(row, missing_hal_ids=missing_hal_ids)) is not None
+    ]
     queries.persist_corrections(unary_updates)
+    queries.delete_missing_hal_locations()
 
     cluster_updates = compute_cluster_updates(queries.fetch_doi_cluster_candidates())
     queries.persist_doi_corrections(cluster_updates)
+
+    matchable_updates = compute_matchable_updates(
+        queries.fetch_matchability_rows(), missing_hal_ids
+    )
+    queries.persist_matchability(matchable_updates)
 
 
 def create_all_publications(conn: Connection) -> None:

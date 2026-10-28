@@ -5,7 +5,7 @@
   import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
   import { replaceQuery } from "#lib/url.js";
-  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
@@ -154,9 +154,8 @@
     try {
       await nameForms.remove(formId);
       loadTable();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast("Erreur : " + msg, 'error');
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), 'error');
     }
   }
 
@@ -188,9 +187,8 @@
 
       await nameForms.update(formId, { requires_context_of: ctx });
       loadTable();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast("Erreur : " + msg, 'error');
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), 'error');
     }
   }
 
@@ -407,7 +405,7 @@
     padding: 6px 14px;
     border: 1px solid var(--border);
     background: var(--card);
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     cursor: pointer;
     font-family: inherit;
   }
@@ -433,20 +431,20 @@
   /* Table */
   .addr-text {
     font-family: var(--mono);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     line-height: 1.4;
     word-break: break-word;
     max-width: 600px;
   }
   .muted-small {
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
 
   /* Structure tags */
   .struct-tag {
     display: inline-block;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     padding: 1px 7px;
     border-radius: var(--radius-pill);
     font-weight: 500;
@@ -473,7 +471,7 @@
 
   /* Form info (FP tab) */
   .form-info {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     margin-top: 4px;
     padding: 4px 8px;
     background: var(--warning-light);
@@ -500,7 +498,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card);
-    font-size: 0.7rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     font-weight: 500;
     font-family: inherit;
@@ -532,7 +530,7 @@
     border: none;
     border-bottom: 1px solid var(--border);
     border-radius: 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     outline: none;
   }
   .picker-results {
@@ -544,7 +542,7 @@
     align-items: center;
     gap: 4px;
     padding: 5px 10px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     background: none;
     border: none;
@@ -558,12 +556,12 @@
     outline: none;
   }
   .picker-type {
-    font-size: 0.65rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .picker-item-empty {
     padding: 5px 10px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .picker-shortcuts {
@@ -577,7 +575,7 @@
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     font-family: inherit;
   }

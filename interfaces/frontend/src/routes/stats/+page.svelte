@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart } from '#lib/components/charts/chart.js';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssColor, fontSize } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
@@ -36,7 +36,7 @@
 	import type { components } from '#lib/api/schema.js';
 	// --- State ---
 	// Filtres de la liste des publications, hors contexte. La famille « Publications » est présélectionnée (cf. onMount).
-	const FILTERS = publicationFilters({ kind: 'all' });
+	const FILTERS = publicationFilters({ kind: 'all' }, publicationsDocTypes);
 	let values = $state(initialValues(FILTERS));
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
@@ -235,7 +235,7 @@
 		const datasets = series.map((sv, i) => ({
 			label: stackDim ? dimLabel(stackDim, sv) : (indicatorDef?.label ?? ''),
 			data: cats.map((cv) => cell(cv, sv)),
-			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssVar('accent'),
+			backgroundColor: stackDim ? pivotValueColor(stackDim, sv, i) : cssColor('accent'),
 			barPercentage: 0.85,
 			categoryPercentage: 0.7
 		}));
@@ -255,14 +255,14 @@
 			yearChart = new Chart(chartCanvas, {
 				type: 'pie',
 				plugins: [whiteBgPlugin],
-				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: cssVar('card'), borderWidth: 1 }] },
+				data: { labels, datasets: [{ data: values, backgroundColor: colors, borderColor: cssColor('card'), borderWidth: 1 }] },
 				options: {
 					responsive: true,
 					maintainAspectRatio: false,
 					plugins: {
 						legend: { display: false },
 						tooltip: {
-							bodyFont: { size: 14 },
+							bodyFont: { size: fontSize('md') },
 							callbacks: {
 								label: (ctx) => {
 									const val = ctx.raw as number;
@@ -273,8 +273,8 @@
 							}
 						},
 						datalabels: {
-							color: (ctx) => readableOn(colors[ctx.dataIndex], cssVar('text')),
-							font: { size: 13, weight: 'bold' },
+							color: (ctx) => readableOn(colors[ctx.dataIndex], cssColor('text')),
+							font: { weight: 'bold' },
 							formatter: (val: number, ctx) => {
 								const total = sliceTotal(ctx);
 								const pct = total ? (val / total) * 100 : 0;
@@ -311,7 +311,7 @@
 				plugins: {
 					legend: { display: false },
 					tooltip: {
-						bodyFont: { size: 14 },
+						bodyFont: { size: fontSize('md') },
 						callbacks: {
 									label: (ctx) => {
 										const val = ctx.raw as number;
@@ -328,8 +328,8 @@
 								}
 					},
 					datalabels: {
-								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssVar('text')),
-								font: { size: 13, weight: 'bold' },
+								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssColor('text')),
+								font: { weight: 'bold' },
 								formatter: (val: number, ctx) => {
 									const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
 									const pct = total ? (val / total) * 100 : 0;
@@ -351,8 +351,8 @@
 				scales: {
 					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 45 ? l.slice(0, 45) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
-						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
-						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
+						? { stacked: true, min: 0, max: 100, ticks: { callback: (v: string | number) => v + ' %' } }
+						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
 				}
 			}
 		});
@@ -380,7 +380,7 @@
 			if (!chartWhiteBg) return;
 			const { ctx, width, height } = chart;
 			ctx.save();
-			ctx.fillStyle = cssVar('card');
+			ctx.fillStyle = cssColor('card');
 			ctx.fillRect(0, 0, width, height);
 			ctx.restore();
 		}
@@ -515,16 +515,18 @@
 	<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
 	<canvas bind:this={chartCanvas} aria-hidden="true"></canvas>
 	{#if chartTable}
-		<table class="visually-hidden">
-			<thead>
-				<tr><td></td>{#each chartTable.columns as c, i (i)}<th scope="col">{c}</th>{/each}</tr>
-			</thead>
-			<tbody>
-				{#each chartTable.rows as row, i (i)}
-					<tr><th scope="row">{row.label}</th>{#each row.values as v, j (j)}<td>{v}</td>{/each}</tr>
-				{/each}
-			</tbody>
-		</table>
+		<div class="visually-hidden">
+			<table>
+				<thead>
+					<tr><td></td>{#each chartTable.columns as c, i (i)}<th scope="col">{c}</th>{/each}</tr>
+				</thead>
+				<tbody>
+					{#each chartTable.rows as row, i (i)}
+						<tr><th scope="row">{row.label}</th>{#each row.values as v, j (j)}<td>{v}</td>{/each}</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
@@ -555,7 +557,7 @@
 		margin-bottom: 16px;
 	}
 	.groupby {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -574,7 +576,7 @@
 	}
 	.sort-dir {
 		font-family: inherit;
-		font-size: 1rem;
+		font-size: var(--fs-base);
 		line-height: 1;
 		height: 34px;
 		padding: 0 10px;
@@ -594,7 +596,7 @@
 		gap: 6px 18px;
 		margin-bottom: 8px;
 		padding-right: 120px;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--text-secondary);
 	}
 	.legend-dot {

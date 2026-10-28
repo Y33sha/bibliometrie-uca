@@ -11,6 +11,7 @@ import pytest
 
 from domain.persons.contributor_name import ContributorName
 from domain.serials.issns import SerialIssn
+from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.scanr.normalize import (
@@ -18,6 +19,7 @@ from pipeline.ingestion.scanr.normalize import (
     build_scanr_author_records,
     extract_doi,
     get_container_facts,
+    get_locations,
     get_publisher,
     get_title,
     scanr_source_record,
@@ -495,3 +497,81 @@ class TestScanrNormalizer:
     )
     def test_metadonnees_minimales(self, raw, attendu):
         assert _normalizer().minimal_metadata(staging_row(raw=raw)) == attendu
+
+
+class TestGetLocations:
+    def test_copie_chez_l_editeur_confondue_avec_la_page_du_document(self):
+        """La page du document et celle de la copie ouverte ne diffèrent que par le schéma : une seule localisation."""
+        doc = {
+            "landingPage": "http://doi.org/10.1093/ehjcr/ytac172",
+            "oaEvidence": {
+                "hostType": "publisher",
+                "landingPageUrl": "https://doi.org/10.1093/ehjcr/ytac172",
+                "license": "cc-by-nc",
+                "pdfUrl": "https://academic.oup.com/ehjcr/ytac172.pdf",
+                "url": "https://academic.oup.com/ehjcr/ytac172.pdf",
+                "version": "publishedVersion",
+            },
+        }
+        assert get_locations(doc) == [
+            LocationFacts(
+                url="https://doi.org/10.1093/ehjcr/ytac172",
+                pdf_url="https://academic.oup.com/ehjcr/ytac172.pdf",
+                version="publishedVersion",
+                license="cc-by-nc",
+                is_oa=True,
+            )
+        ]
+
+    def test_copie_dans_hal_et_page_de_l_editeur(self):
+        doc = {
+            "landingPage": "http://doi.org/10.1016/j.foodchem.2020.126376",
+            "oaEvidence": {
+                "hostType": "repository",
+                "landingPageUrl": "https://hal.science/hal-02494286",
+                "license": "other-oa",
+                "url": "https://hal.science/hal-02494286",
+                "version": "submittedVersion",
+            },
+        }
+        hal, landing = get_locations(doc)
+        assert hal == LocationFacts(
+            url="https://hal.science/hal-02494286",
+            version="submittedVersion",
+            is_oa=True,
+        )
+        assert landing == LocationFacts(url="http://doi.org/10.1016/j.foodchem.2020.126376")
+
+    def test_fichier_hal_rattache_a_la_page_du_meme_depot(self):
+        doc = {
+            "landingPage": "https://hal.science/halshs-01774949",
+            "oaEvidence": {
+                "hostType": "repository",
+                "url": "https://shs.hal.science/halshs-01774949/document",
+            },
+        }
+        assert get_locations(doc) == [
+            LocationFacts(
+                url="https://hal.science/halshs-01774949",
+                pdf_url="https://shs.hal.science/halshs-01774949/document",
+                is_oa=True,
+            )
+        ]
+
+    def test_pdf_qui_repete_la_page_est_ecarte(self):
+        doc = {
+            "oaEvidence": {
+                "landingPageUrl": "http://hdl.handle.net/11343/271783",
+                "pdfUrl": "http://hdl.handle.net/11343/271783",
+                "url": "http://hdl.handle.net/11343/271783",
+            }
+        }
+        assert get_locations(doc) == [
+            LocationFacts(url="http://hdl.handle.net/11343/271783", is_oa=True)
+        ]
+
+    def test_document_sans_copie_ouverte(self):
+        assert get_locations({"landingPage": "https://theses.fr/2020CLFAC001"}) == [
+            LocationFacts(url="https://theses.fr/2020CLFAC001")
+        ]
+        assert get_locations({}) == []

@@ -1,6 +1,6 @@
 # theses.fr
 
-*À jour le 2026-10-21.*
+*À jour le 2026-10-28.*
 
 https://theses.fr/
 
@@ -8,86 +8,95 @@ Documentation API : https://theses.fr/api-doc/swagger-ui/index.html
 
 theses.fr est le portail [ABES](../glossaire.md#abes) qui agrège les thèses françaises **soutenues** et **en préparation**.
 
-## API utilisée
+## API utilisées
 
-**API de recherche** (`https://theses.fr/api/v1/theses/recherche/`) — moissonnage par établissement.
+**API de recherche** (`https://theses.fr/api/v1/theses/recherche/`) — liste des thèses des établissements du périmètre.
 
 - Pas d'authentification
 - Requête : `q=etabSoutenancePpn:(<PPN>)`, pagination par `debut` / `nombre`
 - 500 résultats par page (max accepté par l'API), à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 - L'API ne filtre pas par année : le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours
 
+**API de détail** (`https://theses.fr/api/v1/theses/these/<identifiant>`) — une thèse par son identifiant. Elle répond 400 pour un identifiant inconnu.
+
+- Le moissonnage lit le détail des thèses absentes de `staging`. `fetch_stale` relit le détail des autres, `fetch_missing` cherche les thèses par NNT.
+- `staging` contient le détail de chaque thèse.
+
 ## Données récupérées
 
-- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titre (FR + EN), DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (= laboratoires), sujets auteur (multilingues), sujets Rameau (vocabulaire contrôlé BNF), statut (`soutenue` / `enCours`)
-- **Personnes** : auteur(s), directeur(s), rapporteur(s), examinateur(s), président de jury — chacun avec nom, prénom, PPN IdRef si présent, et l'intitulé de son rôle.
+- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (= laboratoires), sujets auteur (multilingues), sujets Rameau (vocabulaire contrôlé BNF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
+- **Personnes** : auteur(s), directeur(s), rapporteur(s), membres et président du jury — chacun avec nom, prénom et PPN IdRef si présent.
 
 ## Exemple de payload
 
-Thèse soutenue `2022UCFAC034` (informatique, LIMOS). `sujets` réduits à 3 entrées FR + 3 EN, `sujetsRameau` réduit aux 2 premiers.
+Détail de la thèse soutenue `2017CLFAC001`. `resumes` tronqués, `mapSujets` réduit à 2 entrées par langue.
 
 ```json
 {
-  "id": "2022UCFAC034",
-  "doi": "10.70675/406566ecz9cd7z41dbz8333zda4c1226764f",
-  "nnt": "2022UCFAC034",
-  "status": "soutenue",
-  "sujets": [
-    { "langue": "fr", "libelle": "Techniques asymétriques (clés publiques)" },
-    { "langue": "fr", "libelle": "Sécurité de protocoles" },
-    { "langue": "fr", "libelle": "Modèle calculatoire" },
-    { "langue": "en", "libelle": "Public key (asymmetric) techniques" },
-    { "langue": "en", "libelle": "Security protocols" },
-    { "langue": "en", "libelle": "Computational model" },
-    { "...": "(10 autres en fr + 12 autres en en)" }
-  ],
-  "auteurs": [
-    { "nom": "Robert", "ppn": "26761991X", "prenom": "Léo" }
-  ],
-  "titreEN": "Design and analysis of provably secure protocols : Applications to messaging and attestation",
-  "president": { "nom": "Pointcheval", "ppn": "111645751", "prenom": "David" },
-  "directeurs": [
-    { "nom": "Lafourcade", "ppn": "109895355", "prenom": "Pascal" },
-    { "nom": "Onete", "ppn": "22090216X", "prenom": "Maria Cristina" }
-  ],
-  "discipline": "Informatique",
-  "rapporteurs": [
-    { "nom": "Nguyen", "ppn": "07790821X", "prenom": "Benjamin" },
-    { "nom": "Önen", "ppn": "110910850", "prenom": "Suna Melek" }
-  ],
-  "examinateurs": [
-    { "nom": "Bhargavan", "ppn": "198350155", "prenom": "Karthikeyan" },
-    { "nom": "Dumas", "ppn": "11175786X", "prenom": "Jean-Guillaume" },
-    { "nom": "Sanders", "ppn": "234066245", "prenom": "Olivier" }
-  ],
-  "sujetsRameau": [
-    { "ppn": "07706674X", "libelle": "Messageries instantanées" },
-    { "ppn": "027798119", "libelle": "Mesures de sûreté" },
-    "<… 1 autre sujet Rameau>"
-  ],
-  "dateSoutenance": "22/09/2022",
-  "titrePrincipal": "Design and analysis of provably secure protocols : Applications to messaging and attestation",
-  "ecolesDoctorale": [
+  "titrePrincipal": "Extraction de substances naturelles antalgiques à partir de plantes utilisées dans la pharmacopée traditionnelle au Mali",
+  "nnt": "2017CLFAC001",
+  "doi": "10.70675/4ae914bez6c20z4d69z8711zbf2ebeabd0ac",
+  "numSujet": null,
+  "dateSoutenance": "06/01/2017",
+  "datePremiereInscriptionDoctorat": null,
+  "discipline": "Chimie Organique",
+  "titres": {
+    "en": "Extraction of natural analgesic compounds from plants used in traditional medicine in Mali",
+    "fr": "Extraction de substances naturelles antalgiques à partir de plantes utilisées dans la pharmacopée traditionnelle au Mali"
+  },
+  "resumes": {
+    "en": "The present work deals with the isolation of analgesic secon… (tronqué)",
+    "fr": "Le travail présenté dans ce manuscrit porte sur l’isolation … (tronqué)"
+  },
+  "etabSoutenance": { "ppn": "196200032", "nom": "Université Clermont Auvergne (2017-2020)", "type": null },
+  "codeEtab": "CLFA",
+  "etabCotutelle": [],
+  "partenairesRecherche": [
     {
-      "nom": "École doctorale des sciences pour l'ingénieur (Clermont-Ferrand)",
-      "ppn": "075501341",
-      "type": null
-    }
-  ],
-  "etabSoutenanceN": "Université Clermont Auvergne (2021-...)",
-  "etabSoutenancePpn": "252404955",
-  "partenairesDeRecherche": [
-    {
-      "nom": "Laboratoire d'Informatique, de Modélisation et d'Optimisation des Systèmes",
-      "ppn": "155645919",
+      "ppn": "16450916X",
+      "nom": "Institut de Chimie de Clermont-Ferrand (Aubière, Puy-de-Dôme ; 2012-....)",
       "type": "Laboratoire"
     }
   ],
-  "datePremiereInscriptionDoctorat": null
+  "mapSujets": {
+    "en": [
+      { "keyword": "Natural substances", "type": "sujet", "query": "Natural substances" },
+      { "keyword": "Phytochemistry", "type": "sujet", "query": "Phytochemistry" }
+    ],
+    "fr": [
+      { "keyword": "Ethnopharmacologie -- Afrique", "type": "sujetsRameau", "query": "\"Ethnopharmacologie -- Afrique\" ET 029725437" },
+      { "keyword": "Analgésie", "type": "sujetsRameau", "query": "\"Analgésie\" ET 027219046" }
+    ]
+  },
+  "auteurs": [{ "ppn": "204179041", "nom": "Danton", "prenom": "Ombeline" }],
+  "directeurs": [
+    { "ppn": "159337321", "nom": "Chalard", "prenom": "Pierre" },
+    { "ppn": "159138752", "nom": "Ducki", "prenom": "Sylvie" }
+  ],
+  "rapporteurs": [
+    { "ppn": "07464999X", "nom": "Caldefie-Chézet", "prenom": "Florence" },
+    { "ppn": "179241311", "nom": "Pichette", "prenom": "André" },
+    { "ppn": "08113259X", "nom": "Chemat", "prenom": "Farid" }
+  ],
+  "membresJury": [
+    { "ppn": "159337321", "nom": "Chalard", "prenom": "Pierre" },
+    { "ppn": "159138752", "nom": "Ducki", "prenom": "Sylvie" },
+    { "ppn": "145330168", "nom": "Gabant", "prenom": "Marion" }
+  ],
+  "presidentJury": { "ppn": "07464999X", "nom": "Caldefie-Chézet", "prenom": "Florence" },
+  "ecolesDoctorales": [
+    { "ppn": "148543901", "nom": "École doctorale des sciences fondamentales (Clermont-Ferrand)", "type": null }
+  ],
+  "langues": ["fr", "en"],
+  "cas": "cas1",
+  "accessible": "oui",
+  "source": "star",
+  "status": "soutenue",
+  "isSoutenue": true
 }
 ```
 
-Le payload d'une thèse en cours a la même structure, avec `status: "enCours"`, `nnt: null`, `doi: null`, `dateSoutenance: null` et `datePremiereInscriptionDoctorat` rempli. L'identifiant est de la forme `sXXXXXX`.
+Le détail d'une thèse en cours a la même structure, avec `status: "enCours"`, `nnt: null`, `doi: null`, `cas: null`, et l'identifiant `sXXXXXX` dans `numSujet`.
 
 ## Particularités
 
@@ -101,7 +110,7 @@ Les thèses en cours n'ont ni NNT ni DOI ; leur identifiant theses.fr (`sXXXXXX`
 
 ### 5 rôles dans une thèse, tous matérialisés comme contributions
 
-`auteurs`, `directeurs`, `rapporteurs`, `examinateurs`, `president` sont tous transformés en `source_contributions`, chacun avec ses `roles` (`author`, `thesis_director`, `rapporteur`, `jury_member`, `jury_president`). Seuls les auteurs ont un `author_position` ; les autres rôles ont `author_position = NULL`.
+`auteurs`, `directeurs`, `rapporteurs`, `membresJury`, `presidentJury` sont tous transformés en `source_contributions`, chacun avec ses `roles` (`author`, `thesis_director`, `rapporteur`, `jury_member`, `jury_president`). Seuls les auteurs ont un `author_position` ; les autres rôles ont `author_position = NULL`.
 
 Une personne qui apparaît dans plusieurs champs est dédupliquée et a plusieurs rôles. Clé de déduplication : PPN si présent, sinon `(nom, prenom)`.
 
@@ -109,12 +118,22 @@ Une personne qui apparaît dans plusieurs champs est dédupliquée et a plusieur
 
 Le PPN [IdRef](../glossaire.md#idref), lorsque présent, figure dans les informations du contributeur (`contributor_information.identifiers->>'idref'`, reliée par `source_contributions.contributor_information_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/09-persons.md) du pipeline.
 
-Le NNT (ex. `2022UCFAC034`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_records`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
+Le NNT (ex. `2017CLFAC001`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_records`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
 
 ### Affiliations partagées au document
 
-L'établissement de soutenance (`etabSoutenancePpn`) et les laboratoires partenaires (`partenairesDeRecherche`) sont des propriétés du document. La normalisation les garde dans `source_extras` avec leur PPN IdRef, et les contributions sources de la thèse sont sans adresse. La vue `source_contribution_structures` rattache toutes les contributions sources à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la contribution source du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
+L'établissement de soutenance (`etabSoutenance`) et les laboratoires partenaires (`partenairesRecherche`) sont des propriétés du document. La normalisation les garde dans `source_extras` avec leur PPN IdRef, et les contributions sources de la thèse sont sans adresse. La vue `source_contribution_structures` rattache toutes les contributions sources à l'établissement de soutenance quand son PPN figure parmi les établissements du périmètre, et la contribution source du doctorant à chaque laboratoire partenaire reconnu par son PPN (`idref_structures`).
 
-### OA = `closed` par défaut côté source
+### Statut open access
 
-Le payload *theses.fr* n'expose aucun signal sur le statut OA, donc `source_records.oa_status` est posé à `closed` par défaut en l'absence d'autres sources ([HAL](../glossaire.md#hal) principalement).
+Le statut open access vient de la diffusion de la thèse. `cas` est le cas de diffusion STAR : cas 1 à 4, une version de la thèse est destinée à Internet ; cas 5 et 6, l'intranet de l'établissement seulement. `accessible` dit si la thèse est consultable.
+
+| Diffusion | `oa_status` |
+|---|---|
+| `accessible` = `oui` | `green` |
+| cas 1 à 4, `accessible` = `non` | `embargoed` |
+| cas 5 ou 6, thèse en cours | `closed` |
+
+### Langue et résumé
+
+La langue est la première de `langues`. Le résumé est celui de la première langue qui en a un.

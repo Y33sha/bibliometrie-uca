@@ -5,7 +5,8 @@
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
-	import { addresses as addressesApi, api } from '#lib/api/index.js';
+	import { stickyHeight } from '#lib/actions/stickyHeight.js';
+	import { addresses as addressesApi, api, errorMessage } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -177,7 +178,7 @@
 			batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
 			selectedIds = new Set();
 		} catch (e) {
-			batchResult = 'Erreur : ' + (e instanceof Error ? e.message : String(e));
+			batchResult = 'Erreur : ' + errorMessage(e);
 		} finally {
 			batchApplying = false;
 		}
@@ -204,7 +205,7 @@
 	<ResultCount {list} one="adresse" many="adresses" />
 </div>
 
-<div class="batch-bar">
+<div class="batch-bar" use:stickyHeight={{ variable: '--batch-bar-height' }}>
 	<select class="select" aria-label="Pays à ajouter" bind:value={batchCountry}>
 		<option value="">— Choisir un pays à ajouter —</option>
 		{#each countries as c}
@@ -283,32 +284,32 @@
 	.batch-bar {
 		display: flex; align-items: center; gap: 8px;
 		padding: 8px 12px; margin-bottom: 10px;
-		background: var(--accent-light); border-radius: var(--radius); font-size: 0.9rem;
+		background: var(--accent-light); border-radius: var(--radius); font-size: var(--fs-md);
 	}
-	.batch-result { font-size: 0.85rem; color: var(--success); font-weight: 500; }
+	.batch-result { font-size: var(--fs-sm); color: var(--success); font-weight: 500; }
 	.proposal-tag {
 		display: inline-flex; align-items: center; gap: 4px;
 		padding: 2px 8px; background: var(--warning-light); color: var(--warning-text);
 		border: 1px dashed var(--warning); border-radius: var(--radius); cursor: pointer;
-		font-size: 0.78rem; font-weight: 500; white-space: nowrap;
+		font-size: var(--fs-sm); font-weight: 500; white-space: nowrap;
 	}
 	.proposal-tag:hover { background: color-mix(in srgb, var(--warning) 25%, white); }
 	.proposal-methods { font-weight: 400; opacity: 0.8; }
 	.addr-table { table-layout: fixed; min-width: 640px; }
-	.addr-table td { font-size: 0.9rem; vertical-align: middle; }
+	.addr-table td { font-size: var(--fs-md); vertical-align: middle; }
 	.addr-cell { word-break: break-word; }
-	.num-cell { text-align: center; color: var(--muted); font-size: 0.85rem; }
+	.num-cell { text-align: center; color: var(--muted); font-size: var(--fs-sm); }
 	.country-cell { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 	.country-actions { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; justify-content: flex-end; margin-left: auto; }
 	.country-tag {
 		display: inline-flex; align-items: center; gap: 2px;
 		padding: 2px 6px; background: var(--success-light);
-		border-radius: var(--radius); font-size: 0.78rem; color: var(--success); white-space: nowrap;
+		border-radius: var(--radius); font-size: var(--fs-sm); color: var(--success); white-space: nowrap;
 	}
 	.tag-remove {
 		background: none; border: none; cursor: pointer;
-		color: var(--muted); font-size: 0.8rem; padding: 0 1px; line-height: 1;
+		color: var(--muted); font-size: var(--fs-sm); padding: 0 1px; line-height: 1;
 	}
 	.tag-remove:hover { color: var(--danger); }
-	.add-country { width: 7rem; height: 26px; font-size: 0.8rem; color: var(--muted); }
+	.add-country { width: 7rem; height: 26px; font-size: var(--fs-sm); color: var(--muted); }
 </style>

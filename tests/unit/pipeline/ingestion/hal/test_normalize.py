@@ -17,6 +17,7 @@ from domain.source_records.biblio import PageRange
 from domain.structures.identifiers import RorId
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.hal import normalize as normalize_hal
+from pipeline.ingestion.hal.api import HAL_FIELDS
 from pipeline.ingestion.hal.normalize import (
     HalNormalizer,
     active_embargo_until,
@@ -94,8 +95,12 @@ class TestBuildHalExternalIds:
 
     def test_pmid_from_pubmedid(self):
         assert (
-            build_hal_external_ids({"pubmedid_s": "28973220"}, "hal-1", None)["pmid"] == "28973220"
+            build_hal_external_ids({"pubmedId_s": "28973220"}, "hal-1", None)["pmid"] == "28973220"
         )
+
+    def test_pmid_field_requested(self):
+        """Le champ lu pour le PMID figure parmi les champs demandés à l'API HAL."""
+        assert "pubmedId_s" in HAL_FIELDS
 
     def test_pmcid_from_link(self):
         doc = {"linkExtUrl_s": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084"}
@@ -244,7 +249,6 @@ class TestGetLocations:
             "https://hal.science/hal-01/document",
             True,
         )
-        assert location.platform.openalex_id == "S4306402512"
 
     def test_depot_sans_fichier_ferme(self):
         [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)

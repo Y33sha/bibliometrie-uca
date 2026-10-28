@@ -48,7 +48,7 @@
     display: flex;
     gap: 16px;
     margin: 10px 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .modal-options label {
     display: flex;
@@ -59,7 +59,7 @@
     margin: 0;
   }
   .checkbox-label {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     display: flex;
     align-items: center;
     gap: 3px;

@@ -22,6 +22,7 @@ def _m(
     tn="t",
     year=2024,
     doc_type=None,
+    matchable=True,
 ):
     return ReconcileMember(
         source_record_id=source_record_id,
@@ -33,6 +34,7 @@ def _m(
         title_normalized=tn,
         publication_year=year,
         doc_type=doc_type,
+        matchable=matchable,
     )
 
 
@@ -178,6 +180,80 @@ class TestDetachment:
         )
         assert _groups(plan) == {10: (1,), None: (2,)}
         assert plan.detached == ()
+
+
+class TestExclusion:
+    """Enregistrements sources écartés (`matchable` faux) : hors de toute partition, détachés s'ils sont matérialisés."""
+
+    def test_excluded_record_is_detached_from_its_publication(self):
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, publication_doi="10.1/x", doi="10.1/x", tokens=[("hal_id", "hal-1")]),
+                _m(2, 10, tokens=[("hal_id", "hal-1")], matchable=False),
+            ]
+        )
+        assert _groups(plan) == {10: (1,)}
+        assert plan.detached == (2,)
+        assert plan.dissolved == ()
+
+    def test_publication_of_excluded_records_only_is_not_dissolved(self):
+        """Régression : une publication faite de copies GRESIS perd tous ses enregistrements sources, sans successeur. Le recalcul la supprime."""
+        gresis = "10.60692/m2raz-tjw54"
+        plan = plan_reconciliation(
+            [
+                _m(
+                    1,
+                    10,
+                    publication_doi=gresis,
+                    doi=gresis,
+                    tokens=[("doi", gresis)],
+                    matchable=False,
+                ),
+                _m(
+                    2,
+                    10,
+                    publication_doi=gresis,
+                    doi=gresis,
+                    tokens=[("doi", gresis)],
+                    matchable=False,
+                ),
+            ],
+            publication_sizes={10: 2},
+        )
+        assert plan.groups == ()
+        assert plan.detached == (1, 2)
+        assert plan.dissolved == ()
+
+    def test_excluded_orphan_founds_nothing(self):
+        plan = plan_reconciliation([_m(1, None, in_perimeter=True, matchable=False)])
+        assert plan.groups == ()
+        assert plan.detached == ()
+
+    def test_excluded_record_does_not_bridge_two_works(self):
+        """Un enregistrement source écarté partage une clé avec deux œuvres. Les deux œuvres restent distinctes."""
+        plan = plan_reconciliation(
+            [
+                _m(1, 10, tokens=[("hal_id", "hal-1")]),
+                _m(2, 20, tokens=[("pmid", "42")]),
+                _m(3, 10, tokens=[("hal_id", "hal-1"), ("pmid", "42")], matchable=False),
+            ]
+        )
+        assert _groups(plan) == {10: (1,), 20: (2,)}
+        assert plan.detached == (3,)
+        assert plan.dissolved == ()
+
+    def test_merged_publication_with_excluded_record_dissolves_into_successor(self):
+        """La publication 20 cède un enregistrement source à 10, et son plus petit enregistrement source est écarté. Elle est dissoute vers 10."""
+        plan = plan_reconciliation(
+            [
+                _m(1, 20, tokens=(), matchable=False),
+                _m(2, 10, tokens=[("hal_id", "hal-1")]),
+                _m(3, 20, tokens=[("hal_id", "hal-1")]),
+            ]
+        )
+        assert _groups(plan) == {10: (2, 3)}
+        assert plan.detached == (1,)
+        assert plan.dissolved == (DissolvedPublication(20, 10),)
 
 
 class TestAssignmentOfOrphans:

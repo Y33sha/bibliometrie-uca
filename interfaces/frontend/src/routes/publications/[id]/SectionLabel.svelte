@@ -3,11 +3,9 @@
   let {
     icon,
     text,
-    count,
   }: {
     icon: "person" | "building" | "document" | "tag";
     text: string;
-    count?: number;
   } = $props();
 </script>
 
@@ -33,7 +31,7 @@
       <line x1="7" y1="7" x2="7.01" y2="7" />
     {/if}
   </svg>
-  <span>{text}{#if count != null}&nbsp;({count}){/if}</span>
+  <span>{text}</span>
 </h2>
 
 <style>

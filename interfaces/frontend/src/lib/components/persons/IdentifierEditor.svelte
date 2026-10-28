@@ -1,6 +1,7 @@
 <script lang="ts">
   import IdentifierLink from "#lib/components/IdentifierLink.svelte";
   import StatusToggles from "#lib/components/StatusToggles.svelte";
+  import RejectedFold from "./RejectedFold.svelte";
   import { autofocus } from "#lib/actions/focus.js";
   import { identifierTypeLabel } from "#lib/labels.js";
   import type { IdFormState, Person, PersonIdentifier } from "./types";
@@ -31,61 +32,68 @@
             : "en attente";
     return `${identifierTypeLabel(ident.id_type)} (${ident.source}) — ${label}`;
   }
+
+  const activeIdentifiers = $derived((person.identifiers ?? []).filter((i) => i.status !== "rejected"));
+  const rejectedIdentifiers = $derived((person.identifiers ?? []).filter((i) => i.status === "rejected"));
 </script>
 
-{#if person.identifiers?.length}
-  <div class="identifiers-row">
-    {#each person.identifiers as ident}
-      <div class="chip-row">
-        {#if ident.status === "authenticated"}
-          <span class="chip-controls">
-            <span
-              class="authenticated-badge"
-              title="Authentifié par le chercheur — statut protégé, non modifiable"
-              aria-label="Authentifié par le chercheur"
-            >
-              <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-                <path
-                  d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
-                  fill="currentColor"
-                  opacity="0.15"
-                />
-                <path
-                  d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.6"
-                />
-                <path
-                  d="m8.5 11.8 2.4 2.4 4.6-4.9"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="1.8"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </span>
-          </span>
-        {:else}
-          <span class="chip-controls">
-            <StatusToggles status={ident.status} onchange={(s) => onsetStatus(ident.id, s)} />
-          </span>
-        {/if}
+{#snippet identifierRow(ident: PersonIdentifier)}
+  <div class="chip-row">
+    {#if ident.status === "authenticated"}
+      <span class="chip-controls">
         <span
-          class="status-chip identifier-chip"
-          class:confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
-          class:rejected={ident.status === "rejected"}
-          title={identifierTitle(ident)}
+          class="authenticated-badge"
+          title="Authentifié par le chercheur — statut protégé, non modifiable"
+          aria-label="Authentifié par le chercheur"
         >
-          {ident.id_value}
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <path
+              d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
+              fill="currentColor"
+              opacity="0.15"
+            />
+            <path
+              d="M12 2 4 5v6c0 4.5 3.1 7.9 8 9 4.9-1.1 8-4.5 8-9V5l-8-3Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.6"
+            />
+            <path
+              d="m8.5 11.8 2.4 2.4 4.6-4.9"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
         </span>
-        <IdentifierLink
-          id_type={ident.id_type}
-          id_value={ident.id_value}
-          confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
-        />
-      </div>
+      </span>
+    {:else}
+      <span class="chip-controls">
+        <StatusToggles status={ident.status} onchange={(s) => onsetStatus(ident.id, s)} />
+      </span>
+    {/if}
+    <span
+      class="status-chip identifier-chip"
+      class:confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
+      class:rejected={ident.status === "rejected"}
+      title={identifierTitle(ident)}
+    >
+      {ident.id_value}
+    </span>
+    <IdentifierLink
+      id_type={ident.id_type}
+      id_value={ident.id_value}
+      confirmed={ident.status === "confirmed" || ident.status === "authenticated"}
+    />
+  </div>
+{/snippet}
+
+{#if activeIdentifiers.length}
+  <div class="identifiers-row">
+    {#each activeIdentifiers as ident}
+      {@render identifierRow(ident)}
     {/each}
   </div>
 {/if}
@@ -129,6 +137,15 @@
     onclick={() => ontoggleForm(person.id)}>+ Identifiant</button
   >
 {/if}
+{#if rejectedIdentifiers.length}
+  <RejectedFold personId={person.id} label="les identifiants rejetés">
+    <div class="identifiers-row">
+      {#each rejectedIdentifiers as ident}
+        {@render identifierRow(ident)}
+      {/each}
+    </div>
+  </RejectedFold>
+{/if}
 
 <style>
   .identifiers-row {
@@ -145,7 +162,7 @@
   }
   .identifier-chip {
     font-family: var(--mono);
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
   }
   /* Identifiant authentifié par le chercheur : statut protégé, aucune action — le bouclier remplace les boutons confirmer/rejeter. */
   .authenticated-badge {
@@ -159,7 +176,7 @@
     border: 1px dashed var(--border);
     border-radius: var(--radius);
     background: none;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     color: var(--accent);
     margin-top: 4px;
@@ -189,11 +206,11 @@
     padding: 3px 6px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-family: inherit;
   }
   .id-error {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--danger);
   }
 </style>

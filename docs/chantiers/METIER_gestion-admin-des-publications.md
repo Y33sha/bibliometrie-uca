@@ -42,6 +42,7 @@
 - **Une fusion manuelle pose un jeton de fusion** sur tous les enregistrements sources des deux publications. La réconciliation lit ce jeton comme une clé de confirmation. Il équivaut aux arêtes affirmées de CRISalid (voir le [benchmark](archived/2026-10-12_benchmark-pipelines.md)).
 - **La fusion manuelle est refusée entre deux publications à DOI distincts**, en vertu de la règle « un DOI, une œuvre ». Ces cas relèvent d'une correction de DOI.
 - **La fusion manuelle prend effet immédiatement**, comme la fusion des revues, des éditeurs et des personnes. Les sujets, les pays, le statut OA et les relations suivent au prochain passage du pipeline.
+- **Après une fusion manuelle, chaque contribution reçoit la personne de ses contributions sources**, avec le mode de rattachement le plus prioritaire. Deux personnes font un conflit : la contribution reste sans personne. L'aperçu de la fusion compte les conflits.
 - **Veto sur le lien entre une contribution source et une structure.** Un auteur parti garde dans HAL une affiliation obsolète. Sa contribution source HAL fait entrer dans le périmètre une publication faite ailleurs. La personne est bien l'auteur, et du périmètre pour d'autres publications : le rejet du lien personne–publication et l'exclusion de la personne sont inadaptés. Le veto vise le lien entre la contribution source et la structure, stable dans le temps. Un groupe de contributions sources est recalculé à chaque passage.
 
 ## Phasage
@@ -73,8 +74,8 @@ Prérequis : phase 3 du chantier [alignement des auteurs](archived/2026-10-24_DA
 - [x] Tables des fusions manuelles, ancrées sur `(source, source_id)` (4523e022c).
 - [x] Jeton de fusion lu par la réconciliation : un bras du voisinage, une clé de confirmation (6d7c53b69).
 - [x] Réconciliation ciblée sur une liste d'enregistrements sources, hors de la file (0ef354ac6).
-- [ ] Fusion manuelle exposée par `pipeline/public.py` : jeton, réconciliation ciblée, métadonnées consolidées, réalignement des auteurs de la publication conservée, périmètre et compteurs. Les contributions de la publication absorbée gardent leur rattachement aux personnes.
-- [ ] Volet : doublons potentiels par similarité de titre, champ « Fusionner » (identifiant, DOI ou titre).
+- [x] Fusion manuelle et son aperçu dans l'API : verdict, réconciliation ciblée, réalignement des auteurs de la publication conservée, personnes des contributions, périmètre (dfe23db02).
+- [x] Volet : doublons potentiels par similarité de titre, champ « Fusionner » (identifiant, DOI ou titre), modale de confirmation qui annonce les conflits d'auteurs (19d64011d, dcba16174).
 - [ ] Interdiction de fusion, relue par la réconciliation.
 - [ ] Ancrage de `persons.rejected_contributions` sur `(source, source_id)`.
 - [ ] Veto de l'administration sur un lien entre contribution source et structure, relu par le calcul du périmètre. Action dans le volet.

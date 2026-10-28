@@ -126,7 +126,7 @@
   }
   .publication-title-main {
     margin: 0;
-    font-size: 1.75rem;
+    font-size: var(--fs-3xl);
     font-weight: 700;
     line-height: 1.25;
     letter-spacing: -0.015em;
@@ -136,7 +136,7 @@
     gap: 6px 14px;
     align-items: center;
     flex-wrap: wrap;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     color: var(--text-secondary);
   }
   .publication-year {
@@ -152,7 +152,7 @@
     color: var(--accent);
   }
   .doi-label {
-    font-size: 0.7rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     letter-spacing: 0.06em;
     color: var(--muted);
@@ -188,13 +188,13 @@
   }
   .rel-kind {
     text-transform: uppercase;
-    font-size: 0.72rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     letter-spacing: 0.05em;
     white-space: nowrap;
   }
   .rel-title {
-    font-size: 1rem;
+    font-size: var(--fs-base);
     font-weight: 600;
     color: var(--text);
     min-width: 0;
@@ -210,7 +210,7 @@
     background: none;
     border: none;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     cursor: pointer;
   }
@@ -269,7 +269,7 @@
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     margin-bottom: 8px;
   }
   .journal-name {
@@ -284,7 +284,7 @@
   }
   .collection-name,
   .publisher-name {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
   span.publisher-name {
     color: var(--muted);
@@ -295,7 +295,7 @@
     align-items: center;
   }
   .publisher-sep {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
 </style>

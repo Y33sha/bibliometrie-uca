@@ -99,7 +99,7 @@
   .thesis-dl {
     display: grid;
     grid-template-columns: auto 1fr;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     margin: 0;
     background: var(--card);
     border: 1px solid var(--border);
@@ -117,6 +117,6 @@
     color: var(--muted);
     white-space: nowrap;
     background: var(--surface-hover);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
 </style>

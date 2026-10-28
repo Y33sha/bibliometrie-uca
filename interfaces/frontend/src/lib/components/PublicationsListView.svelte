@@ -28,7 +28,7 @@
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { licenseLabels } from '#lib/licenses.js';
-	import { columnLabels, oaStatusLabel, publicationsDocTypes } from '#lib/labels.js';
+	import { columnLabels, oaStatusLabel } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
@@ -80,9 +80,6 @@
 	const isLab = context.kind === 'lab';
 	// svelte-ignore state_referenced_locally
 	const isPerson = context.kind === 'person';
-	// La liste générale présélectionne la famille « Publications » tant que l'URL ne fixe pas les types.
-	// svelte-ignore state_referenced_locally
-	const restrictToPublications = context.kind === 'all';
 
 	// Libellé d'un statut de dépôt HAL, servi par l'API avec les options du filtre « Statuts HAL ».
 	function halStatusLabel(status: string): string {
@@ -111,7 +108,7 @@
 	// Libellés de la colonne Licence, servis par l'API.
 	let licenseNames = $state<Record<string, string>>({});
 	if (isLab) initialHidden.push('hal_status');
-	const cv = useColumnVisibility(columnDefs, initialHidden);
+	const cv = useColumnVisibility('publication-table-columns', columnDefs, initialHidden);
 	const col = cv.col;
 
 	// --- Filtres ---
@@ -135,6 +132,9 @@
 	const yearSort = $derived(sortDirection(currentSort, 'year'));
 	const titleSort = $derived(sortDirection(currentSort, 'title'));
 	const apcSort = $derived(sortDirection(currentSort, 'apc'));
+	const serialSort = $derived(sortDirection(currentSort, 'serial'));
+	const publisherSort = $derived(sortDirection(currentSort, 'publisher'));
+	const labsSort = $derived(sortDirection(currentSort, 'labs'));
 
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
@@ -211,8 +211,8 @@
 		facets.load();
 	});
 
-	function toggleSort(column: 'year' | 'title' | 'apc') {
-		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
+	function toggleSort(column: 'year' | 'title' | 'serial' | 'publisher' | 'labs' | 'apc') {
+		currentSort = nextSort(currentSort, column, column === 'year' || column === 'apc' ? 'desc' : 'asc');
 		onFilterChange();
 	}
 
@@ -244,11 +244,6 @@
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) listing.page = restored.currentPage as number;
-		}
-
-		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle, donc la facette « Types » la reflète ; cocher d'autres types l'élargit, « Effacer » la vide. Le jeton `all` dans l'URL laisse la sélection vide.
-		if (restrictToPublications && !(urlSync && page.url.searchParams.has('doc_type'))) {
-			values.checkbox.docTypes = [...publicationsDocTypes];
 		}
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs
@@ -284,9 +279,15 @@
 			<th class="sortable publication-col-title" class:active={titleSort !== null} onclick={() => toggleSort('title')}>
 				{columnLabels.title} <SortChevron direction={titleSort} />
 			</th>
-			{#if col('serial')}<th class="publication-col-journal">{columnLabels.serial}</th>{/if}
-			{#if col('publisher')}<th class="publication-col-journal">{columnLabels.publisher}</th>{/if}
-			{#if !isLab && col('labs')}<th style="width:80px">{columnLabels.labs}</th>{/if}
+			{#if col('serial')}<th class="publication-col-journal sortable" class:active={serialSort !== null} onclick={() => toggleSort('serial')}>
+				{columnLabels.serial} <SortChevron direction={serialSort} />
+			</th>{/if}
+			{#if col('publisher')}<th class="publication-col-journal sortable" class:active={publisherSort !== null} onclick={() => toggleSort('publisher')}>
+				{columnLabels.publisher} <SortChevron direction={publisherSort} />
+			</th>{/if}
+			{#if !isLab && col('labs')}<th style="width:80px" class="sortable" class:active={labsSort !== null} onclick={() => toggleSort('labs')}>
+				{columnLabels.labs} <SortChevron direction={labsSort} />
+			</th>{/if}
 			{#if isPerson && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				{columnLabels.apc} <SortChevron direction={apcSort} />
@@ -389,12 +390,12 @@
 <Pagination page={listing.page} pages={listing.pages} onchange={(p) => { listing.goToPage(p); syncUrl(); }} />
 
 {#if drawer.id !== null}
-	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} />
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
 {/if}
 
 <style>
 	.license-cell {
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 	}
 	.publication-table { min-width: 760px; }
 	/* La cellule d'actions se réduit à ses icônes. */
@@ -409,7 +410,7 @@
 		display: inline-block;
 		padding: 2px 7px;
 		border-radius: var(--radius);
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 		font-weight: 500;
 		white-space: nowrap;
 	}
@@ -419,7 +420,7 @@
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */
-	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
+	.corr-cell { text-align: center; color: var(--accent); font-size: var(--fs-sm); }
 
 	/* Bouton exclure (admin, person) */
 </style>

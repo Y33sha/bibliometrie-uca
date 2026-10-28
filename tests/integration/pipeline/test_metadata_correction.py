@@ -721,6 +721,150 @@ def test_dataset_piece_not_merged_when_parent_absent(sa_sync_conn):
     assert _doi(conn, piece) == "10.9002/data"
 
 
+# ── Sous-étape cluster : fichier complémentaire figshare → collection de l'article ──
+
+
+def _seed_figshare(
+    conn, *, source_id, doi, title_normalized, source="datacite", year=2023, doc_type="dataset"
+):
+    """Enregistrement source figshare, sans relation déclarée."""
+    return insert_source_record(
+        conn,
+        source=source,
+        source_id=source_id,
+        title=title_normalized,
+        title_normalized=title_normalized,
+        doi=doi,
+        doc_type=doc_type,
+        publication_year=year,
+    )
+
+
+_ARTICLE = "effects of sevoflurane on lung epithelial permeability"
+
+
+def test_figshare_additional_file_converges_to_collection_of_same_title(sa_sync_conn):
+    conn = sa_sync_conn
+    collection = _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
+    )
+    piece = _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    # Doublon OpenAlex de la pièce : il suit la décision du groupe.
+    sibling = _seed_figshare(
+        conn,
+        source="openalex",
+        source_id="W-f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+
+    assert _apply_cluster(conn) == 2
+
+    assert _doi(conn, collection) == "10.6084/m9.figshare.c.6702115"
+    for source_record in (piece, sibling):
+        row = conn.execute(
+            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
+            {"id": source_record},
+        ).one()
+        assert row.doi == "10.6084/m9.figshare.c.6702115"
+        assert row.corrections["doi"] == {
+            "raw": "10.6084/m9.figshare.23538907",
+            "corrected_by": "DATACITE_PACKAGE_PIECE",
+        }
+
+
+def test_figshare_additional_file_converges_whatever_its_source_and_type(sa_sync_conn):
+    """Une pièce que seul OpenAlex donne, et une pièce que DataCite type `media`, rejoignent la collection."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
+    )
+    openalex_only = _seed_figshare(
+        conn,
+        source="openalex",
+        source_id="W-f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    media = _seed_figshare(
+        conn,
+        source_id="f2",
+        doi="10.6084/m9.figshare.23538910",
+        title_normalized=f"additional file 2 of {_ARTICLE}",
+        doc_type="media",
+    )
+
+    assert _apply_cluster(conn) == 2
+    for source_record in (openalex_only, media):
+        assert _doi(conn, source_record) == "10.6084/m9.figshare.c.6702115"
+
+
+def test_figshare_additional_file_without_number_converges(sa_sync_conn):
+    """« Additional file of T », sans numéro."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
+    )
+    piece = _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file of {_ARTICLE}",
+    )
+    assert _apply_cluster(conn) == 1
+    assert _doi(conn, piece) == "10.6084/m9.figshare.c.6702115"
+
+
+def test_figshare_additional_file_stays_without_collection(sa_sync_conn):
+    conn = sa_sync_conn
+    piece = _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, piece) == "10.6084/m9.figshare.23538907"
+
+
+def test_figshare_additional_file_stays_when_two_collections_share_the_title(sa_sync_conn):
+    conn = sa_sync_conn
+    for source_id, doi in (("c1", "10.6084/m9.figshare.c.1"), ("c2", "10.6084/m9.figshare.c.2")):
+        _seed_figshare(conn, source_id=source_id, doi=doi, title_normalized=_ARTICLE)
+    piece = _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, piece) == "10.6084/m9.figshare.23538907"
+
+
+def test_figshare_additional_file_stays_when_collection_year_differs(sa_sync_conn):
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn,
+        source_id="c",
+        doi="10.6084/m9.figshare.c.6702115",
+        title_normalized=_ARTICLE,
+        year=2021,
+    )
+    piece = _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file 1 of {_ARTICLE}",
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, piece) == "10.6084/m9.figshare.23538907"
+
+
 def test_dataset_piece_idempotent_and_self_heals_when_parent_retyped(sa_sync_conn):
     conn = sa_sync_conn
     parent = _typed_source_record(conn, source_id="d-parent", doi="10.9001/set", doc_type="dataset")

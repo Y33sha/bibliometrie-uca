@@ -99,6 +99,31 @@ def _list(conn, **filters):
     )
 
 
+def _hal_and_openalex_contribution(conn, hal_name: str, openalex_name: str) -> int:
+    """Contribution orpheline à deux contributions sources, HAL (source prioritaire, nom affiché) et OpenAlex. Retourne son id."""
+    publication = insert_publication(conn)
+    hal = insert_source_contribution(
+        conn, insert_source_record(conn, publication), raw_author_name=hal_name, in_perimeter=True
+    )
+    openalex_record = insert_source_record(
+        conn, publication, source="openalex", source_id=f"W-{openalex_name}"
+    )
+    openalex = insert_source_contribution(
+        conn, openalex_record, source="openalex", raw_author_name=openalex_name
+    )
+    _contribution(conn)
+    contribution = contribution_of(conn, hal)
+    conn.execute(
+        text(
+            "UPDATE aligned_source_contributions SET contribution_id = :g"
+            " WHERE source_contribution_id = :s"
+        ),
+        {"g": contribution, "s": openalex},
+    )
+    recompose_contribution_attributes(conn)
+    return contribution
+
+
 class TestListOrphanContributions:
     def test_lists_orphan_contributions(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
@@ -118,34 +143,26 @@ class TestListOrphanContributions:
         assert (orphan.publication_id, orphan.sources) == (publication, ["hal"])
 
     def test_aggregates_the_source_contributions_of_the_contribution(self, sa_sync_conn):
-        """Une contribution à deux contributions sources : une ligne, les sources par ordre de priorité, le nom de la contribution source de la source prioritaire, la recherche sur chaque contribution source."""
-        publication = insert_publication(sa_sync_conn)
-        hal = insert_source_contribution(
-            sa_sync_conn,
-            insert_source_record(sa_sync_conn, publication),
-            raw_author_name="Zzmembre Hal",
-            in_perimeter=True,
+        """Une contribution à deux contributions sources : une ligne, les sources par ordre de priorité, le nom de la contribution source de la source prioritaire."""
+        contribution = _hal_and_openalex_contribution(
+            sa_sync_conn, "Zzmembre Hal", "Zzmembre Openalex"
         )
-        openalex_record = insert_source_record(
-            sa_sync_conn, publication, source="openalex", source_id="W-contribution source"
-        )
-        openalex = insert_source_contribution(
-            sa_sync_conn, openalex_record, source="openalex", raw_author_name="Zzmembre Openalex"
-        )
-        _contribution(sa_sync_conn)
-        sa_sync_conn.execute(
-            text(
-                "UPDATE aligned_source_contributions SET contribution_id = :g"
-                " WHERE source_contribution_id = :s"
-            ),
-            {"g": contribution_of(sa_sync_conn, hal), "s": openalex},
-        )
-        recompose_contribution_attributes(sa_sync_conn)
 
-        (orphan,) = _list(sa_sync_conn, search="Zzmembre Openalex").contributions
-        assert orphan.contribution_id == contribution_of(sa_sync_conn, hal)
+        (orphan,) = _list(sa_sync_conn, search="Zzmembre").contributions
+        assert orphan.contribution_id == contribution
         assert orphan.sources == ["hal", "openalex"]
         assert orphan.full_name == "Zzmembre Hal"
+
+    def test_search_matches_the_displayed_name_only(self, sa_sync_conn):
+        """Le nom de la contribution source OpenAlex, absent de l'affichage, ne retient pas la contribution."""
+        _hal_and_openalex_contribution(sa_sync_conn, "Zzaffiche Hal", "Zzcache Openalex")
+        facets = ContributionsQueries(sa_sync_conn).orphan_contributions_facets(
+            filters=OrphanFilters(search="Zzcache")
+        )
+
+        assert _list(sa_sync_conn, search="Zzcache").total == 0
+        assert facets.no_lab_count == 0
+        assert _list(sa_sync_conn, search="Zzaffiche").total == 1
 
     def test_nom_et_prenom_separes_par_la_source(self, sa_sync_conn):
         source_record = insert_source_record(sa_sync_conn, insert_publication(sa_sync_conn))

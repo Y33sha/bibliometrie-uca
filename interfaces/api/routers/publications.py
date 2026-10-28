@@ -8,6 +8,7 @@ Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-these
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from application.services.publication_merge import PublicationMergeService
 from domain.merge import MergedEntity
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import LICENSE_LABELS, License
@@ -16,6 +17,8 @@ from domain.sources.registry import SOURCE_FILTER_VALUES
 from infrastructure.read_models._common import EntityFacetResponse, EntityKind
 from infrastructure.read_models.publications.models import (
     EXPORT_COLUMNS,
+    THESIS_EXPORT_COLUMNS,
+    MergeCandidateOut,
     PublicationDetailResponse,
     PublicationFilters,
     PublicationListResponse,
@@ -26,14 +29,19 @@ from infrastructure.read_models.publications.models import (
 )
 from infrastructure.read_models.publications.queries import PublicationsQueries
 from interfaces.api.csv_export import csv_response
-from interfaces.api.deps import entity_detail, publications_queries
+from interfaces.api.deps import entity_detail, publication_merge_service, publications_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import (
     parse_int_csv,
     parse_lab_id,
     parse_vocabulary_csv,
 )
-from interfaces.api.models import EnumOption, TotalCountResponse
+from interfaces.api.models import (
+    EnumOption,
+    PublicationMergeRequest,
+    PublicationMergeResult,
+    TotalCountResponse,
+)
 from interfaces.api.params import SearchTerm
 from interfaces.api.publication_filters import ListFilters
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
@@ -109,11 +117,12 @@ def export_theses_csv(
     source_filter: str = Query(""),
     doc_type: str = Query(""),
     sort: PublicationSort = Query("soutenance_desc"),
+    columns: str = Query(""),
     queries: PublicationsQueries = Depends(publications_queries),
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+    """Export CSV de la page thèses, fidèle au tableau affiché : mêmes filtres, même tri, et mêmes colonnes que celles listées dans `columns`.
 
     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
 
@@ -133,7 +142,13 @@ def export_theses_csv(
         or ["thesis", "ongoing_thesis"],
     )
     return csv_response(
-        queries.export_theses_csv(filters=filters, sort=sort), filename="theses.csv", slot=slot
+        queries.export_theses_csv(
+            filters=filters,
+            sort=sort,
+            columns=parse_vocabulary_csv(columns, allowed=THESIS_EXPORT_COLUMNS, param="columns"),
+        ),
+        filename="theses.csv",
+        slot=slot,
     )
 
 
@@ -177,6 +192,48 @@ def get_publication_sources(
     return sources
 
 
+@router.get("/{publication_id}/merge-candidates", response_model=list[MergeCandidateOut])
+def get_merge_candidates(
+    publication_id: int,
+    q: SearchTerm = "",
+    queries: PublicationsQueries = Depends(publications_queries),
+) -> list[MergeCandidateOut]:
+    """Publications fusionnables avec la publication, dix au plus. Sans `q` : les titres proches du sien. Avec `q` : la publication de cet identifiant, de ce DOI, ou les titres proches de `q`. Les publications à DOI distinct sont écartées."""
+    return queries.merge_candidates(publication_id, q)
+
+
+@router.post("/{publication_id}/merge-preview", response_model=PublicationMergeResult)
+def preview_merge(
+    publication_id: int,
+    body: PublicationMergeRequest,
+    merges: PublicationMergeService = Depends(publication_merge_service),
+) -> PublicationMergeResult:
+    """Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
+
+    L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite, donc aucune écriture ne survit. Il est en POST pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+    """
+    outcome = merges.preview_merge(publication_id, body.other_id)
+    return PublicationMergeResult(
+        publication_id=outcome.publication_id, conflicts=outcome.conflicts
+    )
+
+
+@router.post("/{publication_id}/merge", response_model=PublicationMergeResult)
+def merge(
+    publication_id: int,
+    body: PublicationMergeRequest,
+    merges: PublicationMergeService = Depends(publication_merge_service),
+) -> PublicationMergeResult:
+    """Fusionne manuellement les deux publications. La réconciliation relit ce verdict à chaque passage du pipeline.
+
+    Renvoie la publication conservée, et le nombre de contributions laissées sans personne parce que leurs contributions sources désignaient deux personnes. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+    """
+    outcome = merges.merge(publication_id, body.other_id)
+    return PublicationMergeResult(
+        publication_id=outcome.publication_id, conflicts=outcome.conflicts
+    )
+
+
 @router.get("", response_model=PublicationListResponse)
 def list_publications(
     filters: ListFilters,
@@ -187,7 +244,7 @@ def list_publications(
 ) -> PublicationListResponse:
     """Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
 
-    Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription — et un sens (`_asc` / `_desc`).
+    Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription, auteur de thèse (par nom puis prénom), laboratoires (par premier libellé), revue, éditeur — et un sens (`_asc` / `_desc`). Les valeurs absentes passent en dernier.
     """
     return queries.list_publications(
         filters=filters.to_filters(),

@@ -134,7 +134,7 @@
 		border: 1px solid color-mix(in srgb, var(--attention) 40%, white);
 		border-radius: var(--radius);
 		color: var(--attention);
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		font-weight: 500;
 		cursor: pointer;
 		text-align: left;

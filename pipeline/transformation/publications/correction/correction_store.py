@@ -10,12 +10,20 @@ from typing import NamedTuple
 from sqlalchemy import Connection, Row, bindparam, func, text
 
 from domain.publications.doc_types import DocType
+from domain.publications.scope import MatchabilityFacts
 from domain.serials.doi_namespaces import DoiNamespace
-from domain.source_records.corrections import CorrectionKey
-from domain.source_records.metadata_correction.rules import MetadataForCorrection
+from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
+from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.metadata_correction.rules import (
+    MetadataCorrectionRule,
+    MetadataForCorrection,
+)
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
+    FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN,
+    FIGSHARE_COLLECTION_DOI_PREFIX,
+    FIGSHARE_ITEM_DOI_PATTERN,
     DoiClusterCase,
 )
 from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
@@ -51,6 +59,21 @@ class CorrectionUpdate(NamedTuple):
 
     id: int
     corrected: CorrectedSourceRecord
+
+
+class MatchabilityRow(NamedTuple):
+    """Une `source_record` : sa valeur courante de `is_matchable` et les faits qui la décident."""
+
+    id: int
+    is_matchable: bool
+    facts: MatchabilityFacts
+
+
+class MatchabilityUpdate(NamedTuple):
+    """Nouvelle valeur de `is_matchable` de l'enregistrement source `id`."""
+
+    id: int
+    is_matchable: bool
 
 
 class SerialCorrectionRow(NamedTuple):
@@ -247,6 +270,62 @@ class SourceRecordCorrectionStore:
             self._conn, [{"id": u.id, **u.corrected._asdict()} for u in updates]
         )
 
+    def fetch_missing_hal_ids(self) -> frozenset[str]:
+        """Identifiants des dépôts HAL introuvables dans HAL (`failed_lookups`). HAL attribue les identifiants HAL : l'échec est définitif."""
+        rows = self._conn.execute(
+            text(f"""
+                SELECT id_value FROM failed_lookups
+                WHERE source = '{Source.HAL.value}' AND id_type = '{ExternalIdType.HAL_ID.value}'
+            """)
+        )
+        return frozenset(rows.scalars())
+
+    def delete_missing_hal_locations(self) -> int:
+        """Supprime les localisations dont la correction unaire a retiré le lien des `urls` de leur enregistrement source (dépôt HAL introuvable). La normalisation réécrit les localisations : la suppression se rejoue à chaque passage. Retourne le nombre de localisations supprimées."""
+        result = self._conn.execute(
+            text(f"""
+                DELETE FROM source_record_locations l
+                USING source_records sr
+                WHERE l.source_record_id = sr.id
+                  AND sr.corrections -> '{CorrectionKey.URLS}' ->> '{CORRECTED_BY}'
+                      = '{MetadataCorrectionRule.HAL_DEPOSIT_MISSING_TO_REMOVED}'
+                  AND sr.corrections -> '{CorrectionKey.URLS}' -> '{RAW}' ? l.url
+                  AND l.url <> ALL(COALESCE(sr.urls, '{{}}'))
+            """)
+        )
+        return result.rowcount
+
+    def fetch_matchability_rows(self) -> list[MatchabilityRow]:
+        """Toutes les `source_records`, avec les faits que lit `is_matchable` et la valeur courante de `is_matchable`."""
+        rows = self._conn.execute(
+            text(f"""
+                SELECT id, is_matchable, source::text AS source, source_id,
+                       {raw_column("doi", "source_records")} AS raw_doi, doi, title_normalized,
+                       COALESCE(urls, '{{}}') AS urls, external_ids
+                FROM source_records
+            """)
+        )
+        return [
+            MatchabilityRow(
+                r.id,
+                r.is_matchable,
+                MatchabilityFacts(
+                    r.source,
+                    r.source_id,
+                    r.raw_doi,
+                    r.doi,
+                    r.title_normalized,
+                    r.urls,
+                    r.external_ids,
+                ),
+            )
+            for r in rows
+        ]
+
+    def persist_matchability(self, updates: list[MatchabilityUpdate]) -> int:
+        """UPDATE en lot de `is_matchable`, bump `updated_at`, marque pour la réconciliation. Retourne le nombre de lignes."""
+        return _persist_updates(self._conn, [u._asdict() for u in updates])
+
     def fetch_serial_doi_namespaces(self) -> list[DoiNamespace]:
         """Le contenu de `serial_doi_namespaces`."""
         rows = self._conn.execute(
@@ -276,8 +355,8 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, doi, title_normalized, corrections,
-                           source_extras, external_ids,
+                    SELECT id, source, source_id, doc_type, doi, title_normalized, publication_year,
+                           corrections, source_extras, external_ids,
                            lower({raw_column("doi", "source_records")}) AS eff_doi
                     FROM source_records
                 ),
@@ -289,6 +368,15 @@ class SourceRecordCorrectionStore:
                 unresolved_dois AS (
                     SELECT id_value AS d FROM failed_lookups
                     WHERE source = '{DOI_ORG}' AND id_type = 'doi'
+                ),
+                -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune.
+                figshare_collections AS (
+                    SELECT title_normalized, publication_year, min(eff_doi) AS doi
+                    FROM sr_eff
+                    WHERE doc_type = '{DocType.DATASET.value}'
+                      AND starts_with(eff_doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
+                    GROUP BY title_normalized, publication_year
+                    HAVING count(DISTINCT eff_doi) = 1
                 ),
                 -- La cible reste attachée à l'enregistrement source DataCite dont les `related_identifiers`
                 -- la mentionnent : la règle de même œuvre lit le type de cet enregistrement, et les
@@ -329,6 +417,24 @@ class SourceRecordCorrectionStore:
                           AND rel->>'doi' IS NOT NULL
                           AND lower(rel->>'doi') <> sr.eff_doi
                           AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
+                        UNION ALL
+                        -- Fichier complémentaire figshare « Additional file N of T » → collection
+                        -- figshare de titre T, sans relation déclarée : la seule collection dataset
+                        -- de même titre et de même année. Le DOI et le titre désignent la pièce,
+                        -- quels que soient sa source et son type.
+                        SELECT
+                            sr.id AS declarant_id,
+                            sr.eff_doi AS secondary_doi,
+                            c.doi AS canonical_doi,
+                            '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
+                        FROM sr_eff sr
+                        JOIN figshare_collections c
+                          ON c.title_normalized = regexp_replace(
+                                 sr.title_normalized, '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}', ''
+                             )
+                         AND c.publication_year = sr.publication_year
+                        WHERE sr.eff_doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
+                          AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
                     ORDER BY declarant_id,

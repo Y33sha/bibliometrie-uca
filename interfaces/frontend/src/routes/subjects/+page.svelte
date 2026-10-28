@@ -92,7 +92,7 @@
     align-items: center;
     gap: 6px;
     padding-left: 10px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     white-space: nowrap;
   }
   .min-count input {

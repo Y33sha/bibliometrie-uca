@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { ApiError, api, apiDetail, latestRequest, post, put, patch, del } from './client';
+import { ApiError, api, apiDetail, errorMessage, latestRequest, post, put, patch, del } from './client';
 
 type RequeteEnVol = {
 	url: string;
@@ -70,6 +70,20 @@ describe('ApiError', () => {
 
 	it('porte le statut de la réponse', () => {
 		expect(new ApiError(404, null).status).toBe(404);
+	});
+});
+
+describe('errorMessage', () => {
+	it('donne le detail de la réponse', () => {
+		expect(errorMessage(new ApiError(409, { detail: 'Déjà rattachée' }))).toBe('Déjà rattachée');
+	});
+
+	it('donne le statut à défaut de detail', () => {
+		expect(errorMessage(new ApiError(500, null))).toBe('erreur 500');
+	});
+
+	it('donne le message d’une erreur réseau', () => {
+		expect(errorMessage(new TypeError('Failed to fetch'))).toBe('Failed to fetch');
 	});
 });
 

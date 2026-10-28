@@ -114,6 +114,6 @@
   }
   .empty {
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
 </style>

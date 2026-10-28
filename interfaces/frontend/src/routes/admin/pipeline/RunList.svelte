@@ -84,7 +84,7 @@
     color: var(--muted);
     cursor: pointer;
     font: inherit;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
   }
   .load-more:hover:not(:disabled) {
     background: var(--hover);
@@ -129,23 +129,23 @@
   .run-id {
     font-weight: 600;
     font-family: var(--mono);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
   .run-date {
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     font-family: var(--mono);
   }
   .run-duration {
     margin-left: auto;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     font-family: var(--mono);
   }
   .run-sub {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .ribbon-wrap {
@@ -153,6 +153,6 @@
   }
   .empty {
     color: var(--muted);
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
 </style>

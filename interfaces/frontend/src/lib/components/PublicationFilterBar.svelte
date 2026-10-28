@@ -95,7 +95,7 @@
 		margin-bottom: 0;
 	}
 	.filters-label {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -109,7 +109,7 @@
 		border-radius: var(--radius);
 		background: none;
 		font: inherit;
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: var(--text-secondary);
 		white-space: nowrap;
 		cursor: pointer;

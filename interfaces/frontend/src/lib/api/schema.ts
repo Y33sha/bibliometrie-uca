@@ -227,7 +227,7 @@ export interface paths {
         };
         /**
          * Export Theses Csv
-         * @description Export CSV de la page thèses, aux mêmes filtres et au même tri que sa liste.
+         * @description Export CSV de la page thèses, fidèle au tableau affiché : mêmes filtres, même tri, et mêmes colonnes que celles listées dans `columns`.
          *
          *     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
          *
@@ -322,6 +322,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/{publication_id}/merge-candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Merge Candidates
+         * @description Publications fusionnables avec la publication, dix au plus. Sans `q` : les titres proches du sien. Avec `q` : la publication de cet identifiant, de ce DOI, ou les titres proches de `q`. Les publications à DOI distinct sont écartées.
+         */
+        get: operations["get_merge_candidates_api_publications__publication_id__merge_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/merge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Merge
+         * @description Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
+         *
+         *     L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite, donc aucune écriture ne survit. Il est en POST pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+         */
+        post: operations["preview_merge_api_publications__publication_id__merge_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge
+         * @description Fusionne manuellement les deux publications. La réconciliation relit ce verdict à chaque passage du pipeline.
+         *
+         *     Renvoie la publication conservée, et le nombre de contributions laissées sans personne parce que leurs contributions sources désignaient deux personnes. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+         */
+        post: operations["merge_api_publications__publication_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications": {
         parameters: {
             query?: never;
@@ -333,7 +397,7 @@ export interface paths {
          * List Publications
          * @description Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
          *
-         *     Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription — et un sens (`_asc` / `_desc`).
+         *     Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription, auteur de thèse (par nom puis prénom), laboratoires (par premier libellé), revue, éditeur — et un sens (`_asc` / `_desc`). Les valeurs absentes passent en dernier.
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -1867,7 +1931,7 @@ export interface paths {
         };
         /**
          * Institution
-         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application.
          */
         get: operations["institution_api_config_institution_get"];
         put?: never;
@@ -3719,13 +3783,17 @@ export interface components {
         };
         /**
          * InstitutionOut
-         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre et teinte de l'application.
          */
         InstitutionOut: {
             /** Name */
             name: string;
             /** Root Structure Ids */
             root_structure_ids: number[];
+            /** Title */
+            title: string | null;
+            /** Brand Hue */
+            brand_hue: number;
         };
         /**
          * IssnStatus
@@ -3771,6 +3839,26 @@ export interface components {
             person_id_a: number;
             /** Person Id B */
             person_id_b: number;
+        };
+        /**
+         * MergeCandidateOut
+         * @description Publication fusionnable avec une autre. `similarity` : similarité trigramme de son titre normalisé avec le titre de référence. `sources` : sources de ses enregistrements sources.
+         */
+        MergeCandidateOut: {
+            /** Publication Id */
+            publication_id: number;
+            /** Title */
+            title: string;
+            /** Publication Year */
+            publication_year: number | null;
+            /** Doc Type */
+            doc_type: string;
+            /** Doi */
+            doi: string | null;
+            /** Similarity */
+            similarity: number;
+            /** Sources */
+            sources: string[];
         };
         /**
          * MergeRequest
@@ -4678,6 +4766,24 @@ export interface components {
             publications: components["schemas"]["PublicationListItem"][];
             /** Pages */
             readonly pages: number;
+        };
+        /**
+         * PublicationMergeRequest
+         * @description Publication à fusionner avec celle désignée par le chemin.
+         */
+        PublicationMergeRequest: {
+            /** Other Id */
+            other_id: number;
+        };
+        /**
+         * PublicationMergeResult
+         * @description Résultat d'une fusion manuelle, ou de son aperçu. `publication_id` : publication issue de la fusion. `conflicts` : contributions dont les contributions sources désignaient deux personnes, laissées sans personne.
+         */
+        PublicationMergeResult: {
+            /** Publication Id */
+            publication_id: number;
+            /** Conflicts */
+            conflicts: number;
         };
         /**
          * PublicationSourcesResponse
@@ -6134,7 +6240,7 @@ export interface operations {
     export_publications_csv_api_publications_export_csv_get: {
         parameters: {
             query?: {
-                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc";
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc" | "serial_asc" | "serial_desc" | "publisher_asc" | "publisher_desc";
                 columns?: string;
                 search?: string;
                 lab_id?: string;
@@ -6194,7 +6300,8 @@ export interface operations {
                 access?: string;
                 source_filter?: string;
                 doc_type?: string;
-                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc";
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc" | "serial_asc" | "serial_desc" | "publisher_asc" | "publisher_desc";
+                columns?: string;
             };
             header?: never;
             path?: never;
@@ -6336,12 +6443,115 @@ export interface operations {
             };
         };
     };
+    get_merge_candidates_api_publications__publication_id__merge_candidates_get: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path: {
+                publication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeCandidateOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_merge_api_publications__publication_id__merge_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationMergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationMergeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_api_publications__publication_id__merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationMergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationMergeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_publications_api_publications_get: {
         parameters: {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc";
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc" | "serial_asc" | "serial_desc" | "publisher_asc" | "publisher_desc";
                 search?: string;
                 lab_id?: string;
                 year?: string;

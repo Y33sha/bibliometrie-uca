@@ -109,7 +109,7 @@
     font-family: var(--mono);
   }
   .form-count {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .form-persons {
@@ -123,7 +123,7 @@
     gap: 8px;
   }
   .incompat-tag {
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--danger);
     border: 1px solid var(--danger);
     border-radius: var(--radius);

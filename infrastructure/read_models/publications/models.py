@@ -26,6 +26,14 @@ PublicationSort = Literal[
     "soutenance_desc",
     "inscription_asc",
     "inscription_desc",
+    "author_asc",
+    "author_desc",
+    "labs_asc",
+    "labs_desc",
+    "serial_asc",
+    "serial_desc",
+    "publisher_asc",
+    "publisher_desc",
 ]
 
 
@@ -46,6 +54,22 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
         "oa_status",
         "license",
         "hal_status",
+        "sources",
+        "access",
+    }
+)
+
+
+# Vocabulaire des colonnes que l'export des thèses sait émettre, aux règles de `EXPORT_COLUMNS`.
+THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
+    {
+        "inscription",
+        "soutenance",
+        "author",
+        "doi",
+        "title",
+        "status",
+        "labs",
         "sources",
         "access",
     }
@@ -463,3 +487,15 @@ class SuspectMergeOut(BaseModel):
 
 class SuspectMergesResponse(PaginatedResponse):
     publications: list[SuspectMergeOut]
+
+
+class MergeCandidateOut(BaseModel):
+    """Publication fusionnable avec une autre. `similarity` : similarité trigramme de son titre normalisé avec le titre de référence. `sources` : sources de ses enregistrements sources."""
+
+    publication_id: int
+    title: str
+    publication_year: int | None
+    doc_type: str
+    doi: str | None
+    similarity: float
+    sources: list[str]

@@ -33,14 +33,18 @@ _MEMBERS = """
     WHERE gm.contribution_id = g.id
 """
 
-# Membre de la source la plus prioritaire, qui donne le nom affiché : jointure latérale `sc`.
-_DISPLAYED_MEMBER = f"""
-    CROSS JOIN LATERAL (
-        SELECT sc_m.* FROM {_MEMBERS}
+
+def _displayed_member(columns: str) -> str:
+    """Sous-requête des colonnes `columns` du membre `sc_m` de la source la plus prioritaire, qui donne le nom affiché de la contribution `g`."""
+    return f"""
+        SELECT {columns} FROM {_MEMBERS}
         ORDER BY {case_priority(SOURCE_PRIORITY, "sc_m.source")}, sc_m.id
         LIMIT 1
-    ) sc
-"""
+    """
+
+
+# Membre qui donne le nom affiché : jointure latérale `sc`.
+_DISPLAYED_MEMBER = f"CROSS JOIN LATERAL ({_displayed_member('sc_m.*')}) sc"
 
 # Laboratoires atteints par les contributions sources de la contribution `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`.
 _CONTRIBUTION_LABS = f"""
@@ -56,15 +60,13 @@ _CONTRIBUTION_LABS = f"""
 
 
 def _orphans_where(filters: OrphanFilters, *, with_labs: bool) -> tuple[str, dict[str, object]]:
-    """Condition des contributions orphelines retenues par `filters` ; le filtre laboratoires seulement si `with_labs`."""
+    """Condition des contributions orphelines retenues par `filters` ; le filtre laboratoires seulement si `with_labs`. La recherche porte sur le nom affiché."""
     conditions = [_ORPHAN_BASE]
     binds: dict[str, object] = {}
     if filters.search.strip():
         binds["search_pat"] = f"%{filters.search.strip()}%"
-        conditions.append(
-            f"EXISTS (SELECT 1 FROM {_MEMBERS} AND unaccent(lower({contributor_display_name('sc_m')}))"
-            " LIKE unaccent(lower(:search_pat)))"
-        )
+        displayed_name = _displayed_member(contributor_display_name("sc_m"))
+        conditions.append(f"unaccent(lower(({displayed_name}))) LIKE unaccent(lower(:search_pat))")
     if with_labs and (filters.lab_ids or filters.lab_none):
         lab_conditions = []
         if filters.lab_ids:

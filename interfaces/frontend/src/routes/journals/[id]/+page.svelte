@@ -230,22 +230,22 @@
 	.doaj-grid { margin-top: 24px; }
 
 	.muted { color: var(--muted); }
-	.small { font-size: 0.8rem; font-weight: 400; }
+	.small { font-size: var(--fs-sm); font-weight: 400; }
 
 	.doaj-fields {
 		display: grid; grid-template-columns: max-content 1fr;
 		gap: 4px 16px; margin: 0 0 12px;
 	}
-	.doaj-fields dt { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
-	.doaj-fields dd { margin: 0; font-size: 0.9rem; }
+	.doaj-fields dt { font-weight: 600; color: var(--muted); font-size: var(--fs-sm); }
+	.doaj-fields dd { margin: 0; font-size: var(--fs-md); }
 	.toggle-raw {
 		background: none; border: none; color: var(--accent);
-		font-size: 0.85rem; cursor: pointer; padding: 4px 0;
+		font-size: var(--fs-sm); cursor: pointer; padding: 4px 0;
 	}
 	.toggle-raw:hover { text-decoration: underline; }
 	.raw-payload {
 		background: var(--surface); padding: 12px; border-radius: var(--radius);
-		font-size: 0.8rem; max-height: 400px; overflow: auto;
+		font-size: var(--fs-sm); max-height: 400px; overflow: auto;
 		white-space: pre-wrap; word-break: break-word;
 	}
 </style>

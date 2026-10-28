@@ -3,7 +3,7 @@
 from domain.platforms.registry import ARXIV, HAL, ZENODO
 from domain.publications.access import Access, AccessLink, Copy, access, access_url
 
-_OPENALEX_IDS = {p.name: p.openalex_ids[0] for p in (ARXIV, HAL, ZENODO)}
+_KNOWN = {p.name: p for p in (ARXIV, HAL, ZENODO)}
 _DOI = "10.1/x"
 
 
@@ -13,7 +13,7 @@ def _copy(url, *, version=None, is_oa=True, platform=None, described=False, arri
         version=version,
         is_oa=is_oa,
         platform=platform,
-        platform_openalex_id=_OPENALEX_IDS.get(platform or ""),
+        known_platform=_KNOWN.get(platform or ""),
         described_by_platform=described,
         arrival=arrival,
     )
@@ -102,7 +102,7 @@ def test_une_plateforme_du_registre_porte_le_nom_du_registre():
         version=None,
         is_oa=True,
         platform="Zenodo (CERN European Organization for Nuclear Research)",
-        platform_openalex_id=ZENODO.openalex_ids[0],
+        known_platform=ZENODO,
         described_by_platform=False,
         arrival=1,
     )

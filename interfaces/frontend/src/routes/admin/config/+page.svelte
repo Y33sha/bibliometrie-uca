@@ -2,14 +2,17 @@
   import TableScroll from '#lib/components/TableScroll.svelte';
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
+  import TabNav from "#lib/components/TabNav.svelte";
+  import { page } from "$app/state";
   import { onMount } from "svelte";
-  import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
+  import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
   import Modal from "#lib/components/Modal.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { autofocus } from "#lib/actions/focus.js";
+  import { applyBrandHue, defaultSiteTitle, institution, previewBrandHue } from "#lib/institution.svelte.js";
   import type { components } from "#lib/api/schema.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
@@ -69,14 +72,6 @@
     };
   }
 
-  function extractDetail(e: unknown): string {
-    if (e instanceof ApiError) {
-      const d = (e.detail as { detail?: string })?.detail;
-      return d || `Erreur ${e.status}`;
-    }
-    return (e as Error)?.message || "Erreur";
-  }
-
   async function savePerimeter() {
     if (!perimModal) return;
     try {
@@ -95,7 +90,7 @@
       perimModal = null;
       await load();
     } catch (e) {
-      toast(extractDetail(e), "error");
+      toast(errorMessage(e), "error");
     }
   }
 
@@ -105,7 +100,7 @@
       await perimetersApi.remove(id);
       await load();
     } catch (e) {
-      toast(extractDetail(e), "error");
+      toast(errorMessage(e), "error");
     }
   }
 
@@ -155,6 +150,12 @@
   const MIN_YEAR = 1970;
   const MAX_YEAR = 2100;
 
+  const activeTab = $derived(page.url.searchParams.get("tab") === "display" ? "display" : "pipeline");
+
+  const SITE_TITLE_KEY = "site_title";
+  /** Clés dont la valeur est un texte libre, enregistré tel quel. */
+  const TEXT_KEYS = new Set([SITE_TITLE_KEY]);
+
   /** Bornes du champ pour une clé numérique, `null` pour les autres. */
   function numericBounds(key: string): { min: number; max: number } | null {
     if (CAP_KEYS.has(key)) return { min: 0, max: 10_000_000 };
@@ -181,6 +182,29 @@
     const v = configByKey("laboratories_display_types")?.value;
     return Array.isArray(v) ? (v as string[]) : [];
   });
+
+  const siteTitleItem = $derived(configByKey(SITE_TITLE_KEY));
+
+  // Teinte : le curseur prévisualise sur toute l'interface, le relâchement enregistre.
+  const BRAND_HUE_KEY = "brand_hue";
+  const brandHueItem = $derived(configByKey(BRAND_HUE_KEY));
+  let hueDraft = $state<number | null>(null);
+  const hueShown = $derived(hueDraft ?? (typeof brandHueItem?.value === "number" ? brandHueItem.value : 196));
+  // Spectre du curseur, plus clair et plus saturé que --accent pour que chaque teinte se reconnaisse.
+  const hueSpectrum = `linear-gradient(to right, ${Array.from({ length: 13 }, (_, i) => `oklch(0.75 0.11 ${i * 30})`).join(", ")})`;
+
+  async function saveBrandHue() {
+    if (hueDraft === null) return;
+    try {
+      const saved = await configApi.setValue(BRAND_HUE_KEY, hueDraft);
+      applyBrandHue(saved.value as number);
+      await load();
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), "error");
+      if (institution.brandHue !== null) previewBrandHue(institution.brandHue);
+    }
+    hueDraft = null;
+  }
 
   async function toggleLabType(type: string) {
     const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
@@ -226,6 +250,8 @@
       let parsed;
       if (CAP_KEYS.has(key) && text.trim() === "") {
         parsed = 0;
+      } else if (TEXT_KEYS.has(key)) {
+        parsed = text;
       } else {
         try {
           parsed = JSON.parse(text);
@@ -233,11 +259,12 @@
           parsed = text;
         }
       }
-      await configApi.setValue(key, parsed);
+      const saved = await configApi.setValue(key, parsed);
+      if (key === SITE_TITLE_KEY) institution.title = (saved.value as string) || null;
       editingKey = null;
       await load();
     } catch (e) {
-      toast("Erreur : " + extractDetail(e), "error");
+      toast("Erreur : " + errorMessage(e), "error");
     }
     saving = false;
   }
@@ -250,7 +277,7 @@
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
   {@const bornes = numericBounds(key)}
-  <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }}
+  <input class="config-editor-inline" class:text={TEXT_KEYS.has(key)} bind:value={editValue} use:autofocus={{ select: true }}
     type={bornes ? "number" : "text"} min={bornes?.min} max={bornes?.max} step={bornes ? 1 : undefined}
     onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
@@ -260,6 +287,14 @@
 {/snippet}
 
 <div class="config-page">
+  <TabNav
+    tabs={[
+      { id: "pipeline", label: "Pipeline" },
+      { id: "display", label: "Affichage" },
+    ]}
+  />
+
+  {#if activeTab === "pipeline"}
   <!-- ═══ ANNÉES ═══ -->
   <h2 class="section-title">Options d'extraction</h2>
   <div class="config-grid">
@@ -384,11 +419,47 @@
       {/if}
     {/each}
   </div>
-
-  <!-- ═══ AFFICHAGE ═══ -->
-  <h2 class="section-title">Affichage</h2>
+  {:else}
   <div class="config-grid">
-    <div class="config-row">
+    {#if siteTitleItem}
+      <div class="config-row">
+        <span class="config-label">Titre de l'application</span>
+        {#if editingKey === SITE_TITLE_KEY}
+          {@render inlineEdit(SITE_TITLE_KEY)}
+        {:else}
+          {#if siteTitleItem.value}
+            <span class="config-value-inline">{siteTitleItem.value}</span>
+          {:else}
+            <span class="config-value-inline default-value">{defaultSiteTitle()} (par défaut)</span>
+          {/if}
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(SITE_TITLE_KEY)} />
+        {/if}
+      </div>
+    {/if}
+    {#if brandHueItem}
+      <div class="config-row stacked">
+        <label class="config-label" for="brand-hue">Teinte de l'interface</label>
+        <div class="hue-control">
+          <input
+            id="brand-hue"
+            class="hue-slider"
+            type="range"
+            min="0"
+            max="359"
+            step="1"
+            value={hueShown}
+            style:background={hueSpectrum}
+            oninput={(e) => {
+              hueDraft = Number((e.target as HTMLInputElement).value);
+              previewBrandHue(hueDraft);
+            }}
+            onchange={saveBrandHue}
+          />
+          <span class="config-value-inline">{hueShown}°</span>
+        </div>
+      </div>
+    {/if}
+    <div class="config-row stacked">
       <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
       <div class="type-checks">
         {#each STRUCTURE_TYPES as t (t.value)}
@@ -400,6 +471,7 @@
       </div>
     </div>
   </div>
+  {/if}
 </div>
 
 {#if perimModal}
@@ -449,7 +521,7 @@
     margin: 4px 0 12px;
   }
   .subsection-title {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--muted);
     margin: 16px 0 6px;
@@ -473,22 +545,36 @@
   .config-row:last-child {
     border-bottom: none;
   }
+  /* Contrôle trop large pour tenir à côté du libellé : il passe dessous. */
+  .config-row.stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 0;
+  }
   .config-label {
     flex: 1;
     min-width: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .config-value-inline {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-variant-numeric: tabular-nums;
   }
   .config-editor-inline {
     width: 100px;
     font-family: var(--mono);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     padding: 3px 6px;
     border: 1px solid var(--accent);
     border-radius: var(--radius);
+  }
+  .config-editor-inline.text {
+    width: 320px;
+    font-family: inherit;
+  }
+  .default-value {
+    color: var(--muted);
   }
   .config-actions-inline {
     display: flex;
@@ -513,7 +599,7 @@
   }
   .perim-code {
     font-family: var(--mono);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     white-space: nowrap;
   }
@@ -537,7 +623,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     padding: 2px 8px;
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -564,7 +650,7 @@
     display: block;
     width: 100%;
     padding: 6px 10px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     cursor: pointer;
     background: none;
     border: none;
@@ -579,6 +665,18 @@
     border-bottom: 1px dotted var(--muted);
     cursor: help;
   }
+  .hue-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hue-slider {
+    flex: 1;
+    height: 12px;
+    border-radius: 6px;
+    appearance: none;
+    cursor: pointer;
+  }
   .type-checks {
     display: flex;
     flex-wrap: wrap;
@@ -588,7 +686,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-weight: 400;
     cursor: pointer;
   }

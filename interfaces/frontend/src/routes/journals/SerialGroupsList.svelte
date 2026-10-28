@@ -1,7 +1,7 @@
 <script lang="ts" generics="Group">
 	import { untrack, type Snippet } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { ApiError } from '#lib/api/index.js';
+	import { errorMessage } from '#lib/api/index.js';
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 	import { mergeSerial } from './mergeSerial';
@@ -37,9 +37,8 @@
 		loading = true;
 		try {
 			groups = await fetchGroups();
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur lors du chargement de la file : ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur lors du chargement de la file : ' + errorMessage(e), 'error');
 		} finally {
 			loading = false;
 		}

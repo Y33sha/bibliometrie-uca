@@ -98,7 +98,7 @@
 
 <style>
   .data-table td {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .hal-accounts {
     display: flex;
@@ -109,21 +109,21 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     flex-wrap: wrap;
   }
   .hal-name {
     font-weight: 500;
   }
   .hal-publications {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     background: var(--border-subtle);
     padding: 1px 6px;
     border-radius: var(--radius);
   }
   .hal-secondary-id {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
 </style>

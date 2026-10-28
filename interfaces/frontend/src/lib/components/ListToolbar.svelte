@@ -106,7 +106,8 @@
 <svelte:window {onscroll} onwheel={markGesture} ontouchmove={markGesture} onkeydown={onScrollKey} />
 
 <div class="list-toolbar-anchor" bind:this={anchor}></div>
-<div class="list-toolbar" class:hidden class:detached bind:this={bar} style:transform={offset ? `translateY(${-offset}px)` : undefined} use:stickyHeight={offset}>
+<!-- La barre glisse par sa position collante (`top`). Une transformation ferait d'elle le repère des panneaux en position fixe qu'elle contient (facettes), décalés d'autant. -->
+<div class="list-toolbar" class:hidden class:detached bind:this={bar} style:top={offset ? `calc(var(--header-height) - ${offset}px)` : undefined} use:stickyHeight={{ variable: '--list-toolbar-height', hidden: offset }}>
 	<div class="toolbar-card">
 		<div class="toolbar">
 			{#if search !== undefined}
@@ -141,10 +142,10 @@
 	}
 	/* Détachée, la barre glisse d'un bloc. Masquée, elle quitte le parcours au clavier à la fin du glissement. */
 	.list-toolbar.detached {
-		transition: transform 0.2s ease, visibility 0s;
+		transition: top 0.2s ease, visibility 0s;
 	}
 	.list-toolbar.detached.hidden {
-		transition: transform 0.2s ease, visibility 0s linear 0.2s;
+		transition: top 0.2s ease, visibility 0s linear 0.2s;
 	}
 	.toolbar-card {
 		display: flex;
@@ -165,7 +166,7 @@
 		}
 	}
 	.filters-label {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: var(--muted);
 		white-space: nowrap;
 	}

@@ -184,6 +184,35 @@ def drop_duplicate_mathml(abstract: str | None) -> str | None:
     return _MATHML_FORMULA_RE.sub(_annotation_tex, _TEX_THEN_MATHML_RE.sub(r"\1", abstract))
 
 
+_ABSTRACT_LABELS = (
+    "Abstract",
+    "Résumé",
+    "Resume",
+    "Summary",
+    "Resumen",
+    "Zusammenfassung",
+    "Riassunto",
+)
+_ABSTRACT_LABEL = "|".join(
+    form for label in _ABSTRACT_LABELS for form in (label, label.lower(), label.upper())
+)
+# Intitulé seul dans une balise de titre, suivi d'une ponctuation, ou suivi d'une majuscule, d'un chiffre ou d'une formule.
+_ABSTRACT_LABEL_RE = re.compile(
+    rf"^\s*(?:<(?:jats:)?title>\s*(?:{_ABSTRACT_LABEL})\s*[.:]?\s*</(?:jats:)?title>\s*"
+    rf"|(?:{_ABSTRACT_LABEL})(?:\s*[.:：–—-]\s*|\s+(?=[A-ZÀ-ÖØ-Þ0-9(\[<$«\"“])))"
+)
+
+
+def strip_abstract_label(abstract: str | None) -> str | None:
+    """Résumé sans l'intitulé qui le précède chez certaines sources (« Abstract », « Résumé : », `<title>Abstract</title>`).
+
+    Un mot suivi d'une minuscule ouvre une phrase (« Summary statistics are… ») : il reste.
+    """
+    if not abstract:
+        return abstract
+    return _ABSTRACT_LABEL_RE.sub("", abstract, count=1) or None
+
+
 _GREEK_LETTERS = (
     "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho"
     " sigma tau upsilon phi chi psi omega"

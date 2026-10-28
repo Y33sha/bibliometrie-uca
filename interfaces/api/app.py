@@ -33,6 +33,7 @@ from infrastructure.db.read_only_guard import read_request
 from infrastructure.observability.log import configure_root_logging
 from infrastructure.settings import settings
 from interfaces.api.deps import READ_ONLY_METHODS, ensure_admin_user, load_session_user
+from interfaces.api.disconnect_cancellation import CancelOnDisconnect, request_cancellation
 from interfaces.api.models.errors import (
     PublisherMergeBlockedResponse,
     RejectedPairsResponse,
@@ -196,15 +197,21 @@ async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
     )
 
 
-# SQLSTATE d'une requête interrompue par Postgres, ici par le plafond `statement_timeout`.
+# SQLSTATE d'une requête interrompue par Postgres : plafond `statement_timeout` ou annulation.
 _QUERY_CANCELED = "57014"
+
+# Statut d'une requête abandonnée par le client, d'usage chez nginx. La réponse n'atteint personne ; le statut sert au journal.
+_CLIENT_CLOSED_REQUEST = 499
 
 
 @app.exception_handler(OperationalError)
-async def operational_error_handler(request: Request, exc: OperationalError) -> JSONResponse:
-    """Traduit en 503 une lecture interrompue par le plafond de durée (`api_read_statement_timeout_s`), et laisse le reste en 500."""
+async def operational_error_handler(request: Request, exc: OperationalError) -> Response:
+    """Traduit en 503 une lecture interrompue par le plafond de durée (`api_read_statement_timeout_s`), en 499 une lecture annulée par la déconnexion du client (`CancelOnDisconnect`), et laisse le reste en 500."""
     if getattr(exc.orig, "sqlstate", None) != _QUERY_CANCELED:
         raise exc
+    cancellation = request_cancellation(request)
+    if cancellation is not None and cancellation.cancelled:
+        return Response(status_code=_CLIENT_CLOSED_REQUEST)
     logger.warning(
         "Requête interrompue (durée maximale dépassée) sur %s %s", request.method, request.url.path
     )
@@ -406,6 +413,10 @@ async def security_headers_middleware(
     else:
         response.headers.setdefault("Content-Security-Policy", _FRAME_ANCESTORS)
     return response
+
+
+# Posé à l'extérieur des middlewares ci-dessus : il lit seul les messages du client et les leur relaie.
+app.add_middleware(CancelOnDisconnect)
 
 
 # ----- CORS -----

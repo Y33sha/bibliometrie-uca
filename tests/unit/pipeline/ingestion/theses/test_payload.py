@@ -49,7 +49,7 @@ class TestAggregateThesisPersons:
         person = {"nom": "X", "prenom": "Xavier", "ppn": "999"}
         thesis = {
             "rapporteurs": [person],
-            "president": person,
+            "presidentJury": person,
         }
         result = aggregate_thesis_persons(thesis)
         assert len(result) == 1
@@ -58,7 +58,7 @@ class TestAggregateThesisPersons:
     def test_dedup_by_name_when_no_ppn(self):
         thesis = {
             "rapporteurs": [{"nom": "X", "prenom": "Xavier"}],
-            "president": {"nom": "X", "prenom": "Xavier"},
+            "presidentJury": {"nom": "X", "prenom": "Xavier"},
         }
         result = aggregate_thesis_persons(thesis)
         assert len(result) == 1
@@ -69,7 +69,7 @@ class TestAggregateThesisPersons:
         assert aggregate_thesis_persons(thesis)[0].identifiers is None
 
     def test_president_singular_field(self):
-        thesis = {"president": {"nom": "P", "prenom": "Pierre"}}
+        thesis = {"presidentJury": {"nom": "P", "prenom": "Pierre"}}
         result = aggregate_thesis_persons(thesis)
         assert len(result) == 1
         assert result[0].roles == ["jury_president"]
@@ -86,21 +86,21 @@ class TestAggregateThesisPersons:
     def test_dedup_by_ppn_despite_name_variants(self):
         thesis = {
             "rapporteurs": [{"nom": "Durand", "prenom": "Élise", "ppn": "999"}],
-            "president": {"nom": "Durand-Martin", "prenom": "E.", "ppn": "999"},
+            "presidentJury": {"nom": "Durand-Martin", "prenom": "E.", "ppn": "999"},
         }
         assert len(aggregate_thesis_persons(thesis)) == 1
 
     def test_homonyms_with_distinct_ppn_stay_distinct(self):
         thesis = {
             "rapporteurs": [{"nom": "Martin", "prenom": "Paul", "ppn": "111"}],
-            "president": {"nom": "Martin", "prenom": "Paul", "ppn": "222"},
+            "presidentJury": {"nom": "Martin", "prenom": "Paul", "ppn": "222"},
         }
         assert len(aggregate_thesis_persons(thesis)) == 2
 
     def test_without_ppn_distinct_first_names_stay_distinct(self):
         thesis = {
             "rapporteurs": [{"nom": "Martin", "prenom": "Paul"}],
-            "president": {"nom": "Martin", "prenom": "Anne"},
+            "presidentJury": {"nom": "Martin", "prenom": "Anne"},
         }
         assert len(aggregate_thesis_persons(thesis)) == 2
 

@@ -105,7 +105,7 @@
     border: none;
     border-bottom: 1px solid var(--border);
     border-radius: var(--radius) var(--radius) 0 0;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     outline: none;
     font-family: inherit;
   }
@@ -125,7 +125,7 @@
   .picker-row input {
     width: 200px;
     padding: 3px 6px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     border: 1px solid var(--accent);
     border-radius: var(--radius);
     font-family: inherit;
@@ -135,7 +135,6 @@
     overflow-y: auto;
   }
   .picker-panel {
-    z-index: 50;
     min-width: 350px;
     max-width: 600px;
     background: var(--card);
@@ -149,7 +148,7 @@
     gap: 6px;
     width: 100%;
     padding: 6px 10px;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     cursor: pointer;
     background: none;
     border: none;
@@ -160,7 +159,7 @@
   .picker-panel .picker-item {
     display: block;
     padding: 5px 8px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

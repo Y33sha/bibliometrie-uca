@@ -3,7 +3,7 @@
  *
  * Les valeurs open access reprennent les variables CSS des statuts ; les autres dimensions prennent la palette catégorielle.
  */
-import { cssVar, oaStatusColor } from '#lib/components/charts/cssVar.js';
+import { cssColor, oaStatusColor } from '#lib/components/charts/cssVar.js';
 import { chartColor } from '#lib/components/charts/palette.js';
 import {
 	docTypeFamilies,
@@ -47,8 +47,8 @@ export function pivotValueLabel(
 export function pivotValueColor(dim: string, value: string, idx: number): string {
 	if (dim === 'oa_voie') return oaStatusColor(value) ?? chartColor(idx);
 	if (dim === 'oa_access') return oaStatusColor(OA_ACCESS_STATUS[value]) ?? chartColor(idx);
-	if (dim === 'doc_type_grouped') return cssVar(docTypeGroupColorVar(value));
-	if (dim === 'license') return cssVar(`license-${value}`) || chartColor(idx);
+	if (dim === 'doc_type_grouped') return cssColor(docTypeGroupColorVar(value));
+	if (dim === 'license') return cssColor(`license-${value}`) || chartColor(idx);
 	return chartColor(idx);
 }
 

@@ -3,6 +3,8 @@
  *
  * Un panneau en position absolue est rogné par tout ancêtre dont le débordement est masqué ou défilant. C'est le cas de `.table-scroll` : son `overflow-x: auto` rend aussi son `overflow-y` calculé `auto`. En position fixe, le panneau échappe à ces ancêtres. Sa position suit l'ancre au défilement de n'importe quel conteneur et au redimensionnement de la fenêtre.
  *
+ * Le panneau est un popover, affiché dans la couche supérieure du navigateur. Il passe donc au-dessus de toute la page, même quand un ancêtre crée un contexte d'empilement (en-tête de tableau collant).
+ *
  * L'ancre est le parent du panneau, sauf mention contraire. Le panneau passe au-dessus de l'ancre quand la place manque en bas de la fenêtre.
  */
 export interface AnchoredOptions {
@@ -42,6 +44,8 @@ export function anchored(node: HTMLElement, options: AnchoredOptions = {}) {
 
 	// Hors du flux avant toute mesure : resté dans le flux pendant la mesure de l'ancre, le panneau allongerait son conteneur, et le navigateur décalerait la page pour compenser.
 	node.style.position = 'fixed';
+	node.setAttribute('popover', 'manual');
+	node.showPopover();
 	place();
 	// Le contenu du panneau (résultats d'une recherche) change sa hauteur : on recalcule, pour le cas où il passe au-dessus.
 	const resize = new ResizeObserver(place);

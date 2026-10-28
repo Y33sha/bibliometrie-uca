@@ -179,7 +179,7 @@
   }
   .access-line {
     margin-top: 10px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     line-height: 1.5;
     color: var(--text-secondary);
   }
@@ -208,7 +208,7 @@
     margin: 0 0 8px;
     padding-bottom: 6px;
     border-bottom: 1px solid color-mix(in srgb, var(--accent) 15%, white);
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
@@ -240,7 +240,7 @@
     transform: scale(1.15);
   }
   .row-label {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     color: var(--text);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -251,7 +251,7 @@
     margin-top: 6px;
   }
   .folded > summary {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     cursor: pointer;
     padding: 3px 0;

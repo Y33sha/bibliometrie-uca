@@ -57,7 +57,7 @@ class ReconcileRow(NamedTuple):
     """Projection d'une `source_record` du voisinage : clés + publication courante.
 
     `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
-    `publication_id` = `None` si orpheline ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve) ; `manual_merge_ids` = fusions manuelles qui désignent l'enregistrement source."""
+    `publication_id` = `None` si orpheline ; `is_matchable` = l'enregistrement source entre dans la réconciliation ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve) ; `manual_merge_ids` = fusions manuelles qui désignent l'enregistrement source."""
 
     id: int
     doi: str | None
@@ -66,6 +66,7 @@ class ReconcileRow(NamedTuple):
     doc_type: str | None
     title_normalized: str | None
     publication_year: int | None
+    is_matchable: bool
     publication_doi: str | None
     in_perimeter: bool
     manual_merge_ids: list[int]
@@ -80,7 +81,8 @@ _SNAPSHOT = "source_record_keys_marks"
 # (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
 _COLS = (
     "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
-    "{a}.doc_type, {a}.title_normalized, {a}.publication_year, p.doi AS publication_doi, "
+    "{a}.doc_type, {a}.title_normalized, {a}.publication_year, {a}.is_matchable, "
+    "p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
     "WHERE sc.source_record_id = {a}.id AND sc.in_perimeter) AS in_perimeter, "
     "ARRAY(SELECT mm.manual_merge_id FROM manual_merge_source_records mm "
@@ -111,7 +113,7 @@ _UNIVERSE_SQL = text(f"""
         LEFT JOIN publications p ON p.id = sr.publication_id
     )
     SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, publication_year,
-           publication_doi, in_perimeter, manual_merge_ids
+           is_matchable, publication_doi, in_perimeter, manual_merge_ids
     FROM dirty
     UNION
     -- DOI : égalité directe (la colonne est toujours normalisée minuscule par `clean_doi` à
@@ -243,6 +245,7 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
             r.doc_type,
             r.title_normalized,
             r.publication_year,
+            r.is_matchable,
             r.publication_doi,
             r.in_perimeter,
             r.manual_merge_ids,
@@ -325,6 +328,7 @@ def _member(row: ReconcileRow) -> ReconcileMember:
         title_normalized=row.title_normalized,
         publication_year=row.publication_year,
         doc_type=row.doc_type,
+        matchable=row.is_matchable,
     )
 
 
@@ -421,9 +425,11 @@ def _apply(
             if (previous := rows_by_source_record[source_record].publication_id) != target:
                 membership_changed.update(p for p in (previous, target) if p is not None)
 
-    # 2. Détachements : les membres d'une partition qui ne peut fonder aucune publication
-    # deviennent orphelins. Leur ancienne publication est recalculée, et supprimée si elle
-    # reste sans source.
+    # 2. Détachements : les enregistrements sources écartés et les membres d'une partition qui ne
+    # peut fonder aucune publication deviennent orphelins. Leur ancienne publication est
+    # recalculée, et supprimée si elle reste sans source. Une publication dissoute est laissée à
+    # l'étape 3, qui redirige ses paiements APC avant de la supprimer.
+    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     if plan.detached:
         detach_source_records(conn, list(plan.detached))
         membership_changed.update(
@@ -438,6 +444,7 @@ def _apply(
                 if (p := rows_by_source_record[source_record].publication_id) is not None
             }
             - survivors
+            - dissolved_ids
         ):
             with savepoint(conn):
                 lifecycle.refresh(conn, publication_id)
@@ -447,7 +454,6 @@ def _apply(
     for dissolved in plan.dissolved:
         lifecycle.dissolve(conn, dissolved.publication_id, dissolved.successor_publication_id)
 
-    dissolved_ids = {dissolved.publication_id for dissolved in plan.dissolved}
     return AppliedReconciliation(
         survivors=frozenset(survivors),
         changed=frozenset(membership_changed - dissolved_ids),

@@ -34,7 +34,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
+from domain.config import (
+    BRAND_HUE_KEY,
+    CAP_KEYS,
+    DELAY_KEYS,
+    MAX_YEAR,
+    MIN_YEAR,
+    SITE_TITLE_KEY,
+    YEAR_KEYS,
+)
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
@@ -50,6 +58,7 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.serials.serial import OA_MODELS, SERIAL_TYPES
+from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -147,6 +156,16 @@ config = Table(
         "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 1 "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
+    ),
+    CheckConstraint(
+        f"key <> '{SITE_TITLE_KEY}' OR jsonb_typeof(value) = 'string'",
+        name="config_site_title_is_text",
+    ),
+    CheckConstraint(
+        f"key <> '{BRAND_HUE_KEY}' OR (jsonb_typeof(value) = 'number' "
+        "AND (value)::numeric BETWEEN 0 AND 359 "
+        "AND (value)::numeric = trunc((value)::numeric))",
+        name="config_brand_hue_is_angle",
     ),
     schema="ops",
 )
@@ -1337,6 +1356,17 @@ source_records = Table(
             "author_count."
         ),
     ),
+    Column(
+        "is_matchable",
+        Boolean,
+        nullable=False,
+        server_default=text("true"),
+        comment=(
+            "Faux pour un enregistrement source écarté de la réconciliation : préfixe DOI exclu, "
+            "titre de paratexte, enregistrement ScanR issu d'un dépôt HAL introuvable, "
+            "enregistrement d'agrégateur sans DOI, lien ni clé de confirmation."
+        ),
+    ),
     UniqueConstraint("source", "source_id", name="source_records_source_source_id_key"),
     CheckConstraint(
         "jsonb_typeof(external_ids) = 'object'",
@@ -1350,6 +1380,43 @@ source_records = Table(
         "jsonb_typeof(corrections) = 'object'",
         name="source_records_corrections_is_object",
     ),
+    schema="sources",
+)
+
+
+source_identifier_type_enum = PgEnum(
+    *SourceIdentifierType, name="source_identifier_type", create_type=False
+)
+source_identifier_role_enum = PgEnum(
+    *SourceIdentifierRole, name="source_identifier_role", create_type=False
+)
+
+source_record_identifiers = Table(
+    "source_record_identifiers",
+    metadata,
+    Column("source_record_id", Integer, nullable=False),
+    Column("id_type", source_identifier_type_enum, nullable=False),
+    Column("id_value", Text, nullable=False, comment="Forme normalisée de l'identifiant."),
+    Column(
+        "role",
+        source_identifier_role_enum,
+        nullable=False,
+        comment=(
+            "primary : identifiant de l'enregistrement dans la source. derived : identifiant de "
+            "l'enregistrement d'une autre source dont la source tire le sien. secondary : "
+            "identifiant que la source attribue au même document. related : identifiant d'un "
+            "document lié."
+        ),
+    ),
+    Column(
+        "removed_by",
+        Text,
+        comment="Règle de correction qui retire l'identifiant. NULL : identifiant actif.",
+    ),
+    PrimaryKeyConstraint(
+        "source_record_id", "id_type", "id_value", name="source_record_identifiers_pkey"
+    ),
+    comment="Identifiants d'un enregistrement source, réécrits à chaque normalisation.",
     schema="sources",
 )
 

@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import cloud from 'd3-cloud';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { mixColors } from '#lib/components/charts/contrast.js';
 	import type { components } from '#lib/api/schema.js';
 
@@ -55,8 +55,8 @@
 		const minCount = Math.min(...counts);
 		const maxCount = Math.max(...counts);
 		// Teinte : de la plus claire (sujet le moins fréquent) au bleu-vert du site (le plus fréquent).
-		const light = cssVar('accent-soft');
-		const dark = cssVar('accent');
+		const light = cssColor('accent-soft');
+		const dark = cssColor('accent');
 		const words: CloudWord[] = list.map((s) => {
 			const weight = weightFor(s.count, minCount, maxCount);
 			return {
@@ -160,7 +160,7 @@
 	.layout-loading {
 		color: var(--muted);
 		font-style: italic;
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		margin: 0;
 		padding: 12px;
 	}
