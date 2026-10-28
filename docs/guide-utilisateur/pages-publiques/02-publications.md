@@ -2,11 +2,11 @@
 
 ## Liste `/publications`
 
-La barre principale filtre par type de document, année, laboratoire et accès (ouvert, fermé). « Plus de filtres » ajoute :
+La barre principale filtre par type de document, année, langue, revue, auteur, laboratoire et accès (ouvert, fermé). « Plus de filtres » ajoute :
 
-- **Revue et éditeur** : revue, éditeur, paiement d'[APC](../../glossaire.md#apc), [voie *open access*](../../glossaire.md#voies-open-access), licence de la version éditeur ;
-- **Auteurs** : auteur, [organisation partenaire](../../glossaire.md#organisation-partenaire), pays des co-auteurs ;
-- **Détails** : langue, sujets, sources.
+- **Revue et éditeur** : éditeur, paiement d'[APC](../../glossaire.md#apc), [voie *open access*](../../glossaire.md#voies-open-access), licence de la version éditeur ;
+- **Auteurs** : [organisation partenaire](../../glossaire.md#organisation-partenaire), pays des co-auteurs ;
+- **Détails** : sujets, sources.
 
 Une facette sans case cochée retient tout ; « Effacer » vide sa sélection. Les filtres actifs s'affichent sous la barre, chacun avec sa croix.
 
