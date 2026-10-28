@@ -1,11 +1,4 @@
-"""Engine SQLAlchemy synchrone basé sur le driver psycopg3.
-
-Un seul Engine sync utilisé par toute l'application :
-- L'API FastAPI consomme cet engine via `db_conn` (les routes `def` tournent dans le threadpool Starlette).
-- Le pipeline et les scripts CLI ouvrent leurs propres connexions via `engine.begin()` / `engine.connect()`.
-
-Le driver `postgresql+psycopg` permet d'accéder aux features psycopg3 (server-side cursors, COPY) via `Connection.connection.driver_connection` si besoin.
-"""
+"""Engine SQLAlchemy synchrone (driver psycopg3), unique pour l'API, le pipeline et les scripts en ligne de commande."""
 
 import os
 from typing import Literal
@@ -25,11 +18,9 @@ DbIdentity = Literal["owner", "app", "pipeline"]
 
 
 def db_url(identity: DbIdentity = "pipeline") -> URL:
-    """URL de connexion Postgres construite depuis les settings (réutilisée par Alembic).
+    """URL de connexion PostgreSQL, construite depuis les réglages (réutilisée par Alembic).
 
-    Trois identités, une par processus, décrites dans `infrastructure/db/roles.sql`. Le pipeline et les scripts en ligne de commande étant les appelants les plus nombreux, c'est leur identité qui vaut par défaut ; les migrations et l'API demandent la leur. L'identité demandée est exigée : sans elle, la construction échoue.
-
-    `db_sslmode`, s'il est défini, est passé en paramètre de connexion `sslmode`.
+    `identity` désigne le rôle PostgreSQL du processus (cf. `infrastructure/db/roles.sql`) : celui du pipeline par défaut. Un rôle non configuré fait échouer la construction.
     """
     username: str = getattr(settings, f"db_{identity}_user")
     secret: SecretStr = getattr(settings, f"db_{identity}_password")
@@ -53,14 +44,11 @@ def db_url(identity: DbIdentity = "pipeline") -> URL:
 
 
 def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
-    """Construit l'Engine SQLAlchemy synchrone (driver psycopg3).
+    """Construit l'engine synchrone pour le rôle `identity` (cf. `db_url`).
 
-    Utilisé par toute la surface (API, pipeline, CLI). `identity` choisit le rôle de connexion (cf. `db_url`). Paramètres pool :
-    - `pool_size = db_pool_min` : connexions persistantes
-    - `max_overflow = db_pool_max - db_pool_min` : connexions supplémentaires sous charge, fermées au retour
-    - `pool_pre_ping = True` : détecte les connexions perdues (timeout réseau, reset SGBD) avant de les remettre en service
+    Pool : `db_pool_min` connexions persistantes, jusqu'à `db_pool_max` sous charge ; `pool_pre_ping` écarte les connexions perdues.
 
-    Garde-fou : sous pytest, refuse toute base dont le nom n'a pas le suffixe `_test`. Les tests redirigent l'engine vers la base de test par monkey-patch (conftest) ; ce backstop empêche qu'un test écrive dans la base de production si ce monkey-patch venait à être contourné.
+    Sous pytest, refuse toute base sans suffixe `_test` : le conftest redirige l'engine vers la base de test, et ce contrôle protège la base de production si la redirection échoue.
     """
     if os.environ.get("PYTEST_CURRENT_TEST") and not settings.db_name.endswith("_test"):
         raise RuntimeError(
@@ -80,7 +68,7 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
 def install_engine_guards(engine: Engine) -> None:
     """Attache les garde-fous de toute connexion du projet : refus d'écrire pendant une requête de lecture, sortie du recensement des annulations au retour dans le pool.
 
-    Réunis ici pour qu'un engine monté hors du constructeur — celui d'une suite de tests, sur la base de test — les reçoive tous en un appel, et qu'en ajouter un ne demande pas d'aller les compléter un par un.
+    Un engine monté hors de `build_sync_engine`, comme celui des tests, les reçoit en un appel.
     """
     install_read_only_guard(engine)
     install_query_cancellation(engine)
@@ -93,10 +81,7 @@ def set_sync_engine(engine: Engine | None) -> None:
 
 
 def get_sync_engine() -> Engine:
-    """Retourne l'engine sync global, en le construisant à la demande.
-
-    L'API initialise l'engine au démarrage via le lifespan, mais les scripts CLI et le pipeline n'ont pas de cycle de vie applicatif : ils déclenchent la construction lazy au premier appel.
-    """
+    """Engine global, construit au premier appel pour le pipeline et les scripts ; l'API le construit au démarrage."""
     global _sync_engine
     if _sync_engine is None:
         _sync_engine = build_sync_engine()

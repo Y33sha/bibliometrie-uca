@@ -1,6 +1,6 @@
 """Session admin : émission, lecture et expiration du jeton, vérification du mot de passe.
 
-Le jeton est un payload signé HMAC-SHA256 avec `session_secret`, de la forme `<payload>.<signature>`. Le format du payload — l'utilisateur et l'instant d'émission — ne sort pas de ce module : `issue_token` le compose, `read_session` le défait et rend l'utilisateur. Ses appelants ne connaissent que le jeton opaque et le nom qui en sort.
+Le jeton a la forme `<utilisateur>|<instant d'émission>.<signature>`, signé HMAC-SHA256 avec `session_secret`. Seul ce module connaît ce format.
 
 `routers/auth.py` émet le jeton à la connexion et le pose en cookie ; `deps.py` le relit et cherche son utilisateur et ses rôles dans `ops.users`.
 """
@@ -16,13 +16,13 @@ from infrastructure.settings import settings
 SESSION_MAX_AGE = 86400 * 7  # 7 jours
 
 MIN_SESSION_SECRET_LENGTH = 32
-"""Plancher de longueur de la clé de signature. `secrets.token_hex(32)`, la recette documentée, en rend 64 ; sous ce plancher, la clé se retrouve par force brute hors ligne et un jeton de session se forge alors sans connaître le mot de passe."""
+"""Longueur minimale de la clé de signature : une clé plus courte se retrouve par force brute hors ligne, et permet de forger un jeton."""
 
 
 def check_auth_config() -> None:
-    """Refuse le démarrage de l'API sans de quoi authentifier une session d'administration.
+    """Refuse le démarrage de l'API sans `ADMIN_HASH` ou avec un `SESSION_SECRET` trop court.
 
-    Le contrôle vit ici plutôt que dans les settings parce qu'il porte sur ce que l'API exerce : le pipeline et les scripts de maintenance lisent la même configuration sans jamais ouvrir de session, et n'ont donc pas à porter ces deux secrets. Le refus tombe au démarrage, où il se voit, et non à la première tentative de connexion.
+    Le contrôle est propre à l'API : le pipeline et les scripts lisent la même configuration sans ouvrir de session.
     """
     if not settings.admin_hash.get_secret_value():
         raise RuntimeError(
@@ -58,7 +58,7 @@ def issue_token(admin_user: str) -> str:
 
 
 def read_session(token: str) -> str | None:
-    """Utilisateur porté par un jeton, ou `None` si la signature ne tient pas, si la forme est illisible ou si `SESSION_MAX_AGE` est passé."""
+    """Utilisateur du jeton, ou `None` si la signature est fausse, la forme illisible ou `SESSION_MAX_AGE` dépassé."""
     if not token or "." not in token:
         return None
     payload, signature = token.rsplit(".", 1)
@@ -81,10 +81,7 @@ def check_username(username: str) -> bool:
 
 
 def check_password(password: str) -> bool:
-    """Confronte un mot de passe au hash bcrypt configuré. Sans hash configuré, ou si le hash est mal formé, aucune connexion n'aboutit.
-
-    `bcrypt.checkpw` lève `ValueError` quand le hash n'est pas un hash bcrypt valide : un mauvais mot de passe reste un refus, pas une erreur serveur.
-    """
+    """Confronte un mot de passe au hash bcrypt configuré. Sans hash, ou avec un hash mal formé (`ValueError` de `bcrypt.checkpw`), la réponse est un refus."""
     admin_hash = settings.admin_hash.get_secret_value()
     if not admin_hash:
         return False
