@@ -159,14 +159,14 @@ def build_hal_external_ids(
 ) -> dict[str, JsonValue]:
     """Construit `external_ids` (clés de déduplication cross-source) pour un doc HAL.
 
-    `hal_id` est redondant avec `source_id` comme clé, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedid_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
+    `hal_id` est redondant avec `source_id` comme clé, mais on le pose aussi ici pour qu'il devienne un **token de confirmation** (cf. `domain.source_records.keys`) et que HAL soit clusterisé comme les autres sources — symétrie avec ce que theses fait déjà pour NNT. `pmid` vient du champ `pubmedId_s` ; `pmcid`/`arxiv_id` des liens externes (`linkExtUrl_s`).
     """
     external_ids: dict[str, JsonValue] = {ExternalIdType.HAL_ID: [hal_id]}
     if nnt:
         external_ids[ExternalIdType.NNT] = nnt
     if isbns := parse_tei_isbns(hal_text_field(doc.get("label_xml"))):
         external_ids[ExternalIdType.ISBN] = isbns
-    if pmid := normalize_pmid(hal_text_field(doc.get("pubmedid_s"))):
+    if pmid := normalize_pmid(hal_text_field(doc.get("pubmedId_s"))):
         external_ids[ExternalIdType.PMID] = pmid
     raw = doc.get("linkExtUrl_s")
     link_urls = [raw] if isinstance(raw, str) else as_sequence(raw)
