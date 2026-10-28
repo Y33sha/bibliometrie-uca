@@ -56,6 +56,7 @@ from infrastructure.repositories import (
 )
 from infrastructure.repositories.config_repository import PgConfigRepository
 from infrastructure.settings import settings
+from interfaces.api.disconnect_cancellation import request_cancellation
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.session import read_session
 from pipeline.public import (
@@ -115,7 +116,7 @@ READ_ONLY_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 def _open_connection(request: Request) -> Connection:
     """Connexion tirée de l'engine, avec les caractéristiques de la requête en cours.
 
-    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`).
+    Sur une méthode de lecture, la transaction s'ouvre **en lecture seule** : PostgreSQL refuse alors tout INSERT, UPDATE, DELETE ou DDL par une erreur `25006`, y compris celui qu'un service émettrait. La caractéristique se pose avant tout statement, sur une connexion dont la transaction n'est pas encore ouverte, et SQLAlchemy la remet à zéro au retour de la connexion dans le pool. La transaction a aussi un plafond de durée par requête SQL (`api_read_statement_timeout_s`). La connexion est annulable par la déconnexion du client (`CancelOnDisconnect`).
 
     Point de passage unique des connexions ouvertes pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture parallélisée. La règle vaut donc pour toutes, quel que soit le code qui les consomme.
     """
@@ -125,6 +126,9 @@ def _open_connection(request: Request) -> Connection:
         conn.exec_driver_sql(
             f"SET LOCAL statement_timeout = '{settings.api_read_statement_timeout_s}s'"
         )
+        cancellation = request_cancellation(request)
+        if cancellation is not None:
+            cancellation.register(conn)
     return conn
 
 

@@ -14,6 +14,7 @@ import psycopg  # noqa: F401 — driver chargé par SA via la URL postgresql+psy
 from pydantic import SecretStr
 from sqlalchemy import URL, Engine, create_engine
 
+from infrastructure.db.query_cancellation import install_query_cancellation
 from infrastructure.db.read_only_guard import install_read_only_guard
 from infrastructure.settings import settings
 
@@ -77,11 +78,12 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
 
 
 def install_engine_guards(engine: Engine) -> None:
-    """Attache les garde-fous que toute connexion du projet porte.
+    """Attache les garde-fous de toute connexion du projet : refus d'écrire pendant une requête de lecture, sortie du recensement des annulations au retour dans le pool.
 
     Réunis ici pour qu'un engine monté hors du constructeur — celui d'une suite de tests, sur la base de test — les reçoive tous en un appel, et qu'en ajouter un ne demande pas d'aller les compléter un par un.
     """
     install_read_only_guard(engine)
+    install_query_cancellation(engine)
 
 
 def set_sync_engine(engine: Engine | None) -> None:
