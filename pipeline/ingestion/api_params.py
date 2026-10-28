@@ -10,6 +10,8 @@ API_BASE_URLS: dict[str, str] = {
     "wos": "https://api.clarivate.com/api/wos",
     "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
     "theses": "https://theses.fr/api/v1/theses/recherche/",
+    # theses.fr : détail d'une thèse, l'adapter compose `<identifiant>`.
+    "theses_detail": "https://theses.fr/api/v1/theses/these/",
     # CrossRef : racine sans /works, l'adapter compose le chemin selon l'usage (/works/<doi>, /works?filter=orcid:...)
     "crossref": "https://api.crossref.org",
     # DataCite : racine, l'adapter compose `/dois` (query batch) ou `/dois/<doi>`.

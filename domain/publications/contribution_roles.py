@@ -159,8 +159,8 @@ THESES_FIELD_ROLES = {
     "auteurs": [ContributionRole.AUTHOR],
     "directeurs": [ContributionRole.THESIS_DIRECTOR],
     "rapporteurs": [ContributionRole.RAPPORTEUR],
-    "examinateurs": [ContributionRole.JURY_MEMBER],
-    "president": [ContributionRole.JURY_PRESIDENT],
+    "membresJury": [ContributionRole.JURY_MEMBER],
+    "presidentJury": [ContributionRole.JURY_PRESIDENT],
 }
 
 # Rôles de jury de thèse, donnés par theses.fr et ScanR.

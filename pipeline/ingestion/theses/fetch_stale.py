@@ -1,13 +1,12 @@
 """Nouvelle lecture d'un document theses.fr par son identifiant natif : tâche `fetch_stale.theses`.
 
-Refetch d'une row par son identifiant natif (`staging.source_id` : NNT pour une thèse soutenue, id theses.fr pour une thèse en cours). Une réponse valide sans hit correspondant = identifiant confirmé absent.
+Lit le détail d'une thèse par son identifiant natif (`staging.source_id` : NNT pour une thèse soutenue, identifiant theses.fr pour une thèse en cours). Le moissonnage écrit seulement les thèses absentes de `staging` : cette tâche met à jour les autres.
 """
 
 from __future__ import annotations
 
 import httpx2
 
-from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.theses.api import fetch_thesis
 
@@ -18,7 +17,4 @@ class ThesesStaleRefetch(StaleRefetch):
     max_concurrent = 1
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        thesis = await fetch_thesis(client, source_id)
-        if isinstance(thesis, NotFound | Unavailable):
-            return thesis
-        return thesis
+        return await fetch_thesis(client, source_id)
