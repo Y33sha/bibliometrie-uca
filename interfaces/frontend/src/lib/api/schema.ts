@@ -322,6 +322,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/{publication_id}/merge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Merge
+         * @description Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
+         *
+         *     L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite, donc aucune écriture ne survit. Il est en POST pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+         */
+        post: operations["preview_merge_api_publications__publication_id__merge_preview_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/publications/{publication_id}/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Merge
+         * @description Fusionne manuellement les deux publications. La réconciliation relit ce verdict à chaque passage du pipeline.
+         *
+         *     Renvoie la publication conservée, et le nombre de contributions laissées sans personne parce que leurs contributions sources désignaient deux personnes. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+         */
+        post: operations["merge_api_publications__publication_id__merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications": {
         parameters: {
             query?: never;
@@ -4682,6 +4726,24 @@ export interface components {
             readonly pages: number;
         };
         /**
+         * PublicationMergeRequest
+         * @description Publication à fusionner avec celle désignée par le chemin.
+         */
+        PublicationMergeRequest: {
+            /** Other Id */
+            other_id: number;
+        };
+        /**
+         * PublicationMergeResult
+         * @description Résultat d'une fusion manuelle, ou de son aperçu. `publication_id` : publication issue de la fusion. `conflicts` : contributions dont les contributions sources désignaient deux personnes, laissées sans personne.
+         */
+        PublicationMergeResult: {
+            /** Publication Id */
+            publication_id: number;
+            /** Conflicts */
+            conflicts: number;
+        };
+        /**
          * PublicationSourcesResponse
          * @description Enregistrements sources d'une publication, toutes sources confondues, leurs contributions sources, et les structures que ces contributions sources citent.
          */
@@ -6325,6 +6387,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PublicationSourcesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_merge_api_publications__publication_id__merge_preview_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationMergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationMergeResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_api_publications__publication_id__merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                publication_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicationMergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicationMergeResult"];
                 };
             };
             /** @description Validation Error */

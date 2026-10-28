@@ -107,6 +107,16 @@ GRANT INSERT ON
     ops.audit_log
 TO bibliometrie_app;
 
+-- Une fusion manuelle de publications s'enregistre ; elle ne se modifie pas. Elle réaligne
+-- les auteurs de la publication conservée, donc récrit ses contributions.
+GRANT INSERT ON
+    publications.manual_merges, publications.manual_merge_source_records
+TO bibliometrie_app;
+
+GRANT INSERT, DELETE ON
+    publications.contributions, publications.aligned_source_contributions
+TO bibliometrie_app;
+
 -- Au démarrage, l'API crée l'utilisateur `ADMIN_USER` et lui attribue le rôle admin s'ils
 -- manquent. `INSERT … ON CONFLICT DO NOTHING` n'exige que le droit d'insertion.
 GRANT INSERT ON

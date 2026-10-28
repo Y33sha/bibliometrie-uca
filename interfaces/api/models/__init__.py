@@ -56,6 +56,7 @@ from interfaces.api.models.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
+from interfaces.api.models.publications import PublicationMergeRequest, PublicationMergeResult
 from interfaces.api.models.serials import SerialTypeChange, SerialTypeChangeImpact
 from interfaces.api.models.structures import (
     StructureTutelleCreateResponse,
@@ -94,6 +95,8 @@ __all__ = [
     "OrphanAssignResponse",
     "OrphanBatchAssignResponse",
     "PerimeterCreate",
+    "PublicationMergeRequest",
+    "PublicationMergeResult",
     "PublisherMergeBlockedResponse",
     "SetPersonExclusion",
     "RejectedPairItem",

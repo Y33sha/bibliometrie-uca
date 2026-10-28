@@ -1,11 +1,12 @@
-"""Personnes des contributions d'une publication après une fusion manuelle.
+"""Règles de la fusion manuelle de publications.
 
-Avant la fusion, chaque contribution source a la personne et le mode de rattachement de sa contribution. Après le réalignement, une contribution reçoit la personne de ses contributions sources, avec le mode le plus prioritaire (`MATCH_REASON_PRIORITY`). Une contribution dont les contributions sources désignent deux personnes est en conflit : elle reste sans personne. Une personne désignée par plusieurs contributions revient à la mieux appuyée (`settle_publication`).
+Deux publications à DOI distincts ne fusionnent pas. Avant la fusion, chaque contribution source a la personne et le mode de rattachement de sa contribution. Après le réalignement, une contribution reçoit la personne de ses contributions sources, avec le mode le plus prioritaire (`MATCH_REASON_PRIORITY`). Une contribution dont les contributions sources désignent deux personnes est en conflit : elle reste sans personne. Une personne désignée par plusieurs contributions revient à la mieux appuyée (`settle_publication`).
 """
 
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 
+from domain.errors import ValidationError
 from domain.persons.contribution_matching import (
     MATCH_REASON_PRIORITY,
     ContributionDecision,
@@ -15,6 +16,13 @@ from domain.persons.contribution_matching import (
 )
 
 _RANK = {reason: rank for rank, reason in enumerate(MATCH_REASON_PRIORITY)}
+
+
+def check_mergeable(dois: Iterable[str | None]) -> None:
+    """Refuse la fusion de publications à DOI distincts (`ValidationError`) : un DOI désigne une seule œuvre."""
+    distinct = sorted({doi.lower() for doi in dois if doi})
+    if len(distinct) > 1:
+        raise ValidationError(f"Fusion impossible : DOI distincts ({', '.join(distinct)})")
 
 
 @dataclass(frozen=True, slots=True)

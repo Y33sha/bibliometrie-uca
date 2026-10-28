@@ -19,6 +19,7 @@ from application.services.config import ConfigService
 from application.services.contributions import ContributionService
 from application.services.perimeters import PerimeterService
 from application.services.persons import PersonService
+from application.services.publication_merge import PublicationMergeService
 from application.services.publishers import PublisherService
 from application.services.serials import SerialService
 from application.services.structures import StructureService
@@ -49,6 +50,7 @@ from infrastructure.repositories import (
     contribution_repository,
     perimeter_repository,
     person_repository,
+    publication_merge_repository,
     publisher_repository,
     serial_repository,
     structure_repository,
@@ -64,6 +66,7 @@ from pipeline.public import (
     PerimeterStructures,
     PublicationCountRecompute,
     PublicationPerimeterRecompute,
+    PublicationRecompute,
     SerialRecompute,
     SourceContributionPerimeterRecompute,
 )
@@ -303,6 +306,15 @@ def person_service(conn: DbConn) -> PersonService:
         persons=person_repository(conn),
         contributions=contribution_repository(conn),
         perimeter_recompute=PublicationPerimeterRecompute(conn),
+    )
+
+
+def publication_merge_service(conn: DbConn) -> PublicationMergeService:
+    return PublicationMergeService(
+        merges=publication_merge_repository(conn),
+        recompute=PublicationRecompute(conn),
+        perimeter_recompute=PublicationPerimeterRecompute(conn),
+        conn=conn,
     )
 
 

@@ -8,6 +8,7 @@ Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-these
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
+from application.services.publication_merge import PublicationMergeService
 from domain.merge import MergedEntity
 from domain.publications.doc_types import DOC_TYPES
 from domain.publications.licenses import LICENSE_LABELS, License
@@ -26,14 +27,19 @@ from infrastructure.read_models.publications.models import (
 )
 from infrastructure.read_models.publications.queries import PublicationsQueries
 from interfaces.api.csv_export import csv_response
-from interfaces.api.deps import entity_detail, publications_queries
+from interfaces.api.deps import entity_detail, publication_merge_service, publications_queries
 from interfaces.api.entity_detail import EntityDetail
 from interfaces.api.filters import (
     parse_int_csv,
     parse_lab_id,
     parse_vocabulary_csv,
 )
-from interfaces.api.models import EnumOption, TotalCountResponse
+from interfaces.api.models import (
+    EnumOption,
+    PublicationMergeRequest,
+    PublicationMergeResult,
+    TotalCountResponse,
+)
 from interfaces.api.params import SearchTerm
 from interfaces.api.publication_filters import ListFilters
 from interfaces.api.rate_limit import ExportSlot, export_rate_limit, export_slot
@@ -175,6 +181,38 @@ def get_publication_sources(
     if sources is None:
         raise HTTPException(status_code=404, detail="Publication introuvable")
     return sources
+
+
+@router.post("/{publication_id}/merge-preview", response_model=PublicationMergeResult)
+def preview_merge(
+    publication_id: int,
+    body: PublicationMergeRequest,
+    merges: PublicationMergeService = Depends(publication_merge_service),
+) -> PublicationMergeResult:
+    """Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
+
+    L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite, donc aucune écriture ne survit. Il est en POST pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+    """
+    outcome = merges.preview_merge(publication_id, body.other_id)
+    return PublicationMergeResult(
+        publication_id=outcome.publication_id, conflicts=outcome.conflicts
+    )
+
+
+@router.post("/{publication_id}/merge", response_model=PublicationMergeResult)
+def merge(
+    publication_id: int,
+    body: PublicationMergeRequest,
+    merges: PublicationMergeService = Depends(publication_merge_service),
+) -> PublicationMergeResult:
+    """Fusionne manuellement les deux publications. La réconciliation relit ce verdict à chaque passage du pipeline.
+
+    Renvoie la publication conservée, et le nombre de contributions laissées sans personne parce que leurs contributions sources désignaient deux personnes. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+    """
+    outcome = merges.merge(publication_id, body.other_id)
+    return PublicationMergeResult(
+        publication_id=outcome.publication_id, conflicts=outcome.conflicts
+    )
 
 
 @router.get("", response_model=PublicationListResponse)

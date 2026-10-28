@@ -1,10 +1,22 @@
-"""Tests unitaires de `domain.publications.manual_merge.merge_attributions`."""
+"""Tests unitaires de `domain.publications.manual_merge`."""
 
+import pytest
+
+from domain.errors import ValidationError
 from domain.persons.contribution_matching import MATCH_REASON_PRIORITY, ContributionMatchReason
-from domain.publications.manual_merge import Attribution, merge_attributions
+from domain.publications.manual_merge import Attribution, check_mergeable, merge_attributions
 
 ORCID = ContributionMatchReason.ORCID
 NAME = ContributionMatchReason.NAME
+
+
+def test_distinct_dois_are_not_mergeable():
+    with pytest.raises(ValidationError, match="DOI distincts"):
+        check_mergeable(["10.1/x", "10.2/y"])
+
+
+def test_one_doi_and_a_publication_without_doi_are_mergeable():
+    check_mergeable(["10.1/X", None, "10.1/x"])
 
 
 def test_priority_follows_the_order_of_the_decision():
