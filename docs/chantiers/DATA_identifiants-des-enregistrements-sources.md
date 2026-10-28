@@ -36,6 +36,12 @@ Les enregistrements sources à ISBN sont surtout des chapitres (4 922), des comm
 
 Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 2021, sans DOI. OpenAlex et ScanR citent les deux dépôts, dans un ordre inverse. Chaque enregistrement source rejoint la publication de son premier dépôt, et les deux publications restent séparées.
 
+Paires de publications reliées par un `hal_id` actif, sur la base locale au 2026-10-28 (1 516 paires) :
+
+- `hal_id` primaire ou dérivé des deux côtés : 67. Même document, avec deux DOI distincts : DOI de revue et DOI arXiv ou DESY (`10.3204/pubdb…`).
+- primaire ou dérivé d'un côté, secondaire de l'autre : 1 429. Surtout des versions distinctes : communication et article, poster et acte. Quelques doublons sans DOI.
+- secondaire des deux côtés : 20.
+
 ## Décisions
 
 - Une table relie un enregistrement source à un identifiant : type, valeur, rôle, statut. Les identifiants d'une publication se déduisent de ses enregistrements sources.
@@ -52,6 +58,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 - Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts à partir de tous les identifiants de la table. Chaque sous-étape réécrit seulement les statuts de ses règles. Un identifiant retiré par la règle d'une autre sous-étape reste retiré.
 - `metadata_correction` écrit `external_ids` à partir des identifiants actifs. `corrections` garde seulement les valeurs d'origine des colonnes.
 - Un DOI mis à nul par la correction par DOI partagé est retiré dans la table. Le DOI concept substitué à un DOI de version reste seulement dans la colonne `doi`.
+- Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
@@ -62,19 +69,19 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 - [x] Inventaire des identifiants par source et par type, avec leur rôle.
 - [x] Table des identifiants des enregistrements sources et migration (570949717).
 - [x] Écriture de la table par la normalisation (05e2c6e63).
-- [ ] Remplissage du stock par un script oneshot : identifiants calculés depuis les payloads du raw store par la fonction de la normalisation.
+- [x] Remplissage du stock par un script oneshot : identifiants calculés depuis les payloads du raw store par la fonction de la normalisation (16df3eee9). En production, le script passe avant les migrations et le premier pipeline.
 
 ### Phase 2 — Corrections
 
-- [ ] Retraits de la correction unaire (clés de thèse, dépôts HAL introuvables) en statuts.
-- [ ] Retraits de la correction par DOI partagé en statuts.
-- [ ] `is_matchable` calculé depuis la table.
-- [ ] Suppression des formats de retrait dans `corrections` (`external_ids`, `removed_external_ids`).
+- [x] Retraits de la correction unaire (clés de thèse, dépôts HAL introuvables) en statuts (8790b3c34).
+- [x] Retraits de la correction par DOI partagé en statuts (8790b3c34).
+- [x] `is_matchable` calculé depuis la table (8790b3c34).
+- [x] Suppression des formats de retrait dans `corrections` (`external_ids`, `removed_external_ids`) (8790b3c34).
 
 ### Phase 3 — Rapprochement
 
 - [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs du document.
-- [ ] Mesure des paires de publications reliées par un identifiant HAL secondaire.
+- [x] Mesure des paires de publications reliées par un identifiant HAL secondaire.
 - [ ] Identifiants retenus pour le rapprochement, après mesure des conséquences de chaque rôle.
 
 ### Phase 4 — Autres lectures
