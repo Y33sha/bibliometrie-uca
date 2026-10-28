@@ -1233,11 +1233,11 @@ TASKS: tuple[Task, ...] = (
                     "source_extras",
                     "corrections",
                     "doi",
-                    "external_ids",
                     "doc_type",
                     "publication_id",
                 )
             ),
+            "source_record_identifiers",
             "publications.id",
             "publications.doc_type",
             "publications.doi",

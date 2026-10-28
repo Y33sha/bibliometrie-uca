@@ -32,7 +32,7 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     SCALAR_CONFIRMATION_ID_TYPES,
@@ -42,7 +42,8 @@ from domain.sources.registry import Source
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
-from infrastructure.sql_fragments import has_source_extra, raw_column
+from infrastructure.db.source_record_identifiers import first_of_its_type_sql
+from infrastructure.sql_fragments import has_source_extra, in_clause, raw_column
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -120,25 +121,18 @@ class RelationsRebuild(NamedTuple):
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
 
-# Une ligne `pub_keys` par clé de confirmation scalaire d'`external_ids` ; `hal_id` (array) a son propre bras.
-_SCALAR_KEY_ROWS = "".join(
-    f"""
-        UNION
-        SELECT sr.publication_id, '{k}', sr.external_ids->>'{k}'
-        FROM source_records sr
-        WHERE sr.publication_id IS NOT NULL AND sr.external_ids->>'{k}' IS NOT NULL"""
-    for k in SCALAR_CONFIRMATION_ID_TYPES
-)
-
-# Paires de publications distinctes partageant une clé de confirmation (`source_records.external_ids`, héritée par la publication). `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
+# Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. Ce sont les valeurs qu'`external_ids` retient. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
-        SELECT sr.publication_id AS pid, '{ExternalIdType.HAL_ID}' AS ktype, h AS kval
+        SELECT sr.publication_id AS pid, i.id_type::text AS ktype, i.id_value AS kval
         FROM source_records sr
-        CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids->'{ExternalIdType.HAL_ID}') h
+        JOIN source_record_identifiers i ON i.source_record_id = sr.id
         WHERE sr.publication_id IS NOT NULL
-          AND jsonb_typeof(sr.external_ids->'{ExternalIdType.HAL_ID}') = 'array'
-        {_SCALAR_KEY_ROWS}
+          AND (
+              (i.id_type = '{SourceIdentifierType.HAL_ID}' AND i.removed_by IS NULL)
+              OR (i.id_type::text IN {in_clause(tuple(map(str, SCALAR_CONFIRMATION_ID_TYPES)))}
+                  AND {first_of_its_type_sql("i")})
+          )
     )
     SELECT DISTINCT
         p1.id AS a_id, p1.doc_type AS a_doc_type, p1.doi AS a_doi,
