@@ -70,6 +70,7 @@
 		box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 	}
 	.login-card h1 {
+		font-family: var(--font-brand);
 		font-size: var(--fs-xl);
 		margin: 0 0 4px;
 		text-align: center;

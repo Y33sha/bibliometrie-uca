@@ -231,7 +231,7 @@
   }
   .site-title {
     white-space: nowrap;
-    font-family: "Ubuntu", sans-serif;
+    font-family: var(--font-brand);
     font-size: var(--fs-lg);
     font-weight: 500;
     margin: 0;
