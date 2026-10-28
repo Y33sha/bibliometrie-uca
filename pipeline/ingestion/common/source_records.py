@@ -12,7 +12,7 @@ from datetime import date
 
 from sqlalchemy import Connection, bindparam, text
 
-from domain.normalize import drop_duplicate_mathml
+from domain.normalize import drop_duplicate_mathml, strip_abstract_label
 from domain.publications.doc_types import DocType
 from domain.publications.licenses import License
 from domain.publications.metadata import normalized_title
@@ -65,7 +65,7 @@ class SourceRecordUpsert:
 
     # Contenu
     abstract: str | None = None
-    """Résumé. L'écriture retire la version MathML d'une formule déposée aussi en LaTeX (`drop_duplicate_mathml`)."""
+    """Résumé. L'écriture retire la version MathML d'une formule déposée aussi en LaTeX (`drop_duplicate_mathml`) et l'intitulé « Abstract » ou « Résumé » en tête (`strip_abstract_label`)."""
     keywords: list[str] | None = None
     topics: JsonValue = None
 
@@ -150,7 +150,7 @@ class SourceRecordStore:
             params["publisher_id"] = None
         if row.container_title and names_ebook_platform(row.container_title):
             params["container_title"] = None
-        params["abstract"] = drop_duplicate_mathml(row.abstract)
+        params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
         params["language"] = language_code(row.raw_language, self._forms())
         params["external_ids"] = _external_ids(row)
         return scalar_int(self._conn.execute(_UPSERT_SQL, params))
