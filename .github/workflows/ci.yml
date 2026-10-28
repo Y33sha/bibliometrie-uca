@@ -5,17 +5,12 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
-  # Les analyses de vulnérabilité dépendent du calendrier des publications de failles, non du
-  # rythme des modifications du code. Un passage quotidien sur la branche par défaut leur donne
-  # cette cadence : une faille publiée contre une version en service se voit le lendemain, sans
-  # attendre qu'un envoi la révèle.
+  # Passage quotidien : une faille publiée contre une dépendance en service se voit le lendemain.
   schedule:
     - cron: "17 4 * * *"
   workflow_dispatch:
 
-# Le jeton fourni aux jobs ne lit que le contenu du dépôt. Sans cette déclaration, il porte
-# les droits par défaut de l'organisation, qui peuvent inclure l'écriture : une action tierce
-# compromise s'en servirait pour pousser du code ou publier une release.
+# Jeton en lecture seule : une action tierce compromise ne peut ni pousser du code ni publier une release.
 permissions:
   contents: read
 
@@ -43,25 +38,19 @@ jobs:
       DB_NAME: postgres
       DB_OWNER_USER: postgres
       DB_OWNER_PASSWORD: postgres
-      # Identité restreinte sous laquelle les tests d'API se connectent, comme l'application
-      # en production. Le rôle est créé sur la base de test s'il n'existe pas.
+      # Rôles PostgreSQL de l'API (tests d'API) et du pipeline (fixtures), comme en production. Créés sur la base de test s'ils manquent.
       DB_APP_USER: bibliometrie_app
       DB_APP_PASSWORD: bibliometrie_app_ci
-      # Identité du pipeline, sous laquelle les fixtures posent leurs données, comme le
-      # pipeline en production. Créée elle aussi sur la base de test si elle n'existe pas.
       DB_PIPELINE_USER: bibliometrie_pipeline
       DB_PIPELINE_PASSWORD: bibliometrie_pipeline_ci
-      # Valeurs bidon : les tests n'exercent pas l'authentification, mais l'API refuse de
-      # démarrer sans empreinte de mot de passe ni clé de signature d'au moins 32 caractères,
-      # et les tests d'intégration déclenchent son cycle de vie.
+      # Valeurs factices : l'API refuse de démarrer sans elles, et les tests d'intégration déclenchent son cycle de vie.
       ADMIN_HASH: ci-placeholder-not-used
       SESSION_SECRET: ci-placeholder-session-secret-of-sufficient-length
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Les versions d'interpréteur viennent des images de base : l'intégration exerce
-      # ce qui est livré, sans qu'aucune valeur soit écrite deux fois.
+      # Versions d'interpréteur lues dans les images de base.
       - id: versions
         uses: ./.github/actions/versions-de-langage
 
@@ -70,10 +59,7 @@ jobs:
         with:
           python-version: ${{ steps.versions.outputs.python }}
 
-      # `--locked` installe les versions de `uv.lock`, celles-là mêmes que le `Dockerfile`
-      # embarque : les tests s'exécutent sur l'arbre qui part en production, et l'analyse de
-      # vulnérabilités porte sur lui. Il échoue si `uv.lock` ne suit plus `pyproject.toml` : une
-      # version relevée dans `pyproject.toml` seul serait sinon testée sur l'ancienne.
+      # `--locked` : versions de `uv.lock`, celles du Dockerfile ; échoue si `uv.lock` ne suit plus `pyproject.toml`.
       - name: Install dependencies
         run: |
           pip install --no-cache-dir uv
@@ -98,26 +84,15 @@ jobs:
         run: uv run pyrefly check
 
       - name: Tests et couverture (seuil via pyproject.toml)
-        # Toute la suite (unitaires et intégration) sous instrumentation : verdict des tests et seuil
-        # de couverture.
         run: uv run python -m pytest tests/ --cov --cov-report=term-missing
 
       - name: Couverture intégrale de la surface sensible
-        # Ces modules décident d'un accès, bornent une entrée, ferment une connexion à
-        # l'écriture ou tracent une action d'administration : une ligne non exercée y est un
-        # trou de sécurité, non une lacune de test. Le seuil global tolère un manque réparti ;
-        # ici, aucun. La liste est courte et le reste : elle ne recense que ce dont un défaut
-        # ouvre un accès, et non toute la couche qui l'entoure.
-        #
-        # Le relevé est celui de l'étape précédente, relu sur cette seule liste.
+        # Modules dont un défaut ouvre un accès : contrôle d'accès, bornes d'entrée, lecture seule, audit. Relevé de l'étape précédente.
         run: >
           uv run python -m coverage report --fail-under=100
           --include="interfaces/api/app.py,interfaces/api/session.py,interfaces/api/rate_limit.py,interfaces/api/deps.py,interfaces/api/params.py,interfaces/api/filters.py,interfaces/api/route_path.py,interfaces/api/spa.py,interfaces/api/routers/auth.py,infrastructure/db/read_only_guard.py,infrastructure/db/dml_guard.py,application/audit_log.py"
 
-  # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le Dockerfile
-  # porte déjà. Le contrôle d'avant envoi les confronte, mais un robot de mise à jour n'en joue
-  # aucun : il propose la montée d'une image de base sans toucher aux deux fichiers, et l'écart
-  # traverserait l'intégration sans se voir, celle-ci lisant ses versions dans le Dockerfile.
+  # Dependabot monte les images de base sans toucher `.python-version` ni `interfaces/frontend/.nvmrc` : ce job signale l'écart.
   versions:
     runs-on: ubuntu-latest
 
@@ -127,8 +102,7 @@ jobs:
       - id: versions
         uses: ./.github/actions/versions-de-langage
 
-      # Le script confronte aussi la version de Node en place : l'installer ici vérifie que
-      # l'action a posé celle qu'elle a lue.
+      # Le script confronte aussi le Node installé à la version lue.
       - name: Set up Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -143,8 +117,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Les versions d'interpréteur viennent des images de base : l'intégration exerce
-      # ce qui est livré, sans qu'aucune valeur soit écrite deux fois.
       - id: versions
         uses: ./.github/actions/versions-de-langage
 
@@ -157,24 +129,12 @@ jobs:
         working-directory: interfaces/frontend
         run: npm ci
 
-      # `--omit=dev` : seul `dependencies` part dans le bundle servi au
-      # navigateur. Les vulnérabilités de l'outillage (serveur de dev vite,
-      # ws) ne concernent pas l'application déployée et bloqueraient la CI
-      # pour un risque qu'elle ne court pas.
-      #
-      # Seuil `moderate` et non `high` : le score CVSS mesure la gravité dans
-      # l'absolu, pas dans notre contexte. Ce qui menace du code de navigateur,
-      # ce sont les XSS et les pollutions de prototype, qu'il classe justement
-      # sous la barre du `high` — elles supposent une entrée hostile et un
-      # utilisateur qui charge la page, et leur portée s'arrête à sa session.
+      # `--omit=dev` : seul `dependencies` part dans le bundle servi au navigateur. Seuil `moderate` : CVSS y classe les XSS et les pollutions de prototype, menaces propres au code de navigateur.
       - name: Vulnerability scan (npm audit)
         working-directory: interfaces/frontend
         run: npm audit --omit=dev --audit-level=moderate
 
-      # L'outillage de construction ne part pas dans le navigateur, mais c'est lui qui produit
-      # le bundle servi : une de ses dépendances compromise atteint l'application par la
-      # chaîne d'approvisionnement. Le signalement n'arrête pas l'intégration — l'outillage
-      # traîne des avis que ses auteurs ne corrigent pas toujours — mais il se voit.
+      # L'outillage de construction produit le bundle : ses failles sont signalées sans bloquer, ses auteurs ne les corrigeant pas toujours.
       - name: Vulnerability scan (arbre de construction, non bloquant)
         working-directory: interfaces/frontend
         run: npm audit --audit-level=moderate || true
@@ -183,9 +143,7 @@ jobs:
         working-directory: interfaces/frontend
         run: npm run check
 
-      # `svelte/no-at-html-tags` : un `{@html}` ajouté hors des points d'insertion recensés fait
-      # échouer l'intégration. C'est le seul endroit du frontend où une valeur reçue d'une source
-      # peut devenir du code exécutable ; la liste des dérogations vit dans `eslint.config.js`.
+      # `svelte/no-at-html-tags` : un `{@html}` hors des dérogations de `eslint.config.js` fait échouer l'intégration.
       - name: Lint (eslint)
         working-directory: interfaces/frontend
         run: npm run lint
@@ -198,9 +156,7 @@ jobs:
         working-directory: interfaces/frontend
         run: npm run build
 
-      # `schema.ts` est produit depuis l'OpenAPI de l'API : les deux dérivent l'un de l'autre
-      # sans que rien ne les rapproche. Le contrôle régénère les types et refuse la version
-      # commitée si elle ne correspond plus.
+      # `schema.ts` suit le contrat OpenAPI de l'API.
       - name: Set up Python
         uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
@@ -221,9 +177,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # Défauts de configuration des descriptions de construction et de déploiement, et secrets
-      # écrits dans les fichiers : deux jeux que ni l'analyse de dépendances ni l'analyse statique
-      # ne couvrent. Les exceptions vivent dans `.trivyignore.yaml`, nommées et bornées.
+      # Défauts de configuration des descriptions de construction et de déploiement, et secrets écrits dans le dépôt. Exceptions dans `.trivyignore.yaml`.
       - name: Configuration et secrets (dépôt)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -235,15 +189,11 @@ jobs:
           trivyignores: .trivyignore.yaml
           skip-dirs: node_modules,.venv,.git
 
-      # Construire l'image vérifie aussi que le `Dockerfile` tient : rien d'autre ne le fait.
+      # Seul contrôle de la construction du Dockerfile.
       - name: Build production image
         run: docker build -t bibliometrie-uca:ci .
 
-      # `pip-audit` et `npm audit` couvrent les dépendances applicatives, jamais la couche
-      # système de l'image. `--ignore-unfixed` réserve l'échec aux failles pour lesquelles un
-      # correctif existe : la mise à jour des paquets que la construction applique les ferme,
-      # ce qui rend le seuil moyen tenable — une faille corrigée en amont se referme d'elle-même
-      # à la construction suivante.
+      # Couche système de l'image. `ignore-unfixed` : échec seulement sur une faille corrigée en amont, que la mise à jour des paquets ferme à la construction suivante.
       - name: Vulnerability scan (image de production)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -253,8 +203,7 @@ jobs:
           ignore-unfixed: true
           exit-code: "1"
 
-      # Les failles sans correctif restent listées dans le journal, sans bloquer :
-      # elles décrivent l'exposition que l'image transporte jusqu'à parution d'un correctif.
+      # Failles sans correctif : listées au journal, sans bloquer.
       - name: Failles d'image sans correctif (signalement)
         if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
