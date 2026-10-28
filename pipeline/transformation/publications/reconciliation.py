@@ -29,16 +29,17 @@ from domain.publications.reconciliation import (
     manual_merge_tokens,
     plan_reconciliation,
 )
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifier
 from domain.source_records.keys import (
+    CONFIRMATION_KEY_ROLES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
-    SCALAR_CONFIRMATION_ID_TYPES,
     project_confirmation_keys,
 )
-from domain.types import JsonValue
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
+from infrastructure.sql_fragments import in_clause
 from pipeline.runtime.observability.log_format import (
     BRANCH,
     LAST_BRANCH,
@@ -56,12 +57,12 @@ from pipeline.transformation.publications import lifecycle
 class ReconcileRow(NamedTuple):
     """Projection d'une `source_record` du voisinage : clés + publication courante.
 
-    `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée thèse de `project_confirmation_keys` (les identifiants viennent de `doi`/`external_ids`).
+    `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée de `project_confirmation_keys` (les identifiants viennent de `doi`/`identifiers`).
     `publication_id` = `None` si orpheline ; `is_matchable` = l'enregistrement source entre dans la réconciliation ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve) ; `manual_merge_ids` = fusions manuelles qui désignent l'enregistrement source."""
 
     id: int
     doi: str | None
-    external_ids: dict[str, JsonValue] | None
+    identifiers: tuple[SourceIdentifier, ...]
     publication_id: int | None
     doc_type: str | None
     title_normalized: str | None
@@ -80,7 +81,7 @@ _SNAPSHOT = "source_record_keys_marks"
 # annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
 # (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
 _COLS = (
-    "{a}.id, {a}.doi, {a}.external_ids, {a}.publication_id, "
+    "{a}.id, {a}.doi, " + identifiers_json_sql("{a}.id") + " AS identifiers, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, {a}.is_matchable, "
     "p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
@@ -90,20 +91,16 @@ _COLS = (
     "ORDER BY mm.manual_merge_id) AS manual_merge_ids"
 )
 
-# Premier identifiant HAL que liste une `source_record` : sa clé de fusion HAL.
-_FIRST_HAL_ID = "(({a}.external_ids -> '" + ExternalIdType.HAL_ID + "') ->> 0)"
-
-# Un bras UNION par clé de confirmation scalaire d'`external_ids` : égalité directe (index btree). `hal_id` (array) a son propre bras.
-_SCALAR_KEY_ARMS = "".join(
-    f"""
-    UNION
-    SELECT {_COLS.format(a="o")}
-    FROM dirty d
-    JOIN source_records o ON o.external_ids ->> '{k}' = d.external_ids ->> '{k}'
-    LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.external_ids ? '{k}'"""
-    for k in SCALAR_CONFIRMATION_ID_TYPES
+# L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé de confirmation (`is_confirmation_key`).
+_CONFIRMATION_KEY_SQL = (
+    "({a}.removed_by IS NULL AND ("
+    + " OR ".join(
+        f"({{a}}.id_type = '{id_type}' AND {{a}}.role IN {in_clause(tuple(sorted(roles)))})"
+        for id_type, roles in CONFIRMATION_KEY_ROLES.items()
+    )
+    + "))"
 )
+
 
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
@@ -112,7 +109,7 @@ _UNIVERSE_SQL = text(f"""
         JOIN source_records sr ON sr.id = m.id
         LEFT JOIN publications p ON p.id = sr.publication_id
     )
-    SELECT id, doi, external_ids, publication_id, doc_type, title_normalized, publication_year,
+    SELECT id, doi, identifiers, publication_id, doc_type, title_normalized, publication_year,
            is_matchable, publication_doi, in_perimeter, manual_merge_ids
     FROM dirty
     UNION
@@ -123,15 +120,18 @@ _UNIVERSE_SQL = text(f"""
     JOIN source_records o ON o.doi IS NOT NULL AND o.doi = d.doi
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.doi IS NOT NULL
-    {_SCALAR_KEY_ARMS}
     UNION
-    -- hal_id : la clé est le premier identifiant HAL listé, comparé par égalité directe (index btree
-    -- `idx_source_records_first_hal_id`).
+    -- Identifiants : même type et même valeur, de part et d'autre une clé de confirmation (index
+    -- `idx_source_record_identifiers_value`).
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    JOIN source_records o ON {_FIRST_HAL_ID.format(a="o")} = {_FIRST_HAL_ID.format(a="d")}
+    JOIN source_record_identifiers di
+      ON di.source_record_id = d.id AND {_CONFIRMATION_KEY_SQL.format(a="di")}
+    JOIN source_record_identifiers oi
+      ON oi.id_type = di.id_type AND oi.id_value = di.id_value
+         AND {_CONFIRMATION_KEY_SQL.format(a="oi")}
+    JOIN source_records o ON o.id = oi.source_record_id
     LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE {_FIRST_HAL_ID.format(a="d")} IS NOT NULL
     UNION
     -- Token metadata_block : même doc_type + titre + année, pour tout doc_type, titre assez long.
     SELECT {_COLS.format(a="o")}
@@ -234,13 +234,13 @@ def delete_processed_marks(conn: Connection) -> None:
 
 
 def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
-    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI / NNT / hal_id / PMID, ou le composite thèse `title_normalized`+`publication_year`) ou une fusion manuelle avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
+    """Le voisinage 1-hop : les enregistrements sources relevés dans la file (orphelins compris) **et** les enregistrements sources qui partagent une clé de confirmation (DOI, identifiant de `CONFIRMATION_KEY_ROLES`, ou token métadonnée) ou une fusion manuelle avec l'un d'eux — matérialisés ou orphelins. Univers sur lequel tourne `connected_components`."""
     rows = conn.execute(_UNIVERSE_SQL).all()
     return [
         ReconcileRow(
             r.id,
             r.doi,
-            r.external_ids,
+            parse_identifiers(r.identifiers),
             r.publication_id,
             r.doc_type,
             r.title_normalized,
@@ -316,7 +316,7 @@ def mark_publications_for_grouping(conn: Connection, publication_ids: list[int])
 
 def _member(row: ReconcileRow) -> ReconcileMember:
     keys = project_confirmation_keys(
-        row.doi, row.external_ids, row.doc_type, row.title_normalized, row.publication_year
+        row.doi, row.identifiers, row.doc_type, row.title_normalized, row.publication_year
     )
     return ReconcileMember(
         source_record_id=row.id,

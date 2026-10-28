@@ -8,7 +8,7 @@ La phase `publications` maintient les [publications](../donnees/03-publications.
 
 Deux enregistrements sources désignent la même publication s'ils partagent une **clé de confirmation**.
 
-- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), identifiant arXiv. Égalité directe.
+- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), identifiant arXiv. Égalité directe. Un identifiant HAL est une clé quand il est l'identifiant de l'enregistrement source HAL, ou celui du dépôt dont un enregistrement source ScanR ou OpenAlex est tiré. Seuls les identifiants qu'aucune [correction](06-metadata-correction.md) ne retire sont des clés.
 - **Bloc de métadonnées** : le triplet `type de document | titre normalisé | année`. Deux documents de même type, même titre et même année sont tenus pour identiques. Une longueur minimale de titre écarte les collisions de titres trop génériques.
 
 `domain/source_records/keys.py` calcule ces clés, à partir des colonnes normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`).

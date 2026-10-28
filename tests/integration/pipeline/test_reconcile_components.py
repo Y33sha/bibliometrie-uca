@@ -10,8 +10,14 @@ from sqlalchemy import bindparam, text
 
 from domain.merge import MergedEntity
 from domain.publications.reconciliation import manual_merge_tokens
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.keys import project_confirmation_keys
 from infrastructure.db.queues import Queue
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from pipeline.transformation.publications.reconciliation import (
     fetch_reconciliation_universe,
     mark_for_reconciliation,
@@ -32,6 +38,21 @@ _source_record = partial(
 )
 
 logger = logging.getLogger("test_reconcile_components")
+
+
+def _ids(id_type, role, *values):
+    return [SourceIdentifier(id_type, v, role) for v in values]
+
+
+def _hal(role, *values):
+    return _ids(SourceIdentifierType.HAL_ID, role, *values)
+
+
+_PRIMARY, _DERIVED, _SECONDARY = (
+    SourceIdentifierRole.PRIMARY,
+    SourceIdentifierRole.DERIVED,
+    SourceIdentifierRole.SECONDARY,
+)
 
 
 def _seed_publication(conn, doi=None) -> int:
@@ -100,30 +121,52 @@ class TestUniverse:
         assert _universe(conn) == {dirty, neighbor}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
+        """Un `hal_id` primaire et le même `hal_id` dérivé relient leurs enregistrements sources."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
         dirty = _source_record(
-            conn, publication_a, source_id="a", external_ids={"hal_id": ["hal-01000001"]}
+            conn,
+            publication_a,
+            source="hal",
+            source_id="hal-01000001",
+            identifiers=_hal(_PRIMARY, "hal-01000001"),
         )
         neighbor = _source_record(
             conn,
             publication_b,
             source_id="b",
             marked=False,
-            external_ids={"hal_id": ["hal-01000001", "hal-01000002"]},
+            identifiers=[*_hal(_DERIVED, "hal-01000001"), *_hal(_SECONDARY, "hal-01000002")],
         )
         assert _universe(conn) == {dirty, neighbor}
 
-    def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
-        """La clé HAL d'un enregistrement source est le premier identifiant qu'il liste : les suivants ne relient rien."""
+    def test_secondary_hal_id_is_not_a_neighbor(self, sa_sync_conn):
+        """Un `hal_id` secondaire ne relie rien."""
         conn = sa_sync_conn
-        dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-01000002"]})
+        dirty = _source_record(
+            conn, source="hal", source_id="hal-01000002", identifiers=_hal(_PRIMARY, "hal-01000002")
+        )
         _source_record(
             conn,
             source_id="b",
             marked=False,
-            external_ids={"hal_id": ["hal-01000001", "hal-01000002"]},
+            identifiers=[*_hal(_DERIVED, "hal-01000001"), *_hal(_SECONDARY, "hal-01000002")],
+        )
+        assert _universe(conn) == {dirty}
+
+    def test_removed_hal_id_is_not_a_neighbor(self, sa_sync_conn):
+        conn = sa_sync_conn
+        removed = SourceIdentifier(
+            SourceIdentifierType.HAL_ID, "hal-01000001", _DERIVED, "HAL_DEPOSIT_MISSING_TO_REMOVED"
+        )
+        dirty = _source_record(conn, source_id="a", identifiers=[removed])
+        _source_record(
+            conn,
+            source="hal",
+            source_id="hal-01000001",
+            marked=False,
+            identifiers=_hal(_PRIMARY, "hal-01000001"),
         )
         assert _universe(conn) == {dirty}
 
@@ -158,7 +201,7 @@ class TestUniverse:
             _seed_publication(conn),
             source_id="b",
             source="hal",
-            external_ids={"hal_id": ["hal-04263452"]},
+            identifiers=_hal(_PRIMARY, "hal-04263452"),
             marked=False,
         )
         _source_record(conn, _seed_publication(conn), source_id="c", marked=False)
@@ -329,10 +372,18 @@ class TestEndToEnd:
         conn = sa_sync_conn
         publication = _seed_publication(conn, doi="10.1/x")
         source_record_x = _source_record(
-            conn, publication, source_id="x", doi="10.1/x", external_ids={"hal_id": ["h"]}
+            conn,
+            publication,
+            source_id="x",
+            doi="10.1/x",
+            identifiers=_hal(_DERIVED, "hal-01000009"),
         )
         source_record_y = _source_record(
-            conn, publication, source_id="y", doi="10.2/y", external_ids={"hal_id": ["h"]}
+            conn,
+            publication,
+            source_id="y",
+            doi="10.2/y",
+            identifiers=_hal(_DERIVED, "hal-01000009"),
         )
 
         reconcile(conn, logger)
@@ -382,12 +433,12 @@ class TestEndToEnd:
         conn = sa_sync_conn
         publication_a = _seed_publication(conn, doi="10.1/x")
         publication_b = _seed_publication(conn, doi="10.2/y")
-        hal_id = {"hal_id": ["hal-01000001"]}
+        hal_id = _hal(_DERIVED, "hal-01000001")
         source_record_a = _source_record(
-            conn, publication_a, source_id="a", doi="10.1/x", external_ids=hal_id
+            conn, publication_a, source_id="a", doi="10.1/x", identifiers=hal_id
         )
         source_record_b = _source_record(
-            conn, publication_b, source_id="b", doi="10.2/y", external_ids=hal_id
+            conn, publication_b, source_id="b", doi="10.2/y", identifiers=hal_id
         )
 
         reconcile(conn, logger)
@@ -401,9 +452,9 @@ class TestEndToEnd:
     def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
         """Régression : l'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, qui gardait le DOI qu'il avait perdu."""
         conn = sa_sync_conn
-        hal_id = {"hal_id": ["hal-01234567"]}
+        hal_id = _hal(_DERIVED, "hal-01234567")
         stale = _seed_publication(conn, doi="10.9/retire")
-        residual = _source_record(conn, stale, source_id="a", external_ids=hal_id)
+        residual = _source_record(conn, stale, source_id="a", identifiers=hal_id)
         for source_id, doi in (("b", "10.1/x"), ("c", "10.2/y")):
             _source_record(
                 conn,
@@ -411,7 +462,7 @@ class TestEndToEnd:
                 source_id=source_id,
                 doi=doi,
                 marked=False,
-                external_ids=hal_id,
+                identifiers=hal_id,
             )
         assert (
             conn.execute(
@@ -445,7 +496,7 @@ class TestManualMerge:
             without_doi,
             source="hal",
             source_id="hal-04263452",
-            external_ids={"hal_id": ["hal-04263452"]},
+            identifiers=_hal(_PRIMARY, "hal-04263452"),
         )
         _manual_merge(conn, [crossref, hal])
 
@@ -485,14 +536,14 @@ class TestReconcileSourceRecords:
             without_doi,
             source="hal",
             source_id="hal-04263452",
-            external_ids={"hal_id": ["hal-04263452"]},
+            identifiers=_hal(_PRIMARY, "hal-04263452"),
             marked=False,
         )
         sibling = _source_record(
             conn,
             without_doi,
             source_id="W1",
-            external_ids={"hal_id": ["hal-04263452"]},
+            identifiers=_hal(_DERIVED, "hal-04263452"),
             marked=False,
         )
         _manual_merge(conn, [crossref, hal])
@@ -661,35 +712,41 @@ class TestUniverseMatchesPythonTokens:
         ids = [
             _source_record(conn, source_id="doi1", doi="10.1/x", marked=False),
             _source_record(conn, source_id="doi2", doi="10.1/x", marked=False),
+            # Le `hal_id` secondaire hal-00000002 relie hal1 à hal2 pour aucun des deux.
             _source_record(
                 conn,
                 source_id="hal1",
                 marked=False,
-                external_ids={"hal_id": ["hal-00000001", "hal-00000002"]},
+                identifiers=[*_hal(_DERIVED, "hal-00000001"), *_hal(_SECONDARY, "hal-00000002")],
             ),
             _source_record(
                 conn,
                 source_id="hal2",
                 marked=False,
-                external_ids={"hal_id": ["hal-00000002", "hal-00000003"]},
-            ),
-            # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
-            # (sinon le SQL les rapproche mais le clustering Python non → divergence + non-fusion).
-            # Le numéro fait 8 chiffres (docid CCSD), exigence du VO.
-            _source_record(
-                conn,
-                source_id="emse1",
-                marked=False,
-                external_ids={"hal_id": ["emse-04836977"]},
+                identifiers=[*_hal(_DERIVED, "hal-00000002"), *_hal(_SECONDARY, "hal-00000003")],
             ),
             _source_record(
                 conn,
-                source_id="emse2",
+                source="hal",
+                source_id="emse-04836977",
                 marked=False,
-                external_ids={"hal_id": ["emse-04836977"]},
+                identifiers=_hal(_PRIMARY, "emse-04836977"),
             ),
-            _source_record(conn, source_id="nnt1", marked=False, external_ids={"nnt": "2024UCA01"}),
-            _source_record(conn, source_id="nnt2", marked=False, external_ids={"nnt": "2024UCA01"}),
+            _source_record(
+                conn, source_id="emse2", marked=False, identifiers=_hal(_DERIVED, "emse-04836977")
+            ),
+            _source_record(
+                conn,
+                source_id="nnt1",
+                marked=False,
+                identifiers=_ids(SourceIdentifierType.NNT, _SECONDARY, "2024UCA01"),
+            ),
+            _source_record(
+                conn,
+                source_id="nnt2",
+                marked=False,
+                identifiers=_ids(SourceIdentifierType.NNT, _DERIVED, "2024UCA01"),
+            ),
             _source_record(
                 conn,
                 source_id="mb1",
@@ -722,15 +779,19 @@ class TestUniverseMatchesPythonTokens:
             r.id: r
             for r in conn.execute(
                 text(
-                    "SELECT id, doi, external_ids, doc_type, title_normalized, publication_year "
-                    "FROM source_records WHERE id = ANY(:ids)"
+                    f"SELECT id, doi, {identifiers_json_sql('id')} AS identifiers, doc_type,"
+                    " title_normalized, publication_year FROM source_records WHERE id = ANY(:ids)"
                 ).bindparams(bindparam("ids")),
                 {"ids": ids},
             )
         }
         toks = {
             i: project_confirmation_keys(
-                r.doi, r.external_ids, r.doc_type, r.title_normalized, r.publication_year
+                r.doi,
+                parse_identifiers(r.identifiers),
+                r.doc_type,
+                r.title_normalized,
+                r.publication_year,
             ).tokens()
             for i, r in rows.items()
         }
@@ -846,31 +907,33 @@ class TestStaleMembership:
         assert _distinct_dois(conn, published_publication) == {self.PUBLISHED_DOI}
 
 
-class TestFirstHalIdKey:
-    """Un enregistrement source qui liste deux dépôts HAL rejoint la publication du premier, et laisse les deux dépôts distincts."""
+class TestHalIdKeyRole:
+    """Un enregistrement source qui cite deux dépôts HAL rejoint la publication de son dépôt dérivé, et laisse les deux dépôts distincts."""
 
-    def test_bridge_source_record_joins_first_listed_deposit_only(self, sa_sync_conn):
+    def test_bridge_source_record_joins_its_derived_deposit_only(self, sa_sync_conn):
         conn = sa_sync_conn
         publication = _seed_publication(conn)
         first = _source_record(
             conn,
             publication,
+            source="hal",
             source_id="hal-01234567",
             doc_type="conference_paper",
-            external_ids={"hal_id": ["hal-01234567"]},
+            identifiers=_hal(_PRIMARY, "hal-01234567"),
         )
         second = _source_record(
             conn,
             publication,
+            source="hal",
             source_id="hal-07654321",
             doc_type="book_chapter",
-            external_ids={"hal_id": ["hal-07654321"]},
+            identifiers=_hal(_PRIMARY, "hal-07654321"),
         )
         bridge = _source_record(
             conn,
             publication,
             source_id="W1",
-            external_ids={"hal_id": ["hal-01234567", "hal-07654321"]},
+            identifiers=[*_hal(_DERIVED, "hal-01234567"), *_hal(_SECONDARY, "hal-07654321")],
         )
 
         reconcile(conn, logger)
