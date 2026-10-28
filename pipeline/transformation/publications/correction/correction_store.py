@@ -21,6 +21,9 @@ from domain.source_records.metadata_correction.rules import (
 from domain.source_records.metadata_correction.shared_doi import (
     DATACITE_DIRECT_CONVERGENCE,
     DATACITE_PACKAGE_PIECE_RELATION,
+    FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN,
+    FIGSHARE_COLLECTION_DOI_PREFIX,
+    FIGSHARE_ITEM_DOI_PATTERN,
     DoiClusterCase,
 )
 from domain.source_records.metadata_correction.source_record import CorrectedSourceRecord
@@ -352,8 +355,8 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, doi, title_normalized, corrections,
-                           source_extras, external_ids,
+                    SELECT id, source, source_id, doc_type, doi, title_normalized, publication_year,
+                           corrections, source_extras, external_ids,
                            lower({raw_column("doi", "source_records")}) AS eff_doi
                     FROM source_records
                 ),
@@ -365,6 +368,15 @@ class SourceRecordCorrectionStore:
                 unresolved_dois AS (
                     SELECT id_value AS d FROM failed_lookups
                     WHERE source = '{DOI_ORG}' AND id_type = 'doi'
+                ),
+                -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune.
+                figshare_collections AS (
+                    SELECT title_normalized, publication_year, min(eff_doi) AS doi
+                    FROM sr_eff
+                    WHERE doc_type = '{DocType.DATASET.value}'
+                      AND starts_with(eff_doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
+                    GROUP BY title_normalized, publication_year
+                    HAVING count(DISTINCT eff_doi) = 1
                 ),
                 -- La cible reste attachée à l'enregistrement source DataCite dont les `related_identifiers`
                 -- la mentionnent : la règle de même œuvre lit le type de cet enregistrement, et les
@@ -405,6 +417,25 @@ class SourceRecordCorrectionStore:
                           AND rel->>'doi' IS NOT NULL
                           AND lower(rel->>'doi') <> sr.eff_doi
                           AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
+                        UNION ALL
+                        -- Fichier complémentaire figshare « Additional file N of T » → collection
+                        -- figshare de titre T, sans relation déclarée : la seule collection dataset
+                        -- de même titre et de même année.
+                        SELECT
+                            sr.id AS declarant_id,
+                            sr.eff_doi AS secondary_doi,
+                            c.doi AS canonical_doi,
+                            '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
+                        FROM sr_eff sr
+                        JOIN figshare_collections c
+                          ON c.title_normalized = regexp_replace(
+                                 sr.title_normalized, '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}', ''
+                             )
+                         AND c.publication_year = sr.publication_year
+                        WHERE sr.source = '{Source.DATACITE.value}'
+                          AND sr.doc_type = '{DocType.DATASET.value}'
+                          AND sr.eff_doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
+                          AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
                     ORDER BY declarant_id,

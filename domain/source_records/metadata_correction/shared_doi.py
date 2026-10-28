@@ -2,7 +2,7 @@
 
 Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_records` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
 
-- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
+- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Un fichier complémentaire figshare, sans relation déclarée, rejoint la collection figshare de même titre. Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
 - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres. Les membres qui gardent le DOI perdent aussi les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 
 Un DOI que doi.org ne connaît pas est nullé sur tous les membres du groupe, avant toute autre décision.
@@ -35,9 +35,7 @@ class DoiClusterCase(StrEnum):
     DATACITE_VARIANT_TO_PRIMARY = (
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
-    DATACITE_PACKAGE_PIECE = (
-        "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf)
-    )
+    DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
 
     # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
     # `book_chapter` d'un autre titre le porte à tort → le chapitre le perd.
@@ -75,6 +73,12 @@ DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
 }
 # Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
+
+# Fichier complémentaire figshare « Additional file N of T » : pièce de la collection figshare de titre T.
+FIGSHARE_ITEM_DOI_PATTERN = r"^10\.6084/m9\.figshare\.[0-9]+$"
+FIGSHARE_COLLECTION_DOI_PREFIX = "10.6084/m9.figshare.c."
+# Préfixe du titre normalisé (`normalize_text`) d'un fichier complémentaire figshare.
+FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file [0-9]+ of "
 
 
 def meme_oeuvre_declaree(
