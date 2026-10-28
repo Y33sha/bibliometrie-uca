@@ -1,4 +1,4 @@
-"""Tests d'intégration de `GET /api/config/institution` : nom et racines du périmètre des personnes."""
+"""Tests d'intégration de `GET /api/config/institution` : nom et racines du périmètre des personnes, titre de l'application."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ def _cleanup():
         cur.execute("TRUNCATE TABLE perimeters, structures RESTART IDENTITY CASCADE")
         # Seule la clé posée par les tests part : les autres viennent de la migration.
         cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
+        cur.execute("""UPDATE config SET value = '""' WHERE key = 'site_title'""")
 
 
 def test_serves_name_and_roots_of_persons_perimeter(client):
@@ -25,7 +26,7 @@ def test_serves_name_and_roots_of_persons_perimeter(client):
     r = client.get("/api/config/institution")
 
     assert r.status_code == 200
-    assert r.json() == {"name": "Université Test", "root_structure_ids": [root]}
+    assert r.json() == {"name": "Université Test", "root_structure_ids": [root], "title": None}
 
 
 def test_falls_back_to_code_without_perimeter_row(client):
@@ -34,4 +35,12 @@ def test_falls_back_to_code_without_perimeter_row(client):
     r = client.get("/api/config/institution")
 
     assert r.status_code == 200
-    assert r.json() == {"name": "sans_ligne", "root_structure_ids": []}
+    assert r.json() == {"name": "sans_ligne", "root_structure_ids": [], "title": None}
+
+
+def test_serves_site_title(client):
+    seed_config("site_title", "Observatoire des publications")
+
+    r = client.get("/api/config/institution")
+
+    assert r.json()["title"] == "Observatoire des publications"

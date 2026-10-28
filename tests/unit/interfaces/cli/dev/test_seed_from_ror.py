@@ -129,6 +129,7 @@ def test_seed_links_children_to_root_and_skips_untyped():
     assert [row[:2] for row in _section(seed, "config").rows] == [
         ("perimeter_extraction", "lorraine"),
         ("perimeter_persons", "lorraine"),
+        ("site_title", ""),
     ]
     assert seed.skipped == [GARDENS]
 

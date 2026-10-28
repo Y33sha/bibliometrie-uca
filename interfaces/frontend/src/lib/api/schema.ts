@@ -1867,7 +1867,7 @@ export interface paths {
         };
         /**
          * Institution
-         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application.
          */
         get: operations["institution_api_config_institution_get"];
         put?: never;
@@ -3719,13 +3719,15 @@ export interface components {
         };
         /**
          * InstitutionOut
-         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes.
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application.
          */
         InstitutionOut: {
             /** Name */
             name: string;
             /** Root Structure Ids */
             root_structure_ids: number[];
+            /** Title */
+            title: string | null;
         };
         /**
          * IssnStatus

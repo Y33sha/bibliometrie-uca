@@ -1,7 +1,7 @@
 # STATUS: recurring (dev)
 """Génère le seed commun et le seed d'établissement à partir des données de référence de la base courante.
 
-Le seed commun (`infrastructure/db/seed.sql`) contient les référentiels partagés par tous les établissements. Le seed d'établissement (`infrastructure/db/seed_uca.sql` pour UCA) contient les structures, leurs tutelles, les périmètres, les formes de noms et les clés de configuration qui désignent les périmètres. Les deux seeds se chargent indépendamment l'un de l'autre.
+Le seed commun (`infrastructure/db/seed.sql`) contient les référentiels partagés par tous les établissements. Le seed d'établissement (`infrastructure/db/seed_uca.sql` pour UCA) contient les structures, leurs tutelles, les périmètres, les formes de noms, les clés de configuration qui désignent les périmètres et le titre de l'application. Les deux seeds se chargent indépendamment l'un de l'autre.
 
 Usage :
     python -m interfaces.cli.dev.generate_seed
@@ -91,8 +91,8 @@ COMMON_SEED = SeedSpec(
 
 INSTITUTION_SEED = SeedSpec(
     description=(
-        "Seed d'établissement : structures, tutelles, périmètres, formes de noms "
-        "et clés de configuration des périmètres."
+        "Seed d'établissement : structures, tutelles, périmètres, formes de noms, "
+        "clés de configuration des périmètres et titre de l'application."
     ),
     tables=(
         {"table": tables.structures},

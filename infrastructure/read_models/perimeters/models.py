@@ -23,7 +23,9 @@ class PerimeterOut(BaseModel):
 
 
 class InstitutionOut(BaseModel):
-    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes."""
+    """Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application."""
 
     name: str
     root_structure_ids: list[int]
+    title: str | None
+    """Titre de l'application. Pour `None`, l'interface compose le titre avec `name`."""

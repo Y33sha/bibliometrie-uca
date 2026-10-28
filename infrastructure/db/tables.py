@@ -34,7 +34,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, YEAR_KEYS
+from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, SITE_TITLE_KEY, YEAR_KEYS
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
@@ -147,6 +147,10 @@ config = Table(
         "OR (jsonb_typeof(value) = 'number' AND (value)::numeric >= 1 "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_delay_is_positive_integer",
+    ),
+    CheckConstraint(
+        f"key <> '{SITE_TITLE_KEY}' OR jsonb_typeof(value) = 'string'",
+        name="config_site_title_is_text",
     ),
     schema="ops",
 )

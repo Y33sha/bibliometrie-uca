@@ -5,7 +5,7 @@ Le contrôle vaut à l'écriture, quelle que soit la voie : une valeur hors form
 
 import pytest
 
-from domain.config import MAX_YEAR, MIN_YEAR, normalize_config_value
+from domain.config import MAX_YEAR, MIN_YEAR, SITE_TITLE_KEY, normalize_config_value
 from domain.errors import ValidationError
 
 _PLAFOND = "unpaywall_max_per_run"
@@ -65,6 +65,20 @@ class TestDelais:
     def test_moins_d_un_jour_ou_illisible_est_refuse(self, valeur):
         with pytest.raises(ValidationError, match="au moins 1"):
             normalize_config_value(_DELAI, valeur)
+
+
+class TestTitre:
+    def test_les_espaces_de_bord_sont_retires(self):
+        assert normalize_config_value(SITE_TITLE_KEY, "  Bibliométrie Test ") == "Bibliométrie Test"
+
+    @pytest.mark.parametrize("valeur", [None, "", "   "])
+    def test_un_titre_absent_vaut_un_texte_vide(self, valeur):
+        assert normalize_config_value(SITE_TITLE_KEY, valeur) == ""
+
+    @pytest.mark.parametrize("valeur", [3, True, [], {}])
+    def test_une_valeur_autre_qu_un_texte_est_refusee(self, valeur):
+        with pytest.raises(ValidationError, match="texte"):
+            normalize_config_value(SITE_TITLE_KEY, valeur)
 
 
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():
