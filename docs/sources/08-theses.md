@@ -118,7 +118,7 @@ Une personne qui apparaît dans plusieurs champs est dédupliquée et a plusieur
 
 Le PPN [IdRef](../glossaire.md#idref), lorsque présent, figure dans les informations du contributeur (`contributor_information.identifiers->>'idref'`, reliée par `source_contributions.contributor_information_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/09-persons.md) du pipeline.
 
-Le NNT (ex. `2017CLFAC001`) sert d'identifiant cross-source pour la thèse : exposé via `external_ids.nnt` côté `source_records`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
+Le NNT (ex. `2017CLFAC001`) sert d'identifiant cross-source pour la thèse : identifiant primaire de l'enregistrement source dans `source_record_identifiers`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
 
 ### Affiliations partagées au document
 

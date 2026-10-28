@@ -9,7 +9,7 @@ from infrastructure.sql_fragments import case_priority, raw_column
 
 
 def first_of_its_type_sql(identifier: str) -> str:
-    """Condition SQL : l'identifiant aliasé `identifier` est actif, et premier des identifiants actifs de son type dans son enregistrement source, par rôle puis par valeur (`by_role`). C'est la valeur qu'`external_ids` retient pour un type à valeur unique. La collation `C` compare les valeurs comme Python."""
+    """Condition SQL : l'identifiant aliasé `identifier` est actif, et premier des identifiants actifs de son type dans son enregistrement source, par rôle puis par valeur (`by_role`). La collation `C` compare les valeurs comme Python."""
     rank = case_priority(tuple(SourceIdentifierRole), "{a}.role")
     # noqa S608 : `identifier` est un alias de la requête hôte, jamais une entrée.
     return (
@@ -23,7 +23,7 @@ def first_of_its_type_sql(identifier: str) -> str:
 
 
 def related_doi_sql(identifier: str, source_record: str) -> str:
-    """Condition SQL : l'identifiant aliasé `identifier` est un DOI actif autre que le DOI d'avant correction de l'enregistrement source aliasé `source_record`. Ce sont les DOI qu'`external_ids` range sous `related_dois`."""
+    """Condition SQL : l'identifiant aliasé `identifier` est un DOI actif autre que le DOI d'avant correction de l'enregistrement source aliasé `source_record`."""
     return (
         f"{identifier}.id_type = '{SourceIdentifierType.DOI}' AND {identifier}.removed_by IS NULL"
         f" AND {identifier}.id_value IS DISTINCT FROM {raw_column('doi', source_record)}"

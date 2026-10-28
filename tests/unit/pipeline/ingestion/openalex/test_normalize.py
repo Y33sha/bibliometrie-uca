@@ -35,7 +35,7 @@ from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
-    external_ids_of,
+    identifier_values,
     staging_row,
 )
 
@@ -451,7 +451,7 @@ class TestOpenalexSourceRecordMetadata:
         assert record.title == "T"
         assert record.publication_year == 2024
         assert record.doi is None
-        assert "nnt" not in external_ids_of(record)
+        assert "nnt" not in identifier_values(record)
         assert record.serial_id is None
 
     def test_display_name_fallback(self):
@@ -546,7 +546,7 @@ class TestOpenalexSourceRecord:
             ],
         }
         captured = self._call(work)
-        assert external_ids_of(captured)["related_dois"] == ["10.2/preprint"]
+        assert identifier_values(captured)["doi"] == ["10.2/preprint"]
 
     def test_related_dois_absent_when_only_primary(self):
         work = {
@@ -555,7 +555,7 @@ class TestOpenalexSourceRecord:
             "locations": [{"landing_page_url": "https://doi.org/10.1/primary"}],
         }
         captured = self._call(work)
-        assert "related_dois" not in external_ids_of(captured)
+        assert "doi" not in identifier_values(captured)
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
         work = {
@@ -614,15 +614,15 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert captured.biblio == {"publisher": "École normale supérieure Editions"}
 
-    def test_theses_fr_nnt_passed_through_to_external_ids(self):
-        """Le NNT d'une localisation principale theses.fr va dans external_ids."""
+    def test_theses_fr_nnt_passed_through_to_identifiers(self):
+        """Le NNT d'une localisation principale theses.fr figure parmi les identifiants."""
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {"id": "pmh:2024CLFAC001", "source": {"display_name": "theses.fr"}},
         }
         captured = self._call(work)
-        assert external_ids_of(captured)
-        assert external_ids_of(captured)["nnt"] == "2024CLFAC001"
+        assert identifier_values(captured)
+        assert identifier_values(captured)["nnt"] == ["2024CLFAC001"]
 
 
 # ── build_openalex_author_records (parsing pur) ──────────────────

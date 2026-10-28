@@ -1294,12 +1294,6 @@ source_records = Table(
     ),
     Column("countries", ARRAY(Text)),
     Column("hal_collections", ARRAY(Text)),
-    Column(
-        "external_ids",
-        Jsonb,
-        nullable=False,
-        server_default=text("'{}'::jsonb"),
-    ),
     Column("urls", ARRAY(Text)),
     Column("impact", Jsonb),
     Column("serial_id", Integer),
@@ -1372,10 +1366,6 @@ source_records = Table(
         ),
     ),
     UniqueConstraint("source", "source_id", name="source_records_source_source_id_key"),
-    CheckConstraint(
-        "jsonb_typeof(external_ids) = 'object'",
-        name="source_records_external_ids_is_object",
-    ),
     CheckConstraint(
         "impact IS NULL OR jsonb_typeof(impact) = 'object'",
         name="source_records_impact_is_object",

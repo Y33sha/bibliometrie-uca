@@ -2,7 +2,7 @@
 
 Une *clé de confirmation* est un attribut cross-source par lequel deux `source_records` attestent du même document. Deux familles :
 
-- **Identifiants** : DOI de la colonne `doi`, NNT, HAL ID, PMID, arXiv ID de `source_record_identifiers` — égalité directe. Pour chaque type, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`), celui que retient `external_ids`. Pour un `hal_id` : le sien pour un enregistrement source HAL, le dépôt dont il est tiré pour un enregistrement source ScanR ou OpenAlex, à défaut le premier dépôt qu'il cite.
+- **Identifiants** : DOI de la colonne `doi`, NNT, HAL ID, PMID, arXiv ID de `source_record_identifiers` — égalité directe. Pour chaque type, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`). Pour un `hal_id` : le sien pour un enregistrement source HAL, le dépôt dont il est tiré pour un enregistrement source ScanR ou OpenAlex, à défaut le premier dépôt qu'il cite.
 - **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<publication_year>")`, pour **tout** `doc_type` (empiriquement ~99 % de même-œuvre par type au-delà du seuil de longueur de titre). Le `doc_type` dans la clé impose l'égalité de type (« un DOI, une œuvre » étendu au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; `thesis` et `ongoing_thesis` ne co-bloquent jamais (leurs années diffèrent — inscription vs soutenance). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur), qui exigeraient un second accord pairwise, relèvent d'un mécanisme distinct.
 
 La projection est la définition Python des clés de confirmation. La réconciliation des publications (`pipeline/transformation/publications/reconciliation.py`) la consomme. Son voisinage SQL (`_UNIVERSE_SQL`) réécrit ces clés ; `TestUniverseMatchesPythonTokens` vérifie que les deux concordent.
@@ -16,19 +16,19 @@ from collections.abc import Iterable
 from dataclasses import dataclass, fields
 
 from domain.publications.identifiers import DOI
-from domain.source_records.external_ids import MULTIVALUED_ID_TYPES, ExternalIdType
-from domain.source_records.identifiers import SourceIdentifier, active, by_role
-
-# Types d'`external_ids` par lesquels deux `source_records` désignent le même document. Le DOI (colonne dédiée) et le token métadonnée sont les autres familles de clés de confirmation.
-CONFIRMATION_ID_TYPES = (
-    ExternalIdType.HAL_ID,
-    ExternalIdType.ARXIV_ID,
-    ExternalIdType.PMID,
-    ExternalIdType.NNT,
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierType,
+    active,
+    by_role,
 )
-# Clés de confirmation stockées en valeur unique dans `external_ids`, comparées par égalité directe. `hal_id` y est une liste.
-SCALAR_CONFIRMATION_ID_TYPES = tuple(
-    t for t in CONFIRMATION_ID_TYPES if t not in MULTIVALUED_ID_TYPES
+
+# Types d'identifiants par lesquels deux `source_records` désignent le même document. Le DOI (colonne dédiée) et le token métadonnée sont les autres familles de clés de confirmation.
+CONFIRMATION_ID_TYPES = (
+    SourceIdentifierType.HAL_ID,
+    SourceIdentifierType.ARXIV_ID,
+    SourceIdentifierType.PMID,
+    SourceIdentifierType.NNT,
 )
 
 

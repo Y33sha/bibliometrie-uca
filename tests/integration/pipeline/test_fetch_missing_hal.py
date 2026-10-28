@@ -6,11 +6,11 @@ from pipeline.http.lookup import NOT_FOUND, UNAVAILABLE
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.hal.fetch_missing import get_missing_hal_ids, get_missing_nnts, search_one
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
-def _insert_source_record(conn, source, source_id, external_ids, *, publication_id) -> None:
+def _insert_source_record(conn, source, source_id, identifiers, *, publication_id) -> None:
     """Crée un source_record `source` rattaché à `publication_id`, avec sa ligne staging."""
     staging_id = insert_staging(conn, source, source_id=source_id)
     insert_source_record(
@@ -20,7 +20,7 @@ def _insert_source_record(conn, source, source_id, external_ids, *, publication_
         source_id=source_id,
         title="titre test",
         staging_id=staging_id,
-        external_ids=external_ids,
+        identifiers=secondary_identifiers(identifiers),
     )
 
 
@@ -32,9 +32,9 @@ class TestFindMissingHalIds:
 
     @staticmethod
     def _carry(conn, source, source_id, hal_ids, *, in_perimeter=True):
-        external_ids = {"hal_id": hal_ids} if hal_ids is not None else {}
+        identifiers = {"hal_id": hal_ids} if hal_ids is not None else {}
         publication_id = insert_publication(conn, in_perimeter=in_perimeter)
-        _insert_source_record(conn, source, source_id, external_ids, publication_id=publication_id)
+        _insert_source_record(conn, source, source_id, identifiers, publication_id=publication_id)
 
     @staticmethod
     def _missing(conn) -> list[str]:

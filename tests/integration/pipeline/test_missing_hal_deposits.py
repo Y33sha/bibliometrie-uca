@@ -14,7 +14,7 @@ from pipeline.transformation.publications.reconciliation import reconcile
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.publications_phase import apply_metadata_corrections
 from tests.integration.helpers.queues import clear, queued
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 from tests.integration.helpers.staging import insert_failed_lookup
 
 _MISSING = "hal-03178520"
@@ -24,7 +24,10 @@ _MISSING_URL = f"https://hal.science/{_MISSING}"
 def _state(conn, source_record_id):
     return conn.execute(
         text(
-            "SELECT external_ids, urls, is_matchable, publication_id FROM source_records"
+            "SELECT ARRAY(SELECT i.id_value FROM source_record_identifiers i"
+            " WHERE i.source_record_id = sr.id AND i.id_type = 'hal_id' AND i.removed_by IS NULL"
+            " ORDER BY i.id_value) AS hal_ids, urls, is_matchable, publication_id"
+            " FROM source_records sr"
             " WHERE id = :id"
         ),
         {"id": source_record_id},
@@ -52,7 +55,6 @@ def _seed_openalex(conn, publication_id=None, *, hal_ids=(_MISSING,), urls=(_MIS
         title_normalized="puzzle with the precession of the neutron spin",
         publication_year=2021,
         doc_type="preprint",
-        external_ids={"hal_id": list(hal_ids)},
         identifiers=[
             SourceIdentifier(SourceIdentifierType.HAL_ID, h, SourceIdentifierRole.SECONDARY)
             for h in hal_ids
@@ -77,7 +79,7 @@ def test_enregistrement_openalex_du_seul_depot_introuvable_est_ecarte(sa_sync_co
     apply_metadata_corrections(conn)
 
     state = _state(conn, record)
-    assert state.external_ids == {}
+    assert state.hal_ids == []
     assert state.urls is None
     assert not state.is_matchable
     assert _locations(conn, record) == []
@@ -101,7 +103,7 @@ def test_enregistrement_qui_garde_un_lien_reste_dans_la_reconciliation(sa_sync_c
     apply_metadata_corrections(conn)
 
     state = _state(conn, record)
-    assert state.external_ids == {"hal_id": ["hal-03263588"]}
+    assert state.hal_ids == ["hal-03263588"]
     assert state.urls == [kept_url]
     assert state.is_matchable
     assert _locations(conn, record) == [kept_url]
@@ -118,7 +120,7 @@ def test_depot_retrouve_reintegre_l_enregistrement(sa_sync_conn):
     apply_metadata_corrections(conn)
 
     state = _state(conn, record)
-    assert state.external_ids == {"hal_id": [_MISSING]}
+    assert state.hal_ids == [_MISSING]
     assert state.urls == [_MISSING_URL]
     assert state.is_matchable
     assert record in queued(conn, Queue.SOURCE_RECORD_KEYS)
@@ -132,7 +134,7 @@ def test_enregistrement_scanr_issu_d_un_depot_introuvable_est_ecarte(sa_sync_con
         source_id="halhal-05524892",
         title="T",
         doi="10.1/x",
-        external_ids={"hal_id": ["hal-05524892"]},
+        identifiers=secondary_identifiers({"hal_id": ["hal-05524892"]}),
     )
     insert_failed_lookup(conn, id_type="hal_id", id_value="hal-05524892")
 

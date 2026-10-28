@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT external_ids), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
+Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
 
 Pattern : doublures de `tests.helpers.normalize_doubles` + `MagicMock`, pas de DB.
 """
@@ -27,7 +27,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
     FakeSourceRecordStore,
     FakeStagingStore,
-    external_ids_of,
+    identifier_values,
     staging_row,
 )
 
@@ -139,7 +139,7 @@ class TestThesesSourceRecord:
         record = self._call({"titrePrincipal": "T"})
         assert record.title == "T"
         assert record.publication_year is None
-        assert external_ids_of(record) == {}
+        assert identifier_values(record) == {}
         assert record.oa_status == "closed"
         assert record.serial_id is None
 
@@ -156,17 +156,17 @@ class TestThesesSourceRecord:
 
     def test_nnt_normalized(self):
         record = self._call({"titrePrincipal": "T", "nnt": "  2024clfac001  "})
-        assert external_ids_of(record) == {"nnt": "2024CLFAC001"}
+        assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
 
     def test_doi_passthrough(self):
         assert self._call({"titrePrincipal": "T", "doi": "10.1/abc"}).doi == "10.1/abc"
 
-    def test_nnt_goes_in_external_ids(self):
+    def test_nnt_goes_in_identifiers(self):
         record = self._call({"nnt": "2024CLFAC001"})
-        assert external_ids_of(record) == {"nnt": "2024CLFAC001"}
+        assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
 
-    def test_no_nnt_no_external_ids(self):
-        assert external_ids_of(self._call({})) == {}
+    def test_no_nnt_no_identifiers(self):
+        assert identifier_values(self._call({})) == {}
 
     def test_keywords_from_sujets(self):
         """Les mots-clés suivent l'ordre de `langues`."""
@@ -307,7 +307,7 @@ class TestThesesNormalizerClass:
             42,
         )
         assert (record.title, record.publication_year) == ("T", 2024)
-        assert external_ids_of(record) == {"nnt": "2024CLFAC001"}
+        assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
         assert record.serial_id is None
 
     def test_contributions_sources_d_une_these(self):

@@ -17,7 +17,7 @@ from pipeline.ingestion.datacite.normalize import (
     get_container_facts,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import external_ids_of, staging_row
+from tests.helpers.normalize_doubles import identifier_values, staging_row
 
 
 def _normalizer() -> DataciteNormalizer:
@@ -411,7 +411,7 @@ class TestSourceRecord:
 
         document = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, None))
 
-        assert external_ids_of(document) == {"related_dois": ["10.5281/zenodo.0"]}
+        assert identifier_values(document) == {"doi": ["10.5281/zenodo.0"]}
 
     def test_titre_du_conteneur_garde_sans_revue_resolue(self):
         attributs = _attributs(container={"title": "Une collection"})

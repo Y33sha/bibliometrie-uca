@@ -1,6 +1,6 @@
 """Aggregate root `Publication` — référence biblio canonique.
 
-Une `Publication` unifie les images qu'une ou plusieurs `SourceRecord` donnent d'un même document scientifique. Clé surrogate : `id`. Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — vivent côté `source_records.external_ids`).
+Une `Publication` unifie les images qu'une ou plusieurs `SourceRecord` donnent d'un même document scientifique. Clé surrogate : `id`. Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — sont dans `source_record_identifiers`).
 
 Les `source_records` attachées sont lues en projection (`SourceRecord`), jamais comme un agrégat mutable.
 

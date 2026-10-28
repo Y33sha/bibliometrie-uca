@@ -25,7 +25,7 @@ def _facts(**overrides: object) -> MetadataForCorrection:
 
 
 def test_enregistrement_deja_corrige():
-    assert correct_source_record(_facts(), (), {}, {}) is None
+    assert correct_source_record(_facts(), (), {}) is None
 
 
 def test_entrees_des_autres_sous_etapes_gardees():
@@ -33,7 +33,7 @@ def test_entrees_des_autres_sous_etapes_gardees():
         CorrectionKey.DOI: stash_entry("10.1/x", "OUVRAGE_VS_CHAPITRE"),
         CorrectionKey.SERIAL_ID: stash_entry(None, "SERIAL_BY_DOI_NAMESPACE"),
     }
-    corrected = correct_source_record(_facts(serial_type="media"), (), {}, others)
+    corrected = correct_source_record(_facts(serial_type="media"), (), others)
     assert corrected is not None
     assert corrected.columns.corrections == {
         **others,
@@ -48,21 +48,13 @@ def test_retrait_par_une_autre_sous_etape_garde():
         SourceIdentifierRole.SECONDARY,
         "ACTES_VS_COMMUNICATION",
     )
-    corrected = correct_source_record(
-        _facts(), (removed, _HAL_2), {"hal_id": ["hal-1", "hal-2"]}, {}
-    )
-    assert corrected is not None
-    assert corrected.identifiers == (removed, _HAL_2)
-    assert corrected.columns.external_ids == {"hal_id": ["hal-2"]}
+    assert correct_source_record(_facts(), (removed, _HAL_2), {}) is None
 
 
 def test_depot_hal_introuvable_retire():
-    corrected = correct_source_record(
-        _facts(), (_HAL_1, _HAL_2), {"hal_id": ["hal-1", "hal-2"]}, {}, missing_hal_ids={"hal-1"}
-    )
+    corrected = correct_source_record(_facts(), (_HAL_1, _HAL_2), {}, missing_hal_ids={"hal-1"})
     assert corrected is not None
     assert [i.removed_by for i in corrected.identifiers] == ["HAL_DEPOSIT_MISSING_TO_REMOVED", None]
-    assert corrected.columns.external_ids == {"hal_id": ["hal-2"]}
 
 
 def test_retrait_defait_quand_la_regle_ne_s_applique_plus():
@@ -72,17 +64,15 @@ def test_retrait_defait_quand_la_regle_ne_s_applique_plus():
         SourceIdentifierRole.SECONDARY,
         "HAL_DEPOSIT_MISSING_TO_REMOVED",
     )
-    corrected = correct_source_record(_facts(), (removed,), {}, {})
+    corrected = correct_source_record(_facts(), (removed,), {})
     assert corrected is not None
     assert corrected.identifiers == (_HAL_1,)
-    assert corrected.columns.external_ids == {"hal_id": ["hal-1"]}
 
 
 def test_correction_defaite_quand_la_regle_ne_s_applique_plus():
     corrected = correct_source_record(
         _facts(doc_type="media"),
         (),
-        {},
         {CorrectionKey.DOC_TYPE: stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA")},
     )
     assert corrected is not None

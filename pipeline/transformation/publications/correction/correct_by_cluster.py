@@ -7,7 +7,7 @@ Corrige le DOI de certaines source_records afin de provoquer leur fusion en phas
 
 Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur tous les enregistrements sources qui le citent.
 
-Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec les enregistrements sources qui le perdent, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI nullé compris, est inscrit dans `source_record_identifiers.removed_by`. `external_ids` se déduit des identifiants actifs.
+Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec les enregistrements sources qui le perdent, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI nullé compris, est inscrit dans `source_record_identifiers.removed_by`.
 
 Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`corrections.doi`) et de tous les identifiants de la table, donc une `source_record` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
 """
@@ -27,7 +27,6 @@ from domain.source_records.corrections import (
     raw_value,
     stash_entry,
 )
-from domain.source_records.external_ids import external_ids_from_identifiers
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierType,
@@ -84,16 +83,10 @@ def _compute_update(
             for value in values:
                 removals.setdefault((SourceIdentifierType(id_type), value), removal.case.value)
     identifiers = with_removals(row.identifiers, CLUSTER_IDENTIFIER_RULES, removals)
-    external_ids = external_ids_from_identifiers(identifiers, raw_doi)
 
-    if (
-        new_doi == row.doi
-        and external_ids == row.external_ids
-        and corrections == row.corrections
-        and identifiers == row.identifiers
-    ):
+    if new_doi == row.doi and corrections == row.corrections and identifiers == row.identifiers:
         return None
-    return DoiCorrectionUpdate(row.id, new_doi, corrections, external_ids, identifiers)
+    return DoiCorrectionUpdate(row.id, new_doi, corrections, identifiers)
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:

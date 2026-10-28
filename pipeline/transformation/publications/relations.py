@@ -34,8 +34,8 @@ from domain.publications.relations import (
 )
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.keys import (
+    CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
-    SCALAR_CONFIRMATION_ID_TYPES,
 )
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
@@ -121,7 +121,12 @@ class RelationsRebuild(NamedTuple):
 # Écart d'années toléré entre une œuvre dépendante et son parent, dans les deux sens : un erratum suit son article (parent dans `[année − N … année]`), une version publiée suit son preprint (parent dans `[année … année + N]`).
 _TITLE_MATCH_YEAR_WINDOW = 2
 
-# Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. Ce sont les valeurs qu'`external_ids` retient. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
+# Types de clé dont chaque enregistrement source retient une seule valeur (`confirmation_identifiers`).
+_SINGLE_KEY_TYPES = tuple(
+    str(t) for t in CONFIRMATION_ID_TYPES if t is not SourceIdentifierType.HAL_ID
+)
+
+# Paires de publications distinctes partageant une clé de confirmation, héritée par la publication de ses enregistrements sources : tout `hal_id` actif, et pour NNT, PMID et arXiv l'identifiant actif de rôle le plus fort, puis de plus petite valeur. `k1.pid < k2.pid` produit chaque paire une fois ; le `DISTINCT` fusionne les clés multiples.
 _SHARED_KEY_PAIRS_SQL = text(f"""
     WITH pub_keys AS (
         SELECT sr.publication_id AS pid, i.id_type::text AS ktype, i.id_value AS kval
@@ -130,7 +135,7 @@ _SHARED_KEY_PAIRS_SQL = text(f"""
         WHERE sr.publication_id IS NOT NULL
           AND (
               (i.id_type = '{SourceIdentifierType.HAL_ID}' AND i.removed_by IS NULL)
-              OR (i.id_type::text IN {in_clause(tuple(map(str, SCALAR_CONFIRMATION_ID_TYPES)))}
+              OR (i.id_type::text IN {in_clause(_SINGLE_KEY_TYPES)}
                   AND {first_of_its_type_sql("i")})
           )
     )

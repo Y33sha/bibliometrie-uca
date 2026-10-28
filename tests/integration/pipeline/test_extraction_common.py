@@ -13,7 +13,7 @@ from pipeline.ingestion.common.stale_refetch import get_stale_source_ids, set_di
 from pipeline.ingestion.hal.hash_normalize import strip_volatile_for_hash
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
 from tests.integration.helpers.serials import insert_doi_prefix
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 # Publication de 2020 sans titre normalisé ni type.
@@ -145,13 +145,18 @@ class TestCleanDoi:
         assert clean_doi("HTTPS://DOI.ORG/10.1234/test") == "10.1234/test"
 
 
-def _add_inperim_source_record(conn, source, sid, *, doi=None, external_ids=None):
+def _add_inperim_source_record(conn, source, sid, *, doi=None, identifiers=None):
     """Publication `in_perimeter` + source_record `source` rattaché.
 
     Le pool de la recherche par DOI ne part que des `source_records` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
     publication_id = _publication(conn, "T", in_perimeter=True)
     _source_record(
-        conn, publication_id, source=source, source_id=sid, doi=doi, external_ids=external_ids
+        conn,
+        publication_id,
+        source=source,
+        source_id=sid,
+        doi=doi,
+        identifiers=secondary_identifiers(identifiers or {}),
     )
 
 
@@ -175,23 +180,10 @@ class TestGetMissingDois:
             "hal",
             "hal-1",
             doi="10.1234/version-editeur",
-            external_ids={"related_dois": ["10.1234/preprint"]},
+            identifiers={"doi": ["10.1234/preprint"]},
         )
 
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
-
-    def test_un_doi_secondaire_nul_n_empeche_pas_la_selection(self, sa_sync_conn):
-        """Un `null` parmi les DOI secondaires de la cible n'écarte pas les autres candidats."""
-        _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/manquant")
-        _add_inperim_source_record(
-            sa_sync_conn,
-            "hal",
-            "hal-1",
-            doi="10.1234/autre",
-            external_ids={"related_dois": [None]},
-        )
-
-        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == ["10.1234/manquant"]
 
     def test_excludes_out_of_perimeter_source_records(self, sa_sync_conn):
         """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
@@ -218,13 +210,13 @@ class TestGetMissingDois:
         assert "10.99999/x.1" not in result
 
     def test_includes_related_dois_from_source_records(self, sa_sync_conn):
-        """Les related_dois d'un source_record in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
+        """Les autres DOI d'un source_record in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
         _add_inperim_source_record(
             sa_sync_conn,
             "openalex",
             "W1",
             doi="10.1234/primary",
-            external_ids={"related_dois": ["10.9999/preprint"]},
+            identifiers={"doi": ["10.9999/preprint"]},
         )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.1234/primary" in result
@@ -233,7 +225,7 @@ class TestGetMissingDois:
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
         """Un arxiv_id d'un source_record in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
         _add_inperim_source_record(
-            sa_sync_conn, "openalex", "W1", external_ids={"arxiv_id": "2605.02321"}
+            sa_sync_conn, "openalex", "W1", identifiers={"arxiv_id": "2605.02321"}
         )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" in result
@@ -241,7 +233,7 @@ class TestGetMissingDois:
     def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
         """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
         _add_inperim_source_record(
-            sa_sync_conn, "hal", "H1", external_ids={"arxiv_id": "2605.02321"}
+            sa_sync_conn, "hal", "H1", identifiers={"arxiv_id": "2605.02321"}
         )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.48550/arxiv.2605.02321" not in result
@@ -455,7 +447,7 @@ class TestGetPrefixesToResolve:
             1,
             source="openalex",
             source_id="W1",
-            external_ids={"arxiv_id": "2605.02321"},
+            identifiers=secondary_identifiers({"arxiv_id": "2605.02321"}),
         )
 
         prefixes = DoiPrefixStore(sa_sync_conn).get_prefixes_to_resolve()

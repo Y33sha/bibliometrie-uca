@@ -37,7 +37,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
     FakeSourceRecordStore,
     FakeStagingStore,
-    external_ids_of,
+    identifier_values,
     staging_row,
 )
 
@@ -223,7 +223,7 @@ class TestCanonicalMetadata:
 
     def test_nnt_normalized(self):
         record = _record({"nntId_s": "  2024CLFAC001  "})
-        assert external_ids_of(record) == {"hal_id": ["hal-01234567"], "nnt": "2024CLFAC001"}
+        assert identifier_values(record) == {"hal_id": ["hal-01234567"], "nnt": ["2024CLFAC001"]}
 
 
 # ── active_embargo_until ─────────────────────────────────────────
@@ -366,14 +366,14 @@ class TestHalSourceRecord:
         captured = self._call({"docType_s": "BOOK"})
         assert captured.raw_doc_type == "BOOK"
 
-    def test_nnt_goes_in_external_ids(self):
+    def test_nnt_goes_in_identifiers(self):
         captured = self._call({"nntId_s": "2024CLFAC001"})
-        assert external_ids_of(captured) == {"hal_id": ["hal-01234567"], "nnt": "2024CLFAC001"}
+        assert identifier_values(captured) == {"hal_id": ["hal-01234567"], "nnt": ["2024CLFAC001"]}
 
-    def test_hal_id_always_in_external_ids(self):
-        """Le `hal_id` du dépôt figure dans `external_ids`, hors thèse comme pour une thèse."""
+    def test_hal_id_always_in_identifiers(self):
+        """Le `hal_id` du dépôt figure parmi ses identifiants, hors thèse comme pour une thèse."""
         captured = self._call({})
-        assert external_ids_of(captured) == {"hal_id": ["hal-01234567"]}
+        assert identifier_values(captured) == {"hal_id": ["hal-01234567"]}
 
     def test_keywords_deduplicated(self):
         captured = self._call({"keyword_s": ["a", "b", "a", "c"]})

@@ -10,7 +10,6 @@ from domain.publications.identifiers import clean_doi, find_isbns
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
-from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -325,15 +324,8 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
         "keywords": keywords,
         "topics": topics or None,
         "urls": None,
-        "external_ids": {
-            key: isbns
-            for key, isbns in (
-                (ExternalIdType.ISBN, _get_api_isbns(dynamic, "isbn")),
-                (ExternalIdType.EISBN, _get_api_isbns(dynamic, "eisbn")),
-            )
-            if isbns
-        }
-        or None,
+        "isbns": _get_api_isbns(dynamic, "isbn"),
+        "eisbns": _get_api_isbns(dynamic, "eisbn"),
     }
 
 
@@ -410,7 +402,8 @@ def extract_from_export(
         "keywords": split_export_list(field("DE")) or None,
         "topics": {"subjects": subjects} if subjects else None,
         "urls": None,
-        "external_ids": {ExternalIdType.ISBN: list(dict.fromkeys(isbns))} if isbns else None,
+        "isbns": list(dict.fromkeys(isbns)),
+        "eisbns": [],
     }
 
 
@@ -430,7 +423,6 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document ne reçoit pas de monographie."""
     title = as_str(rec.get("journal_title"))
     issn, eissn = as_str(rec.get("issn")), as_str(rec.get("eissn"))
-    external_ids = as_mapping(rec.get("external_ids"))
     return ContainerDescription(
         source="wos",
         raw_doc_type=as_str(rec.get("doc_type")),
@@ -439,8 +431,8 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
         collection_title=title if issn or eissn else None,
         book_title=title,
         issns=source_issns(print_issn=issn, electronic_issn=eissn),
-        isbns=tuple(as_strs(external_ids.get(ExternalIdType.ISBN))),
-        eisbns=tuple(as_strs(external_ids.get(ExternalIdType.EISBN))),
+        isbns=tuple(as_strs(rec.get("isbns"))),
+        eisbns=tuple(as_strs(rec.get("eisbns"))),
         year=as_int(rec.get("publication_year")),
     )
 
@@ -453,16 +445,16 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
 def wos_identifiers(rec: Mapping[str, JsonValue]) -> tuple[SourceIdentifier, ...]:
     """Identifiants d'un record WoS. Le DOI est secondaire, le rôle des ISBN suit le type du record (`isbn_role`)."""
     role = isbn_role(as_str(rec.get("doc_type")), "wos")
-    external_ids = as_mapping(rec.get("external_ids"))
     identifiers: list[SourceIdentifier] = []
     if doi := as_str(rec.get("doi")):
         identifiers.append(
             SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)
         )
-    for id_type in (SourceIdentifierType.ISBN, SourceIdentifierType.EISBN):
-        identifiers += (
-            SourceIdentifier(id_type, isbn, role) for isbn in as_strs(external_ids.get(id_type))
-        )
+    for id_type, key in (
+        (SourceIdentifierType.ISBN, "isbns"),
+        (SourceIdentifierType.EISBN, "eisbns"),
+    ):
+        identifiers += (SourceIdentifier(id_type, isbn, role) for isbn in as_strs(rec.get(key)))
     return tuple(identifiers)
 
 

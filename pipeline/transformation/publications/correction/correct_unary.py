@@ -67,7 +67,6 @@ def compute_update(
     corrected = correct_source_record(
         row.facts,
         row.identifiers,
-        row.external_ids,
         row.corrections,
         origin_doc_type=origin_doc_type,
         missing_hal_ids=missing_hal_ids,

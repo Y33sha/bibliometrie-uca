@@ -22,7 +22,7 @@ from pipeline.transformation.publications.relations import (
 )
 from pipeline.transformation.publications.store import PublicationStore
 from tests.integration.helpers.publications import insert_publication, insert_publication_relation
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 
 # Enregistrement source de titre « t ».
 _source_record = partial(insert_source_record, title="t")
@@ -403,17 +403,23 @@ class TestFetchSharedKeyPairs:
         )
         b = _publication(sa_sync_conn, doc_type="poster", title_normalized="t-b", doi=None)
         _source_record(
-            sa_sync_conn, a, source_id="hal-skp-1", external_ids={"hal_id": ["hal-skp-1"]}
+            sa_sync_conn,
+            a,
+            source_id="hal-skp-1",
+            identifiers=secondary_identifiers({"hal_id": ["hal-skp-1"]}),
         )
         _source_record(
-            sa_sync_conn, b, source_id="hal-skp-2", external_ids={"hal_id": ["hal-skp-2"]}
+            sa_sync_conn,
+            b,
+            source_id="hal-skp-2",
+            identifiers=secondary_identifiers({"hal_id": ["hal-skp-2"]}),
         )
         _source_record(
             sa_sync_conn,
             a,
             source="openalex",
             source_id="W-skp",
-            external_ids={"hal_id": ["hal-skp-1", "hal-skp-2"]},
+            identifiers=secondary_identifiers({"hal_id": ["hal-skp-1", "hal-skp-2"]}),
         )
 
         pairs = [p for p in relations.fetch_shared_key_pairs(sa_sync_conn) if p.a_id == a]
@@ -430,8 +436,18 @@ class TestPhaseRelations:
         b = _publication(
             sa_sync_conn, doc_type="article", title_normalized="t-pr-b", doi="10.1/pr-b"
         )
-        _source_record(sa_sync_conn, a, source_id="hal-pr-1", external_ids={"hal_id": ["hal-pr-1"]})
-        _source_record(sa_sync_conn, b, source_id="hal-pr-2", external_ids={"hal_id": ["hal-pr-1"]})
+        _source_record(
+            sa_sync_conn,
+            a,
+            source_id="hal-pr-1",
+            identifiers=secondary_identifiers({"hal_id": ["hal-pr-1"]}),
+        )
+        _source_record(
+            sa_sync_conn,
+            b,
+            source_id="hal-pr-2",
+            identifiers=secondary_identifiers({"hal_id": ["hal-pr-1"]}),
+        )
         insert_source_record(
             sa_sync_conn,
             a,

@@ -1,10 +1,10 @@
-"""Normalisation des identifiants d'un enregistrement source et `external_ids` qui s'en déduit."""
+"""Normalisation et ordre des identifiants d'un enregistrement source."""
 
-from domain.source_records.external_ids import external_ids_from_identifiers
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
+    by_role,
     isbn_role,
     normalize_identifiers,
 )
@@ -66,39 +66,11 @@ class TestIsbnRole:
         assert isbn_role("book", "crossref", declares_conference=True) is R.RELATED
 
 
-class TestExternalIdsFromIdentifiers:
-    def test_related_dois_hors_doi_de_la_colonne(self):
-        identifiers = [
-            SourceIdentifier(T.DOI, "10.1/x", R.PRIMARY),
-            SourceIdentifier(T.DOI, "10.2/y", R.RELATED),
-        ]
-        assert external_ids_from_identifiers(identifiers, "10.1/x") == {"related_dois": ["10.2/y"]}
-
-    def test_types_multivalues_tries_par_role_puis_par_valeur(self):
+class TestByRole:
+    def test_par_role_puis_par_valeur(self):
         identifiers = [
             SourceIdentifier(T.HAL_ID, "hal-3", R.SECONDARY),
             SourceIdentifier(T.HAL_ID, "hal-2", R.SECONDARY),
             SourceIdentifier(T.HAL_ID, "hal-9", R.DERIVED),
         ]
-        assert external_ids_from_identifiers(identifiers, None) == {
-            "hal_id": ["hal-9", "hal-2", "hal-3"]
-        }
-
-    def test_identifiant_retire_absent(self):
-        identifiers = [
-            SourceIdentifier(T.HAL_ID, "hal-1", R.SECONDARY, "HAL_DEPOSIT_MISSING_TO_REMOVED"),
-            SourceIdentifier(T.HAL_ID, "hal-2", R.SECONDARY),
-        ]
-        assert external_ids_from_identifiers(identifiers, None) == {"hal_id": ["hal-2"]}
-
-    def test_type_a_valeur_unique_prend_le_role_le_plus_fort(self):
-        identifiers = [
-            SourceIdentifier(T.NNT, "2020AAAA0001", R.SECONDARY),
-            SourceIdentifier(T.NNT, "2021BBBB0002", R.DERIVED),
-            SourceIdentifier(T.PMID, "1", R.SECONDARY),
-            SourceIdentifier(T.PMID, "2", R.SECONDARY),
-        ]
-        assert external_ids_from_identifiers(identifiers, None) == {
-            "nnt": "2021BBBB0002",
-            "pmid": "1",
-        }
+        assert [i.value for i in by_role(identifiers)] == ["hal-9", "hal-2", "hal-3"]

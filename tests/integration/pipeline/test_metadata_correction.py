@@ -232,7 +232,6 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
         doi="10.1016/j.ex.2020.01.001",
         doc_type="thesis",
         serial_id=jid,
-        external_ids={"nnt": "2020CLFAC001", "hal_id": ["hal-99", "tel-01"]},
         identifiers=[
             SourceIdentifier(SourceIdentifierType.NNT, "2020CLFAC001", secondary),
             SourceIdentifier(SourceIdentifierType.HAL_ID, "tel-01", secondary),
@@ -242,11 +241,10 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
 
     assert _apply(conn) == 1
     row = conn.execute(
-        text("SELECT doc_type, external_ids, corrections FROM source_records WHERE id = :id"),
+        text("SELECT doc_type, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
     assert row.doc_type == "article"  # mistype corrigé
-    assert row.external_ids == {"hal_id": ["hal-99"]}  # nnt + tel- retirés, hal- gardé
     assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
     # Réversibilité : les identifiants retirés restent dans la table, avec leur règle.
     removed = conn.execute(

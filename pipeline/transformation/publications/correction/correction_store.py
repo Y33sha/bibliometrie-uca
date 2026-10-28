@@ -14,9 +14,9 @@ from domain.publications.doc_types import DocType
 from domain.publications.scope import MatchabilityFacts
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
-from domain.source_records.external_ids import ExternalIdType
 from domain.source_records.identifiers import (
     SourceIdentifier,
+    SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
@@ -54,7 +54,6 @@ class UnaryCorrectionRow(NamedTuple):
 
     id: int
     source_id: str
-    external_ids: dict[str, JsonValue]
     corrections: dict[str, JsonValue]
     facts: MetadataForCorrection
     identifiers: tuple[SourceIdentifier, ...] = ()
@@ -116,7 +115,6 @@ class DoiClusterRow(NamedTuple):
     same_work_case: DoiClusterCase | None
     # `raw_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
     unresolved: bool = False
-    external_ids: dict[str, JsonValue] = {}
     identifiers: tuple[SourceIdentifier, ...] = ()
     source: str = ""
     source_id: str = ""
@@ -125,12 +123,11 @@ class DoiClusterRow(NamedTuple):
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour de la correction par cluster : colonne `doi` (nullée, restaurée ou substituée), sidecar, `external_ids`, et identifiants aux statuts recalculés (clés partagées avec une autre œuvre et DOI nullé retirés ou restaurés). Persistée via `persist_doi_corrections`."""
+    """Une mise à jour de la correction par cluster : colonne `doi` (nullée, restaurée ou substituée), sidecar, et identifiants aux statuts recalculés (clés partagées avec une autre œuvre et DOI nullé retirés ou restaurés). Persistée via `persist_doi_corrections`."""
 
     id: int
     doi: str | None
     corrections: dict[str, JsonValue]
-    external_ids: dict[str, JsonValue]
     identifiers: tuple[SourceIdentifier, ...]
 
 
@@ -202,7 +199,7 @@ def _persist_statuses(
 
 # Chaque variante ajoute son `WHERE`.
 _SELECT = f"""
-    SELECT sr.id, sr.source_id, sr.external_ids, sr.corrections,
+    SELECT sr.id, sr.source_id, sr.corrections,
            {identifiers_json_sql("sr.id")} AS identifiers,
            {", ".join(f"{expression} AS {name}" for name, expression in _FACTS.items())}
     FROM source_records sr
@@ -218,7 +215,6 @@ def _unary_rows(rows: Iterable[Row[tuple[object, ...]]]) -> list[UnaryCorrection
         UnaryCorrectionRow(
             id=r.id,
             source_id=r.source_id,
-            external_ids=r.external_ids,
             corrections=r.corrections,
             facts=MetadataForCorrection(**{name: r._mapping[name] for name in _FACTS}),
             identifiers=parse_identifiers(r.identifiers),
@@ -303,7 +299,7 @@ class SourceRecordCorrectionStore:
         )
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — `doc_type` et `external_ids` sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """UPDATE en lot des colonnes effectives + `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — `doc_type` et les identifiants sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         _persist_statuses(self._conn, {u.id: u.corrected.identifiers for u in updates})
         return _persist_updates(
             self._conn, [{"id": u.id, **u.corrected.columns._asdict()} for u in updates]
@@ -314,7 +310,7 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 SELECT id_value FROM failed_lookups
-                WHERE source = '{Source.HAL.value}' AND id_type = '{ExternalIdType.HAL_ID.value}'
+                WHERE source = '{Source.HAL.value}' AND id_type = '{SourceIdentifierType.HAL_ID.value}'
             """)
         )
         return frozenset(rows.scalars())
@@ -396,7 +392,7 @@ class SourceRecordCorrectionStore:
             text(f"""
                 WITH sr_eff AS (
                     SELECT id, source, source_id, doc_type, doi, title_normalized, publication_year,
-                           corrections, source_extras, external_ids,
+                           corrections, source_extras,
                            lower({raw_column("doi", "source_records")}) AS eff_doi
                     FROM source_records
                 ),
@@ -525,7 +521,7 @@ class SourceRecordCorrectionStore:
                     SELECT d FROM foreign_hal_dois
                 )
                 SELECT sr.id, sr.doc_type, sr.doi, sr.title_normalized, sr.corrections,
-                       sr.external_ids, sr.source::text AS source, sr.source_id,
+                       sr.source::text AS source, sr.source_id,
                        {identifiers_json_sql("sr.id")} AS identifiers,
                        sr.eff_doi AS raw_doi,
                        sw.canonical_doi, sw.same_work_case,
@@ -553,7 +549,6 @@ class SourceRecordCorrectionStore:
                 canonical_doi=row.canonical_doi,
                 same_work_case=_cluster_case(row.same_work_case),
                 unresolved=row.unresolved,
-                external_ids=row.external_ids,
                 identifiers=parse_identifiers(row.identifiers),
                 source=row.source,
                 source_id=row.source_id,
@@ -563,7 +558,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes `doi`, `external_ids` et `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — DOI et identifiants externes sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
+        """UPDATE en lot des colonnes `doi` et `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — DOI et identifiants sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
 
         La publication de chaque enregistrement source est marquée pour le groupement des auteurs : le groupement des contributions sources écarte un enregistrement source dont le DOI converge sur celui d'une autre œuvre.
         """
@@ -577,13 +572,5 @@ class SourceRecordCorrectionStore:
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
         return _persist_updates(
             self._conn,
-            [
-                {
-                    "id": u.id,
-                    "doi": u.doi,
-                    "corrections": u.corrections,
-                    "external_ids": u.external_ids,
-                }
-                for u in updates
-            ],
+            [{"id": u.id, "doi": u.doi, "corrections": u.corrections} for u in updates],
         )

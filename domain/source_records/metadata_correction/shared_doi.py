@@ -20,8 +20,7 @@ from typing import NamedTuple
 
 from domain.publications.doc_types import DocType
 from domain.publications.identifiers import NNT, HALId, meme_registrant
-from domain.source_records.external_ids import ExternalIdType
-from domain.source_records.identifiers import SourceIdentifier
+from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
@@ -154,10 +153,10 @@ def source_record_own_ids(source: str, source_id: str) -> dict[str, tuple[str, .
         hal_id = HALId.try_parse(extract_hal_id_from_scanr_id(source_id) or "")
     elif source == Source.THESES:
         nnt = NNT.try_parse(source_id)
-        return {ExternalIdType.NNT.value: (str(nnt),)} if nnt else {}
+        return {SourceIdentifierType.NNT.value: (str(nnt),)} if nnt else {}
     else:
         return {}
-    return {ExternalIdType.HAL_ID.value: (str(hal_id),)} if hal_id else {}
+    return {SourceIdentifierType.HAL_ID.value: (str(hal_id),)} if hal_id else {}
 
 
 def confirmation_id_removals(

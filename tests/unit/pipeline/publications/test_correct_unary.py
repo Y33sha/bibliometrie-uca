@@ -27,6 +27,15 @@ from pipeline.transformation.publications.correction.correction_store import (
 )
 
 
+def _active(identifiers):
+    """Valeurs des identifiants actifs, par type."""
+    values: dict[str, list[str]] = {}
+    for i in identifiers:
+        if i.removed_by is None:
+            values.setdefault(i.id_type.value, []).append(i.value)
+    return {k: sorted(v) for k, v in values.items()}
+
+
 def _update(source_record: UnaryCorrectionRow) -> CorrectionUpdate | None:
     return compute_update(source_record)
 
@@ -39,7 +48,6 @@ def test_tally_corrections_compte_les_regles():
                 CorrectedSourceRecord(
                     "thesis",
                     None,
-                    {},
                     None,
                     {"doc_type": stash_entry("article", "THESIS_WITH_SERIAL_TO_ARTICLE")},
                 ),
@@ -53,7 +61,6 @@ def test_tally_corrections_compte_les_regles():
                 CorrectedSourceRecord(
                     "media",
                     "green",
-                    {},
                     None,
                     {
                         "doc_type": stash_entry("article", "SERIAL_TYPE_MEDIA_TO_MEDIA"),
@@ -64,9 +71,7 @@ def test_tally_corrections_compte_les_regles():
             ),
         ),
         # correction défaite : mise à jour sans règle
-        CorrectionUpdate(
-            4, UnaryCorrection(CorrectedSourceRecord("article", None, {}, None, {}), ())
-        ),
+        CorrectionUpdate(4, UnaryCorrection(CorrectedSourceRecord("article", None, None, {}), ())),
     ]
     corrected, rule_counts = tally_corrections(updates)
     assert corrected == 2
@@ -77,7 +82,7 @@ def test_tally_corrections_compte_les_regles():
     }
 
 
-_ROW_FIELDS = ("id", "source_id", "external_ids", "corrections", "identifiers")
+_ROW_FIELDS = ("id", "source_id", "corrections", "identifiers")
 
 
 def _ids(id_type, *values, removed_by=None):
@@ -95,7 +100,6 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
     row: dict[str, object] = {
         "id": 1,
         "source_id": "W1",
-        "external_ids": {},
         "corrections": {},
         "identifiers": (),
     }
@@ -150,7 +154,7 @@ def test_real_thesis_without_serial_id_untouched():
 def test_retrait_par_cluster_garde():
     """L'étape unaire garde le retrait d'identifiants noté par l'étape cluster : aucune mise à jour."""
     identifiers = (*_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"), *_hal("hal-2"))
-    row = _source_record(external_ids={"hal_id": ["hal-2"]}, identifiers=identifiers)
+    row = _source_record(identifiers=identifiers)
     assert _update(row) is None
 
 
@@ -160,7 +164,6 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
             doc_type="thesis",
             serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
-            external_ids={"hal_id": ["hal-99", "tel-01"]},
             identifiers=(
                 *_hal("tel-01", "hal-99"),
                 *_hal("hal-5", removed_by="ACTES_VS_COMMUNICATION"),
@@ -168,7 +171,7 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
         )
     )
     assert upd is not None
-    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-99"]}
+    assert _active(upd.corrected.identifiers) == {"hal_id": ["hal-99"]}
     assert [i.removed_by for i in upd.corrected.identifiers] == [
         "THESIS_WITH_SERIAL_TO_ARTICLE",
         None,
@@ -193,7 +196,7 @@ def test_thesis_to_article_strips_dissertation_keys():
     )
     assert upd is not None
     assert upd.corrected.columns.doc_type == "article"
-    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-99"], "pmid": "123"}
+    assert _active(upd.corrected.identifiers) == {"hal_id": ["hal-99"], "pmid": ["123"]}
     assert {i.value: i.removed_by for i in upd.corrected.identifiers} == {
         "2020X": "THESIS_WITH_SERIAL_TO_ARTICLE",
         "tel-01": "THESIS_WITH_SERIAL_TO_ARTICLE",
@@ -203,21 +206,20 @@ def test_thesis_to_article_strips_dissertation_keys():
     assert tally_corrections([upd]) == (1, {"THESIS_WITH_SERIAL_TO_ARTICLE": 1})
 
 
-def test_thesis_to_article_without_dissertation_keys_leaves_external_ids():
-    # Mistype pur (pas d'identifiant de thèse) : external_ids et identifiants inchangés.
+def test_thesis_to_article_without_dissertation_keys_leaves_identifiers():
+    # Mistype pur (pas d'identifiant de thèse) : identifiants inchangés.
     identifiers = _ids(SourceIdentifierType.PMID, "123")
     upd = _update(
         _source_record(
             doc_type="thesis",
             serial_id=42,
             doi="10.1016/j.ex.2020.01.001",
-            external_ids={"pmid": "123"},
             identifiers=identifiers,
         )
     )
     assert upd is not None
     assert upd.corrected.columns.doc_type == "article"
-    assert upd.corrected.columns.external_ids == {"pmid": "123"}
+    assert _active(upd.corrected.identifiers) == {"pmid": ["123"]}
     assert upd.corrected.identifiers == identifiers
 
 
@@ -343,7 +345,6 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
 def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
     """Régression : l'enregistrement OpenAlex W4287257393 citait le seul dépôt hal-03178520, introuvable dans HAL."""
     row = _source_record(
-        external_ids={"hal_id": ["hal-03178520", "hal-03263588"], "pmid": "1"},
         identifiers=(
             *_hal("hal-03178520", "hal-03263588"),
             *_ids(SourceIdentifierType.PMID, "1"),
@@ -352,7 +353,7 @@ def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
     )
     upd = compute_update(row, missing_hal_ids={"hal-03178520"})
     assert upd is not None
-    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-03263588"], "pmid": "1"}
+    assert _active(upd.corrected.identifiers) == {"hal_id": ["hal-03263588"], "pmid": ["1"]}
     assert upd.corrected.columns.urls == ["https://hal.inrae.fr/hal-03263588/document"]
     assert upd.corrected.columns.corrections["urls"] == stash_entry(
         row.facts.urls, "HAL_DEPOSIT_MISSING_TO_REMOVED"
@@ -360,7 +361,6 @@ def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
     assert tally_corrections([upd]) == (1, {"HAL_DEPOSIT_MISSING_TO_REMOVED": 1})
 
     corrected = _source_record(
-        external_ids=upd.corrected.columns.external_ids,
         identifiers=upd.corrected.identifiers,
         urls=upd.corrected.columns.urls,
         corrections=upd.corrected.columns.corrections,
@@ -370,13 +370,12 @@ def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
 
 def test_dernier_depot_hal_introuvable_vide_les_liens():
     row = _source_record(
-        external_ids={"hal_id": ["hal-03178520"]},
         identifiers=_hal("hal-03178520"),
         urls=["https://hal.science/hal-03178520"],
     )
     upd = compute_update(row, missing_hal_ids={"hal-03178520"})
     assert upd is not None
-    assert upd.corrected.columns.external_ids == {}
+    assert _active(upd.corrected.identifiers) == {}
     assert upd.corrected.columns.urls is None
 
 
@@ -384,14 +383,13 @@ def test_depot_hal_retrouve_restaure_identifiants_et_liens():
     raw_urls = ["https://hal.science/hal-03178520"]
     rule = "HAL_DEPOSIT_MISSING_TO_REMOVED"
     corrected = _source_record(
-        external_ids={},
         identifiers=_hal("hal-03178520", removed_by=rule),
         urls=None,
         corrections={"urls": stash_entry(raw_urls, rule)},
     )
     upd = compute_update(corrected)
     assert upd is not None
-    assert upd.corrected.columns.external_ids == {"hal_id": ["hal-03178520"]}
+    assert _active(upd.corrected.identifiers) == {"hal_id": ["hal-03178520"]}
     assert upd.corrected.identifiers == _hal("hal-03178520")
     assert upd.corrected.columns.urls == raw_urls
     assert upd.corrected.columns.corrections == {}

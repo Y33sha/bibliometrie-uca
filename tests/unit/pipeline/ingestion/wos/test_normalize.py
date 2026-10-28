@@ -808,7 +808,8 @@ class TestGetContainerFacts:
             {
                 "journal_title": "GEOLOGICAL MELTS",
                 "doc_type": "Book Chapter",
-                "external_ids": {"isbn": ["9783030580803"], "eisbn": ["9783030580810"]},
+                "isbns": ["9783030580803"],
+                "eisbns": ["9783030580810"],
             }
         )
         assert facts.book_title == "GEOLOGICAL MELTS"
@@ -834,7 +835,6 @@ class TestWosSourceRecord:
             "keywords": ["k1"],
             "topics": {"subjects": ["s"]},
             "urls": ["https://x"],
-            "external_ids": {"pmid": "12345"},
         }
 
         row_arg = wos_source_record(

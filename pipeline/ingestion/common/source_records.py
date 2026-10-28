@@ -20,7 +20,6 @@ from domain.publications.metadata import normalized_title
 from domain.publishers.attribution import source_record_has_publisher
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
-from domain.source_records.external_ids import external_ids_from_identifiers
 from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
 from domain.source_records.languages import language_code
 from domain.types import JsonValue
@@ -37,7 +36,7 @@ class SourceRecordUpsert:
 
     Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas d'indicateur de citation, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
 
-    Cinq colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`), `language` de `raw_language` (`language_code`) et `external_ids` de `identifiers`. `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
+    Quatre colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
     """
 
     # Clé de l'enregistrement source
@@ -49,7 +48,7 @@ class SourceRecordUpsert:
     # Rattachement
     doi: str | None = None
     identifiers: tuple[SourceIdentifier, ...] = ()
-    """Identifiants de l'enregistrement source, avec leur rôle, écrits dans `source_record_identifiers`. L'écriture les normalise et en déduit `external_ids`."""
+    """Identifiants de l'enregistrement source, avec leur rôle, écrits dans `source_record_identifiers`. L'écriture les normalise."""
 
     # Métadonnées bibliographiques
     title: str
@@ -96,7 +95,7 @@ _FIELDS = tuple(f for f in fields(SourceRecordUpsert) if f.name != "identifiers"
 # calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` est inséré et
 # réécrit sans autre geste, en phase avec le contrat.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
-_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language", "external_ids")
+_COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language")
 
 # Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `corrections` se vide : les
 # valeurs d'origine qu'il garde viennent de l'import précédent, et la phase `metadata_correction` refait ses
@@ -105,7 +104,7 @@ _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id")
 
 # Colonnes JSONB : les champs annotés `JsonValue` (les `list[str]` sont des `text[]`,
 # hors JSONB). Un champ JSONB ajouté au contrat est typé sans autre geste.
-_JSONB_COLUMNS = (*(f.name for f in _FIELDS if f.type is JsonValue), "external_ids")
+_JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
 
 # Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
 _ENUM_CASTS = {"doc_type": "doc_type", "license": "license_type"}
@@ -188,7 +187,6 @@ class SourceRecordStore:
         params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
         params["language"] = language_code(row.raw_language, self._forms())
         identifiers = normalized_identifiers(row)
-        params["external_ids"] = external_ids_from_identifiers(identifiers, row.doi)
         source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))
         replace_identifiers(self._conn, {source_record_id: identifiers})
         return source_record_id

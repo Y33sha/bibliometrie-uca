@@ -9,10 +9,8 @@ from domain.source_records.corrections import (
     CorrectionKey,
     hydrate_raw_view,
     other_entries,
-    raw_value,
     stash_entry,
 )
-from domain.source_records.external_ids import external_ids_from_identifiers
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierType,
@@ -33,7 +31,6 @@ class CorrectedSourceRecord(NamedTuple):
 
     doc_type: str | None
     oa_status: str | None
-    external_ids: dict[str, JsonValue]
     urls: list[str] | None
     corrections: dict[str, JsonValue]
 
@@ -66,7 +63,6 @@ def corrected_doc_type(
 def correct_source_record(
     facts: MetadataForCorrection,
     identifiers: Sequence[SourceIdentifier],
-    external_ids: Mapping[str, JsonValue],
     corrections: Mapping[str, JsonValue],
     *,
     origin_doc_type: str | None = None,
@@ -74,9 +70,9 @@ def correct_source_record(
 ) -> UnaryCorrection | None:
     """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` et ses `identifiers` permettent de reconstruire. Rend `None` si les valeurs courantes sont déjà les valeurs corrigées.
 
-    `facts`, `external_ids` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `identifiers` sont tous les identifiants de l'enregistrement source, avec leur statut courant. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type. `missing_hal_ids` : dépôts HAL introuvables dans HAL.
+    `facts` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `identifiers` sont tous les identifiants de l'enregistrement source, avec leur statut courant. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type. `missing_hal_ids` : dépôts HAL introuvables dans HAL.
 
-    Une conflation thèse-article corrigée en article perd ses identifiants de thèse (`is_dissertation_identifier`). Les identifiants et les liens des dépôts de `missing_hal_ids` sont retirés. `external_ids` se déduit des identifiants actifs.
+    Une conflation thèse-article corrigée en article perd ses identifiants de thèse (`is_dissertation_identifier`). Les identifiants et les liens des dépôts de `missing_hal_ids` sont retirés.
     """
     before = hydrate_raw_view(facts, corrections)
     corrected = effective_metadata(before)
@@ -117,13 +113,10 @@ def correct_source_record(
             new_corrections[CorrectionKey.URLS] = stash_entry(before.urls, missing_rule)
 
     new_identifiers = with_removals(identifiers, UNARY_IDENTIFIER_RULES, removals)
-    raw_doi = raw_value(corrections, CorrectionKey.DOI, facts.doi)
-    new_external_ids = external_ids_from_identifiers(new_identifiers, raw_doi)
-    columns = CorrectedSourceRecord(doc_type, oa_status, new_external_ids, urls, new_corrections)
+    columns = CorrectedSourceRecord(doc_type, oa_status, urls, new_corrections)
     if columns == (
         facts.doc_type,
         facts.oa_status,
-        external_ids,
         facts.urls,
         dict(corrections),
     ) and new_identifiers == tuple(identifiers):

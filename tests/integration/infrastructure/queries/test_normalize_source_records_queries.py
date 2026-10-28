@@ -196,18 +196,6 @@ class TestUpsertSourceRecord:
             == {}
         )
 
-    def test_external_ids_defaults_to_empty_object(self, sa_sync_conn):
-        """La colonne est `NOT NULL` et contrainte à un objet JSON."""
-        staging_id = _thesis_staging(sa_sync_conn)
-        source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(_row(staging_id))
-        assert (
-            sa_sync_conn.execute(
-                text("SELECT external_ids FROM source_records WHERE id = :id"),
-                {"id": source_record_id},
-            ).scalar_one()
-            == {}
-        )
-
     def test_unknown_doc_type_gives_other_and_is_logged(self, sa_sync_conn, caplog):
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
@@ -225,7 +213,7 @@ class TestUpsertSourceRecord:
         ]
 
     def test_identifiers_normalized_and_rejections_logged(self, sa_sync_conn, caplog):
-        """Chaque valeur passe par son value object. Une valeur invalide est écartée et journalisée. `external_ids` se déduit des identifiants écrits."""
+        """Chaque valeur passe par son value object. Une valeur invalide est écartée et journalisée."""
         staging_id = _thesis_staging(sa_sync_conn)
         source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
             _row(
@@ -243,10 +231,6 @@ class TestUpsertSourceRecord:
             ("hal_id", "hal-04123456", "secondary"),
             ("nnt", "2023ABC001", "primary"),
         ]
-        assert sa_sync_conn.execute(
-            text("SELECT external_ids FROM source_records WHERE id = :id"),
-            {"id": source_record_id},
-        ).scalar_one() == {"hal_id": ["hal-04123456"], "nnt": "2023ABC001"}
         logged = [r.getMessage() for r in caplog.records if "Identifiant écarté" in r.getMessage()]
         assert logged == ["Identifiant écarté (theses 2023ABC001) : hal_id = '10995/102143'"]
 

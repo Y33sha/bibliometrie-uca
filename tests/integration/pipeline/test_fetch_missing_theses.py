@@ -2,7 +2,7 @@
 
 from pipeline.ingestion.theses.fetch_missing import get_missing_nnts
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
@@ -15,7 +15,7 @@ def _carry(conn, source, source_id, nnt):
         source=source,
         source_id=source_id,
         staging_id=staging_id,
-        external_ids={"nnt": nnt},
+        identifiers=secondary_identifiers({"nnt": nnt}),
     )
 
 
