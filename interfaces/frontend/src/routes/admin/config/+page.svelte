@@ -10,6 +10,7 @@
   import Modal from "#lib/components/Modal.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { autofocus } from "#lib/actions/focus.js";
+  import { defaultSiteTitle, institution } from "#lib/institution.svelte.js";
   import type { components } from "#lib/api/schema.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
@@ -147,6 +148,10 @@
   const MIN_YEAR = 1970;
   const MAX_YEAR = 2100;
 
+  const SITE_TITLE_KEY = "site_title";
+  /** Clés dont la valeur est un texte libre, enregistré tel quel. */
+  const TEXT_KEYS = new Set([SITE_TITLE_KEY]);
+
   /** Bornes du champ pour une clé numérique, `null` pour les autres. */
   function numericBounds(key: string): { min: number; max: number } | null {
     if (CAP_KEYS.has(key)) return { min: 0, max: 10_000_000 };
@@ -173,6 +178,8 @@
     const v = configByKey("laboratories_display_types")?.value;
     return Array.isArray(v) ? (v as string[]) : [];
   });
+
+  const siteTitleItem = $derived(configByKey(SITE_TITLE_KEY));
 
   async function toggleLabType(type: string) {
     const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
@@ -218,6 +225,8 @@
       let parsed;
       if (CAP_KEYS.has(key) && text.trim() === "") {
         parsed = 0;
+      } else if (TEXT_KEYS.has(key)) {
+        parsed = text;
       } else {
         try {
           parsed = JSON.parse(text);
@@ -225,7 +234,8 @@
           parsed = text;
         }
       }
-      await configApi.setValue(key, parsed);
+      const saved = await configApi.setValue(key, parsed);
+      if (key === SITE_TITLE_KEY) institution.title = (saved.value as string) || null;
       editingKey = null;
       await load();
     } catch (e) {
@@ -242,7 +252,7 @@
 <!-- Éditeur inline partagé par toutes les valeurs de configuration scalaires : focus + sélection à l'ouverture, Entrée valide, Échap annule. -->
 {#snippet inlineEdit(key: string)}
   {@const bornes = numericBounds(key)}
-  <input class="config-editor-inline" bind:value={editValue} use:autofocus={{ select: true }}
+  <input class="config-editor-inline" class:text={TEXT_KEYS.has(key)} bind:value={editValue} use:autofocus={{ select: true }}
     type={bornes ? "number" : "text"} min={bornes?.min} max={bornes?.max} step={bornes ? 1 : undefined}
     onkeydown={(e) => editKeydown(e, key)} />
   <span class="config-actions-inline">
@@ -380,6 +390,21 @@
   <!-- ═══ AFFICHAGE ═══ -->
   <h2 class="section-title">Affichage</h2>
   <div class="config-grid">
+    {#if siteTitleItem}
+      <div class="config-row">
+        <span class="config-label">Titre de l'application</span>
+        {#if editingKey === SITE_TITLE_KEY}
+          {@render inlineEdit(SITE_TITLE_KEY)}
+        {:else}
+          {#if siteTitleItem.value}
+            <span class="config-value-inline">{siteTitleItem.value}</span>
+          {:else}
+            <span class="config-value-inline default-value">{defaultSiteTitle()} (par défaut)</span>
+          {/if}
+          <IconButton icon="edit" label="Modifier" onclick={() => startEdit(SITE_TITLE_KEY)} />
+        {/if}
+      </div>
+    {/if}
     <div class="config-row stacked">
       <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
       <div class="type-checks">
@@ -488,6 +513,13 @@
     padding: 3px 6px;
     border: 1px solid var(--accent);
     border-radius: var(--radius);
+  }
+  .config-editor-inline.text {
+    width: 320px;
+    font-family: inherit;
+  }
+  .default-value {
+    color: var(--muted);
   }
   .config-actions-inline {
     display: flex;
