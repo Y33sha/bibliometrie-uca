@@ -15,9 +15,10 @@ from collections.abc import Awaitable, Callable, Mapping, Sequence
 import httpx2
 from sqlalchemy import Connection, text
 
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue
+from infrastructure.db.source_record_identifiers import first_of_its_type_sql
 from pipeline.http.lookup import UNAVAILABLE, LookupOutcome, NotFound, Unavailable
 from pipeline.ingestion.common.failed_lookups import (
     LookupIdType,
@@ -32,37 +33,38 @@ from pipeline.runtime.observability.metrics import PhaseMetrics
 HAL_MAX_CONCURRENT = 5
 
 _HAL_ID_PENDING = pending_failed_lookup_sql(
-    source_sql="'hal'", id_type="hal_id", value_sql="h.hal_id"
+    source_sql="'hal'", id_type="hal_id", value_sql="h.id_value"
 )
 
 _MISSING_HAL_IDS_SQL = text(
     f"""
-    SELECT DISTINCT h.hal_id
+    SELECT DISTINCT h.id_value AS hal_id
     FROM source_records sr
     JOIN publications p ON p.id = sr.publication_id
-    CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids -> '{ExternalIdType.HAL_ID}') AS h(hal_id)
+    JOIN source_record_identifiers h
+      ON h.source_record_id = sr.id AND h.id_type = '{SourceIdentifierType.HAL_ID}'
+         AND h.removed_by IS NULL
     WHERE sr.source IN ('openalex', 'scanr')
       AND p.in_perimeter
-      AND jsonb_typeof(sr.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
       AND NOT EXISTS (
-          SELECT 1 FROM staging s WHERE s.source = 'hal' AND s.source_id = h.hal_id
+          SELECT 1 FROM staging s WHERE s.source = 'hal' AND s.source_id = h.id_value
       )
       AND NOT {_HAL_ID_PENDING}
     """
 )
 
-_NNT_PENDING = pending_failed_lookup_sql(
-    source_sql="'hal'", id_type="nnt", value_sql=f"sr.external_ids ->> '{ExternalIdType.NNT}'"
-)
+_NNT_PENDING = pending_failed_lookup_sql(source_sql="'hal'", id_type="nnt", value_sql="n.id_value")
 
 _MISSING_NNTS_SQL = text(
     f"""
-    SELECT sr.external_ids ->> '{ExternalIdType.NNT}' AS nnt
+    SELECT n.id_value AS nnt
     FROM source_records sr
     JOIN publications p ON p.id = sr.publication_id
+    JOIN source_record_identifiers n
+      ON n.source_record_id = sr.id AND n.id_type = '{SourceIdentifierType.NNT}'
+         AND {first_of_its_type_sql("n")}
     WHERE sr.source = 'theses'
       AND p.in_perimeter
-      AND sr.external_ids ->> '{ExternalIdType.NNT}' IS NOT NULL
       AND p.doc_type != 'ongoing_thesis'
       AND NOT EXISTS (
           SELECT 1 FROM source_records hal
@@ -70,7 +72,10 @@ _MISSING_NNTS_SQL = text(
       )
       AND NOT EXISTS (
           SELECT 1 FROM source_records hal
-          WHERE hal.source = 'hal' AND hal.external_ids ->> '{ExternalIdType.NNT}' = sr.external_ids ->> '{ExternalIdType.NNT}'
+          JOIN source_record_identifiers hn
+            ON hn.source_record_id = hal.id AND hn.id_type = n.id_type
+               AND {first_of_its_type_sql("hn")}
+          WHERE hal.source = 'hal' AND hn.id_value = n.id_value
       )
       AND NOT {_NNT_PENDING}
     """
@@ -78,7 +83,7 @@ _MISSING_NNTS_SQL = text(
 
 
 def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """hal-ids que des `source_records` OpenAlex ou ScanR portent dans `external_ids.hal_id`, absents du staging HAL.
+    """hal-ids actifs des `source_records` OpenAlex ou ScanR, absents du staging HAL.
 
     Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_records` du run précédent : les documents extraits pendant le run y entrent au run suivant.
 
@@ -90,7 +95,7 @@ def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """NNT des `source_records` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_records` HAL.
+    """NNT des `source_records` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_records` HAL. Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur.
 
     Écarte les NNT qu'un document HAL contient déjà, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
     """

@@ -29,7 +29,7 @@ from domain.publications.reconciliation import (
     manual_merge_tokens,
     plan_reconciliation,
 )
-from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierRole
+from domain.source_records.identifiers import SourceIdentifier
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -38,8 +38,12 @@ from domain.source_records.keys import (
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
-from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
-from infrastructure.sql_fragments import case_priority, in_clause
+from infrastructure.db.source_record_identifiers import (
+    first_of_its_type_sql,
+    identifiers_json_sql,
+    parse_identifiers,
+)
+from infrastructure.sql_fragments import in_clause
 from pipeline.runtime.observability.log_format import (
     BRANCH,
     LAST_BRANCH,
@@ -91,22 +95,13 @@ _COLS = (
     "ORDER BY mm.manual_merge_id) AS manual_merge_ids"
 )
 
-# Rang d'un rôle d'identifiant, dans l'ordre de `SourceIdentifierRole`.
-_ROLE_RANK = case_priority(tuple(SourceIdentifierRole), "{a}.role")
-
 # L'identifiant aliasé `{a}` de `source_record_identifiers` est la clé de confirmation de son type
-# (`confirmation_identifiers`) : actif, et premier des identifiants actifs de son type dans
-# l'enregistrement source, par rôle puis par valeur. La collation `C` compare les valeurs comme Python.
+# (`confirmation_identifiers`).
 _CONFIRMATION_KEY_SQL = (
-    "{a}.removed_by IS NULL AND {a}.id_type::text IN "
+    "{a}.id_type::text IN "
     + in_clause(tuple(map(str, CONFIRMATION_ID_TYPES)))
-    + " AND NOT EXISTS (SELECT 1 FROM source_record_identifiers x"
-    " WHERE x.source_record_id = {a}.source_record_id AND x.id_type = {a}.id_type"
-    " AND x.removed_by IS NULL AND ("
-    + _ROLE_RANK.format(a="x")
-    + ', x.id_value COLLATE "C") < ('
-    + _ROLE_RANK
-    + ', {a}.id_value COLLATE "C"))'
+    + " AND "
+    + first_of_its_type_sql("{a}")
 )
 
 _UNIVERSE_SQL = text(f"""

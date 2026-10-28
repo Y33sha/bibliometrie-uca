@@ -6,7 +6,11 @@ from collections.abc import Sequence
 
 from sqlalchemy import Connection, text
 
-from domain.source_records.identifiers import SourceIdentifier
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.contributions import upsert_contributor_information
 from tests.integration.helpers.queues import mark
@@ -15,6 +19,37 @@ from tests.integration.helpers.rows import PERIMETER_EVIDENCE_CAST, insert_row, 
 
 def _jsonb(value: object) -> str | None:
     return json.dumps(value) if value is not None else None
+
+
+# Type d'identifiant de chaque clé d'`external_ids`.
+_EXTERNAL_ID_TYPES = {
+    "hal_id": SourceIdentifierType.HAL_ID,
+    "nnt": SourceIdentifierType.NNT,
+    "pmid": SourceIdentifierType.PMID,
+    "pmcid": SourceIdentifierType.PMCID,
+    "arxiv_id": SourceIdentifierType.ARXIV_ID,
+    "related_dois": SourceIdentifierType.DOI,
+    "isbn": SourceIdentifierType.ISBN,
+    "eisbn": SourceIdentifierType.EISBN,
+}
+
+
+def identifiers_of_external_ids(external_ids: dict[str, object]) -> list[SourceIdentifier]:
+    """Identifiants qu'un `external_ids` donne à lire : les `related_dois` sont des DOI liés, les autres valeurs des identifiants secondaires."""
+    identifiers: list[SourceIdentifier] = []
+    for key, raw in external_ids.items():
+        role = (
+            SourceIdentifierRole.RELATED
+            if key == "related_dois"
+            else SourceIdentifierRole.SECONDARY
+        )
+        if key in _EXTERNAL_ID_TYPES:
+            identifiers.extend(
+                SourceIdentifier(_EXTERNAL_ID_TYPES[key], value, role)
+                for value in (raw if isinstance(raw, list) else [raw])
+                if isinstance(value, str)
+            )
+    return identifiers
 
 
 def insert_identifiers(
@@ -77,7 +112,7 @@ def insert_source_record(
     corrections: dict[str, object] | None = None,
     is_matchable: bool = True,
 ) -> int:
-    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `identifiers` s'écrivent dans `source_record_identifiers`, avec leur statut. `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
+    """Insère un enregistrement source et renvoie son `id`. `row_id` fixe l'`id`. `raw_doc_type` et `raw_language` valent par défaut `doc_type` et `language`. `identifiers` s'écrivent dans `source_record_identifiers`, avec leur statut ; à défaut, ceux qu'`external_ids` donne (`identifiers_of_external_ids`). `marked` marque l'enregistrement source pour la réconciliation, comme la normalisation."""
     source_record_id = insert_row(
         conn,
         "source_records",
@@ -117,6 +152,8 @@ def insert_source_record(
             ("external_ids", "biblio", "source_extras", "topics", "corrections"), "jsonb"
         ),
     )
+    if not identifiers and external_ids:
+        identifiers = identifiers_of_external_ids(external_ids)
     if identifiers:
         insert_identifiers(conn, source_record_id, identifiers)
     if marked:
