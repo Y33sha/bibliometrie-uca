@@ -23,7 +23,7 @@
   const activeForms = $derived(nameForms.filter((nf) => nf.status !== "rejected"));
   const rejectedForms = $derived(nameForms.filter((nf) => nf.status === "rejected"));
 
-  // Une forme dérivée du nom canonique (source 'persons') est confirmée d'office et le recompute la rétablirait : pas d'action de statut dessus.
+  // Une forme dérivée du nom canonique (source 'persons') est confirmée d'office, sans bascule de statut : le recalcul la rétablirait.
   function isCanonical(nf: NameForm): boolean {
     return nf.sources?.includes("persons") ?? false;
   }
@@ -32,16 +32,14 @@
 {#snippet formRow(nf: NameForm)}
   <div class="chip-row">
     <span class="chip-controls">
-      {#if isCanonical(nf)}
-        <span class="canonical-tag" title="Forme dérivée du nom canonique">nom</span>
-      {:else}
+      {#if !isCanonical(nf)}
         <StatusToggles status={nf.status} onchange={(s) => onsetStatus(personId, nf.name_form, s)} />
       {/if}
     </span>
     {#if nf.publication_count > 0}
       <button
         class="status-chip"
-        class:confirmed={nf.status === "confirmed"}
+        class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
         title="Voir les {nf.publication_count} publication(s) liée(s)"
         onclick={() => onopenDetail(personId, nf.name_form)}
@@ -51,7 +49,7 @@
     {:else}
       <span
         class="status-chip"
-        class:confirmed={nf.status === "confirmed"}
+        class:confirmed={nf.status === "confirmed" || isCanonical(nf)}
         class:rejected={nf.status === "rejected"}
       >
         {nf.name_form}
