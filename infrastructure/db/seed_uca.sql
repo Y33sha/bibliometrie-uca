@@ -723,7 +723,7 @@ SELECT setval(pg_get_serial_sequence('structure_name_forms', 'id'), (SELECT COAL
 -- config (3 lignes)
 DELETE FROM config WHERE (key IN ('perimeter_extraction', 'perimeter_persons', 'site_title')) AND (key) NOT IN (('perimeter_extraction'), ('perimeter_persons'), ('site_title'));
 INSERT INTO config (key, value, description) VALUES ('perimeter_extraction', '"alliance_uca"', 'Périmètre pour déterminer les structures à interroger lors de l''extraction') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
-INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"alliance_uca"', 'Périmètre pour la création des personnes (authorships is_uca)') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
+INSERT INTO config (key, value, description) VALUES ('perimeter_persons', '"alliance_uca"', 'Périmètre pour la création des personnes (contributions is_uca)') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 INSERT INTO config (key, value, description) VALUES ('site_title', '"Bibliométrie UCA"', 'Titre de l''application. Vide : « Bibliométrie » suivi du nom de l''établissement.') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, description = EXCLUDED.description;
 
 COMMIT;
