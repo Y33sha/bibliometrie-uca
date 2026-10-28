@@ -1,9 +1,14 @@
+python interfaces/cli/oneshot/fill_source_record_identifiers.py
+
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Extraction
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
+* [ ] payloads bruts: ne plus faire transiter par la base?
 ## Suite du traitement
+* [ ] normalisation en parallèle de l'extraction?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
+* [ ] rendre la résolution des personnes totalement indépendante de l’ordre d'arrivée + remettre en jeu les résolutions non épinglées
 * [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer) / annoter un corpus et trouver une bonne fonction de décision
 
 # Données
