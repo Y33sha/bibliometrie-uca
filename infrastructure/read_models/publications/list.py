@@ -111,6 +111,8 @@ _SORT_JOINS = {
     ),
 }
 
+_SORT_DIRECTIONS = {"asc": "ASC", "desc": "DESC"}
+
 
 def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
     """Jointure à ajouter à la requête et clause ORDER BY de la clé `sort` (`<champ>_<sens>`). Valeurs absentes en dernier, titre en départage.
@@ -129,7 +131,7 @@ def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
         key = "labs_sort.sort_key"
     else:
         key = _SORT_FIELDS[field]
-    return join, f"{key} {direction.upper()} NULLS LAST, p.title"
+    return join, f"{key} {_SORT_DIRECTIONS[direction]} NULLS LAST, p.title"
 
 
 def _plain_text(s: str | None) -> str:
