@@ -1,4 +1,6 @@
 # Image de développement de l'API, pour la composition de développement.
+FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
+
 FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 
 WORKDIR /app
@@ -7,7 +9,7 @@ WORKDIR /app
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 ENV PATH="/opt/venv/bin:${PATH}"
 
-RUN pip install --no-cache-dir uv
+COPY --from=uv /uv /usr/local/bin/uv
 
 # Versions de `uv.lock`, groupe `dev` compris (pytest, ruff, pyrefly). Le montage de la composition recouvre le code copié ici.
 COPY pyproject.toml uv.lock ./
