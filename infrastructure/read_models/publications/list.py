@@ -60,6 +60,34 @@ _APC_SORT = (
     "WHERE ap.publication_id = p.id)"
 )
 
+
+def _thesis_author(column: str) -> str:
+    """Sous-requête scalaire : `column` lu sur l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou si aucune contribution d'auteur n'a de personne."""
+    return f"""(SELECT {column}
+                 FROM contributions ath
+                 JOIN persons pe ON pe.id = ath.person_id
+                 WHERE p.doc_type IN ('thesis', 'ongoing_thesis')
+                   AND ath.publication_id = p.id
+                   AND {has_author_role("ath")}
+                 ORDER BY ath.id
+                 LIMIT 1)"""
+
+
+def _perimeter_labs(*, person_filter: bool = False) -> str:
+    """Clauses FROM et WHERE des laboratoires des auteurs de `p` dans le périmètre (structure aliasée `s`). `person_filter` restreint aux contributions de la personne liée à `:lab_person`."""
+    person_clause = "AND lc.person_id = :lab_person" if person_filter else ""
+    return f"""FROM contributions lc
+                 JOIN contribution_structures lcs ON lcs.contribution_id = lc.id
+                 JOIN structures s ON s.id = lcs.structure_id AND s.structure_type = '{StructureType.LABO.value}'
+                 WHERE lc.publication_id = p.id AND lc.in_perimeter = TRUE
+                   AND {has_author_role("lc")}
+                   {person_clause}"""
+
+
+# Auteur de thèse trié par nom puis prénom ; laboratoires triés par le premier libellé affiché.
+_AUTHOR_SORT = _thesis_author("ROW(LOWER(pe.last_name), LOWER(pe.first_name))")
+_LABS_SORT = f"(SELECT MIN(LOWER(COALESCE(s.acronym, s.name))) {_perimeter_labs()})"
+
 _ORDER_MAP = {
     "year_desc": "p.publication_year DESC, p.title",
     "year_asc": "p.publication_year ASC, p.title",
@@ -71,6 +99,10 @@ _ORDER_MAP = {
     "soutenance_asc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} ASC NULLS LAST, p.title",
     "inscription_desc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} DESC NULLS LAST, p.title",
     "inscription_asc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} ASC NULLS LAST, p.title",
+    "author_asc": f"{_AUTHOR_SORT} ASC NULLS LAST, p.title",
+    "author_desc": f"{_AUTHOR_SORT} DESC NULLS LAST, p.title",
+    "labs_asc": f"{_LABS_SORT} ASC NULLS LAST, p.title",
+    "labs_desc": f"{_LABS_SORT} DESC NULLS LAST, p.title",
 }
 
 
@@ -201,12 +233,6 @@ class PublicationListQueries:
         ).one()
         total = count_row.total
 
-        # Sur la vue personne (person_id défini), restreindre la liste des labos affichée à ceux de la contribution de cette personne.
-        if filters.person_id:
-            person_lab_filter_a4 = "AND a4.person_id = :person_lab_a4"
-        else:
-            person_lab_filter_a4 = ""
-
         rows = self._conn.execute(
             text(f"""
                 SELECT
@@ -222,22 +248,8 @@ class PublicationListQueries:
                     {hal_status.sql} AS hal_status,
                     {source_extra(SourceExtra.DATE_SOUTENANCE, "p")} AS date_soutenance,
                     {source_extra(SourceExtra.DATE_INSCRIPTION, "p")} AS date_inscription,
-                    (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
-                        (SELECT pe.first_name || ' ' || pe.last_name
-                         FROM contributions ath
-                         JOIN persons pe ON pe.id = ath.person_id
-                         WHERE ath.publication_id = p.id
-                           AND {has_author_role("ath")}
-                         LIMIT 1)
-                     END) AS thesis_author_name,
-                    (CASE WHEN p.doc_type IN ('thesis', 'ongoing_thesis') THEN
-                        (SELECT ath.person_id
-                         FROM contributions ath
-                         WHERE ath.publication_id = p.id
-                           AND ath.person_id IS NOT NULL
-                           AND {has_author_role("ath")}
-                         LIMIT 1)
-                     END) AS thesis_author_person_id,
+                    {_thesis_author("pe.first_name || ' ' || pe.last_name")} AS thesis_author_name,
+                    {_thesis_author("pe.id")} AS thesis_author_person_id,
                     (SELECT a.is_corresponding FROM contributions a
                      WHERE a.publication_id = p.id AND a.person_id = :focus_person
                      LIMIT 1) AS is_corresponding,
@@ -247,12 +259,7 @@ class PublicationListQueries:
                     (SELECT json_agg(sub ORDER BY sub.label)
                      FROM (
                         SELECT DISTINCT s.id, COALESCE(s.acronym, s.name) AS label
-                        FROM contributions a4
-                        JOIN contribution_structures aus4 ON aus4.contribution_id = a4.id
-                        JOIN structures s ON s.id = aus4.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                        WHERE a4.publication_id = p.id AND a4.in_perimeter = TRUE
-                          AND {has_author_role("a4")}
-                          {person_lab_filter_a4}
+                        {_perimeter_labs(person_filter=bool(filters.person_id))}
                      ) sub
                     ) AS lab_items,
                     (SELECT json_agg(json_build_object(
@@ -285,7 +292,7 @@ class PublicationListQueries:
                 **binds,
                 **hal_status.binds,
                 "focus_person": filters.person_id,
-                "person_lab_a4": filters.person_id,
+                "lab_person": filters.person_id,
                 "apc_perimeter_ids": perimeter_structure_ids,
                 "sort_search_pat": f"%{normalize_text(filters.search)}%" if filters.search else "",
                 "pg_limit": per_page,
@@ -356,11 +363,6 @@ class PublicationListQueries:
             else WhereClause("NULL", {})
         )
 
-        if filters.person_id:
-            person_lab_filter_a3 = "AND a3.person_id = :person_lab_a3"
-        else:
-            person_lab_filter_a3 = ""
-
         rows = self._conn.execute(
             text(f"""
                 SELECT
@@ -379,12 +381,7 @@ class PublicationListQueries:
                      LIMIT 1) AS is_corresponding,
                     (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                              ORDER BY COALESCE(s.acronym, s.name))
-                     FROM contributions a3
-                     JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
-                     JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                          AND {has_author_role("a3")}
-                       {person_lab_filter_a3}
+                     {_perimeter_labs(person_filter=bool(filters.person_id))}
                     ) AS labs
                 FROM publications p
                 LEFT JOIN serials j ON j.id = p.serial_id
@@ -400,7 +397,7 @@ class PublicationListQueries:
             """),
             {
                 **binds,
-                "person_lab_a3": filters.person_id,
+                "lab_person": filters.person_id,
                 "focus_person": filters.person_id,
                 **hal_status.binds,
                 "export_limit": MAX_EXPORT_ROWS + 1,
@@ -456,11 +453,7 @@ class PublicationListQueries:
                     src_ids.hal_id, src_ids.openalex_id, src_ids.scanr_id, src_ids.theses_id,
                     (SELECT string_agg(DISTINCT COALESCE(s.acronym, s.name), ', '
                              ORDER BY COALESCE(s.acronym, s.name))
-                     FROM contributions a3
-                     JOIN contribution_structures aus3 ON aus3.contribution_id = a3.id
-                     JOIN structures s ON s.id = aus3.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                     WHERE a3.publication_id = p.id AND a3.in_perimeter = TRUE
-                          AND {has_author_role("a3")}
+                     {_perimeter_labs()}
                     ) AS labs
                 FROM publications p
                 LEFT JOIN LATERAL (

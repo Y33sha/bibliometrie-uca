@@ -41,7 +41,7 @@
 		NonNullable<operations['list_publications_api_publications_get']['parameters']['query']>['sort']
 	>;
 
-	export type ThesisSortColumn = 'inscription' | 'soutenance' | 'title';
+	export type ThesisSortColumn = 'inscription' | 'soutenance' | 'author' | 'title' | 'labs';
 
 	let {
 		items,
@@ -94,7 +94,9 @@
 
 	const inscrSort = $derived(sortDirection(sort, 'inscription'));
 	const soutSort = $derived(sortDirection(sort, 'soutenance'));
+	const authorSort = $derived(sortDirection(sort, 'author'));
 	const titleSort = $derived(sortDirection(sort, 'title'));
+	const labsSort = $derived(sortDirection(sort, 'labs'));
 </script>
 
 <TableScroll>
@@ -112,7 +114,11 @@
 				class:active={soutSort !== null}
 				onclick={() => onToggleSort('soutenance')}
 			>Soutenance <SortChevron direction={soutSort} /></th>{/if}
-			{#if col('author')}<th class="col-author">{columnLabels.author}</th>{/if}
+			{#if col('author')}<th
+				class="col-author sortable"
+				class:active={authorSort !== null}
+				onclick={() => onToggleSort('author')}
+			>{columnLabels.author} <SortChevron direction={authorSort} /></th>{/if}
 			{#if col('doi')}<th class="col-doi">{columnLabels.doi}</th>{/if}
 			<th
 				class="col-title sortable"
@@ -120,9 +126,11 @@
 				onclick={() => onToggleSort('title')}
 			>{columnLabels.title} <SortChevron direction={titleSort} /></th>
 			{#if col('status')}<th class="col-status">Statut</th>{/if}
-			{#if col('labs')}
-				<th class="col-labs">{columnLabels.labs}</th>
-			{/if}
+			{#if col('labs')}<th
+				class="col-labs sortable"
+				class:active={labsSort !== null}
+				onclick={() => onToggleSort('labs')}
+			>{columnLabels.labs} <SortChevron direction={labsSort} /></th>{/if}
 			{#if col('sources')}<th class="col-sources">{columnLabels.sources}</th>{/if}
 			<th class="col-access col-menu-th">
 				<ColumnMenu label={columnLabels.access} columns={cv.columns} visibleColumns={cv.visibleColumns}

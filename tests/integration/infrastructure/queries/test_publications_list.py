@@ -292,6 +292,46 @@ class TestThesesExport:
         assert line.split(",")[-1] == "https://theses.hal.science/tel-1"
 
 
+class TestThesesSort:
+    """Tri des thèses par auteur (nom puis prénom) et par laboratoires (premier libellé affiché), thèses sans valeur en dernier."""
+
+    def _seed(self, conn):
+        alpha, beta, gamma = (insert_structure(conn, code) for code in ("Alpha", "Beta", "Gamma"))
+        zola, abel = (
+            insert_person(conn, last_name, first_name=first_name)
+            for last_name, first_name in (("Zola", "Albert"), ("Abel", "Zoé"))
+        )
+        theses = []
+        for title, author, labs in (("T1", zola, (gamma, alpha)), ("T2", abel, (beta,))):
+            thesis = insert_publication(conn, title, doc_type="thesis", in_perimeter=True)
+            contribution = insert_contribution(
+                conn, thesis, person_id=author, in_perimeter=True, roles=["author"]
+            )
+            for lab in labs:
+                add_contribution_structure(conn, contribution, lab)
+            theses.append(thesis)
+        theses.append(insert_publication(conn, "T3", doc_type="thesis", in_perimeter=True))
+        return theses
+
+    def _sorted(self, conn, sort):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(doc_types=["thesis"]), page=1, per_page=50, sort=sort
+        )
+        return [p.id for p in res.publications]
+
+    def test_author_sort_reads_the_last_name(self, sa_sync_conn):
+        t1, t2, t3 = self._seed(sa_sync_conn)
+
+        assert self._sorted(sa_sync_conn, "author_asc") == [t2, t1, t3]
+        assert self._sorted(sa_sync_conn, "author_desc") == [t1, t2, t3]
+
+    def test_labs_sort_reads_the_first_label(self, sa_sync_conn):
+        t1, t2, t3 = self._seed(sa_sync_conn)
+
+        assert self._sorted(sa_sync_conn, "labs_asc") == [t1, t2, t3]
+        assert self._sorted(sa_sync_conn, "labs_desc") == [t2, t1, t3]
+
+
 class TestLabScope:
     """Les laboratoires sélectionnés délimitent l'ensemble, hors périmètre compris, pour la liste, ses facettes et les statistiques."""
 

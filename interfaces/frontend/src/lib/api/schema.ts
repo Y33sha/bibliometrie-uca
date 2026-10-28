@@ -377,7 +377,7 @@ export interface paths {
          * List Publications
          * @description Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
          *
-         *     Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription — et un sens (`_asc` / `_desc`).
+         *     Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription, auteur de thèse (par nom puis prénom), laboratoires (par premier libellé) — et un sens (`_asc` / `_desc`).
          */
         get: operations["list_publications_api_publications_get"];
         put?: never;
@@ -6198,7 +6198,7 @@ export interface operations {
     export_publications_csv_api_publications_export_csv_get: {
         parameters: {
             query?: {
-                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc";
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc";
                 columns?: string;
                 search?: string;
                 lab_id?: string;
@@ -6258,7 +6258,7 @@ export interface operations {
                 access?: string;
                 source_filter?: string;
                 doc_type?: string;
-                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc";
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc";
             };
             header?: never;
             path?: never;
@@ -6475,7 +6475,7 @@ export interface operations {
             query?: {
                 page?: number;
                 per_page?: number;
-                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc";
+                sort?: "year_asc" | "year_desc" | "title_asc" | "title_desc" | "apc_asc" | "apc_desc" | "soutenance_asc" | "soutenance_desc" | "inscription_asc" | "inscription_desc" | "author_asc" | "author_desc" | "labs_asc" | "labs_desc";
                 search?: string;
                 lab_id?: string;
                 year?: string;

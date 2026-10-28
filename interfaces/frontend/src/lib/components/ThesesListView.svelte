@@ -156,7 +156,8 @@
 	});
 
 	function toggleSort(column: ThesisSortColumn) {
-		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
+		const dates: ThesisSortColumn[] = ['inscription', 'soutenance'];
+		currentSort = nextSort(currentSort, column, dates.includes(column) ? 'desc' : 'asc');
 		onFilterChange();
 	}
 

@@ -26,6 +26,10 @@ PublicationSort = Literal[
     "soutenance_desc",
     "inscription_asc",
     "inscription_desc",
+    "author_asc",
+    "author_desc",
+    "labs_asc",
+    "labs_desc",
 ]
 
 
