@@ -17,7 +17,7 @@ import httpx2
 from sqlalchemy import Connection, text
 
 from domain.publications.identifiers import clean_doi
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
 from domain.types import JsonValue, as_mapping, as_sequence, as_str
 from pipeline.http.lookup import UNAVAILABLE, NotFound, Unavailable
@@ -85,19 +85,21 @@ _MISSING_HAL_IDS_SQL = text(
         JOIN publications p ON p.id = sr.publication_id
         WHERE sr.source = 'hal' AND p.in_perimeter
         UNION
-        SELECT h.hal_id
+        SELECT h.id_value
         FROM source_records sr
         JOIN publications p ON p.id = sr.publication_id
-        CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids -> '{ExternalIdType.HAL_ID}') AS h(hal_id)
+        JOIN source_record_identifiers h
+          ON h.source_record_id = sr.id AND h.id_type = '{SourceIdentifierType.HAL_ID}'
+             AND h.removed_by IS NULL
         WHERE sr.source = 'openalex' AND p.in_perimeter
-          AND jsonb_typeof(sr.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
     ),
     in_scanr AS (
-        SELECT DISTINCT h.hal_id
+        SELECT DISTINCT h.id_value AS hal_id
         FROM source_records sr
-        CROSS JOIN LATERAL jsonb_array_elements_text(sr.external_ids -> '{ExternalIdType.HAL_ID}') AS h(hal_id)
+        JOIN source_record_identifiers h
+          ON h.source_record_id = sr.id AND h.id_type = '{SourceIdentifierType.HAL_ID}'
+             AND h.removed_by IS NULL
         WHERE sr.source = 'scanr'
-          AND jsonb_typeof(sr.external_ids -> '{ExternalIdType.HAL_ID}') = 'array'
     )
     SELECT c.hal_id
     FROM candidates c

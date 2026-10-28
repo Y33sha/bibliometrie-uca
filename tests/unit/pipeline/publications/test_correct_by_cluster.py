@@ -2,6 +2,11 @@
 chapitre/chapitre, volume d'actes/communication) + `compute_updates`."""
 
 from domain.source_records.corrections import stash_entry
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.metadata_correction.shared_doi import (
     DoiClusterCase,
     DoiClusterDecision,
@@ -21,13 +26,19 @@ from pipeline.transformation.publications.correction.correction_store import (
 def test_tally_doi_corrections_par_cas():
     updates = [
         DoiCorrectionUpdate(
-            1, "10.9005/c", {"doi": stash_entry("10.9005/v1", "DATACITE_VERSION_TO_CONCEPT")}, {}
+            1,
+            "10.9005/c",
+            {"doi": stash_entry("10.9005/v1", "DATACITE_VERSION_TO_CONCEPT")},
+            (),
         ),
         DoiCorrectionUpdate(
-            2, "10.9005/d", {"doi": stash_entry("10.9005/v2", "DATACITE_VERSION_TO_CONCEPT")}, {}
+            2,
+            "10.9005/d",
+            {"doi": stash_entry("10.9005/v2", "DATACITE_VERSION_TO_CONCEPT")},
+            (),
         ),
         DoiCorrectionUpdate(
-            3, None, {"doi": stash_entry("10.9006/book", "OUVRAGE_VS_CHAPITRE")}, {}
+            3, None, {"doi": stash_entry("10.9006/book", "OUVRAGE_VS_CHAPITRE")}, ()
         ),
     ]
     assert tally_doi_corrections(updates) == {
@@ -45,7 +56,7 @@ def _row(
     raw_doi="10.1/x",
     canonical_doi=None,
     same_work_case=None,
-    external_ids=None,
+    identifiers=(),
 ) -> DoiClusterRow:
     return DoiClusterRow(
         row_id,
@@ -56,8 +67,27 @@ def _row(
         raw_doi,
         canonical_doi,
         same_work_case,
-        external_ids=external_ids or {},
+        identifiers=tuple(identifiers),
     )
+
+
+def _hal(*values, removed_by=None):
+    return tuple(
+        SourceIdentifier(SourceIdentifierType.HAL_ID, v, SourceIdentifierRole.SECONDARY, removed_by)
+        for v in values
+    )
+
+
+_PMID_99 = SourceIdentifier(SourceIdentifierType.PMID, "99", SourceIdentifierRole.SECONDARY)
+
+
+def _active(identifiers):
+    """Valeurs des identifiants actifs, par type."""
+    values: dict[str, list[str]] = {}
+    for i in identifiers:
+        if i.removed_by is None:
+            values.setdefault(i.id_type.value, []).append(i.value)
+    return {k: sorted(v) for k, v in values.items()}
 
 
 _OWN_TITLE = object()
@@ -420,7 +450,7 @@ def test_copie_de_l_article_prend_le_doi_publie():
             1,
             "10.1103/published",
             {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}},
-            {},
+            (),
         )
     ]
 
@@ -441,7 +471,7 @@ def test_preprint_deja_substitue_retrouve_son_doi():
         canonical_doi="10.1007/jhep07(2023)066",
         same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
     )
-    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.48550/arxiv.2210.12000", {}, {})]
+    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.48550/arxiv.2210.12000", {}, ())]
 
 
 def test_package_piece_substituted_to_parent():
@@ -458,7 +488,7 @@ def test_package_piece_substituted_to_parent():
             1,
             "10.15454/abc",
             {"doi": {"raw": "10.15454/abc/file1", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
-            {},
+            (),
         )
     ]
 
@@ -487,7 +517,7 @@ def test_self_heals_when_canonical_gone():
         },
         raw_doi="10.5281/zenodo.10",
     )
-    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.5281/zenodo.10", {}, {})]
+    assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.5281/zenodo.10", {}, ())]
 
 
 def test_chapter_doi_nulled_book_untouched():
@@ -495,7 +525,7 @@ def test_chapter_doi_nulled_book_untouched():
     chapter = _row(2, "book_chapter", "10.1/x")
     assert compute_updates([book, chapter]) == [
         DoiCorrectionUpdate(
-            2, None, {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}, {}
+            2, None, {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}, ()
         )
     ]
 
@@ -529,7 +559,7 @@ def test_self_heals_when_book_gone():
         None,
         corrections={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
     )
-    assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {}, {})]
+    assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {}, ())]
 
 
 # ── identifiants partagés avec une œuvre qui perd le DOI ──────────────────
@@ -542,40 +572,52 @@ def test_volume_perd_le_hal_id_de_ses_communications():
         "proceedings",
         "10.1/x",
         title="eapc abstract book",
-        external_ids={"hal_id": ["hal-1", "hal-2"], "pmid": "99"},
+        identifiers=(*_hal("hal-1", "hal-2"), _PMID_99),
     )
-    communication = _row(
-        2, "poster", "10.1/x", title="total pain", external_ids={"hal_id": ["hal-1"]}
-    )
+    communication = _row(2, "poster", "10.1/x", title="total pain", identifiers=_hal("hal-1"))
     updates = {u.id: u for u in compute_updates([volume, communication])}
 
     assert updates[1].doi == "10.1/x"
-    assert updates[1].external_ids == {"hal_id": ["hal-2"], "pmid": "99"}
-    assert updates[1].corrections["removed_external_ids"] == {
-        "before": {"hal_id": ["hal-1", "hal-2"]},
-        "removed": {"hal_id": ["hal-1"]},
-        "corrected_by": "ACTES_VS_COMMUNICATION",
-    }
+    assert _active(updates[1].identifiers) == {"hal_id": ["hal-2"], "pmid": ["99"]}
+    assert updates[1].identifiers == (
+        *_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"),
+        *_hal("hal-2"),
+        _PMID_99,
+    )
     assert updates[2].doi is None
-    assert updates[2].external_ids == {"hal_id": ["hal-1"]}
+    assert _active(updates[2].identifiers) == {"hal_id": ["hal-1"]}
+
+
+def test_doi_nulle_retire_dans_les_identifiants():
+    doi = SourceIdentifier(SourceIdentifierType.DOI, "10.1/x", SourceIdentifierRole.SECONDARY)
+    book = _row(1, "book", "10.1/x")
+    chapter = _row(2, "book_chapter", "10.1/x", identifiers=(doi,))
+    updates = {u.id: u for u in compute_updates([book, chapter])}
+    assert updates[2].identifiers == (
+        SourceIdentifier(
+            SourceIdentifierType.DOI,
+            "10.1/x",
+            SourceIdentifierRole.SECONDARY,
+            "OUVRAGE_VS_CHAPITRE",
+        ),
+    )
 
 
 def test_ouvrage_perd_le_hal_id_de_son_chapitre():
-    book = _row(1, "book", "10.1/x", external_ids={"hal_id": ["hal-9"]})
-    chapter = _row(2, "book_chapter", "10.1/x", external_ids={"hal_id": ["hal-9"]})
+    book = _row(1, "book", "10.1/x", identifiers=_hal("hal-9"))
+    chapter = _row(2, "book_chapter", "10.1/x", identifiers=_hal("hal-9"))
     updates = {u.id: u for u in compute_updates([book, chapter])}
-    assert updates[1].external_ids == {}
+    assert _active(updates[1].identifiers) == {}
 
 
 def test_retrait_stable_d_un_run_a_l_autre():
-    volume = _row(
-        1, "proceedings", "10.1/x", title="eapc abstract book", external_ids={"hal_id": ["hal-1"]}
-    )
-    communication = _row(
-        2, "poster", "10.1/x", title="total pain", external_ids={"hal_id": ["hal-1"]}
-    )
+    volume = _row(1, "proceedings", "10.1/x", title="eapc abstract book", identifiers=_hal("hal-1"))
+    communication = _row(2, "poster", "10.1/x", title="total pain", identifiers=_hal("hal-1"))
     first = {u.id: u for u in compute_updates([volume, communication])}
-    volume = volume._replace(external_ids=first[1].external_ids, corrections=first[1].corrections)
+    volume = volume._replace(
+        corrections=first[1].corrections,
+        identifiers=first[1].identifiers,
+    )
     communication = communication._replace(doi=None, corrections=first[2].corrections)
     assert compute_updates([volume, communication]) == []
 
@@ -586,37 +628,50 @@ def test_identifiants_restaures_quand_la_divergence_disparait():
         "proceedings",
         "10.1/x",
         title="eapc abstract book",
-        corrections={
-            "removed_external_ids": {
-                "before": {"hal_id": ["hal-1", "hal-2"]},
-                "removed": {"hal_id": ["hal-1"]},
-                "corrected_by": "ACTES_VS_COMMUNICATION",
-            }
-        },
-        external_ids={"hal_id": ["hal-2"]},
+        identifiers=(*_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"), *_hal("hal-2")),
     )
     assert compute_updates([volume]) == [
-        DoiCorrectionUpdate(1, "10.1/x", {}, {"hal_id": ["hal-1", "hal-2"]})
+        DoiCorrectionUpdate(1, "10.1/x", {}, _hal("hal-1", "hal-2"))
     ]
+
+
+def test_retrait_par_la_correction_unaire_garde():
+    """Un identifiant retiré par une règle de la correction unaire reste retiré, et hors des clés de confirmation."""
+    volume = _row(
+        1,
+        "proceedings",
+        "10.1/x",
+        title="eapc abstract book",
+        identifiers=_hal("hal-1", removed_by="HAL_DEPOSIT_MISSING_TO_REMOVED"),
+    )
+    communication = _row(
+        2,
+        "poster",
+        "10.1/x",
+        title="total pain",
+        identifiers=_hal("hal-1", removed_by="HAL_DEPOSIT_MISSING_TO_REMOVED"),
+    )
+    updates = {u.id: u for u in compute_updates([volume, communication])}
+    assert set(updates) == {2}
 
 
 def test_identifiant_propre_d_un_enregistrement_source_qui_garde_le_doi_reste_en_place():
     """Le chapitre OpenAlex recopie le dépôt HAL de l'enregistrement source qui garde le DOI : ce dépôt reste à lui."""
-    book = _row(1, "book", "10.1/x", external_ids={"hal_id": ["hal-01234567"]})
+    book = _row(1, "book", "10.1/x", identifiers=_hal("hal-01234567"))
     hal = _row(
         2,
         "conference_paper",
         "10.1/x",
-        external_ids={"hal_id": ["hal-01234567"]},
+        identifiers=_hal("hal-01234567"),
     )._replace(source="hal", source_id="hal-01234567")
-    chapter = _row(3, "book_chapter", "10.1/x", external_ids={"hal_id": ["hal-01234567"]})
+    chapter = _row(3, "book_chapter", "10.1/x", identifiers=_hal("hal-01234567"))
     updates = {u.id: u for u in compute_updates([book, hal, chapter])}
     assert set(updates) == {3}
 
 
 def test_sans_divergence_aucun_retrait():
-    a = _row(1, "article", "10.1/x", external_ids={"hal_id": ["hal-1"]})
-    b = _row(2, "article", "10.1/x", external_ids={"hal_id": ["hal-1"]})
+    a = _row(1, "article", "10.1/x", identifiers=_hal("hal-1"))
+    b = _row(2, "article", "10.1/x", identifiers=_hal("hal-1"))
     assert compute_updates([a, b]) == []
 
 

@@ -1,8 +1,13 @@
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    normalize_identifiers,
+)
 from pipeline.ingestion.openalex.payload import (
     BULK_AUTHORSHIPS_CAP,
     OpenalexLocation,
     authors_may_be_truncated,
-    extract_external_ids_from_urls,
     extract_nnt_from_location,
     full_openalex_id,
     is_hal_location,
@@ -11,8 +16,10 @@ from pipeline.ingestion.openalex.payload import (
     map_openalex_oa_status,
     names_publisher,
     names_serial,
+    openalex_derived_identifier,
     parse_primary_location,
     short_openalex_id,
+    url_identifiers,
 )
 
 
@@ -32,78 +39,55 @@ class TestOpenalexIdConversion:
         )
 
 
-class TestExtractExternalIdsFromUrls:
+def _url_ids(urls):
+    identifiers, _ = normalize_identifiers(url_identifiers(urls))
+    assert all(i.role is SourceIdentifierRole.SECONDARY for i in identifiers)
+    return [(str(i.id_type), i.value) for i in identifiers]
+
+
+class TestUrlIdentifiers:
     def test_hal(self):
-        urls = ["https://hal.science/hal-04123456v2"]
-        assert extract_external_ids_from_urls(urls) == {"hal_id": ["hal-04123456"]}
+        assert _url_ids(["https://hal.science/hal-04123456v2"]) == [("hal_id", "hal-04123456")]
 
     def test_nnt(self):
-        urls = ["https://www.theses.fr/2021CLFAC030"]
-        assert extract_external_ids_from_urls(urls) == {"nnt": "2021CLFAC030"}
+        assert _url_ids(["https://www.theses.fr/2021CLFAC030"]) == [("nnt", "2021CLFAC030")]
 
     def test_pmid(self):
-        urls = ["https://pubmed.ncbi.nlm.nih.gov/12345678"]
-        assert extract_external_ids_from_urls(urls) == {"pmid": "12345678"}
+        assert _url_ids(["https://pubmed.ncbi.nlm.nih.gov/12345678"]) == [("pmid", "12345678")]
 
     def test_pmc_with_prefix(self):
         urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654"]
-        assert extract_external_ids_from_urls(urls) == {"pmcid": "PMC987654"}
+        assert _url_ids(urls) == [("pmcid", "PMC987654")]
 
     def test_pmc_without_prefix(self):
         """Le préfixe PMC est ajouté même si l'URL ne le contient pas."""
         urls = ["https://www.ncbi.nlm.nih.gov/pmc/articles/987654"]
-        assert extract_external_ids_from_urls(urls) == {"pmcid": "PMC987654"}
+        assert _url_ids(urls) == [("pmcid", "PMC987654")]
 
     def test_arxiv(self):
-        urls = ["http://arxiv.org/abs/1210.6893"]
-        assert extract_external_ids_from_urls(urls) == {"arxiv_id": "1210.6893"}
+        assert _url_ids(["http://arxiv.org/abs/1210.6893"]) == [("arxiv_id", "1210.6893")]
 
-    def test_hal_collects_all_distinct(self):
-        """hal_id est multivalué : toutes les URLs HAL distinctes sont collectées
-        (ordre d'apparition, version ignorée). Les clés scalaires restent au premier match."""
+    def test_collecte_chaque_identifiant_distinct_dans_l_ordre(self):
+        """Une version HAL ne fait pas un dépôt distinct."""
         urls = [
             "https://hal.science/hal-04111111",
+            "https://pubmed.ncbi.nlm.nih.gov/12345678",
             "https://hal.science/hal-04222222",
-            "https://hal.science/hal-04111111v2",  # doublon (version) → ignoré
-        ]
-        assert extract_external_ids_from_urls(urls) == {"hal_id": ["hal-04111111", "hal-04222222"]}
-
-    def test_multiple_types_combined(self):
-        urls = [
-            "https://hal.science/hal-04123456",
-            "https://www.theses.fr/2021CLFAC030",
-            "https://pubmed.ncbi.nlm.nih.gov/12345678",
-        ]
-        assert extract_external_ids_from_urls(urls) == {
-            "hal_id": ["hal-04123456"],
-            "nnt": "2021CLFAC030",
-            "pmid": "12345678",
-        }
-
-    def test_scalar_ids_keep_the_first_match(self):
-        urls = [
-            "https://www.theses.fr/2021CLFAC030",
-            "https://pubmed.ncbi.nlm.nih.gov/12345678",
-            "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC987654",
-            "http://arxiv.org/abs/1210.6893",
-            "https://www.theses.fr/2022CLFAC099",
+            "https://hal.science/hal-04111111v2",
             "https://pubmed.ncbi.nlm.nih.gov/87654321",
-            "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC111111",
-            "http://arxiv.org/abs/2301.00001",
         ]
-        assert extract_external_ids_from_urls(urls) == {
-            "nnt": "2021CLFAC030",
-            "pmid": "12345678",
-            "pmcid": "PMC987654",
-            "arxiv_id": "1210.6893",
-        }
+        assert _url_ids(urls) == [
+            ("hal_id", "hal-04111111"),
+            ("pmid", "12345678"),
+            ("hal_id", "hal-04222222"),
+            ("pmid", "87654321"),
+        ]
 
     def test_no_match_returns_empty(self):
-        urls = ["https://example.com/foo", "https://random.org/bar"]
-        assert extract_external_ids_from_urls(urls) == {}
+        assert _url_ids(["https://example.com/foo", "https://random.org/bar"]) == []
 
     def test_empty_input(self):
-        assert extract_external_ids_from_urls([]) == {}
+        assert url_identifiers([]) == []
 
 
 def _loc(**kwargs) -> OpenalexLocation:
@@ -321,3 +305,29 @@ class TestAuthorsMayBeTruncated:
 
     def test_without_authorships(self):
         assert not authors_may_be_truncated({})
+
+
+class TestOpenalexDerivedIdentifier:
+    def test_sans_localisation_principale(self):
+        assert openalex_derived_identifier(None) is None
+
+    def test_nnt_d_une_localisation_theses_fr(self):
+        loc = _loc(source_display_name="theses.fr", location_id="pmh:2023UCFAC123")
+        assert openalex_derived_identifier(loc) == SourceIdentifier(
+            SourceIdentifierType.NNT, "2023UCFAC123", SourceIdentifierRole.DERIVED
+        )
+
+    def test_hal_id_d_une_localisation_hal(self):
+        loc = _loc(landing_page_url="https://hal.science/hal-04123456v1")
+        assert openalex_derived_identifier(loc) == SourceIdentifier(
+            SourceIdentifierType.HAL_ID, "hal-04123456", SourceIdentifierRole.DERIVED
+        )
+
+    def test_doi_d_une_localisation_editeur(self):
+        loc = _loc(landing_page_url="https://doi.org/10.1234/ABC", location_id="doi:10.1234/abc")
+        assert openalex_derived_identifier(loc) == SourceIdentifier(
+            SourceIdentifierType.DOI, "10.1234/abc", SourceIdentifierRole.DERIVED
+        )
+
+    def test_page_sans_identifiant(self):
+        assert openalex_derived_identifier(_loc(landing_page_url="https://example.com/x")) is None

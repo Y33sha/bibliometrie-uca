@@ -4,8 +4,8 @@
 #     l'index, types, hygiène des fichiers, concordance du contrat OpenAPI).
 #   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
 #     format, types, contrats d'architecture, hygiène des dépendances,
-#     contrôles du frontend). La suite de tests et le build du frontend
-#     restent à la charge de la CI.
+#     tests unitaires, contrôles du frontend). La suite d'intégration et le
+#     build du frontend restent à la charge de la CI.
 # Installation des deux étages, par machine (`.git/hooks/` n'est pas versionné) :
 # `pre-commit install`.
 # Les hooks constatent et refusent ; ils ne modifient aucun fichier. Une
@@ -115,7 +115,7 @@ repos:
       # Étage pre-push : les contrôles de la CI (.github/workflows/ci.yml) qui
       # tiennent en quelques secondes et se passent d'une base. Tourne avant
       # chaque `git push`, sur tout le projet, quels que soient les fichiers
-      # modifiés. Nécessite `pre-commit install --hook-type pre-push`.
+      # modifiés.
       #
       # La suite d'intégration reste à la CI seule : elle demande une base et
       # dure plus d'une minute, ce qui pèserait sur chaque push.

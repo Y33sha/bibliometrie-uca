@@ -1,10 +1,10 @@
 """Localisations d'un enregistrement source et plateformes qui les hébergent. L'écriture est commune aux normaliseurs.
 
-Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement lui-même : le dernier import fait autorité. Un identifiant arXiv ou PMCID de l'enregistrement donne aussi une localisation, quelle que soit la source. La plateforme d'une localisation est celle que nomme OpenAlex, et se reconnaît par son identifiant OpenAlex. La lecture des copies rattache en plus chaque localisation à une plateforme de la liste des plateformes connues, d'après son URL (`domain.platforms.registry`).
+Les localisations d'un enregistrement source se réécrivent à chaque normalisation, comme l'enregistrement lui-même : le dernier import fait autorité. Un identifiant arXiv ou un PMCID de l'enregistrement donne aussi une localisation, quelle que soit la source. La plateforme d'une localisation est celle que nomme OpenAlex, et se reconnaît par son identifiant OpenAlex. La lecture des copies rattache en plus chaque localisation à une plateforme de la liste des plateformes connues, d'après son URL (`domain.platforms.registry`).
 """
 
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
@@ -13,8 +13,7 @@ from domain.normalize import normalize_text
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import IDENTIFIER_COPIES
 from domain.publications.licenses import License
-from domain.source_records.external_ids import normalize_external_ids
-from domain.types import JsonValue
+from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
 from infrastructure.db.scalars import scalar_int
 
 
@@ -38,15 +37,13 @@ class LocationFacts(NamedTuple):
     platform: PlatformFacts | None = None
 
 
-def identifier_locations(external_ids: JsonValue) -> list[LocationFacts]:
-    """Copies ouvertes que désignent l'identifiant arXiv et le PMCID d'un enregistrement source, sans version connue."""
-    if not isinstance(external_ids, Mapping):
-        return []
-    ids, _ = normalize_external_ids(external_ids)
+def identifier_locations(identifiers: Iterable[SourceIdentifier]) -> list[LocationFacts]:
+    """Copies ouvertes que désignent les identifiants arXiv et les PMCID d'un enregistrement source, sans version connue."""
+    identifiers, _ = normalize_identifiers(identifiers)
     return [
-        LocationFacts(url=url.format(value), is_oa=True)
-        for id_type, url in IDENTIFIER_COPIES
-        if isinstance(value := ids.get(id_type), str)
+        LocationFacts(url=IDENTIFIER_COPIES[i.id_type].format(i.value), is_oa=True)
+        for i in identifiers
+        if i.id_type in IDENTIFIER_COPIES
     ]
 
 

@@ -12,7 +12,11 @@ from collections.abc import Mapping
 from domain.dates import french_date_to_iso
 from domain.publications.contribution_roles import THESES_FIELD_ROLES
 from domain.publications.identifiers import clean_doi, normalize_nnt
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_strs
 from pipeline.ingestion.common.normalizer import Document, SourceNormalizer
@@ -114,8 +118,16 @@ def theses_source_record(
 
     Sans conteneur. Le doc_type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue qui en a un.
     """
-    nnt = normalize_nnt(as_str(thesis.get("nnt")))
-    external_ids: dict[str, JsonValue] | None = {ExternalIdType.NNT: nnt} if nnt else None
+    doi = clean_doi(as_str(thesis.get("doi")))
+    identifiers: list[SourceIdentifier] = []
+    if nnt := normalize_nnt(as_str(thesis.get("nnt"))):
+        identifiers.append(
+            SourceIdentifier(SourceIdentifierType.NNT, nnt, SourceIdentifierRole.PRIMARY)
+        )
+    if doi:
+        identifiers.append(
+            SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)
+        )
 
     languages = [lang for lang in as_strs(thesis.get("langues")) if lang]
     # Mots-clés de l'auteur et vedettes RAMEAU, par langue, dans l'ordre de `langues`.
@@ -146,8 +158,8 @@ def theses_source_record(
         source="theses",
         source_id=theses_id,
         staging_id=staging_id,
-        doi=clean_doi(as_str(thesis.get("doi"))),
-        external_ids=external_ids,
+        doi=doi,
+        identifiers=tuple(identifiers),
         title=get_title(thesis) or "",
         publication_year=get_publication_year(thesis),
         raw_doc_type=derive_theses_doc_type(_defense_date(thesis)),

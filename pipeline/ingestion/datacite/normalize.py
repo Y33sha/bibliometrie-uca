@@ -4,7 +4,7 @@ Particularités DataCite :
 - Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
 - `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des contributions sources collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
 - `raw_doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`).
-- `relatedIdentifiers` (type DOI) → `external_ids.related_dois` (recherche par DOI + relations) et `source_extras.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
+- `relatedIdentifiers` (type DOI) → identifiants liés (recherche par DOI + relations) et `source_extras.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
 - `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
 """
 
@@ -21,7 +21,11 @@ from domain.publications.licenses import datacite_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.source_records.biblio import compact_biblio
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.impact import Impact
 from domain.structures.identifiers import RorId, parse_ror_ids
 from domain.types import JsonValue, as_mapping, as_sequence, as_str, as_text
@@ -52,6 +56,8 @@ from pipeline.ingestion.datacite.payload import (
     get_language,
     get_publisher_name,
     get_title,
+    host_isbns,
+    own_isbns,
 )
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -200,6 +206,22 @@ def datacite_doi(attributes: Mapping[str, JsonValue], staging_doi: str | None) -
     return clean_doi(as_str(attributes.get("doi"))) or staging_doi
 
 
+def datacite_identifiers(
+    attributes: Mapping[str, JsonValue], doi: str
+) -> tuple[SourceIdentifier, ...]:
+    """Identifiants d'un enregistrement source DataCite. Le DOI est primaire, les ISBN du document secondaires (`own_isbns`). Les DOI apparentés (`extract_related_dois`) et les ISBN de l'ouvrage qui contient le document (`host_isbns`) sont liés."""
+    secondary, related = SourceIdentifierRole.SECONDARY, SourceIdentifierRole.RELATED
+    return (
+        SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.PRIMARY),
+        *(
+            SourceIdentifier(SourceIdentifierType.DOI, d, related)
+            for d in extract_related_dois(attributes, doi)
+        ),
+        *(SourceIdentifier(SourceIdentifierType.ISBN, i, secondary) for i in own_isbns(attributes)),
+        *(SourceIdentifier(SourceIdentifierType.ISBN, i, related) for i in host_isbns(attributes)),
+    )
+
+
 def datacite_source_record(
     attributes: Mapping[str, JsonValue], staging_id: int, doi: str, containers: Containers
 ) -> SourceRecordUpsert:
@@ -209,18 +231,12 @@ def datacite_source_record(
     # Garanti par `SourceNormalizer`, qui filtre les enregistrements sources sans titre ou sans année.
     assert isinstance(title, str) and isinstance(publication_year, int)
     container_title, _ = get_container(attributes)
-    related_dois = extract_related_dois(attributes, doi)
-    external_ids: dict[str, JsonValue] = {}
-    if related_dois:
-        external_ids[ExternalIdType.RELATED_DOIS] = related_dois
-    if isbns := get_isbns(attributes):
-        external_ids[ExternalIdType.ISBN] = isbns
     return SourceRecordUpsert(
         source="datacite",
         source_id=doi,
         staging_id=staging_id,
         doi=doi,
-        external_ids=external_ids or None,
+        identifiers=datacite_identifiers(attributes, doi),
         title=title,
         publication_year=publication_year,
         raw_doc_type=extract_datacite_doc_type_token(attributes),

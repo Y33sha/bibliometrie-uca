@@ -2,12 +2,17 @@
 
 import pytest
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
     MetadataForCorrection,
     _check_predicate,
     effective_metadata,
-    strip_dissertation_keys,
+    is_dissertation_identifier,
 )
 
 
@@ -52,17 +57,23 @@ class TestPredicates:
             _check_predicate(_view(), "inconnu", True)
 
 
-class TestStripDissertationKeys:
-    def test_only_dissertation_hal_ids_leave_no_hal_id(self):
-        external_ids = {"nnt": "2021CLFAC030", "hal_id": ["tel-01234567", "dumas-07654321"]}
-        assert strip_dissertation_keys(external_ids) == {}
+def _identifier(id_type: SourceIdentifierType, value: str) -> SourceIdentifier:
+    return SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY)
 
-    def test_article_hal_ids_are_kept(self):
-        external_ids = {"hal_id": ["tel-01234567", "hal-04123456"], "doi": "10.1/x"}
-        assert strip_dissertation_keys(external_ids) == {
-            "hal_id": ["hal-04123456"],
-            "doi": "10.1/x",
-        }
+
+class TestIsDissertationIdentifier:
+    def test_nnt_and_dissertation_hal_ids(self):
+        assert is_dissertation_identifier(_identifier(SourceIdentifierType.NNT, "2021CLFAC030"))
+        assert is_dissertation_identifier(_identifier(SourceIdentifierType.HAL_ID, "tel-01234567"))
+        assert is_dissertation_identifier(
+            _identifier(SourceIdentifierType.HAL_ID, "dumas-07654321")
+        )
+
+    def test_article_identifiers(self):
+        assert not is_dissertation_identifier(
+            _identifier(SourceIdentifierType.HAL_ID, "hal-04123456")
+        )
+        assert not is_dissertation_identifier(_identifier(SourceIdentifierType.DOI, "10.1/x"))
 
 
 class TestThesesFrRule:

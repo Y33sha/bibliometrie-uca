@@ -20,7 +20,11 @@ from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
 from domain.serials.serial import OaModel
 from domain.source_records.biblio import compact_biblio
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.impact import Impact
 from domain.source_records.source_extras import SourceExtra
 from domain.structures.identifiers import RorId, parse_ror_ids
@@ -48,14 +52,13 @@ from pipeline.ingestion.common.source_records import (
 from pipeline.ingestion.common.staging import StagingRow
 from pipeline.ingestion.openalex.payload import (
     OpenalexLocation,
-    extract_external_ids_from_urls,
-    extract_nnt_from_location,
-    is_theses_fr_location,
     map_openalex_oa_status,
     names_publisher,
     names_serial,
+    openalex_derived_identifier,
     parse_primary_location,
     short_openalex_id,
+    url_identifiers,
 )
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
@@ -68,14 +71,10 @@ from pipeline.transformation.publishing.find_or_create import (
 
 def extract_locations_data(
     work: Mapping[str, JsonValue],
-) -> tuple[list[str], dict[str, JsonValue]]:
-    """Extrait les URLs et identifiants depuis les locations d'un work OpenAlex.
+) -> tuple[list[str], list[SourceIdentifier]]:
+    """URLs dédoublonnées des localisations d'un work (`landing_page_url` et `pdf_url`), et identifiants secondaires de ces localisations.
 
-    Retourne (urls, external_ids) où :
-      - urls : liste dédupliquée de landing_page_url et pdf_url
-      - external_ids : dict d'identifiants (nnt, pmid, pmcid, arxiv_id scalaires ; hal_id et related_dois **listes**)
-
-    hal_id et related_dois sont collectés depuis les URLs **et** depuis `location.id` (formes OAI-PMH `pmh:oai:HAL:<halid>` et `doi:<doi>`), source structurée présente même quand la landing page est une page éditeur. related_dois contient ici **tous** les DOI des locations ; l'appelant en retire le DOI primaire (top-level) de la publication.
+    Les identifiants viennent des URLs (`url_identifiers`), puis des `hal_id` et DOI des URLs et des `location.id` (formes OAI-PMH `pmh:oai:HAL:<halid>` et `doi:<doi>`). `location.id` donne ces identifiants même quand la page de la localisation est une page éditeur.
     """
     urls: list[str] = []
     seen: set[str] = set()
@@ -90,23 +89,32 @@ def extract_locations_data(
         if loc_id := as_str(loc.get("id")):
             location_ids.append(loc_id)
 
-    external_ids: dict[str, JsonValue] = dict(extract_external_ids_from_urls(urls))
-    # hal_id et related_dois sont multivalués et apparaissent aussi dans les location.id (absents des URLs quand la landing page est une page éditeur).
-    # On balaie URLs + location.id en une passe.
-    hal_ids: list[str] = [
-        h for e in as_sequence(external_ids.get(ExternalIdType.HAL_ID)) if (h := as_str(e))
-    ]
-    related_dois: list[str] = []
+    identifiers = url_identifiers(urls)
     for s in (*urls, *location_ids):
-        if (hal_id := extract_hal_id_from_url(s)) and hal_id not in hal_ids:
-            hal_ids.append(hal_id)
-        if (doi := extract_doi_from_url(s)) and doi not in related_dois:
-            related_dois.append(doi)
-    if hal_ids:
-        external_ids[ExternalIdType.HAL_ID] = hal_ids
-    if related_dois:
-        external_ids[ExternalIdType.RELATED_DOIS] = related_dois
-    return urls, external_ids
+        if hal_id := extract_hal_id_from_url(s):
+            identifiers.append(
+                SourceIdentifier(
+                    SourceIdentifierType.HAL_ID, hal_id, SourceIdentifierRole.SECONDARY
+                )
+            )
+        if doi := extract_doi_from_url(s):
+            identifiers.append(
+                SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)
+            )
+    return urls, identifiers
+
+
+def openalex_identifiers(
+    identifiers: list[SourceIdentifier], doi: str | None, primary: OpenalexLocation | None
+) -> tuple[SourceIdentifier, ...]:
+    """Identifiants d'un work : son DOI et les identifiants secondaires de ses localisations (`extract_locations_data`), plus l'identifiant de sa localisation principale, qui est dérivé (`openalex_derived_identifier`)."""
+    work_doi = (
+        [SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.SECONDARY)]
+        if doi
+        else []
+    )
+    derived = openalex_derived_identifier(primary)
+    return (*work_doi, *identifiers, *([derived] if derived else []))
 
 
 def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
@@ -268,13 +276,6 @@ def get_publication_year(work: Mapping[str, JsonValue]) -> int | None:
     return as_int(work.get("publication_year"))
 
 
-def get_nnt(primary: OpenalexLocation | None) -> str | None:
-    """NNT d'une localisation principale theses.fr."""
-    if primary is None or not is_theses_fr_location(primary):
-        return None
-    return extract_nnt_from_location(primary)
-
-
 def openalex_source_record(  # noqa: C901
     work: Mapping[str, JsonValue],
     staging_id: int,
@@ -291,17 +292,7 @@ def openalex_source_record(  # noqa: C901
 
     doi = clean_doi(as_str(work.get("doi")))
 
-    # URLs et identifiants extraits des locations
-    urls, external_ids = extract_locations_data(work)
-    if nnt := get_nnt(primary):
-        external_ids[ExternalIdType.NNT] = nnt
-    # related_dois (collecté depuis les locations) = DOI secondaires : on retire
-    # le DOI primaire de la publication, qui vit sur la colonne `doi`.
-    if related_dois := as_sequence(external_ids.get(ExternalIdType.RELATED_DOIS)):
-        if remaining := [d for d in related_dois if d != doi]:
-            external_ids[ExternalIdType.RELATED_DOIS] = remaining
-        else:
-            del external_ids[ExternalIdType.RELATED_DOIS]
+    urls, location_identifiers = extract_locations_data(work)
 
     is_retracted = bool(work.get("is_retracted"))
 
@@ -344,7 +335,7 @@ def openalex_source_record(  # noqa: C901
         source_id=openalex_id,
         staging_id=staging_id,
         doi=doi,
-        external_ids=external_ids or None,
+        identifiers=openalex_identifiers(location_identifiers, doi, primary),
         title=get_title(work) or "",
         publication_year=get_publication_year(work),
         raw_doc_type=as_str(work.get("type")),

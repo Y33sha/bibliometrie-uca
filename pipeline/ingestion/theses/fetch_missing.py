@@ -9,25 +9,29 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.staging import StagingEntryMode
+from infrastructure.db.source_record_identifiers import first_of_its_type_sql
 from pipeline.ingestion.common.failed_lookups import pending_failed_lookup_sql, record_failed_lookup
 from pipeline.ingestion.common.lookup import LookupChannel, look_up, one_at_a_time
 from pipeline.ingestion.theses.api import fetch_thesis
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-_NNT = f"sr.external_ids ->> '{ExternalIdType.NNT}'"
+_NNT_PENDING = pending_failed_lookup_sql(
+    source_sql="'theses'", id_type="nnt", value_sql="n.id_value"
+)
 
-_NNT_PENDING = pending_failed_lookup_sql(source_sql="'theses'", id_type="nnt", value_sql=_NNT)
-
+# Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur.
 _MISSING_NNTS_SQL = text(
     f"""
-    SELECT DISTINCT {_NNT} AS nnt
+    SELECT DISTINCT n.id_value AS nnt
     FROM source_records sr
+    JOIN source_record_identifiers n
+      ON n.source_record_id = sr.id AND n.id_type = '{SourceIdentifierType.NNT}'
+         AND {first_of_its_type_sql("n")}
     WHERE sr.source <> 'theses'
-      AND {_NNT} IS NOT NULL
       AND NOT EXISTS (
-          SELECT 1 FROM staging s WHERE s.source = 'theses' AND s.source_id = {_NNT}
+          SELECT 1 FROM staging s WHERE s.source = 'theses' AND s.source_id = n.id_value
       )
       AND NOT {_NNT_PENDING}
     ORDER BY 1

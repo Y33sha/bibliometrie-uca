@@ -12,7 +12,7 @@ from urllib.parse import urlsplit
 
 from domain.platforms.platform import PlatformType
 from domain.publications.identifiers import clean_doi, is_hal_host
-from domain.source_records.external_ids import ExternalIdType
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.urls import is_host, url_host
 
 
@@ -122,11 +122,11 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
 PMC_ARTICLE_URL = "https://www.ncbi.nlm.nih.gov/pmc/articles/{}/"
 """Page d'un article de PubMed Central, à compléter par son PMCID."""
 
-IDENTIFIER_COPIES: tuple[tuple[ExternalIdType, str], ...] = (
-    (ExternalIdType.ARXIV_ID, "https://arxiv.org/abs/{}"),
-    (ExternalIdType.PMCID, PMC_ARTICLE_URL),
-)
-"""Copie ouverte que désigne un identifiant de document : type d'identifiant, URL à compléter par sa valeur."""
+IDENTIFIER_COPIES: dict[SourceIdentifierType, str] = {
+    SourceIdentifierType.ARXIV_ID: "https://arxiv.org/abs/{}",
+    SourceIdentifierType.PMCID: PMC_ARTICLE_URL,
+}
+"""Copie ouverte que désigne un identifiant de document : URL à compléter par sa valeur, par type d'identifiant."""
 
 _BY_OPENALEX_ID = {i: p for p in KNOWN_PLATFORMS for i in p.openalex_ids}
 _PUBLISHER_PLATFORM_PREFIXES = frozenset(

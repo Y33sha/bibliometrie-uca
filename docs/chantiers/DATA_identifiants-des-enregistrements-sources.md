@@ -36,62 +36,81 @@ Les enregistrements sources à ISBN sont surtout des chapitres (4 922), des comm
 
 Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 2021, sans DOI. OpenAlex et ScanR citent les deux dépôts, dans un ordre inverse. Chaque enregistrement source rejoint la publication de son premier dépôt, et les deux publications restent séparées.
 
+Paires de publications reliées par un `hal_id` actif, sur la base locale au 2026-10-28 (1 516 paires) :
+
+- `hal_id` primaire ou dérivé des deux côtés : 67. Même document, avec deux DOI distincts : DOI de revue et DOI arXiv ou DESY (`10.3204/pubdb…`).
+- primaire ou dérivé d'un côté, secondaire de l'autre : 1 429. Surtout des versions distinctes : communication et article, poster et acte. Quelques doublons sans DOI.
+- secondaire des deux côtés : 20.
+
+Publications de la base locale scindées quand seuls les identifiants primaires et dérivés sont des clés : 1 289 par la règle sur le `hal_id`, 337 de plus par la même règle sur le PMID et l'identifiant arXiv. Parmi elles, des dépôts HAL sans DOI séparés de leur version éditeur, et des enregistrements sources ScanR `pmid…` séparés de leur article.
+
 ## Décisions
 
 - Une table relie un enregistrement source à un identifiant : type, valeur, rôle, statut. Les identifiants d'une publication se déduisent de ses enregistrements sources.
 - Rôle d'un identifiant dans un enregistrement source :
   - primaire : identifiant de l'enregistrement dans la source, soit le DOI chez Crossref et DataCite, le `hal_id` chez HAL, le NNT chez theses.fr ;
-  - dérivé : identifiant de l'enregistrement d'une autre source dont la source tire le sien. Un enregistrement source a au plus un identifiant dérivé ;
+  - dérivé : identifiant de l'enregistrement d'une autre source dont l'enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé ;
   - secondaire : identifiant que la source attribue au même document ;
   - lié : identifiant d'un document lié, par exemple un DOI apparenté ou l'ISBN de l'ouvrage hôte.
 - L'identifiant dérivé est un identifiant d'un type de la table :
   - chez ScanR, l'identifiant que contient l'identifiant ScanR (`doi…`, `hal…`, `nnt…`, `pmid…`) ;
   - chez OpenAlex, l'identifiant de la localisation principale (`primary_location`). Le DOI du work est secondaire quand il diffère de cet identifiant.
+- Un ISBN est secondaire pour un livre et lié pour un autre document. DataCite distingue les ISBN du document de ceux de son conteneur.
 - Les identifiants OpenAlex et WoS restent seulement dans `source_id`.
-- Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts.
+- Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts à partir de tous les identifiants de la table. Chaque sous-étape réécrit seulement les statuts de ses règles. Un identifiant retiré par la règle d'une autre sous-étape reste retiré.
+- `metadata_correction` écrit `external_ids` à partir des identifiants actifs. `corrections` garde seulement les valeurs d'origine des colonnes.
+- Un DOI mis à nul par la correction par DOI partagé est retiré dans la table. Le DOI concept substitué à un DOI de version reste seulement dans la colonne `doi`.
+- Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
+- Les clés de la réconciliation restent celles d'`external_ids` : premier `hal_id` par rôle puis par valeur, NNT, PMID et identifiant arXiv.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
-- La colonne `doi` reste en place.
+- La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
 ## Phasage
 
 ### Phase 1 — Table et normalisation
 
 - [x] Inventaire des identifiants par source et par type, avec leur rôle.
-- [ ] Table des identifiants des enregistrements sources, migration et remplissage depuis `external_ids`.
-- [ ] Écriture de la table par la normalisation.
+- [x] Table des identifiants des enregistrements sources et migration (570949717).
+- [x] Écriture de la table par la normalisation (05e2c6e63).
+- [x] Remplissage du stock par un script oneshot : identifiants calculés depuis les payloads du raw store par la fonction de la normalisation (16df3eee9). En production, le script passe avant les migrations et le premier pipeline.
 
 ### Phase 2 — Corrections
 
-- [ ] Retraits de la correction unaire (clés de thèse, dépôts HAL introuvables) en statuts.
-- [ ] Retraits de la correction par DOI partagé en statuts.
-- [ ] `is_matchable` calculé depuis la table.
+- [x] Retraits de la correction unaire (clés de thèse, dépôts HAL introuvables) en statuts (8790b3c34).
+- [x] Retraits de la correction par DOI partagé en statuts (8790b3c34).
+- [x] `is_matchable` calculé depuis la table (8790b3c34).
+- [x] Suppression des formats de retrait dans `corrections` (`external_ids`, `removed_external_ids`) (8790b3c34).
 
 ### Phase 3 — Rapprochement
 
-- [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs du document.
-- [ ] Mesure des paires de publications reliées par un identifiant HAL secondaire.
-- [ ] Identifiants retenus pour le rapprochement, après mesure des conséquences de chaque rôle.
+- [x] Mesure des paires de publications reliées par un identifiant actif, selon son rôle.
+- [x] Mesure des publications scindées quand seuls les identifiants primaires et dérivés sont des clés.
+- [x] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs, avec les clés d'`external_ids` (34ab26da6).
 
 ### Phase 4 — Autres lectures
 
-- [ ] `fetch_missing` et `candidate_dois`.
-- [ ] Relations entre publications.
-- [ ] Modèles de lecture de l'API et affichage.
+- [x] `fetch_missing` et `candidate_dois` (3f932bce4).
+- [x] Relations entre publications (d985bbb41).
+- [x] Modèles de lecture de l'API et affichage (1bb499b59).
 
 ### Phase 5 — Retrait de `external_ids`
 
-- [ ] Suppression de la colonne et des formats de retrait dans `corrections`.
+- [x] Suppression de la colonne (77739fdaa).
 
-### Phase 6 — DOI bioRxiv et medRxiv
+### Phase 6 — Retrait de la colonne `doi`
+
+- [ ] Place du DOI concept substitué à un DOI de version.
+- [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.
+- [ ] Suppression de la colonne.
+
+### Phase 7 — DOI bioRxiv et medRxiv
 
 - [ ] DOI bioRxiv et medRxiv (préfixe 10.1101) exposés par les sources, par exemple dans les localisations OpenAlex (publication 2757).
 
-### Phase 7 — Documentation
+### Phase 8 — Documentation
 
 - [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
 
-- Colonne `doi` : gardée à côté de la table, ou remplacée par l'identifiant DOI du document.
-- Identifiants HAL secondaires : réintégration au rapprochement sous condition, au vu de la mesure de la phase 3.
-- Rôle de l'ISBN : identifiant du document pour un ouvrage, identifiant d'une œuvre apparentée pour un chapitre.
+- DOI de version et pièces de dataset : écartés de la réconciliation (`is_matchable`) au lieu de la substitution du DOI concept ou du DOI du dataset parent. Le DOI concept ou le dataset parent est parfois absent de la base.

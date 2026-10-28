@@ -4,11 +4,11 @@
 
 La phase `metadata_correction` prépare les `source_records` pour que le [rattachement des publications](07-publications.md) s'appuie sur des valeurs propres. Elle tourne après [`publishing`](05-publishing.md), dont le typage des revues alimente les règles dépendantes de la revue.
 
-Les corrections sont écrites sur les colonnes des `source_records` ; la valeur d'origine est conservée dans `corrections`, et chaque correction est recalculée à partir d'elle à chaque exécution.
+Les corrections sont écrites sur les colonnes des `source_records` ; la valeur d'origine est conservée dans `corrections`, et chaque correction est recalculée à partir d'elle à chaque exécution. Un identifiant retiré reste dans `source_record_identifiers`, avec la règle qui le retire (`removed_by`).
 
 1. **`serial_by_doi`** — renseigne `serial_id` lorsqu'il est vide et que le DOI tombe dans l'espace de noms d'une revue (`serial_doi_namespaces`, calculée par [`publishing`](05-publishing.md)).
 
-2. **`correct_unary`** — applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document, le statut *open access* et les identifiants associés au document. Un dépôt HAL introuvable dans HAL (`failed_lookups`) est retiré des identifiants externes, des liens et des localisations.
+2. **`correct_unary`** — applique les règles de correction qui s'appliquent à un enregistrement isolé. Ces règles corrigent le type de document, le statut *open access* et les identifiants associés au document. Un dépôt HAL introuvable dans HAL (`failed_lookups`) est retiré des identifiants, des liens et des localisations.
     *Exemples : un document typé « thèse » paru dans une revue est retypé en article, et perd les identifiants de thèse que la source lui avait attribués ; un article avec un titre préfixé « Erratum: » est retypé en erratum ; un statut `embargoed` dont la date d'embargo est échue passe à `green`.*
 
 3. **`correct_by_cluster`** — rapproche les `source_records` partageant un même DOI et déduit le DOI de chaque membre du groupe.

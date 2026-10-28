@@ -14,6 +14,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.platforms.platform import PlatformType
 from domain.publications.licenses import License
 from domain.serials.issns import SerialIssn
+from domain.source_records.identifiers import normalize_identifiers
 from pipeline.ingestion.common.locations import LocationFacts, PlatformFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
@@ -34,6 +35,7 @@ from pipeline.transformation.publishing.find_or_create import Containers
 from tests.helpers.normalize_doubles import (
     FakeSourceRecordStore,
     FakeStagingStore,
+    identifier_values,
     staging_row,
 )
 
@@ -43,11 +45,15 @@ from tests.helpers.normalize_doubles import (
 # ── extract_locations_data ───────────────────────────────────────
 
 
+def _location_ids(work, id_type):
+    _, identifiers = extract_locations_data(work)
+    kept, _ = normalize_identifiers(identifiers)
+    return [i.value for i in kept if i.id_type == id_type]
+
+
 class TestExtractLocationsData:
     def test_empty_locations(self):
-        urls, ids = extract_locations_data({})
-        assert urls == []
-        assert ids == {}
+        assert extract_locations_data({}) == ([], [])
 
     def test_dedup_urls(self):
         work = {
@@ -65,8 +71,7 @@ class TestExtractLocationsData:
         assert urls == ["https://b.com"]
 
     def test_collects_all_location_dois(self):
-        """DOI collectés depuis les URLs doi.org ET les location.id `doi:`,
-        dédupliqués. Le retrait du primaire est fait par l'appelant."""
+        """DOI collectés depuis les URLs doi.org et les location.id `doi:`."""
         work = {
             "locations": [
                 {"landing_page_url": "https://doi.org/10.1/a", "id": "doi:10.1/a"},
@@ -74,11 +79,10 @@ class TestExtractLocationsData:
                 {"id": "doi:10.3/c"},
             ]
         }
-        _, ids = extract_locations_data(work)
-        assert ids["related_dois"] == ["10.1/a", "10.2/b", "10.3/c"]
+        assert _location_ids(work, "doi") == ["10.1/a", "10.2/b", "10.3/c"]
 
     def test_collects_hal_ids_from_urls_and_location_id(self):
-        """hal_id collectés depuis les URLs et les location.id OAI-PMH, y compris un dépôt dont seule la location.id porte le hal_id."""
+        """hal_id collectés depuis les URLs et les location.id OAI-PMH, y compris un dépôt dont seule la location.id contient le hal_id."""
         work = {
             "locations": [
                 {"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"},
@@ -89,13 +93,41 @@ class TestExtractLocationsData:
                 {"landing_page_url": None, "id": "pmh:oai:HAL:hal-04000222v1"},
             ]
         }
-        _, ids = extract_locations_data(work)
-        assert ids["hal_id"] == ["hal-04000111", "hal-04000222"]
+        assert _location_ids(work, "hal_id") == ["hal-04000111", "hal-04000222"]
 
     def test_no_hal_id(self):
         work = {"locations": [{"landing_page_url": "https://doi.org/10.1/x", "id": "doi:10.1/x"}]}
-        _, ids = extract_locations_data(work)
-        assert "hal_id" not in ids
+        assert _location_ids(work, "hal_id") == []
+
+
+class TestOpenalexIdentifiers:
+    def test_doi_du_work_derive_quand_la_localisation_principale_le_donne(self):
+        work = {
+            "doi": "https://doi.org/10.1/x",
+            "primary_location": {"landing_page_url": "https://doi.org/10.1/x"},
+            "locations": [{"landing_page_url": "https://doi.org/10.1/x"}],
+        }
+        record = openalex_source_record(work, 1, Containers(None, None))
+        kept, _ = normalize_identifiers(record.identifiers)
+        assert [(str(i.id_type), i.value, str(i.role)) for i in kept] == [
+            ("doi", "10.1/x", "derived")
+        ]
+
+    def test_doi_du_work_secondaire_sous_une_localisation_principale_hal(self):
+        work = {
+            "doi": "https://doi.org/10.1/x",
+            "primary_location": {"landing_page_url": "https://hal.science/hal-04000111"},
+            "locations": [
+                {"landing_page_url": "https://hal.science/hal-04000111"},
+                {"landing_page_url": "https://doi.org/10.1/x"},
+            ],
+        }
+        record = openalex_source_record(work, 1, Containers(None, None))
+        kept, _ = normalize_identifiers(record.identifiers)
+        assert {(str(i.id_type), i.value, str(i.role)) for i in kept} == {
+            ("doi", "10.1/x", "secondary"),
+            ("hal_id", "hal-04000111", "derived"),
+        }
 
 
 # ── get_locations ────────────────────────────────────────────────
@@ -419,7 +451,7 @@ class TestOpenalexSourceRecordMetadata:
         assert record.title == "T"
         assert record.publication_year == 2024
         assert record.doi is None
-        assert "nnt" not in (record.external_ids or {})
+        assert "nnt" not in identifier_values(record)
         assert record.serial_id is None
 
     def test_display_name_fallback(self):
@@ -514,7 +546,7 @@ class TestOpenalexSourceRecord:
             ],
         }
         captured = self._call(work)
-        assert captured.external_ids["related_dois"] == ["10.2/preprint"]
+        assert identifier_values(captured)["doi"] == ["10.2/preprint"]
 
     def test_related_dois_absent_when_only_primary(self):
         work = {
@@ -523,7 +555,7 @@ class TestOpenalexSourceRecord:
             "locations": [{"landing_page_url": "https://doi.org/10.1/primary"}],
         }
         captured = self._call(work)
-        assert "related_dois" not in (captured.external_ids or {})
+        assert "doi" not in identifier_values(captured)
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
         work = {
@@ -582,15 +614,15 @@ class TestOpenalexSourceRecord:
         captured = self._call(work)
         assert captured.biblio == {"publisher": "École normale supérieure Editions"}
 
-    def test_theses_fr_nnt_passed_through_to_external_ids(self):
-        """Le NNT d'une localisation principale theses.fr va dans external_ids."""
+    def test_theses_fr_nnt_passed_through_to_identifiers(self):
+        """Le NNT d'une localisation principale theses.fr figure parmi les identifiants."""
         work = {
             "id": "https://openalex.org/W1",
             "primary_location": {"id": "pmh:2024CLFAC001", "source": {"display_name": "theses.fr"}},
         }
         captured = self._call(work)
-        assert captured.external_ids is not None
-        assert captured.external_ids["nnt"] == "2024CLFAC001"
+        assert identifier_values(captured)
+        assert identifier_values(captured)["nnt"] == ["2024CLFAC001"]
 
 
 # ── build_openalex_author_records (parsing pur) ──────────────────

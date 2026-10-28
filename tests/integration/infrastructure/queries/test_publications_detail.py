@@ -18,7 +18,11 @@ from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
 from tests.integration.helpers.serials import insert_doi_prefix, insert_monograph, insert_publisher
-from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.sources import (
+    insert_source_contribution,
+    insert_source_record,
+    secondary_identifiers,
+)
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
@@ -260,10 +264,12 @@ class TestGetPublicationExternalIdentifiers:
             publication,
             source="openalex",
             source_id="W1",
-            external_ids={"pmid": "123", "arxiv_id": "2401.001"},
+            identifiers=secondary_identifiers({"pmid": "123", "arxiv_id": "2401.001"}),
         )
         # Même PMID sur une seconde source : dédupliqué.
-        insert_source_record(sa_sync_conn, publication, external_ids={"pmid": "123"})
+        insert_source_record(
+            sa_sync_conn, publication, identifiers=secondary_identifiers({"pmid": "123"})
+        )
 
         ids = get_publication_external_identifiers(sa_sync_conn, publication)
         # Une seule entrée par valeur ; l'identifiant arXiv désigne une copie, pas une référence.
@@ -278,10 +284,13 @@ class TestGetPublicationExternalIdentifiers:
             publication,
             source="theses",
             source_id="2017CLFAC011",
-            external_ids={"nnt": "2017CLFAC011"},
+            identifiers=secondary_identifiers({"nnt": "2017CLFAC011"}),
         )
         insert_source_record(
-            sa_sync_conn, publication, source_id="tel-1", external_ids={"nnt": "2017CLFAC011"}
+            sa_sync_conn,
+            publication,
+            source_id="tel-1",
+            identifiers=secondary_identifiers({"nnt": "2017CLFAC011"}),
         )
 
         ids = get_publication_external_identifiers(sa_sync_conn, publication)
@@ -291,7 +300,10 @@ class TestGetPublicationExternalIdentifiers:
         # NNT porté par un enregistrement HAL sans source theses.fr moissonnée : le lien reste utile.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
-            sa_sync_conn, publication, source_id="tel-1", external_ids={"nnt": "2017CLFAC011"}
+            sa_sync_conn,
+            publication,
+            source_id="tel-1",
+            identifiers=secondary_identifiers({"nnt": "2017CLFAC011"}),
         )
 
         ids = get_publication_external_identifiers(sa_sync_conn, publication)

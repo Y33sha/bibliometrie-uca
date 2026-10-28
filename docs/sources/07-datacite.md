@@ -114,7 +114,7 @@ Les affiliations des `creators` sont des chaînes de texte (parfois accompagnée
 
 Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour faire converger versions et concept vers une seule publication.
 
-Les `relatedIdentifiers` contiennent aussi d'autres liens entre documents (un supplément et son article, un chapitre et son ouvrage, des citations). Le sous-ensemble « même œuvre ou œuvre étroitement liée » alimente le pool de DOI à rapatrier (`external_ids.related_dois`) ; la liste complète et typée est conservée dans `source_records.source_extras` pour un usage ultérieur (relations entre publications).
+Les `relatedIdentifiers` contiennent aussi d'autres liens entre documents (un supplément et son article, un chapitre et son ouvrage, des citations). Le sous-ensemble « même œuvre ou œuvre étroitement liée » alimente le pool de DOI à rapatrier (identifiants liés de l'enregistrement source) ; la liste complète et typée est conservée dans `source_records.source_extras` pour un usage ultérieur (relations entre publications).
 
 ### `oa_status` non dérivé
 

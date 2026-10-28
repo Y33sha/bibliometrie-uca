@@ -12,6 +12,7 @@ from sqlalchemy import Connection
 
 from domain.source_records.corrections import CORRECTED_BY, UNARY_KEYS
 from domain.source_records.metadata_correction.source_record import (
+    UNARY_IDENTIFIER_RULES,
     correct_source_record,
     corrected_doc_type,
 )
@@ -65,7 +66,7 @@ def compute_update(
     """Mise à jour de la correction unaire d'une `source_record` (`correct_source_record`), ou `None` si rien ne change. `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu."""
     corrected = correct_source_record(
         row.facts,
-        row.external_ids,
+        row.identifiers,
         row.corrections,
         origin_doc_type=origin_doc_type,
         missing_hal_ids=missing_hal_ids,
@@ -83,13 +84,17 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """`(source_records corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires. Une règle qui corrige plusieurs champs d'une `source_record` compte une fois."""
+    """`(source_records corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires et des règles qui retirent des identifiants. Une règle qui corrige plusieurs champs d'une `source_record` compte une fois."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:
-        fired: set[str] = set()
+        fired = {
+            i.removed_by
+            for i in update.corrected.identifiers
+            if i.removed_by in UNARY_IDENTIFIER_RULES
+        }
         for field in UNARY_KEYS:
-            entry = update.corrected.corrections.get(field)
+            entry = update.corrected.columns.corrections.get(field)
             rule = entry.get(CORRECTED_BY) if isinstance(entry, dict) else None
             if isinstance(rule, str):
                 fired.add(rule)

@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, build_hal_external_ids, get_container_facts), `hal_source_record` (métadonnées canoniques, collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
+Couvre les helpers (get_title, build_hal_identifiers, get_container_facts), `hal_source_record` (métadonnées canoniques, collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
 
 Pattern : doublures de stores + `MagicMock`, pas de DB.
 """
@@ -22,7 +22,7 @@ from pipeline.ingestion.hal.normalize import (
     HalNormalizer,
     active_embargo_until,
     build_hal_author_records,
-    build_hal_external_ids,
+    build_hal_identifiers,
     extract_hal_author_block,
     get_container_facts,
     get_locations,
@@ -37,6 +37,7 @@ from tests.helpers.normalize_doubles import (
     FakeSourceContributionStore,
     FakeSourceRecordStore,
     FakeStagingStore,
+    identifier_values,
     staging_row,
 )
 
@@ -83,20 +84,26 @@ class TestGetTitle:
         assert get_title({"title_s": [], "label_s": "L"}) == "L"
 
 
-# ── build_hal_external_ids ───────────────────────────────────────
+# ── build_hal_identifiers ────────────────────────────────────────
 
 
-class TestBuildHalExternalIds:
-    def test_minimal(self):
-        assert build_hal_external_ids({}, "hal-1234", None) == {"hal_id": ["hal-1234"]}
+def _ids(doc, nnt=None):
+    return {
+        (str(i.id_type), i.value, str(i.role)) for i in build_hal_identifiers(doc, "hal-1", nnt)
+    }
 
-    def test_nnt(self):
-        assert build_hal_external_ids({}, "hal-1", "2021CLFA0030")["nnt"] == "2021CLFA0030"
+
+class TestBuildHalIdentifiers:
+    def test_hal_id_primaire(self):
+        assert _ids({}) == {("hal_id", "hal-1", "primary")}
+
+    def test_doi_et_nnt_secondaires(self):
+        ids = _ids({"doiId_s": "10.1/X"}, "2021CLFA0030")
+        assert ("doi", "10.1/x", "secondary") in ids
+        assert ("nnt", "2021CLFA0030", "secondary") in ids
 
     def test_pmid_from_pubmedid(self):
-        assert (
-            build_hal_external_ids({"pubmedId_s": "28973220"}, "hal-1", None)["pmid"] == "28973220"
-        )
+        assert ("pmid", "28973220", "secondary") in _ids({"pubmedId_s": "28973220"})
 
     def test_pmid_field_requested(self):
         """Le champ lu pour le PMID figure parmi les champs demandés à l'API HAL."""
@@ -104,15 +111,22 @@ class TestBuildHalExternalIds:
 
     def test_pmcid_from_link(self):
         doc = {"linkExtUrl_s": "https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5625084"}
-        assert build_hal_external_ids(doc, "hal-1", None)["pmcid"] == "PMC5625084"
+        assert ("pmcid", "PMC5625084", "secondary") in _ids(doc)
 
     def test_arxiv_from_link_list(self):
         doc = {"linkExtUrl_s": ["https://arxiv.org/abs/2401.00123"]}
-        assert build_hal_external_ids(doc, "hal-1", None)["arxiv_id"] == "2401.00123"
+        assert ("arxiv_id", "2401.00123", "secondary") in _ids(doc)
 
     def test_non_id_link_ignored(self):
         doc = {"linkExtUrl_s": "https://example.com/openaccess"}
-        assert build_hal_external_ids(doc, "hal-1", None) == {"hal_id": ["hal-1"]}
+        assert _ids(doc) == {("hal_id", "hal-1", "primary")}
+
+    def test_isbn_secondaire_d_un_livre_lie_d_un_chapitre(self):
+        tei = '<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body><idno type="isbn">978-3-031-33210-4</idno></body></text></TEI>'
+        book = _ids({"docType_s": "OUV", "label_xml": tei})
+        chapter = _ids({"docType_s": "COUV", "label_xml": tei})
+        assert ("isbn", "9783031332104", "secondary") in book
+        assert ("isbn", "9783031332104", "related") in chapter
 
 
 # ── conteneurs ───────────────────────────────────────────────────
@@ -178,7 +192,7 @@ class TestContainerDescription:
 
 
 def _record(doc, containers=Containers(None, None)):
-    return hal_source_record(doc, staging_id=1, hal_id="h1", containers=containers)
+    return hal_source_record(doc, staging_id=1, hal_id="hal-01234567", containers=containers)
 
 
 class TestCanonicalMetadata:
@@ -209,7 +223,7 @@ class TestCanonicalMetadata:
 
     def test_nnt_normalized(self):
         record = _record({"nntId_s": "  2024CLFAC001  "})
-        assert record.external_ids == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
+        assert identifier_values(record) == {"hal_id": ["hal-01234567"], "nnt": ["2024CLFAC001"]}
 
 
 # ── active_embargo_until ─────────────────────────────────────────
@@ -230,7 +244,7 @@ def test_un_enregistrement_source_est_analyse_une_seule_fois(monkeypatch):
         "label_xml": _embargo_tei('<idno type="isbn">978-3-031-33210-4</idno>'),
     }
     get_container_facts(doc)
-    build_hal_external_ids(doc, "hal-1", None)
+    build_hal_identifiers(doc, "hal-1", None)
     _record(doc)
     normalize_hal.parse_tei_author_identifiers(doc["label_xml"])
     assert len(calls) == 1
@@ -352,14 +366,14 @@ class TestHalSourceRecord:
         captured = self._call({"docType_s": "BOOK"})
         assert captured.raw_doc_type == "BOOK"
 
-    def test_nnt_goes_in_external_ids(self):
+    def test_nnt_goes_in_identifiers(self):
         captured = self._call({"nntId_s": "2024CLFAC001"})
-        assert captured.external_ids == {"hal_id": ["h1"], "nnt": "2024CLFAC001"}
+        assert identifier_values(captured) == {"hal_id": ["hal-01234567"], "nnt": ["2024CLFAC001"]}
 
-    def test_hal_id_always_in_external_ids(self):
-        """Le normalizer pose `external_ids.hal_id = source_id` même hors thèse, pour que `hal_id` soit un token de confirmation et que HAL soit clusterisé comme les autres sources (symétrie avec ce que theses fait déjà pour NNT)."""
+    def test_hal_id_always_in_identifiers(self):
+        """Le `hal_id` du dépôt figure parmi ses identifiants, hors thèse comme pour une thèse."""
         captured = self._call({})
-        assert captured.external_ids == {"hal_id": ["h1"]}
+        assert identifier_values(captured) == {"hal_id": ["hal-01234567"]}
 
     def test_keywords_deduplicated(self):
         captured = self._call({"keyword_s": ["a", "b", "a", "c"]})

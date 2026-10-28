@@ -6,11 +6,11 @@ import pytest
 from pipeline.ingestion.api_params import API_BASE_URLS
 from pipeline.ingestion.scanr.fetch_missing import get_missing_hal_ids, search_by_external_ids
 from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.sources import insert_source_record
+from tests.integration.helpers.sources import insert_source_record, secondary_identifiers
 from tests.integration.helpers.staging import insert_failed_lookup, insert_staging
 
 
-def _record(conn, source, source_id, external_ids=None, *, in_perimeter=True) -> None:
+def _record(conn, source, source_id, identifiers=None, *, in_perimeter=True) -> None:
     """Crée un enregistrement source `source` rattaché à une publication, avec sa ligne staging."""
     publication_id = insert_publication(conn, in_perimeter=in_perimeter)
     staging_id = insert_staging(conn, source, source_id=source_id)
@@ -21,7 +21,7 @@ def _record(conn, source, source_id, external_ids=None, *, in_perimeter=True) ->
         source_id=source_id,
         title="titre test",
         staging_id=staging_id,
-        external_ids=external_ids or {},
+        identifiers=secondary_identifiers(identifiers or {}),
     )
 
 

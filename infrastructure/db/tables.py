@@ -58,7 +58,11 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.serials.serial import OA_MODELS, SERIAL_TYPES
-from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
+from domain.source_records.identifiers import (
+    SOURCE_IDENTIFIER_ROLE_DEFINITIONS,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -1290,12 +1294,6 @@ source_records = Table(
     ),
     Column("countries", ARRAY(Text)),
     Column("hal_collections", ARRAY(Text)),
-    Column(
-        "external_ids",
-        Jsonb,
-        nullable=False,
-        server_default=text("'{}'::jsonb"),
-    ),
     Column("urls", ARRAY(Text)),
     Column("impact", Jsonb),
     Column("serial_id", Integer),
@@ -1369,10 +1367,6 @@ source_records = Table(
     ),
     UniqueConstraint("source", "source_id", name="source_records_source_source_id_key"),
     CheckConstraint(
-        "jsonb_typeof(external_ids) = 'object'",
-        name="source_records_external_ids_is_object",
-    ),
-    CheckConstraint(
         "impact IS NULL OR jsonb_typeof(impact) = 'object'",
         name="source_records_impact_is_object",
     ),
@@ -1401,11 +1395,9 @@ source_record_identifiers = Table(
         "role",
         source_identifier_role_enum,
         nullable=False,
-        comment=(
-            "primary : identifiant de l'enregistrement dans la source. derived : identifiant de "
-            "l'enregistrement d'une autre source dont la source tire le sien. secondary : "
-            "identifiant que la source attribue au même document. related : identifiant d'un "
-            "document lié."
+        comment=" ".join(
+            f"{role} : {definition}"
+            for role, definition in SOURCE_IDENTIFIER_ROLE_DEFINITIONS.items()
         ),
     ),
     Column(

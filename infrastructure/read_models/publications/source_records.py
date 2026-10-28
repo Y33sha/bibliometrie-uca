@@ -5,8 +5,10 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, Row, text
 
 from domain.source_records.biblio import BiblioKey, JournalKey
+from infrastructure.db.source_record_identifiers import related_doi_sql
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.publications.models import (
+    ExternalIdentifierOut,
     PublicationSourcesResponse,
     SourceContributionOut,
     SourceRecordMetadataOut,
@@ -15,17 +17,6 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
     source_contribution_structure_ids,
 )
-
-
-def _identifiers(external_ids: Mapping[str, object]) -> dict[str, list[str]]:
-    """Valeurs textuelles de `external_ids`, en listes : une valeur isolée devient une liste d'un élément."""
-    out: dict[str, list[str]] = {}
-    for key, value in external_ids.items():
-        values = value if isinstance(value, list) else [value]
-        strings = [v for v in values if isinstance(v, str) and v]
-        if strings:
-            out[key] = strings
-    return out
 
 
 def _text(mapping: Mapping[str, object], key: str) -> str | None:
@@ -50,7 +41,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         source=r.source,
         source_id=r.source_id,
         doi=r.doi,
-        identifiers=_identifiers(r.external_ids),
+        identifiers=[ExternalIdentifierOut(**i) for i in r.identifiers],
         title=r.title,
         title_normalized=r.title_normalized,
         doc_type=r.doc_type,
@@ -133,8 +124,15 @@ class PublicationSourceRecordQueries:
         if title is None:
             return None
         rows = self._conn.execute(
-            text("""
-                SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi, sr.external_ids,
+            text(f"""
+                SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi,
+                       COALESCE((
+                           SELECT jsonb_agg(jsonb_build_object('type', i.id_type, 'value', i.id_value)
+                                            ORDER BY i.id_type, i.id_value)
+                           FROM source_record_identifiers i
+                           WHERE i.source_record_id = sr.id AND i.removed_by IS NULL
+                             AND (i.id_type <> 'doi' OR {related_doi_sql("i", "sr")})
+                       ), '[]'::jsonb) AS identifiers,
                        sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
@@ -148,7 +146,7 @@ class PublicationSourceRecordQueries:
                 LEFT JOIN languages lang ON lang.code = sr.language
                 WHERE sr.publication_id = :pid
                 ORDER BY sr.source, sr.source_id
-            """),
+            """),  # noqa: S608 — fragments rendus depuis des alias de la requête
             {"pid": publication_id},
         ).all()
         source_contributions = _source_contributions(self._conn, publication_id)

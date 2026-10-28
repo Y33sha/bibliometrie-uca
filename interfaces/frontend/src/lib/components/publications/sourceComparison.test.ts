@@ -18,7 +18,7 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		source_id: 'hal-1',
 		record_url: 'https://hal.science/hal-1',
 		doi: null,
-		identifiers: {},
+		identifiers: [],
 		title: 'Titre',
 		title_normalized: 'titre',
 		doc_type: 'article',
@@ -83,8 +83,14 @@ describe('isDivergent', () => {
 describe('comparisonRows', () => {
 	it("ajoute une ligne par type d'identifiant présent", () => {
 		const rows = comparisonRows([
-			record({ identifiers: { pmid: ['123'] } }),
-			record({ id: 2, identifiers: { hal_id: ['hal-1'], pmid: ['123'] } }),
+			record({ identifiers: [{ type: 'pmid', value: '123' }] }),
+			record({
+				id: 2,
+				identifiers: [
+					{ type: 'hal_id', value: 'hal-1' },
+					{ type: 'pmid', value: '123' },
+				],
+			}),
 		]);
 		const identifierKeys = rows.map((r) => r.key).filter((k) => k.startsWith('identifier:'));
 		expect(identifierKeys).toEqual(['identifier:hal_id', 'identifier:pmid']);

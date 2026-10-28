@@ -24,7 +24,7 @@ def test_champs_des_mises_a_jour_sont_des_colonnes():
     for fields in (
         CorrectedSourceRecord._fields,
         SerialCorrectionUpdate._fields[1:],
-        DoiCorrectionUpdate._fields[1:],
+        tuple(f for f in DoiCorrectionUpdate._fields[1:] if f != "identifiers"),
     ):
         assert set(fields) <= columns
         _compile(list(fields))

@@ -14,7 +14,7 @@ def test_sans_archivage_le_store_disque_n_est_pas_construit(monkeypatch):
         pytest.fail("le store sur disque ne doit pas être construit sans archivage")
 
     monkeypatch.setattr("pipeline.ingestion.common.normalize.get_raw_store", _interdit)
-    assert normalize._normalize_builders(archive=False)
+    assert normalize.normalizer_builders(archive=False)
 
 
 def test_avec_archivage_le_store_disque_est_construit(monkeypatch):
@@ -23,7 +23,7 @@ def test_avec_archivage_le_store_disque_est_construit(monkeypatch):
         "pipeline.ingestion.common.normalize.get_raw_store",
         lambda *a, **k: obtenus.append(True) or LocalFileRawStore("/tmp/inexistant"),
     )
-    normalize._normalize_builders(archive=True)
+    normalize.normalizer_builders(archive=True)
     assert obtenus == [True]
 
 
@@ -34,5 +34,5 @@ def test_le_defaut_archive(monkeypatch):
         "pipeline.ingestion.common.normalize.get_raw_store",
         lambda *a, **k: obtenus.append(True) or LocalFileRawStore("/tmp/inexistant"),
     )
-    normalize._normalize_builders()
+    normalize.normalizer_builders()
     assert obtenus == [True]

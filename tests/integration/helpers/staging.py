@@ -5,7 +5,7 @@ import logging
 
 from sqlalchemy import Connection, text
 
-from pipeline.ingestion.common.normalize import _normalize_builders
+from pipeline.ingestion.common.normalize import normalizer_builders
 from pipeline.ingestion.common.staging import StagingStore
 
 # Colonnes remises à jour quand la ligne (source, source_id) existe déjà.
@@ -89,6 +89,6 @@ def insert_failed_lookup(
 
 def normalize_pending(conn: Connection, source: str) -> int:
     """Normalise les lignes de staging à traiter de `source`, avec le normaliseur de la phase, dans la transaction du test. Rend le nombre d'enregistrements sources normalisés."""
-    normalizer = _normalize_builders(archive=False)[source](conn, logging.getLogger("test"))
+    normalizer = normalizer_builders(archive=False)[source](conn, logging.getLogger("test"))
     rows = StagingStore(conn).fetch_pending_staging(source, limit=10_000)
     return sum(1 for row in rows if normalizer.process_work(row))

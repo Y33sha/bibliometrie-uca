@@ -1,6 +1,6 @@
 """Tests unitaires des fonctions pures de `pipeline.ingestion.crossref.normalize`.
 
-Couvre les fonctions sans I/O qui parsent un payload CrossRef brut : `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`, `get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`, `get_external_ids`, `get_biblio`, `get_container_facts`, `_author_name`, `_author_affiliations`, `build_crossref_author_records`, `crossref_source_record`, et les méthodes `parse` et `publisher` de `CrossrefNormalizer`.
+Couvre les fonctions sans I/O qui parsent un payload CrossRef brut : `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`, `get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`, `get_isbns`, `crossref_identifiers`, `get_biblio`, `get_container_facts`, `_author_name`, `_author_affiliations`, `build_crossref_author_records`, `crossref_source_record`, et les méthodes `parse` et `publisher` de `CrossrefNormalizer`.
 
 Les délégations vers `pipeline.ingestion.crossref.payload` (`extract_crossref_source_extras`, `extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`) sont testées dans `test_payload.py`. Ici, seul le branchement est vérifié (1-2 cas par délégation).
 """
@@ -12,6 +12,11 @@ from unittest.mock import MagicMock
 from domain.persons.contributor_name import ContributorName
 from domain.publications.licenses import License
 from domain.serials.issns import IssnSupport, SerialIssn
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.ingestion.common.locations import LocationFacts
 from pipeline.ingestion.common.normalizer import PublisherFacts
 from pipeline.ingestion.crossref.normalize import (
@@ -19,6 +24,7 @@ from pipeline.ingestion.crossref.normalize import (
     _author_affiliations,
     _author_name,
     build_crossref_author_records,
+    crossref_identifiers,
     crossref_source_record,
     get_abstract,
     get_biblio,
@@ -26,7 +32,7 @@ from pipeline.ingestion.crossref.normalize import (
     get_container_facts,
     get_container_title,
     get_doi,
-    get_external_ids,
+    get_isbns,
     get_issns,
     get_keywords,
     get_language,
@@ -233,19 +239,17 @@ class TestGetLanguage:
         assert get_language({"language": 42}) is None
 
 
-class TestGetExternalIds:
-    def test_issn_reste_hors_des_identifiants(self):
+class TestGetIsbns:
+    def test_issn_reste_hors_des_isbn(self):
         """L'ISSN identifie la revue : il figure dans `biblio.journal`."""
-        assert get_external_ids({"ISSN": ["1234-5679"]}) is None
+        assert get_isbns({"ISSN": ["1234-5679"]}) == ([], [])
 
     def test_isbn_only(self):
-        assert get_external_ids({"ISBN": ["978-0-12345-678-9"]}) == (
-            {"isbn": ["978-0-12345-678-9"]}
-        )
+        assert get_isbns({"ISBN": ["978-0-12345-678-9"]}) == (["978-0-12345-678-9"], [])
 
     def test_electronic_isbn_goes_to_eisbn(self):
-        """`isbn-type` donne le support : l'édition électronique a sa clé."""
-        result = get_external_ids(
+        """`isbn-type` donne le support de chaque ISBN."""
+        result = get_isbns(
             {
                 "ISBN": ["978-3-030-04869-3", "978-3-030-04870-9"],
                 "isbn-type": [
@@ -254,19 +258,27 @@ class TestGetExternalIds:
                 ],
             }
         )
-        assert result == {"isbn": ["978-3-030-04869-3"], "eisbn": ["978-3-030-04870-9"]}
+        assert result == (["978-3-030-04869-3"], ["978-3-030-04870-9"])
 
     def test_filters_non_strings(self):
-        assert get_external_ids({"ISBN": ["978-0-12345-678-9", 12345, None]}) == (
-            {"isbn": ["978-0-12345-678-9"]}
+        assert get_isbns({"ISBN": ["978-0-12345-678-9", 12345, None]}) == (
+            ["978-0-12345-678-9"],
+            [],
         )
 
-    def test_none_when_empty(self):
-        assert get_external_ids({}) is None
 
-    def test_none_when_both_empty_lists(self):
-        # Les deux listes vides → pas de clé dans le dict → None.
-        assert get_external_ids({"ISSN": [], "ISBN": []}) is None
+class TestCrossrefIdentifiers:
+    def test_doi_primaire(self):
+        assert crossref_identifiers({}, "10.1/x") == (
+            SourceIdentifier(SourceIdentifierType.DOI, "10.1/x", SourceIdentifierRole.PRIMARY),
+        )
+
+    def test_isbn_secondaire_d_un_livre_lie_d_un_chapitre(self):
+        isbn = {"ISBN": ["978-0-12345-678-9"]}
+        book = crossref_identifiers({**isbn, "type": "book"}, "10.1/x")
+        chapter = crossref_identifiers({**isbn, "type": "book-chapter"}, "10.1/x")
+        assert book[1].role is SourceIdentifierRole.SECONDARY
+        assert chapter[1].role is SourceIdentifierRole.RELATED
 
 
 class TestGetBiblio:

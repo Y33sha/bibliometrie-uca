@@ -5,8 +5,9 @@ Un enregistrement source est la vue normalisée d'un import : le dernier import 
 L'écriture concerne seulement les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes de la file `source_record_keys_queue`, où chaque écriture met la ligne. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
 """
 
+import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
 from datetime import date
 
@@ -19,7 +20,7 @@ from domain.publications.metadata import normalized_title
 from domain.publishers.attribution import source_record_has_publisher
 from domain.serials.titles import names_ebook_platform
 from domain.source_records.doc_types import map_doc_type
-from domain.source_records.external_ids import normalize_external_ids
+from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
 from domain.source_records.languages import language_code
 from domain.types import JsonValue
 from infrastructure.db.jsonb import Jsonb
@@ -46,7 +47,8 @@ class SourceRecordUpsert:
 
     # Rattachement
     doi: str | None = None
-    external_ids: JsonValue = None
+    identifiers: tuple[SourceIdentifier, ...] = ()
+    """Identifiants de l'enregistrement source, avec leur rôle, écrits dans `source_record_identifiers`. L'écriture les normalise."""
 
     # Métadonnées bibliographiques
     title: str
@@ -87,7 +89,7 @@ class SourceRecordUpsert:
     source_extras: JsonValue = None
 
 
-_FIELDS = fields(SourceRecordUpsert)
+_FIELDS = tuple(f for f in fields(SourceRecordUpsert) if f.name != "identifiers")
 
 # Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes
 # calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` est inséré et
@@ -131,8 +133,40 @@ _UPSERT_SQL = text(
 ).bindparams(*(bindparam(c, type_=Jsonb) for c in _JSONB_COLUMNS))
 
 
+_DELETE_IDENTIFIERS = text(
+    "DELETE FROM source_record_identifiers WHERE source_record_id = ANY(:source_record_ids)"
+)
+
+_INSERT_IDENTIFIERS = text("""
+    INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role)
+    SELECT i.source_record_id, CAST(i.id_type AS source_identifier_type), i.id_value,
+           CAST(i.role AS source_identifier_role)
+    FROM jsonb_to_recordset(CAST(:identifiers AS jsonb))
+        AS i(source_record_id integer, id_type text, id_value text, role text)
+""")
+
+
+def replace_identifiers(
+    conn: Connection, identifiers_by_source_record: Mapping[int, Iterable[SourceIdentifier]]
+) -> None:
+    """Remplace les identifiants de chaque enregistrement source de `identifiers_by_source_record`, en une suppression et une insertion. Chaque identifiant écrit est actif."""
+    conn.execute(_DELETE_IDENTIFIERS, {"source_record_ids": list(identifiers_by_source_record)})
+    rows = [
+        {
+            "source_record_id": source_record_id,
+            "id_type": i.id_type.value,
+            "id_value": i.value,
+            "role": i.role.value,
+        }
+        for source_record_id, identifiers in identifiers_by_source_record.items()
+        for i in identifiers
+    ]
+    if rows:
+        conn.execute(_INSERT_IDENTIFIERS, {"identifiers": json.dumps(rows)})
+
+
 class SourceRecordStore:
-    """Écriture des `source_records`. Les formes de `language_forms` se chargent à la première écriture."""
+    """Écriture des `source_records` et de leurs identifiants. Les formes de `language_forms` se chargent à la première écriture."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -152,8 +186,10 @@ class SourceRecordStore:
             params["container_title"] = None
         params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
         params["language"] = language_code(row.raw_language, self._forms())
-        params["external_ids"] = _external_ids(row)
-        return scalar_int(self._conn.execute(_UPSERT_SQL, params))
+        identifiers = normalized_identifiers(row)
+        source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))
+        replace_identifiers(self._conn, {source_record_id: identifiers})
+        return source_record_id
 
     def _forms(self) -> dict[str, str]:
         if self._language_forms is None:
@@ -184,31 +220,20 @@ def fetch_language_forms(conn: Connection) -> dict[str, str]:
     return {r.form_normalized: r.language_code for r in rows}
 
 
-def _external_ids(row: SourceRecordUpsert) -> dict[str, JsonValue]:
-    """`external_ids` normalisé, objet JSON vide à défaut : la colonne est `NOT NULL` et contrainte à un objet. Chaque entrée écartée est journalisée."""
-    if row.external_ids is None:
-        return {}
-    if not isinstance(row.external_ids, Mapping):
+def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, ...]:
+    """Identifiants normalisés de la ligne (`normalize_identifiers`). Chaque identifiant écarté est journalisé."""
+    identifiers, rejected = normalize_identifiers(row.identifiers)
+    for identifier in rejected:
         # Lignes de détail : le terminal les masque, le journal les garde.
         logger.warning(
-            "external_ids écarté (%s %s) : objet attendu, reçu %r",
+            "Identifiant écarté (%s %s) : %s = %r",
             row.source,
             row.source_id,
-            row.external_ids,
+            identifier.id_type,
+            identifier.value,
             extra={"detail": True},
         )
-        return {}
-    clean, rejected = normalize_external_ids(row.external_ids)
-    for entry in rejected:
-        logger.warning(
-            "external_ids écarté (%s %s) : %s = %r",
-            row.source,
-            row.source_id,
-            entry.key,
-            entry.value,
-            extra={"detail": True},
-        )
-    return clean
+    return identifiers
 
 
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:

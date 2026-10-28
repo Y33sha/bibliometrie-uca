@@ -97,13 +97,9 @@ jobs:
       - name: Type check (pyrefly)
         run: uv run pyrefly check
 
-      - name: Unit tests
-        run: uv run python -m pytest tests/unit/ -v
-
-      - name: Coverage (tous les tests, seuil via pyproject.toml)
-        # Re-joue toute la suite (unitaires + intégration) sous instrumentation : couvre le pass/fail
-        # ET le seuil de couverture. L'étape unitaire ci-dessus n'est qu'un fail-fast (~2 s) avant
-        # cette passe complète ; pas d'étape intégration séparée, qui ne ferait que la rejouer.
+      - name: Tests et couverture (seuil via pyproject.toml)
+        # Toute la suite (unitaires et intégration) sous instrumentation : verdict des tests et seuil
+        # de couverture.
         run: uv run python -m pytest tests/ --cov --cov-report=term-missing
 
       - name: Couverture intégrale de la surface sensible
