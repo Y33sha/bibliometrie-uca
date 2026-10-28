@@ -9,7 +9,8 @@
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
-	import { api, ApiError, orphanContributions } from '#lib/api/index.js';
+	import { api, ApiError, errorMessage, orphanContributions } from '#lib/api/index.js';
+	import { toast } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { titleCase } from '#lib/utils.js';
@@ -88,29 +89,40 @@
 	let rejectModal: { detail: string; pairs: RejectedPair[]; retry: () => Promise<void> } | null =
 		$state(null);
 
+	/** Exécute une attribution et affiche son erreur éventuelle. */
+	async function reportingErrors(run: () => Promise<void>) {
+		try {
+			await run();
+		} catch (e) {
+			toast(`Attribution refusée : ${errorMessage(e)}`, 'error', 8000);
+		}
+	}
+
 	/**
-	 * Exécute une réassignation en interceptant le 409 « paire déjà rejetée » : ouvre la modale de confirmation avec une closure qui rejoue l'opération en `force=true` (lève le rejet puis réassigne). Les autres erreurs remontent normalement.
+	 * Exécute une réassignation en interceptant le 409 « paire déjà rejetée » : ouvre la modale de confirmation avec une closure qui rejoue l'opération en `force=true` (lève le rejet puis réassigne). Les autres erreurs s'affichent (`reportingErrors`).
 	 */
 	async function withRejectGuard(run: (force: boolean) => Promise<void>) {
-		try {
-			await run(false);
-		} catch (e) {
-			if (e instanceof ApiError && e.status === 409) {
-				const body = e.detail as Partial<components['schemas']['RejectedPairsResponse']>;
-				if (body?.rejected_pairs?.length) {
-					rejectModal = { detail: body.detail ?? '', pairs: body.rejected_pairs, retry: () => run(true) };
-					return;
+		await reportingErrors(async () => {
+			try {
+				await run(false);
+			} catch (e) {
+				if (e instanceof ApiError && e.status === 409) {
+					const body = e.detail as Partial<components['schemas']['RejectedPairsResponse']>;
+					if (body?.rejected_pairs?.length) {
+						rejectModal = { detail: body.detail ?? '', pairs: body.rejected_pairs, retry: () => run(true) };
+						return;
+					}
 				}
+				throw e;
 			}
-			throw e;
-		}
+		});
 	}
 
 	async function confirmReassign() {
 		if (!rejectModal) return;
 		const retry = rejectModal.retry;
 		rejectModal = null;
-		await retry();
+		await reportingErrors(retry);
 	}
 
 	function openAssign(idx: number) {
@@ -161,11 +173,12 @@
 	async function batchAssign(personId: number) {
 		const items = orphans.filter(o => selectedIds.has(o.contribution_id));
 		await withRejectGuard(async (force) => {
-			await orphanContributions.batchAssign({
+			const { assigned } = await orphanContributions.batchAssign({
 				person_id: personId,
 				contribution_ids: items.map(o => o.contribution_id),
 				force,
 			});
+			reportSkipped(items.length, assigned);
 			selectedIds = new Set();
 			batchSearch.clear();
 			reload();
@@ -183,27 +196,42 @@
 		};
 	}
 
+	/** Signale les contributions qu'un lot écarte : déjà rattachées, ou dans une publication où la personne a déjà une contribution rattachée par une décision humaine. */
+	function reportSkipped(requested: number, assigned: number) {
+		const skipped = requested - assigned;
+		if (skipped <= 0) return;
+		const plural = skipped > 1 ? 's' : '';
+		toast(
+			`${skipped} contribution${plural} écartée${plural} : déjà rattachée${plural}, ou dans une publication où la personne a déjà une contribution rattachée manuellement.`,
+			'warning',
+			8000,
+		);
+	}
+
 	async function confirmCreate() {
 		if (!createModal) return;
 		const { lastName, firstName, items } = createModal;
-		// Créer la personne avec la première contribution
-		const data = await orphanContributions.assign({
-			contribution_id: items[0].contribution_id,
-			create_person: { last_name: lastName, first_name: firstName },
-		}) as { person_id?: number };
-		if (!data.person_id) return;
-		// Attribuer le reste
-		const remaining = items.slice(1);
-		if (remaining.length) {
-			await orphanContributions.batchAssign({
-				person_id: data.person_id,
-				contribution_ids: remaining.map(o => o.contribution_id),
-			});
-		}
-		createModal = null;
-		selectedIds = new Set();
-		batchSearch.clear();
-		reload();
+		await reportingErrors(async () => {
+			// Créer la personne avec la première contribution
+			const data = await orphanContributions.assign({
+				contribution_id: items[0].contribution_id,
+				create_person: { last_name: lastName, first_name: firstName },
+			}) as { person_id?: number };
+			if (!data.person_id) return;
+			// Attribuer le reste
+			const remaining = items.slice(1);
+			if (remaining.length) {
+				const { assigned } = await orphanContributions.batchAssign({
+					person_id: data.person_id,
+					contribution_ids: remaining.map(o => o.contribution_id),
+				});
+				reportSkipped(remaining.length, assigned);
+			}
+			createModal = null;
+			selectedIds = new Set();
+			batchSearch.clear();
+			reload();
+		});
 	}
 
 	function syncUrl() {

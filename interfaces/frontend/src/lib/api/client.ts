@@ -21,6 +21,12 @@ export class ApiError extends Error {
 	}
 }
 
+/** Message à afficher pour l'erreur `e` : le `detail` de la réponse de l'API, à défaut son statut, ou le message d'une erreur réseau. */
+export function errorMessage(e: unknown): string {
+	if (e instanceof ApiError) return e.detailMessage ?? `erreur ${e.status}`;
+	return e instanceof Error ? e.message : String(e);
+}
+
 /** Corps d'une réponse en échec : l'objet que composent les erreurs FastAPI, le texte brut d'un intermédiaire réseau, ou `null` quand le corps est vide ou illisible. Le flux se lit une fois, l'analyse JSON portant ensuite sur le texte obtenu. */
 async function parseError(res: Response): Promise<unknown> {
 	const texte = await res.text().catch(() => null);
