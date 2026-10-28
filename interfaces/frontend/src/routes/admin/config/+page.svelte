@@ -190,8 +190,8 @@
   const brandHueItem = $derived(configByKey(BRAND_HUE_KEY));
   let hueDraft = $state<number | null>(null);
   const hueShown = $derived(hueDraft ?? (typeof brandHueItem?.value === "number" ? brandHueItem.value : 196));
-  // Spectre du curseur, à la luminosité et à la saturation de --accent.
-  const hueSpectrum = `linear-gradient(to right, ${Array.from({ length: 13 }, (_, i) => `oklch(0.446 0.064 ${i * 30})`).join(", ")})`;
+  // Spectre du curseur, plus clair et plus saturé que --accent pour que chaque teinte se reconnaisse.
+  const hueSpectrum = `linear-gradient(to right, ${Array.from({ length: 13 }, (_, i) => `oklch(0.75 0.11 ${i * 30})`).join(", ")})`;
 
   async function saveBrandHue() {
     if (hueDraft === null) return;
