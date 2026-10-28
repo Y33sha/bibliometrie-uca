@@ -430,7 +430,6 @@
 	.assign-row { display: flex; gap: 4px; align-items: center; }
 	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); width: 200px; }
 	.assign-results {
-		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 250px;
@@ -449,7 +448,6 @@
 	}
 	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius); font-size: var(--fs-sm); width: 220px; }
 	.batch-results {
-		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
 		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 4px; min-width: 280px;

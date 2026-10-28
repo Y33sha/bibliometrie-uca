@@ -135,7 +135,6 @@
     overflow-y: auto;
   }
   .picker-panel {
-    z-index: 50;
     min-width: 350px;
     max-width: 600px;
     background: var(--card);

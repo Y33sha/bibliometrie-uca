@@ -47,10 +47,9 @@
 		letter-spacing: 2px;
 	}
 	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
-	/* Au niveau des autres menus de la page (100). */
 	.column-menu {
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
-		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0; z-index: 100;
+		box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 6px 0;
 		min-width: 150px;
 	}
 	.column-menu label {
