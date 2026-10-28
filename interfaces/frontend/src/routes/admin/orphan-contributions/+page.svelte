@@ -422,13 +422,13 @@
 {/if}
 
 <style>
-	.publication-link { color: var(--accent); text-decoration: none; font-size: 0.85rem; }
+	.publication-link { color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
 	/* Titre coupé à la largeur de 50 caractères, sur une ligne. */
 	.publication-title { display: inline-block; max-width: 50ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.85rem; width: 200px; }
+	.assign-row input { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); width: 200px; }
 	.assign-results {
 		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
@@ -437,17 +437,17 @@
 	}
 	.result-btn {
 		display: block; width: 100%; text-align: left; padding: 4px 8px;
-		border: none; background: var(--surface); cursor: pointer; border-radius: var(--radius); font-size: 0.85rem;
+		border: none; background: var(--surface); cursor: pointer; border-radius: var(--radius); font-size: var(--fs-sm);
 	}
 	.result-btn:hover { background: var(--hover); }
-	.result-hint { font-size: 0.75rem; color: var(--muted); margin-left: 4px; }
-	.loading-text { font-size: 0.8rem; color: var(--muted); }
+	.result-hint { font-size: var(--fs-sm); color: var(--muted); margin-left: 4px; }
+	.loading-text { font-size: var(--fs-sm); color: var(--muted); }
 	.batch-bar {
 		display: flex; align-items: center; gap: 10px;
 		padding: 10px 14px; margin-bottom: 10px;
 		background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius);
 	}
-	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius); font-size: 0.85rem; width: 220px; }
+	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius); font-size: var(--fs-sm); width: 220px; }
 	.batch-results {
 		z-index: 50;
 		display: flex; flex-direction: column; gap: 2px;
@@ -456,9 +456,9 @@
 		margin-top: 4px;
 	}
 	.create-form { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
-	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: 0.85rem; font-weight: 500; }
-	.create-form input { padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.9rem; }
+	.create-form label { display: flex; flex-direction: column; gap: 3px; font-size: var(--fs-sm); font-weight: 500; }
+	.create-form input { padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-md); }
 	.reject-detail { font-weight: 600; margin: 8px 0; }
-	.reject-muted { color: var(--muted); font-size: 0.85rem; }
-	.reject-list { margin: 10px 0; padding-left: 18px; font-size: 0.85rem; }
+	.reject-muted { color: var(--muted); font-size: var(--fs-sm); }
+	.reject-list { margin: 10px 0; padding-left: 18px; font-size: var(--fs-sm); }
 </style>

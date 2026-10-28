@@ -113,7 +113,7 @@
 		margin-top: 4px;
 		padding: 7px 12px 3px;
 		border-top: 1px solid var(--border);
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 		font-weight: 600;
 		color: var(--muted);
 	}

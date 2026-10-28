@@ -170,7 +170,7 @@
 <style>
 	.dash-corpus {
 		margin: -24px 0 24px;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--text-secondary);
 	}
 </style>

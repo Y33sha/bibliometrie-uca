@@ -35,7 +35,7 @@
 	}
 	h1 {
 		margin: 0;
-		font-size: 1.5rem;
+		font-size: var(--fs-2xl);
 		line-height: 1.2;
 		font-weight: 700;
 		letter-spacing: -0.01em;
@@ -44,7 +44,7 @@
 		margin: 6px 0 0;
 		max-width: 80ch;
 		color: var(--text-secondary);
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		line-height: 1.5;
 	}
 </style>

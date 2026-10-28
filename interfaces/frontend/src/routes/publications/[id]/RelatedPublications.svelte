@@ -66,7 +66,7 @@
   }
   .meta {
     color: var(--muted);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     margin-left: 6px;
   }
 </style>

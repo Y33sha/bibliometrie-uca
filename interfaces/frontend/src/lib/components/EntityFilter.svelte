@@ -168,7 +168,7 @@
 	}
 	.facet-empty {
 		padding: 6px 12px;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--muted);
 	}
 </style>

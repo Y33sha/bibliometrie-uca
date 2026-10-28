@@ -143,16 +143,18 @@
 <div class="collab-map">
 	<canvas bind:this={canvas} aria-hidden="true"></canvas>
 </div>
-<table class="visually-hidden">
-	<thead>
-		<tr><th scope="col">Pays</th><th scope="col">Publications</th></tr>
-	</thead>
-	<tbody>
-		{#each countryRows as row (row.name)}
-			<tr><th scope="row">{row.name}</th><td>{row.value.toLocaleString('fr-FR')}</td></tr>
-		{/each}
-	</tbody>
-</table>
+<div class="visually-hidden">
+	<table>
+		<thead>
+			<tr><th scope="col">Pays</th><th scope="col">Publications</th></tr>
+		</thead>
+		<tbody>
+			{#each countryRows as row (row.name)}
+				<tr><th scope="row">{row.name}</th><td>{row.value.toLocaleString('fr-FR')}</td></tr>
+			{/each}
+		</tbody>
+	</table>
+</div>
 {#if internationalCount}
 	<p class="collab-caption">
 		{internationalCount.toLocaleString('fr-FR')} publications en collaboration internationale, soit
@@ -174,7 +176,7 @@
 	.collab-caption {
 		text-align: center;
 		color: var(--muted);
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		margin-top: 0.5rem;
 	}
 </style>

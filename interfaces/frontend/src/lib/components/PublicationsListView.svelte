@@ -394,7 +394,7 @@
 
 <style>
 	.license-cell {
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 	}
 	.publication-table { min-width: 760px; }
 	/* La cellule d'actions se réduit à ses icônes. */
@@ -409,7 +409,7 @@
 		display: inline-block;
 		padding: 2px 7px;
 		border-radius: var(--radius);
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 		font-weight: 500;
 		white-space: nowrap;
 	}
@@ -419,7 +419,7 @@
 	.hal-hors_hal        { background: var(--danger-light); color: var(--danger); }
 
 	/* Auteur correspondant (person) */
-	.corr-cell { text-align: center; color: var(--accent); font-size: 0.85rem; }
+	.corr-cell { text-align: center; color: var(--accent); font-size: var(--fs-sm); }
 
 	/* Bouton exclure (admin, person) */
 </style>

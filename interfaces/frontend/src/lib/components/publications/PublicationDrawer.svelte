@@ -166,7 +166,7 @@
   .drawer-title {
     color: inherit;
     text-decoration: none;
-    font-size: 1.05rem;
+    font-size: var(--fs-base);
     font-weight: 600;
   }
   .drawer-title:hover {
@@ -175,7 +175,7 @@
   }
   .comparison {
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     min-width: 100%;
   }
   .comparison th,
@@ -244,14 +244,14 @@
   .record-id {
     font-weight: 400;
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
   .absent {
     color: var(--text-faint);
   }
   .note {
     color: var(--muted);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     margin-top: 2px;
   }
   .failure {
@@ -271,7 +271,7 @@
     left: 0;
     width: calc(var(--position-gutter) - 6px);
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     font-variant-numeric: tabular-nums;
     text-align: right;
     white-space: nowrap;
@@ -287,7 +287,7 @@
   .countries,
   .roles {
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     margin-left: 4px;
   }
 

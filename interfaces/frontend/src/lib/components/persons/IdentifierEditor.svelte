@@ -162,7 +162,7 @@
   }
   .identifier-chip {
     font-family: var(--mono);
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
   }
   /* Identifiant authentifié par le chercheur : statut protégé, aucune action — le bouclier remplace les boutons confirmer/rejeter. */
   .authenticated-badge {
@@ -176,7 +176,7 @@
     border: 1px dashed var(--border);
     border-radius: var(--radius);
     background: none;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     cursor: pointer;
     color: var(--accent);
     margin-top: 4px;
@@ -206,11 +206,11 @@
     padding: 3px 6px;
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-family: inherit;
   }
   .id-error {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--danger);
   }
 </style>

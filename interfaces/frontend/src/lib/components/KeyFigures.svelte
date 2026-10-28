@@ -25,7 +25,7 @@
 		margin-bottom: 36px;
 	}
 	.key-figure-value {
-		font-size: 2.2rem;
+		font-size: var(--fs-4xl);
 		font-weight: 700;
 		line-height: 1.1;
 		letter-spacing: -0.02em;
@@ -35,7 +35,7 @@
 	}
 	.key-figure-label {
 		margin-top: 4px;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--text-secondary);
 	}
 </style>

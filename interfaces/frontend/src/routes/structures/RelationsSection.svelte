@@ -71,7 +71,7 @@
         placeholder="Rechercher une structure"
       >
         {#snippet item(rs)}
-          <span class="structure-type structure-type-{rs.type}" style="font-size: 0.65rem;padding:0 5px">{rs.type}</span>
+          <span class="structure-type structure-type-{rs.type}" style="font-size: var(--fs-sm);padding:0 5px">{rs.type}</span>
           {rs.acronym ? rs.acronym + " — " : ""}{rs.name}
         {/snippet}
       </Picker>
@@ -88,7 +88,7 @@
     grid-template-columns: 180px 1fr;
     gap: 12px 20px;
     align-items: center;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .relation-label {
     color: var(--text-secondary);

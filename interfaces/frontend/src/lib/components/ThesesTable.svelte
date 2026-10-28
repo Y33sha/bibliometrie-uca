@@ -194,7 +194,7 @@
 	.panel-col { width: 28px; padding-right: 0; }
 	.theses-table {
 		min-width: 720px;
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 	}
 
 	.col-author {
@@ -207,13 +207,13 @@
 	}
 	/* Taille propre aux cellules : l'en-tête garde la typographie commune des tableaux. */
 	td.col-author {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 	}
 	td.col-date {
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 	}
 	.col-date .date-month {
-		font-size: 0.75rem;
+		font-size: var(--fs-sm);
 		color: var(--muted);
 	}
 	.col-title {
@@ -238,7 +238,7 @@
 		white-space: nowrap;
 	}
 	.status-badge {
-		font-size: 0.75rem;
+		font-size: var(--fs-sm);
 		padding: 2px 6px;
 		border-radius: var(--radius);
 	}

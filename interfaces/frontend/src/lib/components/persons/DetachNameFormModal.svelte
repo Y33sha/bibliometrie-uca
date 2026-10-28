@@ -130,14 +130,14 @@
   }
   .detach-year {
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     min-width: 30px;
     flex-shrink: 0;
   }
   .detach-title {
     flex: 1;
     min-width: 0;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     color: var(--text);
     text-decoration: none;
   }
@@ -157,7 +157,7 @@
   }
   .other-persons-section h4 {
     margin: 0 0 8px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     color: var(--muted);
   }
   .other-persons-list {
@@ -177,11 +177,11 @@
     background: var(--hover);
   }
   .other-person-name {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .other-person-dept {
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
   }
   .btn-merge-modal {
     background: var(--accent);
@@ -195,7 +195,7 @@
   }
   .tag {
     display: inline-block;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     padding: 1px 7px;
     border-radius: var(--radius-pill);
     font-weight: 500;
@@ -204,6 +204,6 @@
   .tag-source {
     background: var(--surface);
     color: var(--muted);
-    font-size: 0.7rem;
+    font-size: var(--fs-sm);
   }
 </style>

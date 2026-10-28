@@ -38,7 +38,7 @@
 	.confirm-message {
 		margin: 0;
 		white-space: pre-line;
-		font-size: 0.95rem;
+		font-size: var(--fs-md);
 		line-height: 1.4;
 	}
 	.toast-stack {
@@ -57,7 +57,7 @@
 		border-radius: var(--radius);
 		font-family: inherit;
 		text-align: left;
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: white;
 		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 		cursor: pointer;

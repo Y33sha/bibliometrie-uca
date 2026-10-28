@@ -4,7 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { api, latestRequest } from '#lib/api/index.js';
 	import { Chart } from '#lib/components/charts/chart.js';
-	import { cssVar } from '#lib/components/charts/cssVar.js';
+	import { cssVar, fontSize } from '#lib/components/charts/cssVar.js';
 	import { readableOn } from '#lib/components/charts/contrast.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
@@ -262,7 +262,7 @@
 					plugins: {
 						legend: { display: false },
 						tooltip: {
-							bodyFont: { size: 14 },
+							bodyFont: { size: fontSize('md') },
 							callbacks: {
 								label: (ctx) => {
 									const val = ctx.raw as number;
@@ -274,7 +274,7 @@
 						},
 						datalabels: {
 							color: (ctx) => readableOn(colors[ctx.dataIndex], cssVar('text')),
-							font: { size: 13, weight: 'bold' },
+							font: { weight: 'bold' },
 							formatter: (val: number, ctx) => {
 								const total = sliceTotal(ctx);
 								const pct = total ? (val / total) * 100 : 0;
@@ -311,7 +311,7 @@
 				plugins: {
 					legend: { display: false },
 					tooltip: {
-						bodyFont: { size: 14 },
+						bodyFont: { size: fontSize('md') },
 						callbacks: {
 									label: (ctx) => {
 										const val = ctx.raw as number;
@@ -329,7 +329,7 @@
 					},
 					datalabels: {
 								color: (ctx) => readableOn(String(ctx.dataset.backgroundColor), cssVar('text')),
-								font: { size: 13, weight: 'bold' },
+								font: { weight: 'bold' },
 								formatter: (val: number, ctx) => {
 									const total = ctx.chart.data.datasets.reduce((s, ds) => s + ((ds.data[ctx.dataIndex] as number) || 0), 0);
 									const pct = total ? (val / total) * 100 : 0;
@@ -351,8 +351,8 @@
 				scales: {
 					[highCard ? 'y' : 'x']: { stacked: true, grid: { display: false }, ticks: { font: { size: highCard ? 12 : 14 }, callback: (_v: string | number, i: number) => { const l = labels[i] ?? ''; return l.length > 45 ? l.slice(0, 45) + '…' : l; } } },
 					[highCard ? 'x' : 'y']: part
-						? { stacked: true, min: 0, max: 100, ticks: { font: { size: 13 }, callback: (v: string | number) => v + ' %' } }
-						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { font: { size: 13 }, precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
+						? { stacked: true, min: 0, max: 100, ticks: { callback: (v: string | number) => v + ' %' } }
+						: { stacked: true, beginAtZero: true, suggestedMax: valueMax, ticks: { precision: 0, callback: (v: string | number) => Number(v).toLocaleString('fr-FR') } }
 				}
 			}
 		});
@@ -515,16 +515,18 @@
 	<!-- Le graphique est dessiné dans un canvas : les lecteurs d'écran lisent le tableau des données. -->
 	<canvas bind:this={chartCanvas} aria-hidden="true"></canvas>
 	{#if chartTable}
-		<table class="visually-hidden">
-			<thead>
-				<tr><td></td>{#each chartTable.columns as c, i (i)}<th scope="col">{c}</th>{/each}</tr>
-			</thead>
-			<tbody>
-				{#each chartTable.rows as row, i (i)}
-					<tr><th scope="row">{row.label}</th>{#each row.values as v, j (j)}<td>{v}</td>{/each}</tr>
-				{/each}
-			</tbody>
-		</table>
+		<div class="visually-hidden">
+			<table>
+				<thead>
+					<tr><td></td>{#each chartTable.columns as c, i (i)}<th scope="col">{c}</th>{/each}</tr>
+				</thead>
+				<tbody>
+					{#each chartTable.rows as row, i (i)}
+						<tr><th scope="row">{row.label}</th>{#each row.values as v, j (j)}<td>{v}</td>{/each}</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 	<button type="button" class="export-btn chart-export" onclick={exportChartPng}>Export PNG</button>
 </div>
@@ -555,7 +557,7 @@
 		margin-bottom: 16px;
 	}
 	.groupby {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -574,7 +576,7 @@
 	}
 	.sort-dir {
 		font-family: inherit;
-		font-size: 1rem;
+		font-size: var(--fs-base);
 		line-height: 1;
 		height: 34px;
 		padding: 0 10px;
@@ -594,7 +596,7 @@
 		gap: 6px 18px;
 		margin-bottom: 8px;
 		padding-right: 120px;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--text-secondary);
 	}
 	.legend-dot {

@@ -85,7 +85,7 @@
 		padding: 6px 0;
 	}
 	.active-filters-label {
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		color: var(--muted);
 		white-space: nowrap;
 	}
@@ -99,7 +99,7 @@
 		border-radius: var(--radius-pill);
 		background: var(--accent-light);
 		font: inherit;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--text);
 		cursor: pointer;
 	}
@@ -115,7 +115,7 @@
 	}
 	.active-filter-remove {
 		flex-shrink: 0;
-		font-size: 0.75rem;
+		font-size: var(--fs-sm);
 		color: var(--muted);
 	}
 	.active-filter:hover .active-filter-remove {
@@ -126,7 +126,7 @@
 		border: none;
 		background: none;
 		font: inherit;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		color: var(--accent);
 		text-decoration: underline;
 		cursor: pointer;

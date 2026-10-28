@@ -37,7 +37,7 @@
     /* Retire le triangle natif : la flèche fait partie du libellé. */
     list-style: none;
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
   }
   .rejected-fold summary::-webkit-details-marker {

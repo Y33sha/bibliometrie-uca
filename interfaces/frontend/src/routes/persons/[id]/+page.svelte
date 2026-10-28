@@ -296,7 +296,7 @@
 
 <style>
 	.thesis-role-heading {
-		font-size: 1rem;
+		font-size: var(--fs-base);
 		font-weight: 600;
 		margin: 20px 0 8px;
 		color: var(--text);
@@ -305,5 +305,5 @@
 
 
 	/* Addresses tab */
-	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
+	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 </style>

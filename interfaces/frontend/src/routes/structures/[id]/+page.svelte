@@ -313,12 +313,12 @@
 
 
 	/* Addresses tab */
-	.addr-cell { font-size: 0.85rem; color: var(--muted); word-break: break-all; }
+	.addr-cell { font-size: var(--fs-sm); color: var(--muted); word-break: break-all; }
 	.status-tag {
 		display: inline-block;
 		padding: 2px 7px;
 		border-radius: var(--radius);
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 		font-weight: 500;
 	}
 	.status-tag.confirmed { background: var(--success-light); color: var(--success); }

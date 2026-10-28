@@ -125,7 +125,7 @@
 		padding: 6px 12px;
 		border: none;
 		background: none;
-		font-size: 0.95rem;
+		font-size: var(--fs-md);
 		cursor: pointer;
 		font-family: inherit;
 		color: var(--text);
@@ -141,7 +141,7 @@
 		width: 20px;
 		height: 20px;
 		border-radius: var(--radius);
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 		font-weight: 600;
 		color: var(--muted);
 		background: var(--surface);
@@ -160,7 +160,7 @@
 		font-weight: 500;
 	}
 	.item-count {
-		font-size: 0.8rem;
+		font-size: var(--fs-sm);
 		color: var(--muted);
 		margin-left: auto;
 	}

@@ -266,13 +266,13 @@
     border-bottom: 1px solid var(--border);
   }
   .meta-label {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
   .meta-value {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-family: var(--mono);
     display: flex;
     align-items: center;
@@ -291,12 +291,12 @@
   .phase-table {
     width: 100%;
     border-collapse: collapse;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
   }
   .phase-table th {
     padding: 6px 8px;
     border-bottom: 2px solid var(--border);
-    font-size: 0.75rem;
+    font-size: var(--fs-xs);
     color: var(--muted);
     text-transform: uppercase;
     text-align: left;
@@ -321,7 +321,7 @@
   .num {
     text-align: right;
     font-family: var(--mono);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     white-space: nowrap;
   }
   .expand-row td {
@@ -337,13 +337,13 @@
   }
   .src-table {
     border-collapse: collapse;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
     margin-bottom: 10px;
   }
   .src-table th {
     padding: 3px 8px;
     border-bottom: 1px solid var(--border);
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
     color: var(--muted);
     text-transform: uppercase;
     text-align: left;
@@ -363,7 +363,7 @@
   .summary {
     display: flex;
     flex-direction: column;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
     max-width: 420px;
     margin-bottom: 6px;
   }
@@ -387,19 +387,19 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
     margin-bottom: 6px;
   }
   .expand-line {
     display: grid;
     grid-template-columns: 160px 1fr;
     gap: 12px;
-    font-size: 0.82rem;
+    font-size: var(--fs-sm);
   }
   .expand-line .k {
     color: var(--muted);
     text-transform: uppercase;
-    font-size: 0.72rem;
+    font-size: var(--fs-xs);
     letter-spacing: 0.05em;
     font-family: var(--mono);
   }
@@ -412,6 +412,6 @@
     padding: 1px 6px;
     border: 1px solid;
     border-radius: var(--radius-pill);
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
   }
 </style>

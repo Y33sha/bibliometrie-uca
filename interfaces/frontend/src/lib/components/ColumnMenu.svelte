@@ -43,7 +43,7 @@
 	.column-menu-wrapper { position: relative; }
 	.column-menu-btn {
 		background: none; border: 1px solid var(--border); border-radius: var(--radius);
-		padding: 2px 8px; font-size: 1.1rem; cursor: pointer; color: var(--muted);
+		padding: 2px 8px; font-size: var(--fs-lg); cursor: pointer; color: var(--muted);
 		letter-spacing: 2px;
 	}
 	.column-menu-btn:hover { background: var(--hover); color: var(--text); }
@@ -55,7 +55,7 @@
 	}
 	.column-menu label {
 		display: flex; align-items: center; gap: 6px;
-		padding: 4px 12px; font-size: 0.85rem; cursor: pointer; white-space: nowrap;
+		padding: 4px 12px; font-size: var(--fs-sm); cursor: pointer; white-space: nowrap;
 	}
 	.column-menu label:hover { background: var(--hover); }
 	.column-menu label.disabled { opacity: 0.5; cursor: default; }

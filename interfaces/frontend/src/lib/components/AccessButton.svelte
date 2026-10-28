@@ -50,7 +50,7 @@
 		background: var(--accent);
 		color: white;
 		font-weight: 700;
-		font-size: 1rem;
+		font-size: var(--fs-base);
 		text-decoration: none;
 		white-space: nowrap;
 	}
@@ -67,7 +67,7 @@
 		gap: 4px;
 		height: 22px;
 		padding: 0 8px;
-		font-size: 0.75rem;
+		font-size: var(--fs-sm);
 		font-weight: 600;
 	}
 	.access-btn.compact svg {

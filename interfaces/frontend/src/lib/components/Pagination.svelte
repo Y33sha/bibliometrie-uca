@@ -59,7 +59,7 @@
 		background: transparent;
 		color: var(--text-secondary);
 		cursor: pointer;
-		font-size: 0.95rem;
+		font-size: var(--fs-md);
 		font-family: inherit;
 	}
 	button:hover:not(:disabled):not(.active) {
@@ -78,7 +78,7 @@
 		font-weight: 600;
 	}
 	.page-info {
-		font-size: 0.95rem;
+		font-size: var(--fs-md);
 		color: var(--muted);
 		margin-left: 8px;
 	}

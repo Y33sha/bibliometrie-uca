@@ -162,7 +162,7 @@
     min-width: 0;
   }
   .meta {
-    font-size: 0.78rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     margin-top: 2px;
   }
@@ -173,7 +173,7 @@
     margin-top: 4px;
   }
   .lab-badge {
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     background: var(--accent-light);
     color: var(--accent);
     border-radius: var(--radius-pill);
@@ -186,7 +186,7 @@
   }
   .act {
     padding: 4px 10px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--card);

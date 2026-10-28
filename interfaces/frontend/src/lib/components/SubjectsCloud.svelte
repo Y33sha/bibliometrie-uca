@@ -160,7 +160,7 @@
 	.layout-loading {
 		color: var(--muted);
 		font-style: italic;
-		font-size: 0.9rem;
+		font-size: var(--fs-md);
 		margin: 0;
 		padding: 12px;
 	}

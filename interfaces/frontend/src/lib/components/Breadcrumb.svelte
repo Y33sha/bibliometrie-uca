@@ -28,7 +28,7 @@
 <style>
 	.breadcrumb {
 		margin-bottom: 14px;
-		font-size: 0.85rem;
+		font-size: var(--fs-sm);
 	}
 	/* Une seule ligne : les niveaux parents gardent leur largeur, la page courante se tronque. */
 	ol {

@@ -143,13 +143,13 @@
 
 <style>
   :global(html) {
-    font-size: 16px;
+    font-size: var(--fs-base);
   }
   :global(body) {
     margin: 0;
     font-family: var(--font);
     font-variant-numeric: tabular-nums;
-    font-size: 1rem;
+    font-size: var(--fs-base);
     line-height: 1.5;
     color: var(--text);
     background: var(--bg);
@@ -166,7 +166,7 @@
     border-radius: var(--radius);
     background: var(--card);
     font-family: inherit;
-    font-size: 0.95rem;
+    font-size: var(--fs-md);
     color: inherit;
   }
   :global(:where(input[type="search"]):focus) {
@@ -223,7 +223,7 @@
     background: none;
     border: none;
     color: inherit;
-    font-size: 1.5rem;
+    font-size: var(--fs-2xl);
     line-height: 1;
     cursor: pointer;
     padding: 0 6px;
@@ -232,7 +232,7 @@
   .site-title {
     white-space: nowrap;
     font-family: "Ubuntu", sans-serif;
-    font-size: 1.15rem;
+    font-size: var(--fs-lg);
     font-weight: 500;
     margin: 0;
   }
@@ -247,7 +247,7 @@
     white-space: nowrap;
     color: var(--nav-fg-soft);
     text-decoration: none;
-    font-size: 0.92rem;
+    font-size: var(--fs-md);
     font-weight: 500;
     padding: 0 12px;
     height: 34px;
@@ -267,7 +267,7 @@
   .nav-icon {
     display: inline-flex;
     margin-right: 7px;
-    font-size: 0.9em;
+    font-size: var(--fs-sm);
   }
   .nav-link.active,
   .nav-dropdown.active > .nav-link {
@@ -276,7 +276,7 @@
   }
   .nav-switch-link {
     color: var(--nav-fg-soft);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     margin-left: 12px;
   }
   .nav-switch-link:hover {
@@ -320,7 +320,7 @@
     padding: 8px 16px;
     color: var(--nav-fg-soft);
     text-decoration: none;
-    font-size: 0.92rem;
+    font-size: var(--fs-md);
   }
   .nav-dropdown-menu a:hover {
     background: var(--nav-hover);
@@ -338,7 +338,7 @@
     display: block;
     padding: 8px 16px 2px;
     color: var(--nav-fg-soft);
-    font-size: 0.72rem;
+    font-size: var(--fs-xs);
     font-weight: 600;
     letter-spacing: 1px;
     text-transform: uppercase;
@@ -357,7 +357,7 @@
     background: none;
     color: var(--nav-fg-soft);
     font-family: inherit;
-    font-size: 0.92rem;
+    font-size: var(--fs-md);
     text-align: left;
     cursor: pointer;
   }

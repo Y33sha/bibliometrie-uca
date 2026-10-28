@@ -223,8 +223,8 @@
 		display: flex; justify-content: space-between; align-items: center;
 		margin-bottom: 6px;
 	}
-	.blocking-detail { margin: 4px 0 8px; font-size: 0.95rem; }
-	.blocking-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+	.blocking-detail { margin: 4px 0 8px; font-size: var(--fs-md); }
+	.blocking-table { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
 	.blocking-table th {
 		text-align: left; padding: 4px 8px; font-weight: 600; color: var(--muted);
 		border-bottom: 1px solid var(--warning);

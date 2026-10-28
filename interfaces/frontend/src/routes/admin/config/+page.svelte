@@ -466,7 +466,7 @@
     margin: 4px 0 12px;
   }
   .subsection-title {
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     font-weight: 600;
     color: var(--muted);
     margin: 16px 0 6px;
@@ -500,16 +500,16 @@
   .config-label {
     flex: 1;
     min-width: 0;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
   }
   .config-value-inline {
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-variant-numeric: tabular-nums;
   }
   .config-editor-inline {
     width: 100px;
     font-family: var(--mono);
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     padding: 3px 6px;
     border: 1px solid var(--accent);
     border-radius: var(--radius);
@@ -544,7 +544,7 @@
   }
   .perim-code {
     font-family: var(--mono);
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     white-space: nowrap;
   }
@@ -568,7 +568,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.85rem;
+    font-size: var(--fs-sm);
     padding: 2px 8px;
     border-radius: var(--radius-pill);
     background: var(--surface);
@@ -595,7 +595,7 @@
     display: block;
     width: 100%;
     padding: 6px 10px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     cursor: pointer;
     background: none;
     border: none;
@@ -619,7 +619,7 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 0.9rem;
+    font-size: var(--fs-md);
     font-weight: 400;
     cursor: pointer;
   }

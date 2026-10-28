@@ -6,6 +6,17 @@
 
 /* ── Variables ── */
 :root {
+	/* Échelle des tailles de police : toute taille de texte en est tirée. */
+	--fs-xs: 0.75rem;   /* libellés en capitales : en-têtes de tableau, libellés de métadonnées */
+	--fs-sm: 0.85rem;   /* pastilles, badges, identifiants, étiquettes, texte secondaire */
+	--fs-md: 0.95rem;   /* texte des tableaux, des listes et des contrôles */
+	--fs-base: 1rem;    /* texte courant */
+	--fs-lg: 1.15rem;   /* titres de volet */
+	--fs-xl: 1.3rem;    /* sigle d'une fiche, titre de la connexion */
+	--fs-2xl: 1.5rem;   /* titre de page */
+	--fs-3xl: 1.85rem;  /* titre d'une fiche */
+	--fs-4xl: 2.2rem;   /* chiffres clés */
+
 	/* Texte */
 	--text: #1d2433;
 	--text-secondary: #5b6474;
@@ -151,7 +162,7 @@
 	padding: 6px 10px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	font-size: 0.95rem;
+	font-size: var(--fs-md);
 	font-family: inherit;
 }
 
@@ -171,7 +182,7 @@
 	border-radius: var(--radius);
 	background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 9px center;
 	font: inherit;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	font-weight: 500;
 	color: var(--text);
 	cursor: pointer;
@@ -190,7 +201,7 @@
 	border-radius: var(--radius);
 	background: var(--card) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%236b7280' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 10px center;
 	font: inherit;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	color: var(--text);
 	cursor: pointer;
 }
@@ -201,7 +212,7 @@
 /* Un bouton dans une barre d'outils s'aligne sur le gabarit des champs/dropdowns voisins (même hauteur). `.btn-sm` reste petit volontairement. */
 .toolbar .btn:not(.btn-sm) {
 	padding: 6px 10px;
-	font-size: 0.95rem;
+	font-size: var(--fs-md);
 }
 
 .toolbar-spacer {
@@ -224,7 +235,7 @@
 	border-radius: var(--radius);
 	background: var(--accent);
 	color: white;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	font-weight: 600;
 	text-decoration: none;
 	white-space: nowrap;
@@ -265,7 +276,7 @@
 	border: none;
 	border-radius: var(--radius);
 	background: transparent;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	cursor: pointer;
 	color: var(--text);
 	white-space: nowrap;
@@ -291,7 +302,7 @@
 	border-radius: var(--radius-pill);
 	background: var(--accent);
 	color: white;
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 }
 .facet-panel {
@@ -313,7 +324,7 @@
 	padding: 5px 8px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 }
 /* Retire la sélection d'une facette, en tête du panneau. */
 .facet-clear {
@@ -323,7 +334,7 @@
 	border: none;
 	background: none;
 	font: inherit;
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	color: var(--accent);
 	text-align: left;
 	cursor: pointer;
@@ -336,7 +347,7 @@
 	align-items: center;
 	gap: 6px;
 	padding: 4px 12px;
-	font-size: 0.95rem;
+	font-size: var(--fs-md);
 	cursor: pointer;
 }
 .facet-options label:hover {
@@ -358,7 +369,7 @@
 	flex-shrink: 0;
 	margin-left: auto;
 	padding-left: 12px;
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	color: var(--muted);
 }
 
@@ -415,7 +426,7 @@
 /* ── Nombre de résultats (barre d'outils) ── */
 .count {
 	margin-left: auto;
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	color: var(--text-secondary);
 	white-space: nowrap;
 }
@@ -430,7 +441,7 @@
 	border-radius: var(--radius);
 	background: transparent;
 	font: inherit;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	font-weight: 500;
 	color: var(--accent);
 	text-decoration: none;
@@ -453,7 +464,7 @@
 .data-table thead th {
 	text-align: left;
 	padding: 10px 12px;
-	font-size: 0.7rem;
+	font-size: var(--fs-xs);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
@@ -464,7 +475,7 @@
 
 .data-table td {
 	padding: 10px 12px;
-	font-size: 0.95rem;
+	font-size: var(--fs-md);
 	border-bottom: 1px solid var(--border-subtle);
 	vertical-align: top;
 }
@@ -495,7 +506,7 @@
 
 /* Bouton « Fusionner… » d'une ligne de liste. */
 .btn-merge {
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	color: var(--accent);
 	background: none;
 	border: 1px solid var(--border);
@@ -534,7 +545,7 @@
 /* Tableau d'une file de triage : colonnes de largeur fixe, lignes regroupées par `tbody.group`. */
 .triage-table {
 	table-layout: fixed;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 }
 .triage-table th,
 .triage-table td {
@@ -592,7 +603,7 @@
 
 /* ── Subtitle ── */
 .subtitle {
-	font-size: 0.95rem;
+	font-size: var(--fs-md);
 	color: var(--muted);
 	margin: -10px 0 16px;
 }
@@ -600,7 +611,7 @@
 /* ── Champs de formulaire dans une modale (composant Modal) ── */
 .modal-content label {
 	display: block;
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	color: var(--muted);
 	margin: 8px 0 3px;
@@ -629,7 +640,7 @@
 	padding: 6px 8px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	font-size: 0.95rem;
+	font-size: var(--fs-md);
 	font-family: inherit;
 }
 
@@ -645,7 +656,7 @@
 }
 .entity-title {
 	margin: 0;
-	font-size: 1.85rem;
+	font-size: var(--fs-3xl);
 	line-height: 1.2;
 	font-weight: 700;
 	letter-spacing: -0.02em;
@@ -653,7 +664,7 @@
 /* Sigle à côté du titre. */
 .entity-acronym {
 	margin-left: 10px;
-	font-size: 1.25rem;
+	font-size: var(--fs-xl);
 	font-weight: 500;
 	letter-spacing: 0;
 	color: var(--muted);
@@ -664,7 +675,7 @@
 	align-items: center;
 	flex-wrap: wrap;
 	gap: 6px 22px;
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	color: var(--text-secondary);
 }
 /* Libellé et valeurs d'une métadonnée (composant EntityMetaItem). */
@@ -675,7 +686,7 @@
 	gap: 6px 8px;
 }
 .entity-meta-label {
-	font-size: 0.7rem;
+	font-size: var(--fs-xs);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
@@ -687,7 +698,7 @@
 	border-radius: var(--radius-pill);
 	background: var(--surface);
 	color: var(--text-secondary);
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 }
 .entity-tag-accent {
 	background: var(--accent-light);
@@ -697,7 +708,7 @@
 .entity-meta .id-badge {
 	padding: 3px 9px;
 	border-radius: var(--radius-pill);
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	font-weight: 500;
 }
 
@@ -720,7 +731,7 @@
 	border-bottom: 3px solid transparent;
 	background: none;
 	font: inherit;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	font-weight: 500;
 	color: var(--text-secondary);
 	white-space: nowrap;
@@ -735,7 +746,7 @@
 	border-bottom-color: var(--accent-mid);
 }
 .tab-count {
-	font-size: 0.75rem;
+	font-size: var(--fs-sm);
 	font-weight: 500;
 	color: var(--muted);
 }
@@ -761,7 +772,7 @@
 
 /* Min-width : `width` seul est une simple hint en table-layout: auto et la colonne Titre (width: 100%) la grignoterait jusqu'à la min-content-width (4 lignes pour « Journal of High Energy Physics » sur 56px). `min-width` est la seule contrainte que l'auto-layout respecte vraiment. */
 .publication-col-journal {
-	font-size: 0.9em;
+	font-size: var(--fs-sm);
 	min-width: 180px;
 	width: 180px;
 }
@@ -773,7 +784,7 @@
 	background: var(--accent-light);
 	border-radius: var(--radius);
 	font-family: var(--mono);
-	font-size: 0.75rem;
+	font-size: var(--fs-sm);
 	color: var(--accent);
 	text-decoration: none;
 	white-space: nowrap;
@@ -925,7 +936,7 @@ a.id-badge.id-confirmed:hover {
 }
 
 .wos-label {
-	font-size: 11px;
+	font-size: var(--fs-sm);
 	font-weight: 700;
 	color: #5a3d8a;
 	line-height: 14px;
@@ -965,7 +976,7 @@ a.id-badge.id-confirmed:hover {
 	display: inline-block;
 	padding: 1px 5px;
 	border-radius: var(--radius);
-	font-size: 0.7rem;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	margin-right: 2px;
 }
@@ -993,7 +1004,7 @@ a.id-badge.id-confirmed:hover {
 /* ── Lab tag (pill) ── */
 .lab-tag {
 	display: inline-block;
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	padding: 1px 7px;
 	border-radius: var(--radius-pill);
 	background: var(--accent-light);
@@ -1012,7 +1023,7 @@ a.id-badge.id-confirmed:hover {
 	padding: 1px 6px;
 	background: var(--accent-light);
 	border-radius: var(--radius);
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	color: var(--accent);
 	font-weight: 500;
 	margin: 1px 3px 1px 0;
@@ -1029,14 +1040,14 @@ a.structure-tag:hover {
 	padding: 2px 7px;
 	background: var(--border-subtle);
 	border-radius: var(--radius);
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	color: var(--muted);
 	white-space: nowrap;
 }
 
 /* ── Pastille de type de structure (`structure-type structure-type-{type}`) ── */
 .structure-type {
-	font-size: 0.7rem;
+	font-size: var(--fs-xs);
 	padding: 1px 6px;
 	border-radius: var(--radius);
 	font-weight: 600;
@@ -1081,14 +1092,14 @@ a.structure-tag:hover {
 /* Part d'une modalité, sous un graphique en anneau. */
 .dash-summary {
 	text-align: center;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	color: var(--muted);
 	margin-top: 8px;
 }
 
 /* ── Files de triage (administration des référentiels) ── */
 .triage-intro {
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	color: var(--muted);
 	margin: 4px 0 14px;
 	max-width: 75ch;
@@ -1123,7 +1134,7 @@ a.structure-tag:hover {
 
 /* Forme de nom dérivée du nom canonique de la personne. */
 .canonical-tag {
-	font-size: 0.68rem;
+	font-size: var(--fs-sm);
 	color: var(--muted);
 	background: var(--surface);
 	border-radius: var(--radius);
@@ -1133,7 +1144,7 @@ a.structure-tag:hover {
 
 /* ── Pastille DOAJ d'une revue ── */
 .badge-doaj {
-	font-size: 0.7rem;
+	font-size: var(--fs-sm);
 	padding: 1px 6px;
 	background: var(--success);
 	color: white;
@@ -1153,7 +1164,7 @@ a.badge-doaj:hover {
 .dash-card h2,
 .detail-label {
 	color: var(--accent);
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
@@ -1170,7 +1181,7 @@ a.badge-doaj:hover {
 	padding: 2px 8px;
 	background: var(--border-subtle);
 	border-radius: var(--radius);
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	color: var(--muted);
 	font-weight: 500;
 }
@@ -1183,7 +1194,7 @@ a.badge-doaj:hover {
 /* ── OA tags ── */
 .oa-tag {
 	display: inline-block;
-	font-size: 0.7rem;
+	font-size: var(--fs-sm);
 	padding: 1px 6px;
 	border-radius: var(--radius);
 	font-weight: 600;
@@ -1227,7 +1238,7 @@ a.badge-doaj:hover {
 /* ── Pastille d'accès générique (fiche détail) ── */
 .access-tag {
 	display: inline-block;
-	font-size: 0.78rem;
+	font-size: var(--fs-sm);
 	padding: 2px 8px;
 	border-radius: var(--radius);
 	font-weight: 600;
@@ -1248,7 +1259,7 @@ a.badge-doaj:hover {
 /* ── APC tag ── */
 .apc-tag {
 	display: inline-block;
-	font-size: 0.75rem;
+	font-size: var(--fs-sm);
 	padding: 1px 5px;
 	border-radius: var(--radius);
 	background: var(--success-light);
@@ -1276,7 +1287,7 @@ a.badge-doaj:hover {
 	background: color-mix(in srgb, var(--type-color) 16%, white);
 	/* 50 % de noir : contraste de 4,5:1 au moins, y compris pour les types les plus clairs (preprints, autres). */
 	color: color-mix(in srgb, var(--type-color), black 50%);
-	font-size: 0.75rem;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	white-space: nowrap;
 }
@@ -1299,7 +1310,7 @@ a.badge-doaj:hover {
 	border-radius: var(--radius);
 	background: var(--card);
 	cursor: pointer;
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	font-family: inherit;
 	text-decoration: none;
 	color: var(--text);
@@ -1319,7 +1330,7 @@ a.badge-doaj:hover {
 
 .btn-sm {
 	padding: 3px 8px;
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 }
 
 /* Boutons pleins (gros boutons à texte) */
@@ -1372,7 +1383,7 @@ a.badge-doaj:hover {
 
 .btn-nav {
 	padding: 4px 10px;
-	font-size: 1rem;
+	font-size: var(--fs-base);
 	line-height: 1;
 }
 
@@ -1446,7 +1457,7 @@ button.entity-link {
 }
 
 .journal-cell {
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	color: var(--muted);
 }
 .journal-cell a {
@@ -1463,7 +1474,7 @@ button.entity-link {
 	border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
 	border-radius: var(--radius);
 	padding: 8px 14px;
-	font-size: 0.9rem;
+	font-size: var(--fs-md);
 	color: var(--text);
 	margin-bottom: 12px;
 	line-height: 1.5;
@@ -1493,7 +1504,7 @@ button.entity-link {
 
 .modal-content h3 {
 	margin: 0 0 12px;
-	font-size: 1.05rem;
+	font-size: var(--fs-base);
 }
 
 .modal-actions {
@@ -1546,7 +1557,7 @@ button.entity-link {
 	gap: 5px;
 	padding: 3px 10px;
 	border-radius: var(--radius-pill);
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	line-height: 1.35;
 	white-space: nowrap;
 	background: var(--surface);
@@ -1559,7 +1570,7 @@ button.entity-link {
 }
 /* Sous-titre d'une section (ex. « Mots-clés libres », type de relation) : même teal que le titre, plus petit, subordonné. */
 .detail-sublabel {
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	font-weight: 600;
 	color: var(--accent);
 	margin: 12px 0 7px;
@@ -1575,7 +1586,7 @@ button.entity-link {
 	background: var(--surface);
 	border-radius: var(--radius);
 	padding: 2px 7px;
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	text-align: left;
 }
 .status-chip.confirmed {
@@ -1597,7 +1608,7 @@ button.entity-link {
 }
 button.status-chip {
 	font: inherit;
-	font-size: 0.8rem;
+	font-size: var(--fs-sm);
 	cursor: pointer;
 	transition: background 0.15s;
 }
@@ -1612,7 +1623,7 @@ button.status-chip:hover {
 	border-radius: var(--radius-pill);
 	background: none;
 	font: inherit;
-	font-size: 0.85rem;
+	font-size: var(--fs-sm);
 	font-weight: 500;
 	color: var(--accent);
 	cursor: pointer;

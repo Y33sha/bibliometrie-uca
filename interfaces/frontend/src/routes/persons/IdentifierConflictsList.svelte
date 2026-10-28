@@ -49,7 +49,7 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     background: var(--accent-light);
     border: 1px solid color-mix(in srgb, var(--accent) 25%, white);
     border-radius: var(--radius);
@@ -58,7 +58,7 @@
   }
   .ident-chip .it {
     text-transform: uppercase;
-    font-size: 0.65rem;
+    font-size: var(--fs-xs);
     font-weight: 700;
     color: var(--accent);
   }

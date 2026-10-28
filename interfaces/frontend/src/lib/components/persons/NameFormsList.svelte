@@ -104,7 +104,7 @@
     gap: 4px;
   }
   .publication-count {
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--muted);
     white-space: nowrap;
   }
@@ -112,12 +112,12 @@
     color: var(--text-faint);
   }
   .shared {
-    font-size: 0.72rem;
+    font-size: var(--fs-sm);
     color: var(--warning-text);
     white-space: nowrap;
   }
   .empty {
-    font-size: 0.8rem;
+    font-size: var(--fs-sm);
     color: var(--warning-text);
     background: var(--warning-light);
     padding: 1px 7px;

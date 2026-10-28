@@ -133,5 +133,5 @@
 	tr.excluded:hover { opacity: 0.7; }
 	tr.excluded .person-link { text-decoration: line-through; }
 	.person-last { font-weight: 600; }
-	.secondary-cell { font-size: 0.9rem; color: var(--text-secondary); }
+	.secondary-cell { font-size: var(--fs-md); color: var(--text-secondary); }
 </style>
