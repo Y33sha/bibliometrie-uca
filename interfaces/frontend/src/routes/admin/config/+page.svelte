@@ -388,7 +388,7 @@
   <!-- ═══ AFFICHAGE ═══ -->
   <h2 class="section-title">Affichage</h2>
   <div class="config-grid">
-    <div class="config-row">
+    <div class="config-row stacked">
       <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
       <div class="type-checks">
         {#each STRUCTURE_TYPES as t (t.value)}
@@ -472,6 +472,13 @@
   }
   .config-row:last-child {
     border-bottom: none;
+  }
+  /* Contrôle trop large pour tenir à côté du libellé : il passe dessous. */
+  .config-row.stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+    padding: 8px 0;
   }
   .config-label {
     flex: 1;
