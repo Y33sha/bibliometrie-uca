@@ -61,8 +61,7 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 - `metadata_correction` écrit `external_ids` à partir des identifiants actifs. `corrections` garde seulement les valeurs d'origine des colonnes.
 - Un DOI mis à nul par la correction par DOI partagé est retiré dans la table. Le DOI concept substitué à un DOI de version reste seulement dans la colonne `doi`.
 - Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
-- Cible : seuls les identifiants primaires et dérivés sont des clés de confirmation. Un identifiant secondaire est une clé de blocage : il propose une fusion, qu'une comparaison deux à deux confirme.
-- Jusqu'aux clés de blocage, la réconciliation lit ses clés dans `external_ids` : premier `hal_id`, NNT, PMID et identifiant arXiv.
+- Les clés de la réconciliation restent celles d'`external_ids` : premier `hal_id` par rôle puis par valeur, NNT, PMID et identifiant arXiv.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
@@ -86,8 +85,7 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 - [x] Mesure des paires de publications reliées par un identifiant actif, selon son rôle.
 - [x] Mesure des publications scindées quand seuls les identifiants primaires et dérivés sont des clés.
-- [ ] Clés de blocage : fusion par un identifiant secondaire, confirmée par une comparaison deux à deux.
-- [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs.
+- [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs, avec les clés d'`external_ids`.
 
 ### Phase 4 — Autres lectures
 
@@ -110,5 +108,4 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 ## Questions ouvertes
 
 - Place de la suppression de la colonne `doi` dans le phasage.
-- Critères de la comparaison deux à deux d'une fusion par identifiant secondaire : titres compatibles, types, années.
 - DOI de version et pièces de dataset : écartés de la réconciliation (`is_matchable`) au lieu de la substitution du DOI concept ou du DOI du dataset parent. Le DOI concept ou le dataset parent est parfois absent de la base.
