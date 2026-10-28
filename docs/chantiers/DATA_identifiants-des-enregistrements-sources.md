@@ -42,6 +42,8 @@ Paires de publications reliées par un `hal_id` actif, sur la base locale au 202
 - primaire ou dérivé d'un côté, secondaire de l'autre : 1 429. Surtout des versions distinctes : communication et article, poster et acte. Quelques doublons sans DOI.
 - secondaire des deux côtés : 20.
 
+Publications de la base locale scindées quand seuls les identifiants primaires et dérivés sont des clés : 1 289 par la règle sur le `hal_id`, 337 de plus par la même règle sur le PMID et l'identifiant arXiv. Parmi elles, des dépôts HAL sans DOI séparés de leur version éditeur, et des enregistrements sources ScanR `pmid…` séparés de leur article.
+
 ## Décisions
 
 - Une table relie un enregistrement source à un identifiant : type, valeur, rôle, statut. Les identifiants d'une publication se déduisent de ses enregistrements sources.
@@ -59,6 +61,8 @@ Paires de publications reliées par un `hal_id` actif, sur la base locale au 202
 - `metadata_correction` écrit `external_ids` à partir des identifiants actifs. `corrections` garde seulement les valeurs d'origine des colonnes.
 - Un DOI mis à nul par la correction par DOI partagé est retiré dans la table. Le DOI concept substitué à un DOI de version reste seulement dans la colonne `doi`.
 - Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
+- Cible : seuls les identifiants primaires et dérivés sont des clés de confirmation. Un identifiant secondaire est une clé de blocage : il propose une fusion, qu'une comparaison deux à deux confirme.
+- Jusqu'aux clés de blocage, la réconciliation lit ses clés dans `external_ids` : premier `hal_id`, NNT, PMID et identifiant arXiv.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
@@ -80,9 +84,10 @@ Paires de publications reliées par un `hal_id` actif, sur la base locale au 202
 
 ### Phase 3 — Rapprochement
 
-- [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs du document.
-- [x] Mesure des paires de publications reliées par un identifiant HAL secondaire.
-- [ ] Identifiants retenus pour le rapprochement, après mesure des conséquences de chaque rôle.
+- [x] Mesure des paires de publications reliées par un identifiant actif, selon son rôle.
+- [x] Mesure des publications scindées quand seuls les identifiants primaires et dérivés sont des clés.
+- [ ] Clés de blocage : fusion par un identifiant secondaire, confirmée par une comparaison deux à deux.
+- [ ] Voisinage de la réconciliation par une jointure sur le type et la valeur des identifiants actifs.
 
 ### Phase 4 — Autres lectures
 
@@ -105,5 +110,5 @@ Paires de publications reliées par un `hal_id` actif, sur la base locale au 202
 ## Questions ouvertes
 
 - Place de la suppression de la colonne `doi` dans le phasage.
-- Identifiants HAL secondaires : réintégration au rapprochement sous condition, au vu de la mesure de la phase 3.
+- Critères de la comparaison deux à deux d'une fusion par identifiant secondaire : titres compatibles, types, années.
 - DOI de version et pièces de dataset : écartés de la réconciliation (`is_matchable`) au lieu de la substitution du DOI concept ou du DOI du dataset parent. Le DOI concept ou le dataset parent est parfois absent de la base.
