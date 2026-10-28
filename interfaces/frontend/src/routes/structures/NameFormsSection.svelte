@@ -258,6 +258,9 @@
   .forms-table .excluding {
     background: var(--attention-light);
   }
+  .forms-table tr.excluding:hover td {
+    background: color-mix(in srgb, var(--attention-light), var(--attention) 6%);
+  }
   .form-text {
     font-family: var(--mono);
     font-size: 0.85rem;
