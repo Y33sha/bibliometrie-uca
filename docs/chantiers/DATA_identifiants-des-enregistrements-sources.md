@@ -41,7 +41,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 - Une table relie un enregistrement source à un identifiant : type, valeur, rôle, statut. Les identifiants d'une publication se déduisent de ses enregistrements sources.
 - Rôle d'un identifiant dans un enregistrement source :
   - primaire : identifiant de l'enregistrement dans la source, soit le DOI chez Crossref et DataCite, le `hal_id` chez HAL, le NNT chez theses.fr ;
-  - dérivé : identifiant de l'enregistrement d'une autre source dont la source tire le sien. Un enregistrement source a au plus un identifiant dérivé ;
+  - dérivé : identifiant de l'enregistrement d'une autre source dont l'enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé ;
   - secondaire : identifiant que la source attribue au même document ;
   - lié : identifiant d'un document lié, par exemple un DOI apparenté ou l'ISBN de l'ouvrage hôte.
 - L'identifiant dérivé est un identifiant d'un type de la table :
@@ -50,7 +50,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 - Les identifiants OpenAlex et WoS restent seulement dans `source_id`.
 - Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
-- La colonne `doi` reste en place.
+- La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
 ## Phasage
 
@@ -92,6 +92,6 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 
 ## Questions ouvertes
 
-- Colonne `doi` : gardée à côté de la table, ou remplacée par l'identifiant DOI du document.
+- Place de la suppression de la colonne `doi` dans le phasage.
 - Identifiants HAL secondaires : réintégration au rapprochement sous condition, au vu de la mesure de la phase 3.
 - Rôle de l'ISBN : identifiant du document pour un ouvrage, identifiant d'une œuvre apparentée pour un chapitre.

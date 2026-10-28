@@ -20,10 +20,17 @@ class SourceIdentifierRole(StrEnum):
     """Rôle d'un identifiant dans un enregistrement source."""
 
     PRIMARY = "primary"
-    """Identifiant de l'enregistrement dans la source."""
     DERIVED = "derived"
-    """Identifiant de l'enregistrement d'une autre source dont la source tire le sien. Un enregistrement source a au plus un identifiant dérivé."""
     SECONDARY = "secondary"
-    """Identifiant que la source attribue au même document."""
     RELATED = "related"
-    """Identifiant d'un document lié."""
+
+
+SOURCE_IDENTIFIER_ROLE_DEFINITIONS: dict[SourceIdentifierRole, str] = {
+    SourceIdentifierRole.PRIMARY: "identifiant de l'enregistrement dans la source.",
+    SourceIdentifierRole.DERIVED: (
+        "identifiant de l'enregistrement d'une autre source dont l'enregistrement source est "
+        "dérivé. Un enregistrement source a au plus un identifiant dérivé."
+    ),
+    SourceIdentifierRole.SECONDARY: "identifiant que la source attribue au même document.",
+    SourceIdentifierRole.RELATED: "identifiant d'un document lié.",
+}

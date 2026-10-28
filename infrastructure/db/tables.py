@@ -58,7 +58,11 @@ from domain.publications.relations import RelationType
 from domain.publishers.publisher import PUBLISHER_TYPES
 from domain.serials.issns import ISSN_STATUSES, ISSN_SUPPORTS
 from domain.serials.serial import OA_MODELS, SERIAL_TYPES
-from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
+from domain.source_records.identifiers import (
+    SOURCE_IDENTIFIER_ROLE_DEFINITIONS,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.sources.registry import ALL_SOURCES, LOOKUP_SOURCES
 from domain.sources.staging import StagingEntryMode
 from domain.structures.hal_structures import HalStructureStatus
@@ -1401,11 +1405,9 @@ source_record_identifiers = Table(
         "role",
         source_identifier_role_enum,
         nullable=False,
-        comment=(
-            "primary : identifiant de l'enregistrement dans la source. derived : identifiant de "
-            "l'enregistrement d'une autre source dont la source tire le sien. secondary : "
-            "identifiant que la source attribue au même document. related : identifiant d'un "
-            "document lié."
+        comment=" ".join(
+            f"{role} : {definition}"
+            for role, definition in SOURCE_IDENTIFIER_ROLE_DEFINITIONS.items()
         ),
     ),
     Column(
