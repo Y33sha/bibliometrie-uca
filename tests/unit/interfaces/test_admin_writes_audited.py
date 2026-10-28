@@ -49,6 +49,7 @@ AUDITE: dict[tuple[str, str], str] = {
     ("PATCH", "/api/persons/{person_id}/name"): "person.name_updated",
     ("PATCH", "/api/persons/{person_id}/name-forms/status"): "person_name_form.status_changed",
     ("PATCH", "/api/persons/{person_id}/exclusion"): "person.exclusion",
+    ("POST", "/api/publications/{publication_id}/merge"): "publication.merged",
     ("PUT", "/api/publishers/{publisher_id}"): "publisher.updated",
     ("POST", "/api/publishers/{publisher_id}/merge"): "publisher.merged",
     ("POST", "/api/structures"): "structure.created",
@@ -68,6 +69,10 @@ EXEMPTES: dict[tuple[str, str], str] = {
     ("POST", "/api/serials/{serial_id}/type-change-impact"): (
         "Calcule l'ampleur d'un changement de type sans l'appliquer : l'écriture est annulée "
         "avec le point de reprise qui l'enveloppe, et rien ne subsiste à consigner."
+    ),
+    ("POST", "/api/publications/{publication_id}/merge-preview"): (
+        "Calcule le résultat d'une fusion sans l'appliquer : l'écriture est annulée avec le "
+        "point de reprise qui l'enveloppe, et l'événement émis est écarté."
     ),
 }
 """Point d'entrée d'écriture qui ne consigne rien, et la raison qui l'en dispense."""
