@@ -175,7 +175,7 @@ def _interactive_terminal() -> bool:
     """Vrai quand la sortie standard est un terminal."""
     try:
         return sys.stdout.isatty()
-    except (AttributeError, ValueError):
+    except AttributeError, ValueError:
         return False
 
 
@@ -299,7 +299,7 @@ class Progress:
             if not self._erase:
                 write_above_bars(last_frame, _bar_stream or sys.stderr)
 
-    def __enter__(self) -> "Progress":
+    def __enter__(self) -> Progress:
         return self
 
     def __exit__(

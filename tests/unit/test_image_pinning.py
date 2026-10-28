@@ -4,7 +4,9 @@ Une étiquette (`python:3.12-slim`) se redéplace sur un autre contenu : deux co
 
 Chaque répertoire portant une description de construction figure dans la configuration du robot de mise à jour, qui propose la montée des empreintes qu'il y trouve.
 
-Toutes les déclarations de version de langage du dépôt s'accordent : les descriptions de construction, que l'intégration continue lit plutôt que de les recopier, et `.nvmrc`, qui donne au poste de développement le Node sous lequel les contrôles du frontend s'exécutent.
+Toutes les déclarations de version de langage du dépôt s'accordent : les descriptions de construction, que l'intégration continue lit plutôt que de les recopier, et `.nvmrc`, qui donne au poste de développement le Node sous lequel les contrôles du frontend s'exécutent. La version de uv suit la même règle.
+
+Les conteneurs de service des workflows reprennent les images des compositions, que le robot suit.
 """
 
 import re
@@ -14,9 +16,10 @@ import yaml
 from infrastructure import PROJECT_ROOT
 
 _DEPENDABOT = PROJECT_ROOT / ".github" / "dependabot.yml"
-_CI = PROJECT_ROOT / ".github" / "workflows" / "ci.yml"
-# Nom de l'image de base, et paramètre par lequel l'intégration continue installe le langage.
-_LANGAGES = {"python": "python-version", "node": "node-version"}
+_WORKFLOWS = sorted((PROJECT_ROOT / ".github" / "workflows").glob("*.yml"))
+_COMPOSITIONS = sorted(PROJECT_ROOT.glob("docker-compose*.yml"))
+# Nom de l'image de base, et paramètre par lequel l'intégration continue installe l'outil.
+_LANGAGES = {"python": "python-version", "node": "node-version", "ghcr.io/astral-sh/uv": "version"}
 _EXPRESSION = re.compile(r"^\$\{\{.*\}\}$")
 _NVMRC = PROJECT_ROOT / "interfaces" / "frontend" / ".nvmrc"
 _FROM = re.compile(r"^FROM\s+(\S+)", re.M)
@@ -86,19 +89,20 @@ def _versions_des_images() -> dict[str, set[str]]:
 
 
 def _versions_declarees_par_l_integration() -> dict[str, list[str]]:
-    """Versions de langage écrites en clair dans l'intégration continue, par langage.
+    """Versions de langage écrites en clair dans les workflows, par langage.
 
     Une valeur lue depuis les images est une expression `${{ … }}` ; toute autre est une version recopiée.
     """
-    config = yaml.safe_load(_CI.read_text(encoding="utf-8"))
     litterales: dict[str, list[str]] = {langage: [] for langage in _LANGAGES}
-    for job in config["jobs"].values():
-        for step in job.get("steps", []):
-            parametres = step.get("with") or {}
-            for langage, cle in _LANGAGES.items():
-                valeur = str(parametres.get(cle, ""))
-                if valeur and not _EXPRESSION.match(valeur):
-                    litterales[langage].append(valeur)
+    for workflow in _WORKFLOWS:
+        config = yaml.safe_load(workflow.read_text(encoding="utf-8"))
+        for job in config["jobs"].values():
+            for step in job.get("steps", []):
+                parametres = step.get("with") or {}
+                for langage, cle in _LANGAGES.items():
+                    valeur = str(parametres.get(cle, ""))
+                    if valeur and not _EXPRESSION.match(valeur):
+                        litterales[langage].append(f"{workflow.name} : {valeur}")
     return litterales
 
 
@@ -141,7 +145,39 @@ def test_l_integration_ne_redeclare_aucune_version():
         if versions
     }
     assert not litterales, (
-        f"Versions de langage écrites en clair dans `ci.yml` : {litterales}. Une valeur recopiée "
+        f"Versions de langage écrites en clair dans les workflows : {litterales}. Une valeur recopiée "
         "se désaccorde en silence de l'image qu'elle est censée refléter. Les installer depuis "
         "`./.github/actions/versions-de-langage`, qui les lit dans la description de construction."
+    )
+
+
+def _images_des_services() -> list[tuple[str, str]]:
+    """Images des conteneurs de service des workflows, avec le nom du workflow."""
+    return [
+        (workflow.name, service["image"])
+        for workflow in _WORKFLOWS
+        for job in yaml.safe_load(workflow.read_text(encoding="utf-8"))["jobs"].values()
+        for service in (job.get("services") or {}).values()
+    ]
+
+
+def test_les_workflows_declarent_des_services():
+    """Garde-fou du parcours : un relevé vide rendrait le test suivant vrai sans rien vérifier."""
+    assert _images_des_services()
+
+
+def test_les_services_des_workflows_reprennent_les_images_des_compositions():
+    """Le robot suit les images des compositions, et ignore celles des workflows."""
+    suivies = {
+        service["image"]
+        for composition in _COMPOSITIONS
+        for service in yaml.safe_load(composition.read_text(encoding="utf-8"))["services"].values()
+        if "image" in service
+    }
+    ecarts = [
+        (workflow, image) for workflow, image in _images_des_services() if image not in suivies
+    ]
+    assert not ecarts, (
+        f"Images de service absentes des compositions : {ecarts}. Le robot de mise à jour ne lit "
+        "pas les workflows : reprendre l'image épinglée de `docker-compose.yml`, qu'il suit."
     )

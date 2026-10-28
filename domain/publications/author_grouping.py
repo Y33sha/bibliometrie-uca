@@ -550,7 +550,7 @@ class _SourceRecordLinks:
         model: ResidualModel | None = None,
         assign: Assign | None = None,
         on_residual: ResidualSink | None = None,
-    ) -> dict[int, "_Link"]:
+    ) -> dict[int, _Link]:
         """Liens des contributions sources de l'enregistrement source vers les contributions : noms et identifiants, filtre d'ordre deux fois, ordre dans les trous, puis le résidu par le modèle quand `model` et `assign` sont donnés. `on_residual` reçoit le résidu de la règle, avant le modèle."""
         self.name_steps()
         self.order_filter()

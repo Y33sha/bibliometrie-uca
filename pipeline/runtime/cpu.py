@@ -13,7 +13,7 @@ def available_cpus(cpu_max: Path = CGROUP_CPU_MAX) -> int:
     cpus = os.process_cpu_count() or 1
     try:
         quota, period = cpu_max.read_text().split()
-    except (OSError, ValueError):
+    except OSError, ValueError:
         return cpus
     if quota == "max":
         return cpus

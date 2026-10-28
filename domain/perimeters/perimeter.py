@@ -28,7 +28,7 @@ class Perimeter:
     root_structure_ids: tuple[int, ...] = field(default=())
 
     @classmethod
-    def create(cls, *, code: str, name: str, root_structure_ids: list[int]) -> "Perimeter":
+    def create(cls, *, code: str, name: str, root_structure_ids: list[int]) -> Perimeter:
         """Fabrique un périmètre neuf (`id` non encore attribué) en validant code et nom."""
         return cls(
             id=None,

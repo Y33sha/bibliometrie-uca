@@ -162,7 +162,7 @@ def source_candidates(
             continue
         try:
             payload = json.loads(store.get(source, source_id))
-        except (UnreadablePayloadError, ValueError):
+        except UnreadablePayloadError, ValueError:
             unreadable += 1
             continue
         read += 1

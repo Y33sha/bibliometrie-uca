@@ -108,7 +108,7 @@ class DOI(NormalizedIdentifier):
     normalize = staticmethod(clean_doi)
 
     @property
-    def prefix(self) -> "DoiPrefix":
+    def prefix(self) -> DoiPrefix:
         """Préfixe du DOI, qui identifie son registrant."""
         return DoiPrefix(self.value.split("/", 1)[0])
 

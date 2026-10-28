@@ -114,7 +114,7 @@ def parse_date(val: object) -> str | None:
         if 30000 < n < 60000:
             base = datetime(1899, 12, 30)  # noqa: DTZ001
             return (base + timedelta(days=n)).date().isoformat()
-    except (ValueError, OverflowError):
+    except ValueError, OverflowError:
         pass
     log.warning("Date non parsable: '%s'", val)
     return None

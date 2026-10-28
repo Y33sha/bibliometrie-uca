@@ -171,7 +171,7 @@ def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == "doi":
                 return clean_doi(str(ident.get("value", "")))
-    except (KeyError, TypeError):
+    except KeyError, TypeError:
         pass
     return None
 
@@ -183,7 +183,7 @@ def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> 
         for ident in _safe_list(identifiers):
             if isinstance(ident, dict) and ident.get("type") == issn_type:
                 return str(ident.get("value", "")).strip() or None
-    except (KeyError, TypeError):
+    except KeyError, TypeError:
         pass
     return None
 

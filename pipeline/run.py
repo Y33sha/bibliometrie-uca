@@ -81,8 +81,7 @@ configure_root_logging(logging.WARNING)
 # Une phase se construit sans argument : elle reçoit les options du run par son contexte d'exécution.
 type PhaseBuilder = Callable[[], Phase]
 
-# Construction de chaque phase. `PHASE_ORDER` fixe l'ordre d'exécution ; un contrôle au
-# démarrage vérifie que le registre couvre exactement les phases qu'il nomme.
+# Fonction `build` de chaque phase.
 _PHASE_BUILDERS: dict[str, PhaseBuilder] = {
     "harvest": harvest.build,
     "harvest_by_person": harvest_by_person.build,
@@ -120,9 +119,9 @@ def _sigterm_raises_keyboard_interrupt(_signum: int, _frame: FrameType | None) -
 
 
 def _install_sigterm_handler() -> None:
-    """Convertit SIGTERM en KeyboardInterrupt, traité comme une interruption clavier : ligne de journal, rapport partiel, commande de reprise.
+    """Convertit SIGTERM en KeyboardInterrupt : un arrêt par systemd ou `docker stop` journalise la phase interrompue et la commande de reprise.
 
-    Un arrêt demandé par systemd, `docker stop` ou `kubectl delete` laisse ainsi la trace du point où le pipeline s'est arrêté. Sur Windows, où `os.kill` ne délivre pas SIGTERM, la fonction reste sans effet.
+    Sans effet sur Windows, où `os.kill` ne délivre pas SIGTERM.
     """
     signal.signal(signal.SIGTERM, _sigterm_raises_keyboard_interrupt)
 
@@ -164,8 +163,8 @@ class _RunFlag:
 _RUN_FLAGS = (
     _RunFlag(
         "--include-wos",
-        "Inclure WoS dans l'extraction et la phase fetch_missing (opt-in : source en fin de vie, "
-        "crédit API limité ; exclue par défaut).",
+        "Inclure WoS dans le moissonnage et la phase fetch_missing (source exclue par défaut : "
+        "en fin de vie, crédit API limité).",
     ),
     _RunFlag(
         "--raw-store",
@@ -182,8 +181,8 @@ _RUN_FLAGS = (
     ),
     _RunFlag(
         "--rebuild-publications",
-        "Avant la phase publications, re-dirtie tout le stock (rebuild complet : "
-        "cluster-then-materialize global). À utiliser après une évolution des règles de clés.",
+        "À la phase publications, reconstruit toutes les publications, pour appliquer une "
+        "évolution des règles de clés sur tout le stock.",
         "publications reconstruites",
     ),
     _RunFlag(
@@ -203,10 +202,7 @@ _RUN_FLAGS = (
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:
-    """Parseur des arguments de la CLI pipeline.
-
-    L'aide porte le catalogue des phases : `--from` et `--only` les nomment.
-    """
+    """Parseur des arguments de `run_pipeline`. L'aide liste les phases, que `--from` et `--only` nomment."""
     parser = argparse.ArgumentParser(
         description="Orchestrateur pipeline bibliométrique",
         epilog=_catalogue_des_phases(),
@@ -239,13 +235,11 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         default=",".join(ALL_SOURCES),
         help=f"Sources, séparées par des virgules (défaut : {','.join(ALL_SOURCES)})",
     )
-    parser.add_argument(
-        "--year", type=int, help="Surcharger l'année d'extraction (une seule année)"
-    )
+    parser.add_argument("--year", type=int, help="Moissonner cette seule année")
     parser.add_argument(
         "--start-year",
         type=int,
-        help="Année de début du range d'extraction (mode full ; défaut: config "
+        help="Première année moissonnée (mode full ; défaut : clé de configuration "
         "pipeline_start_year_full)",
     )
     for flag in _RUN_FLAGS:
@@ -305,14 +299,14 @@ def _framed(lines: list[str]) -> list[str]:
     ]
 
 
-def _fetch_stale_fields(conn: "Connection") -> dict[str, str]:
+def _fetch_stale_fields(conn: Connection) -> dict[str, str]:
     return {"delai": quantity(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
 
 
-_LABEL_FIELDS: dict[str, Callable[["Connection"], dict[str, str]]] = {
+_LABEL_FIELDS: dict[str, Callable[[Connection], dict[str, str]]] = {
     "fetch_stale": _fetch_stale_fields,
 }
-"""Valeurs des champs de chaque libellé de phase qui en porte, lues en configuration."""
+"""Champs des libellés de phase, lus dans la configuration."""
 
 
 def _phase_label(name: str) -> str | None:
@@ -487,9 +481,7 @@ def _execute_phases(
     if recorder.run_id is not None:
         log.info("%s%d", RUN_MARKER, recorder.run_id)
 
-    # Matérialise `perimeter_structures` avant toute phase, même avec `--only` ou `--from` :
-    # les phases qui suivent lisent le périmètre sans le recalculer.
-
+    # Matérialise `perimeter_structures` avant toute phase, même avec `--only` ou `--from` : les phases lisent le périmètre sans le recalculer.
     with open_tx() as perimeter_conn:
         refresh_perimeter_structures(perimeter_conn)
 
@@ -511,10 +503,7 @@ def _execute_phases(
 
 
 def main() -> None:
-    # Une faute de segmentation vient d'une extension C — pilote de base, client HTTP, automate
-    # de matching — et tue le processus sans passer par Python. `faulthandler` écrit alors la pile
-    # de chaque thread sur la sortie d'erreur. Il lui faut un vrai descripteur de fichier, que la
-    # sortie capturée d'un test ne donne pas.
+    # Sur une faute de segmentation dans une extension C, `faulthandler` écrit la pile de chaque thread sur la sortie d'erreur. Il exige un vrai descripteur de fichier, absent sous la sortie capturée d'un test.
     with contextlib.suppress(ValueError, io.UnsupportedOperation):
         faulthandler.enable()
     _install_sigterm_handler()

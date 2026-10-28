@@ -22,7 +22,7 @@ def _stored_int(conn: Connection, key: ConfigKey) -> int | None:
     if isinstance(value, (int, str, float)) and not isinstance(value, bool):
         try:
             return int(value)
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             pass
     if value is not None:
         logger.warning("Valeur invalide pour %s: %s", key, value)

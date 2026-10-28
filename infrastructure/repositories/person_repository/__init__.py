@@ -55,7 +55,7 @@ class PgPersonRepository(PersonRepository):
 
     # ── persons ────────────────────────────────────────────────────
 
-    def find_by_id(self, person_id: int) -> "Person | None":
+    def find_by_id(self, person_id: int) -> Person | None:
         return _core.find_by_id(self._conn, person_id)
 
     def create(self, last_name: str, first_name: str = "") -> int:
@@ -91,13 +91,13 @@ class PgPersonRepository(PersonRepository):
 
     # ── person_identifiers ─────────────────────────────────────────
 
-    def find_identifier(self, id_type: str, id_value: str) -> "IdentifierAttribution | None":
+    def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:
         return _identifiers.find_identifier(self._conn, id_type, id_value)
 
-    def insert_identifier(self, ident: "IdentifierAttribution") -> int:
+    def insert_identifier(self, ident: IdentifierAttribution) -> int:
         return _identifiers.insert_identifier(self._conn, ident)
 
-    def update_identifier(self, ident: "IdentifierAttribution") -> None:
+    def update_identifier(self, ident: IdentifierAttribution) -> None:
         _identifiers.update_identifier(self._conn, ident)
 
     def attribute_identifier(
@@ -122,7 +122,7 @@ class PgPersonRepository(PersonRepository):
             self.update_identifier(existing)
         return AttributionResult(outcome, id_value, existing)
 
-    def update_identifier_status(self, ident_id: int, status: str) -> "IdentifierStatusRow":
+    def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:
         return _identifiers.update_identifier_status(self._conn, ident_id, status)
 
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
@@ -138,7 +138,7 @@ class PgPersonRepository(PersonRepository):
 
     def update_name_form_status(
         self, person_id: int, name_form: str, status: str
-    ) -> "NameFormStatusRow":
+    ) -> NameFormStatusRow:
         return _name_forms.update_name_form_status(self._conn, person_id, name_form, status)
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:

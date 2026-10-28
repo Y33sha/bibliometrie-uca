@@ -47,7 +47,7 @@ class ContributorName:
         return self.raw is None
 
     @classmethod
-    def from_parts(cls, last_name: str | None, first_name: str | None) -> "ContributorName | None":
+    def from_parts(cls, last_name: str | None, first_name: str | None) -> ContributorName | None:
         """Nom séparé par la source. Sans nom de famille, le prénom seul devient la chaîne brute. `None` sans aucun nom, ou pour un nom absent (`is_placeholder_name`)."""
         last = clean_raw_author_name(last_name or "").strip()
         first = clean_raw_author_name(first_name or "").strip()
@@ -58,7 +58,7 @@ class ContributorName:
         return cls(last_name=last, first_name=first or None)
 
     @classmethod
-    def from_raw(cls, raw: str | None) -> "ContributorName | None":
+    def from_raw(cls, raw: str | None) -> ContributorName | None:
         """Chaîne brute. `None` pour une chaîne vide ou un nom absent (`is_placeholder_name`)."""
         cleaned = clean_raw_author_name(raw or "").strip()
         return cls(raw=cleaned) if cleaned and not is_placeholder_name(cleaned) else None
@@ -66,7 +66,7 @@ class ContributorName:
     @classmethod
     def from_columns(
         cls, raw: str | None, last_name: str | None, first_name: str | None
-    ) -> "ContributorName":
+    ) -> ContributorName:
         """Nom stocké d'une contribution source (`raw_author_name`, `raw_last_name`, `raw_first_name`), déjà nettoyé."""
         if last_name is not None:
             return cls(last_name=last_name, first_name=first_name)

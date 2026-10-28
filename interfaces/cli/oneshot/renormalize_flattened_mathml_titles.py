@@ -49,7 +49,7 @@ def main() -> None:
         for source, source_id in targets:
             try:
                 raw_data = json.loads(store.get(source, source_id))
-            except (KeyError, UnreadablePayloadError, ValueError):
+            except KeyError, UnreadablePayloadError, ValueError:
                 log.warning("%s/%s : payload absent ou illisible au raw store", source, source_id)
                 continue
             rehydrated += rehydrate_staging_row(conn, source, source_id, raw_data)

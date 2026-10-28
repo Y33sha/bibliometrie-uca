@@ -143,7 +143,7 @@ class TestRedessinDeLaBarre:
         return barre
 
     @staticmethod
-    def _redessine(barre: "module._Bar", stream: io.StringIO) -> str:
+    def _redessine(barre: module._Bar, stream: io.StringIO) -> str:
         """Vide le flux, redessine la barre, rend ce que le redessin a écrit."""
         stream.seek(0)
         stream.truncate(0)

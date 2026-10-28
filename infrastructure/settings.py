@@ -1,14 +1,10 @@
-"""Configuration du projet bibliometrie-uca.
+"""Configuration du projet.
 
-Settings typés chargés depuis les variables d'environnement, le fichier `.env` à la racine du projet (gitignored) et le fichier de l'instance désignée par `BIBLIO_INSTANCE` (cf. `infrastructure/__init__.py`). En prod, les variables sont injectées par l'orchestrateur (pm2, systemd, docker).
+Settings typés chargés depuis les variables d'environnement, le fichier `.env` à la racine du projet (gitignored) et le fichier de l'instance désignée par `BIBLIO_INSTANCE` (cf. `infrastructure/__init__.py`).
 
-Usage :
-    from infrastructure.settings import settings
-    print(settings.db_host)
+Les secrets sont typés `SecretStr` : ils s'affichent `**********`, dans un journal comme dans une trace d'erreur, et se lisent par `.get_secret_value()`.
 
-Les valeurs secrètes sont typées `SecretStr` : leur représentation et leur sérialisation rendent `**********`, et la valeur se lit par `.get_secret_value()`. Un relevé de la configuration, une trace d'erreur ou un journal qui traverserait l'objet ne les expose donc pas.
-
-Les paramètres d'exploitation externalisés (périmètres, collections HAL, années couvertes) sont lus depuis la table `config` en base. Les identifiants d'accès aux sources, eux, sont des secrets : ils viennent de l'environnement comme les autres.
+Les paramètres d'exploitation (périmètres, collections HAL, années couvertes) sont dans la table `config`.
 """
 
 from typing import Annotated
@@ -20,7 +16,7 @@ from infrastructure import ENV_FILES
 
 
 class Settings(BaseSettings):
-    """Configuration de l'app — lit les fichiers d'environnement et les variables d'environnement."""
+    """Réglages lus dans les fichiers d'environnement et les variables d'environnement."""
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILES,
@@ -30,116 +26,77 @@ class Settings(BaseSettings):
     )
 
     # ----- Authentification admin -----
-    # Hash bcrypt : python -c 'import bcrypt; print(bcrypt.hashpw(b"MOT_DE_PASSE", bcrypt.gensalt()).decode())'
-    # Session secret : python -c "import secrets; print(secrets.token_hex(32))"
-    # Exigés du processus qui sert l'API, et de lui seul : le pipeline et les scripts de
-    # maintenance partagent cette configuration sans jamais ouvrir de session. Le contrôle vit
-    # donc au démarrage de l'API (`interfaces.api.session.check_auth_config`).
+    # `admin_hash` et `session_secret` sont exigés par l'API seulement, au démarrage (`interfaces.api.session.check_auth_config`). Commandes de génération dans `.env.example`.
     admin_user: str = "admin"
     admin_hash: SecretStr = SecretStr("")
     session_secret: SecretStr = SecretStr("")
 
     # ----- Sécurité HTTP -----
-    # Cookie de session marqué `Secure` (transmis uniquement sur HTTPS). Vrai par défaut ;
-    # passer à false pour un développement local servi en HTTP clair.
+    # Cookie de session réservé à HTTPS.
     cookie_secure: bool = True
-    # Exposition des docs interactives (`/docs`, `/redoc`, `/openapi.json`), qui cartographient
-    # toute la surface d'API. Faux par défaut ; activer en développement.
+    # Docs interactives (`/docs`, `/redoc`, `/openapi.json`).
     expose_api_docs: bool = False
-    # Origines autorisées à appeler l'API depuis un navigateur, énumérées et séparées par des
-    # virgules. Vide → aucune origine tierce, ce qui suffit quand le frontend est servi par
-    # l'API elle-même (même origine).
+    # Origines autorisées à appeler l'API depuis un navigateur, séparées par des virgules. Vide quand l'API sert le frontend.
     cors_origins: Annotated[list[str], NoDecode] = []
 
     # ----- Serveur de développement -----
-    # Port d'écoute de l'API lancée par `start.sh`. Le proxy de vite en déduit sa cible, avec le
-    # même défaut (cf. `interfaces/frontend/vite.config.ts`).
+    # Port de l'API lancée par `start.sh`. Le proxy de vite en déduit sa cible (cf. `interfaces/frontend/vite.config.ts`).
     api_port: int = 8000
 
     # ----- Base de données -----
     db_host: str = "localhost"
     db_port: int = 5432
     db_name: str = "bibliometrie"
-    # Trois identités de connexion, une par processus (cf. `infrastructure/db/roles.sql`).
-    # Chacune est exigée de la connexion qui la demande : vide, cette connexion est refusée
-    # (cf. `infrastructure.db.engine.db_url`) plutôt que repliée en silence sur une autre.
+    # Un rôle PostgreSQL par processus (cf. `infrastructure/db/roles.sql`). Une connexion dont le rôle est vide est refusée (`infrastructure.db.engine.db_url`).
     #
-    # Propriétaire du schéma. Les migrations s'en servent, et elles seules : elles sont seules
-    # à modifier la structure. Aucun processus qui tourne n'a à la porter.
+    # Propriétaire du schéma, pour les migrations seulement.
     db_owner_user: str = ""
     db_owner_password: SecretStr = SecretStr("")
-    # Identité de l'API : lecture, et écriture sur les seules tables que ses points d'entrée
-    # d'administration modifient.
+    # API : lecture, et écriture sur les tables que ses routes d'administration modifient.
     db_app_user: str = ""
     db_app_password: SecretStr = SecretStr("")
-    # Identité du pipeline et des scripts en ligne de commande : écriture sur les données,
-    # entretien des vues matérialisées et des statistiques, aucun droit sur le schéma.
+    # Pipeline et scripts en ligne de commande : écriture sur les données, entretien des vues matérialisées et des statistiques, aucun droit sur le schéma.
     db_pipeline_user: str = ""
     db_pipeline_password: SecretStr = SecretStr("")
-    # Mode SSL de la connexion (valeurs libpq : disable/prefer/require/verify-ca/verify-full).
-    # Vide → défaut du driver, soit `prefer` : chiffré si le serveur le propose, certificat non
-    # vérifié. `require` impose le chiffrement sans authentifier le serveur pour autant. Poser
-    # `verify-full` dès que la base est déportée : c'est la seule valeur qui écarte une
-    # interception, en vérifiant la chaîne du certificat et le nom d'hôte.
+    # Mode SSL de libpq. Vide : `prefer`, chiffrement sans vérification du certificat. `verify-full` authentifie le serveur.
     db_sslmode: str = ""
 
-    # Plafond du décalage qu'une lecture paginée peut demander. Le coût d'une page profonde
-    # tient au produit du rang par la taille de page : sans borne, un rang arbitrairement grand
-    # fait trier à la base l'ensemble du résultat pour n'en rendre aucune ligne. La valeur passe
-    # au-delà du plus gros ensemble servi ; la relever est le geste à faire le jour où un
-    # ensemble la dépasse, la marche à suivre restant de filtrer pour rapprocher les lignes
-    # visées du début du résultat.
+    # Décalage maximal d'une lecture paginée : une page profonde fait trier à la base tout le résultat. La valeur dépasse le plus gros ensemble servi.
     max_pagination_offset: int = 500_000
 
-    # Nombre d'exports menés de front. Un export compose sa réponse en mémoire avant de l'envoyer :
-    # ce plafond borne ce que le processus porte à un instant donné, là où le plafond de lignes
-    # borne le coût d'un export et celui de fréquence le coût d'une rafale venue d'un même client.
-    #
-    # La valeur se dimensionne sur le coût mesuré d'un export sans filtre — 59 Mo pour les 61 877
-    # publications d'août 2026 — rapporté à la mémoire du conteneur. À ce compte, cinq exports
-    # simultanés occupent de l'ordre de 300 Mo sur les deux gigaoctets qu'il porte. Une croissance
-    # du corpus déplace ce calcul : le plafond de lignes en donne la borne haute, et l'atteindre
-    # multiplierait par huit le coût d'un export.
+    # Exports simultanés. Un export compose sa réponse en mémoire : 59 Mo sans filtre pour 61 877 publications (août 2026), soit environ 300 Mo pour cinq exports, sur les 2 Go du conteneur.
     max_concurrent_exports: int = 5
 
     # ----- Concurrence de l'API -----
-    # Les routes sont synchrones : FastAPI les exécute dans le threadpool d'anyio, dont le
-    # lifespan de l'API fixe la taille à cette valeur. `db_pool_max` doit la couvrir, faute de
-    # quoi des threads attendent une connexion.
+    # Taille du threadpool d'anyio, qui exécute les routes synchrones ; fixée au démarrage de l'API. `db_pool_max` doit la couvrir.
     api_threadpool_size: int = 40
-    # Durée maximale d'une requête SQL servant une lecture de l'API (GET), en secondes. Postgres
-    # interrompt la requête au-delà. L'export complet des publications prend une dizaine de secondes.
+    # Durée maximale d'une requête SQL servant une lecture de l'API (GET), en secondes. L'export complet des publications prend une dizaine de secondes.
     api_read_statement_timeout_s: int = 30
 
     # ----- Pool de connexions -----
-    # `db_pool_min` : connexions tenues ouvertes en permanence. Le différentiel jusqu'à
-    # `db_pool_max` s'ouvre à la demande et se referme au retour. Le plafond égale
-    # `api_threadpool_size` : un thread qui sert une requête trouve une connexion.
+    # `db_pool_min` connexions toujours ouvertes ; les suivantes, jusqu'à `db_pool_max`, s'ouvrent à la demande. `db_pool_max` égale `api_threadpool_size` : chaque thread de l'API trouve une connexion.
     db_pool_min: int = 2
     db_pool_max: int = 40
 
     # ----- Identifiants d'accès aux sources externes -----
-    # Une source dont les identifiants manquent est sautée au lancement du pipeline, avec un
-    # avertissement, sans interrompre le run.
+    # Une source sans identifiants est sautée au lancement du pipeline, avec un avertissement.
     openalex_api_key: SecretStr = SecretStr("")
     wos_api_key: SecretStr = SecretStr("")
     scanr_username: str = ""
     scanr_password: SecretStr = SecretStr("")
-    # Adresse annoncée aux API qui pratiquent le polite pool. Requise par Crossref, DataCite et
-    # Unpaywall ; facultative pour OpenAlex, dont une clé d'API ouvre aussi le polite pool.
+    # Adresse annoncée aux API à polite pool : exigée par Crossref, DataCite et Unpaywall ; pour OpenAlex, à défaut de clé d'API.
     polite_pool_email: str = ""
 
-    # ----- Raw store (payloads bruts hors BDD) -----
-    # Répertoire où le pipeline archive les réponses des sources, quand `--raw-store` le lui
-    # demande. Vide → `data/raw_store` à la racine du dépôt.
+    # ----- Raw store (réponses brutes des sources) -----
+    # Répertoire de l'archive, quand le pipeline tourne avec `--raw-store`. Vide : `data/raw_store` à la racine du dépôt.
     biblio_raw_store_dir: str = ""
 
     @field_validator("cors_origins", mode="before")
     @classmethod
     def _parse_cors_origins(cls, value: object) -> object:
-        """Découpe la liste d'origines et refuse le joker.
+        """Découpe la liste d'origines et refuse le joker au démarrage.
 
-        `*` est inconciliable avec les requêtes portant un cookie : le middleware CORS répond alors en renvoyant l'`Origin` de l'appelant, si bien que n'importe quel site autorise ses visiteurs à appeler l'API avec leur session. Le refus tombe au démarrage plutôt qu'à la première requête, où il passerait inaperçu.
+        Avec `*` et des requêtes à cookie, le middleware CORS renvoie l'`Origin` de l'appelant : tout site pourrait appeler l'API avec la session de ses visiteurs.
         """
         if not isinstance(value, str):
             return value

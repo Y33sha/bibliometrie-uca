@@ -51,7 +51,7 @@ class StructureListItem(BaseModel):
     hal_collection: str | None
     perimeter_ids: list[int]
     """Périmètres auxquels la structure appartient (clôture transitive). Vide = hors périmètre."""
-    tutelles: list["RelatedStructureOut"] | None
+    tutelles: list[RelatedStructureOut] | None
     """Structures qui exercent une tutelle sur celle-ci."""
 
 
@@ -84,7 +84,7 @@ class StructureOut(BaseModel):
     api_ids: dict[str, list[str]] | None
 
     @classmethod
-    def from_structure(cls, structure: Structure) -> "StructureOut":
+    def from_structure(cls, structure: Structure) -> StructureOut:
         """Réponse d'une structure enregistrée : son type sous le nom `type`, ses identifiants ROR et HAL en chaînes."""
         return cls(
             id=cast(int, structure.id),

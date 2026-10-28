@@ -147,7 +147,7 @@ def _decode_html_entities_once(s: str) -> str:
             try:
                 code = int(name[2:], 16) if name[1] in "xX" else int(name[1:])
                 return chr(code)
-            except (ValueError, OverflowError):
+            except ValueError, OverflowError:
                 return m.group(0)
         return _HTML_ENTITY_NAMED.get(name, m.group(0))
 

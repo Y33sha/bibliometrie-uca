@@ -215,7 +215,7 @@ def fetch_hal_structures(
         if progress is not None:
             progress.set_total(len(requested))
         parents: set[int] = set()
-        for chunk in batched(sorted(pending), HAL_STRUCTURES_BATCH):
+        for chunk in batched(sorted(pending), HAL_STRUCTURES_BATCH, strict=False):
             structures = {s.hal_structure_id: s for s in _parsed(source.by_ids(chunk))}
             missing = set(chunk) - structures.keys()
             aliases: dict[int, int] = {}

@@ -18,7 +18,7 @@ class _Connection:
     def __init__(self) -> None:
         self.gestes: list[str] = []
 
-    def __enter__(self) -> "_Connection":
+    def __enter__(self) -> _Connection:
         return self
 
     def __exit__(self, *exc: object) -> None:

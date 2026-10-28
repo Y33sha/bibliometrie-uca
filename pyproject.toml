@@ -7,20 +7,20 @@ name = "bibliometrie-uca"
 version = "0.1.0"
 requires-python = ">=3.14"
 dependencies = [
-    "httpx2==2.16.0",            # unique client HTTP : appels synchrones et asynchrones du pipeline
-    "psycopg[binary]==3.3.6",    # driver Postgres pour SQLAlchemy ; import symbolique dans infrastructure/db/engine.py
-    "sqlalchemy==2.1.6",        # query builder Core
+    "httpx2==2.16.0",            # client HTTP unique du projet
+    "psycopg[binary]==3.3.6",    # driver PostgreSQL de SQLAlchemy
+    "sqlalchemy==2.1.6",         # query builder Core
     "alembic==1.20.1",           # migrations DB
     "fastapi==0.159.1",
-    "starlette==1.9.0",         # importé directement (Response, Scope, RequestResponseEndpoint) ; ≥1.3.1 corrige CVE-2026-54282/54283 (≥1.0.1 corrigeait déjà CVE-2026-48710)
+    "starlette==1.9.0",          # importé directement (Response, Scope, RequestResponseEndpoint)
     "anyio==4.15.1",             # importé directement : taille du threadpool posée au démarrage de l'API
     "uvicorn==0.54.0",           # serveur ASGI ; lancé en ligne de commande, jamais importé
     "bcrypt==5.0.0",
-    "python-dotenv==1.2.4",      # requis par pydantic-settings pour env_file ; CVE-2026-28684 fixed
+    "python-dotenv==1.2.4",      # requis par pydantic-settings pour env_file ; jamais importé
     "pydantic==2.14.1",          # requis par pydantic-settings et utilisé directement
-    "pydantic-settings==2.16.1", # ≥2.14.2 corrige GHSA-4xgf-cpjx-pc3j
+    "pydantic-settings==2.16.1",
     "pyahocorasick==2.3.1",      # automate Aho-Corasick : matching multi-formes des adresses (phase affiliations)
-    "defusedxml==0.7.1",         # lecture du TEI joint aux notices HAL : refuse les déclarations d'entités, que l'analyseur standard développe
+    "defusedxml==0.7.1",         # lecture du TEI des enregistrements HAL, sans développer les entités XML
     "orjson>=3.13.0",
     "xxhash>=4.0.2",
     "scipy==1.18.1",             # affectation optimale (algorithme hongrois) des contributions sources aux contributions
@@ -35,8 +35,8 @@ migrate_all = "interfaces.cli.dev.migrate_all:main"
 # Outils de développement et de test. `uv sync` les installe par défaut ; `--no-dev` les écarte.
 [dependency-groups]
 dev = [
-    "pytest==9.1.1",           # CVE-2025-71176 fixed
-    "pytest-asyncio==1.4.0",   # tests des extractions HTTP async du pipeline
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",   # tests des moissonnages HTTP async du pipeline
     "pytest-cov==7.1.0",
     "ruff==0.17.1",
     "pyrefly==1.4.0",
@@ -61,17 +61,10 @@ py-modules = []
 [tool.setuptools.packages.find]
 include = ["application*", "domain*", "infrastructure*", "interfaces*", "pipeline*"]
 
-# ----------------------------------------------------------------------
-# deptry : détection de dépendances manquantes / inutiles / transitives
-# Lit [project.dependencies] (PEP 621) et [dependency-groups] (PEP 735).
-# ----------------------------------------------------------------------
+# deptry : dépendances manquantes, inutilisées ou transitives.
 [tool.deptry]
 known_first_party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
-# `scripts/` et les hooks de `.claude/` outillent le dépôt sans être distribués : leurs imports
-# relèvent de l'environnement de développement, pas des dépendances de l'application. `data/` est un répertoire de travail local,
-# hors du dépôt. L'estimation des poids du modèle de l'alignement des auteurs tourne sur le poste de
-# développement : elle importe Splink, DuckDB et pyarrow, dépendances de développement. Les captures
-# d'écran du guide utilisateur s'y prennent aussi : elles importent Playwright.
+# Code non distribué, dont les imports relèvent des dépendances de développement : outillage du dépôt (`scripts/`, `.claude/`), répertoire de travail local (`data/`), scripts de développement qui importent Splink, DuckDB, pyarrow ou Playwright.
 extend_exclude = [
     "frontend",
     ".venv",
@@ -83,10 +76,7 @@ extend_exclude = [
     "interfaces/cli/dev/screenshots.py",
 ]
 
-# ----------------------------------------------------------------------
-# import-linter : vérifie les règles de dépendance entre couches DDD.
-# Lancement : `lint-imports`
-# ----------------------------------------------------------------------
+# import-linter : règles de dépendance entre couches. Lancement : `lint-imports`.
 [tool.importlinter]
 root_packages = ["domain", "application", "infrastructure", "interfaces", "pipeline"]
 # Nécessaire aux contrats qui ciblent des modules externes.
@@ -98,12 +88,7 @@ contract_types = ["purete_du_noyau: scripts.contrats_import.PureteDuNoyau"]
 name = "Couches DDD (layered)"
 type = "layers"
 layers = ["interfaces", "infrastructure | application", "domain"]
-# `application` n'importe pas `infrastructure` : toute nouvelle
-# dépendance doit passer par un port.
-#
-# Exception : `application.ports.*` est zone neutre. `infrastructure`
-# peut en importer les dataclasses de transport pour typer ses
-# signatures. Les Protocols restent implémentés via duck typing.
+# `application` atteint `infrastructure` par ses ports. `infrastructure` importe de `application.ports` les dataclasses qui typent ses signatures.
 ignore_imports = [
     "infrastructure.** -> application.ports.**",
 ]
@@ -113,10 +98,7 @@ name = "Pipeline : hors des couches hexagonales"
 type = "forbidden"
 source_modules = ["pipeline"]
 forbidden_modules = ["application", "interfaces"]
-# Le pipeline importe `domain/` et les modules techniques d'`infrastructure/` (connexion,
-# réglages, journalisation, fragments SQL), jamais `application/` ni `interfaces/`.
-# `infrastructure/`, que le pipeline importe, dépend des ports d'`application/` : ce chemin indirect
-# est admis.
+# Le pipeline importe `domain` et les modules techniques d'`infrastructure` (connexion, réglages, journalisation, fragments SQL). Le chemin indirect par les ports d'`application`, qu'`infrastructure` importe, est admis.
 ignore_imports = ["infrastructure.** -> application.ports.**"]
 
 [[tool.importlinter.contracts]]
@@ -131,8 +113,7 @@ name = "Pipeline : le noyau d'exécution ignore les phases"
 type = "forbidden"
 source_modules = ["pipeline.runtime", "pipeline.graph", "pipeline.task_runner", "pipeline.http"]
 forbidden_modules = ["pipeline.ingestion", "pipeline.transformation"]
-# Les phases dépendent du noyau (`runtime`, `graph`, `task_runner`) et de l'outillage HTTP (`http`).
-# Seul l'orchestrateur `pipeline/run.py` assemble les phases.
+# Les phases dépendent du noyau (`runtime`, `graph`, `task_runner`) et de l'outillage HTTP (`http`). Seul l'orchestrateur `pipeline/run.py` assemble les phases.
 
 [[tool.importlinter.contracts]]
 name = "Sources : les orchestrateurs de phase les importent, jamais l'inverse"
@@ -160,13 +141,7 @@ name = "Routers : pas d'import direct de infrastructure"
 type = "forbidden"
 source_modules = ["interfaces.api.routers"]
 forbidden_modules = ["infrastructure"]
-# Les routers reçoivent leurs dépendances par `Depends(...)`, dont les fabriques vivent dans
-# `interfaces.api.deps` (composition root). Une écriture passe par un service d'`application/`.
-# Une lecture importe son adaptateur de `infrastructure.read_models`, pour en typer la
-# dépendance et en lire les modèles de réponse. Cf. docs/architecture/01-vue-d-ensemble.md.
-#
-# Imports transitifs autorisés : `routers → deps → infrastructure` est le chemin attendu
-# (composition root), donc on n'interdit que les imports directs.
+# Les routers reçoivent leurs dépendances par `Depends(...)`, fabriquées dans `interfaces.api.deps` (composition root) : le chemin indirect `routers → deps → infrastructure` est admis. Une écriture passe par un service d'`application`. Une lecture importe son adaptateur de `infrastructure.read_models`, pour typer la dépendance et lire les modèles de réponse.
 allow_indirect_imports = "true"
 ignore_imports = ["interfaces.api.routers.** -> infrastructure.read_models.**"]
 
@@ -175,9 +150,7 @@ name = "Composition root : repositories concrets uniquement dans deps"
 type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = ["infrastructure.repositories"]
-# Seul `interfaces/api/deps.py` instancie les repositories concrets, qu'il remet aux services
-# d'écriture ; les routers reçoivent ces services par `Depends(...)`. L'interface publique du
-# pipeline relève de son propre contrat.
+# Seul `interfaces/api/deps.py` instancie les repositories concrets. `pipeline.public` relève de son propre contrat.
 ignore_imports = [
     "interfaces.api.deps -> infrastructure.repositories.**",
     "interfaces.api.** -> pipeline.public",
@@ -188,8 +161,7 @@ name = "API : le pipeline par son interface publique"
 type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = ["pipeline"]
-# L'API importe seulement `pipeline/public.py`, qui exporte l'ordre des phases et les recalculs
-# ciblés.
+# L'API importe seulement `pipeline/public.py`, qui exporte l'ordre des phases et les recalculs ciblés.
 ignore_imports = ["interfaces.api.** -> pipeline.public"]
 
 [[tool.importlinter.contracts]]
@@ -197,15 +169,7 @@ name = "Adapters : la connexion se reçoit, elle ne s'ouvre pas"
 type = "forbidden"
 source_modules = ["infrastructure.read_models", "infrastructure.repositories"]
 forbidden_modules = ["infrastructure.db.engine"]
-# Un adapter travaille sur la connexion que son appelant lui remet : c'est elle qui porte la
-# transaction de la requête, et les caractéristiques que la composition root y a posées — la
-# lecture seule sur une méthode HTTP sans effet de bord. Atteindre l'engine ouvrirait une
-# connexion en marge de cette règle, et l'écriture qu'un point d'entrée de lecture émettrait
-# par ce chemin aboutirait.
-#
-# L'adapter dont la lecture se répartit sur plusieurs connexions — les facettes de
-# publications, calculées en parallèle — reçoit une fabrique de connexions à sa construction,
-# comme il reçoit sa connexion.
+# Un adapter reçoit la connexion de la requête, avec sa transaction et sa lecture seule. Une connexion tirée de l'engine échapperait à la lecture seule. Une lecture parallélisée reçoit une fabrique de connexions (`connection_factory`).
 
 [[tool.importlinter.contracts]]
 name = "API : aucune requête réseau sortante"
@@ -226,37 +190,16 @@ forbidden_modules = [
     "telnetlib",
     "socketserver",
 ]
-# L'API n'émet aucun appel sortant : elle lit et écrit dans PostgreSQL, et rien d'autre. Tout
-# le trafic sortant appartient au pipeline, exécuté hors du cycle web. Ce contrat en fait une
-# garantie mécanique plutôt qu'un constat : aucun module servant une requête HTTP ne peut
-# atteindre un client réseau, fût-ce par un import indirect (les chaînes sont vérifiées, pas
-# seulement les imports directs).
+# L'API échange seulement avec PostgreSQL : le trafic sortant appartient au pipeline. Le contrat suit les chaînes d'imports, pas seulement les imports directs.
 #
-# `httpx2` est le client HTTP unique du projet, et `httpx` l'autre nom de publication de la même bibliothèque : les deux sont fermés.
-# `socket` ferme la porte à un repli sur la
-# primitive de la bibliothèque standard, et `socketserver` à l'ouverture d'un service à
-# l'écoute. Les autres noms couvrent les clients tiers et les protocoles que la bibliothèque
-# standard sert : courrier, transfert de fichiers, terminal distant.
-#
-# `urllib.request` échappe seul à ce contrat : l'outil ne sait pas viser le sous-module d'un
-# paquet qu'il tient pour externe, et interdire `urllib` entier écarterait `urllib.parse`, dont
-# le domaine se sert pour manipuler des URL sans rien émettre. Il se ferme par la règle
-# `banned-api` d'`interfaces/api/ruff.toml`.
+# `httpx` est l'autre nom de publication de `httpx2`. Les autres noms couvrent les primitives réseau et les clients de la bibliothèque standard, et les clients tiers. L'outil ne sait pas viser `urllib.request`, sous-module d'un paquet externe : la règle `banned-api` de ruff l'interdit.
 
 [[tool.importlinter.contracts]]
 name = "API : aucun lancement de programme"
 type = "forbidden"
 source_modules = ["interfaces.api"]
 forbidden_modules = ["subprocess", "multiprocessing", "pty"]
-# Le code servant les requêtes HTTP ne lance aucun programme externe.
-# L'analyse statique signale les appels de lancement partout dans le dépôt, mais elle
-# ne voit qu'un appel écrit dans un fichier : ce contrat établit qu'aucun module atteignable
-# depuis la couche API ne joint un lanceur, fût-ce par une chaîne d'imports.
-#
-# `subprocess` est le module de lancement de la bibliothèque standard ; `multiprocessing` et
-# `pty` en lancent aussi, et échappent à l'analyse statique. `os.posix_spawn` reste hors de
-# portée des deux outils : l'un ne connaît pas cet appel, l'autre ne sait pas viser l'attribut
-# d'un module, et interdire `os` entier écarterait tout le reste de son usage.
+# Le contrat suit les chaînes d'imports ; les règles `S6xx` de ruff voient seulement les appels écrits. `os.posix_spawn` reste hors de portée : interdire `os` écarterait tout le module.
 
 [[tool.importlinter.contracts]]
 name = "Domain : rien hors bibliothèque standard"
@@ -264,22 +207,12 @@ type = "purete_du_noyau"
 paquet = "domain"
 # `_typeshed` est fourni par les vérificateurs de types et n'existe pas à l'exécution.
 autorises = ["_typeshed"]
-# Le domaine ne dépend de rien : pas d'ORM, pas de validation Pydantic, pas de framework web,
-# pas de driver de base. Les modèles d'entrée-sortie JSONB vivent dans
-# `infrastructure/jsonb_models/`.
+# Les modèles d'entrée-sortie JSONB sont dans `infrastructure/jsonb_models/`.
 
 [tool.deptry.per_rule_ignores]
-# Paquets que rien n'importe, et qui restent des dépendances de production.
-# - python-dotenv : pydantic-settings l'appelle en interne dès qu'on utilise
-#   `env_file=...`.
-# - uvicorn : serveur ASGI lancé en ligne de commande (`CMD uvicorn ...` du
-#   Dockerfile, `start.sh`, systemd ou pm2 hors Docker). C'est lui qui importe
-#   l'application, jamais l'inverse — deptry ne lit que les imports.
+# Dépendances de production qu'aucun module n'importe.
 DEP002 = ["python-dotenv", "uvicorn"]
-
-# Paquets de développement qu'un module de production importe sous `try`.
-# - tqdm : les barres de progression ne s'affichent qu'en terminal. Son absence conduit au
-#   même repli que l'absence de terminal, celui des runs en conteneur.
+# Dépendances de développement qu'un module de production importe sous `try`.
 DEP004 = ["tqdm"]
 
 # Alias paquet distribué → nom de module importé (les noms peuvent différer).
@@ -287,17 +220,10 @@ DEP004 = ["tqdm"]
 pydantic-settings = "pydantic_settings"
 pyahocorasick = "ahocorasick"
 
-# ----------------------------------------------------------------------
-# Ruff : linter + formateur (remplace flake8, isort, pyupgrade, black)
-# Mode permissif au début — voir `ruff check .` et `ruff format --check .`
-# ----------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
-target-version = "py312"
 extend-exclude = [
-    # Les extraits de code de la documentation illustrent un propos : ils ne sont pas du code
-    # à maintenir, et les fiches archivées sont un compte rendu qu'on ne réécrit pas.
-    "*.md",
+    "*.md",                      # extraits de code de la documentation
     ".claude",                   # hooks du harnais de développement, hors code applicatif
     "data",                      # répertoire de travail local, hors du dépôt
     "interfaces/frontend",
@@ -309,7 +235,6 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-# Règles activées — on démarre permissif, à durcir au fil du temps.
 select = [
     "E",     # pycodestyle errors
     "W",     # pycodestyle warnings
@@ -319,7 +244,7 @@ select = [
     "B",     # flake8-bugbear (pièges courants)
     "C901",  # complexité cyclomatique
     "ASYNC", # flake8-async : I/O bloquantes dans une async def, etc.
-    "S",     # flake8-bandit : 73 règles de sécurité (cf. per-file-ignores pour les exceptions)
+    "S",     # flake8-bandit : sécurité (exceptions dans per-file-ignores)
     "A",     # flake8-builtins : un nom qui masque une fonction de base
     "C4",    # flake8-comprehensions : compréhensions et appels de collection superflus
     "DTZ",   # flake8-datetimez : instants sans fuseau (cf. `domain.dates.today`)
@@ -332,108 +257,59 @@ select = [
     "RET",   # flake8-return : chemins de retour superflus
     "TID",   # flake8-tidy-imports : imports relatifs remontants
 ]
-# RUF029 (async def sans await) serait utile mais reste en preview chez
-# ruff à ce jour : l'activer exigerait `preview = true` qui allume
-# d'autres règles preview non évaluées. À ajouter quand elle stabilise.
-# Ignorés le temps d'assainir progressivement
 ignore = [
-    "E501", # ligne trop longue — à durcir plus tard
-    "E402", # module-level import not at top — quelques cas légitimes
-    "B008", # function call in default argument — FastAPI Depends() idiomatique
+    "E501", # ligne trop longue : docstrings et commentaires tiennent sur une ligne par paragraphe
+    "E402", # module-level import not at top
+    "B008", # function call in default argument : `Depends()` de FastAPI
 ]
 
 [tool.ruff.lint.mccabe]
-# Seuil à 15 après décomposition de publications_facets (25 → <10),
-# _build_list_conditions (17 → <15), refresh_from_sources (24 → <15),
-# export_publications_csv (23 → <15). Prochaine cible : 10.
 max-complexity = 15
 
 [tool.ruff.lint.flake8-tidy-imports.banned-api]
-# `httpx2` est le client HTTP unique du projet. `urllib.request` ouvrirait un second chemin
-# sortant, hors des délais d'expiration, des tentatives bornées et du disjoncteur qui
-# encadrent le premier — et hors de la liste blanche d'hôtes qu'un test confronte au code.
-#
-# L'interdiction vaut pour tout le dépôt plutôt que pour la seule couche API : le contrat
-# d'architecture qui ferme les autres modules réseau à cette couche ne sait pas nommer le
-# sous-module d'un paquet qu'il tient pour externe. Fermer la source obtient la même
-# transitivité, sans avoir à suivre les chemins.
+# `httpx2` est le client HTTP unique du projet, encadré par des délais d'expiration, des tentatives bornées, un disjoncteur et une liste blanche d'hôtes.
 "urllib.request".msg = "Le client HTTP du projet est httpx2, et le trafic sortant appartient au pipeline (pipeline/ingestion)."
 
-# Le projet n'a qu'un engine, construit par `infrastructure/db/engine.py`, seul endroit d'où
-# une connexion peut naître. C'est lui qui choisit l'identité de connexion selon le processus
-# et qui installe le suivi du DML ; un second engine fabriqué ailleurs porterait ni l'une ni
-# l'autre, et ouvrirait des connexions hors des caractéristiques que la composition root de
-# l'API pose sur les siennes — la lecture seule d'une requête de lecture, en particulier.
-#
-# L'interdiction porte sur tout le dépôt, les exceptions se lisant dans `per-file-ignores` :
-# le constructeur lui-même, et les tests, qui montent leur propre engine sur la base de test.
+# L'engine unique du projet choisit le rôle PostgreSQL selon le processus et installe le suivi du DML. Exceptions dans `per-file-ignores`.
 "sqlalchemy.create_engine".msg = "L'engine du projet se construit dans infrastructure/db/engine.py, et s'obtient par get_sync_engine."
 
-# Le type JSONB de SQLAlchemy écrit `None` en JSON `null` plutôt qu'en NULL SQL. Les deux se
-# relisent en `None` côté Python, mais SQL les distingue : une colonne qui mélange les deux
-# formes échappe aux contraintes et aux index qui raisonnent sur NULL. `infrastructure/db/jsonb.py`
-# en pose la variante du projet, seule autorisée, et l'interdiction empêche l'autre de revenir.
+# Le type JSONB de SQLAlchemy écrit `None` en JSON `null`, que les contraintes et les index sur NULL ignorent.
 "sqlalchemy.dialects.postgresql.JSONB".msg = "Le type JSONB du projet est Jsonb, dans infrastructure/db/jsonb.py : il écrit None en NULL SQL."
 
 [tool.ruff.lint.isort]
-# Les couches du projet, déclarées pour que leur classement en premier rang ne dépende
-# pas de l'inférence de ruff, qui varie d'une version à l'autre.
+# Déclarées : l'inférence de ruff varie d'une version à l'autre.
 known-first-party = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
-# Regroupe les imports d'un même module en un seul bloc, alias inclus
-# (sinon chaque `from x import (a as b)` aliasé occupe son propre bloc).
+# Regroupe les imports d'un même module en un seul bloc, alias inclus.
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-# `S101` : une assertion est le propos d'un test. `S105`/`S106` : les fixtures posent des
-# identifiants factices, nommés pour ce qu'ils sont. `S608` : les tests composent du SQL de
-# jeu de données.
-# `TID251` : les tests montent leur propre engine sur la base de test.
+# `S105`/`S106` : identifiants factices des fixtures. `S608` : SQL de jeu de données. `TID251` : engine de la base de test.
 "tests/*" = ["E402", "S101", "S105", "S106", "S108", "S324", "S608", "TID251"]
-# Les sites légitimes de ce qui est interdit ailleurs : le constructeur de l'engine, et le
-# module qui pose le type JSONB du projet.
+# Constructeur de l'engine et type JSONB du projet.
 "infrastructure/db/engine.py" = ["TID251"]
 "infrastructure/db/jsonb.py" = ["TID251"]
-# `S608` signale toute interpolation dans une chaîne SQL. Ces couches ont pour métier de
-# composer des requêtes à partir de fragments pris dans des listes blanches écrites en dur
-# (tris, dimensions, colonnes) ; les valeurs issues d'une requête HTTP, elles, passent
-# toujours par des paramètres liés. La règle reste active partout ailleurs — un SQL composé
-# à la main dans `interfaces/api` ou `application` doit se signaler.
+# `S608` (SQL composé par interpolation) : ces modules composent leurs requêtes à partir de fragments écrits en dur ; les valeurs reçues passent par des paramètres liés.
 "infrastructure/read_models/*" = ["S608"]
 "pipeline/*" = ["S101", "S608"]
 "infrastructure/repositories/*" = ["S608"]
 "infrastructure/sql_fragments.py" = ["S608"]
 "alembic/versions/*" = ["S608"]
-# Scripts de développement : `dump_schema` lance `pg_dump`, dont il compose lui-même les
-# arguments.
+# Scripts de développement : `dump_schema` lance `pg_dump`.
 "interfaces/cli/dev/*" = ["S603", "S607"]
 # Génération d'illustrations : la disposition d'un graphe tire au sort des positions.
 "docs/img/graphs/*" = ["S311"]
-# `S101` vise l'assertion qui porte une décision de sécurité, effacée par l'interpréteur en
-# mode optimisé. Ces couches et le pipeline s'en servent pour des invariants internes — cohérence d'un
-# registre au chargement, resserrement d'un type — sans qu'aucune autorisation en dépende.
-# La règle reste active sur `interfaces/` et `application/services/`, où une décision
-# d'autorisation pourrait naître.
+# `S101` (assertion, effacée en mode optimisé) : ces couches s'en servent pour des invariants internes, sans décision d'autorisation.
 "domain/*" = ["S101"]
 "infrastructure/*" = ["S101"]
-"application/pipeline/normalize/normalize_hal.py" = ["S101"]
-# Scripts en ligne de commande et orchestrateur du pipeline : imports tardifs, et SQL
-# composé à partir de fragments écrits en dur.
+# Scripts en ligne de commande : imports tardifs, SQL composé à partir de fragments écrits en dur.
 "interfaces/cli/*" = ["E402", "S608"]
-"application/pipeline/*" = ["S101"]
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
-# ----------------------------------------------------------------------
-# Pytest + coverage
-# ----------------------------------------------------------------------
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Mode d'import `importlib` : le nom de module dérive du chemin complet,
-# ce qui autorise des fichiers de test homonymes dans des répertoires
-# distincts sans exiger un `__init__.py` dans chacun.
+# `importlib` : des fichiers de test homonymes coexistent dans des répertoires distincts, sans `__init__.py`.
 addopts = "-q --import-mode=importlib"
-# pytest-asyncio mode auto — les fonctions `async def test_*` sont
-# reconnues automatiquement sans décorateur. Loop scope par fonction
-# (défaut) : chaque test async a sa propre boucle.
+# Les tests `async def` sont reconnus sans décorateur.
 asyncio_mode = "auto"
 
 [tool.coverage.run]
@@ -442,18 +318,12 @@ source = ["application", "domain", "infrastructure", "interfaces", "pipeline"]
 omit = [
     "tests/*",
     "*/__init__.py",
-    # Backfills jetables : écrits pour une exécution, lancés à la main, puis conservés
-    # comme trace de ce qui a été fait. Les autres scripts en ligne de commande — imports
-    # de fichiers, maintenance, outils de développement — restent mesurés : ils écrivent
-    # en base et se rejouent.
-    "interfaces/cli/oneshot/*",
+    "interfaces/cli/oneshot/*", # scripts ponctuels, exécutés une fois et conservés comme trace
 ]
 
 [tool.coverage.report]
 skip_empty = true
 show_missing = true
-# Seuil progressif : ne jamais régresser. À faire remonter au fur et à
-# mesure qu'on ajoute des tests.
 fail_under = 90
 exclude_lines = [
     "pragma: no cover",
@@ -461,17 +331,9 @@ exclude_lines = [
     "if __name__ == .__main__.:",
 ]
 
-# ----------------------------------------------------------------------
-# Pyrefly : vérificateur de types.
-# Lancement : `uv run pyrefly check`
-# ----------------------------------------------------------------------
+# Pyrefly : vérificateur de types. Lancement : `uv run pyrefly check`.
 [tool.pyrefly]
-# Version des images de production (cf. `scripts/versions-des-images.sh`) : le typage se
-# vérifie sur la sémantique de l'interpréteur qui exécute, non sur un plancher de compatibilité.
-python-version = "3.14.0"
-# Système des images de production, pour la même raison. Sans cette ligne, pyrefly analyse pour
-# la plateforme qui le lance : depuis un poste Windows, il rejette les appels POSIX que le code
-# exécute en production (`signal.SIGKILL`).
+# Système des images de production. Sans ce réglage, pyrefly lancé sous Windows rejette les appels POSIX (`signal.SIGKILL`).
 python-platform = "linux"
 project-excludes = [
     "**/frontend/",
@@ -487,24 +349,15 @@ project-excludes = [
 ignore-missing-imports = ["ahocorasick"]
 
 [tool.pyrefly.errors]
-# `Any` explicite interdit, comme les génériques sans paramètre (`dict`, `list`). Les exceptions
-# se lisent dans les sous-configurations plus bas, où chacune porte son motif.
+# `Any` explicite et génériques sans paramètre (`dict`, `list`) interdits ; exceptions dans les sous-configurations.
 explicit-any = "error"
 implicit-any-type-argument = "error"
-# Une fonction ne rend pas un `Any` sous une déclaration qui promet autre chose : le contrôle
-# se fait à l'endroit où la valeur entre, non chez l'appelant qui la croira acquise.
 no-any-return = "error"
 # Toutes les fonctions sont annotées.
 unannotated-parameter = "error"
 unannotated-return = "error"
 
-# Désactivation d'`explicit-any`, tenue au plus juste : une entrée qui ne couvre plus aucune
-# erreur est retirée, et le motif se lit en regard du module.
-#
-# Un JSON de forme libre ne se décrit pas par l'alias récursif `JsonValue` : le schéma OpenAPI
-# qui en découlerait produit un type TypeScript circulaire, que le compilateur refuse, et
-# `schema.ts` dérive du contrat. Les trois premiers modules en relèvent ; `facets` appelle une
-# facette par son nom (`getattr`).
+# `explicit-any` désactivé module par module. Les trois premiers servent du JSON de forme libre : l'alias récursif `JsonValue` produirait un type TypeScript circulaire dans `schema.ts`. `facets` appelle une facette par son nom (`getattr`).
 [[tool.pyrefly.sub-config]]
 matches = "infrastructure/read_models/config/models.py"
 [tool.pyrefly.sub-config.errors]
@@ -525,15 +378,13 @@ matches = "infrastructure/read_models/publications/facets.py"
 [tool.pyrefly.sub-config.errors]
 explicit-any = false
 
-# L'appariement d'une ligne de relevé avec le type qu'elle alimente se fait par dépaquetage de
-# clés qu'aucune analyse statique ne connaît, le relevé étant une chaîne de caractères. Le module
-# porte ce contrôle à l'exécution, et les tests d'intégration l'exercent sur chaque relevé.
+# Une ligne SQL alimente son type par dépaquetage de clés, invisible à l'analyse statique. Le module contrôle ces clés à l'exécution.
 [[tool.pyrefly.sub-config]]
 matches = "infrastructure/db/rows.py"
 [tool.pyrefly.sub-config.errors]
 bad-unpacking = false
 
-# Tests et scripts ponctuels : vérifiés pour le code cassé (import d'un nom ou d'un module inexistant, nom inconnu, mot-clé inconnu…). Les annotations et les accès que l'analyse ne prouve pas sûrs, faute de types dans ce code, ne sont pas exigés.
+# Tests et scripts ponctuels : seul le code cassé est vérifié (import, nom ou mot-clé inexistant).
 [[tool.pyrefly.sub-config]]
 matches = "tests/**"
 [tool.pyrefly.sub-config.errors]
@@ -573,23 +424,13 @@ bad-assignment = false
 no-matching-overload = false
 read-only = false
 
-# ----------------------------------------------------------------------
-# mutmut : tests de mutation du domaine.
-# Lancement, à la demande : `uv run --with mutmut mutmut run`, puis
-# `mutmut results` pour la liste et `mutmut show <mutant>` pour le diff.
-# ----------------------------------------------------------------------
+# mutmut : tests de mutation du domaine. Lancement : `uv run --with mutmut mutmut run`, puis `mutmut results` et `mutmut show <mutant>`.
 [tool.mutmut]
-# Seule couche mutée : ses règles sont pures, et une règle fausse ne s'y voit
-# qu'au résultat. Les tests unitaires y répondent sans base de données.
+# Couche pure : les tests unitaires l'exercent sans base de données.
 source_paths = ["domain"]
-
-# Toute la suite unitaire répond, pas seulement `tests/unit/domain` : les tests
-# d'une règle du domaine vivent parfois sous la couche qui l'appelle.
+# Toute la suite unitaire : des règles du domaine sont testées sous la couche qui les appelle.
 pytest_add_cli_args_test_selection = ["tests/unit"]
-
-# mutmut copie le code muté dans `mutants/` et y lance les tests. Ce qu'ils lisent
-# hors de la couche mutée s'y copie tel quel : modules importés et fichiers du
-# repository que les tests de conformité relisent.
+# Fichiers lus par les tests hors de la couche mutée, copiés dans `mutants/` : modules importés, fichiers relus par les tests de conformité.
 also_copy = [
     "application",
     "infrastructure",

@@ -1,58 +1,32 @@
-# ============================================================
-# Vérifications git : deux étages.
-#   - pre-commit : garde rapide et locale à chaque commit (lint, format sur
-#     l'index, types, hygiène des fichiers, concordance du contrat OpenAPI).
-#   - pre-push   : rejoue les vérifications de la CI avant chaque push (lint,
-#     format, types, contrats d'architecture, hygiène des dépendances,
-#     tests unitaires, contrôles du frontend). La suite d'intégration et le
-#     build du frontend restent à la charge de la CI.
-# Installation des deux étages, par machine (`.git/hooks/` n'est pas versionné) :
-# `pre-commit install`.
-# Les hooks constatent et refusent ; ils ne modifient aucun fichier. Une
-# vérification en échec se corrige à la main (ou via `ruff format` / `ruff check
-# --fix` / `uv lock` lancés explicitement) puis se rejoue.
-# Lancement manuel sur tout le repo : `pre-commit run --all-files`
-#   (et `pre-commit run --all-files --hook-stage pre-push` pour l'étage push).
-# ============================================================
+# Deux étages, installés par `pre-commit install` (une fois par machine) :
+#   - pre-commit : lint, format, types, hygiène des fichiers, concordance du contrat OpenAPI ;
+#   - pre-push : les contrôles de la CI qui se passent d'une base de données.
+# Les hooks vérifient sans modifier. Lancement manuel : `pre-commit run --all-files`, et `--hook-stage pre-push` pour le second étage.
 
-# `pre-commit install` installe les deux étages : sans cette clé, il n'en pose
-# qu'un, et le pre-push reste muet jusqu'à ce que quelqu'un pense au
-# `--hook-type pre-push`.
+# Sans cette clé, `pre-commit install` pose seulement l'étage pre-commit.
 default_install_hook_types: [pre-commit, pre-push]
 
-# Les hooks sans `stages` explicite ne tournent qu'au commit ; l'étage pre-push
-# est réservé aux hooks qui le déclarent.
+# Un hook sans `stages` tourne seulement au commit.
 default_stages: [pre-commit]
 
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.16.4
-    hooks:
-      # Lint : signale les erreurs sans les corriger.
-      - id: ruff
-        args: [--no-fix]
-      # Format : vérifie le formatage sans reformater.
-      - id: ruff-format
-        args: [--check]
-
-  # Hooks locaux : outils installés dans l'env Python du projet.
-  # pyrefly et lint-imports résolvent les imports sur tout le projet. Au commit,
-  # pre-commit met de côté les modifications non indexées, mais les fichiers non
-  # suivis restent visibles. pyrefly tourne au commit et se rejoue au push, sur
-  # l'arbre entièrement commité ; lint-imports tourne seulement au push.
+  # Outils lancés par `uv run python -m`, dans le venv du projet, à la version de `uv.lock`. Le contrôle d'application de Windows bloque les exécutables non signés qu'uv ou pre-commit posent dans un venv (« os error 4551 ») ; l'interpréteur est signé. `import-linter`, sans point d'entrée module, se lance par sa fonction de console.
   #
-  # Les outils sont lancés par l'interpréteur, pas par leur exécutable : le contrôle
-  # d'application de Windows bloque les shims .exe non signés que uv pose dans le venv
-  # (« os error 4551 »), binaire par binaire selon leur réputation. L'interpréteur, lui,
-  # est signé. La forme est `python -m <module>` pour les outils qui exposent un point
-  # d'entrée module ; `import-linter` n'en a pas, et se lance par la fonction que son
-  # script de console appelle.
+  # pyrefly et lint-imports analysent tout le projet, fichiers non suivis compris : pyrefly tourne au commit et se rejoue au push ; lint-imports tourne au push seulement.
   - repo: local
     hooks:
-      # Hygiène de fichiers reprise de pre-commit/pre-commit-hooks, lancée via
-      # `python -m` dans l'env du projet plutôt que par le venv que pre-commit se
-      # fabriquerait : ce venv expose un `python.exe` sans réputation que le
-      # contrôle d'application de Windows bloque (« os error 4551 »).
+      - id: ruff-check
+        name: ruff check (lint)
+        entry: uv run python -m ruff check --no-fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+
+      - id: ruff-format
+        name: ruff format --check (format)
+        entry: uv run python -m ruff format --check --force-exclude
+        language: system
+        types_or: [python, pyi]
+
       - id: check-yaml
         name: check-yaml
         entry: uv run python -m pre_commit_hooks.check_yaml
@@ -77,8 +51,7 @@ repos:
         args: [--maxkb=500]
         language: system
 
-      # Vérifie que uv.lock est à jour avec pyproject.toml, sans le régénérer.
-      # Si le lockfile est périmé, le commit échoue : lancer `uv lock` à la main.
+      # Correction : `uv lock`.
       - id: uv-lock
         name: uv-lock (vérifie que le lockfile est à jour)
         entry: uv lock --check
@@ -86,13 +59,7 @@ repos:
         pass_filenames: false
         files: ^(pyproject\.toml|uv\.lock)$
 
-      # Contrat OpenAPI → types TypeScript : schema.ts est généré depuis
-      # l'OpenAPI de l'API par `npm run types:gen`. Ce contrôle le régénère dans
-      # un fichier temporaire et échoue si la version commitée a dérivé, sans la
-      # modifier. Correction : `npm run types:gen` (dans interfaces/frontend)
-      # puis commiter. Le contrat dépend de tout le code Python que l'API
-      # importe : le contrôle tourne dès qu'un fichier Python ou schema.ts est
-      # commité.
+      # schema.ts suit le contrat OpenAPI de l'API, qui dépend de tout le code Python. Correction : `npm run types:gen` dans interfaces/frontend.
       - id: openapi-types
         name: openapi-typescript (concordance des types et du contrat)
         entry: |-
@@ -101,8 +68,7 @@ repos:
         pass_filenames: false
         files: (\.py|^interfaces/frontend/src/lib/api/schema\.ts)$
 
-      # Types, sur tout le projet. Rejoué au push, comme ruff : un commit passé en
-      # --no-verify ou un fichier non suivi au moment du commit y sont rattrapés.
+      # Rejoué au push : rattrape un commit en --no-verify.
       - id: pyrefly
         name: pyrefly (types)
         entry: uv run python -m pyrefly check --summary=none
@@ -111,17 +77,8 @@ repos:
         files: (\.py|^pyproject\.toml)$
         stages: [pre-commit, pre-push]
 
-      # --------------------------------------------------------
-      # Étage pre-push : les contrôles de la CI (.github/workflows/ci.yml) qui
-      # tiennent en quelques secondes et se passent d'une base. Tourne avant
-      # chaque `git push`, sur tout le projet, quels que soient les fichiers
-      # modifiés.
-      #
-      # La suite d'intégration reste à la CI seule : elle demande une base et
-      # dure plus d'une minute, ce qui pèserait sur chaque push.
-      # --------------------------------------------------------
+      # ---- Étage pre-push : contrôles de la CI sans base de données, sur tout le projet ----
 
-      # Hygiène des dépendances : imports non déclarés, dépendances inutilisées.
       - id: ci-deptry
         name: deptry (hygiène des dépendances)
         entry: uv run python -m deptry .
@@ -130,7 +87,6 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Scan de vulnérabilités des dépendances installées.
       - id: ci-pip-audit
         name: pip-audit (vulnérabilités)
         entry: uv run python -m pip_audit --skip-editable
@@ -139,9 +95,7 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Lint + format + contrats d'architecture sur tout le projet.
-      # Rejoués ici même s'ils tournent au commit : garantit un push propre
-      # y compris après un commit passé en --no-verify.
+      # Rejoués au push : rattrapent un commit en --no-verify.
       - id: ci-ruff-check
         name: ruff check (lint)
         entry: uv run python -m ruff check .
@@ -166,9 +120,6 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Seize secondes : de quoi peser sur chaque commit, sans peser sur un push qui
-      # dure déjà une minute. Les tests d'intégration, qui demandent une base, restent
-      # à l'intégration.
       - id: ci-pytest-unit
         name: pytest (tests unitaires)
         entry: uv run python -m pytest tests/unit/ -q
@@ -177,11 +128,7 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # `.python-version` et `interfaces/frontend/.nvmrc` redisent des versions que le
-      # Dockerfile porte déjà, et que rien ne rapprochait de lui : l'interpréteur des
-      # contrôles locaux pouvait dériver de celui qui exécute en production. Le script
-      # confronte les deux fichiers au Dockerfile, et la version de Node du terminal aux
-      # contrôles du frontend qui s'y jouent.
+      # Confronte `.python-version` et `interfaces/frontend/.nvmrc` au Dockerfile, et le Node du terminal aux contrôles du frontend.
       - id: ci-versions-de-langage
         name: versions de langage alignées sur les images
         entry: ./scripts/verifier-les-versions.sh
@@ -190,11 +137,7 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # Frontend : vulnérabilités, types, lint et tests.
-      # `--omit=dev` : seul `dependencies` part dans le bundle servi au
-      # navigateur ; les failles de l'outillage de développement ne concernent
-      # pas l'application déployée. Seuil `moderate` : c'est là que CVSS range
-      # les XSS, qui sont la menace propre au code de navigateur.
+      # `--omit=dev` : seul `dependencies` part dans le bundle servi au navigateur. Seuil `moderate` : CVSS y classe les XSS.
       - id: ci-frontend-audit
         name: npm audit (vulnérabilités du bundle)
         entry: bash -c 'cd interfaces/frontend && npm audit --omit=dev --audit-level=moderate'
@@ -211,8 +154,6 @@ repos:
         always_run: true
         stages: [pre-push]
 
-      # `svelte/no-at-html-tags` recense les points d'insertion de HTML : la règle n'a de
-      # portée que si elle tourne avant l'envoi.
       - id: ci-frontend-lint
         name: eslint (frontend)
         entry: bash -c 'cd interfaces/frontend && npm run lint'
