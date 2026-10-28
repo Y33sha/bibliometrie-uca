@@ -7,6 +7,7 @@ L'écriture concerne seulement les colonnes de la ligne : celles qu'aucun import
 
 import json
 import logging
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
 from datetime import date
 
@@ -134,15 +135,35 @@ _UPSERT_SQL = text(
 
 
 _DELETE_IDENTIFIERS = text(
-    "DELETE FROM source_record_identifiers WHERE source_record_id = :source_record_id"
+    "DELETE FROM source_record_identifiers WHERE source_record_id = ANY(:source_record_ids)"
 )
 
 _INSERT_IDENTIFIERS = text("""
     INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role)
-    SELECT :source_record_id, CAST(i.id_type AS source_identifier_type), i.id_value,
+    SELECT i.source_record_id, CAST(i.id_type AS source_identifier_type), i.id_value,
            CAST(i.role AS source_identifier_role)
-    FROM jsonb_to_recordset(CAST(:identifiers AS jsonb)) AS i(id_type text, id_value text, role text)
+    FROM jsonb_to_recordset(CAST(:identifiers AS jsonb))
+        AS i(source_record_id integer, id_type text, id_value text, role text)
 """)
+
+
+def replace_identifiers(
+    conn: Connection, identifiers_by_source_record: Mapping[int, Iterable[SourceIdentifier]]
+) -> None:
+    """Remplace les identifiants de chaque enregistrement source de `identifiers_by_source_record`, en une suppression et une insertion. Chaque identifiant écrit est actif."""
+    conn.execute(_DELETE_IDENTIFIERS, {"source_record_ids": list(identifiers_by_source_record)})
+    rows = [
+        {
+            "source_record_id": source_record_id,
+            "id_type": i.id_type.value,
+            "id_value": i.value,
+            "role": i.role.value,
+        }
+        for source_record_id, identifiers in identifiers_by_source_record.items()
+        for i in identifiers
+    ]
+    if rows:
+        conn.execute(_INSERT_IDENTIFIERS, {"identifiers": json.dumps(rows)})
 
 
 class SourceRecordStore:
@@ -166,26 +187,11 @@ class SourceRecordStore:
             params["container_title"] = None
         params["abstract"] = strip_abstract_label(drop_duplicate_mathml(row.abstract))
         params["language"] = language_code(row.raw_language, self._forms())
-        identifiers = _identifiers(row)
+        identifiers = normalized_identifiers(row)
         params["external_ids"] = external_ids_from_identifiers(identifiers, row.doi)
         source_record_id = scalar_int(self._conn.execute(_UPSERT_SQL, params))
-        self._write_identifiers(source_record_id, identifiers)
+        replace_identifiers(self._conn, {source_record_id: identifiers})
         return source_record_id
-
-    def _write_identifiers(
-        self, source_record_id: int, identifiers: tuple[SourceIdentifier, ...]
-    ) -> None:
-        """Remplace les identifiants de l'enregistrement source. Chaque identifiant écrit est actif."""
-        self._conn.execute(_DELETE_IDENTIFIERS, {"source_record_id": source_record_id})
-        if identifiers:
-            rows = [
-                {"id_type": i.id_type.value, "id_value": i.value, "role": i.role.value}
-                for i in identifiers
-            ]
-            self._conn.execute(
-                _INSERT_IDENTIFIERS,
-                {"source_record_id": source_record_id, "identifiers": json.dumps(rows)},
-            )
 
     def _forms(self) -> dict[str, str]:
         if self._language_forms is None:
@@ -216,7 +222,7 @@ def fetch_language_forms(conn: Connection) -> dict[str, str]:
     return {r.form_normalized: r.language_code for r in rows}
 
 
-def _identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, ...]:
+def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, ...]:
     """Identifiants normalisés de la ligne (`normalize_identifiers`). Chaque identifiant écarté est journalisé."""
     identifiers, rejected = normalize_identifiers(row.identifiers)
     for identifier in rejected:

@@ -7,7 +7,7 @@ from domain.sources.registry import (
     SOURCE_PRIORITY,
 )
 from pipeline.graph import PHASE_ORDER, TASKS, Task, dependencies, order_violations
-from pipeline.ingestion.common.normalize import _normalize_builders
+from pipeline.ingestion.common.normalize import normalizer_builders
 
 
 def test_noms_uniques():
@@ -47,7 +47,7 @@ def test_normalisation_dans_l_ordre_de_priorite_des_sources():
         if n.phase == "normalize" and n.name.removeprefix("normalize.") in set(SOURCE_PRIORITY)
     ]
     assert normalize_tasks == [s.value for s in SOURCE_PRIORITY]
-    assert set(_normalize_builders(archive=False)) == {s.value for s in SOURCE_PRIORITY}
+    assert set(normalizer_builders(archive=False)) == {s.value for s in SOURCE_PRIORITY}
 
 
 def test_aucune_tache_ne_lit_une_donnee_ecrite_apres_elle():

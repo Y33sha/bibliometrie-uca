@@ -58,7 +58,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 
 - [x] Inventaire des identifiants par source et par type, avec leur rôle.
 - [x] Table des identifiants des enregistrements sources et migration (570949717).
-- [ ] Écriture de la table par la normalisation.
+- [x] Écriture de la table par la normalisation (05e2c6e63).
 - [ ] Remplissage du stock par un script oneshot : identifiants calculés depuis les payloads du raw store par la fonction de la normalisation.
 
 ### Phase 2 — Corrections

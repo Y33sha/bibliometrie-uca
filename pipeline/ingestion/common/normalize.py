@@ -169,7 +169,7 @@ class _NormalizeByOptions:
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
         options = ctx.options
-        registry = _normalize_builders(archive=options.raw_store)
+        registry = normalizer_builders(archive=options.raw_store)
 
         def normalize_one(ctx: PhaseContext, source: str) -> NormalizeStats:
             if options.normalize_full:
@@ -204,7 +204,7 @@ def _run_cleanup_orphan_addresses(ctx: PhaseContext) -> int:
         return delete_orphan_addresses(conn)
 
 
-def _normalize_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
+def normalizer_builders(*, archive: bool = True) -> dict[str, NormalizerFactory]:
     """Constructeur du normaliseur de chaque source, sur les stores de la phase."""
 
     raw_store = get_raw_store() if archive else NullRawStore()
