@@ -8,6 +8,7 @@ from pipeline.transformation.countries.refresh_publication_countries import Coun
 from pipeline.transformation.publications.publication_perimeter import (
     PublicationPerimeterRecompute,
 )
+from pipeline.transformation.publications.publication_recompute import PublicationRecompute
 from pipeline.transformation.publishing.publication_counts import PublicationCountRecompute
 from pipeline.transformation.publishing.serials.serial_merge import SerialRecompute
 from pipeline.transformation.structures.perimeter import PerimeterStructures
@@ -23,4 +24,5 @@ __all__ = [
     "PerimeterStructures",
     "PublicationCountRecompute",
     "PublicationPerimeterRecompute",
+    "PublicationRecompute",
 ]
