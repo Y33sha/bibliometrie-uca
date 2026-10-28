@@ -74,11 +74,11 @@ DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
 # Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
 
-# Fichier complémentaire figshare « Additional file N of T » : pièce de la collection figshare de titre T.
+# Fichier complémentaire figshare « Additional file [N] of T » : pièce de la collection figshare de titre T.
 FIGSHARE_ITEM_DOI_PATTERN = r"^10\.6084/m9\.figshare\.[0-9]+$"
 FIGSHARE_COLLECTION_DOI_PREFIX = "10.6084/m9.figshare.c."
 # Préfixe du titre normalisé (`normalize_text`) d'un fichier complémentaire figshare.
-FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file [0-9]+ of "
+FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file( [0-9]+)? of "
 
 
 def meme_oeuvre_declaree(

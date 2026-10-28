@@ -804,6 +804,22 @@ def test_figshare_additional_file_converges_whatever_its_source_and_type(sa_sync
         assert _doi(conn, source_record) == "10.6084/m9.figshare.c.6702115"
 
 
+def test_figshare_additional_file_without_number_converges(sa_sync_conn):
+    """« Additional file of T », sans numéro."""
+    conn = sa_sync_conn
+    _seed_figshare(
+        conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
+    )
+    piece = _seed_figshare(
+        conn,
+        source_id="f1",
+        doi="10.6084/m9.figshare.23538907",
+        title_normalized=f"additional file of {_ARTICLE}",
+    )
+    assert _apply_cluster(conn) == 1
+    assert _doi(conn, piece) == "10.6084/m9.figshare.c.6702115"
+
+
 def test_figshare_additional_file_stays_without_collection(sa_sync_conn):
     conn = sa_sync_conn
     piece = _seed_figshare(
