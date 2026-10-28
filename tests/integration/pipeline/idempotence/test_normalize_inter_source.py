@@ -11,6 +11,8 @@ from tests.integration.pipeline.idempotence.test_normalize_openalex import (
 )
 
 SHARED_DOI = "10.9999/shared-article-001"
+# Un enregistrement OpenAlex sans DOI, lien ni clé de confirmation est écarté de la réconciliation.
+OA_ONLY_DOI = "10.9999/oa-only-article-002"
 
 INTER_HAL_DOCS = [
     {
@@ -88,9 +90,10 @@ INTER_OA_DOCS = [
     },
     {
         "openalex_id": "W9910000002",
-        "doi": None,
+        "doi": OA_ONLY_DOI,
         "raw_data": {
             "id": "https://openalex.org/W9910000002",
+            "doi": f"https://doi.org/{OA_ONLY_DOI}",
             "title": "Another OA-only Article",
             "display_name": "Another OA-only Article",
             "publication_year": 2024,
@@ -144,7 +147,7 @@ class TestNormalizeInterSourceIdempotence:
         ).scalar_one()
         assert cnt == 1, "L'article partagé ne doit exister qu'une fois"
 
-        # Le rapport HAL sans DOI + l'article OA-only = 2 publications de plus
+        # Seul l'article OA-only crée une publication
         assert publications_after_oa == publications_after_hal + 1, (
             f"OA devrait ajouter 1 publication (OA-only), pas plus. "
             f"HAL={publications_after_hal}, après OA={publications_after_oa}"
