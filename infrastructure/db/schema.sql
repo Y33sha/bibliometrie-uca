@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hFFRcR1YaID4fXS71HwzxbyHS8W27GKrjKptYCb5KW40px0CWb3frOvKcA0U386
+\restrict pnKtdU7zK3uYdE1M3Hxnd0bwJ7rWhZLvWRjRLxeyGIUIIwdLCdNoh3iVRIYdJtE
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -426,6 +426,7 @@ CREATE TYPE public.ror_type AS ENUM (
 
 CREATE TYPE public.serial_type AS ENUM (
     'journal',
+    'data_journal',
     'proceedings',
     'repository',
     'book_series',
@@ -638,8 +639,9 @@ CREATE TABLE ops.config (
     value jsonb NOT NULL,
     description text,
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['unpaywall_max_per_run'::text, 'fetch_missing_max_per_source'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
 );
 
@@ -2479,7 +2481,7 @@ COMMENT ON TABLE ref.languages IS 'Référentiel des langues. code : ISO 639-1, 
 
 CREATE TABLE ref.place_name_forms (
     id integer CONSTRAINT country_name_forms_id_not_null NOT NULL,
-    iso_code text CONSTRAINT country_name_forms_iso_code_not_null NOT NULL,
+    iso_code character(2) CONSTRAINT country_name_forms_iso_code_not_null NOT NULL,
     form_normalized text CONSTRAINT country_name_forms_form_normalized_not_null NOT NULL,
     created_at timestamp with time zone DEFAULT now(),
     kind text DEFAULT 'country'::text NOT NULL,
@@ -2768,7 +2770,7 @@ CREATE TABLE sources.staging (
     disappeared_at timestamp with time zone,
     authors_truncated boolean DEFAULT false NOT NULL,
     entry_mode text DEFAULT 'bulk'::text NOT NULL,
-    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'fetch_missing_hal'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_theses'::text])))
+    CONSTRAINT staging_entry_mode_check CHECK ((entry_mode = ANY (ARRAY['bulk'::text, 'fetch_missing_doi'::text, 'manual_export'::text, 'person_identifier'::text, 'fetch_missing_hal_id'::text, 'fetch_missing_nnt'::text])))
 );
 
 
@@ -3614,7 +3616,7 @@ ALTER TABLE ONLY publishing.serial_issns
 --
 
 ALTER TABLE ONLY publishing.serial_name_forms
-    ADD CONSTRAINT uq_serial_name_forms_form_publisher UNIQUE (form_normalized, publisher_id);
+    ADD CONSTRAINT uq_serial_name_forms_form_publisher UNIQUE NULLS NOT DISTINCT (form_normalized, publisher_id);
 
 
 --
@@ -5237,6 +5239,14 @@ ALTER TABLE ONLY ref.language_forms
 
 
 --
+-- Name: place_name_forms place_name_forms_iso_code_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
+--
+
+ALTER TABLE ONLY ref.place_name_forms
+    ADD CONSTRAINT place_name_forms_iso_code_fkey FOREIGN KEY (iso_code) REFERENCES ref.countries(code);
+
+
+--
 -- Name: ror_relations ror_relations_child_ror_id_fkey; Type: FK CONSTRAINT; Schema: ref; Owner: -
 --
 
@@ -5472,5 +5482,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hFFRcR1YaID4fXS71HwzxbyHS8W27GKrjKptYCb5KW40px0CWb3frOvKcA0U386
+\unrestrict pnKtdU7zK3uYdE1M3Hxnd0bwJ7rWhZLvWRjRLxeyGIUIIwdLCdNoh3iVRIYdJtE
 
