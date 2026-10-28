@@ -27,8 +27,10 @@ Publications du périmètre, par type : `conference` 10 031, `conference_paper` 
 
 - [ ] Type de la communication filmée. Correspondance de DataCite `Audiovisual` et `Sound`, de HAL `VIDEO` et `SON`.
 - [ ] Famille « Conférences ».
+- [ ] posters et communications réunis sous un même DOI
 - [ ] `data_paper` dans la famille des données et logiciels.
 - [ ] Libellé de `media`, réservé aux interventions dans la presse.
+- [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 
 ### Phase 2 — Errata et rétractations
 
@@ -44,6 +46,11 @@ Publications du périmètre, par type : `conference` 10 031, `conference_paper` 
 - [ ] 100685 : typée preprint.
 - [ ] 107270 et 869915 « Computing Pivot-Minors » : article typé preprint par OpenAlex. Déduction du DOI depuis l'identifiant arXiv, et inversement.
 - [ ] 206476 : communication de congrès déposée en entrepôt, typée `article` par OpenAlex seul.
+* [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)
+* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
+* [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs: ie la revue)
+* [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
+* "(No longer) Hiking hypothetical trails in one direction: How unidirectional comparisons hinder theoretical progress in social psychology, and how reversing the direction of comparisons can advance it" => openalex type "article"
 
 ### Phase 5 — Documentation
 

@@ -1,6 +1,3 @@
-python -m interfaces.cli.oneshot.renormalize_duplicate_mathml_abstracts
-run_pipeline --from normalize --sources crossref,openalex
-
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Extraction
@@ -12,16 +9,11 @@ run_pipeline --from normalize --sources crossref,openalex
 * [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer) / annoter un corpus et trouver une bonne fonction de décision
 
 # Données
-* [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 * [ ] publi 106296: gérer les adresses résultant d'une erreur de parsing (à quel niveau: exclure adresses? exclure source_contributions? - gestion manuelle, détection automatisée) / Cf personne 62293
-* [ ] goldschmidt abstracts: faire un nouveau type abstract, ou le mettre comme "conférence"?
 * [ ] conserver l'historique des structures
 * [ ] identifiants mal placés et neutralisés par le pipeline: auditer
 * [ ] récupérer date de publication complète au lieu de l'année seule
 * [ ] "Additional file" sur figshare: comment regrouper les pièces liées à un même article?
-* [ ] posters et communications réunis sous un même DOI
-* [ ] règle à créer: si DOI de forme ISBN + _n => conference_paper ou chapitre / si forme ISBN: proceedings ou book (trancher selon type du "journal")
-* [ ] doc_types souvent suspects, à investiguer: "preprint", "autre" (voir aussi si le type "article" peut être affiné selon des critères objectifs)
 
 # UI
 ## Admin
@@ -32,19 +24,16 @@ run_pipeline --from normalize --sources crossref,openalex
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories; `corresponding_is_in_perimeter`; `peer_reviewed`? (suppose de posséder la donnée ou de pouvoir la déduire des sources); premier/dernier auteur (sur l'onglet publications de la page personne); impact (citations, fwci, top10)
 
 # Cas particuliers, bizarreries à élucider
-* [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article); réfléchir au type "report"
-* [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
-* [ ] 182637 et 182636: vérifier si DataCite indique relation
-* [ ] 107270 et 869915 Computing Pivot-Minors: un article faussement typé preprint par openalex; + question des arxiv_id (déduire le DOI et vice-versa)
-* [ ] fusion entre article et conference_paper: 12362
-* [ ] 165425: fusion d'un article et d'un dataset
+* problèmes de fusion
+    * [ ] 30172 un recueil de proceedings fusionné avec tous ses chapitres
+    * [ ] 182637 et 182636: vérifier si DataCite indique relation
+    * [ ] fusion entre article et conference_paper: 12362
+    * [ ] 165425: fusion d'un article et d'un dataset
+    * 138474: 1 seul document alors que le preprint devrait être distinct
+    * 116323: comment empêcher la fusion de l'ouvrage et de ses chapitres?
 * [ ] « Daniel Régnier-Roux » incompatible avec la personne 2958 (« daniel roux ») Identifiant hal_person_id='1169' déjà attribué à person_id=2958 avec statut 'pending' ; impossible d'attribuer à person_id=44830. (Correct par hasard; mais l'incompatibilité est anormale)
-* 116323: comment empêcher la fusion de l'ouvrage et de ses chapitres?
-* 100685: pourquoi preprint?
-* 138474: 1 seul document alors que le preprint devrait être distinct
 * 206321: pourquoi UNH non reconnue?
 * 81408: openalex, source hal; mais pas de doc hal correpondant
-* "(No longer) Hiking hypothetical trails in one direction: How unidirectional comparisons hinder theoretical progress in social psychology, and how reversing the direction of comparisons can advance it" => openalex type "article"
 
 # Idées pour plus tard, éventuellement
 ## Fonctionnalités
