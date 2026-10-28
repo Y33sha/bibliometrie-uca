@@ -2,7 +2,7 @@
 	import PageHeader from '#lib/components/PageHeader.svelte';
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { onMount } from 'svelte';
-	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
+	import { api, serials as serialsApi, errorMessage } from '#lib/api/index.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import HubTabs from '#lib/components/HubTabs.svelte';
 	import SerialsListView from '#lib/components/SerialsListView.svelte';
@@ -84,9 +84,8 @@
 		let detail: SerialDetail;
 		try {
 			detail = await api<SerialDetail>(`/api/serials/${j.id}`);
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur lors du chargement de la publication en série : ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur lors du chargement de la publication en série : ' + errorMessage(e), 'error');
 			return;
 		}
 		const jt = detail.serial_type || 'journal';
@@ -115,9 +114,8 @@
 					const msg = `Ce changement entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural}. Continuer ?`;
 					if (!(await confirmDialog({ message: msg }))) return;
 				}
-			} catch (e: any) {
-				const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-				toast('Erreur lors du calcul d\'impact : ' + msg, 'error');
+			} catch (e) {
+				toast('Erreur lors du calcul d\'impact : ' + errorMessage(e), 'error');
 				return;
 			}
 		}
@@ -139,9 +137,8 @@
 			reload();
 			// Une modification d'ISSN, de titre ou de type fait entrer ou sortir la publication en série des files.
 			loadQueueCounts();
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur : ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur : ' + errorMessage(e), 'error');
 		}
 	}
 

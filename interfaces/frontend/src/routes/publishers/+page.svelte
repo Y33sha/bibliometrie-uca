@@ -3,7 +3,7 @@
 	import IconButton from '#lib/components/IconButton.svelte';
 	import { onMount } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { api, ApiError, publishers as publishersApi } from '#lib/api/index.js';
+	import { api, ApiError, publishers as publishersApi, errorMessage } from '#lib/api/index.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import PublishersListView from '#lib/components/PublishersListView.svelte';
 	import Modal from '#lib/components/Modal.svelte';
@@ -51,9 +51,8 @@
 			await publishersApi.update(editModal.id, body);
 			editModal = null;
 			reload();
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur : ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur : ' + errorMessage(e), 'error');
 		}
 	}
 
@@ -91,7 +90,7 @@
 			await publishersApi.merge(mergeTargetId, sourceId);
 			closeMerge();
 			reload();
-		} catch (e: any) {
+		} catch (e) {
 			if (e instanceof ApiError) {
 				const body = e.detail as Partial<components['schemas']['PublisherMergeBlockedResponse']>;
 				if (body?.blocking_serials?.length) {
@@ -99,10 +98,8 @@
 					blockingDetail = body.detail ?? '';
 					return;
 				}
-				toast(body?.detail || `HTTP ${e.status}`, 'error');
-				return;
 			}
-			toast('Erreur réseau : ' + e.message, 'error');
+			toast(errorMessage(e), 'error');
 		}
 	}
 

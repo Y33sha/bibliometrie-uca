@@ -6,7 +6,7 @@
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
 	import { stickyHeight } from '#lib/actions/stickyHeight.js';
-	import { addresses as addressesApi, api } from '#lib/api/index.js';
+	import { addresses as addressesApi, api, errorMessage } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
@@ -178,7 +178,7 @@
 			batchResult = `${data.updated} adresse${data.updated > 1 ? 's' : ''} mise${data.updated > 1 ? 's' : ''} à jour`;
 			selectedIds = new Set();
 		} catch (e) {
-			batchResult = 'Erreur : ' + (e instanceof Error ? e.message : String(e));
+			batchResult = 'Erreur : ' + errorMessage(e);
 		} finally {
 			batchApplying = false;
 		}

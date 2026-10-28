@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
 	import { resolve } from '$app/paths';
-	import { api, ApiError, serials as serialsApi } from '#lib/api/index.js';
+	import { api, serials as serialsApi, errorMessage } from '#lib/api/index.js';
 	import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 	import type { components } from '#lib/api/schema.js';
 
@@ -23,9 +23,8 @@
 		loading = true;
 		try {
 			items = (await api<Response>('/api/serials/likely-proceedings')).serials;
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur lors du chargement de la file : ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur lors du chargement de la file : ' + errorMessage(e), 'error');
 		} finally {
 			loading = false;
 		}
@@ -49,9 +48,8 @@
 			await serialsApi.update(j.id, { serial_type: 'proceedings' });
 			await load();
 			onchange();
-		} catch (e: any) {
-			const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-			toast('Erreur : ' + msg, 'error');
+		} catch (e) {
+			toast('Erreur : ' + errorMessage(e), 'error');
 		} finally {
 			busy = false;
 		}

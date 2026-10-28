@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { api, ApiError, persons as personsApi } from '#lib/api/index.js';
+	import { api, errorMessage, persons as personsApi } from '#lib/api/index.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import { useDebouncedSearch } from '#lib/composables/useDebouncedSearch.svelte.js';
 	import type { components } from '#lib/api/schema.js';
@@ -86,8 +86,7 @@
 				id_value: form.id_value.trim(),
 			});
 		} catch (e) {
-			const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-			idForms = { ...idForms, [id]: { ...form, error: detail || 'Erreur inconnue' } };
+			idForms = { ...idForms, [id]: { ...form, error: errorMessage(e) } };
 			return;
 		}
 		const next = { ...idForms };
@@ -112,9 +111,7 @@
 		try {
 			await personsApi.rename(id, lastName, firstName);
 		} catch (e) {
-			const status = e instanceof ApiError ? e.status : '?';
-			const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-			toast(detail || `Erreur ${status}`, 'error');
+			toast(errorMessage(e), 'error');
 			return false;
 		}
 		await refreshAfterChange();
@@ -197,8 +194,7 @@
 		try {
 			await personsApi.merge(personId, otherId);
 		} catch (e) {
-			const detail = e instanceof ApiError ? (e.detail as { detail?: string })?.detail : null;
-			toast(detail || 'Fusion impossible', 'error');
+			toast(`Fusion impossible : ${errorMessage(e)}`, 'error');
 			return;
 		}
 		await refreshAfterChange();

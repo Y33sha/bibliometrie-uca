@@ -3,7 +3,7 @@
   import IconButton from "#lib/components/IconButton.svelte";
   import PageHeader from "#lib/components/PageHeader.svelte";
   import { onMount } from "svelte";
-  import { api, ApiError, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
+  import { api, errorMessage, latestRequest, config as configApi, perimeters as perimetersApi } from "#lib/api/index.js";
   import { STRUCTURE_TYPES } from "#lib/structureTypes.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { confirmDialog, toast } from "#lib/dialogs.svelte.js";
@@ -69,14 +69,6 @@
     };
   }
 
-  function extractDetail(e: unknown): string {
-    if (e instanceof ApiError) {
-      const d = (e.detail as { detail?: string })?.detail;
-      return d || `Erreur ${e.status}`;
-    }
-    return (e as Error)?.message || "Erreur";
-  }
-
   async function savePerimeter() {
     if (!perimModal) return;
     try {
@@ -95,7 +87,7 @@
       perimModal = null;
       await load();
     } catch (e) {
-      toast(extractDetail(e), "error");
+      toast(errorMessage(e), "error");
     }
   }
 
@@ -105,7 +97,7 @@
       await perimetersApi.remove(id);
       await load();
     } catch (e) {
-      toast(extractDetail(e), "error");
+      toast(errorMessage(e), "error");
     }
   }
 
@@ -237,7 +229,7 @@
       editingKey = null;
       await load();
     } catch (e) {
-      toast("Erreur : " + extractDetail(e), "error");
+      toast("Erreur : " + errorMessage(e), "error");
     }
     saving = false;
   }

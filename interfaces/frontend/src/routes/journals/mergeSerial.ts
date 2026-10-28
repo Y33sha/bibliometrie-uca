@@ -1,4 +1,4 @@
-import { ApiError, serials as serialsApi } from '#lib/api/index.js';
+import { errorMessage, serials as serialsApi } from '#lib/api/index.js';
 import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 
 /**
@@ -17,21 +17,15 @@ export async function mergeSerial(
 			const msg = `Cette fusion entraînera un recalcul de la métadonnée « type de document » sur ${impact.count} publication${plural} de la publication en série absorbée. Continuer ?`;
 			if (!(await confirmDialog({ message: msg, danger: true }))) return false;
 		}
-	} catch (e: any) {
-		const msg = e instanceof ApiError ? JSON.stringify(e.detail) : e.message;
-		toast("Erreur lors du calcul d'impact : " + msg, 'error');
+	} catch (e) {
+		toast("Erreur lors du calcul d'impact : " + errorMessage(e), 'error');
 		return false;
 	}
 	try {
 		await serialsApi.merge(target.id, sourceId);
 		return true;
-	} catch (e: any) {
-		if (e instanceof ApiError) {
-			const detail = (e.detail as { detail?: string })?.detail;
-			toast(detail || `Erreur ${e.status}: ${JSON.stringify(e.detail)}`, 'error');
-			return false;
-		}
-		toast('Erreur réseau : ' + e.message, 'error');
+	} catch (e) {
+		toast(errorMessage(e), 'error');
 		return false;
 	}
 }

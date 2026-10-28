@@ -1,7 +1,7 @@
 <script lang="ts" generics="Pair extends { person_a: CurationPerson; person_b: CurationPerson }">
   import RhCheck from "#lib/components/RhCheck.svelte";
   import { untrack, type Snippet } from "svelte";
-  import { ApiError, persons as personsApi } from "#lib/api/index.js";
+  import { errorMessage, persons as personsApi } from "#lib/api/index.js";
   import { titleCase } from "#lib/utils.js";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
@@ -58,7 +58,7 @@
       await list.load();
       onchange();
     } catch (e) {
-      error = e instanceof ApiError ? `Erreur ${e.status}` : "Erreur de fusion";
+      error = `Fusion impossible : ${errorMessage(e)}`;
     }
     acting = false;
   }

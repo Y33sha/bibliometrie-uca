@@ -5,7 +5,7 @@
   import KeyFigures from '#lib/components/KeyFigures.svelte';
   import { onMount } from "svelte";
   import { replaceQuery } from "#lib/url.js";
-  import { api, nameForms, structures as structuresApi } from "#lib/api/index.js";
+  import { api, nameForms, structures as structuresApi, errorMessage } from "#lib/api/index.js";
   import { deriveStructDetectionStatus } from "#lib/utils.js";
   import { structureLabel } from "#lib/structureLabels.js";
   import { groupStructuresByType, structureGroupLabel } from "#lib/structureTypes.js";
@@ -154,9 +154,8 @@
     try {
       await nameForms.remove(formId);
       loadTable();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast("Erreur : " + msg, 'error');
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), 'error');
     }
   }
 
@@ -188,9 +187,8 @@
 
       await nameForms.update(formId, { requires_context_of: ctx });
       loadTable();
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      toast("Erreur : " + msg, 'error');
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), 'error');
     }
   }
 

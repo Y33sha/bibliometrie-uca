@@ -7,7 +7,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { replaceQuery } from '#lib/url.js';
-	import { addresses as addressesApi, api, ApiError, structures as structuresApi } from '#lib/api/index.js';
+	import { addresses as addressesApi, api, errorMessage, structures as structuresApi } from '#lib/api/index.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
@@ -238,14 +238,8 @@
 				: addresses.filter((a) => a.id !== addrId);
 			if (!keep) list.total--;
 			loadStats();
-		} catch (e: unknown) {
-			if (e instanceof ApiError) {
-				const detail = (e.detail as { detail?: string })?.detail;
-				toast(`Erreur ${e.status} : ${detail || 'inconnue'}`, 'error');
-				return;
-			}
-			const msg = e instanceof Error ? e.message : String(e);
-			toast('Erreur réseau : ' + msg, 'error');
+		} catch (e) {
+			toast(`Erreur : ${errorMessage(e)}`, 'error');
 		}
 	}
 
