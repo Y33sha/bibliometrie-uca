@@ -10,7 +10,7 @@ La barre principale filtre par type de document, année, laboratoire et accès (
 
 Une facette sans case cochée retient tout ; « Effacer » vide sa sélection. Les filtres actifs s'affichent sous la barre, chacun avec sa croix.
 
-La recherche interroge le titre et les sujets. Par défaut, la liste retient la famille « Publications ».
+La recherche interroge le titre et les sujets.
 
 Un bouton choisit les colonnes affichées ; l'export csv reprend les colonnes visibles. Le bouton « Statistiques » ouvre la [page Statistiques](01-statistiques.md) sous les mêmes filtres.
 
