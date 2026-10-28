@@ -111,6 +111,11 @@ async def _fetch_ids(
 
     Compteurs de `look_up`, et `extras["not_found"]` = identifiants introuvables.
     """
+    entry_mode = (
+        StagingEntryMode.FETCH_MISSING_HAL_ID
+        if id_type == "hal_id"
+        else StagingEntryMode.FETCH_MISSING_NNT
+    )
     return await look_up(
         conn,
         log,
@@ -120,9 +125,7 @@ async def _fetch_ids(
             on_absent=lambda conn, identifier: record_failed_lookup(
                 conn, "hal", id_type, identifier
             ),
-            stage=lambda staging, doc: staging.stage(
-                "hal", doc, entry_mode=StagingEntryMode.FETCH_MISSING_HAL
-            ),
+            stage=lambda staging, doc: staging.stage("hal", doc, entry_mode=entry_mode),
             max_concurrent=HAL_MAX_CONCURRENT,
         ),
         ids,

@@ -1274,6 +1274,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/persons/{person_id}/distinct-persons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Distinct Persons
+         * @description Personnes déclarées distinctes de celle-ci.
+         */
+        get: operations["distinct_persons_api_persons__person_id__distinct_persons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/persons/{person_id}/name-forms": {
         parameters: {
             query?: never;
@@ -1399,6 +1419,26 @@ export interface paths {
          */
         post: operations["merge_persons_api_persons__person_id__merge_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/persons/{person_id}/distinct-persons/{other_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unmark Persons Distinct
+         * @description Annule la décision qui déclare les deux personnes distinctes : les files de triage peuvent de nouveau présenter la paire.
+         */
+        delete: operations["unmark_persons_distinct_api_persons__person_id__distinct_persons__other_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -3219,6 +3259,20 @@ export interface components {
             cleaned_forms: number;
         };
         /**
+         * DistinctPersonOut
+         * @description Personne déclarée distincte d'une autre.
+         */
+        DistinctPersonOut: {
+            /** Person Id */
+            person_id: number;
+            /** First Name */
+            first_name: string;
+            /** Last Name */
+            last_name: string;
+            /** Has Rh */
+            has_rh: boolean;
+        };
+        /**
          * DoiNamespaceConflict
          * @description Enregistrements de `record_serial` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_serial`.
          *
@@ -5032,7 +5086,7 @@ export interface components {
          * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`.
          * @enum {string}
          */
-        SerialType: "journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
+        SerialType: "journal" | "data_journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
         /**
          * SerialTypeChange
          * @description Valeur de `serial_type` dont la modale admin demande l'impact avant de confirmer l'édition.
@@ -7922,6 +7976,37 @@ export interface operations {
             };
         };
     };
+    distinct_persons_api_persons__person_id__distinct_persons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DistinctPersonOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     person_name_forms_api_persons__person_id__name_forms_get: {
         parameters: {
             query?: never;
@@ -8113,6 +8198,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MergeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmark_persons_distinct_api_persons__person_id__distinct_persons__other_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                person_id: number;
+                other_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OkResponse"];
                 };
             };
             /** @description Validation Error */

@@ -12,7 +12,7 @@ Schéma PostgreSQL `publishing`.
 |---|---|---|
 | `serials` | Titre, type (`serial_type`), éditeur, modèle open access, présence dans le DOAJ, nombre de publications. `manual_fields` : champs saisis à la main, que le pipeline conserve | Identifiant OpenAlex unique |
 | `serial_issns` | ISSN, support, ISSN de liaison, statut, date de vérification dans le Sudoc. Un ISSN vérifié sans publication en série désigne une publication absente de la base | Un ISSN de liaison par publication en série |
-| `serial_name_forms` | Formes du titre qui désignent la publication en série, avec l'éditeur de la source | Une forme par éditeur |
+| `serial_name_forms` | Formes du titre qui désignent la publication en série, avec l'éditeur de la source | Une forme par éditeur, éditeur absent compris |
 | `serial_doi_namespaces` | Espaces de noms DOI qui désignent une publication en série, avec la part de leurs DOI qui la désignent | |
 
 La base refuse de supprimer une publication en série que référence une publication ou un enregistrement source.

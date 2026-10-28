@@ -61,7 +61,7 @@ _RECORDS = {
 }
 
 
-async def _run(rows, *, on_fetch_ppns=None, max_concurrent=1, titles=()):
+async def _run(rows, *, on_fetch_ppns=None, max_concurrent=1, titles=(), max_per_run=None):
     """Vérifie `rows` sous le circuit-breaker du Sudoc. `on_fetch_ppns` reçoit le breaker à chaque recherche de PPN."""
     repo = MagicMock()
     repo.find_serials_to_check_in_sudoc.return_value = rows
@@ -101,6 +101,7 @@ async def _run(rows, *, on_fetch_ppns=None, max_concurrent=1, titles=()):
             fetch_ppns=fetch_ppns,
             fetch_record=fetch_record,
             max_concurrent=max_concurrent,
+            max_per_run=max_per_run,
         )
     return repo, conn, metrics, calls
 
@@ -141,6 +142,14 @@ async def test_each_record_is_fetched_once():
     twin = _NATURE._replace(id=3)
     _, _, _, calls = await _run([_NATURE, twin])
     assert sorted(calls["records"]) == ["038758717", "068267983"]
+
+
+@pytest.mark.asyncio
+async def test_cap_limits_the_serials_checked():
+    rows = [_NATURE._replace(id=i) for i in range(5)]
+    repo, _, metrics, _ = await _run(rows, max_per_run=2)
+    assert sorted(c.args[0] for c in repo.record_sudoc_check.call_args_list) == [0, 1]
+    assert metrics.seen == 2
 
 
 @pytest.mark.asyncio

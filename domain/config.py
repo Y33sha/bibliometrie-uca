@@ -27,6 +27,8 @@ class ConfigKey(StrEnum):
     """Nombre de DOI vérifiés auprès d'Unpaywall par run."""
     FETCH_MISSING_MAX_PER_SOURCE = "fetch_missing_max_per_source"
     """Nombre de DOI interrogés par source cible à l'import par DOI."""
+    SUDOC_MAX_PER_RUN = "sudoc_max_per_run"
+    """Nombre de revues vérifiées dans le Sudoc par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
     """Âge au-delà duquel un document moissonné est interrogé de nouveau à sa source."""
     FETCH_MISSING_RETRY_AFTER_DAYS = "fetch_missing_retry_after_days"
@@ -60,6 +62,7 @@ class ConfigSetting(NamedTuple):
 SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
     ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(ConfigKind.CAP),
+    ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
     ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 90),
     ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
     ConfigKey.UNPAYWALL_RECHECK_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 15),

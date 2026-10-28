@@ -78,6 +78,19 @@ class TestUpsertSourceRecord:
         )
         assert titles == {platform: None, book: "Actes du colloque"}
 
+    def test_abstract_keeps_one_version_of_each_formula(self, sa_sync_conn):
+        staging_id = _thesis_staging(sa_sync_conn)
+        source_record_id = SourceRecordStore(sa_sync_conn).upsert_source_record(
+            _row(
+                staging_id,
+                abstract="at $$\\sqrt{s}$$ <mml:math><mml:msqrt>s</mml:msqrt></mml:math> = 13 TeV",
+            )
+        )
+        abstract = sa_sync_conn.execute(
+            text("SELECT abstract FROM source_records WHERE id = :id"), {"id": source_record_id}
+        ).scalar_one()
+        assert abstract == "at $$\\sqrt{s}$$ = 13 TeV"
+
     def test_reimport_keeps_row_identity(self, sa_sync_conn):
         """La clé `(source, source_id)` traverse les imports : l'id reste stable pour les tables qui la référencent."""
         staging_id = _thesis_staging(sa_sync_conn)

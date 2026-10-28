@@ -103,23 +103,26 @@ class TestUniverse:
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
         dirty = _source_record(
-            conn, publication_a, source_id="a", external_ids={"hal_id": ["hal-1"]}
+            conn, publication_a, source_id="a", external_ids={"hal_id": ["hal-01000001"]}
         )
         neighbor = _source_record(
             conn,
             publication_b,
             source_id="b",
             marked=False,
-            external_ids={"hal_id": ["hal-1", "hal-2"]},
+            external_ids={"hal_id": ["hal-01000001", "hal-01000002"]},
         )
         assert _universe(conn) == {dirty, neighbor}
 
     def test_hal_id_listed_second_is_not_a_neighbor(self, sa_sync_conn):
         """La clé HAL d'un enregistrement source est le premier identifiant qu'il liste : les suivants ne relient rien."""
         conn = sa_sync_conn
-        dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-2"]})
+        dirty = _source_record(conn, source_id="a", external_ids={"hal_id": ["hal-01000002"]})
         _source_record(
-            conn, source_id="b", marked=False, external_ids={"hal_id": ["hal-1", "hal-2"]}
+            conn,
+            source_id="b",
+            marked=False,
+            external_ids={"hal_id": ["hal-01000001", "hal-01000002"]},
         )
         assert _universe(conn) == {dirty}
 
@@ -332,11 +335,12 @@ class TestEndToEnd:
         conn = sa_sync_conn
         publication_a = _seed_publication(conn, doi="10.1/x")
         publication_b = _seed_publication(conn, doi="10.2/y")
+        hal_id = {"hal_id": ["hal-01000001"]}
         source_record_a = _source_record(
-            conn, publication_a, source_id="a", doi="10.1/x", external_ids={"hal_id": ["hal-1"]}
+            conn, publication_a, source_id="a", doi="10.1/x", external_ids=hal_id
         )
         source_record_b = _source_record(
-            conn, publication_b, source_id="b", doi="10.2/y", external_ids={"hal_id": ["hal-1"]}
+            conn, publication_b, source_id="b", doi="10.2/y", external_ids=hal_id
         )
 
         reconcile(conn, logger)
@@ -346,6 +350,38 @@ class TestEndToEnd:
         # Drapeaux nettoyés malgré l'absence de fusion (les enregistrements sources ont été réconciliées).
         assert _source_record_state(conn, source_record_a)[1] is False
         assert _source_record_state(conn, source_record_b)[1] is False
+
+    def test_publication_of_a_residual_source_record_is_refreshed(self, sa_sync_conn):
+        """Régression : l'enregistrement source sans DOI d'une composante à deux DOI reste sur sa publication, qui gardait le DOI qu'il avait perdu."""
+        conn = sa_sync_conn
+        hal_id = {"hal_id": ["hal-01234567"]}
+        stale = _seed_publication(conn, doi="10.9/retire")
+        residual = _source_record(conn, stale, source_id="a", external_ids=hal_id)
+        for source_id, doi in (("b", "10.1/x"), ("c", "10.2/y")):
+            _source_record(
+                conn,
+                _seed_publication(conn, doi=doi),
+                source_id=source_id,
+                doi=doi,
+                marked=False,
+                external_ids=hal_id,
+            )
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": stale}
+            ).scalar()
+            == "10.9/retire"
+        )
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, residual) == (stale, False)
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": stale}
+            ).scalar()
+            is None
+        )
 
 
 class TestManualMerge:

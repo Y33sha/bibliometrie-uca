@@ -232,14 +232,25 @@ async def run_check_serials_in_sudoc(
     fetch_ppns: FetchPpns,
     fetch_record: FetchRecord,
     max_concurrent: int,
+    max_per_run: int | None,
 ) -> PhaseMetrics:
-    """Vérifie les revues à vérifier, `max_concurrent` à la fois."""
+    """Vérifie les revues à vérifier, `max_concurrent` à la fois. `max_per_run` plafonne le nombre de revues vérifiées, `None` valant illimité : les suivantes attendent le run suivant."""
     titled_as_volumes = [
         j.id
         for j in find_titles_of_serials_with_issn(conn)
         if holds_volumes(j.serial_type) and container_level(j.title) is ContainerLevel.VOLUME
     ]
     rows = find_serials_to_check_in_sudoc(conn, also=titled_as_volumes)
+    if max_per_run and len(rows) > max_per_run:
+        deferred = len(rows) - max_per_run
+        logger.info(
+            "%splafond de %s par run ⇒ %s %s au prochain",
+            BRANCH,
+            quantity(max_per_run, "revue", "revues"),
+            deferred,
+            inflect(deferred, "reportée"),
+        )
+        rows = rows[:max_per_run]
     total = len(rows)
     metrics = PhaseMetrics()
     if total == 0:

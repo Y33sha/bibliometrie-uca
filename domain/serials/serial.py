@@ -17,6 +17,8 @@ class SerialType(StrEnum):
     """Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`."""
 
     JOURNAL = "journal"
+    # Revue dont les articles décrivent des jeux de données (data papers).
+    DATA_JOURNAL = "data_journal"
     PROCEEDINGS = "proceedings"
     REPOSITORY = "repository"
     BOOK_SERIES = "book_series"
@@ -31,6 +33,7 @@ SERIAL_TYPES_SET: frozenset[str] = frozenset(SerialType)
 # Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/serials/types`.
 SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.JOURNAL: "Revue",
+    SerialType.DATA_JOURNAL: "Revue de données",
     SerialType.PROCEEDINGS: "Proceedings",
     SerialType.REPOSITORY: "Archive / dépôt",
     SerialType.BOOK_SERIES: "Série d'ouvrages",

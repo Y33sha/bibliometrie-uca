@@ -14,6 +14,7 @@
   import NameFormsList from "./NameFormsList.svelte";
 
   type SharingPerson = components["schemas"]["SharingPersonOut"];
+  type DistinctPerson = components["schemas"]["DistinctPersonOut"];
   type NameFormSummary = components["schemas"]["NameFormSummaryOut"];
   type PersonExclusion = components["schemas"]["PersonExclusion"];
 
@@ -34,6 +35,7 @@
     onmergeClose,
     onmerge,
     onabsorb,
+    onunmarkDistinct,
     onopenPerson,
   }: {
     person: Person;
@@ -63,12 +65,16 @@
     onmerge: (targetId: number, sourceId: number) => void | Promise<void>;
     /** Absorbe une autre personne dans celle du drawer (fusion vers `person`). */
     onabsorb: (otherId: number) => Promise<void>;
+    /** Annule la décision qui déclare `person` et `otherId` distinctes. */
+    onunmarkDistinct: (otherId: number) => Promise<void>;
     /** Ouvre le drawer d'une autre personne (depuis la liste des partages). */
     onopenPerson: (personId: number) => void;
   } = $props();
 
   // Personnes partageant ≥1 forme de nom (candidates à l'absorption).
   let sharing = $state<SharingPerson[]>([]);
+  // Personnes déclarées distinctes de celle-ci.
+  let distinct = $state<DistinctPerson[]>([]);
   // Les formes de nom se chargent ici : la liste ne les porte pas, seul ce tiroir les montre. `null` tant qu'elles chargent.
   let nameForms = $state<NameFormSummary[] | null>(null);
   // Personne des données affichées : à un changement de personne, les données de la précédente disparaissent pendant le chargement ; après une écriture sur la même personne, elles restent affichées.
@@ -78,15 +84,18 @@
     const id = person.id;
     if (id !== loadedId) {
       sharing = [];
+      distinct = [];
       nameForms = null;
       loadedId = id;
     }
-    const [s, f] = await Promise.all([
+    const [s, d, f] = await Promise.all([
       api<SharingPerson[]>(`/api/persons/${id}/sharing-name-forms`),
+      api<DistinctPerson[]>(`/api/persons/${id}/distinct-persons`),
       api<NameFormSummary[]>(`/api/persons/${id}/name-forms`)
     ]);
     if (id !== person.id) return;
     sharing = s;
+    distinct = d;
     nameForms = f;
   }
 
@@ -97,6 +106,11 @@
 
   async function absorb(otherId: number) {
     await onabsorb(otherId);
+    await loadDetails();
+  }
+
+  async function unmarkDistinct(otherId: number) {
+    await onunmarkDistinct(otherId);
     await loadDetails();
   }
 
@@ -247,6 +261,28 @@
               <span class="sharing-forms" title={sp.shared_forms.join(", ")}>
                 {sp.shared_forms.length} forme{sp.shared_forms.length > 1 ? "s" : ""}
               </span>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
+    {#if distinct.length}
+      <section class="drawer-section">
+        <h3>Distinct de</h3>
+        <div class="sharing-list">
+          {#each distinct as dp (dp.person_id)}
+            <div class="sharing-row">
+              <button
+                class="btn btn-sm"
+                title="Annuler la décision : les files de triage peuvent de nouveau présenter la paire"
+                onclick={() => unmarkDistinct(dp.person_id)}>Annuler</button
+              >
+              <button class="sharing-name" onclick={() => onopenPerson(dp.person_id)}>
+                <span class="person-last">{titleCase(dp.last_name)}</span>
+                {titleCase(dp.first_name)}
+              </button>
+              {#if dp.has_rh}<RhCheck />{/if}
             </div>
           {/each}
         </div>

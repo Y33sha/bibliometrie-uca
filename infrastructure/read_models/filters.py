@@ -18,7 +18,7 @@ from domain.publications.metadata import (
 from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
 from domain.structures.structure import StructureType
 from infrastructure.read_models.publications.models import NO_LICENSE
-from infrastructure.sql_fragments import has_author_role
+from infrastructure.sql_fragments import has_author_role, pending_name_form
 
 
 def _sql_list(values: Iterable[str]) -> str:
@@ -489,10 +489,10 @@ def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClaus
     return WhereClause(f"{negate}{person_has_identifier_sql(id_type)}", {})
 
 
-# Prédicat : la personne `p` a ≥1 forme de nom au statut `pending` (à confirmer). Les formes dérivées du nom de la personne (source `'persons'`) sont confirmées d'office : `status = 'pending'` capte donc seulement les formes bibliographiques non encore tranchées.
+# Prédicat : la personne `p` a ≥1 forme de nom à confirmer (`pending_name_form`).
 PERSON_HAS_PENDING_NAME_FORMS_SQL = f"""EXISTS (
             SELECT 1 FROM person_name_forms pnf
-            WHERE pnf.person_id = p.id AND pnf.status = '{AttributionStatus.PENDING.value}'
+            WHERE pnf.person_id = p.id AND {pending_name_form("pnf")}
         )"""
 
 # Prédicat : la personne `p` a ≥1 identifiant au statut `pending` (à confirmer).

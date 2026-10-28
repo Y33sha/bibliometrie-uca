@@ -10,9 +10,8 @@ from sqlalchemy import Connection, text
 from application.ports.repositories.person_repository import NameFormStatusRow
 from domain.errors import ConflictError, NotFoundError
 from domain.normalize import normalize_text
-from domain.persons.identifiers import AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE, compute_person_name_forms
-from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
+from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES, pending_name_form
 
 
 def refresh_canonical_name_forms(
@@ -86,8 +85,7 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
         text(f"""
             DELETE FROM person_name_forms pnf
             WHERE pnf.person_id = :pid
-              AND pnf.status = '{AttributionStatus.PENDING.value}'
-              AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources))
+              AND {pending_name_form("pnf")}
               AND NOT EXISTS (
                   SELECT 1 FROM {CONTRIBUTIONS_AND_SOURCES}
                   WHERE g.person_id = :pid

@@ -1,4 +1,4 @@
-import { patch, post } from './client';
+import { del, patch, post } from './client';
 import type { components } from './schema';
 
 type AddIdentifierResponse = components['schemas']['AddIdentifierResponse'];
@@ -71,4 +71,8 @@ export function markDistinct(
 		person_id_a: personIdA,
 		person_id_b: personIdB
 	});
+}
+
+export function unmarkDistinct(personId: number, otherId: number): Promise<OkResponse> {
+	return del<OkResponse>(`/api/persons/${personId}/distinct-persons/${otherId}`);
 }

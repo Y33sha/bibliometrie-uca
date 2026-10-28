@@ -500,7 +500,12 @@ serial_name_forms = Table(
     Column("form_normalized", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publisher_id", Integer),
-    UniqueConstraint("form_normalized", "publisher_id", name="uq_serial_name_forms_form_publisher"),
+    UniqueConstraint(
+        "form_normalized",
+        "publisher_id",
+        name="uq_serial_name_forms_form_publisher",
+        postgresql_nulls_not_distinct=True,
+    ),
     schema="publishing",
 )
 
@@ -678,7 +683,7 @@ place_name_forms = Table(
     metadata,
     Column("id", Integer, primary_key=True),
     # `iso_code` en minuscule (cf. countries.code / addresses.countries).
-    Column("iso_code", Text, nullable=False),
+    Column("iso_code", CHAR(2), nullable=False),
     Column("form_normalized", Text, nullable=False),
     # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
     # `city` (lieux détectés n'importe où, via la passe place). Défaut `country` :

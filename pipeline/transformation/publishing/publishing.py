@@ -37,7 +37,7 @@ from pipeline.ingestion.complements.sudoc import fetch_ppns, fetch_serial_record
 from pipeline.ingestion.crossref.prefixes import fetch_crossref_prefix
 from pipeline.ingestion.datacite.prefixes import fetch_datacite_prefix
 from pipeline.ingestion.openalex.serial_enrichment import fetch_sources_batch
-from pipeline.runtime.config import delay
+from pipeline.runtime.config import cap, delay
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.task_runner import TaskStep, run_tasks
@@ -340,6 +340,7 @@ def _run_check_serials_in_sudoc(
                     client, ppn, base_url=base_url
                 ),
                 max_concurrent=SUDOC_MAX_CONCURRENT,
+                max_per_run=cap(conn, ConfigKey.SUDOC_MAX_PER_RUN),
             )
         )
 

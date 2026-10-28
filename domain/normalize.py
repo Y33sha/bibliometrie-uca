@@ -158,6 +158,32 @@ def drop_flattened_mathml(title: str) -> str:
     return " ".join(" ".join(line for k, line in enumerate(lines) if k not in dropped).split())
 
 
+# Formule MathML. Son corps exclut une autre ouverture. La fin du texte ferme une formule : OpenAlex tronque des résumés en pleine formule.
+_MATHML_FORMULA = r"<mml:math\b(?:(?!<mml:math\b).)*?(?:</mml:math>|\Z)"
+# Formules LaTeX `$$…$$` suivies de leurs versions MathML, sans texte entre elles.
+_TEX_THEN_MATHML_RE = re.compile(rf"(\$\$[^$]+\$\$)(?:\s*{_MATHML_FORMULA})+", re.DOTALL)
+_MATHML_FORMULA_RE = re.compile(_MATHML_FORMULA, re.DOTALL)
+_TEX_ANNOTATION_RE = re.compile(
+    r'<mml:annotation\b[^>]*encoding="application/x-tex"[^>]*>(.*?)</mml:annotation>', re.DOTALL
+)
+
+
+def _annotation_tex(match: re.Match[str]) -> str:
+    """Version LaTeX `$$…$$` de l'annotation de la formule, la formule à défaut."""
+    annotation = _TEX_ANNOTATION_RE.search(match.group())
+    return f"$${annotation.group(1).strip()}$$" if annotation else match.group()
+
+
+def drop_duplicate_mathml(abstract: str | None) -> str | None:
+    """Résumé où chaque formule a une seule version, LaTeX quand l'éditeur en dépose une.
+
+    Un éditeur dépose une formule en deux versions de deux manières. Soit la version LaTeX `$$…$$` précède la formule MathML. Plusieurs formules LaTeX consécutives précèdent alors leurs versions MathML consécutives. Soit la formule MathML contient sa version LaTeX dans une annotation `<mml:annotation encoding="application/x-tex">`. La formule MathML est retirée, et la version LaTeX prend sa place. Une formule MathML seule reste.
+    """
+    if not abstract or "<mml:math" not in abstract:
+        return abstract
+    return _MATHML_FORMULA_RE.sub(_annotation_tex, _TEX_THEN_MATHML_RE.sub(r"\1", abstract))
+
+
 _GREEK_LETTERS = (
     "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi rho"
     " sigma tau upsilon phi chi psi omega"

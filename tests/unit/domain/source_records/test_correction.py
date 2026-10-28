@@ -556,6 +556,35 @@ class TestSerialTypePreprintServerRule:
         assert corrected is not None and corrected.value == "thesis"
 
 
+class TestSerialTypeDataJournalRule:
+    def test_article_of_data_journal_is_data_paper(self):
+        view = _view(doc_type="article", serial_type="data_journal")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None
+        assert corrected.value == "data_paper"
+        assert corrected.rule == MetadataCorrectionRule.SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER
+
+    def test_publication_of_data_journal_is_data_paper(self):
+        publication = _publication(doc_type="article", serial_type="data_journal")
+        corrected = effective_metadata(publication).doc_type
+        assert corrected is not None and corrected.value == "data_paper"
+
+    @pytest.mark.parametrize("doc_type", ["erratum", "preprint", "other", "data_paper"])
+    def test_other_doc_types_are_spared(self, doc_type):
+        view = _view(doc_type=doc_type, serial_type="data_journal")
+        assert effective_metadata(view).doc_type is None
+
+    def test_erratum_title_wins_over_data_journal(self):
+        # 10.1038/s41597-023-01980-z, Scientific Data : Crossref type l'erratum `journal-article`.
+        view = _view(
+            doc_type="article",
+            serial_type="data_journal",
+            title="Author Correction: MOSAiC-ACA and AFLUX - Arctic airborne campaigns",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "erratum"
+
+
 class TestTitleMediaPrefixRule:
     def test_interview_prefix_on_other_corrects_to_media(self):
         view = _view(doc_type="other", title="Interview par France Inter sur l'agriculture")

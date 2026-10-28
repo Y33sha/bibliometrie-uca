@@ -58,7 +58,7 @@ async def fetch_missing_theses_by_nnt(
             fetch=one_at_a_time(fetch_thesis),
             on_absent=lambda conn, nnt: record_failed_lookup(conn, "theses", "nnt", nnt),
             stage=lambda staging, thesis: staging.stage(
-                "theses", thesis, entry_mode=StagingEntryMode.FETCH_MISSING_THESES
+                "theses", thesis, entry_mode=StagingEntryMode.FETCH_MISSING_NNT
             ),
         ),
         nnts,

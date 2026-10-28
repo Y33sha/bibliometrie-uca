@@ -209,6 +209,22 @@ class TestPendingFacets:
         assert p_clean not in ids
         assert q.persons_facets(filters=PersonFilters()).pending_forms.yes >= 1
 
+    def test_form_derived_from_the_name_is_not_to_confirm(self, sa_sync_conn):
+        """Régression : une forme dérivée du nom de la personne, confirmée d'office, comptait comme à confirmer."""
+        p_canonical = insert_person(sa_sync_conn, "Canonicalform")
+        insert_person_name_form(
+            sa_sync_conn,
+            p_canonical,
+            name_form="canonicalform",
+            sources=["persons", "hal"],
+            status="pending",
+        )
+
+        res = PersonsQueries(sa_sync_conn).list_persons(
+            filters=PersonFilters(has_pending_forms=True), page=1, per_page=50, sort="name_asc"
+        )
+        assert p_canonical not in {p.id for p in res.persons}
+
     def test_pending_identifiers_filter(self, sa_sync_conn):
         p_pending = insert_person(sa_sync_conn, "Pendingid")
         insert_person_identifier(

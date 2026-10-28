@@ -3,7 +3,19 @@
 Les CLI oneshot ne sont pas testés (joués une fois) ; les CLI récurrents comme celui-ci ont un smoke test, pour qu'un renommage de schéma ne les casse pas silencieusement — pyrefly et ruff ne voient pas les identifiants SQL contenus dans les chaînes `text()`.
 """
 
-from interfaces.cli.dev.generate_seed import COMMON_SEED, INSTITUTION_SEED, generate_seed
+from pathlib import Path
+
+from sqlalchemy import text
+
+from infrastructure.db import tables
+from interfaces.cli.dev.generate_seed import (
+    COMMON_SEED,
+    INSTITUTION_SEED,
+    SeedSection,
+    generate_seed,
+    render_seed,
+)
+from tests.integration.helpers.addresses import ensure_country, insert_address
 from tests.integration.helpers.config import set_config
 from tests.integration.helpers.structures import insert_perimeter, insert_structure
 
@@ -65,5 +77,34 @@ def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
     # Les délais de réinterrogation, que la migration pose, suivent le seed commun.
     assert "VALUES ('fetch_stale_after_days'" in common_sql
     # Chaque seed supprime seulement ses propres clés : l'ordre de chargement est indifférent.
-    assert "DELETE FROM config WHERE key NOT IN (" in common_sql
-    assert "DELETE FROM config WHERE key IN (" in institution_sql
+    assert "DELETE FROM config WHERE (key NOT IN (" in common_sql
+    assert "DELETE FROM config WHERE (key IN (" in institution_sql
+
+
+def test_seed_se_recharge_sur_une_base_remplie(sa_sync_conn):
+    """Régression : la suppression d'un pays référencé par un candidat d'adresse faisait échouer le chargement."""
+    ensure_country(sa_sync_conn, "fr", "Ancien nom")
+    ensure_country(sa_sync_conn, "zz", "Absent du seed")
+    address_id = insert_address(sa_sync_conn, "Clermont-Ferrand")
+    sa_sync_conn.execute(
+        text(
+            "INSERT INTO address_country_candidates (address_id, country_code, method)"
+            " VALUES (:a, 'fr', 'country_name')"
+        ),
+        {"a": address_id},
+    )
+    # Les migrations insèrent des villes des deux Congo : leurs pays restent référencés.
+    rows = [("cd", "Rép. dém. du Congo"), ("cg", "Congo"), ("de", "Allemagne"), ("fr", "France")]
+    section = SeedSection(tables.countries, rows)
+    sql = render_seed(COMMON_SEED.description, Path("seed.sql"), [section])
+
+    # La transaction du test encadre le chargement : le seed s'y joue sans ses propres bornes.
+    sa_sync_conn.exec_driver_sql(sql.replace("BEGIN;", "").replace("COMMIT;", ""))
+
+    countries = sa_sync_conn.execute(text("SELECT code, name FROM countries ORDER BY code")).all()
+    assert [tuple(r) for r in countries] == rows
+    candidate = sa_sync_conn.execute(
+        text("SELECT country_code FROM address_country_candidates WHERE address_id = :a"),
+        {"a": address_id},
+    ).scalar_one()
+    assert candidate == "fr"

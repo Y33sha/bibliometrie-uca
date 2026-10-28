@@ -312,6 +312,15 @@ class NameDuplicatesResponse(PaginatedResponse):
     pairs: list[NameDuplicatePairOut]
 
 
+class DistinctPersonOut(BaseModel):
+    """Personne déclarée distincte d'une autre."""
+
+    person_id: int
+    first_name: str
+    last_name: str
+    has_rh: bool
+
+
 class SharingPersonOut(BaseModel):
     """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
 

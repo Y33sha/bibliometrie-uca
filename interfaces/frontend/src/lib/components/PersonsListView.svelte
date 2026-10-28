@@ -23,7 +23,7 @@
 	// Vue-liste des personnes réutilisable. Utilisée par :
 	// - `/persons` (annuaire autonome avec sync URL)
 	// - `/structures/[id]?tab=persons` (labo fixe via `labId`, sans sync URL)
-	// La session admin y gagne les facettes Exclusion, Activité et À confirmer, la colonne des publications du périmètre, et une icône qui ouvre le volet de la personne.
+	// La session admin y gagne les facettes Exclusion et À confirmer, les personnes sans contribution ni fiche RH, la colonne des publications du périmètre, et une icône qui ouvre le volet de la personne.
 	let {
 		apiKey = 'persons-dir',
 		labId,
@@ -56,10 +56,6 @@
 		{ value: 'none', text: 'Retenue' },
 		...Object.entries(personExclusionLabels).map(([value, text]) => ({ value, text })),
 	];
-	const activityOptions: FacetOption[] = [
-		{ value: 'yes', text: 'Avec contribution ou fiche RH' },
-		{ value: 'no', text: 'Sans contribution ni fiche RH' },
-	];
 
 	let search = $state('');
 	let selectedDepts: string[] = $state([]);
@@ -67,9 +63,8 @@
 	let idStates = $state<Record<string, IdState>>({});
 	let selectedRh: string[] = $state(['yes']);
 	let currentSort = $state('name_asc');
-	// Restrictions de l'annuaire : personnes retenues, actives. Seule la session admin change ces réglages.
+	// Restriction de l'annuaire aux personnes retenues. Seule la session admin change ce réglage.
 	let selectedExclusions: string[] = $state(['none']);
-	let selectedActivity: string[] = $state(['yes']);
 	let pendingStates = $state<Record<string, IdState>>({});
 
 	const idQueryKey: Record<string, string> = {
@@ -85,7 +80,8 @@
 	function buildFilterParams(): URLSearchParams {
 		const params = new URLSearchParams();
 		if (selectedExclusions.length) params.set('exclusion', selectedExclusions.join(','));
-		if (selectedActivity.length === 1) params.set('active', selectedActivity[0]);
+		// L'annuaire public écarte les personnes sans contribution ni fiche RH, conservées pour leurs décisions.
+		if (!isAdmin()) params.set('active', 'yes');
 		if (selectedDepts.length) params.set('department', selectedDepts.join(','));
 		if (selectedRoles.length) params.set('role', selectedRoles.join(','));
 		for (const [key, qk] of Object.entries(idQueryKey)) {
@@ -173,7 +169,6 @@
 			idStates: { type: 'source_states', urlKey: 'id_filter' },
 			hasRh: { type: 'single', urlKey: 'has_rh', defaultValue: 'yes' },
 			exclusion: { type: 'single', urlKey: 'exclusion', defaultValue: 'none' },
-			activity: { type: 'single', urlKey: 'active', defaultValue: 'yes' },
 			pendingStates: { type: 'source_states', urlKey: 'pending_filter' },
 			search: { type: 'single', urlKey: 'search' },
 			currentSort: { type: 'single', urlKey: 'sort', defaultValue: 'name_asc' },
@@ -189,7 +184,6 @@
 			idStates,
 			hasRh: selectedRh.length === 1 ? selectedRh[0] : 'all',
 			exclusion: selectedExclusions.length ? selectedExclusions.join(',') : 'all',
-			activity: selectedActivity.length === 1 ? selectedActivity[0] : 'all',
 			pendingStates,
 			search,
 			currentSort,
@@ -233,10 +227,6 @@
 					const value = restored.exclusion as string;
 					selectedExclusions = value === 'all' ? [] : value.split(',');
 				}
-				if (restored.activity != null) {
-					const value = restored.activity as string;
-					selectedActivity = value === 'all' ? [] : [value];
-				}
 				if (restored.pendingStates) pendingStates = restored.pendingStates as Record<string, IdState>;
 			}
 			if (restored.search) search = restored.search as string;
@@ -268,7 +258,6 @@
 				counts={pendingCounts}
 				onchange={onFilterChange}
 			/>
-			<FacetDropdown label="Activité" options={activityOptions} bind:selected={selectedActivity} onchange={onFilterChange} />
 			<FacetDropdown label="Exclusion" options={exclusionOptions} bind:selected={selectedExclusions} onchange={onFilterChange} />
 		{/if}
 	{/snippet}

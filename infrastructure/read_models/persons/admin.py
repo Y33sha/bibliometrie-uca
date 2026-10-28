@@ -13,6 +13,7 @@ from infrastructure.read_models.persons.models import (
     AmbiguousNameFormOut,
     AmbiguousNameFormsResponse,
     CurationPersonOut,
+    DistinctPersonOut,
     IdentifierConflictPairOut,
     IdentifierConflictsResponse,
     IdentifierRef,
@@ -32,20 +33,19 @@ from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
     has_author_role,
     identifier_neutralized,
+    pending_name_form,
 )
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Formes de ≥2 personnes au sens de `name_form_holder`, dont au moins une en attente. Les formes dérivées du nom de la personne, confirmées d'office, ne comptent pas comme en attente.
+# Formes de ≥2 personnes au sens de `name_form_holder`, dont au moins une à confirmer (`pending_name_form`).
 _AMBIGUOUS_FORMS_SQL = f"""
     SELECT pnf.name_form
     FROM person_name_forms pnf
     JOIN persons p ON p.id = pnf.person_id
     WHERE {name_form_holder("pnf", "p")}
     GROUP BY pnf.name_form
-    HAVING count(*) >= 2
-       AND bool_or(pnf.status = '{AttributionStatus.PENDING.value}'
-                   AND NOT ('{CANONICAL_NAME_FORM_SOURCE}' = ANY(pnf.sources)))
+    HAVING count(*) >= 2 AND bool_or({pending_name_form("pnf")})
 """
 
 
@@ -473,6 +473,30 @@ class PersonAdminQueries:
             if id_a in persons and id_b in persons
         ]
         return NameDuplicatesResponse(total=total, page=page, per_page=per_page, pairs=items)
+
+    def distinct_persons(self, person_id: int) -> list[DistinctPersonOut]:
+        """Personnes déclarées distinctes de `person_id` (`distinct_persons`)."""
+        rows = self._conn.execute(
+            text("""
+                SELECT p.id AS person_id, p.first_name, p.last_name,
+                       EXISTS(SELECT 1 FROM hr_records rh WHERE rh.person_id = p.id) AS has_rh
+                FROM distinct_persons dp
+                JOIN persons p
+                  ON p.id = CASE WHEN dp.person_id_a = :id THEN dp.person_id_b ELSE dp.person_id_a END
+                WHERE :id IN (dp.person_id_a, dp.person_id_b)
+                ORDER BY p.last_name, p.first_name
+            """),
+            {"id": person_id},
+        ).all()
+        return [
+            DistinctPersonOut(
+                person_id=r.person_id,
+                first_name=r.first_name,
+                last_name=r.last_name,
+                has_rh=r.has_rh,
+            )
+            for r in rows
+        ]
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
         """Autres personnes qui ont au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.

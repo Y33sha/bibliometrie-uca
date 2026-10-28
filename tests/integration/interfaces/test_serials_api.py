@@ -570,6 +570,7 @@ class TestSerialTypes:
         values = [opt["value"] for opt in body]
         assert values == [
             "journal",
+            "data_journal",
             "proceedings",
             "repository",
             "book_series",

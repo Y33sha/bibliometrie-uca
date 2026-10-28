@@ -197,7 +197,19 @@ TASKS: tuple[Task, ...] = (
         )
         for source in PERSON_SEARCHED_SOURCES
     ),
-    _task("fetch_missing.hal_by_id", "fetch_missing", network="hal"),
+    _task(
+        "fetch_missing.hal_by_id",
+        "fetch_missing",
+        network="hal",
+        parallel_group="fetch_missing.hal_id",
+    ),
+    _task(
+        "fetch_missing.scanr_by_hal_id",
+        "fetch_missing",
+        reads=("source_records.source_id",),
+        network="scanr",
+        parallel_group="fetch_missing.hal_id",
+    ),
     _task(
         "fetch_missing.hal_by_nnt",
         "fetch_missing",

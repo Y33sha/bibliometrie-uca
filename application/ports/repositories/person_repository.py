@@ -70,6 +70,10 @@ class PersonRepository(Protocol):
         """Marque deux personnes comme distinctes (idempotent). Retourne `(a, b)` triés si la paire vient d'être insérée, `None` si elle existait déjà."""
         ...
 
+    def unmark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
+        """Retire la paire de personnes distinctes. Retourne `(a, b)` triés si la paire existait, `None` sinon."""
+        ...
+
     # ── person_identifiers ─────────────────────────────────────────
 
     def find_identifier(self, id_type: str, id_value: str) -> IdentifierAttribution | None:

@@ -109,6 +109,7 @@ class MetadataCorrectionRule(StrEnum):
     TITLE_ISBN_TO_BOOK_REVIEW = "TITLE_ISBN_TO_BOOK_REVIEW"
     TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW = "TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW"
     TITLE_RECENSION_TO_BOOK_REVIEW = "TITLE_RECENSION_TO_BOOK_REVIEW"
+    SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER = "SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER"
     DOI_FIGSHARE_COLLECTION_TO_DATASET = "DOI_FIGSHARE_COLLECTION_TO_DATASET"
     EMBARGO_EXPIRED_TO_GREEN = "EMBARGO_EXPIRED_TO_GREEN"
     GOLD_DIAMOND_JOURNAL_TO_DIAMOND = "GOLD_DIAMOND_JOURNAL_TO_DIAMOND"
@@ -476,6 +477,14 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
             "title_regex": _RECENSION_TITLE_PATTERN,
         },
         "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
+    },
+    # Revue de données + doc_type `article` ⇒ `data_paper`. Les sources typent `article` les data papers de ces revues. Évaluée après les règles de titre : un erratum ou un éditorial d'une revue de données garde son type.
+    MetadataCorrectionRule.SERIAL_TYPE_DATA_JOURNAL_TO_DATA_PAPER: {
+        "applies_to": {
+            "serial_type": SerialType.DATA_JOURNAL,
+            "doc_type": DocType.ARTICLE,
+        },
+        "applies_correction": {"doc_type": DocType.DATA_PAPER},
     },
     # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
     # (`embargo_expired`, calculé à la lecture) devient `green`. Promotion à l'échéance sans

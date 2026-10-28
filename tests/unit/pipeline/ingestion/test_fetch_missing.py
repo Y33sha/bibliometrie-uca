@@ -28,6 +28,7 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
     # Toutes les sources, par défaut ; seule openalex est configurée côté DOI.
     metrics = FetchMissingPhase(
         fetch_hal_by_id=lambda _ctx: PhaseMetrics(new=2),
+        fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
         fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(new=1),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
         fetch_doi_one=lambda _ctx, source: (
@@ -48,6 +49,7 @@ def test_nnt_channel_only_in_full_mode(contexte):
 
     FetchMissingPhase(
         fetch_hal_by_id=lambda _ctx: calls.append("id") or PhaseMetrics(),
+        fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
         fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
         fetch_doi_one=lambda _ctx, source: PhaseMetrics(),
@@ -62,11 +64,12 @@ def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
     with caplog.at_level(logging.INFO, logger="test"):
         FetchMissingPhase(
             fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
+            fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_doi_one=fetch_doi_one,
             run_parallel=_sync_run_parallel,
-        ).run(contexte(mode="daily", sources={"openalex", "scanr"}))
+        ).run(contexte(mode="daily", sources={"openalex", "crossref"}))
     return caplog.text
 
 
@@ -103,6 +106,7 @@ def test_les_recherches_par_nnt_sans_rien_a_chercher_ferment_leur_section_une_fo
     with caplog.at_level(logging.INFO, logger="test"):
         FetchMissingPhase(
             fetch_hal_by_id=lambda _ctx: PhaseMetrics(seen=2),
+            fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
@@ -121,6 +125,7 @@ def test_theses_channel_suit_le_filtre_des_sources(contexte):
     def phase() -> FetchMissingPhase:
         return FetchMissingPhase(
             fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
+            fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
             fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
             fetch_theses_by_nnt=lambda _ctx: calls.append("theses") or PhaseMetrics(),
             fetch_doi_one=lambda _ctx, source: PhaseMetrics(),
@@ -138,6 +143,7 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
 
     FetchMissingPhase(
         fetch_hal_by_id=lambda _ctx: calls.append("id") or PhaseMetrics(),
+        fetch_scanr_by_hal_id=lambda _ctx: PhaseMetrics(),
         fetch_hal_by_nnt=lambda _ctx: calls.append("nnt") or PhaseMetrics(),
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
         fetch_doi_one=lambda _ctx, source: PhaseMetrics(new=3),
@@ -145,3 +151,29 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
     ).run(contexte(mode="full", sources={"openalex"}))  # pas de hal → canaux HAL sautés
 
     assert calls == []  # aucun canal HAL
+
+
+def test_les_recherches_par_hal_id_partagent_une_section(contexte, caplog):
+    """Les recherches par hal-id dans HAL et dans ScanR partagent une section, et chacune suit le filtre des sources."""
+    calls: list[str] = []
+
+    def phase() -> FetchMissingPhase:
+        return FetchMissingPhase(
+            fetch_hal_by_id=lambda _ctx: calls.append("hal") or PhaseMetrics(),
+            fetch_scanr_by_hal_id=lambda _ctx: calls.append("scanr") or PhaseMetrics(),
+            fetch_hal_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
+            fetch_doi_one=lambda _ctx, source: PhaseMetrics(seen=1),
+            run_parallel=_sync_run_parallel,
+        )
+
+    with caplog.at_level(logging.INFO, logger="test"):
+        phase().run(contexte(mode="daily", sources={"hal", "scanr"}))
+    assert sorted(calls) == ["hal", "scanr"]
+    messages = caplog.messages
+    section = messages.index("▶ Recherche des documents avec hal-id trouvés ailleurs")
+    assert messages[section + 1] == f"{LAST_BRANCH}Rien à faire"
+
+    calls.clear()
+    phase().run(contexte(mode="daily", sources={"scanr"}))
+    assert calls == ["scanr"]
