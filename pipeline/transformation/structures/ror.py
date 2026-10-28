@@ -51,7 +51,7 @@ class RorStore:
         )
         self._conn.execute(delete(ror_relations_table))
         self._conn.execute(delete(ror_organizations))
-        for batch in batched(organizations, _BATCH_SIZE):
+        for batch in batched(organizations, _BATCH_SIZE, strict=False):
             self._conn.execute(
                 insert(ror_organizations),
                 [
@@ -65,7 +65,7 @@ class RorStore:
                     for org in batch
                 ],
             )
-        for relation_batch in batched(relations, _BATCH_SIZE):
+        for relation_batch in batched(relations, _BATCH_SIZE, strict=False):
             self._conn.execute(
                 insert(ror_relations_table),
                 [

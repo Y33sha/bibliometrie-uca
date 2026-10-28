@@ -191,7 +191,7 @@ def main() -> None:
             for source_id in keys(source):
                 try:
                     raw_data = json.loads(store.get(source, source_id))
-                except (UnreadablePayloadError, ValueError):
+                except UnreadablePayloadError, ValueError:
                     unreadable += 1
                     log.warning(
                         "%s/%s : payload illisible au raw store (ligne staging inchangée)",

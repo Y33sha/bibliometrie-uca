@@ -74,7 +74,7 @@ def test_la_couche_api_ne_peut_pas_atteindre_le_module(module: str) -> None:
     assert par_contrat or par_analyse, (
         f"`{module}` s'atteint depuis interfaces/api/, qui doit en rester séparée. "
         "Le fermer par un contrat d'architecture, qui suit les chaînes d'imports, "
-        "ou par la règle `banned-api` d'interfaces/api/ruff.toml quand le contrat ne sait pas "
+        "ou par la règle `banned-api` de pyproject.toml quand le contrat ne sait pas "
         "le nommer."
     )
 

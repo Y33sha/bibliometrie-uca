@@ -65,7 +65,7 @@ class MetadataForCorrection:
         doi: str | None,
         serial_id: int | None,
         serial_type: str | None,
-    ) -> "MetadataForCorrection":
+    ) -> MetadataForCorrection:
         """Faits d'une publication : les champs que l'agrégation arbitre, et le type de sa revue."""
         return cls(
             title=title,

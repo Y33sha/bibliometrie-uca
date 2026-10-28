@@ -222,7 +222,6 @@ pyahocorasick = "ahocorasick"
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
 extend-exclude = [
     "*.md",                      # extraits de code de la documentation
     ".claude",                   # hooks du harnais de développement, hors code applicatif
@@ -302,10 +301,8 @@ combine-as-imports = true
 # `S101` (assertion, effacée en mode optimisé) : ces couches s'en servent pour des invariants internes, sans décision d'autorisation.
 "domain/*" = ["S101"]
 "infrastructure/*" = ["S101"]
-"application/pipeline/normalize/normalize_hal.py" = ["S101"]
 # Scripts en ligne de commande : imports tardifs, SQL composé à partir de fragments écrits en dur.
 "interfaces/cli/*" = ["E402", "S608"]
-"application/pipeline/*" = ["S101"]
 "interfaces/api/routers/*" = ["E402"] # imports tardifs fréquents
 
 [tool.pytest.ini_options]

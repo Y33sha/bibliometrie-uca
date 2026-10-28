@@ -299,11 +299,11 @@ def _framed(lines: list[str]) -> list[str]:
     ]
 
 
-def _fetch_stale_fields(conn: "Connection") -> dict[str, str]:
+def _fetch_stale_fields(conn: Connection) -> dict[str, str]:
     return {"delai": quantity(delay(conn, ConfigKey.FETCH_STALE_AFTER_DAYS), "jour")}
 
 
-_LABEL_FIELDS: dict[str, Callable[["Connection"], dict[str, str]]] = {
+_LABEL_FIELDS: dict[str, Callable[[Connection], dict[str, str]]] = {
     "fetch_stale": _fetch_stale_fields,
 }
 """Champs des libellés de phase, lus dans la configuration."""

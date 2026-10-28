@@ -289,7 +289,7 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
         return None
     try:
         root = _parse_tei(label_xml)
-    except (ParseError, DefusedXmlException):
+    except ParseError, DefusedXmlException:
         return None
     dates: list[date] = []
     for ref in root.iter(f"{{{_TEI_NS['tei']}}}ref"):
@@ -319,7 +319,7 @@ def parse_tei_isbns(label_xml: str | None) -> list[str]:
         return []
     try:
         root = _parse_tei(label_xml)
-    except (ParseError, DefusedXmlException):
+    except ParseError, DefusedXmlException:
         return []
     isbns: list[str] = []
     for idno in root.iter(f"{{{_TEI_NS['tei']}}}idno"):
@@ -335,7 +335,7 @@ def _tei_root(label_xml: str | None) -> Element | None:
         return None
     try:
         return _parse_tei(label_xml)
-    except (ParseError, DefusedXmlException):
+    except ParseError, DefusedXmlException:
         return None
 
 

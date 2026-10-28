@@ -58,7 +58,7 @@ def published_ror_version(*, user_agent: str) -> str | None:
         )
         raise_for_status(response)
         attributes = as_mapping(as_mapping(response.json().get("data")).get("attributes"))
-    except (httpx2.HTTPError, ValueError):
+    except httpx2.HTTPError, ValueError:
         return None
     return as_str(attributes.get("version"))
 

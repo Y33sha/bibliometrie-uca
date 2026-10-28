@@ -112,7 +112,7 @@ class Structure:
         rnsr_id: str | None = None,
         hal_collection: str | None = None,
         api_ids: dict[str, str | list[str]] | None = None,
-    ) -> "Structure":
+    ) -> Structure:
         """Fabrique une structure neuve (`id` non encore attribué) en validant ses champs."""
         return cls(
             id=None,

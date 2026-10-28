@@ -1,9 +1,0 @@
-# Analyse de `interfaces/api/`, en plus des règles du dépôt.
-#
-# Rien n'est ajouté ici pour l'instant : les modules réseau et le lancement de programme sont
-# fermés à cette couche par deux contrats d'architecture, qui suivent les chaînes d'imports, et
-# `urllib.request` — que ces contrats ne savent pas nommer — est refusé à tout le dépôt par la
-# règle `banned-api` de `pyproject.toml`.
-#
-# Le fichier reste pour porter une règle propre à la couche le jour où il en faudra une.
-extend = "../../pyproject.toml"

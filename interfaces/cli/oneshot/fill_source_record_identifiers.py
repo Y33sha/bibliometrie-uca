@@ -63,7 +63,7 @@ def _fill_source(conn: Connection, source: str) -> None:
         for r in rows:
             try:
                 raw_data = json.loads(store.get(source, r.source_id))
-            except (KeyError, UnreadablePayloadError, ValueError):
+            except KeyError, UnreadablePayloadError, ValueError:
                 missing += 1
                 continue
             row = StagingRow(id=r.staging_id, source_id=r.source_id, doi=r.doi, raw_data=raw_data)
