@@ -10,6 +10,23 @@ Les identifiants d'un enregistrement source sont dans la colonne `doi` et dans l
 - Un identifiant absent de son registre est inscrit dans `failed_lookups`, que chaque usage doit rejoindre.
 - `fetch_missing`, les relations et la vue `candidate_dois` déplient `external_ids` chacun à sa manière.
 
+### Inventaire
+
+Valeurs en base au 2026-10-28. Le DOI principal est dans la colonne `doi` pour toutes les sources.
+
+| Type | Source : origine (valeurs) | Clé de rapprochement | Rôle |
+|---|---|---|---|
+| `hal_id` | HAL : `halId_s` (64 791) ; OpenAlex : URL et identifiant des localisations (73 211, dont 3 679 enregistrements sources à plusieurs valeurs) ; ScanR : `externalIds` de type `hal` (64 947, dont 2 281 enregistrements sources à plusieurs valeurs) | premier seulement | premier : document ; suivants : secondaire |
+| `nnt` | HAL : `nntId_s` (2 794) ; OpenAlex : URL theses.fr (2 247) ; ScanR : identifiant ScanR (4 029) ; theses.fr : identifiant (5 066) | oui | document |
+| `pmid` | OpenAlex : URL PubMed (16 995) ; ScanR : `externalIds` de type `pmid` (10 469) ; HAL : `pubmedId_s` (0) | oui | document |
+| `pmcid` | HAL : `linkExtUrl_s` (2 556) ; OpenAlex : URL PMC (7 433) | non | document |
+| `arxiv_id` | HAL : `linkExtUrl_s` (3 603) ; OpenAlex : URL arXiv (7 299) | oui | document |
+| `related_dois` | OpenAlex : DOI des localisations autres que le DOI principal (15 141, dont 4 295 arXiv et 2 366 Zenodo) ; ScanR : `externalIds` de type `doi` autres que le DOI principal (1 278) ; DataCite : `relatedIdentifiers` de version, de forme, de partie et de supplément (17 806) | non | œuvre apparentée |
+| `isbn` | HAL : `idno` du TEI (4 242) ; Crossref : ISBN imprimé ou sans support (2 942) ; WoS (2 145) ; DataCite : identifiants et `IsPartOf` (628) | non | selon le type de document |
+| `eisbn` | Crossref : ISBN électronique (2 639) ; WoS (2) | non | selon le type de document |
+
+Les enregistrements sources à ISBN sont surtout des chapitres (4 922), des communications (2 397) et des livres (1 368). Deux enregistrements sources WoS ont un PMID absent de la normalisation WoS.
+
 Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 2021, sans DOI. OpenAlex et ScanR citent les deux dépôts, dans un ordre inverse. Chaque enregistrement source rejoint la publication de son premier dépôt, et les deux publications restent séparées.
 
 ## Décisions
@@ -27,7 +44,7 @@ Cas 245311 et 102233 : deux dépôts HAL d'un même texte, datés de 2020 et 202
 
 ### Phase 1 — Table et normalisation
 
-- [ ] Inventaire des identifiants par source et par type, avec leur rôle.
+- [x] Inventaire des identifiants par source et par type, avec leur rôle.
 - [ ] Table des identifiants des enregistrements sources, migration et remplissage depuis `external_ids`.
 - [ ] Écriture de la table par la normalisation.
 
