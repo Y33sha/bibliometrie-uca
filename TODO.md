@@ -1,4 +1,5 @@
 python interfaces/cli/oneshot/fill_source_record_identifiers.py
+la migration b8e3c1d7a4f2 doit passer après le remplissage
 
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
@@ -27,8 +28,9 @@ python interfaces/cli/oneshot/fill_source_record_identifiers.py
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * [ ] visualisation des collab avec carte (monde, Europe, France) qui les localise au niveau de leur ville
 * [ ] stats en compte fractionnaire vs compte entier
-* [ ] mettre en place des slugs pour les URL?
+* [ ] mettre en place des slugs pour les URL? (personnes, labos, éditeurs, revues)
 * [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
 * [ ] icônes des licences
 
 # Cas particuliers, bizarreries à élucider
+* publi 165064: lien éditeur présenté comme "full text" alors que non
