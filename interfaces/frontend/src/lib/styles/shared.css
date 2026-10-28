@@ -1168,8 +1168,7 @@ a.badge-doaj:hover {
 	background: color-mix(in srgb, var(--success), black 20%);
 }
 
-/* ── Titre de section : petites capitales en couleur d'accent ── */
-.section-title,
+/* ── Titre de carte et libellé de métadonnée : petites capitales en couleur d'accent ── */
 .dash-card h2,
 .detail-label {
 	color: var(--accent);
@@ -1178,10 +1177,13 @@ a.badge-doaj:hover {
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
 }
+
+/* ── Titre de section ── */
 .section-title {
+	color: var(--accent);
+	font-size: var(--fs-lg);
+	font-weight: 600;
 	margin: 24px 0 10px;
-	padding-bottom: 6px;
-	border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, white);
 }
 
 /* ── Meta badge (detail pages) ── */
