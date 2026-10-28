@@ -183,7 +183,7 @@
     align-items: center;
   }
   .site-icon {
-    height: 30px;
+    height: 32px;
     width: auto;
     margin-right: 10px;
   }
