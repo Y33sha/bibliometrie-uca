@@ -135,6 +135,9 @@
 	const yearSort = $derived(sortDirection(currentSort, 'year'));
 	const titleSort = $derived(sortDirection(currentSort, 'title'));
 	const apcSort = $derived(sortDirection(currentSort, 'apc'));
+	const serialSort = $derived(sortDirection(currentSort, 'serial'));
+	const publisherSort = $derived(sortDirection(currentSort, 'publisher'));
+	const labsSort = $derived(sortDirection(currentSort, 'labs'));
 
 	// --- Shared filter params builder ---
 	function buildFilterParams(): URLSearchParams {
@@ -211,8 +214,8 @@
 		facets.load();
 	});
 
-	function toggleSort(column: 'year' | 'title' | 'apc') {
-		currentSort = nextSort(currentSort, column, column === 'title' ? 'asc' : 'desc');
+	function toggleSort(column: 'year' | 'title' | 'serial' | 'publisher' | 'labs' | 'apc') {
+		currentSort = nextSort(currentSort, column, column === 'year' || column === 'apc' ? 'desc' : 'asc');
 		onFilterChange();
 	}
 
@@ -284,9 +287,15 @@
 			<th class="sortable publication-col-title" class:active={titleSort !== null} onclick={() => toggleSort('title')}>
 				{columnLabels.title} <SortChevron direction={titleSort} />
 			</th>
-			{#if col('serial')}<th class="publication-col-journal">{columnLabels.serial}</th>{/if}
-			{#if col('publisher')}<th class="publication-col-journal">{columnLabels.publisher}</th>{/if}
-			{#if !isLab && col('labs')}<th style="width:80px">{columnLabels.labs}</th>{/if}
+			{#if col('serial')}<th class="publication-col-journal sortable" class:active={serialSort !== null} onclick={() => toggleSort('serial')}>
+				{columnLabels.serial} <SortChevron direction={serialSort} />
+			</th>{/if}
+			{#if col('publisher')}<th class="publication-col-journal sortable" class:active={publisherSort !== null} onclick={() => toggleSort('publisher')}>
+				{columnLabels.publisher} <SortChevron direction={publisherSort} />
+			</th>{/if}
+			{#if !isLab && col('labs')}<th style="width:80px" class="sortable" class:active={labsSort !== null} onclick={() => toggleSort('labs')}>
+				{columnLabels.labs} <SortChevron direction={labsSort} />
+			</th>{/if}
 			{#if isPerson && col('corr')}<th style="width:30px" title="Auteur correspondant">&#9993;</th>{/if}
 			{#if col('apc')}<th style="width:60px" class="sortable" class:active={apcSort !== null} onclick={() => toggleSort('apc')}>
 				{columnLabels.apc} <SortChevron direction={apcSort} />

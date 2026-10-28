@@ -77,37 +77,59 @@ def _thesis_author(column: str) -> str:
                      LIMIT 1))"""
 
 
-def _perimeter_labs(*, person_filter: bool = False) -> str:
-    """Clauses FROM et WHERE des laboratoires des auteurs de `p` dans le périmètre (structure aliasée `s`). `person_filter` restreint aux contributions de la personne liée à `:lab_person`."""
+def _perimeter_labs(*, person_filter: bool = False, correlated: bool = True) -> str:
+    """Clauses FROM et WHERE des laboratoires des auteurs dans le périmètre (contribution aliasée `lc`, structure aliasée `s`). `correlated` les restreint à la publication `p`. `person_filter` les restreint aux contributions de la personne liée à `:lab_person`."""
+    publication_clause = "lc.publication_id = p.id AND" if correlated else ""
     person_clause = "AND lc.person_id = :lab_person" if person_filter else ""
     return f"""FROM contributions lc
                  JOIN contribution_structures lcs ON lcs.contribution_id = lc.id
                  JOIN structures s ON s.id = lcs.structure_id AND s.structure_type = '{StructureType.LABO.value}'
-                 WHERE lc.publication_id = p.id AND lc.in_perimeter = TRUE
+                 WHERE {publication_clause} lc.in_perimeter = TRUE
                    AND {has_author_role("lc")}
                    {person_clause}"""
 
 
-# Auteur de thèse trié par nom puis prénom ; laboratoires triés par le premier libellé affiché.
-_AUTHOR_SORT = _thesis_author("ROW(LOWER(pe.last_name), LOWER(pe.first_name))")
-_LABS_SORT = f"(SELECT MIN(LOWER(COALESCE(s.acronym, s.name))) {_perimeter_labs()})"
-
-_ORDER_MAP = {
-    "year_desc": "p.publication_year DESC, p.title",
-    "year_asc": "p.publication_year ASC, p.title",
-    "title_asc": "p.title ASC",
-    "title_desc": "p.title DESC",
-    "apc_desc": f"{_APC_SORT} DESC, p.title",
-    "apc_asc": f"{_APC_SORT} ASC, p.title",
-    "soutenance_desc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title",
-    "soutenance_asc": f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} ASC NULLS LAST, p.title",
-    "inscription_desc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} DESC NULLS LAST, p.title",
-    "inscription_asc": f"{source_extra(SourceExtra.DATE_INSCRIPTION, 'p')} ASC NULLS LAST, p.title",
-    "author_asc": f"{_AUTHOR_SORT} ASC NULLS LAST, p.title",
-    "author_desc": f"{_AUTHOR_SORT} DESC NULLS LAST, p.title",
-    "labs_asc": f"{_LABS_SORT} ASC NULLS LAST, p.title",
-    "labs_desc": f"{_LABS_SORT} DESC NULLS LAST, p.title",
+# Expression triée par champ de `PublicationSort`, tris par jointure exceptés. Auteur de thèse trié par nom puis prénom.
+_SORT_FIELDS = {
+    "year": "p.publication_year",
+    "title": "p.title",
+    "apc": _APC_SORT,
+    "soutenance": source_extra(SourceExtra.DATE_SOUTENANCE, "p"),
+    "inscription": source_extra(SourceExtra.DATE_INSCRIPTION, "p"),
+    "author": _thesis_author("ROW(LOWER(pe.last_name), LOWER(pe.first_name))"),
 }
+
+# Jointure et expression triée des champs lus dans une autre table, sans égard à la casse. Une jointure coûte moins qu'une sous-requête par ligne sur la liste complète.
+_SORT_JOINS = {
+    "serial": (
+        "LEFT JOIN serials serial_sort ON serial_sort.id = p.serial_id",
+        "LOWER(serial_sort.title)",
+    ),
+    "publisher": (
+        "LEFT JOIN publishers publisher_sort ON publisher_sort.id = p.publisher_id",
+        "LOWER(publisher_sort.name)",
+    ),
+}
+
+
+def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
+    """Jointure à ajouter à la requête et clause ORDER BY de la clé `sort` (`<champ>_<sens>`). Valeurs absentes en dernier, titre en départage.
+
+    Les laboratoires se trient par le premier libellé affiché. `person_filter` les restreint à ceux de la personne liée à `:lab_person`, comme la colonne. Leur clé se calcule en une agrégation sur toutes les publications : une sous-requête par ligne coûte plusieurs secondes sur la liste complète."""
+    field, direction = sort.rsplit("_", 1)
+    join = ""
+    if field in _SORT_JOINS:
+        join, key = _SORT_JOINS[field]
+    elif field == "labs":
+        join = f"""LEFT JOIN (
+                    SELECT lc.publication_id, MIN(LOWER(COALESCE(s.acronym, s.name))) AS sort_key
+                    {_perimeter_labs(person_filter=person_filter, correlated=False)}
+                    GROUP BY lc.publication_id
+                ) labs_sort ON labs_sort.publication_id = p.id"""
+        key = "labs_sort.sort_key"
+    else:
+        key = _SORT_FIELDS[field]
+    return join, f"{key} {direction.upper()} NULLS LAST, p.title"
 
 
 def _plain_text(s: str | None) -> str:
@@ -214,7 +236,7 @@ class PublicationListQueries:
         self._conn.execute(text("SET LOCAL jit = off"))
         offset = (page - 1) * per_page
         where_clause, binds = publication_filter_where(filters, context)
-        order = _ORDER_MAP[sort]
+        sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
         # Le statut HAL se lit au regard d'un laboratoire : il est calculé quand la liste porte sur un seul.
         hal_status = (
             hal_status_expression(context.lab_hal_collection)
@@ -285,6 +307,7 @@ class PublicationListQueries:
                         {_SOURCE_ID_COLUMNS}
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
+                {sort_join}
                 WHERE {where_clause}
                 ORDER BY {order}
                 LIMIT :pg_limit OFFSET :pg_offset
@@ -352,7 +375,7 @@ class PublicationListQueries:
         self._conn.execute(text("SET LOCAL jit = off"))
         context = filter_context(self._conn, filters)
         where_clause, binds = publication_filter_where(filters, context)
-        order = _ORDER_MAP[sort]
+        sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
 
         # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
         hal_status = (
@@ -389,6 +412,7 @@ class PublicationListQueries:
                         {_SOURCE_ID_COLUMNS}
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
+                {sort_join}
                 WHERE {where_clause}
                 ORDER BY {order}
                 LIMIT :export_limit
@@ -438,9 +462,7 @@ class PublicationListQueries:
         """
         self._conn.execute(text("SET LOCAL jit = off"))
         where_clause, binds = publication_filter_where(filters, filter_context(self._conn, filters))
-        order = _ORDER_MAP.get(
-            sort, f"{source_extra(SourceExtra.DATE_SOUTENANCE, 'p')} DESC NULLS LAST, p.title"
-        )
+        sort_join, order = _sort_clauses(sort)
 
         rows = self._conn.execute(
             text(f"""
@@ -464,6 +486,7 @@ class PublicationListQueries:
                         max(CASE WHEN sr.source = '{Source.THESES.value}' THEN sr.source_id END) AS theses_id
                     FROM source_records sr WHERE sr.publication_id = p.id
                 ) src_ids ON TRUE
+                {sort_join}
                 WHERE {where_clause}
                 ORDER BY {order}
                 LIMIT :export_limit

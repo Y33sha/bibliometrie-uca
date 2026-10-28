@@ -13,6 +13,7 @@ from tests.integration.helpers.contributions import contribution_id_of, insert_c
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
+from tests.integration.helpers.serials import insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
@@ -354,6 +355,70 @@ class TestThesesSort:
 
         assert self._sorted(sa_sync_conn, "labs_asc") == [t1, t2, t3]
         assert self._sorted(sa_sync_conn, "labs_desc") == [t2, t1, t3]
+
+
+class TestPublicationsSort:
+    """Tri des publications par revue, éditeur et laboratoires, sans égard à la casse, publications sans valeur en dernier."""
+
+    def _publication(self, conn, title, *, serial=None, publisher=None, labs=(), person=None):
+        serial_id = insert_serial(conn, serial) if serial else None
+        publication = insert_publication(conn, title, serial_id=serial_id, in_perimeter=True)
+        if publisher:
+            conn.execute(
+                text("UPDATE publications SET publisher_id = :pub WHERE id = :p"),
+                {"pub": insert_publisher(conn, publisher), "p": publication},
+            )
+        if labs:
+            contribution = insert_contribution(
+                conn,
+                publication,
+                person_id=person or insert_person(conn),
+                in_perimeter=True,
+                roles=["author"],
+            )
+            for lab in labs:
+                add_contribution_structure(conn, contribution, lab)
+        return publication
+
+    def _sorted(self, conn, sort, **filters):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(**filters), page=1, per_page=50, sort=sort
+        )
+        return [p.id for p in res.publications]
+
+    def test_serial_publisher_and_labs_sorts(self, sa_sync_conn):
+        alpha, beta, gamma = (insert_structure(sa_sync_conn, c) for c in ("Alpha", "Beta", "Gamma"))
+        p1 = self._publication(
+            sa_sync_conn, "P1", serial="zeta journal", publisher="Alpha Press", labs=(beta,)
+        )
+        p2 = self._publication(
+            sa_sync_conn, "P2", serial="Alpha Journal", publisher="beta press", labs=(gamma, alpha)
+        )
+        p3 = self._publication(sa_sync_conn, "P3")
+
+        assert self._sorted(sa_sync_conn, "serial_asc") == [p2, p1, p3]
+        assert self._sorted(sa_sync_conn, "serial_desc") == [p1, p2, p3]
+        assert self._sorted(sa_sync_conn, "publisher_asc") == [p1, p2, p3]
+        assert self._sorted(sa_sync_conn, "publisher_desc") == [p2, p1, p3]
+        assert self._sorted(sa_sync_conn, "labs_asc") == [p2, p1, p3]
+        assert self._sorted(sa_sync_conn, "labs_desc") == [p1, p2, p3]
+
+    def test_labs_sort_reads_the_labs_of_the_person(self, sa_sync_conn):
+        """Sur la vue d'une personne, la colonne n'affiche que ses laboratoires : le tri lit les mêmes."""
+        alpha, beta, zeta = (insert_structure(sa_sync_conn, c) for c in ("Alpha", "Beta", "Zeta"))
+        person = insert_person(sa_sync_conn, "Focus")
+        q1 = self._publication(sa_sync_conn, "Q1", labs=(zeta,), person=person)
+        contribution = insert_contribution(
+            sa_sync_conn,
+            q1,
+            person_id=insert_person(sa_sync_conn),
+            in_perimeter=True,
+            roles=["author"],
+        )
+        add_contribution_structure(sa_sync_conn, contribution, alpha)
+        q2 = self._publication(sa_sync_conn, "Q2", labs=(beta,), person=person)
+
+        assert self._sorted(sa_sync_conn, "labs_asc", person_id=person) == [q2, q1]
 
 
 class TestLabScope:

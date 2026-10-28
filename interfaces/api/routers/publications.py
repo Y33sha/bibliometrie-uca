@@ -244,7 +244,7 @@ def list_publications(
 ) -> PublicationListResponse:
     """Liste paginée des publications, avec leurs sources, leurs laboratoires et leur revue.
 
-    Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription, auteur de thèse (par nom puis prénom), laboratoires (par premier libellé) — et un sens (`_asc` / `_desc`).
+    Les filtres se cumulent. `sort` combine un champ — année, titre, APC, date de soutenance ou d'inscription, auteur de thèse (par nom puis prénom), laboratoires (par premier libellé), revue, éditeur — et un sens (`_asc` / `_desc`). Les valeurs absentes passent en dernier.
     """
     return queries.list_publications(
         filters=filters.to_filters(),
