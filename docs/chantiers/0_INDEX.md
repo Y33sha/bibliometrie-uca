@@ -10,6 +10,7 @@
 
 ### Non commencé
 
+- [Date de publication](DATA_date-de-publication.md)
 - [Gestion des publications dans l'administration](METIER_gestion-admin-des-publications.md)
 - [Identifiants des enregistrements sources](DATA_identifiants-des-enregistrements-sources.md)
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
