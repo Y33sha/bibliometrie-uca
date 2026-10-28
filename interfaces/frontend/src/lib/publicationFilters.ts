@@ -11,12 +11,14 @@ import {
 	oaLabelsMap,
 	docTypePlural,
 	docTypeFamilies,
-	publicationsDocTypes,
 } from '#lib/labels.js';
 import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
 
-/** Filtres des publications dans le contexte, dans l'ordre d'affichage. Un filtre sans `group` figure dans la barre principale. */
-export function publicationFilters(context: PublicationListContext): ListFilter[] {
+/** Filtres des publications dans le contexte, dans l'ordre d'affichage. Un filtre sans `group` figure dans la barre principale. `defaultDocTypes` : types que la page sélectionne quand l'URL ne fixe pas les types, et que son URL omet. */
+export function publicationFilters(
+	context: PublicationListContext,
+	defaultDocTypes: readonly string[] = [],
+): ListFilter[] {
 	return [
 		{
 			key: 'docTypes',
@@ -26,7 +28,7 @@ export function publicationFilters(context: PublicationListContext): ListFilter[
 			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
 			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
-			url: explicitSelectionUrl(publicationsDocTypes.join(',')),
+			url: explicitSelectionUrl(defaultDocTypes.length ? defaultDocTypes.join(',') : ALL_TOKEN),
 		},
 		{
 			key: 'years',

@@ -36,7 +36,7 @@
 	import type { components } from '#lib/api/schema.js';
 	// --- State ---
 	// Filtres de la liste des publications, hors contexte. La famille « Publications » est présélectionnée (cf. onMount).
-	const FILTERS = publicationFilters({ kind: 'all' });
+	const FILTERS = publicationFilters({ kind: 'all' }, publicationsDocTypes);
 	let values = $state(initialValues(FILTERS));
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();

@@ -28,7 +28,7 @@
 	} from '#lib/filterRegistry.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import { licenseLabels } from '#lib/licenses.js';
-	import { columnLabels, oaStatusLabel, publicationsDocTypes } from '#lib/labels.js';
+	import { columnLabels, oaStatusLabel } from '#lib/labels.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
 	import { usePublicationFacets } from '#lib/composables/usePublicationFacets.svelte.js';
@@ -80,9 +80,6 @@
 	const isLab = context.kind === 'lab';
 	// svelte-ignore state_referenced_locally
 	const isPerson = context.kind === 'person';
-	// La liste générale présélectionne la famille « Publications » tant que l'URL ne fixe pas les types.
-	// svelte-ignore state_referenced_locally
-	const restrictToPublications = context.kind === 'all';
 
 	// Libellé d'un statut de dépôt HAL, servi par l'API avec les options du filtre « Statuts HAL ».
 	function halStatusLabel(status: string): string {
@@ -247,11 +244,6 @@
 			if (restored.search) search = restored.search as string;
 			if (restored.currentSort) currentSort = restored.currentSort as string;
 			if (restored.currentPage) listing.page = restored.currentPage as number;
-		}
-
-		// Défaut « Publications » (liste générale uniquement) : sans filtre de type explicite dans l'URL, on pré-sélectionne la famille Publications. La sélection est réelle, donc la facette « Types » la reflète ; cocher d'autres types l'élargit, « Effacer » la vide. Le jeton `all` dans l'URL laisse la sélection vide.
-		if (restrictToPublications && !(urlSync && page.url.searchParams.has('doc_type'))) {
-			values.checkbox.docTypes = [...publicationsDocTypes];
 		}
 
 		// Forcer l'affichage des colonnes liées aux filtres actifs
