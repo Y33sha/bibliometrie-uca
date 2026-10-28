@@ -1,4 +1,4 @@
-"""Doublons d'auteur dans la liste d'un enregistrement source : la source répète tout ou partie de la liste à sa suite (A B C A B C), ou chaque nom à sa place (A A B B…)."""
+"""Doublons d'auteur dans la liste d'un enregistrement source : la source répète tout ou partie de la liste à sa suite (A B C A B C), chaque nom à sa place (A A B B…), ou les auteurs dans un autre ordre, en liste des membres d'un collectif (A B C D B X A)."""
 
 from collections import defaultdict
 from collections.abc import Sequence
@@ -6,8 +6,10 @@ from itertools import pairwise
 
 from domain.publications.author_grouping import SourceContribution
 
-# Nombre de noms complets répétés au même décalage qui signale la répétition d'un bloc de la liste.
+# Nombre de noms complets répétés qui signale une copie : au même décalage pour un bloc de la liste, à des décalages quelconques pour une liste de membres.
 MIN_COPIED_NAMES = 2
+# Part des auteurs de la liste répétés à distance qui signale une liste de membres.
+MIN_MEMBER_LIST_SHARE = 0.10
 # Nombre de paires côte à côte, de noms différents et à la suite, qui signale une liste où chaque nom est répété à sa place.
 MIN_DOUBLED_PAIRS = 4
 
@@ -27,7 +29,11 @@ def copied_source_contributions(
     by_name: dict[Name, list[Placed]] = defaultdict(list)
     for p in ordered:
         by_name[_name(p)].append(p)
-    copies = _block_copies(by_name) | _doubled_in_place(ordered)
+    copies = (
+        _block_copies(by_name)
+        | _doubled_in_place(ordered)
+        | _member_list_copies(by_name, len(ordered))
+    )
     return {s.id: by_name[_name(p)][0][1].id for p in ordered if (s := p[1]).id in copies}
 
 
@@ -48,6 +54,21 @@ def _block_copies(by_name: dict[Name, list[Placed]]) -> set[int]:
         for (pa, _), (pb, b) in pairwise(occurrences)
         if pb - pa in offsets
     }
+
+
+def _member_list_copies(by_name: dict[Name, list[Placed]], list_size: int) -> set[int]:
+    """Occurrences qui suivent la précédente du même nom à distance (décalage supérieur à 1), quand au moins `MIN_COPIED_NAMES` noms et `MIN_MEMBER_LIST_SHARE` des `list_size` auteurs se répètent à distance.
+
+    La liste des membres d'un collectif reprend des auteurs dans un autre ordre : chaque nom repris a son propre décalage. Les homonymes sont côte à côte, ou moins nombreux.
+    """
+    distant = {
+        name: [b.id for (pa, _), (pb, b) in pairwise(occurrences) if pb - pa > 1]
+        for name, occurrences in by_name.items()
+    }
+    repeated = [ids for ids in distant.values() if ids]
+    if len(repeated) < max(MIN_COPIED_NAMES, MIN_MEMBER_LIST_SHARE * list_size):
+        return set()
+    return {i for ids in repeated for i in ids}
 
 
 def _doubled_in_place(ordered: Sequence[Placed]) -> set[int]:

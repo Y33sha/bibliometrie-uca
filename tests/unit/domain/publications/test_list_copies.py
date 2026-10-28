@@ -60,3 +60,19 @@ def test_trois_paires_cote_a_cote_restent_des_homonymes():
 
 def test_un_meme_nom_repete_quatre_fois_n_est_pas_une_liste_doublee():
     assert copied_source_contributions(_source_record(["wang"] * 8)) == {}
+
+
+def test_une_liste_de_membres_reprenant_les_auteurs_dans_un_autre_ordre_est_une_copie():
+    """Auteurs, puis membres du collectif : trois auteurs repris, chacun à son propre décalage."""
+    authors = ["martin", "petit", "durand", "leroy", "moreau", "simon", "laurent", "michel"]
+    members = ["durand", "garcia", "martin", "roux", "petit", "fournier"]
+    copies = copied_source_contributions(_source_record(authors + members))
+    assert copies == {9: 3, 11: 1, 13: 2}
+
+
+def test_des_noms_repetes_a_distance_sous_le_seuil_restent_des_homonymes():
+    """Deux noms répétés à distance, à des décalages différents, sur une liste de quarante noms."""
+    names = [f"nom{i}" for i in range(38)]
+    names[20:20] = ["nom3"]
+    names[30:30] = ["nom7"]
+    assert copied_source_contributions(_source_record(names)) == {}
