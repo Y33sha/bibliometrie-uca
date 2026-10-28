@@ -84,9 +84,11 @@ function renderLatex(s: string, allowedTags: Set<string>): string {
 			parts.push(escapeHtml(m[0]));
 		} else {
 			const tex = undoubleBackslashes(content.trim());
+			// Une formule détachée (`$$`) de plusieurs lignes s'affiche en bloc ; les autres restent dans la phrase.
+			const displayMode = m[1] !== undefined && tex.includes('\\\\');
 			try {
 				parts.push(katex.renderToString(tex, {
-					displayMode: false,
+					displayMode,
 					throwOnError: false
 				}));
 			} catch {

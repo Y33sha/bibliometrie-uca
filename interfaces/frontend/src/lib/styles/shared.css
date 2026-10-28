@@ -137,6 +137,12 @@
 	border: 0;
 }
 
+/* ── Formule détachée (KaTeX en mode bloc) : centrée sur sa ligne, elle défile si elle dépasse sa colonne ── */
+.katex-display {
+	overflow-x: auto;
+	overflow-y: hidden;
+}
+
 /* ── Liens ── */
 /* Style par défaut : couleur d'accent, souligné au survol. `:where()` donne une spécificité nulle : un lien stylé par une classe garde son style. */
 :where(a) {
