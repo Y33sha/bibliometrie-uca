@@ -108,7 +108,7 @@
 
 <header class="site-header" class:admin={isAdmin()}>
   <div class="site-brand">
-    <img src={asset(isAdmin() ? "connectome.png" : "favicon.png")} alt="" class="site-icon" />
+    <img src={asset(isAdmin() ? "connectome.svg" : "favicon.svg")} alt="" class="site-icon" />
     <span class="site-title">{siteTitle()}</span>
   </div>
   <nav id="site-nav" class="site-nav" class:open={mobileNavOpen} aria-label="Navigation principale">
