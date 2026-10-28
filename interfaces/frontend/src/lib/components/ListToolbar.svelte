@@ -107,7 +107,7 @@
 
 <div class="list-toolbar-anchor" bind:this={anchor}></div>
 <!-- La barre glisse par sa position collante (`top`). Une transformation ferait d'elle le repère des panneaux en position fixe qu'elle contient (facettes), décalés d'autant. -->
-<div class="list-toolbar" class:hidden class:detached bind:this={bar} style:top={offset ? `calc(var(--header-height) - ${offset}px)` : undefined} use:stickyHeight={offset}>
+<div class="list-toolbar" class:hidden class:detached bind:this={bar} style:top={offset ? `calc(var(--header-height) - ${offset}px)` : undefined} use:stickyHeight={{ variable: '--list-toolbar-height', hidden: offset }}>
 	<div class="toolbar-card">
 		<div class="toolbar">
 			{#if search !== undefined}

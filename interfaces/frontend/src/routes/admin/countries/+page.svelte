@@ -5,6 +5,7 @@
 	import ResultCount from '#lib/components/ResultCount.svelte';
 	import { resolve } from '$app/paths';
 	import { replaceQuery } from '#lib/url.js';
+	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 	import { addresses as addressesApi, api } from '#lib/api/index.js';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import TableStatusRow from '#lib/components/TableStatusRow.svelte';
@@ -204,7 +205,7 @@
 	<ResultCount {list} one="adresse" many="adresses" />
 </div>
 
-<div class="batch-bar">
+<div class="batch-bar" use:stickyHeight={{ variable: '--batch-bar-height' }}>
 	<select class="select" aria-label="Pays à ajouter" bind:value={batchCountry}>
 		<option value="">— Choisir un pays à ajouter —</option>
 		{#each countries as c}

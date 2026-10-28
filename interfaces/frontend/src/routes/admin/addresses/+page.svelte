@@ -929,9 +929,6 @@
 
 	/* Batch bar */
 	.batch-bar {
-		position: sticky;
-		top: var(--header-height);
-		z-index: 40;
 		background: var(--accent);
 		color: white;
 		padding: 8px 16px;

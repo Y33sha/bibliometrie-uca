@@ -15,6 +15,7 @@
 	import { titleCase } from '#lib/utils.js';
 	import { autofocus } from '#lib/actions/focus.js';
 	import { anchored } from '#lib/actions/anchored.js';
+	import { stickyHeight } from '#lib/actions/stickyHeight.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
@@ -248,7 +249,7 @@
 </ListToolbar>
 
 {#if selectedIds.size > 0}
-	<div class="batch-bar">
+	<div class="batch-bar" use:stickyHeight={{ variable: '--batch-bar-height' }}>
 		<span>{selectedIds.size} sélectionnée{selectedIds.size > 1 ? 's' : ''}</span>
 		<input type="search" placeholder="Attribuer à une personne existante" value={batchSearch.query}
 			onkeydown={(e) => { if (e.key === 'Escape') { batchSearch.setQuery(''); } }}
@@ -417,7 +418,6 @@
 		display: flex; align-items: center; gap: 10px;
 		padding: 10px 14px; margin-bottom: 10px;
 		background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius);
-		position: relative;
 	}
 	.batch-bar input { padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--accent) 25%, white); border-radius: var(--radius); font-size: 0.85rem; width: 220px; }
 	.batch-results {

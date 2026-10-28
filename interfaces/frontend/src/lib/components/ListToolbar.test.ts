@@ -31,7 +31,7 @@ describe('ListToolbar', () => {
 		window.dispatchEvent(new Event('scroll'));
 		flushSync();
 
-		expect(document.documentElement.style.getPropertyValue('--list-sticky-height')).toBe('70px');
+		expect(document.documentElement.style.getPropertyValue('--list-toolbar-height')).toBe('70px');
 		expect(bar.style.transform).toBe('');
 		unmount(component);
 		target.remove();

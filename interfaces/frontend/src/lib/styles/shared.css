@@ -362,16 +362,24 @@
 	color: var(--muted);
 }
 
-/* Conteneur d'un tableau (composant TableScroll). Quand le tableau tient dans la page, son en-tête se colle sous le menu supérieur et sous la barre d'outils quand elle est affichée (`--list-sticky-height`, publiée par l'action `stickyHeight`). Le filet inférieur passe par une ombre, qu'un en-tête collant garde, là où la bordure d'un tableau en `border-collapse` disparaît. */
+/* Barre d'actions sur la sélection d'une liste. Elle se colle sous le menu supérieur et sous la part visible de la barre d'outils (`--list-toolbar-height`). Les panneaux de la barre d'outils passent au-dessus d'elle. Sur une page à tableau, la barre publie sa hauteur dans `--batch-bar-height` (action `stickyHeight`), donc l'en-tête du tableau se colle dessous. */
+.batch-bar {
+	position: sticky;
+	top: calc(var(--header-height) + var(--list-toolbar-height, 0px));
+	z-index: 30;
+}
+
+/* Conteneur d'un tableau (composant TableScroll). Quand le tableau tient dans la page, son en-tête se colle sous le menu supérieur, sous la barre d'outils quand elle est affichée et sous la barre d'actions (`--list-toolbar-height` et `--batch-bar-height`, publiées par l'action `stickyHeight`). Le filet inférieur passe par une ombre, qu'un en-tête collant garde, là où la bordure d'un tableau en `border-collapse` disparaît. */
 .table-scroll thead th {
 	position: sticky;
-	top: calc(var(--header-height) + var(--list-sticky-height, 0px));
+	top: calc(var(--header-height) + var(--list-toolbar-height, 0px) + var(--batch-bar-height, 0px));
 	z-index: 2;
 	background: var(--bg);
 	border-bottom: none;
 	box-shadow: inset 0 -1px 0 var(--border);
 }
-/* Barre d'outils détachée (`ListToolbar`) : l'en-tête glisse au même rythme qu'elle. */
+/* Barre d'outils détachée (`ListToolbar`) : la barre d'actions et l'en-tête glissent au même rythme qu'elle. */
+:root[data-list-toolbar='detached'] .batch-bar,
 :root[data-list-toolbar='detached'] .table-scroll thead th {
 	transition: top 0.2s ease;
 }
