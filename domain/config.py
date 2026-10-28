@@ -1,6 +1,6 @@
 """Règles des paramètres applicatifs.
 
-La table `config` contient les réglages d'exploitation du pipeline : périmètres, années couvertes, plafonds d'interrogation, délais de réinterrogation, types de structure affichés, titre de l'application. Une part est consommée par les pages publiques, le reste est réservé à une session d'administration.
+La table `config` contient les réglages d'exploitation du pipeline : périmètres, années couvertes, plafonds d'interrogation, délais de réinterrogation, types de structure affichés, titre et teinte de l'application. Une part est consommée par les pages publiques, le reste est réservé à une session d'administration.
 
 Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond attend un entier positif ou nul, un délai un nombre entier de jours d'au moins un, une année doit tomber dans les bornes.
 """
@@ -105,10 +105,16 @@ PERIMETER_PERSONS_KEY = "perimeter_persons"
 SITE_TITLE_KEY = "site_title"
 """Clé du titre de l'application. Pour un texte vide, l'interface compose le titre avec le nom de l'établissement."""
 
+BRAND_HUE_KEY = "brand_hue"
+"""Clé de la teinte de l'interface : angle OKLCH en degrés, entier de 0 à 359."""
+
+DEFAULT_BRAND_HUE = 196
+"""Teinte de l'interface quand la clé est absente."""
+
 INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
-    {PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY, SITE_TITLE_KEY}
+    {PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY, SITE_TITLE_KEY, BRAND_HUE_KEY}
 )
-"""Clés propres à l'établissement : ses périmètres et le titre de l'application."""
+"""Clés propres à l'établissement : ses périmètres, le titre et la teinte de l'application."""
 
 MIN_YEAR = 1970
 MAX_YEAR = 2100
@@ -133,7 +139,7 @@ def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
 
     Un plafond attend un entier positif ou nul, zéro retirant la borne ; une valeur absente ou vide y vaut zéro. Un délai attend un nombre entier de jours, au moins un. Une année doit tomber dans les bornes. Toute autre valeur est refusée, aucune valeur de repli n'ayant de sens.
 
-    Le titre de l'application attend un texte, dont les espaces de bord sont retirés. Une valeur absente vaut un texte vide.
+    Le titre de l'application attend un texte, dont les espaces de bord sont retirés. Une valeur absente vaut un texte vide. La teinte attend un entier de 0 à 359.
 
     Les autres clés passent telles quelles.
     """
@@ -143,6 +149,11 @@ def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
         if not isinstance(value, str):
             raise ValidationError(f"`{key}` attend un texte ; reçu : {value!r}")
         return value.strip()
+    if key == BRAND_HUE_KEY:
+        teinte = _as_int(value)
+        if teinte is None or not (0 <= teinte <= 359):
+            raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
+        return teinte
     if key in CAP_KEYS:
         if value is None or (isinstance(value, str) and not value.strip()):
             return 0

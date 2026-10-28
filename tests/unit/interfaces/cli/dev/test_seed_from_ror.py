@@ -130,6 +130,7 @@ def test_seed_links_children_to_root_and_skips_untyped():
         ("perimeter_extraction", "lorraine"),
         ("perimeter_persons", "lorraine"),
         ("site_title", ""),
+        ("brand_hue", 196),
     ]
     assert seed.skipped == [GARDENS]
 

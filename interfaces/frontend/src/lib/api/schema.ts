@@ -3783,7 +3783,7 @@ export interface components {
         };
         /**
          * InstitutionOut
-         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre de l'application.
+         * @description Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre et teinte de l'application.
          */
         InstitutionOut: {
             /** Name */
@@ -3792,6 +3792,8 @@ export interface components {
             root_structure_ids: number[];
             /** Title */
             title: string | null;
+            /** Brand Hue */
+            brand_hue: number;
         };
         /**
          * IssnStatus

@@ -12,7 +12,7 @@
   import Modal from "#lib/components/Modal.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { autofocus } from "#lib/actions/focus.js";
-  import { defaultSiteTitle, institution } from "#lib/institution.svelte.js";
+  import { applyBrandHue, defaultSiteTitle, institution, previewBrandHue } from "#lib/institution.svelte.js";
   import type { components } from "#lib/api/schema.js";
 
   type StructureListItem = components["schemas"]["StructureListItem"];
@@ -184,6 +184,27 @@
   });
 
   const siteTitleItem = $derived(configByKey(SITE_TITLE_KEY));
+
+  // Teinte : le curseur prévisualise sur toute l'interface, le relâchement enregistre.
+  const BRAND_HUE_KEY = "brand_hue";
+  const brandHueItem = $derived(configByKey(BRAND_HUE_KEY));
+  let hueDraft = $state<number | null>(null);
+  const hueShown = $derived(hueDraft ?? (typeof brandHueItem?.value === "number" ? brandHueItem.value : 196));
+  // Spectre du curseur, à la luminosité et à la saturation de --accent.
+  const hueSpectrum = `linear-gradient(to right, ${Array.from({ length: 13 }, (_, i) => `oklch(0.446 0.064 ${i * 30})`).join(", ")})`;
+
+  async function saveBrandHue() {
+    if (hueDraft === null) return;
+    try {
+      const saved = await configApi.setValue(BRAND_HUE_KEY, hueDraft);
+      applyBrandHue(saved.value as number);
+      await load();
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), "error");
+      if (institution.brandHue !== null) previewBrandHue(institution.brandHue);
+    }
+    hueDraft = null;
+  }
 
   async function toggleLabType(type: string) {
     const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
@@ -415,6 +436,29 @@
         {/if}
       </div>
     {/if}
+    {#if brandHueItem}
+      <div class="config-row stacked">
+        <label class="config-label" for="brand-hue">Teinte de l'interface</label>
+        <div class="hue-control">
+          <input
+            id="brand-hue"
+            class="hue-slider"
+            type="range"
+            min="0"
+            max="359"
+            step="1"
+            value={hueShown}
+            style:background={hueSpectrum}
+            oninput={(e) => {
+              hueDraft = Number((e.target as HTMLInputElement).value);
+              previewBrandHue(hueDraft);
+            }}
+            onchange={saveBrandHue}
+          />
+          <span class="config-value-inline">{hueShown}°</span>
+        </div>
+      </div>
+    {/if}
     <div class="config-row stacked">
       <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
       <div class="type-checks">
@@ -504,9 +548,9 @@
   /* Contrôle trop large pour tenir à côté du libellé : il passe dessous. */
   .config-row.stacked {
     flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
-    padding: 8px 0;
+    align-items: stretch;
+    gap: 12px;
+    padding: 12px 0;
   }
   .config-label {
     flex: 1;
@@ -620,6 +664,18 @@
   .role-phase {
     border-bottom: 1px dotted var(--muted);
     cursor: help;
+  }
+  .hue-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .hue-slider {
+    flex: 1;
+    height: 12px;
+    border-radius: 6px;
+    appearance: none;
+    cursor: pointer;
   }
   .type-checks {
     display: flex;

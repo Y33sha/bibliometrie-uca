@@ -34,7 +34,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM as PgEnum
 
-from domain.config import CAP_KEYS, DELAY_KEYS, MAX_YEAR, MIN_YEAR, SITE_TITLE_KEY, YEAR_KEYS
+from domain.config import (
+    BRAND_HUE_KEY,
+    CAP_KEYS,
+    DELAY_KEYS,
+    MAX_YEAR,
+    MIN_YEAR,
+    SITE_TITLE_KEY,
+    YEAR_KEYS,
+)
 from domain.countries import PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
@@ -151,6 +159,12 @@ config = Table(
     CheckConstraint(
         f"key <> '{SITE_TITLE_KEY}' OR jsonb_typeof(value) = 'string'",
         name="config_site_title_is_text",
+    ),
+    CheckConstraint(
+        f"key <> '{BRAND_HUE_KEY}' OR (jsonb_typeof(value) = 'number' "
+        "AND (value)::numeric BETWEEN 0 AND 359 "
+        "AND (value)::numeric = trunc((value)::numeric))",
+        name="config_brand_hue_is_angle",
     ),
     schema="ops",
 )

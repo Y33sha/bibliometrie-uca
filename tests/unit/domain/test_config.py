@@ -5,7 +5,13 @@ Le contrôle vaut à l'écriture, quelle que soit la voie : une valeur hors form
 
 import pytest
 
-from domain.config import MAX_YEAR, MIN_YEAR, SITE_TITLE_KEY, normalize_config_value
+from domain.config import (
+    BRAND_HUE_KEY,
+    MAX_YEAR,
+    MIN_YEAR,
+    SITE_TITLE_KEY,
+    normalize_config_value,
+)
 from domain.errors import ValidationError
 
 _PLAFOND = "unpaywall_max_per_run"
@@ -79,6 +85,17 @@ class TestTitre:
     def test_une_valeur_autre_qu_un_texte_est_refusee(self, valeur):
         with pytest.raises(ValidationError, match="texte"):
             normalize_config_value(SITE_TITLE_KEY, valeur)
+
+
+class TestTeinte:
+    @pytest.mark.parametrize(("valeur", "attendu"), [(0, 0), (359, 359), ("  120 ", 120)])
+    def test_un_angle_entier_est_retenu(self, valeur, attendu):
+        assert normalize_config_value(BRAND_HUE_KEY, valeur) == attendu
+
+    @pytest.mark.parametrize("valeur", [-1, 360, 12.5, "rouge", None, True])
+    def test_une_valeur_hors_de_0_a_359_est_refusee(self, valeur):
+        with pytest.raises(ValidationError, match="0 à 359"):
+            normalize_config_value(BRAND_HUE_KEY, valeur)
 
 
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():

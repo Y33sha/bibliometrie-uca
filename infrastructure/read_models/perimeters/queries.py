@@ -7,7 +7,13 @@ Les fonctions libres sont partagées par l'extraction, le pipeline et les adapte
 
 from sqlalchemy import Connection, text
 
-from domain.config import PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY, SITE_TITLE_KEY
+from domain.config import (
+    BRAND_HUE_KEY,
+    DEFAULT_BRAND_HUE,
+    PERIMETER_EXTRACTION_KEY,
+    PERIMETER_PERSONS_KEY,
+    SITE_TITLE_KEY,
+)
 from infrastructure.read_models.perimeters.models import (
     InstitutionOut,
     PerimeterOut,
@@ -145,13 +151,18 @@ class PerimetersQueries:
         self._conn = conn
 
     def institution(self) -> InstitutionOut:
-        title = self._conn.execute(
-            text("SELECT value FROM config WHERE key = :key"), {"key": SITE_TITLE_KEY}
-        ).scalar_one_or_none()
+        values = dict(
+            self._conn.execute(
+                text("SELECT key, value FROM config WHERE key IN (:title, :hue)"),
+                {"title": SITE_TITLE_KEY, "hue": BRAND_HUE_KEY},
+            ).all()
+        )
+        hue = values.get(BRAND_HUE_KEY)
         return InstitutionOut(
             name=get_persons_perimeter_name(self._conn),
             root_structure_ids=get_persons_perimeter_root_ids(self._conn),
-            title=title or None,
+            title=values.get(SITE_TITLE_KEY) or None,
+            brand_hue=hue if isinstance(hue, int) else DEFAULT_BRAND_HUE,
         )
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
