@@ -174,19 +174,16 @@ class PerimetersQueries:
         """Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent."""
         rows = self._conn.execute(
             text(
-                "SELECT lower(r.country_code) AS code, c.name, count(*) AS structure_count "
+                "SELECT lower(r.country_code) AS code, c.name "
                 "FROM structures s "
                 "JOIN ror_organizations r ON r.ror_id = s.ror_id "
                 "LEFT JOIN countries c ON c.code = lower(r.country_code) "
                 "WHERE s.id = ANY(:ids) "
-                "GROUP BY 1, 2 ORDER BY 3 DESC, 1"
+                "GROUP BY 1, 2 ORDER BY count(*) DESC, 1"
             ),
             {"ids": get_persons_structure_ids_list(self._conn)},
         ).all()
-        return [
-            PerimeterCountryOut(code=r.code, name=r.name, structure_count=r.structure_count)
-            for r in rows
-        ]
+        return [PerimeterCountryOut(code=r.code, name=r.name) for r in rows]
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
         """Tous les périmètres, avec leurs structures racines et leur nombre de structures, lu dans `perimeter_structures`."""

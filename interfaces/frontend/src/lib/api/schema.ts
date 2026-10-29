@@ -2019,7 +2019,7 @@ export interface paths {
         };
         /**
          * List Perimeter Countries
-         * @description Pays des organisations ROR des structures du périmètre des personnes, avec leur nombre de structures. Sert à choisir le pays de l'établissement.
+         * @description Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent. Sert à choisir le pays de l'établissement.
          */
         get: operations["list_perimeter_countries_api_perimeters_countries_get"];
         put?: never;
@@ -4257,15 +4257,13 @@ export interface components {
         };
         /**
          * PerimeterCountryOut
-         * @description Pays d'organisations ROR du périmètre des personnes, avec le nombre de structures rattachées à une organisation ROR de ce pays.
+         * @description Pays d'organisations ROR des structures du périmètre des personnes.
          */
         PerimeterCountryOut: {
             /** Code */
             code: string;
             /** Name */
             name: string | null;
-            /** Structure Count */
-            structure_count: number;
         };
         /** PerimeterCreate */
         PerimeterCreate: {

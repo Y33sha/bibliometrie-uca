@@ -434,7 +434,7 @@
           {#if perimeterCountries.length > 0}
             <optgroup label="Pays des structures du périmètre">
               {#each perimeterCountries as c (c.code)}
-                <option value={c.code}>{c.name ?? c.code.toUpperCase()} ({c.structure_count} structure{c.structure_count > 1 ? "s" : ""})</option>
+                <option value={c.code}>{c.name ?? c.code.toUpperCase()}</option>
               {/each}
             </optgroup>
           {/if}

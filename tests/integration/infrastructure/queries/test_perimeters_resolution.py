@@ -70,7 +70,7 @@ def test_institution_country_defaults_when_absent(sa_sync_conn):
     assert get_institution_country(conn) == "fr"
 
 
-def test_persons_perimeter_countries_count_structures_by_ror_country(sa_sync_conn):
+def test_persons_perimeter_countries_by_frequency(sa_sync_conn):
     conn = sa_sync_conn
     _clear_perimeter_config(conn)
     insert_ror_tree(conn)
@@ -91,7 +91,7 @@ def test_persons_perimeter_countries_count_structures_by_ror_country(sa_sync_con
 
     countries = PerimetersQueries(conn).persons_perimeter_countries()
 
-    assert [(c.code, c.structure_count) for c in countries] == [("fr", 2), ("de", 1)]
+    assert [c.code for c in countries] == ["fr", "de"]
 
 
 class TestGetHalCollections:

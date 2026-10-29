@@ -37,7 +37,7 @@ def list_perimeters(
 def list_perimeter_countries(
     queries: PerimetersQueries = Depends(perimeters_queries),
 ) -> list[PerimeterCountryOut]:
-    """Pays des organisations ROR des structures du périmètre des personnes, avec leur nombre de structures. Sert à choisir le pays de l'établissement."""
+    """Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent. Sert à choisir le pays de l'établissement."""
     return queries.persons_perimeter_countries()
 
 
