@@ -1,6 +1,6 @@
-"""Contributions : les contributions sources d'un même auteur dans une publication, avec au maximum une contribution source par enregistrement source.
+"""Alignement des auteurs d'une publication : les contributions sources d'un même auteur forment une contribution, avec au plus une contribution source par enregistrement source.
 
-Les enregistrements sources d'une publication se traitent de la plus longue liste d'auteurs à la plus courte, chacune face aux contributions déjà formées. Ce module réunit les décisions pures : ordre des liens, trous, poids du modèle du résidu, réconciliation des identifiants de contributions.
+Les liens se font par le nom, par identifiant, puis par la position dans la liste des auteurs. Une contribution source sans lien se situe par son trou : l'intervalle entre deux liens consécutifs de la liste. Un modèle probabiliste lie ce qui reste, le résidu.
 """
 
 import math
@@ -16,16 +16,16 @@ from domain.persons.name_matching import first_name_initials, full_first_name_ex
 
 
 class GroupingMethod(StrEnum):
-    """Origine de l'appartenance d'une contribution source à sa contribution. Mappe l'enum PostgreSQL `grouping_method`."""
+    """Origine de l'appartenance d'une contribution source à sa contribution. Reflet du type PostgreSQL `grouping_method`."""
 
     REFERENCE = "reference"
     """La contribution source fonde la contribution."""
     NAME = "name"
-    """Patronyme, prénom ou initiale, uniques de part et d'autre."""
+    """Nom de famille, prénom ou initiale, uniques de part et d'autre."""
     IDENTIFIER = "identifier"
-    """ORCID ou IdRef partagé, à patronyme égal."""
+    """ORCID ou IdRef partagé, à nom de famille égal."""
     ORDER = "order"
-    """Rang parmi les contributions sources de même patronyme et de même initiale."""
+    """Rang parmi les contributions sources de même nom de famille et de même initiale."""
     MODEL = "model"
     """Modèle probabiliste, avec un score et une marge."""
 
@@ -118,7 +118,7 @@ def jaro_winkler(a: str, b: str) -> float:
 
 @dataclass(frozen=True)
 class Author:
-    """Ce qu'une contribution source expose au modèle du résidu : noms normalisés, identifiants, trou."""
+    """Contribution source vue par le modèle du résidu."""
 
     last_name: str
     first_name: str
@@ -227,7 +227,7 @@ def comparison_levels(x: Author, y: Author) -> dict[Comparison, ComparisonLevel 
 
 
 def position_only(x: Author, y: Author) -> bool:
-    """Seule la position rapproche les deux auteurs : patronymes sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
+    """Seule la position rapproche les deux auteurs : noms de famille sans ressemblance, prénoms sans ressemblance ou absents, aucun identifiant commun."""
     return _position_only(comparison_levels(x, y))
 
 
@@ -240,7 +240,7 @@ def _position_only(levels: Mapping[Comparison, ComparisonLevel | None]) -> bool:
 
 
 def conflicting_initials(x: Author, y: Author) -> bool:
-    """Patronymes seulement proches et premières initiales différentes, sans identifiant commun : « V. Balakrishnan » et « S. Balaji »."""
+    """Noms de famille seulement proches et premières initiales différentes, sans identifiant commun : « V. Balakrishnan » et « S. Balaji »."""
     return _conflicting_initials(x, y, comparison_levels(x, y))
 
 
@@ -315,7 +315,7 @@ def plan_contribution_ids(
 
 @dataclass(frozen=True)
 class SourceContribution:
-    """Contribution source à aligner : enregistrement source, position dans la liste, noms normalisés, identifiants. Une contribution source hors de la liste ordonnée (jury de thèse chez theses.fr) est sans position."""
+    """Contribution source à aligner, noms normalisés. Une contribution source hors de la liste ordonnée des auteurs (jury de thèse chez theses.fr) est sans position."""
 
     id: int
     source_record: int
@@ -385,7 +385,7 @@ class _SourceRecordLinks:
     ) -> None:
         self.record_contributions = record_contributions
         self.contributions = contributions
-        # Contributions sources des contributions sources des contributions, pour comparer les identifiants à tout la contribution.
+        # Toutes les contributions sources par identifiant : les identifiants se comparent à tous les membres d'une contribution.
         self.source_contributions = source_contributions or {}
         self.rank = {g.index: r for r, g in enumerate(contributions)}
         self.ranked = {g.index for g in contributions if g.reference.position is not None}
@@ -450,7 +450,7 @@ class _SourceRecordLinks:
 
     @cached_property
     def by_identifier(self) -> dict[tuple[str, str, str], set[int]]:
-        """Contributions par (type d'identifiant, patronyme, identifiant) de leurs contributions sources."""
+        """Contributions par (type d'identifiant, nom de famille, identifiant) de leurs contributions sources."""
         by_identifier: dict[tuple[str, str, str], set[int]] = defaultdict(set)
         for g in self.contributions:
             for m in self._members(g):
@@ -461,7 +461,7 @@ class _SourceRecordLinks:
         return by_identifier
 
     def shared_identifier(self, record_contributions: Sequence[SourceContribution]) -> None:
-        """Lie une contribution source à la contribution dont une autre contribution source partage son ORCID ou son IdRef, à patronyme égal. Un identifiant présent dans plusieurs contributions ne lie rien."""
+        """Lie une contribution source à la contribution dont une autre contribution source partage son ORCID ou son IdRef, à nom de famille égal. Un identifiant présent dans plusieurs contributions ne lie rien."""
         for s in record_contributions:
             if s.id in self.links or not s.last_name or not (s.orcid or s.idref):
                 continue
@@ -517,7 +517,7 @@ class _SourceRecordLinks:
         return source_contribution_gaps, contribution_gaps
 
     def order_in_gaps(self) -> None:
-        """Dans chaque trou, patronyme et initiale en nombre égal des deux côtés : lien dans l'ordre des positions."""
+        """Dans chaque trou, nom de famille et initiale en nombre égal des deux côtés : lien dans l'ordre des positions."""
         source_contribution_gaps, contribution_gaps = self.gaps()
         by_source_contribution: dict[tuple[str, str, int], list[SourceContribution]] = {}
         by_contribution: dict[tuple[str, str, int], list[Contribution]] = {}
@@ -575,7 +575,7 @@ class _SourceRecordLinks:
 
 
 class _Link(NamedTuple):
-    """Lien d'une contribution source vers la contribution d'indice `group`, avec le score et la marge d'un lien du modèle."""
+    """Lien d'une contribution source vers la contribution d'indice `contribution`, avec le score et la marge d'un lien du modèle."""
 
     contribution: int
     method: GroupingMethod
@@ -594,7 +594,7 @@ def _swapped(s: SourceContribution) -> SourceContribution:
 def _inverted(
     record_contributions: Sequence[SourceContribution], contributions: Sequence[Contribution]
 ) -> bool:
-    """L'enregistrement source donne le prénom à la place du patronyme : plus de ses prénoms que de ses patronymes sont des patronymes de contributions."""
+    """L'enregistrement source donne le prénom à la place du nom de famille : plus de ses prénoms que de ses noms de famille sont des noms de famille de contributions."""
     last_names = {g.reference.last_name for g in contributions if g.reference.last_name}
     direct = sum(s.last_name in last_names for s in record_contributions)
     swapped = sum(bool(s.first_name) and s.first_name in last_names for s in record_contributions)
@@ -609,7 +609,7 @@ def _residual_links(
 ) -> dict[int, tuple[int, float, float]]:
     """Liens du résidu : contribution source → (indice de contribution, score, marge).
 
-    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du patronyme, ou un identifiant. Son score est le meilleur face aux contributions sources de la contribution retenus : ceux que la position seule ne rapproche pas (`position_only`), et dont les initiales ne contredisent pas un patronyme seulement proche (`conflicting_initials`). Un lien est retenu quand le score dépasse `link_threshold` du nombre de contributions restants.
+    Une paire candidate partage un trou ou un trou voisin, les deux premières lettres du nom de famille, ou un identifiant. Son score est le meilleur face aux contributions sources retenues de la contribution : celles que la position seule ne rapproche pas (`position_only`), et dont les initiales ne contredisent pas un nom de famille seulement proche (`conflicting_initials`). Un lien est retenu si le score dépasse `link_threshold` du nombre de contributions restantes.
     """
     source_contribution_gaps, contribution_gaps = record_links.gaps()
     rest_source_contributions = [
@@ -626,7 +626,7 @@ def _residual_links(
         ]
         for g in rest_contributions
     }
-    # Index de blocage : contributions par trou, par deux premières lettres d'un patronyme de contribution source, par identifiant de contribution source.
+    # Index de blocage : contributions par trou, par deux premières lettres d'un nom de famille de contribution source, par identifiant de contribution source.
     by_gap: dict[int, set[int]] = defaultdict(set)
     by_prefix: dict[str, set[int]] = defaultdict(set)
     by_orcid: dict[str, set[int]] = defaultdict(set)
@@ -657,7 +657,7 @@ def _residual_links(
                 if not _position_only(levels := comparison_levels(x, y))
                 and not _conflicting_initials(x, y, levels)
             ]
-            # Le blocage ne retient que les contributions sources retenues ; le trou est celui de la contribution.
+            # Le blocage s'applique seulement aux contributions sources retenues ; le trou est celui de la contribution.
             if not kept or not (
                 abs(x.gap - contribution_gaps[index]) <= 1
                 or any(
@@ -697,7 +697,7 @@ def align_publication(
 ) -> list[Contribution]:
     """Contributions d'une publication.
 
-    Les enregistrements sources se traitent du plus long au plus court, chacun face aux contributions déjà formées. À longueur égale, les enregistrements sources `deferred` passent après les autres, puis l'ordre suit leur identifiant. Un enregistrement source qui intervertit patronyme et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
+    Les enregistrements sources se traitent du plus long au plus court, chacun face aux contributions déjà formées. À longueur égale, les enregistrements sources `deferred` passent après les autres, puis l'ordre suit leur identifiant. Un enregistrement source qui intervertit nom de famille et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
     """
     source_contributions = {
         s.id: s for record_contributions in source_records.values() for s in record_contributions
@@ -730,7 +730,7 @@ def _with_new_contributions(
 ) -> list[Contribution]:
     """Contributions rangées après l'alignement d'un enregistrement source : ses contributions sources liées rejoignent leur contribution, les autres fondent une contribution.
 
-    Une contribution fondé se range juste après la contribution de la contribution source liée qui le précède dans la liste, ou en tête sans telle contribution source. Les contributions fondés sans position se rangent à la fin.
+    Une contribution fondée se range juste après la contribution de la dernière contribution source liée qui précède sa fondatrice dans la liste, ou en tête. Les contributions fondées sans position se rangent à la fin.
     """
     by_index = {g.index: g for g in contributions}
     following: dict[int | None, list[Contribution]] = defaultdict(list)
