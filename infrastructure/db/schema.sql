@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict hbcMQh2XX1e8CajAfjrnr3yT3vgWlZHF0oDkDDemjGM6hvas3sFwLuYnYvv6veK
+\restrict eSDU3ACcpF7pwaInqxWWrEomfrHVEPaE1fcwlkhogIPUpRBQjbEU5XTQ3cvtdKe
 
--- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
--- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped from database version 18.4
+-- Dumped by pg_dump version 18.4
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -125,6 +125,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'article',
     'conference_paper',
     'conference',
+    'recorded_talk',
     'book',
     'book_chapter',
     'thesis',
@@ -5617,5 +5618,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hbcMQh2XX1e8CajAfjrnr3yT3vgWlZHF0oDkDDemjGM6hvas3sFwLuYnYvv6veK
+\unrestrict eSDU3ACcpF7pwaInqxWWrEomfrHVEPaE1fcwlkhogIPUpRBQjbEU5XTQ3cvtdKe
 

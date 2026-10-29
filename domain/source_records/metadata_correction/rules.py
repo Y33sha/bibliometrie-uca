@@ -137,6 +137,10 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "supplementary information",
     "supplementary file",  # couvre "file" et "files"
     "supplementary dataset",  # couvre "dataset" et "datasets"
+    "supplementary video",
+    "supplementary movie",
+    "supporting video",
+    "supporting movie",
     "data from",
 )
 
@@ -336,10 +340,10 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"self_declared_preprint": True},
         "applies_correction": {"doc_type": DocType.PREPRINT},
     },
-    # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other} ⇒ `media`.
+    # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other, recorded_talk} ⇒ `media`.
     MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA: {
         "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER,
+            "doc_type": _ARTICLE_OR_OTHER | {DocType.RECORDED_TALK},
             "title_prefix_normalized": _MEDIA_TITLE_PREFIXES,
         },
         "applies_correction": {"doc_type": DocType.MEDIA},
@@ -352,10 +356,10 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.DATASET},
     },
-    # Titre de fichiers complémentaires + doc_type ∈ {article, other, conference} ⇒ `dataset`. DataCite et des entrepôts (Dryad, Zenodo) les décrivent à part ; Figshare en type certains `Presentation`.
+    # Titre de fichiers complémentaires + doc_type ∈ {article, other, conference, recorded_talk} ⇒ `dataset`. DataCite et des entrepôts (Dryad, Zenodo) les décrivent à part ; Figshare en type certains `Presentation`, DataCite les vidéos `Audiovisual`.
     MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: {
         "applies_to": {
-            "doc_type": _ARTICLE_OR_OTHER | {DocType.CONFERENCE},
+            "doc_type": _ARTICLE_OR_OTHER | {DocType.CONFERENCE, DocType.RECORDED_TALK},
             "title_prefix_normalized": _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES,
         },
         "applies_correction": {"doc_type": DocType.DATASET},

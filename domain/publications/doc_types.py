@@ -11,6 +11,7 @@ class DocType(StrEnum):
     ARTICLE = "article"
     CONFERENCE_PAPER = "conference_paper"
     CONFERENCE = "conference"
+    RECORDED_TALK = "recorded_talk"
     BOOK = "book"
     BOOK_CHAPTER = "book_chapter"
     THESIS = "thesis"
@@ -67,6 +68,7 @@ DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.ARTICLE: DocTypeLabel("Article", "Articles"),
     DocType.CONFERENCE_PAPER: DocTypeLabel("Conference paper", "Conference papers"),
     DocType.CONFERENCE: DocTypeLabel("Conférence", "Conférences"),
+    DocType.RECORDED_TALK: DocTypeLabel("Conférence filmée", "Conférences filmées"),
     DocType.BOOK: DocTypeLabel("Ouvrage", "Ouvrages"),
     DocType.BOOK_CHAPTER: DocTypeLabel("Chapitre", "Chapitres"),
     DocType.THESIS: DocTypeLabel("Thèse", "Thèses"),
@@ -129,6 +131,7 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
             DocType.OTHER,
             DocType.MEDIA,
             DocType.CONFERENCE,
+            DocType.RECORDED_TALK,
             DocType.POSTER,
             DocType.REPORT,
             DocType.ERRATUM,
