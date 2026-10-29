@@ -130,7 +130,7 @@
         {#each authors as row (row.key)}
           <tr class:divergent={row.divergent}>
             <th
-              class="field"
+              class="field unlabeled"
               scope="row"
               title={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
             ></th>
@@ -242,17 +242,26 @@
     position: sticky;
     left: calc(-1 * var(--drawer-padding-x));
     z-index: 1;
-    background: var(--card);
+    background: var(--row-bg);
     color: var(--muted);
     font-weight: 600;
     white-space: nowrap;
   }
+  /* Les lignes d'auteurs n'ont pas de libellé : seule la marge du volet y reste opaque. */
+  .field.unlabeled {
+    background: linear-gradient(to right, var(--row-bg) var(--drawer-padding-x), transparent 0);
+  }
   .comparison thead th.field {
     z-index: 3;
   }
-  tr.divergent td,
-  tr.divergent .field {
-    background: var(--warning-light);
+  .comparison {
+    --row-bg: var(--card);
+  }
+  tr.divergent {
+    --row-bg: var(--warning-light);
+  }
+  tr.divergent td {
+    background: var(--row-bg);
   }
   tr.divergent .field {
     box-shadow: inset 3px 0 0 var(--warning);
