@@ -1,6 +1,6 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit, pour chacune de ses tâches, un `TaskStep` : la fonction qui l'exécute, et pour une tâche qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute la tâche par l'accès à sa source si elle en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Une tâche sans libellé écrit elle-même ses lignes. Une section dont toutes les tâches se taisent faute de rien traiter (`silent_when_empty`) se ferme sur « Rien à faire ».
+Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, l'exécute, par l'accès à sa source si elle sort sur le réseau, écrit sa ligne de bilan, puis lance sa maintenance.
 """
 
 from __future__ import annotations
@@ -169,7 +169,7 @@ def _execute(task: Task, step: TaskStep, phase: str, ctx: PhaseContext) -> Phase
 
 
 def _outcome(metrics: PhaseMetrics) -> str:
-    """Bilan d'une tâche : sa ligne de bilan, ce qui l'a empêché de travailler, ou ses compteurs."""
+    """Bilan d'une tâche : sa ligne de bilan, ce qui l'a empêchée de travailler, ou ses compteurs."""
     if metrics.report is not None:
         return metrics.report
     if any(s["code"] == "source_unconfigured" for s in metrics.signals):

@@ -400,8 +400,7 @@ def _run_one_phase(
     """Construit et exécute une phase, et enregistre son observabilité. Rend son nom et sa durée.
 
     Une interruption clavier ou une exception est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
-    # Injecte le nom de phase dans tous les records émis pendant la phase (logger `normalize:`
-    # plutôt que `pipeline:`), y compris depuis les moissonneurs threadés qui héritent du contexte.
+    # Le nom de la phase préfixe les records émis pendant la phase, y compris par les moissonneurs en threads, qui héritent du contexte.
     phase_token = set_log_phase(name)
     try:
         # Ligne vide devant le cadre : elle le détache de ce que la phase précédente a écrit.
