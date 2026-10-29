@@ -4503,7 +4503,7 @@ export interface components {
         };
         /**
          * PhaseMetricsPayload
-         * @description Sérialisation JSON de `pipeline.runtime.observability.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise.
+         * @description Compteurs et durée d'une exécution de phase, sous forme JSON.
          */
         PhaseMetricsPayload: {
             /** New */
@@ -4525,7 +4525,7 @@ export interface components {
         };
         /**
          * PhaseStatus
-         * @description Statut d'une exécution de phase, et niveau d'un signal. Les membres sont rangés du moins grave au plus grave.
+         * @description Statut d'une exécution de phase, et niveau d'un signal, du moins grave au plus grave. `ERROR` signale une exception, `WARNING` une interruption ou des signaux.
          * @enum {string}
          */
         PhaseStatus: "ok" | "warning" | "error";
@@ -5264,9 +5264,7 @@ export interface components {
         };
         /**
          * Signal
-         * @description Un fait notable remonté par une phase.
-         *
-         *     `level` aligne la couleur de la phase (`warning` ou `error`), `code` permet le regroupement, `message` est lisible tel quel.
+         * @description Fait notable remonté par une phase : source indisponible, série de réponses 429, conflit d'identifiant… `code` sert au regroupement, `message` s'affiche tel quel.
          */
         Signal: {
             level: components["schemas"]["PhaseStatus"];

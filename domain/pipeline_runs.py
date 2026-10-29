@@ -1,9 +1,4 @@
-"""Compte rendu d'une exécution de phase du pipeline : statut, signaux et métriques.
-
-Le pipeline le produit, `infrastructure/observability/` l'enregistre dans `pipeline_phase_executions`, et l'API le relit pour la page des exécutions.
-
-Le statut et les signaux disent la santé du run : `error` est décidé par l'orchestrateur sur exception, `warning` et les signaux sont remontés par la phase elle-même (source indisponible, série de 429, conflit d'identifiant…).
-"""
+"""Compte rendu d'une exécution de phase du pipeline : statut, signaux et métriques. La table `pipeline_phase_executions` le conserve."""
 
 from collections.abc import Iterable
 from enum import StrEnum
@@ -11,7 +6,7 @@ from typing import TypedDict
 
 
 class PhaseStatus(StrEnum):
-    """Statut d'une exécution de phase, et niveau d'un signal. Les membres sont rangés du moins grave au plus grave."""
+    """Statut d'une exécution de phase, et niveau d'un signal, du moins grave au plus grave. `ERROR` signale une exception, `WARNING` une interruption ou des signaux."""
 
     OK = "ok"
     WARNING = "warning"
@@ -19,16 +14,13 @@ class PhaseStatus(StrEnum):
 
 
 def worst_status(statuses: Iterable[PhaseStatus]) -> PhaseStatus:
-    """Statut le plus grave parmi `statuses` ; `OK` sans statut. C'est le statut d'un run."""
+    """Statut le plus grave, ou `OK` pour une liste vide."""
     order = list(PhaseStatus)
     return max(statuses, key=order.index, default=PhaseStatus.OK)
 
 
 class Signal(TypedDict):
-    """Un fait notable remonté par une phase.
-
-    `level` aligne la couleur de la phase (`warning` ou `error`), `code` permet le regroupement, `message` est lisible tel quel.
-    """
+    """Fait notable remonté par une phase : source indisponible, série de réponses 429, conflit d'identifiant… `code` sert au regroupement, `message` s'affiche tel quel."""
 
     level: PhaseStatus
     code: str
@@ -36,7 +28,7 @@ class Signal(TypedDict):
 
 
 class PhaseMetricsPayload(TypedDict):
-    """Sérialisation JSON de `pipeline.runtime.observability.metrics.PhaseMetrics`, durée d'exécution mesurée par l'orchestrateur comprise."""
+    """Compteurs et durée d'une exécution de phase, sous forme JSON."""
 
     new: int
     updated: int
