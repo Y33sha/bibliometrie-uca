@@ -15,7 +15,11 @@ from domain.source_records.identifiers import (
 from domain.source_records.keys import project_confirmation_keys
 from infrastructure.db.doi_targets import fetch_doi_targets
 from infrastructure.db.queues import Queue
-from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
+from infrastructure.db.source_record_identifiers import (
+    identifiers_json_sql,
+    parse_identifiers,
+    source_record_doi_sql,
+)
 from pipeline.transformation.publications.reconciliation import (
     fetch_reconciliation_universe,
     mark_for_reconciliation,
@@ -935,12 +939,12 @@ def _distinct_dois(conn, publication_id) -> set[str]:
     return set(
         conn.execute(
             text(
-                "SELECT DISTINCT doi FROM source_records "
-                "WHERE publication_id = :id AND doi IS NOT NULL"
+                f"SELECT {source_record_doi_sql('sr')} FROM source_records sr"
+                " WHERE sr.publication_id = :id"
             ),
             {"id": publication_id},
         ).scalars()
-    )
+    ) - {None}
 
 
 class TestStaleMembership:

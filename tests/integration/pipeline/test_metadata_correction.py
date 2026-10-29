@@ -13,6 +13,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from infrastructure.db.queues import Queue
+from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from pipeline.transformation.publications.correction import serial_by_doi
 from pipeline.transformation.publications.correction.correct_unary import compute_update
 from pipeline.transformation.publications.correction.correction_store import (
@@ -136,7 +137,8 @@ def _state(conn, source_record_id: int) -> tuple:
 
 def _doi(conn, source_record_id: int) -> str | None:
     return conn.execute(
-        text("SELECT doi FROM source_records WHERE id = :id"), {"id": source_record_id}
+        text(f"SELECT {source_record_doi_sql('sr')} FROM source_records sr WHERE sr.id = :id"),
+        {"id": source_record_id},
     ).scalar_one()
 
 
