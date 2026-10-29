@@ -1,21 +1,8 @@
-"""Décision pure de réconciliation des composantes — assignation, merge et split unifiés.
+"""Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-À partir des `source_records` d'un voisinage (les enregistrements sources marqués pour la réconciliation et leurs voisins directs, cf. `pipeline/transformation/publications/reconciliation.py`), calcule **où chaque enregistrement source doit aboutir** pour qu'il y ait exactement une publication par partition `(composante ∩ DOI)` — dans le respect du cannot-link DOI.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par DOI. Deux DOI distincts ne fusionnent jamais. Dans une composante à plusieurs DOI, les enregistrements sources sans DOI restent sur leur publication.
 
-**Opération unique.** Chaque enregistrement source est assigné à la **publication ancre** de sa partition. Un enregistrement source est soit **matérialisé** (`publication_id` posé), soit **orphelin** (`publication_id = None`) — la passe ne fait aucune différence, c'est le clustering qui décide. Les quatre cas du matcher en sont des facettes :
-
-- **match** : une partition contient un orphelin et une publication existante (token partagé) → l'orphelin rejoint l'ancre.
-- **create** : une partition n'est faite que d'orphelins, dont ≥1 in-périmètre → une publication est créée.
-- **skip** : une partition d'orphelins sans aucun membre in-périmètre → rien n'est créé, ils restent orphelins.
-- **merge / split** : partitions étalées sur plusieurs publications / publication qui contient plusieurs partitions (cf. ci-dessous).
-
-**Exclusion.** Un enregistrement source écarté (`domain.publications.scope.is_matchable`) n'entre dans aucune partition. Matérialisé, il est détaché de sa publication.
-
-**Ancre = porteur du DOI.** Pour une partition de DOI `X`, l'ancre est la publication qui **a déjà** `doi=X` (`publication_doi`), départage `min(publication_id)` si plusieurs l'ont (doublons hérités), fallback `min(source_record_id)` parmi les enregistrements sources **matérialisés** de la partition. Si aucun enregistrement source n'a de publication (partition d'orphelins) : pas d'ancre existante → **create** (si in-périmètre) ou **skip**. Les corrections à la main restent sur l'ancre (la publication qui a le DOI). L'ancre est orthogonale au clustering (elle ne décide que *quel id survit*, pas *quels enregistrements sources sont ensemble*).
-
-**Cannot-link DOI** (décision « un DOI, une œuvre ») : deux DOI non-nuls distincts ne fusionnent jamais. Dans une composante multi-DOI, chaque DOI est sa propre partition ; les enregistrements sources **sans DOI** y sont **résiduels** (laissés tels quels, inertes).
-
-Pourquoi le voisinage **1-hop** suffit (pas de fermeture transitive) : l'invariant du marquage garantit que toute arête susceptible d'imposer une assignation/merge/split a une extrémité marquée, donc l'autre est son voisin direct. `connected_components` sur l'union des 1-hop voit toutes les arêtes neuves. Une arête **retirée**, elle, ne laisse aucune trace dans les clés d'après : seule l'appartenance déjà matérialisée la conserve, d'où le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, en amont de la constitution du voisinage. Sur un full rerun (tout marqué), l'univers = tout le stock → la passe dégénère en cluster-then-materialize global.
+Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
 
 from collections import Counter
@@ -40,11 +27,13 @@ def manual_merge_tokens(manual_merge_ids: Iterable[int]) -> frozenset[tuple[str,
 
 @dataclass(frozen=True, slots=True)
 class ReconcileMember:
-    """Un enregistrement source du voisinage de réconciliation.
+    """Enregistrement source du voisinage de réconciliation.
 
-    `tokens` = clés de confirmation (cf. `ConfirmationKeys.tokens`) et jetons de fusion manuelle (`manual_merge_tokens`) ; `matchable` = l'enregistrement source entre dans la réconciliation (`is_matchable`) ; `effective_doi` = DOI de partition (colonne corrigée, `None` si absent) ; `publication_id` = publication courante de l'enregistrement source, **`None` s'il est orphelin** (pas encore matérialisé) ; `publication_doi` = DOI de cette publication courante (`None` s'il est orphelin) ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre ; `title_normalized` / `publication_year` = métadonnées minimales requises pour matérialiser une publication neuve ; `doc_type` = type de l'enregistrement source.
-
-    `in_perimeter`, `title_normalized`, `publication_year` et `doc_type` n'ont de rôle que pour la **création** : ils décident create vs skip pour une partition d'orphelins ; l'année décide create vs détachement pour une partition qui perd sa publication.
+    - `tokens` : clés de confirmation et jetons de fusion manuelle.
+    - `matchable` : l'enregistrement source entre dans la réconciliation (`is_matchable`).
+    - `effective_doi` : DOI corrigé, qui détermine la partition.
+    - `publication_id`, `publication_doi` : publication de l'enregistrement source et son DOI, `None` s'il est orphelin.
+    - `in_perimeter`, `title_normalized`, `publication_year`, `doc_type` : servent seulement à décider la création d'une publication.
     """
 
     source_record_id: int
@@ -60,21 +49,18 @@ class ReconcileMember:
 
     @property
     def can_found_publication(self) -> bool:
-        """L'enregistrement source est in-périmètre et d'un type du périmètre métier."""
+        """Vrai si l'enregistrement source est dans le périmètre, et d'un type de document retenu (`OUT_OF_SCOPE_DOC_TYPES`)."""
         return self.in_perimeter and self.doc_type not in OUT_OF_SCOPE_DOC_TYPES
 
     @property
     def materializable(self) -> bool:
-        """L'enregistrement source a les métadonnées minimales d'une publication (`has_minimal_publication_metadata`)."""
+        """Vrai si l'enregistrement source a un titre et une année."""
         return has_minimal_publication_metadata(self.title_normalized, self.publication_year)
 
 
 @dataclass(frozen=True, slots=True)
 class WorkGroup:
-    """Une œuvre : tous ses enregistrements sources doivent aboutir sur une seule publication.
-
-    `target_publication_id` = publication existante conservée (l'ancre) ; `None` => créer une publication (partition d'orphelins in-périmètre, ou partition perdante d'un split). `source_record_ids` = les enregistrements sources à y rattacher. Une partition d'orphelins **sans** membre in-périmètre n'émet pas de groupe (ses enregistrements sources restent orphelins).
-    """
+    """Œuvre : enregistrements sources à rattacher à une seule publication. `target_publication_id` : ancre conservée, ou `None` pour créer une publication."""
 
     target_publication_id: int | None
     source_record_ids: tuple[int, ...]
@@ -82,10 +68,7 @@ class WorkGroup:
 
 @dataclass(frozen=True, slots=True)
 class DissolvedPublication:
-    """Publication vidée de tous ses enregistrements sources par la réconciliation (cas merge).
-
-    Avant suppression, ses paiements APC (`apc_payments`) sont re-pointés vers `successor_publication_id` — la publication qui a absorbé le gros de ses enregistrements sources (porteuse du même DOI).
-    """
+    """Publication vidée de ses enregistrements sources par une fusion. `successor_publication_id` : publication qui reçoit son plus petit enregistrement source, et ses paiements APC."""
 
     publication_id: int
     successor_publication_id: int
@@ -93,10 +76,7 @@ class DissolvedPublication:
 
 @dataclass(frozen=True, slots=True)
 class ReconcilePlan:
-    """Plan de réconciliation : groupes à matérialiser, publications dissoutes, `source_records` à détacher de leur publication.
-
-    Deux cas de détachement : un enregistrement source écarté (`ReconcileMember.matchable` faux) ; une partition qui a perdu la revendication de sa publication et dont aucun membre n'a d'année, donc qui ne peut pas fonder une publication neuve. Les membres détachés deviennent orphelins.
-    """
+    """Plan de réconciliation : groupes à rattacher, publications dissoutes, enregistrements sources à détacher de leur publication. Un enregistrement source se détache s'il est écarté, ou si sa partition perd sa publication sans pouvoir en fonder une, faute d'année."""
 
     groups: tuple[WorkGroup, ...]
     dissolved: tuple[DissolvedPublication, ...]
@@ -104,10 +84,7 @@ class ReconcilePlan:
 
 
 def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
-    """Découpe le voisinage en partitions `(composante ∩ DOI)`.
-
-    Composante à 0 ou 1 DOI distinct → une seule partition (toute la composante, enregistrements sources sans DOI inclus). Composante multi-DOI → une partition par DOI ; les enregistrements sources sans DOI sont **résiduels** (exclus, laissés sur leur publication courante).
-    """
+    """Partitions du voisinage : composantes connexes, coupées par DOI. Dans une composante à plusieurs DOI, les enregistrements sources sans DOI restent hors partition."""
     by_id = {m.source_record_id: m for m in members}
     components = connected_components([(m.source_record_id, m.tokens) for m in members])
 
@@ -118,8 +95,6 @@ def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
         if len(distinct_dois) <= 1:
             partitions.append(comp)
         else:
-            # Les enregistrements sources sans DOI d'une composante multi-DOI restent résiduels,
-            # non assignés.
             partitions.extend([m for m in comp if m.effective_doi == doi] for doi in distinct_dois)
     return partitions
 
@@ -136,21 +111,12 @@ class _Claim(NamedTuple):
 def _claim(
     part: list[ReconcileMember], existing_publication_by_doi: dict[str, int]
 ) -> _Claim | None:
-    """Revendication d'ancre d'une partition, ou `None` si **skip** (orphelins dont aucun ne peut fonder une publication).
+    """Revendication d'ancre d'une partition, ou `None` si la partition reste orpheline.
 
-    - Partition qui contient ≥1 enregistrement source matérialisé → revendique une publication existante : porteuse du DOI
-      (revendication **forte**, départage `min`), sinon la publication du plus petit `source_record_id`
-      *parmi les enregistrements sources matérialisés* (**faible**).
-    - Partition d'orphelins (aucun enregistrement source matérialisé) → `preferred = None` (**create**) si ≥1 membre
-      peut fonder une publication (`ReconcileMember.can_found_publication`) **et** ≥1 membre est
-      matérialisable (`ReconcileMember.materializable`) ; sinon `None` (**skip**, les enregistrements
-      sources restent orphelins).
+    - Partition avec des enregistrements sources rattachés : la publication qui a son DOI (revendication forte), sinon celle du plus petit enregistrement source rattaché (faible).
+    - Partition d'orphelins : création, si un membre peut fonder une publication et un membre a un titre et une année.
 
-    Porteur du DOI **hors voisinage** (`existing_publication_by_doi`) : une publication existante a
-    déjà le DOI de la partition sans qu'aucun enregistrement source du voisinage n'y soit rattaché (orpheline après
-    un TRUNCATE + réimport, ou dérive du `publications.doi`). Elle reste l'ancre — sinon la création
-    d'une publication neuve au même DOI heurterait la contrainte unique. Honore la doctrine « ancre = porteur
-    du DOI » pour les porteurs qu'aucun membre ne représente.
+    Une publication qui a déjà le DOI de la partition sans membre dans le voisinage (`existing_publication_by_doi`) reste l'ancre : une publication créée au même DOI heurterait la contrainte d'unicité.
     """
     source_record_ids = tuple(sorted(m.source_record_id for m in part))
     min_source_record = min(m.source_record_id for m in part)
@@ -184,20 +150,11 @@ def plan_reconciliation(
     existing_publication_by_doi: dict[str, int] | None = None,
     publication_sizes: Mapping[int, int] | None = None,
 ) -> ReconcilePlan:
-    """Calcule les assignations enregistrement source → publication sur le voisinage `members` (pur, sans I/O).
+    """Plan de réconciliation du voisinage `members`.
 
-    Pour chaque partition, une revendication (`_claim`) : publication existante (match/merge), création
-    (`target=None`, orphelins in-périmètre ou partition split perdante) ou skip (orphelins
-    hors-périmètre, aucun groupe). Attribution gloutonne : une publication existante ne peut être l'ancre
-    que d'**une** partition — la revendication forte (porteur du DOI) l'emporte, puis le plus petit
-    `source_record_id` ; les perdantes prennent une nouvelle publication. Les publications vidées de tous leurs
-    enregistrements sources sont listées dans `dissolved` avec leur successeur.
+    Une publication existante est l'ancre d'une seule partition : la revendication forte l'emporte, puis le plus petit enregistrement source. Les autres partitions créent une publication. Une publication vidée de ses enregistrements sources est dissoute.
 
-    `existing_publication_by_doi` (map `lower(doi) → id`) sert d'ancre de repli pour une partition dont le
-    DOI appartient à une publication existante qu'aucun membre du voisinage ne représente (publication
-    orpheline, ou dérive). Vide par défaut (aucun porteur hors voisinage connu).
-
-    `publication_sizes` (map `publication_id → nombre total d'enregistrements sources`) signale les publications qui gardent des enregistrements sources hors du voisinage : elles restent. Sans entrée, une publication a les seuls enregistrements sources du voisinage.
+    `existing_publication_by_doi` : publication par DOI en minuscules, pour les publications qui ont un DOI sans membre dans le voisinage. `publication_sizes` : nombre total d'enregistrements sources par publication ; une publication qui en garde hors du voisinage survit.
     """
     members = list(members)
     by_doi = existing_publication_by_doi or {}
@@ -205,9 +162,7 @@ def plan_reconciliation(
     admitted = [m for m in members if m.source_record_id not in excluded]
     claims = [c for part in _partitions(admitted) if (c := _claim(part, by_doi)) is not None]
 
-    # Attribution gloutonne : revendications de publication existante d'abord (forte, puis min_source_record), puis
-    # les créations (`preferred=None`). La première à revendiquer une publication la garde ; les suivantes,
-    # comme les créations, prennent une nouvelle publication (`target=None`).
+    # Revendications fortes, puis faibles, puis créations. La première à revendiquer une publication la garde.
     by_id = {m.source_record_id: m for m in admitted}
     awarded: set[int] = set()
     groups: list[WorkGroup] = []
@@ -230,10 +185,7 @@ def plan_reconciliation(
         for source_record_id in claim.source_record_ids:
             target_of_source_record[source_record_id] = target
 
-    # Publications dissoutes : publication courante qui ne survit comme ancre d'aucun groupe et ne retient aucun
-    # enregistrement source résiduel. Successeur = l'ancre où la partition de son plus petit enregistrement source a abouti.
-    # Les orphelins, sans publication, sont ignorés ici.
-    # Les enregistrements sources écartés quittent leur publication : ils ne la retiennent pas.
+    # Publication dissoute : ancre d'aucun groupe, sans enregistrement source restant. Son successeur est l'ancre de la partition de son plus petit enregistrement source.
     assigned = {i for claim in claims for i in claim.source_record_ids} | excluded
     universe_publication_ids = {m.publication_id for m in members if m.publication_id is not None}
     residual_publication_ids = {
@@ -241,7 +193,7 @@ def plan_reconciliation(
         for m in members
         if m.source_record_id not in assigned and m.publication_id is not None
     }
-    # Une publication qui garde des enregistrements sources hors du voisinage survit à ses enregistrements sources réassignés.
+    # Une publication qui garde des enregistrements sources hors du voisinage survit.
     members_per_publication = Counter(
         m.publication_id for m in members if m.publication_id is not None
     )
