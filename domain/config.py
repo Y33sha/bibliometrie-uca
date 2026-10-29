@@ -1,9 +1,4 @@
-"""Règles des paramètres applicatifs.
-
-La table `config` contient les réglages d'exploitation du pipeline : périmètres, années couvertes, plafonds d'interrogation, délais de réinterrogation, types de structure affichés, titre et teinte de l'application. Une part est consommée par les pages publiques, le reste est réservé à une session d'administration.
-
-Chaque clé dont la valeur a une forme imposée la voit contrôlée à l'écriture : un plafond attend un entier positif ou nul, un délai un nombre entier de jours d'au moins un, une année doit tomber dans les bornes.
-"""
+"""Règles des paramètres applicatifs : forme imposée à chaque clé, valeur appliquée quand la clé est absente."""
 
 from enum import StrEnum
 from typing import NamedTuple
@@ -30,9 +25,9 @@ class ConfigKey(StrEnum):
     SUDOC_MAX_PER_RUN = "sudoc_max_per_run"
     """Nombre de revues vérifiées dans le Sudoc par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
-    """Âge au-delà duquel un document moissonné est interrogé de nouveau à sa source."""
+    """Âge au-delà duquel un enregistrement source est interrogé de nouveau à sa source."""
     FETCH_MISSING_RETRY_AFTER_DAYS = "fetch_missing_retry_after_days"
-    """Délai avant de chercher de nouveau un identifiant resté introuvable dans une source. L'échec est définitif pour un identifiant absent de son registre (`REGISTRY_LOOKUPS`)."""
+    """Délai avant de chercher de nouveau un identifiant resté introuvable dans une source."""
     UNPAYWALL_RECHECK_AFTER_DAYS = "unpaywall_recheck_after_days"
     """Délai avant de vérifier de nouveau le statut open access d'une publication auprès d'Unpaywall."""
     DOAJ_REFRESH_AFTER_DAYS = "doaj_refresh_after_days"
@@ -45,15 +40,15 @@ class ConfigKind(StrEnum):
     """Forme d'un réglage numérique."""
 
     CAP = "cap"
-    """Plafond d'interrogations, entier positif ; zéro retire la borne."""
+    """Plafond d'interrogations, entier positif ou nul ; zéro pour illimité."""
     DELAY = "delay"
-    """Délai de réinterrogation, en nombre entier de jours, au moins un."""
+    """Délai de réinterrogation, en jours, au moins un."""
     YEAR = "year"
     """Année, entre `MIN_YEAR` et `MAX_YEAR`."""
 
 
 class ConfigSetting(NamedTuple):
-    """Forme d'un réglage, et valeur retenue quand la clé est absente ou illisible ; pour un plafond, `None` vaut illimité."""
+    """Forme d'un réglage, et valeur retenue quand la clé est absente ou illisible."""
 
     kind: ConfigKind
     default: int | None = None
@@ -61,7 +56,7 @@ class ConfigSetting(NamedTuple):
 
 SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.UNPAYWALL_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
-    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(ConfigKind.CAP),
+    ConfigKey.FETCH_MISSING_MAX_PER_SOURCE: ConfigSetting(ConfigKind.CAP, 0),
     ConfigKey.SUDOC_MAX_PER_RUN: ConfigSetting(ConfigKind.CAP, 10_000),
     ConfigKey.FETCH_STALE_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 90),
     ConfigKey.FETCH_MISSING_RETRY_AFTER_DAYS: ConfigSetting(ConfigKind.DELAY, 30),
@@ -70,7 +65,7 @@ SETTINGS: dict[ConfigKey, ConfigSetting] = {
     ConfigKey.PIPELINE_START_YEAR_FULL: ConfigSetting(ConfigKind.YEAR),
 }
 assert set(SETTINGS) == set(ConfigKey)
-assert all(s.default is not None for s in SETTINGS.values() if s.kind is ConfigKind.DELAY)
+assert all(s.default is not None for s in SETTINGS.values() if s.kind is not ConfigKind.YEAR)
 
 
 def _keys_of(kind: ConfigKind) -> frozenset[str]:
@@ -83,21 +78,21 @@ YEAR_KEYS = _keys_of(ConfigKind.YEAR)
 
 
 def cap_value(key: ConfigKey, stored: int | None) -> int | None:
-    """Plafond effectif de `key`, `None` valant illimité : zéro ou une valeur négative retire la borne ; une valeur absente donne la valeur par défaut."""
-    if stored is None:
-        return SETTINGS[key].default
-    return stored if stored > 0 else None
+    """Plafond à appliquer pour `key` d'après la valeur stockée ; `None` pour illimité."""
+    value = SETTINGS[key].default if stored is None else stored
+    assert value is not None
+    return value if value > 0 else None
 
 
 def delay_value(key: ConfigKey, stored: int | None) -> int:
-    """Délai effectif de `key`, en jours : la valeur par défaut pour une valeur absente ou inférieure à un jour."""
+    """Délai à appliquer pour `key` d'après la valeur stockée, en jours."""
     default = SETTINGS[key].default
     assert default is not None
     return stored if stored is not None and stored >= 1 else default
 
 
 PERIMETER_EXTRACTION_KEY = "perimeter_extraction"
-"""Clé du code du périmètre dont les structures sont interrogées à l'extraction."""
+"""Clé du code du périmètre moissonné."""
 
 PERIMETER_PERSONS_KEY = "perimeter_persons"
 """Clé du code du périmètre de création des personnes."""
@@ -114,14 +109,14 @@ DEFAULT_BRAND_HUE = 196
 INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
     {PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY, SITE_TITLE_KEY, BRAND_HUE_KEY}
 )
-"""Clés propres à l'établissement : ses périmètres, le titre et la teinte de l'application."""
+"""Clés propres à l'établissement."""
 
 MIN_YEAR = 1970
 MAX_YEAR = 2100
 
 
 def _as_int(value: JsonValue) -> int | None:
-    """Entier porté par `value`, ou `None`. Un booléen est écarté, Python le tenant pour un entier."""
+    """Entier contenu dans `value`, entier ou texte ; sinon `None`. Écarte les booléens, que Python tient pour des entiers."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
@@ -137,11 +132,7 @@ def _as_int(value: JsonValue) -> int | None:
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
     """Valeur à écrire pour `key`, ramenée à la forme que la clé impose.
 
-    Un plafond attend un entier positif ou nul, zéro retirant la borne ; une valeur absente ou vide y vaut zéro. Un délai attend un nombre entier de jours, au moins un. Une année doit tomber dans les bornes. Toute autre valeur est refusée, aucune valeur de repli n'ayant de sens.
-
-    Le titre de l'application attend un texte, dont les espaces de bord sont retirés. Une valeur absente vaut un texte vide. La teinte attend un entier de 0 à 359.
-
-    Les autres clés passent telles quelles.
+    Lève `ValidationError` pour une valeur hors de cette forme. Une valeur absente ou vide vaut zéro pour un plafond, un texte vide pour le titre. Les clés sans forme imposée passent telles quelles.
     """
     if key == SITE_TITLE_KEY:
         if value is None:
