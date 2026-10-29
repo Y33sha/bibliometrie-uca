@@ -1,6 +1,6 @@
 """Nouvelle lecture d'un document Crossref par son identifiant natif : tâche `fetch_stale.crossref`.
 
-CrossRef est native du DOI : son `staging.source_id` **est** le DOI. Le refetch par id natif revient à `GET /works/{doi}`. Un 404 = DOI confirmé absent.
+L'identifiant natif d'un document Crossref est son DOI : la nouvelle lecture interroge `GET /works/{doi}`. Un 404 confirme l'absence.
 """
 
 from __future__ import annotations
