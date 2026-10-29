@@ -85,6 +85,27 @@ def test_serial_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
     assert raw2["serial_id"] == {"raw": None, "corrected_by": "SERIAL_BY_DOI_NAMESPACE"}
 
 
+def test_serial_by_doi_ignores_a_removed_doi(sa_sync_conn):
+    """Un DOI retiré par la correction est faux : il ne désigne aucune revue."""
+    conn = sa_sync_conn
+    _seed_serial(conn, "journal", namespace="10.5194/acp-")
+    _source_record(
+        conn,
+        source_id="W_removed",
+        doc_type="article",
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI,
+                "10.5194/acp-20-1-2020",
+                SourceIdentifierRole.SECONDARY,
+                "UNRESOLVED_DOI_TO_NULL",
+            )
+        ],
+    )
+
+    assert _apply_serial_by_doi(conn) == 0
+
+
 def test_serial_by_doi_idempotent_and_self_heals(sa_sync_conn):
     conn = sa_sync_conn
     serial = _seed_serial(conn, "journal", namespace="10.5194/acp-")

@@ -104,7 +104,6 @@ class TestRelevesRendantUneLigne:
 TYPES_EXERCES = {
     "FacetOption",
     "DoiNamespace",
-    "SerialCorrectionRow",
     "_SerialRow",
     "_PerimeterRow",
     "_PublisherRow",

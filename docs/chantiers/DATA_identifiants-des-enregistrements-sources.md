@@ -129,6 +129,7 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Groupes de `remove_identifiers` par DOI de la table, de rôle autre que `related` : un enregistrement source appartient à un groupe par DOI et perd seulement le DOI du groupe qui le désigne. Sur la base locale, 40 retraits de plus (1 164 au lieu de 1 124), aucun en moins.
 - [x] `is_matchable` sur la table : préfixe exclu quand tous les DOI propres de l'enregistrement source l'ont (`primary` ou `derived`, à défaut `secondary`) ; forme secondaire DataCite par son DOI `primary` ; agrégateur gardé par un DOI actif de rôle autre que `related`.
 - [x] Règles de type de la correction unaire (collection Figshare, DOI hors du registre de thèses, registrant de presse) sur les DOI propres actifs : l'un d'eux suffit. Résultat identique sur la base locale.
+- [x] `serial_by_doi` sur les DOI propres actifs : rattachement si leurs espaces de noms désignent une seule revue. Sur la base locale, 14 rattachements de plus (DOI des actes LIPIcs à côté du DOI arXiv, DOI Cairn `derived` de ScanR), 2 de moins (DOI `derived` d'un preprint, DOI de la revue en `secondary`).
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [ ] Suppression de la colonne.
 

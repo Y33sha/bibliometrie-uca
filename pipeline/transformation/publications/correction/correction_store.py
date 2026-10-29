@@ -87,12 +87,12 @@ class MatchabilityUpdate(NamedTuple):
 
 
 class SerialCorrectionRow(NamedTuple):
-    """Un enregistrement source candidat au rattachement de la revue par l'espace de noms de son DOI. `corrections` garde le rattachement d'origine, et limite la correction à une revue manquante."""
+    """Un enregistrement source candidat au rattachement de la revue par l'espace de noms de ses DOI propres actifs (`dois`). `corrections` garde le rattachement d'origine, et limite la correction à une revue manquante."""
 
     id: int
     source: str
     raw_doc_type: str | None
-    doi: str | None
+    dois: frozenset[str]
     serial_id: int | None
     corrections: dict[str, JsonValue]
 
@@ -391,17 +391,33 @@ class SourceRecordCorrectionStore:
         return rows_as(DoiNamespace, rows)
 
     def fetch_serial_by_doi_candidates(self) -> list[SerialCorrectionRow]:
-        """Enregistrements sources candidats au rattachement : sans revue avec un DOI, ou déjà rattachés par espace de noms, dont le rattachement se réévalue."""
+        """Enregistrements sources candidats au rattachement : sans revue avec un DOI actif, ou déjà rattachés par espace de noms, dont le rattachement se réévalue."""
         rows = self._conn.execute(
             text(f"""
-                SELECT id, source::text AS source, raw_doc_type,
-                       doi, serial_id, corrections
-                FROM source_records
-                WHERE (serial_id IS NULL AND doi IS NOT NULL)
-                   OR {corrected("serial_id", "source_records")}
+                SELECT sr.id, sr.source::text AS source, sr.raw_doc_type,
+                       sr.serial_id, sr.corrections,
+                       {identifiers_json_sql("sr.id")} AS identifiers
+                FROM source_records sr
+                WHERE (sr.serial_id IS NULL AND EXISTS (
+                          SELECT 1 FROM source_record_identifiers i
+                          WHERE i.source_record_id = sr.id
+                            AND i.id_type = '{SourceIdentifierType.DOI.value}'
+                            AND i.role <> '{SourceIdentifierRole.RELATED.value}'
+                            AND i.removed_by IS NULL))
+                   OR {corrected("serial_id")}
             """)
         )
-        return rows_as(SerialCorrectionRow, rows)
+        return [
+            SerialCorrectionRow(
+                id=r.id,
+                source=r.source,
+                raw_doc_type=r.raw_doc_type,
+                dois=frozenset(own_dois(active(parse_identifiers(r.identifiers)))),
+                serial_id=r.serial_id,
+                corrections=r.corrections,
+            )
+            for r in rows
+        ]
 
     def persist_serial_corrections(self, updates: list[SerialCorrectionUpdate]) -> int:
         """Écrit en lot `serial_id` et `corrections`, et marque les enregistrements sources pour la réconciliation, qui recalcule la revue de la publication. Renvoie le nombre de lignes."""

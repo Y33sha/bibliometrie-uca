@@ -1,4 +1,4 @@
-"""Sous-étape `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms du DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
+"""Sous-étape `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms des DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
 
 import logging
 from collections.abc import Mapping, Sequence
@@ -22,7 +22,7 @@ def _compute_update(
 ) -> SerialCorrectionUpdate | None:
     """Mise à jour d'un enregistrement source, ou `None` si rien ne change."""
     attached = attach_serial_by_doi(
-        row.serial_id, row.doi, row.raw_doc_type, row.source, row.corrections, namespaces
+        row.serial_id, row.dois, row.raw_doc_type, row.source, row.corrections, namespaces
     )
     if tuple(attached) == (row.serial_id, row.corrections):
         return None
@@ -48,7 +48,7 @@ class SerialByDoiStats:
 def run(
     conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> SerialByDoiStats:
-    """Rattache leur revue aux enregistrements sources sans revue dont le DOI relève d'un espace de noms, et réévalue les rattachements existants."""
+    """Rattache leur revue aux enregistrements sources sans revue dont les DOI relèvent d'un espace de noms, et réévalue les rattachements existants."""
     step(logger, "Revues non renseignées, identifiables par le DOI du document")
     namespaces = store.fetch_serial_doi_namespaces()
     rows = store.fetch_serial_by_doi_candidates()
