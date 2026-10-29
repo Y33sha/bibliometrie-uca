@@ -106,7 +106,7 @@ _CONFIRMATION_KEY_SQL = (
     + first_of_its_type_sql("{a}")
 )
 
-# L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif non lié (`doi_keys`).
+# L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif de rôle autre que `related` (`doi_keys`).
 _DOI_KEY_SQL = (
     f"{{a}}.id_type = '{SourceIdentifierType.DOI.value}' AND {{a}}.removed_by IS NULL"
     f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"

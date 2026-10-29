@@ -1,6 +1,6 @@
 """Tests unitaires de `domain.source_records.keys` : clés de confirmation et ancres DOI.
 
-Garde le contrat de la projection partagée : DOI actifs non liés, clé de chaque type d'identifiant (rôle le plus fort, puis plus petite valeur, parmi les identifiants actifs), token métadonnée `metadata_block`.
+Garde le contrat de la projection partagée : DOI actifs de rôle autre que `related`, clé de chaque type d'identifiant (rôle le plus fort, puis plus petite valeur, parmi les identifiants actifs), token métadonnée `metadata_block`.
 """
 
 from __future__ import annotations

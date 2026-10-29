@@ -1,6 +1,6 @@
 """Clés de confirmation d'un enregistrement source : les valeurs par lesquelles deux enregistrements sources désignent le même document.
 
-- DOI : tous ses DOI actifs non liés, chacun remplacé par sa cible quand c'est le DOI d'une forme secondaire (`DoiKeys`).
+- DOI : tous ses DOI actifs de rôle autre que `related`, chacun remplacé par sa cible quand c'est le DOI d'une forme secondaire (`DoiKeys`).
 - Identifiants : l'identifiant actif de rôle le plus fort de chaque type de `CONFIRMATION_ID_TYPES`.
 - Bloc de métadonnées : `<type de document>|<titre normalisé>|<année>`, pour un titre assez long. Le type de document dans la clé impose l'égalité des types.
 
@@ -38,7 +38,7 @@ _STRONG_ROLES = frozenset({SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DE
 
 @dataclass(frozen=True, slots=True)
 class DoiKeys:
-    """DOI actifs non liés d'un enregistrement source, cible appliquée : `strong`, primaires ou dérivés ; `weak`, secondaires et absents de `strong`."""
+    """DOI actifs d'un enregistrement source, cible appliquée : `strong`, de rôle `primary` ou `derived` ; `weak`, de rôle `secondary` et absents de `strong`."""
 
     strong: frozenset[str] = frozenset()
     weak: frozenset[str] = frozenset()
@@ -51,7 +51,7 @@ class DoiKeys:
 def doi_keys(
     identifiers: Iterable[SourceIdentifier], doi_targets: Mapping[str, str] | None = None
 ) -> DoiKeys:
-    """DOI actifs non liés de `identifiers`, chacun remplacé par sa cible dans `doi_targets`."""
+    """DOI actifs de `identifiers` de rôle autre que `related`, chacun remplacé par sa cible dans `doi_targets`."""
     targets = doi_targets or {}
     strong: set[str] = set()
     weak: set[str] = set()
@@ -63,7 +63,7 @@ def doi_keys(
 
 
 def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
-    """Ancres d'un ensemble d'enregistrements sources : leurs DOI primaires ou dérivés ; à défaut, le DOI de ceux qui ont un seul DOI."""
+    """Ancres d'un ensemble d'enregistrements sources : leurs DOI `primary` ou `derived` ; à défaut, le DOI de ceux qui ont un seul DOI."""
     keys = list(keys)
     strong = frozenset().union(*(k.strong for k in keys))
     if strong:
@@ -72,7 +72,7 @@ def doi_anchors(keys: Iterable[DoiKeys]) -> frozenset[str]:
 
 
 def anchor_of(keys: DoiKeys, anchors: frozenset[str]) -> str | None:
-    """Ancre que rejoint un enregistrement source : celle de son DOI primaire ou dérivé, à défaut l'unique ancre parmi ses DOI secondaires. `None` sans ancre unique."""
+    """Ancre que rejoint un enregistrement source : celle de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary`. `None` sans ancre unique."""
     own = keys.strong & anchors or keys.weak & anchors
     return next(iter(own)) if len(own) == 1 else None
 

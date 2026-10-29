@@ -16,7 +16,7 @@ class SourceRecord:
     title: str
     publication_year: int | None
     doc_type: str | None
-    # DOI actifs non liés, cible appliquée.
+    # DOI actifs de rôle autre que `related`, cible appliquée.
     dois: DoiKeys
     serial_id: int | None
     monograph_id: int | None

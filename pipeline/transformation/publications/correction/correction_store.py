@@ -399,14 +399,20 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, doc_type, title_normalized, publication_year, source_extras,
-                           lower({raw_column("doi", "source_records")}) AS eff_doi
+                    SELECT id, source, doc_type, title_normalized, publication_year, source_extras
                     FROM source_records
                 ),
+                -- DOI de rôle autre que `related` de chaque enregistrement source, quel que soit leur statut.
+                record_dois AS (
+                    SELECT source_record_id AS id, id_value AS doi, role
+                    FROM source_record_identifiers
+                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
+                      AND role <> '{SourceIdentifierRole.RELATED.value}'
+                ),
                 dataset_dois AS (
-                    SELECT DISTINCT eff_doi AS d
-                    FROM sr_eff
-                    WHERE doc_type = '{DocType.DATASET.value}' AND eff_doi IS NOT NULL
+                    SELECT DISTINCT d.doi AS d
+                    FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
+                    WHERE sr.doc_type = '{DocType.DATASET.value}'
                 ),
                 unresolved_dois AS (
                     SELECT id_value AS d FROM failed_lookups
@@ -414,19 +420,26 @@ class SourceRecordCorrectionStore:
                 ),
                 -- Collections figshare typées dataset, une par titre et année : un titre partagé par deux collections n'en désigne aucune.
                 figshare_collections AS (
-                    SELECT title_normalized, publication_year, min(eff_doi) AS doi
-                    FROM sr_eff
-                    WHERE doc_type = '{DocType.DATASET.value}'
-                      AND starts_with(eff_doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
-                    GROUP BY title_normalized, publication_year
-                    HAVING count(DISTINCT eff_doi) = 1
+                    SELECT sr.title_normalized, sr.publication_year, min(d.doi) AS doi
+                    FROM sr_eff sr JOIN record_dois d ON d.id = sr.id
+                    WHERE sr.doc_type = '{DocType.DATASET.value}'
+                      AND starts_with(d.doi, '{FIGSHARE_COLLECTION_DOI_PREFIX}')
+                    GROUP BY sr.title_normalized, sr.publication_year
+                    HAVING count(DISTINCT d.doi) = 1
                 ),
-                -- DOI présents en base : DOI non liés des enregistrements sources, hors retraits de la correction unaire.
+                -- DOI présents en base : DOI de rôle autre que `related` des enregistrements sources, hors retraits de la correction unaire.
                 present_dois AS (
                     SELECT DISTINCT id_value AS d FROM source_record_identifiers
                     WHERE id_type = '{SourceIdentifierType.DOI.value}'
                       AND role <> '{SourceIdentifierRole.RELATED.value}'
                       AND (removed_by IS NULL OR removed_by IN ({_CLUSTER_CASES_SQL}))
+                ),
+                -- DOI `primary` de chaque enregistrement source DataCite, son DOI propre.
+                datacite_dois AS (
+                    SELECT d.id, d.doi FROM record_dois d
+                    JOIN sr_eff sr ON sr.id = d.id
+                    WHERE sr.source = '{Source.DATACITE.value}'
+                      AND d.role = '{SourceIdentifierRole.PRIMARY.value}'
                 ),
                 -- La règle de même œuvre lit le type de l'enregistrement source DataCite dont les
                 -- `related_identifiers` mentionnent la cible. Quand un enregistrement mentionne plusieurs
@@ -438,15 +451,15 @@ class SourceRecordCorrectionStore:
                         SELECT
                             sr.id AS declarant_id,
                             sr.doc_type,
-                            sr.eff_doi AS secondary_doi,
+                            own.doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
                         FROM sr_eff sr
+                        JOIN datacite_dois own ON own.id = sr.id
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
-                        WHERE sr.source = '{Source.DATACITE.value}'
-                          AND rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
+                        WHERE rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> sr.eff_doi
+                          AND lower(rel->>'doi') <> own.doi
                           AND lower(rel->>'doi') IN (SELECT d FROM present_dois)
                         UNION ALL
                         -- Pièce d'un dataset → dataset parent : le parent doit être présent en base
@@ -457,16 +470,16 @@ class SourceRecordCorrectionStore:
                         SELECT
                             sr.id AS declarant_id,
                             sr.doc_type,
-                            sr.eff_doi AS secondary_doi,
+                            own.doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
+                        JOIN datacite_dois own ON own.id = sr.id
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
-                        WHERE sr.source = '{Source.DATACITE.value}'
-                          AND sr.doc_type = '{DocType.DATASET.value}'
+                        WHERE sr.doc_type = '{DocType.DATASET.value}'
                           AND rel->>'relation_type' = '{DATACITE_PACKAGE_PIECE_RELATION}'
                           AND rel->>'doi' IS NOT NULL
-                          AND lower(rel->>'doi') <> sr.eff_doi
+                          AND lower(rel->>'doi') <> own.doi
                           AND lower(rel->>'doi') IN (SELECT d FROM dataset_dois)
                         UNION ALL
                         -- Fichier complémentaire figshare « Additional file N of T » → collection
@@ -476,16 +489,17 @@ class SourceRecordCorrectionStore:
                         SELECT
                             sr.id AS declarant_id,
                             sr.doc_type,
-                            sr.eff_doi AS secondary_doi,
+                            piece.doi AS secondary_doi,
                             c.doi AS canonical_doi,
                             '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
+                        JOIN record_dois piece ON piece.id = sr.id
                         JOIN figshare_collections c
                           ON c.title_normalized = regexp_replace(
                                  sr.title_normalized, '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}', ''
                              )
                          AND c.publication_year = sr.publication_year
-                        WHERE sr.eff_doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
+                        WHERE piece.doi ~ '{FIGSHARE_ITEM_DOI_PATTERN}'
                           AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)

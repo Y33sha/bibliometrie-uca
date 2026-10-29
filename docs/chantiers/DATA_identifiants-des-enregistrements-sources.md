@@ -46,9 +46,9 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 Réconciliation simulée sur la base locale au 2026-10-29 (341 073 enregistrements sources rattachables), face à la clé DOI de la colonne :
 
-- DOI actifs primaires ou dérivés comme seules clés DOI : 11 234 partitions scindées. Les DOI de HAL, WoS et theses.fr sont secondaires : 7 865 enregistrements sources WoS, 2 974 dépôts HAL et 1 189 works OpenAlex quittent leur publication.
-- Tous les DOI actifs non liés comme clés, sans coupe par DOI : 6 632 fusions, jusqu'à 100 publications. Un work OpenAlex cite en DOI secondaires les fichiers d'un jeu de données ou les versions d'un logiciel.
-- Tous les DOI actifs non liés comme clés, le DOI secondaire cédant le premier : 144 publications perdent un enregistrement source et 210 fusionnent. Ce sont surtout des enregistrements sources ScanR dont l'identifiant ScanR désigne l'article et le premier DOI des `externalIds` le preprint : ils passent de la publication du preprint à celle de l'article.
+- DOI actifs `primary` ou `derived` comme seules clés DOI : 11 234 partitions scindées. Les DOI de HAL, WoS et theses.fr sont `secondary` : 7 865 enregistrements sources WoS, 2 974 dépôts HAL et 1 189 works OpenAlex quittent leur publication.
+- Tous les DOI actifs de rôle autre que `related` comme clés, sans coupe par DOI : 6 632 fusions, jusqu'à 100 publications. Un work OpenAlex cite en DOI `secondary` les fichiers d'un jeu de données ou les versions d'un logiciel.
+- Tous les DOI actifs de rôle autre que `related` comme clés, le DOI `secondary` cédant le premier : 144 publications perdent un enregistrement source et 210 fusionnent. Ce sont surtout des enregistrements sources ScanR dont l'identifiant ScanR désigne l'article et le premier DOI des `externalIds` le preprint : ils passent de la publication du preprint à celle de l'article.
 
 Usages qui demandent un seul DOI par enregistrement source :
 
@@ -79,8 +79,8 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - Le DOI d'une version, d'une variante ou d'une pièce de dataset a une cible quand l'œuvre principale est présente en base : DOI concept, forme principale ou dataset parent. La table `doi_targets` relie les deux DOI.
 - La cible tient lieu du DOI pour tous les enregistrements sources qui ont ce DOI, dans la réconciliation et la consolidation.
 - L'enregistrement source DataCite de la forme secondaire est écarté de la réconciliation (`is_matchable`).
-- Clés de la réconciliation : tous les DOI actifs non liés, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
-- Coupe d'une composante de la réconciliation par DOI : ses ancres sont ses DOI primaires et dérivés ; à défaut, les DOI des membres qui ont un seul DOI. Une composante à une ancre au plus reste entière. Sinon, un membre rejoint l'ancre de son DOI primaire ou dérivé, à défaut l'unique ancre parmi ses DOI secondaires ; un membre sans ancre unique reste sur sa publication.
+- Clés de la réconciliation : tous les DOI actifs de rôle autre que `related`, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
+- Coupe d'une composante de la réconciliation par DOI : ses ancres sont ses DOI `primary` et `derived` ; à défaut, les DOI des membres qui ont un seul DOI. Une composante à une ancre au plus reste entière. Sinon, un membre rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary` ; un membre sans ancre unique reste sur sa publication.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 

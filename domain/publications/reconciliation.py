@@ -1,6 +1,6 @@
 """Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI primaire ou dérivé, à défaut l'unique ancre parmi ses DOI secondaires ; sans ancre unique, il reste sur sa publication.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, à défaut l'unique ancre parmi ses DOI `secondary` ; sans ancre unique, il reste sur sa publication.
 
 Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
@@ -32,7 +32,7 @@ class ReconcileMember:
 
     - `tokens` : clés de confirmation et jetons de fusion manuelle.
     - `matchable` : l'enregistrement source entre dans la réconciliation (`is_matchable`).
-    - `doi_keys` : DOI actifs non liés, qui déterminent la partition.
+    - `doi_keys` : DOI actifs de rôle autre que `related`, qui déterminent la partition.
     - `publication_id`, `publication_doi` : publication de l'enregistrement source et son DOI, `None` s'il est orphelin.
     - `in_perimeter`, `title_normalized`, `publication_year`, `doc_type` : servent seulement à décider la création d'une publication.
     """
