@@ -1,14 +1,10 @@
-"""Phase `finalize` : données dérivées des contributions, mises à jour après la résolution des personnes et avant les enrichissements.
+"""Phase `finalize` : données dérivées des contributions, après la résolution des personnes. Chaque tâche a sa transaction.
 
-Tâches (`pipeline.graph`), chacune dans sa transaction :
+La phase recompose le périmètre des publications et les vues matérialisées des structures, supprime les publications sans enregistrement source ou sans contribution, recalcule l'éditeur des revues, supprime les référentiels vides, puis recompte les publications des adresses, revues et éditeurs.
 
-1. **publications_in_perimeter**, **structures** — recomposent le périmètre des publications et les matviews `contribution_structures`, `publication_structures`, `publication_rors`.
-2. **purge des publications** — supprime les publications sans source ou sans contribution (`lifecycle.purge_publications`).
-3. **éditeur des revues** — recalcule l'éditeur de chaque revue d'après ses publications (`serial_publishers`).
-4. **référentiels vides** — supprime les monographies, revues et éditeurs que plus rien ne référence, dans cet ordre : une monographie maintient sa collection, une revue ou un préfixe DOI son éditeur. Elle suit les dernières suppressions de publications, donc un référentiel vidé dans le run est supprimé dans le même run.
-5. **refresh des `publication_count`** — recalcule le nombre de publications de chaque adresse, revue et éditeur.
+Les référentiels vides se suppriment dans l'ordre monographies, revues, éditeurs : une monographie retient sa collection, une revue ou un préfixe DOI son éditeur. Leur suppression suit celle des publications : un référentiel vidé pendant le run disparaît dans le même run.
 
-La phase traite toutes les sources à chaque run et ignore `--sources` : une contribution change aussi par d'autres voies que la normalisation, comme la repopulation des affiliations ou le recalcul des métadonnées d'une publication.
+La phase traite toutes les sources et ignore `--sources` : une contribution change aussi hors de la normalisation, par les affiliations ou le recalcul d'une publication.
 """
 
 from __future__ import annotations
@@ -221,9 +217,6 @@ def _refresh_publication_counts(open_tx: OpenTransaction, logger: logging.Logger
             publishers = refresh_publisher_publication_counts(conn)
         # « mis à jour » ne varie pas au pluriel, contrairement à « mise à jour ».
         line.conclude(f"{LAST_BRANCH}{quantity(publishers, 'éditeur')} mis à jour")
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

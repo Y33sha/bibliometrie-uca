@@ -1,12 +1,6 @@
-"""Orchestrateur de la phase `countries` : pays candidats des adresses, résolution, et recalcul en cascade.
+"""Phase `countries` : pays candidats des adresses en file, pays retenus, puis pays des contributions sources, des enregistrements sources et des publications. Chaque tâche a sa transaction.
 
-Trois tâches (`pipeline.graph`), chacune dans sa propre transaction :
-
-1. `countries.detect` — candidats `country_name`, `institution` et `city` des adresses en file (`address_candidates_queue`).
-2. `countries.resolve` — `addresses.countries` composé des candidats par la préséance du domaine.
-3. `countries.refresh_publication_countries` — recalcul des caches dénormalisés (contributions sources, source_records, publications).
-
-L'état pays des adresses est relevé avant et après le passage : l'entonnoir qui s'en déduit — manque initial, pays rattachés par le run, reste — alimente l'observabilité de la phase. Chaque sous-étape dit au journal ce qu'elle a résolu.
+L'état pays des adresses, relevé avant et après, donne l'entonnoir de la phase : manque initial, pays rattachés par le run, reste.
 """
 
 from __future__ import annotations
@@ -109,9 +103,6 @@ class CountriesPhase:
             "remaining": total - final.with_country,
         }
         return metrics
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

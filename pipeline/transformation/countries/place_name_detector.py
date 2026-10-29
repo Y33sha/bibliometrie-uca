@@ -1,8 +1,8 @@
 """Détection de noms de lieux dans une adresse via un automate Aho-Corasick.
 
-Les formes `place_name_forms` de `kind IN ('institution', 'city')` (universités, CHU, villes…) sont des expressions multi-mots associées chacune à un pays. On les cherche comme sous-chaînes du `normalized_text` d'une adresse — n'importe où, pas seulement en fin de segment — pour poser le pays d'adresses sans pays explicite.
+Les formes `place_name_forms` de `kind IN ('institution', 'city')` (universités, CHU, villes…) sont des expressions de plusieurs mots, associées chacune à un pays. Elles se cherchent n'importe où dans le `normalized_text` d'une adresse.
 
-Match **au mot près** : les motifs et le texte sont encadrés d'espaces, donc « universite lyon » ne matche pas « luniversite lyonx ». L'automate balaie chaque adresse en un seul passage, quel que soit le nombre de formes.
+La comparaison se fait au mot près : motifs et texte sont encadrés d'espaces, et « universite lyon » est absent de « luniversite lyonx ». L'automate parcourt chaque adresse en un seul passage, quel que soit le nombre de formes.
 """
 
 from collections.abc import Mapping
