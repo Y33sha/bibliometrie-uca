@@ -1,10 +1,10 @@
-"""Graphe de dépendances du pipeline : les tâches, ce qu'elles lisent et écrivent, dans l'ordre d'exécution actuel. Chaque tâche appartient à une phase, et l'ordre des phases est celui de leurs tâches.
+"""Graphe de dépendances du pipeline : les tâches, ce qu'elles lisent et écrivent, dans l'ordre d'exécution. Chaque tâche appartient à une phase, et l'ordre des phases est celui de leurs tâches.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`) ; `"serials.id"` désigne l'existence des lignes, que créent et suppriment les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
 Une tâche dépend des tâches placées avant elle qui écrivent ce qu'elle lit. Une lecture déclarée `previous_run` lit aussi ce qu'une tâche placée après elle, ou elle-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
-La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche de la contribution.
+La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
 """
 
 from collections.abc import Iterable, Sequence
@@ -34,7 +34,7 @@ class Task:
     network: str | None = None
     # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`.
     maintenance: tuple[str, ...] = ()
-    # Contribution de tâches consécutives exécutées en parallèle.
+    # Groupe de tâches consécutives exécutées en parallèle.
     parallel_group: str | None = None
 
 
@@ -97,7 +97,7 @@ def _task(
 
 
 def overlaps(a: str, b: str) -> bool:
-    """Deux données se recouvrent : même table, et même colonne si les deux en désignent une."""
+    """Vrai si deux données se recouvrent : même table, et même colonne si les deux en désignent une."""
     table_a, _, column_a = a.partition(".")
     table_b, _, column_b = b.partition(".")
     return table_a == table_b and (not column_a or not column_b or column_a == column_b)
@@ -108,7 +108,7 @@ def _overlaps_any(item: str, items: Iterable[str]) -> bool:
 
 
 def _affected_by(read: str, write: str) -> bool:
-    """L'écriture `write` change ce que lit `read`. Créer ou supprimer des lignes (`id`) change toutes les lectures de la table."""
+    """Vrai si l'écriture `write` change ce que lit `read`. Créer ou supprimer des lignes (`id`) change toutes les lectures de la table."""
     return overlaps(read, write) or (
         write.partition(".")[2] == "id" and read.partition(".")[0] == write.partition(".")[0]
     )
@@ -119,7 +119,7 @@ def _writes_read(reader: Task, writer: Task) -> list[str]:
 
 
 def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
-    """Pour chaque tâche, les tâches placées avant elle, hors de sa contribution parallèle, qui écrivent ce qu'elle lit."""
+    """Pour chaque tâche, les tâches placées avant elle, hors de son groupe parallèle, qui écrivent ce qu'elle lit."""
     return {
         reader.name: {
             writer.name
@@ -1023,7 +1023,7 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             # Publications dont une contribution source change de neutralisation : leurs contributions sont à recalculer.
             "publication_contributions_queue",
-            # Contributions rattachés par un identifiant neutralisé ou transféré, à redécider.
+            # Contributions rattachées par un identifiant neutralisé ou transféré, à redécider.
             "contribution_resolution_queue",
             "person_identifiers",
         ),
@@ -1086,7 +1086,7 @@ TASKS: tuple[Task, ...] = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Contributions vidés et personnes supprimées par `purge`.
+        # Contributions vidées et personnes supprimées par `purge`.
         previous_run=("persons", "person_name_forms", "contributions.person_id"),
     ),
     _task(
@@ -1345,10 +1345,8 @@ TASKS: tuple[Task, ...] = (
 )
 
 
-# ── Phases ────────────────────────────────────────────────────
-
 _RUN_PHASE = "run"
-"""Contribution des tâches que l'orchestrateur exécute avant toute phase."""
+"""Groupe des tâches que l'orchestrateur exécute avant toute phase."""
 
 PHASE_ORDER: tuple[str, ...] = tuple(
     dict.fromkeys(task.phase for task in TASKS if task.phase != _RUN_PHASE)
@@ -1398,4 +1396,4 @@ if not HARVESTING_PHASES <= set(PHASE_ORDER):
     raise ValueError("HARVESTING_PHASES nomme une phase absente du graphe")
 
 if set(PHASE_LABELS) != set(PHASE_ORDER):
-    raise ValueError("PHASE_LIBELLES et le graphe ne nomment pas les mêmes phases")
+    raise ValueError("PHASE_LABELS et le graphe ne nomment pas les mêmes phases")
