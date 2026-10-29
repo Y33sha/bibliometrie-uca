@@ -1,7 +1,4 @@
-"""Identifiants de personne, au contrat de `domain.identifiers.NormalizedIdentifier` : ORCID, IdHAL, IdRef (PPN SUDOC), compte HAL (`HalPersonId`).
-
-`normalized_identifier_value` rend la forme normalisée d'une valeur selon son type, sans construire de value object.
-"""
+"""Identifiants de personne (ORCID, IdHAL, IdRef, compte HAL), leur forme normalisée et leur neutralisation."""
 
 import re
 from collections import Counter
@@ -15,7 +12,7 @@ from domain.types import JsonValue
 
 
 class IdentifierOrigin(StrEnum):
-    """Origine d'une attribution `IdentifierAttribution ↔ Person`, valeur de l'enum Postgres `identifier_origin`."""
+    """Origine d'une attribution d'identifiant. Reflet du type PostgreSQL `identifier_origin`."""
 
     MANUAL = "manual"
     """Décision d'une utilisatrice."""
@@ -24,22 +21,17 @@ class IdentifierOrigin(StrEnum):
 
 
 class AttributionStatus(StrEnum):
-    """Statut d'une attribution `IdentifierAttribution ↔ Person`.
+    """Statut d'une attribution d'identifiant. Reflet du type PostgreSQL `identifier_status`.
 
-    Mappe sur l'enum Postgres `identifier_status`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
+    L'administration pose librement `PENDING`, `CONFIRMED` ou `REJECTED`. Le pipeline change le statut par les méthodes de `IdentifierAttribution`.
 
-    L'admin pose librement `PENDING`, `CONFIRMED` ou `REJECTED` (`update_identifier_status`). Le pipeline passe par les méthodes de `IdentifierAttribution` : `reattribute_to` reprend un identifiant `REJECTED` chez une autre personne, `transfer_to` déplace un identifiant `PENDING`.
-
-    `AUTHENTICATED` est un statut à part : il atteste que le chercheur a lui-même authentifié son ORCID en se connectant à son compte. Seul un ORCID peut le porter. C'est le statut le plus fort et le seul immuable : un trigger Postgres interdit d'en sortir (aucune dégradation, même par l'admin) et de le poser hors de l'import dédié des ORCID authentifiés. Il ne participe à aucune transition applicative.
+    `AUTHENTICATED` atteste que le chercheur a authentifié son ORCID en se connectant à son compte. Seul un ORCID a ce statut. Un trigger PostgreSQL le rend définitif, et le réserve à l'import des ORCID authentifiés.
     """
 
     PENDING = "pending"
     CONFIRMED = "confirmed"
     REJECTED = "rejected"
     AUTHENTICATED = "authenticated"
-
-
-# ── Types d'identifiants côté référentiel personnes ───────────────
 
 
 class PersonIdentifierType(StrEnum):
@@ -58,43 +50,30 @@ PERSON_IDENTIFIER_LABELS: dict[PersonIdentifierType, str] = {
     PersonIdentifierType.HAL_PERSON_ID: "compte HAL",
 }
 
-# Deux vues du vocabulaire :
-#
-# - `PERSON_IDENTIFIER_TYPES` : tous les types admissibles dans `person_identifiers`. La promotion depuis les `source_contributions` (`add_identifiers_from_contributions`) et l'interface d'administration les couvrent tous.
-# - `PUBLIC_PERSON_IDENTIFIER_TYPES` : les types de l'interface publique, seuls attribuables à la main. `hal_person_id` en est exclu : l'extraction l'observe dans le TEI HAL.
-#
-# Un type ajouté à l'enum entre automatiquement dans `PERSON_IDENTIFIER_TYPES`, et dans `PUBLIC_...` seulement s'il doit apparaître dans l'interface publique.
-
 PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = tuple(PersonIdentifierType)
+# Types de l'interface publique, seuls attribuables à la main. Le compte HAL vient seulement du moissonnage de HAL.
 PUBLIC_PERSON_IDENTIFIER_TYPES: tuple[PersonIdentifierType, ...] = (
     PersonIdentifierType.ORCID,
     PersonIdentifierType.IDHAL,
     PersonIdentifierType.IDREF,
 )
 
-# ── ORCID ──────────────────────────────────────────────────────────
-
 _ORCID_URL_PREFIXES = ("https://orcid.org/", "http://orcid.org/", "orcid.org/")
-# Format canonique : 4 groupes de 4 caractères, dernier peut être X (checksum)
+# Le dernier caractère, clé de contrôle, peut valoir X.
 _ORCID_CANONICAL = re.compile(r"^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$")
 
 
 def normalize_orcid(raw: str | None) -> str | None:
-    """Normalise un ORCID : supprime le préfixe URL, met les hyphens en forme.
-
-    Accepte les variantes avec ou sans URL, avec ou sans hyphens. Renvoie None si la normalisation échoue ou si le format est invalide.
-    """
+    """Forme normalisée d'un ORCID (`0000-0002-1825-0097`), écrit avec ou sans URL, avec ou sans tirets ; `None` si le format est invalide."""
     if not raw:
         return None
     s = raw.strip()
-    # Strip URL prefix (casse-insensible)
     lower = s.lower()
     for prefix in _ORCID_URL_PREFIXES:
         if lower.startswith(prefix):
             s = s[len(prefix) :]
             break
-    s = s.strip().upper()  # X en majuscule
-    # Forme sans hyphens → ajouter les hyphens
+    s = s.strip().upper()
     if "-" not in s and len(s) == 16:
         s = f"{s[0:4]}-{s[4:8]}-{s[8:12]}-{s[12:16]}"
     if not _ORCID_CANONICAL.match(s):
@@ -108,23 +87,18 @@ def orcid_uri(orcid: str) -> str:
 
 
 class ORCID(NormalizedIdentifier):
-    """Open Researcher and Contributor ID, format XXXX-XXXX-XXXX-XXXX.
-
-    Lève `ValidationError` si la valeur ne respecte pas le format. Contrôle le format, sans vérifier la checksum MOD 11-2.
-    """
+    """ORCID. Seul le format est contrôlé, sans la clé de contrôle MOD 11-2."""
 
     label = "ORCID"
     normalize = staticmethod(normalize_orcid)
 
-
-# ── IdHAL (personne) ───────────────────────────────────────────────
 
 # Un IdHAL est une chaîne sans espace. Sa forme par défaut est `prenom-nom`.
 _IDHAL_CANONICAL = re.compile(r"^\S+$")
 
 
 def _normalize_idhal(raw: str | None) -> str | None:
-    """Normalise un IdHAL personne : trim, lowercase, refuse une valeur vide ou qui contient un espace. HAL ne distingue pas la casse."""
+    """IdHAL en minuscules (HAL ignore la casse) ; `None` s'il contient un espace."""
     if not raw:
         return None
     s = raw.strip().lower()
@@ -134,16 +108,11 @@ def _normalize_idhal(raw: str | None) -> str | None:
 
 
 class IdHAL(NormalizedIdentifier):
-    """Identifiant IdHAL d'une personne, choisi par la personne à sa création.
-
-    Ex. `jean-dupont`, `jdupont`, `jean.dupont`.
-    """
+    """IdHAL, choisi par la personne elle-même : `jean-dupont`, `jdupont`, `jean.dupont`."""
 
     label = "IdHAL"
     normalize = staticmethod(_normalize_idhal)
 
-
-# ── IdRef (PPN SUDOC) ──────────────────────────────────────────────
 
 _IDREF_URL_RE = re.compile(r"idref\.fr/(\d{8}[\dX])(?:/id)?", re.IGNORECASE)
 # PPN : 8 chiffres + 1 caractère de contrôle (chiffre ou X)
@@ -151,14 +120,10 @@ _IDREF_CANONICAL = re.compile(r"^\d{8}[\dX]$")
 
 
 def _normalize_idref(raw: str | None) -> str | None:
-    """Normalise un IdRef (PPN) : 9 caractères, dernier peut être X.
-
-    Accepte une URL idref.fr en entrée. Les blancs sont retirés.
-    """
+    """Forme normalisée d'un IdRef, écrit seul ou dans une URL idref.fr ; `None` si le format est invalide."""
     if not raw:
         return None
     s = "".join(raw.split())
-    # URL éventuelle
     m = _IDREF_URL_RE.search(s)
     if m:
         s = m.group(1)
@@ -169,20 +134,17 @@ def _normalize_idref(raw: str | None) -> str | None:
 
 
 class IdRef(NormalizedIdentifier):
-    """Identifiant IdRef (PPN SUDOC), format 8 chiffres + clé de contrôle."""
+    """IdRef (PPN du Sudoc) : 8 chiffres et une clé de contrôle."""
 
     label = "IdRef"
     normalize = staticmethod(_normalize_idref)
 
 
-# ── hal_person_id (compte HAL) ────────────────────────────────────
-
-# `personId` HAL : entier positif.
 _HAL_PERSON_ID_CANONICAL = re.compile(r"^[1-9][0-9]*$")
 
 
 def _normalize_hal_person_id(raw: str | None) -> str | None:
-    """Normalise un hal_person_id : entier positif sous forme de chaîne."""
+    """Identifiant de compte HAL ; `None` s'il n'est pas un entier positif."""
     if not raw:
         return None
     s = str(raw).strip()
@@ -198,8 +160,6 @@ class HalPersonId(NormalizedIdentifier):
     normalize = staticmethod(_normalize_hal_person_id)
 
 
-# ── Validation d'un identifiant par type ──────────────────────────
-
 _IDENTIFIER_VALUE_OBJECTS: dict[str, type[ORCID | IdHAL | IdRef | HalPersonId]] = {
     PersonIdentifierType.ORCID: ORCID,
     PersonIdentifierType.IDHAL: IdHAL,
@@ -209,17 +169,11 @@ _IDENTIFIER_VALUE_OBJECTS: dict[str, type[ORCID | IdHAL | IdRef | HalPersonId]] 
 
 
 def normalized_identifier_value(id_type: str, raw: str) -> str:
-    """Valide et normalise la valeur d'un identifiant via le value object de son type.
-
-    Point d'entrée unique de validation avant écriture : délègue au VO auto-validé du type et renvoie la forme canonique stockée en base. Couvre les quatre types de `PERSON_IDENTIFIER_TYPES`. Lève `ValidationError` si le type est inconnu ou si la valeur est malformée — à l'appelant de décider (rejet 4xx côté API, log et poursuite côté pipeline).
-    """
+    """Forme normalisée de la valeur d'un identifiant de personne. Lève `ValidationError` pour un type inconnu ou une valeur mal formée."""
     value_object = _IDENTIFIER_VALUE_OBJECTS.get(id_type)
     if value_object is None:
         raise ValidationError(f"Type d'identifiant inconnu : {id_type!r}")
     return value_object(raw).value
-
-
-# ── Identifiants d'une contribution source (`contributor_information.identifiers`) ──
 
 
 class ContributorIdentifiers(NamedTuple):
@@ -230,10 +184,7 @@ class ContributorIdentifiers(NamedTuple):
 
 
 def compact_identifiers(**ids: str | int | None) -> ContributorIdentifiers:
-    """Construit les identifiants d'une contribution source depuis les valeurs brutes de la source.
-
-    Une valeur falsy (None, 0, "") est absente. Un identifiant de `PersonIdentifierType` prend la forme normalisée par le value object de son type ; une valeur mal formée va dans `malformed`. Les autres clés gardent leur valeur. Sans identifiant, `values` vaut None.
-    """
+    """Identifiants d'une contribution source, d'après les valeurs brutes de la source. Une valeur vide ou nulle est ignorée. Un identifiant de personne prend sa forme normalisée, ou va dans `malformed`. Les autres identifiants restent tels quels."""
     values: dict[str, JsonValue] = {}
     malformed: list[tuple[str, str]] = []
     for id_type, raw in ids.items():
@@ -250,10 +201,10 @@ def compact_identifiers(**ids: str | int | None) -> ContributorIdentifiers:
 
 
 class IdentifierNeutralization(StrEnum):
-    """Motif pour lequel une contribution source neutralise un identifiant de ses informations du contributeur : l'identifiant reste enregistré, et la résolution des personnes l'ignore pour cette contribution source."""
+    """Motif de neutralisation d'un identifiant d'une contribution source : l'identifiant reste enregistré, et la résolution des personnes l'ignore pour cette contribution source."""
 
     SHARED = "shared"
-    """Valeur portée par plusieurs contributions sources d'un même enregistrement source."""
+    """Valeur présente dans plusieurs contributions sources d'un même enregistrement source."""
     MISPLACED = "misplaced"
     """Valeur dont le consensus désigne une autre personne que le nom de la contribution source."""
 
@@ -261,9 +212,9 @@ class IdentifierNeutralization(StrEnum):
 def shared_identifier_neutralizations(
     ids_by_source_contribution: Sequence[Mapping[str, JsonValue] | None],
 ) -> list[dict[str, IdentifierNeutralization] | None]:
-    """Identifiants neutralisés de chaque contribution source d'un enregistrement source, pour cause de partage.
+    """Identifiants neutralisés de chaque contribution source d'un enregistrement source, pour partage d'une valeur. `None` pour une contribution source sans identifiant neutralisé.
 
-    Une valeur d'identifiant, quel que soit son type, présente sur plusieurs contributions sources d'un même enregistrement source est une corruption : un identifiant désigne une seule contribution source par enregistrement source. Toute contribution source qui contient une valeur partagée voit tous ses identifiants neutralisés, y compris celle du vrai propriétaire, que rien ne distingue des autres. `None` pour une contribution source sans identifiant neutralisé.
+    Un identifiant désigne un seul auteur d'un enregistrement source : une valeur partagée est une corruption. Toute contribution source qui la contient voit tous ses identifiants neutralisés, vrai propriétaire compris, faute de le distinguer.
     """
     counts: Counter[tuple[str, JsonValue]] = Counter()
     for ids in ids_by_source_contribution:
