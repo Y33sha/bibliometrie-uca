@@ -58,10 +58,11 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 - Un ISBN est secondaire pour un livre et lié pour un autre document. DataCite distingue les ISBN du document de ceux de son conteneur.
 - Les identifiants OpenAlex et WoS restent seulement dans `source_id`.
 - Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts à partir de tous les identifiants de la table. Chaque sous-étape réécrit seulement les statuts de ses règles. Un identifiant retiré par la règle d'une autre sous-étape reste retiré.
-- `metadata_correction` écrit `external_ids` à partir des identifiants actifs. `corrections` garde seulement les valeurs d'origine des colonnes.
-- Un DOI mis à nul par la correction par DOI partagé est retiré dans la table. Le DOI concept substitué à un DOI de version reste seulement dans la colonne `doi`.
+- `corrections` garde seulement les valeurs d'origine des colonnes.
+- La correction par DOI partagé garde ou retire chaque DOI.
+- Une version, une variante ou une pièce de dataset est écartée de la réconciliation (`is_matchable`) quand son DOI cible est présent en base : DOI concept, forme principale ou dataset parent.
 - Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
-- Les clés de la réconciliation restent celles d'`external_ids` : premier `hal_id` par rôle puis par valeur, NNT, PMID et identifiant arXiv.
+- Clés de la réconciliation : DOI, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
@@ -99,7 +100,8 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 ### Phase 6 — Retrait de la colonne `doi`
 
-- [ ] Place du DOI concept substitué à un DOI de version.
+- [ ] Versions, variantes et pièces de dataset écartées quand leur DOI cible est en base.
+- [ ] DOI d'un enregistrement source à plusieurs DOI actifs.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.
 - [ ] Suppression de la colonne.
 
@@ -113,4 +115,4 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 ## Questions ouvertes
 
-- DOI de version et pièces de dataset : écartés de la réconciliation (`is_matchable`) au lieu de la substitution du DOI concept ou du DOI du dataset parent. Le DOI concept ou le dataset parent est parfois absent de la base.
+- DOI d'un enregistrement source à plusieurs DOI actifs. La colonne `doi` contient le DOI que la source donne au document (`doi` du work OpenAlex, `doiId_s` HAL). Les autres DOI d'un work OpenAlex sont secondaires, comme celui-ci. Sur 10 000 works OpenAlex, 777 ont plusieurs DOI actifs : 423 un DOI Crossref et des DOI DataCite (arXiv, Zenodo, DESY), 242 seulement des DOI DataCite, 112 plusieurs DOI Crossref (bioRxiv, SSRN, Research Square).
