@@ -2,7 +2,7 @@
 
 *À jour le 2026-09-07.*
 
-Sources externes interrogées pour **enrichir** les entités du référentiel (publications, revues, éditeurs). Différence avec les sources principales : elles ne moissonnent pas, n'alimentent pas la table `staging`, et n'ont pas de `source_records.source=...` dédié. Les données récupérées sont écrites directement sur les tables du référentiel, par la phase d'enrichissement concernée.
+Sources consultées pour enrichir les publications, les revues et les éditeurs. Elles ne produisent pas d'enregistrement source : leurs données vont dans des tables dédiées ou dans le référentiel.
 
 ## Unpaywall
 
@@ -10,15 +10,14 @@ https://unpaywall.org/
 
 Documentation API : https://unpaywall.org/products/api
 
-Source d'enrichissement consultée par DOI pour le statut open access des publications.
+Source d'enrichissement consultée par DOI pour le statut open access des publications. Les DOI DataCite, qu'Unpaywall ignore, sont écartés.
 
 ### API utilisée
 
 **v2** (`https://api.unpaywall.org/v2/{doi}`) — interrogation unitaire par DOI.
 
-- Polite pool obtenu via le paramètre `?email=...` (lue via `POLITE_POOL_EMAIL`).
-- Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. L'adaptateur limite à 5 requêtes concurrentes (`asyncio.Semaphore(5)`).
-- Implémentation async (`httpx2.AsyncClient`), comme toutes les recherches par DOI (HAL/OpenAlex/WoS/ScanR/CrossRef/DataCite `fetch_missing_doi`, `fetch_truncated`).
+- Adresse électronique de contact dans le paramètre `email` (`POLITE_POOL_EMAIL`).
+- Limites Unpaywall : 100 000 requêtes/jour, ~10 req/s recommandé. Le pipeline envoie 5 requêtes simultanées.
 
 ### Données récupérées
 
@@ -26,9 +25,7 @@ Une seule donnée consommée : le `oa_status` du payload Unpaywall, mappé sur l
 
 ### Particularités
 
-**Préservation du `diamond`** — Unpaywall ne distingue pas le diamond OA du gold. Une publication diamond selon ses sources le reste face au gold d'Unpaywall.
-
-<!--TODO: récupérer un lien OA pour chaque publi?-->
+Le verdict d'Unpaywall l'emporte sur le statut des sources, sauf dans trois cas : diamond face à gold, qu'Unpaywall ne distingue pas ; embargoed face à closed ou unknown ; dépôt en archive ouverte face à closed ou unknown.
 
 ## Sudoc
 
@@ -38,18 +35,14 @@ Source de référence des ISSN des revues. Consommée par `check_serials_in_sudo
 
 ### Services utilisés
 
-- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN d'une revue, en une requête. Le format de réponse se donne dans le chemin. Une requête dont aucun ISSN n'a de notice répond 404.
-- `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML, lue avec `defusedxml`.
+- `https://www.sudoc.fr/services/issn2ppn/<ISSN>,<ISSN>&format=text/json` : PPN de la notice de chaque ISSN d'une revue, en une requête.
+- `https://www.sudoc.fr/<ppn>.xml` : notice MARCXML.
 
 Aucun identifiant d'accès n'est requis. Aucune limite de débit n'est documentée : le pipeline s'en tient à 5 requêtes par seconde, 4 revues à la fois (`MAX_PER_SECOND`, `SUDOC_MAX_CONCURRENT`, `pipeline/ingestion/api_params.py`). Licence ouverte Etalab.
 
 ### Données récupérées
 
-Une notice décrit une publication sur un support : l'ISSN papier, l'ISSN en ligne et l'ISSN d'un CD-ROM d'une revue ont chacun leur notice. Zones lues : `011$a` (ISSN), `011$f` (ISSN-L), `011$y` (ISSN annulé), `183$a` (support : `n…` papier, `ceb` en ligne, `cde` CD-ROM ; à défaut `182$c` et `135$a`), `452$x` et `452$t` (ISSN d'un autre support et son titre, dont la mention entre parenthèses indique souvent le support), `430$x` à `448$x` (titres précédents et suivants), `200$a`, `200$h`, `200$i` (titre, numéro et nom de la partie).
-
-Le Sudoc code « électronique » (`182$c = c`) aussi bien une ressource en ligne qu'un CD-ROM : seul `183$a` les distingue. Une notice dont le titre nomme le CD-ROM est lue comme un autre support, quel que soit son codage. L'arrêt du papier au profit de l'en ligne est souvent codé comme un changement de titre (`430`, `440`), sous le même titre. L'ISSN-L des notices papier et en ligne d'une même revue diffère parfois ; la notice contient alors l'ISSN-L d'un titre précédent.
-
-La notice elle-même n'est pas conservée. Ses informations sont écrites dans `serial_issns` : support, ISSN-L, statut et date de vérification de chaque ISSN.
+Une notice décrit une revue sur un support : le papier, l'en ligne et le CD-ROM ont chacun leur ISSN et leur notice. Le pipeline lit dans la notice l'ISSN, l'ISSN-L, les ISSN annulés, le support et les ISSN des autres supports. Il écrit dans `serial_issns` le support, l'ISSN-L, le statut et la date de vérification de chaque ISSN.
 
 ## DOAJ
 
@@ -61,13 +54,13 @@ Source d'enrichissement des revues : « cette revue est-elle un journal open acc
 
 Le dump CSV public, téléchargé depuis https://doaj.org/csv. Aucun identifiant d'accès n'est requis.
 
-L'import indexe les revues par leurs ISSN valides, remet `is_in_doaj` à FALSE partout, puis écrit `doaj_payload`, `doaj_imported_at` et `is_in_doaj` pour chaque ligne appariée. Le dump est retéléchargé quand le dernier import date de plus de trente jours.
+Le dump est retéléchargé quand le dernier import date de plus de trente jours, par défaut.
 
 ### Données récupérées
 
 Stockage : `serials.doaj_payload` (JSONB), `serials.doaj_imported_at` (timestamptz), `serials.is_in_doaj` (bool).
 
-Le payload garde les colonnes du CSV pour clés. Le frontend les lit telles quelles dans `READABLE_DOAJ_FIELDS` (`"Journal title"`, `"APC amount"`…).
+Le payload garde les colonnes du CSV pour clés.
 
 Un dump téléchargé à la main s'importe par le même chemin d'écriture :
 

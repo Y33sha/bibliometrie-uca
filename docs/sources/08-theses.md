@@ -106,7 +106,7 @@ Une thèse avec `dateSoutenance` est soutenue (`thesis`), sans elle en cours (`o
 
 ### Rôles
 
-Les cinq champs de personnes (`auteurs`, `directeurs`, `rapporteurs`, `membresJury`, `presidentJury`) donnent des contributions sources, avec leurs rôles (`author`, `thesis_director`, `rapporteur`, `jury_member`, `jury_president`). Seuls les auteurs ont une position d'auteur. Une personne présente dans plusieurs champs a plusieurs rôles ; elle est reconnue par son PPN, à défaut par son nom et son prénom.
+Les cinq champs de personnes (`auteurs`, `directeurs`, `rapporteurs`, `membresJury`, `presidentJury`) donnent des contributions sources. Leurs rôles sont `author`, `thesis_director`, `rapporteur`, `jury_member` et `jury_president`. Seuls les auteurs ont une position d'auteur. Une personne présente dans plusieurs champs a plusieurs rôles ; elle est reconnue par son PPN, à défaut par son nom et son prénom.
 
 ### Identifiants : PPN IdRef pour les personnes, NNT pour les thèses
 
