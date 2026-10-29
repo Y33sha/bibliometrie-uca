@@ -44,6 +44,22 @@ Paires de publications reliées par un `hal_id` actif, sur la base locale au 202
 
 Publications de la base locale scindées quand seuls les identifiants primaires et dérivés sont des clés : 1 289 par la règle sur le `hal_id`, 337 de plus par la même règle sur le PMID et l'identifiant arXiv. Parmi elles, des dépôts HAL sans DOI séparés de leur version éditeur, et des enregistrements sources ScanR `pmid…` séparés de leur article.
 
+Réconciliation simulée sur la base locale au 2026-10-29 (341 073 enregistrements sources rattachables), face à la clé DOI de la colonne :
+
+- DOI actifs primaires ou dérivés comme seules clés DOI : 11 234 partitions scindées. Les DOI de HAL, WoS et theses.fr sont secondaires : 7 865 enregistrements sources WoS, 2 974 dépôts HAL et 1 189 works OpenAlex quittent leur publication.
+- Tous les DOI actifs non liés comme clés, sans coupe par DOI : 6 632 fusions, jusqu'à 100 publications. Un work OpenAlex cite en DOI secondaires les fichiers d'un jeu de données ou les versions d'un logiciel.
+- Tous les DOI actifs non liés comme clés, le DOI secondaire cédant le premier : 144 publications perdent un enregistrement source et 210 fusionnent. Ce sont surtout des enregistrements sources ScanR dont l'identifiant ScanR désigne l'article et le premier DOI des `externalIds` le preprint : ils passent de la publication du preprint à celle de l'article.
+
+Usages qui demandent un seul DOI par enregistrement source :
+
+- coupe des partitions et ancre de la réconciliation ;
+- DOI de la publication en consolidation ;
+- groupes de la correction par DOI partagé ;
+- DOI propre du déclarant DataCite (cibles, relations) ;
+- rattachement d'une revue par espace de noms DOI, type d'éditeur du registrant.
+
+Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `resolve_ra`, apprentissage des référentiels, règles de correction sur le préfixe, `is_matchable`.
+
 ## Décisions
 
 - Une table relie un enregistrement source à un identifiant : type, valeur, rôle, statut. Les identifiants d'une publication se déduisent de ses enregistrements sources.
@@ -63,8 +79,8 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 - Le DOI d'une version, d'une variante ou d'une pièce de dataset a une cible quand l'œuvre principale est présente en base : DOI concept, forme principale ou dataset parent. La table `doi_targets` relie les deux DOI.
 - La cible tient lieu du DOI pour tous les enregistrements sources qui ont ce DOI, dans la réconciliation et la consolidation.
 - L'enregistrement source DataCite de la forme secondaire est écarté de la réconciliation (`is_matchable`).
-- Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
-- Clés de la réconciliation : DOI, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
+- Clés de la réconciliation : tous les DOI actifs non liés, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
+- Coupe d'une composante de la réconciliation par DOI : ses ancres sont ses DOI primaires et dérivés ; à défaut, les DOI des membres qui ont un seul DOI. Une composante à une ancre au plus reste entière. Sinon, un membre rejoint l'ancre de son DOI primaire ou dérivé, à défaut l'unique ancre parmi ses DOI secondaires ; un membre sans ancre unique reste sur sa publication.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
 - La colonne `doi` disparaît au profit de l'identifiant DOI de l'enregistrement source.
 
@@ -106,7 +122,9 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 - [x] Table `doi_targets`, écrite par la correction par DOI partagé et lue par la réconciliation et la consolidation. Enregistrement source DataCite de la forme secondaire écarté.
 - [x] Sous-étapes distinctes de `metadata_correction` : `doi_targets` écrit les cibles, `remove_identifiers` les retraits. DOI des formes secondaires rendus au stock par une migration.
 - [x] Cible appliquée au DOI cible d'une relation entre publications (`doi_or_target_sql`).
-- [ ] DOI d'un enregistrement source à plusieurs DOI actifs.
+- [x] Usages du DOI d'un enregistrement source, et réconciliation simulée selon la règle des clés DOI.
+- [x] DOI des enregistrements sources sans payload au raw store écrits dans la table (oneshot, 086044c44).
+- [ ] Clés DOI et coupe de la réconciliation selon les ancres.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [ ] Suppression de la colonne.
 
@@ -120,5 +138,4 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 ## Questions ouvertes
 
-- DOI d'un enregistrement source à plusieurs DOI actifs. La colonne `doi` contient le DOI que la source donne au document (`doi` du work OpenAlex, `doiId_s` HAL). Les autres DOI d'un work OpenAlex sont secondaires, comme celui-ci. Sur 10 000 works OpenAlex, 777 ont plusieurs DOI actifs : 423 un DOI Crossref et des DOI DataCite (arXiv, Zenodo, DESY), 242 seulement des DOI DataCite, 112 plusieurs DOI Crossref (bioRxiv, SSRN, Research Square).
 - Hors périmètre : retrait des identifiants secondaires trop éloignés de l'enregistrement source qui les cite, par comparaison deux à deux des titres par exemple. Ce serait une généralisation de `remove_identifiers` à tous les identifiants.
