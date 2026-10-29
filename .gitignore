@@ -1,4 +1,4 @@
-# Logs, rapports pipeline et status.json
+# Journaux du pipeline et de l'API
 logs/
 
 # Python
@@ -19,31 +19,24 @@ dist/
 node_modules/
 interfaces/frontend/build/
 interfaces/frontend/.svelte-kit/
-# OpenAPI dump intermédiaire (schema.ts généré via types:gen)
+# Schéma OpenAPI intermédiaire de `types:gen`, qui génère schema.ts
 interfaces/frontend/openapi.json
 
-# Backups DB
-db/backup/
-
-# Raw store local : snapshots gzippés des payloads sources (cf. chantier DATA_raw-data-store)
+# Données locales : fichiers à importer, raw store des payloads sources
 data/
 
 # IDE
 .vscode/
 .idea/
 
-# Docker
+# Secrets d'environnement
 .env
 
 # Claude Code
 .claude/*.json
 .claude/projects
 
-# Vale
-# .vale.ini
-# styles/
-
-# mutmut
+# Copie de travail de mutmut
 mutants/
 
 # Instances par université

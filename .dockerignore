@@ -23,7 +23,7 @@ venv
 .coverage
 htmlcov
 
-# Frontend (rebuildé dans le conteneur)
+# Frontend, reconstruit dans le conteneur
 interfaces/frontend/node_modules
 interfaces/frontend/.svelte-kit
 interfaces/frontend/build
@@ -35,11 +35,5 @@ interfaces/frontend/build
 # Claude
 .claude
 
-# Logs et rapports pipeline (runtime)
+# Journaux
 logs
-
-# Imports manuels volumineux
-imports_manuels
-
-# Notes internes (non déployables)
-TODO_LAURA.md
