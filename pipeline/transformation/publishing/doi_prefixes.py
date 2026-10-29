@@ -7,6 +7,8 @@ from typing import Literal, NamedTuple
 
 from sqlalchemy import Connection, text
 
+from domain.source_records.identifiers import SourceIdentifierType
+
 type Agency = Literal["Crossref", "DataCite"]
 """Agence dont l'API `/prefixes` donne l'éditeur d'un préfixe."""
 
@@ -148,9 +150,14 @@ class DoiPrefixStore:
         )
 
     def find_doi_with_prefix(self, prefix: str) -> str | None:
-        """Un DOI d'enregistrement source de ce préfixe. Il sert à retrouver le membre Crossref déposant."""
+        """Un DOI actif d'enregistrement source de ce préfixe. Il sert à retrouver le membre Crossref déposant."""
         return self._conn.execute(
-            text("SELECT doi FROM source_records WHERE doi LIKE :motif LIMIT 1"),
+            text(f"""
+                SELECT id_value FROM source_record_identifiers
+                WHERE id_type = '{SourceIdentifierType.DOI.value}' AND removed_by IS NULL
+                  AND id_value LIKE :motif
+                LIMIT 1
+            """),
             {"motif": f"{prefix}/%"},
         ).scalar()
 

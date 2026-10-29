@@ -18,6 +18,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.serials.titles import compatible_titles, nested_titles
+from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.sql_fragments import active_issns, has_active_issn
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -154,10 +155,11 @@ _SERIALS_SHARING_AN_INACTIVE_ISSN = text(f"""
 # Un titre normalisé vide (alphabet non latin, symboles) ne rapproche aucune revue.
 _SAME_TITLE_DUPLICATES = text(f"""
     WITH prefixes AS (
-        SELECT serial_id AS id, array_agg(DISTINCT split_part(doi, '/', 1)) AS pfx
-        FROM source_records
-        WHERE serial_id IS NOT NULL AND doi IS NOT NULL
-        GROUP BY serial_id
+        SELECT s.serial_id AS id, array_agg(DISTINCT split_part(d.id_value, '/', 1)) AS pfx
+        FROM source_records s
+        JOIN source_record_identifiers d ON d.source_record_id = s.id AND {serial_doi_sql("d", "s")}
+        WHERE s.serial_id IS NOT NULL
+        GROUP BY s.serial_id
     ), paires_de_titre AS (
         SELECT title_normalized FROM serials
         WHERE title_normalized <> ''

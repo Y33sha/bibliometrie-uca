@@ -11,6 +11,11 @@ from sqlalchemy import text
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
 from domain.serials.serial import SerialType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
     find_serials_to_check_in_sudoc,
     find_titles_of_serials_with_issn,
@@ -502,6 +507,39 @@ class TestDoiNamespaces:
         )
         pairs = [p for p in find_doi_serial_pairs(sa_sync_conn) if p.serial_id == serial_id]
         assert [(p.doi, p.serial_type) for p in pairs] == [("10.9001/abc.1", SerialType.UNKNOWN)]
+
+    def test_doi_secondaire_d_agregateur_exclu_des_temoins(self, sa_sync_conn, repo):
+        """Régression : des works OpenAlex sans DOI `derived`, rattachés à tort à une revue, faisaient voter leurs copies de repository Apollo (`10.17863/cam.`) pour elle."""
+        serial_id = _serial(sa_sync_conn)
+        secondary = SourceIdentifierRole.SECONDARY
+        _article(
+            sa_sync_conn,
+            source="openalex",
+            source_id="W1",
+            serial_id=serial_id,
+            identifiers=[SourceIdentifier(SourceIdentifierType.DOI, "10.17863/cam.1", secondary)],
+        )
+        _article(
+            sa_sync_conn,
+            source="hal",
+            source_id="hal-1",
+            serial_id=serial_id,
+            identifiers=[SourceIdentifier(SourceIdentifierType.DOI, "10.9001/abc.1", secondary)],
+        )
+        _article(
+            sa_sync_conn,
+            source="openalex",
+            source_id="W2",
+            serial_id=serial_id,
+            identifiers=[
+                SourceIdentifier(
+                    SourceIdentifierType.DOI, "10.9001/abc.2", SourceIdentifierRole.DERIVED
+                ),
+                SourceIdentifier(SourceIdentifierType.DOI, "10.17863/cam.2", secondary),
+            ],
+        )
+        pairs = [p for p in find_doi_serial_pairs(sa_sync_conn) if p.serial_id == serial_id]
+        assert sorted(p.doi for p in pairs) == ["10.9001/abc.1", "10.9001/abc.2"]
 
     def test_store_vide_puis_ecrit(self, sa_sync_conn, repo):
         serial_id = _serial(sa_sync_conn)
