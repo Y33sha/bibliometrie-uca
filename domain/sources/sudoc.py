@@ -49,7 +49,7 @@ _PRINT_WORDS = ("print", "imprimé", "impresso", "papier")
 
 @dataclass(frozen=True, slots=True)
 class SudocSerialRecord:
-    """Ce que le pipeline lit dans une notice Sudoc de publication en série. Les ISSN sont normalisés ; une valeur invalide est ignorée."""
+    """Notice Sudoc d'une publication en série, réduite aux zones lues. Les ISSN sont normalisés ; une valeur invalide est ignorée."""
 
     ppn: str
     issn: str | None
@@ -102,7 +102,7 @@ def _names_other_support(text: str) -> bool:
 
 
 def support_mentioned(title: str) -> IssnSupport | None:
-    """IssnSupport qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
+    """Support qu'indique la mention entre parenthèses d'un titre (« Nature (Print) »), ou `None`."""
     mentions = " ".join(re.findall(r"\(([^)]*)\)", title)).lower()
     if _names_other_support(mentions):
         return IssnSupport.OTHER

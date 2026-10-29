@@ -1,7 +1,4 @@
-"""Règles métier pures spécifiques à la source HAL.
-
-Interprétation des champs propres au schéma HAL — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique HAL pour le reste du pipeline.
-"""
+"""Lecture des champs propres à HAL."""
 
 import re
 
@@ -21,27 +18,24 @@ HAL_DEPOSIT_STATUS_LABELS: dict[str, str] = {
     "hors_hal": "Hors HAL",
 }
 
-# Code d'un domaine CCSD : des segments alphanumériques séparés par des points
-# (`sdv`, `sdv.bbm.bm`), le tiret étant admis dans un segment (`info.info-oh`).
+# Code d'un domaine CCSD : des segments alphanumériques séparés par des points (`sdv.bbm.bm`), le tiret admis dans un segment (`info.info-oh`).
 _DOMAIN_CODE = re.compile(r"^[a-z0-9]+(?:[-.][a-z0-9]+)*$")
 
 # Annotation d'un libellé de domaine : `Informatique [cs]`, `Autre [cs.OH]`.
 _DOMAIN_ANNOTATION = re.compile(r"\s*\[[^]]*\]")
 
-# Libellés de feuilles fourre-tout du référentiel CCSD (`chim.othe`, `info.info-oh`,
-# `spi.other`, `stat.ot`…). Ils rassembleraient sous un même concept des feuilles
-# sans rapport, là où leur parent porte déjà le signal.
+# Libellés des feuilles fourre-tout du référentiel CCSD (`chim.othe`, `spi.other`…), qui réuniraient des feuilles sans rapport. Leur parent suffit.
 _GENERIC_DOMAIN_LABELS = frozenset({"autre", "autres"})
 
 
 def hal_domain_labels(facet_entry: str) -> list[str]:
     """Libellés de chaque niveau d'un domaine, depuis une entrée de `fr_domainAllCodeLabel_fs`.
 
-    L'entrée porte le code du domaine et le chemin de ses libellés, de la racine à la feuille : `sdv.bbm.bm_FacetSep_Sciences du Vivant [q-bio]/Biochimie, Biologie Moléculaire/Biologie moléculaire` donne `["Sciences du Vivant", "Biochimie, Biologie Moléculaire", "Biologie moléculaire"]`.
+    L'entrée contient le code du domaine et le chemin de ses libellés, de la racine à la feuille : `sdv.bbm.bm_FacetSep_Sciences du Vivant [q-bio]/Biochimie, Biologie Moléculaire/Biologie moléculaire` donne `["Sciences du Vivant", "Biochimie, Biologie Moléculaire", "Biologie moléculaire"]`.
 
-    La profondeur se lit du code et borne le découpage du chemin : le libellé de feuille peut lui-même contenir des `/` (« Chimie théorique et/ou physique », « Optique / photonique »), qu'un découpage libre romprait en libellés fantômes.
+    La profondeur du code borne le découpage du chemin : un libellé peut contenir des `/` (« Optique / photonique »).
 
-    Les annotations entre crochets sont retirées, et les libellés génériques écartés. Une entrée dont le code n'a pas la forme attendue ne donne aucun libellé : le référentiel en compte quelques-unes, où le code porte un chemin de libellés au lieu d'un code.
+    Les annotations entre crochets sont retirées, et les libellés génériques écartés. Une entrée dont le code n'a pas la forme attendue ne donne aucun libellé : dans quelques entrées du référentiel, un chemin de libellés tient lieu de code.
     """
     code, separator, path = facet_entry.partition("_FacetSep_")
     if not separator or not _DOMAIN_CODE.match(code):
