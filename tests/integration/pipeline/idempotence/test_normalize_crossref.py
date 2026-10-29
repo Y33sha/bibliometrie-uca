@@ -73,7 +73,7 @@ def _insert_crossref_staging(conn, docs):
             doi=doc["doi"],
             raw_data=doc["raw_data"],
             processed=False,
-            upsert="raw_data",
+            replace=True,
         )
 
 

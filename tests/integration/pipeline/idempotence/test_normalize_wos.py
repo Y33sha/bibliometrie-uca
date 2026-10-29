@@ -58,7 +58,7 @@ def insert_wos_staging(conn, docs):
             doi=doc["doi"],
             raw_data=doc["raw_data"],
             processed=False,
-            upsert="processed",
+            replace=True,
         )
 
 
@@ -83,7 +83,6 @@ def _count_wos_tables(conn) -> dict:
 
 class TestNormalizeWosIdempotence:
     def test_double_run_same_counts(self, sa_sync_conn):
-        from sqlalchemy import text
 
         insert_wos_staging(sa_sync_conn, WOS_STAGING_DOCS)
 
@@ -91,8 +90,9 @@ class TestNormalizeWosIdempotence:
         counts_1 = _count_wos_tables(sa_sync_conn)
         assert processed_1 == 3
 
-        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'wos'"))
-        run_normalize_wos(sa_sync_conn)
+        # La normalisation vide `raw_data` : le test réinsère le contenu pour relancer.
+        insert_wos_staging(sa_sync_conn, WOS_STAGING_DOCS)
+        assert run_normalize_wos(sa_sync_conn) == 3
         counts_2 = _count_wos_tables(sa_sync_conn)
 
         assert counts_2 == counts_1, (

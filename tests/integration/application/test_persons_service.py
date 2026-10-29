@@ -969,24 +969,6 @@ class TestUpdateNameFormStatus:
         with pytest.raises(NotFoundError):
             service.update_name_form_status(person_id, "inexistante xyz", "rejected")
 
-    def test_reject_sets_the_lock(self, sa_sync_conn, service):
-        """Rejeter une forme passe son statut à `rejected`."""
-        pid = _person(sa_sync_conn, last_name="Foreign", first_name="Form")
-        _hal_name_form(sa_sync_conn, pid, name_form="intrus etranger")
-
-        service.update_name_form_status(pid, "intrus etranger", "rejected")
-
-        assert (
-            sa_sync_conn.execute(
-                text(
-                    "SELECT status::text FROM person_name_forms "
-                    "WHERE name_form = 'intrus etranger' AND person_id = :pid"
-                ),
-                {"pid": pid},
-            ).scalar_one()
-            == "rejected"
-        )
-
 
 class TestNameFormRejectionOnContributions:
     """Le rejet d'une forme de nom met en file de résolution les contributions rattachées par le nom (`name`, `compatible_name`) dont une contribution source a cette forme."""

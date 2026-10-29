@@ -135,7 +135,7 @@ def insert_scanr_staging(conn, docs):
             doi=doc["doi"],
             raw_data=doc["raw_data"],
             processed=False,
-            upsert="processed",
+            replace=True,
         )
 
 
@@ -163,7 +163,6 @@ class TestNormalizeScanrIdempotence:
     """La normalisation ScanR produit le même résultat si lancée deux fois."""
 
     def test_double_run_same_counts(self, sa_sync_conn):
-        from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
 
@@ -176,11 +175,9 @@ class TestNormalizeScanrIdempotence:
         assert counts_1["scanr_documents"] == 3
         assert counts_1["publications"] >= 3
 
-        # Remet les lignes à traiter.
-        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'scanr'"))
-
-        # Deuxième passe
-        run_normalize_scanr(sa_sync_conn)
+        # La normalisation vide `raw_data` : le test réinsère le contenu pour relancer.
+        insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
+        assert run_normalize_scanr(sa_sync_conn) == 3
         create_all_publications(sa_sync_conn)
         counts_2 = _count_tables(sa_sync_conn)
 
@@ -276,9 +273,9 @@ class TestNormalizeScanrIdempotence:
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         run_normalize_scanr(sa_sync_conn)
 
-        # Remet les lignes à traiter et relance.
-        sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'scanr'"))
-        run_normalize_scanr(sa_sync_conn)
+        # La normalisation vide `raw_data` : le test réinsère le contenu pour relancer.
+        insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
+        assert run_normalize_scanr(sa_sync_conn) == 3
 
         cnt = sa_sync_conn.execute(
             text("SELECT count(*) AS cnt FROM publishers WHERE name_normalized LIKE '%elsevier%'")

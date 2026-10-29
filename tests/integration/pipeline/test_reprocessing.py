@@ -32,7 +32,7 @@ def _insert_hal_staging(conn, doc):
         doi=doc.get("doiId_s"),
         raw_data=doc,
         processed=False,
-        upsert="raw_data",
+        replace=True,
     )
 
 

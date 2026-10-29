@@ -426,7 +426,7 @@ class TestPropagationSkipsNoOp:
 
         assert changed == [addr]
 
-    def test_reject_absent_creates_and_triggers_propagation(self, sa_sync_conn, service):
+    def test_reject_absent_creates_rejected_link_without_propagation(self, sa_sync_conn, service):
         """Rejeter un lien absent crée un lien rejeté : l'adresse reste hors du périmètre."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
@@ -434,15 +434,17 @@ class TestPropagationSkipsNoOp:
         changed = service.review_structure_link(addr, uca, False)
 
         assert changed == []
+        assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is False
 
     def test_confirm_absent_creates_and_triggers_propagation(self, sa_sync_conn, service):
-        """Confirmer un lien absent fait entrer l'adresse dans le périmètre."""
+        """Confirmer un lien absent crée un lien confirmé, qui fait entrer l'adresse dans le périmètre."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = service.review_structure_link(addr, uca, True)
 
         assert changed == [addr]
+        assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is True
 
     def test_batch_only_propagates_changed(self, sa_sync_conn, service):
         """En lot, seules les adresses dont la contribution au périmètre change sont renvoyées."""

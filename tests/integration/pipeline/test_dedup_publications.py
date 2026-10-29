@@ -108,8 +108,8 @@ class TestRefreshFromSources:
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "green"
 
-    def test_diamond_always_wins(self, sa_sync_conn):
-        """Le statut diamond l'emporte sur gold."""
+    def test_diamond_wins_over_gold(self, sa_sync_conn):
+        """Le statut le plus ouvert des sources l'emporte : diamond sur gold."""
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/dia", oa_status="gold")
         _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-gold", oa_status="gold")
         _source_record(
