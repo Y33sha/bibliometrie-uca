@@ -218,6 +218,16 @@ AVANT :
 APRÈS :
     | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
 
+## Personnification du code
+
+Une phase, un module ou une étape ne « cherche » ni n'« essaie ». Quand l'action est celle du processus, « on » suffit.
+
+AVANT :
+    On essaie donc de retrouver dans chaque source les documents trouvés seulement dans les autres.
+
+APRÈS :
+    On cherche donc dans chaque source les documents trouvés seulement dans les autres.
+
 ## Mot qui fait poser une question au lecteur
 
 Relire hors du contexte du projet. Un mot qui fait poser une question (meilleure selon quel critère ? lequel parmi d'autres ?) se remplace par un mot plus simple qui ne la pose pas.
