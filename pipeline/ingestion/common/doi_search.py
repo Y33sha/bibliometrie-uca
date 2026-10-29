@@ -13,6 +13,7 @@ import httpx2
 from sqlalchemy import Connection, ScalarResult, text
 
 from domain.publications.identifiers import clean_doi
+from domain.source_records.identifiers import SourceIdentifierType
 from domain.sources.registry import (
     ALL_SOURCES_SET as VALID_SOURCES,
     DOI_ORG,
@@ -20,7 +21,6 @@ from domain.sources.registry import (
     Source,
 )
 from domain.sources.staging import StagingEntryMode
-from infrastructure.db.source_record_identifiers import related_doi_sql
 from pipeline.http.lookup import UNAVAILABLE, Unavailable
 from pipeline.http.polite_pool import polite_user_agent
 from pipeline.ingestion.common.failed_lookups import (
@@ -90,15 +90,11 @@ def get_missing_dois(
     # `NOT EXISTS` : avec `NOT IN`, un NULL dans la sous-requête viderait la sélection.
     query = f"""
         WITH deja_connus AS (
-            SELECT sr.doi
+            SELECT d.id_value AS doi
             FROM source_records sr
-            WHERE sr.source = CAST(:target AS source_type) AND sr.doi IS NOT NULL
-            UNION
-            SELECT d.id_value
-            FROM source_records sr
-            JOIN source_record_identifiers d
-              ON d.source_record_id = sr.id AND {related_doi_sql("d", "sr")}
+            JOIN source_record_identifiers d ON d.source_record_id = sr.id
             WHERE sr.source = CAST(:target AS source_type)
+              AND d.id_type = '{SourceIdentifierType.DOI.value}' AND d.removed_by IS NULL
         )
         SELECT DISTINCT c.doi
         FROM candidate_dois c

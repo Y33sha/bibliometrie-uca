@@ -6,6 +6,11 @@ import pytest
 from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.doi_search import get_missing_dois
 from pipeline.ingestion.common.fingerprint import fingerprint
@@ -196,17 +201,47 @@ class TestGetMissingDois:
         assert "10.99999/x.1" not in result
 
     def test_includes_related_dois_from_source_records(self, sa_sync_conn):
-        """Les DOI secondaires d'un enregistrement source du périmètre, d'une autre source que la cible, sont retenus comme son DOI principal."""
+        """Tous les DOI actifs d'un enregistrement source du périmètre, d'une autre source que la cible, sont retenus."""
         _add_inperim_source_record(
             sa_sync_conn,
             "openalex",
             "W1",
-            doi="10.1234/primary",
-            identifiers={"doi": ["10.9999/preprint"]},
+            identifiers={"doi": ["10.1234/primary", "10.9999/preprint"]},
         )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
+
+    def test_reads_the_dois_of_the_identifier_table(self, sa_sync_conn):
+        """Régression : la colonne `doi` d'un work OpenAlex gardait un DOI mal formé, absent de ses identifiants."""
+        _add_inperim_source_record(
+            sa_sync_conn,
+            "openalex",
+            "W1",
+            doi="10.3389/feart.2020.00279/abstract",
+            identifiers={"doi": ["10.3389/feart.2020.00279"]},
+        )
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == [
+            "10.3389/feart.2020.00279"
+        ]
+
+    def test_excludes_a_doi_removed_by_the_correction(self, sa_sync_conn):
+        publication_id = _publication(sa_sync_conn, "T", in_perimeter=True)
+        _source_record(
+            sa_sync_conn,
+            publication_id,
+            source="openalex",
+            source_id="W1",
+            identifiers=[
+                SourceIdentifier(
+                    SourceIdentifierType.DOI,
+                    "10.1234/faux",
+                    SourceIdentifierRole.SECONDARY,
+                    "UNRESOLVED_DOI_TO_NULL",
+                )
+            ],
+        )
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
         """L'identifiant arXiv d'un enregistrement source du périmètre, d'une autre source que la cible, est retenu sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""

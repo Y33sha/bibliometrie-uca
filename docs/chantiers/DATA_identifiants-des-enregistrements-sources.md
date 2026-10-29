@@ -130,6 +130,7 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] `is_matchable` sur la table : préfixe exclu quand tous les DOI propres de l'enregistrement source l'ont (`primary` ou `derived`, à défaut `secondary`) ; forme secondaire DataCite par son DOI `primary` ; agrégateur gardé par un DOI actif de rôle autre que `related`.
 - [x] Règles de type de la correction unaire (collection Figshare, DOI hors du registre de thèses, registrant de presse) sur les DOI propres actifs : l'un d'eux suffit. Résultat identique sur la base locale.
 - [x] `serial_by_doi` sur les DOI propres actifs : rattachement si leurs espaces de noms désignent une seule revue. Sur la base locale, 14 rattachements de plus (DOI des actes LIPIcs à côté du DOI arXiv, DOI Cairn `derived` de ScanR), 2 de moins (DOI `derived` d'un preprint, DOI de la revue en `secondary`).
+- [x] Vue `known_dois` et DOI déjà connus de la cible de `fetch_missing` : DOI actifs de la table, tous rôles. Sur la base locale, 6 DOI de colonne mal formés ou étrangers à l'enregistrement source sortent de la vue.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [ ] Suppression de la colonne.
 
