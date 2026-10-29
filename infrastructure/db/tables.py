@@ -1192,7 +1192,7 @@ publications = Table(
     # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
     # colonnes grasses lues uniquement par la page détail, sorties pour garder
     # `publications` étroite (scans listes/facettes).
-    # Indices des contributions de personnes non exclues, maintenus par la phase `contributions` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
+    # Indices des contributions de personnes non exclues, maintenus par la phase `finalize` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
         "perimeter_evidence",
         ARRAY(perimeter_evidence_enum),

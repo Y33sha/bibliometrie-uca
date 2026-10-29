@@ -1,18 +1,16 @@
-"""Passe d'assignation + réconciliation des composantes — match/create/skip **et** merge/split unifiés.
+"""Réconciliation des enregistrements sources avec les publications (tâche `publications.reconcile`).
 
-Recalcule les composantes connexes du voisinage 1-hop des `source_records` de la file `source_record_keys_queue` et assigne chaque enregistrement source à la publication ancre de sa partition `(composante ∩ DOI)`. Assignation d'un orphelin (match/create/skip) et réconciliation de publications matérialisées (merge/split) sont des facettes du même primitif. La décision revient à `domain.publications.reconciliation.plan_reconciliation` (pure) ; ce module l'applique :
+Les enregistrements sources de la file `source_record_keys_queue` et leurs voisins directs reçoivent un plan de `domain.publications.reconciliation.plan_reconciliation`, que ce module applique :
 
-- **groupes** : les enregistrements sources de chaque groupe sont rattachés à son ancre (publication existante conservée), ou à une publication créée quand la partition est sans ancre existante (split) ;
-- **publications dissoutes** (vidées de tous leurs enregistrements sources par un merge) : `lifecycle.dissolve` redirige leurs paiements APC et leur identifiant vers le successeur, puis les supprime ;
-- **rafraîchissement** : `lifecycle.refresh` recalcule les métadonnées consolidées de chaque publication d'un enregistrement source relevé, avant comme après la réconciliation, et de chaque publication cible d'un groupe. Il supprime celles restées sans source.
+- les enregistrements sources de chaque groupe rejoignent son ancre, ou une publication créée ;
+- une publication dissoute redirige ses paiements APC et son identifiant vers son successeur, puis disparaît (`lifecycle.dissolve`) ;
+- `lifecycle.refresh` recalcule chaque publication touchée, avant comme après la réconciliation, et supprime celles restées sans enregistrement source.
 
-Les `contributions` sont laissées à la phase `contributions` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des enregistrements sources et les métadonnées des publications, et laisse les contributions.
+Les publications touchées sont marquées pour l'alignement de leurs auteurs (`author_grouping`), qui recompose leurs contributions.
 
-Voisinage 1-hop, pas de fermeture transitive : l'invariant du marquage garantit que toute arête neuve a une extrémité marquée. La passe s'ouvre sur le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
+Le voisinage direct suffit : l'invariant du marquage garantit que toute arête ajoutée a une extrémité marquée. La passe commence par marquer les enregistrements sources rattachés à la même publication qu'un enregistrement source marqué : le voisinage couvre ainsi les arêtes retirées comme les ajoutées.
 
 `reconcile_source_records` applique la même passe à une liste d'enregistrements sources, hors de la file : l'administration l'appelle après une fusion manuelle.
-
-Tâche `publications.reconcile`.
 """
 
 import logging
@@ -315,7 +313,7 @@ def detach_source_records(conn: Connection, source_record_ids: list[int]) -> Non
 
 
 def mark_publications_for_grouping(conn: Connection, publication_ids: list[int]) -> int:
-    """Marque ces publications pour le groupement des auteurs. Retourne le nombre de publications marquées."""
+    """Marque ces publications pour l'alignement des auteurs. Retourne le nombre de publications marquées."""
     if not publication_ids:
         return 0
     return enqueue(

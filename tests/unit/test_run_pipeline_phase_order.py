@@ -14,10 +14,10 @@ def _fake_tx():
     yield MagicMock()
 
 
-def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
+def test_les_decomptes_de_publications_se_recalculent_dans_finalize():
     """Adresses, revues et éditeurs se comptent des mêmes publications et contributions sources.
 
-    La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
+    La phase `finalize` les stabilise : leurs décomptes s'y recalculent ensemble.
     """
     with (
         patch.object(finalize_phase, "purge_publications", return_value=0),

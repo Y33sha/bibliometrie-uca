@@ -1,6 +1,6 @@
-"""Recalcul de `publications.perimeter_evidence`, par la phase `contributions`, après une correction d'adresse et après les décisions de l'administration sur une personne ou sur ses contributions.
+"""Recalcul de `publications.perimeter_evidence`, par la phase `finalize`, après une correction d'adresse, et après une décision de l'administration sur une personne ou sur ses contributions.
 
-Une publication réunit les indices de ses contributions d'auteurs (contributions rattachées à une personne non exclue) : direction de thèse, jury, édition ou traduction comptent pour la personne, pas pour le périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
+Une publication réunit les indices de ses contributions d'auteurs, rattachées à une personne non exclue. Direction de thèse, jury, édition ou traduction comptent pour la personne, et restent hors du périmètre. Une thèse soutenue dans un établissement du périmètre reçoit en plus l'indice `thesis_institution`.
 """
 
 from sqlalchemy import Connection, text

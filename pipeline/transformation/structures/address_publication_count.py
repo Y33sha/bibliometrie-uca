@@ -1,4 +1,4 @@
-"""Recalcul du cache `addresses.publication_count`, en fin de phase `contributions`."""
+"""Recalcul du cache `addresses.publication_count`, en fin de phase `finalize`."""
 
 from sqlalchemy import Connection, text
 

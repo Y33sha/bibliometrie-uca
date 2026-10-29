@@ -1,12 +1,8 @@
-"""Phase `publications` : assignation des `source_records` aux publications, en une seule passe.
+"""Phase `publications` : rattachement des enregistrements sources aux publications (`reconciliation`), idempotent.
 
-Les documents sources modifiés et leur voisinage sont regroupés par composante connexe de leurs clés de confirmation — DOI, NNT, hal_id, PMID, et pour les thèses le couple titre-année (`reconciliation`). Chaque document rejoint la publication qui ancre sa partition. Rattacher un document, fusionner deux publications ou en scinder une sont trois lectures du même regroupement.
+Les enregistrements sources modifiés et leurs voisins se regroupent par leurs clés de confirmation (`domain.source_records.keys`), corrigées par la phase `metadata_correction`. Rattacher un enregistrement source, fusionner deux publications ou en scinder une relèvent de la même décision.
 
-La phase suit `metadata_correction`, qui a substitué le DOI de concept aux DOI de version DataCite : le regroupement se fait alors sur le concept.
-
-`--rebuild-publications` marque tout le stock à traiter avant le regroupement, qui reprend alors le corpus entier. Sert après une évolution des règles de clés, pour matérialiser les fusions et scissions qu'elles impliquent.
-
-La réconciliation est idempotente. La phase `contributions` purge ensuite les publications sans source ou sans contribution (`lifecycle.purge_publications`).
+`--rebuild-publications` marque tout le stock : la réconciliation applique alors une évolution des règles de clés à toutes les publications.
 """
 
 from __future__ import annotations
@@ -68,9 +64,6 @@ def _reconcile(open_tx: OpenTransaction, logger: logging.Logger, *, rebuild: boo
         "detached": stats.detached,
     }
     return metrics
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

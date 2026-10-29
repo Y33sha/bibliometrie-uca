@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `contributions` — supprime les monographies vides.
+"""Suppression des monographies vides, dans la phase `finalize`.
 
-Une monographie vide n'est portée par aucun enregistrement ni aucune publication. Elle se vide quand ses enregistrements rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore portée par une publication attend que la phase `publications` recalcule celle-ci. Le journal garde le titre de chaque monographie supprimée.
+Une monographie vide est sans enregistrement source et sans publication. Elle se vide quand ses enregistrements rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore portée par une publication attend que la phase `publications` recalcule celle-ci. Le journal garde le titre de chaque monographie supprimée.
 """
 
 import logging
