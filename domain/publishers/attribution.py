@@ -48,7 +48,7 @@ def publication_publisher(
 ) -> int | None:
     """Éditeur d'une publication à la date de sa publication.
 
-    C'est le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur de `record_publisher_ids`, rangés dans l'ordre de priorité des sources. Le titulaire d'un préfixe de plateforme d'éditeurs (`platform_prefix`) est la plateforme : il ne compte pas, ni un enregistrement source qui le nomme.
+    C'est le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur de `record_publisher_ids`, rangés dans l'ordre de priorité des sources. Si `platform_prefix`, le titulaire du préfixe est une plateforme d'éditeurs, écartée aussi des éditeurs des enregistrements sources.
     """
     if not is_published(doc_type):
         return None
