@@ -4,7 +4,7 @@ Quatre tâches (`pipeline.graph`), chacune dans sa propre transaction, dans l'or
 
 1. **serial_by_doi** — rattache la revue manquante que désigne l'espace de noms du DOI. En premier : le `serial_id` qu'il commit est consommé par l'étape suivante (`serial_type` depuis la colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
 2. **unaire** (per-record) — règles de correction `effective_metadata`, retrait des dépôts HAL introuvables.
-3. **cluster** (group-by-DOI) — substitution version→concept DataCite, nullage des DOI erronés ouvrage/chapitre et des DOI inconnus de doi.org.
+3. **cluster** (group-by-DOI) — nullage du DOI des formes secondaires DataCite d'une œuvre présente en base, des DOI erronés ouvrage/chapitre et des DOI inconnus de doi.org.
 4. **matchable** — enregistrements sources écartés de la réconciliation (`is_matchable`), d'après les valeurs corrigées.
 """
 

@@ -1,8 +1,8 @@
 """Phase `metadata_correction` — sous-étape **cluster** (corrections de DOI par groupe).
 
-Corrige le DOI de certaines source_records afin de provoquer leur fusion en phase `publications` (versions d'un même document avec DOI distincts) ou de l'empêcher (DOI identiques sur publications différentes). Deux familles de cas (extensibles) :
+Retire le DOI de certaines source_records. Deux familles de cas (extensibles) :
 
-- **convergence** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale — version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent présent (`IsPartOf`, ou collection figshare de même titre pour un fichier complémentaire figshare) ;
+- **convergence** : une forme secondaire DataCite d'une œuvre principale présente en base perd son DOI, et la sous-étape matchable l'écarte de la réconciliation. Version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent (`IsPartOf`, ou collection figshare de même titre pour un fichier complémentaire figshare) ;
 - **divergence** : un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait.
 
 Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur tous les enregistrements sources qui le citent.
@@ -65,17 +65,17 @@ def _compute_update(
     decision: DoiClusterDecision | None,
     removal: ConfirmationIdRemoval | None = None,
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une `source_record` : selon la décision du domaine, DOI nullé (`target_doi=None`) ou substitué (concept), le brut stashé sous la provenance du cas ; sans décision, ou si la cible égale le brut (dépôt non versionné), le DOI brut est restauré. Un DOI nullé est retiré des identifiants, sous le cas de la décision. `removal` retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés. Retourne `None` si rien ne change (idempotence / auto-cicatrisation). La *décision* vient du domaine."""
+    """État cible d'une `source_record`. Avec une décision du domaine, le DOI est nullé, le brut stashé sous le cas de la décision, et retiré des identifiants sous ce cas. Sans décision, le DOI brut est restauré. `removal` retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés. Retourne `None` si rien ne change (idempotence / auto-cicatrisation)."""
     raw_doi = raw_value(row.corrections, CorrectionKey.DOI, row.doi)
     corrections = other_entries(row.corrections, CLUSTER_KEYS)
 
     removals: dict[tuple[SourceIdentifierType, str], str] = {}
-    if decision is None or decision.target_doi == raw_doi:
+    if decision is None:
         new_doi = raw_doi
     else:
-        new_doi = decision.target_doi
+        new_doi = None
         corrections[CorrectionKey.DOI] = stash_entry(raw_doi, decision.case.value)
-        if new_doi is None and raw_doi is not None:
+        if raw_doi is not None:
             removals[(SourceIdentifierType.DOI, raw_doi)] = decision.case.value
 
     if removal is not None:
@@ -148,7 +148,7 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 def run(
     conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> ClusterCorrectionStats:
-    """Passe cluster : fait converger les formes secondaires DataCite sur l'œuvre principale (version → concept, variante → version publiée, fichier → dépôt parent). Nulle le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, et le DOI inconnu de doi.org."""
+    """Passe cluster : nulle le DOI des formes secondaires DataCite d'une œuvre présente en base (version → concept, variante → version publiée, fichier → dépôt parent), des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, et le DOI inconnu de doi.org."""
     step(logger, "Corrections de DOI par confrontation de documents")
     t0 = time.perf_counter()
     rows = store.fetch_doi_cluster_candidates()

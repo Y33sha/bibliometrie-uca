@@ -16,6 +16,7 @@ from domain.serials.doi_namespaces import DoiNamespace
 from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
 from domain.source_records.identifiers import (
     SourceIdentifier,
+    SourceIdentifierRole,
     SourceIdentifierType,
 )
 from domain.source_records.metadata_correction.rules import (
@@ -103,7 +104,7 @@ class SerialCorrectionUpdate(NamedTuple):
 class DoiClusterRow(NamedTuple):
     """Une `source_record` candidate à la correction de DOI par cluster.
 
-    `raw_doi` est le DOI **source reconstruit** (`corrections.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre de référence quand `raw_doi` est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` donne alors le cas correspondant."""
+    `raw_doi` est le DOI **source reconstruit** (`corrections.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre principale, présente en base, quand `raw_doi` en est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` donne alors le cas correspondant."""
 
     id: int
     doc_type: str | None
@@ -123,7 +124,7 @@ class DoiClusterRow(NamedTuple):
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour de la correction par cluster : colonne `doi` (nullée, restaurée ou substituée), sidecar, et identifiants aux statuts recalculés (clés partagées avec une autre œuvre et DOI nullé retirés ou restaurés). Persistée via `persist_doi_corrections`."""
+    """Une mise à jour de la correction par cluster : colonne `doi` (nullée ou restaurée), sidecar, et identifiants aux statuts recalculés (clés partagées avec une autre œuvre et DOI nullé retirés ou restaurés). Persistée via `persist_doi_corrections`."""
 
     id: int
     doi: str | None
@@ -414,11 +415,18 @@ class SourceRecordCorrectionStore:
                     GROUP BY title_normalized, publication_year
                     HAVING count(DISTINCT eff_doi) = 1
                 ),
+                -- DOI présents en base : DOI non liés des enregistrements sources, actifs avant cette sous-étape.
+                present_dois AS (
+                    SELECT DISTINCT id_value AS d FROM source_record_identifiers
+                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
+                      AND role <> '{SourceIdentifierRole.RELATED.value}'
+                      AND (removed_by IS NULL OR removed_by IN ({_CLUSTER_CASES_SQL}))
+                ),
                 -- La cible reste attachée à l'enregistrement source DataCite dont les `related_identifiers`
                 -- la mentionnent : la règle de même œuvre lit le type de cet enregistrement, et les
                 -- autres enregistrements au même DOI suivent la décision du groupe. Quand un enregistrement
-                -- mentionne plusieurs cibles, la version (concept) prime sur la variante. Une cible que
-                -- doi.org ne connaît pas est écartée.
+                -- mentionne plusieurs cibles, la version (concept) prime sur la variante. Une cible absente
+                -- de la base, ou que doi.org ne connaît pas, est écartée.
                 same_work AS (
                     SELECT DISTINCT ON (declarant_id)
                            declarant_id, secondary_doi, canonical_doi, same_work_case
@@ -434,6 +442,7 @@ class SourceRecordCorrectionStore:
                           AND rel->>'relation_type' IN {_DATACITE_DIRECT_RELATIONS_SQL}
                           AND rel->>'doi' IS NOT NULL
                           AND lower(rel->>'doi') <> sr.eff_doi
+                          AND lower(rel->>'doi') IN (SELECT d FROM present_dois)
                         UNION ALL
                         -- Pièce d'un dataset → dataset parent : le parent doit être présent en base
                         -- comme dataset pour absorber ses pièces (`IN dataset_dois`). Ça exclut le

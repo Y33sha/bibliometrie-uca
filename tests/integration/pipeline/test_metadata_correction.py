@@ -542,12 +542,32 @@ def _seed_datacite(conn, *, source_id, doi, doc_type, relations, corrections=Non
     )
 
 
+def _seed_work(conn, *, source_id, doi):
+    """Enregistrement source Crossref d'une œuvre principale, dont le DOI est dans `source_record_identifiers`."""
+    return _typed_source_record(
+        conn,
+        source="crossref",
+        source_id=source_id,
+        doi=doi,
+        doc_type="article",
+        identifiers=[SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.PRIMARY)],
+    )
+
+
+def _doi_correction(conn, source_record_id: int) -> tuple:
+    return conn.execute(
+        text("SELECT doi, corrections->'doi' FROM source_records WHERE id = :id"),
+        {"id": source_record_id},
+    ).one()
+
+
 def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(sa_sync_conn):
     """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite ne fait pas converger le groupe.
 
     Régression : la cible était attachée à toutes les enregistrements sources du DOI, et le type de l'enregistrement source OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
     """
     conn = sa_sync_conn
+    _seed_work(conn, source_id="arxiv", doi="10.48550/arxiv.1")
     wp = _seed_datacite(
         conn,
         source_id="wp",
@@ -560,18 +580,19 @@ def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(
     assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
 
 
-def test_un_groupe_substitue_a_tort_retrouve_ses_doi(sa_sync_conn):
+def test_un_groupe_prive_de_doi_a_tort_retrouve_ses_doi(sa_sync_conn):
     conn = sa_sync_conn
+    _seed_work(conn, source_id="arxiv", doi="10.48550/arxiv.1")
     stash = {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}}
     wp = _seed_datacite(
         conn,
         source_id="wp",
-        doi="10.48550/arxiv.1",
+        doi=None,
         doc_type="preprint",
         relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
         corrections=stash,
     )
-    oa = _typed_source_record(conn, source_id="oa", doi="10.48550/arxiv.1", doc_type="article")
+    oa = _typed_source_record(conn, source_id="oa", doi=None, doc_type="article")
     conn.execute(
         text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE id = :id"),
         {"raw": json.dumps(stash), "id": oa},
@@ -581,8 +602,9 @@ def test_un_groupe_substitue_a_tort_retrouve_ses_doi(sa_sync_conn):
     assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
 
 
-def test_une_copie_de_l_article_fait_converger_ses_voisines(sa_sync_conn):
+def test_une_copie_de_l_article_et_ses_voisines_perdent_leur_doi(sa_sync_conn):
     conn = sa_sync_conn
+    article = _seed_work(conn, source_id="article", doi="10.1007/article")
     copie = _seed_datacite(
         conn,
         source_id="copie",
@@ -592,17 +614,32 @@ def test_une_copie_de_l_article_fait_converger_ses_voisines(sa_sync_conn):
     )
     oa = _typed_source_record(conn, source_id="oa", doi="10.3204/pubdb-1", doc_type="article")
     assert _apply_cluster(conn) == 2
-    assert (_doi(conn, copie), _doi(conn, oa)) == ("10.1007/article", "10.1007/article")
+    assert (_doi(conn, copie), _doi(conn, oa)) == (None, None)
+    assert _doi(conn, article) == "10.1007/article"
 
 
-def test_une_cible_inconnue_de_doi_org_ne_remplace_pas_le_doi(sa_sync_conn):
-    """Régression : une copie de repository prenait le DOI de l'article qu'elle déclare, que doi.org ne connaît pas, et le reprenait à chaque passage."""
+def test_une_copie_de_l_article_absent_de_la_base_garde_son_doi(sa_sync_conn):
     conn = sa_sync_conn
+    copie = _seed_datacite(
+        conn,
+        source_id="copie",
+        doi="10.3204/pubdb-1",
+        doc_type="article",
+        relations=[("IsVariantFormOf", "10.1007/article")],
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, copie) == "10.3204/pubdb-1"
+
+
+def test_une_cible_inconnue_de_doi_org_laisse_le_doi(sa_sync_conn):
+    """Régression : une copie de repository perdait son DOI au profit de l'article qu'elle déclare, que doi.org ne connaît pas."""
+    conn = sa_sync_conn
+    _seed_work(conn, source_id="article", doi="10.1103/inconnu")
     stash = {"doi": {"raw": "10.15120/gsi-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}}
     copie = _seed_datacite(
         conn,
         source_id="copie",
-        doi="10.1103/inconnu",
+        doi=None,
         doc_type="article",
         relations=[("IsVariantFormOf", "10.1103/inconnu")],
         corrections=stash,
@@ -613,13 +650,15 @@ def test_une_cible_inconnue_de_doi_org_ne_remplace_pas_le_doi(sa_sync_conn):
             " VALUES ('doi_org', 'doi', '10.1103/inconnu', now())"
         )
     )
-    assert _apply_cluster(conn) == 1
+    _apply_cluster(conn)
     assert _doi(conn, copie) == "10.15120/gsi-1"
 
 
 def test_la_version_prime_sur_la_variante(sa_sync_conn):
-    """Un enregistrement source qui mentionne un concept et une variante converge sur le concept."""
+    """Un enregistrement source qui mentionne un concept et une variante perd son DOI sous le cas de la version."""
     conn = sa_sync_conn
+    _seed_work(conn, source_id="variante", doi="10.5281/zenodo.1")
+    _seed_work(conn, source_id="concept", doi="10.5281/zenodo.9")
     version = _seed_datacite(
         conn,
         source_id="v",
@@ -628,7 +667,31 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
         relations=[("IsVariantFormOf", "10.5281/zenodo.1"), ("IsVersionOf", "10.5281/zenodo.9")],
     )
     assert _apply_cluster(conn) == 1
-    assert _doi(conn, version) == "10.5281/zenodo.9"
+    assert _doi_correction(conn, version) == (
+        None,
+        {"raw": "10.5281/zenodo.20", "corrected_by": "DATACITE_VERSION_TO_CONCEPT"},
+    )
+
+
+def test_le_concept_present_comme_doi_lie_ne_compte_pas(sa_sync_conn):
+    """Le concept que seule la version mentionne, en identifiant lié, est absent de la base."""
+    conn = sa_sync_conn
+    version = _seed_datacite(
+        conn,
+        source_id="v",
+        doi="10.5281/zenodo.20",
+        doc_type="software",
+        relations=[("IsVersionOf", "10.5281/zenodo.9")],
+    )
+    conn.execute(
+        text(
+            "INSERT INTO source_record_identifiers (source_record_id, id_type, id_value, role)"
+            " VALUES (:id, 'doi', '10.5281/zenodo.9', 'related')"
+        ),
+        {"id": version},
+    )
+    assert _apply_cluster(conn) == 0
+    assert _doi(conn, version) == "10.5281/zenodo.20"
 
 
 # ── Sous-étape cluster : pièce d'un dataset → dataset parent (IsPartOf) ──
@@ -648,15 +711,15 @@ def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset"
     )
 
 
-def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
+def test_dataset_piece_of_a_present_dataset_parent_loses_its_doi(sa_sync_conn):
     # Le parent dataset est moissonné ; la pièce (DOI frère, non suffixé) et son doublon
-    # cross-source basculent tous deux sur le DOI parent.
+    # cross-source perdent tous deux leur DOI.
     conn = sa_sync_conn
     parent = _typed_source_record(conn, source_id="d-parent", doi="10.9001/set", doc_type="dataset")
     piece = _seed_datacite_piece(
         conn, source_id="d-piece", doi="10.9002/file1", parent_doi="10.9001/set"
     )
-    # Doublon OpenAlex de la pièce : même DOI, sans la relation ; il doit converger aussi.
+    # Doublon OpenAlex de la pièce : même DOI, sans la relation ; il suit la décision du groupe.
     sibling = _typed_source_record(
         conn, source_id="oa-piece", doi="10.9002/file1", doc_type="dataset"
     )
@@ -665,19 +728,14 @@ def test_dataset_piece_converges_to_present_dataset_parent(sa_sync_conn):
 
     assert _doi(conn, parent) == "10.9001/set"  # le parent garde son DOI
     for source_record in (piece, sibling):
-        row = conn.execute(
-            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
-            {"id": source_record},
-        ).one()
-        assert row.doi == "10.9001/set"
-        assert row.corrections["doi"] == {
-            "raw": "10.9002/file1",
-            "corrected_by": "DATACITE_PACKAGE_PIECE",
-        }
+        assert _doi_correction(conn, source_record) == (
+            None,
+            {"raw": "10.9002/file1", "corrected_by": "DATACITE_PACKAGE_PIECE"},
+        )
 
 
 def test_une_correction_de_doi_regroupe_les_contributions_sources_de_la_publication(sa_sync_conn):
-    """La pièce converge sur le DOI du dépôt qui partage sa publication : le groupement l'écarte."""
+    """La pièce perd son DOI : sa publication est marquée pour le groupement des contributions sources."""
     conn = sa_sync_conn
     publication = insert_publication(conn)
     other = insert_publication(conn)
@@ -756,7 +814,7 @@ def _seed_figshare(
 _ARTICLE = "effects of sevoflurane on lung epithelial permeability"
 
 
-def test_figshare_additional_file_converges_to_collection_of_same_title(sa_sync_conn):
+def test_figshare_additional_file_of_a_collection_of_same_title_loses_its_doi(sa_sync_conn):
     conn = sa_sync_conn
     collection = _seed_figshare(
         conn, source_id="c", doi="10.6084/m9.figshare.c.6702115", title_normalized=_ARTICLE
@@ -780,18 +838,13 @@ def test_figshare_additional_file_converges_to_collection_of_same_title(sa_sync_
 
     assert _doi(conn, collection) == "10.6084/m9.figshare.c.6702115"
     for source_record in (piece, sibling):
-        row = conn.execute(
-            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
-            {"id": source_record},
-        ).one()
-        assert row.doi == "10.6084/m9.figshare.c.6702115"
-        assert row.corrections["doi"] == {
-            "raw": "10.6084/m9.figshare.23538907",
-            "corrected_by": "DATACITE_PACKAGE_PIECE",
-        }
+        assert _doi_correction(conn, source_record) == (
+            None,
+            {"raw": "10.6084/m9.figshare.23538907", "corrected_by": "DATACITE_PACKAGE_PIECE"},
+        )
 
 
-def test_figshare_additional_file_converges_whatever_its_source_and_type(sa_sync_conn):
+def test_figshare_additional_file_loses_its_doi_whatever_its_source_and_type(sa_sync_conn):
     """Une pièce que seul OpenAlex donne, et une pièce que DataCite type `media`, rejoignent la collection."""
     conn = sa_sync_conn
     _seed_figshare(
@@ -814,10 +867,10 @@ def test_figshare_additional_file_converges_whatever_its_source_and_type(sa_sync
 
     assert _apply_cluster(conn) == 2
     for source_record in (openalex_only, media):
-        assert _doi(conn, source_record) == "10.6084/m9.figshare.c.6702115"
+        assert _doi(conn, source_record) is None
 
 
-def test_figshare_additional_file_without_number_converges(sa_sync_conn):
+def test_figshare_additional_file_without_number_loses_its_doi(sa_sync_conn):
     """« Additional file of T », sans numéro."""
     conn = sa_sync_conn
     _seed_figshare(
@@ -830,7 +883,7 @@ def test_figshare_additional_file_without_number_converges(sa_sync_conn):
         title_normalized=f"additional file of {_ARTICLE}",
     )
     assert _apply_cluster(conn) == 1
-    assert _doi(conn, piece) == "10.6084/m9.figshare.c.6702115"
+    assert _doi(conn, piece) is None
 
 
 def test_figshare_additional_file_stays_without_collection(sa_sync_conn):
