@@ -15,6 +15,7 @@ Schéma PostgreSQL `publications`.
 | `publications` | Métadonnées consolidées : titre, type de document, année, DOI, statut d'accès, licences, langue, pays, publication en série, monographie, éditeur. `sources` : sources qui décrivent la publication. `publisher_id` : éditeur à la date de publication. `best_copy_url` : lien vers le texte intégral. `in_perimeter` : vrai dès qu'il y a un indice de périmètre | Un DOI par publication, sans distinction de casse |
 | `publications_detail` | Résumé, mots-clés, thématiques et données bibliographiques | Une ligne par publication |
 | `publication_relations` | Lien orienté d'une publication vers une publication apparentée ou vers un DOI, avec le type de relation et sa source | La cible est une publication ou un DOI |
+| `manual_merges`, `manual_merge_source_records` | Fusions de publications décidées par l'administration, avec leurs enregistrements sources : la réconciliation les réunit dans une même publication | |
 
 Les frais de publication (`apc_payments`) sont décrits avec l'[édition](07-publishing.md).
 
@@ -32,7 +33,11 @@ Un sujet est un terme d'un vocabulaire contrôlé : domaine HAL, discipline de t
 
 ## Écriture
 
-Seul le pipeline écrit ces tables. Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06-metadata-correction.md) sur l'enregistrement source.
+Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06-metadata-correction.md) sur l'enregistrement source.
+
+**Administration** (`application/services/publication_merge.py`) : fusion manuelle de deux publications (`manual_merges`), que la réconciliation respecte.
+
+**Pipeline :**
 
 - La phase [`publications`](../pipeline/07-publications.md) regroupe les enregistrements sources en publications, puis recalcule les métadonnées de chaque publication touchée. Une publication réunie à une autre est supprimée : son identifiant redirige vers la publication conservée.
 - La phase [`finalize`](../pipeline/10-finalize.md) reporte le périmètre sur les publications et supprime les publications sans contribution rattachée.

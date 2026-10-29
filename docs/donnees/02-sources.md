@@ -30,6 +30,7 @@ Schéma PostgreSQL `sources`.
 | `source_records` | Métadonnées typées : titre, type de document, année, DOI, revue, éditeur, statut d'accès, langue. Champs propres à certaines sources : résumé, mots-clés, thématiques, données bibliographiques, collections HAL, embargo, rétractation. `raw_doc_type` et `raw_language` : valeurs dans le vocabulaire de la source. `corrections` : valeurs d'origine des métadonnées corrigées. `is_matchable` : faux pour un enregistrement source écarté de la réconciliation. `publication_id` : publication de rattachement | Un enregistrement source par source et identifiant |
 | `source_record_identifiers` | Identifiants d'un enregistrement source : type, valeur, rôle (primaire, dérivé, secondaire ou lié). `removed_by` : règle de correction qui retire l'identifiant | Un identifiant par type et valeur, au plus un identifiant dérivé |
 | `source_record_locations` | Copies du document : URL de la page et du PDF, identifiant OAI-PMH, version, licence, open access, [plateforme](07-publishing.md) | Une copie par URL |
+| `doi_targets` | Cible du DOI d'une forme secondaire de la même œuvre (version, variante), qui tient lieu du DOI pour la réconciliation | Une cible par DOI |
 
 **Contributions sources**
 
@@ -53,7 +54,7 @@ Schéma PostgreSQL `sources`.
 
 - Les phases de [moissonnage](../pipeline/02-harvest.md) écrivent `staging` et `failed_lookups`.
 - La phase [`normalize`](../pipeline/03-normalize.md) crée et met à jour les enregistrements sources et leurs contributions sources à partir de `staging`.
-- La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) corrige les métadonnées typées des enregistrements sources.
+- La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) corrige les métadonnées typées des enregistrements sources et calcule `doi_targets`.
 - La phase [`affiliations`](../pipeline/04-affiliations.md) écrit les indices de périmètre des contributions sources.
 - La phase [`publications`](../pipeline/07-publications.md) rattache chaque enregistrement source à sa publication.
 - La phase [`author_grouping`](../pipeline/08-author-grouping.md) marque les doublons d'auteur.
