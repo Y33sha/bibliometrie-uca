@@ -17,7 +17,7 @@ from pipeline.http.http_status import raise_for_status
 from pipeline.http.tls import tls_context
 
 _MAX_REDIRECTS = 3
-"""Bornes du nombre de sauts. La garantie tient à la liste d'hôtes ; ce plafond ferme la boucle qu'une redirection circulaire ouvrirait."""
+"""Nombre maximal de redirections, contre une redirection circulaire. La liste des hôtes autorisés fait la sécurité."""
 
 
 class DumpUnavailableError(Exception):
