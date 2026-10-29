@@ -1,15 +1,9 @@
-"""Projection d'une `source_record` vers son jeu de clés de confirmation.
+"""Clés de confirmation d'un enregistrement source : les valeurs par lesquelles deux enregistrements sources désignent le même document.
 
-Une *clé de confirmation* est un attribut cross-source par lequel deux `source_records` attestent du même document. Deux familles :
+- Identifiants : le DOI, et l'identifiant actif de rôle le plus fort de chaque type de `CONFIRMATION_ID_TYPES`.
+- Bloc de métadonnées : `<type de document>|<titre normalisé>|<année>`, pour un titre assez long. Le type de document dans la clé impose l'égalité des types.
 
-- **Identifiants** : DOI de la colonne `doi`, NNT, HAL ID, PMID, arXiv ID de `source_record_identifiers` — égalité directe. Pour chaque type, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur (`by_role`). Pour un `hal_id` : le sien pour un enregistrement source HAL, le dépôt dont il est tiré pour un enregistrement source ScanR ou OpenAlex, à défaut le premier dépôt qu'il cite.
-- **Token métadonnée** : `("metadata_block", "<doc_type>|<title_normalized>|<publication_year>")`, pour **tout** `doc_type` (empiriquement ~99 % de même-œuvre par type au-delà du seuil de longueur de titre). Le `doc_type` dans la clé impose l'égalité de type (« un DOI, une œuvre » étendu au type). Garde de **longueur minimale de titre** : écarte les collisions de titres génériques. La thèse passe par ce même token (`thesis|<titre>|<année>`) ; `thesis` et `ongoing_thesis` ne co-bloquent jamais (leurs années diffèrent — inscription vs soutenance). Les paliers plus lâches (hors `doc_type`, titres courts via le conteneur), qui exigeraient un second accord pairwise, relèvent d'un mécanisme distinct.
-
-La projection est la définition Python des clés de confirmation. La réconciliation des publications (`pipeline/transformation/publications/reconciliation.py`) la consomme. Son voisinage SQL (`_UNIVERSE_SQL`) réécrit ces clés ; `TestUniverseMatchesPythonTokens` vérifie que les deux concordent.
-
-Un type d'identifiant devient une clé de confirmation par son ajout à `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Le voisinage SQL en dérive. Une clé composite demande son calcul dans `project_confirmation_keys` et sa branche dans `_UNIVERSE_SQL`. `run_pipeline --only publications --rebuild-publications` applique une clé au stock.
-
-Les valeurs sont lues sur la `source_record` **corrigée** : colonnes typées et identifiants actifs, déjà normalisés (phase `normalize`) puis corrigés (phase `metadata_correction`). Le DOI lu est la colonne nue (concept Zenodo déjà substitué en amont par `metadata_correction`) : la projection ignore Zenodo.
+Les valeurs sont celles de l'enregistrement source corrigé (phase `metadata_correction`). Le voisinage SQL de la réconciliation (`_UNIVERSE_SQL`) réécrit ces clés, et `TestUniverseMatchesPythonTokens` vérifie que les deux concordent. Un type d'identifiant de plus demande son entrée dans `CONFIRMATION_ID_TYPES` et un champ de même nom dans `ConfirmationKeys`. Une clé composite demande aussi sa branche dans `_UNIVERSE_SQL`.
 """
 
 from collections.abc import Iterable
@@ -23,7 +17,7 @@ from domain.source_records.identifiers import (
     by_role,
 )
 
-# Types d'identifiants par lesquels deux `source_records` désignent le même document. Le DOI (colonne dédiée) et le token métadonnée sont les autres familles de clés de confirmation.
+# Types d'identifiants qui sont des clés de confirmation, à côté du DOI et du bloc de métadonnées.
 CONFIRMATION_ID_TYPES = (
     SourceIdentifierType.HAL_ID,
     SourceIdentifierType.ARXIV_ID,
@@ -32,18 +26,14 @@ CONFIRMATION_ID_TYPES = (
 )
 
 
-# Seuil de longueur de `title_normalized` (caractères, strict) en-deçà duquel un titre est trop
-# générique pour rapprocher deux publications : token `metadata_block` (matching de clés), univers
-# de réconciliation, appariement par titre (relations, dédup HAL). Les requêtes SQL l'interpolent.
+# Longueur de titre normalisé, en caractères, en deçà de laquelle un titre est trop générique pour apparier deux publications.
+# Sert aux clés de confirmation, aux relations et au dédoublonnage HAL ; les requêtes SQL l'interpolent.
 DISCRIMINANT_TITLE_MIN_LENGTH = 30
 
 
 @dataclass(frozen=True, slots=True)
 class ConfirmationKeys:
-    """Clés de confirmation portées par une `source_record`, normalisées.
-
-    Chaque clé est au plus unitaire (`confirmation_identifiers`). Les identifiants ont la forme que produisent leurs value objects. `metadata_block` = `"<doc_type>|<title_normalized>|<publication_year>"` pour toute `source_record` à `doc_type` présent et titre assez long. Une clé absente vaut `None`.
-    """
+    """Clés de confirmation d'un enregistrement source ; une clé absente vaut `None`."""
 
     doi: str | None
     nnt: str | None
@@ -53,10 +43,7 @@ class ConfirmationKeys:
     metadata_block: str | None
 
     def tokens(self) -> frozenset[tuple[str, str]]:
-        """Jeu de tokens `(nom de la clé, valeur)` de la `source_record`, pour le clustering.
-
-        Chaque token est namespacé par son type : un DOI `x` et un NNT `x` ne s'apparentent pas. Deux `source_records` partageant un token sont reliées dans le graphe de composantes (cf. `connected_components`). Une clé absente ne produit pas de token.
-        """
+        """Clés présentes, en jetons `(nom de la clé, valeur)` : un DOI `x` et un NNT `x` restent distincts. Deux enregistrements sources qui partagent un jeton sont reliés dans le graphe des composantes."""
         return frozenset(
             (name, value) for name in _KEY_NAMES if (value := getattr(self, name)) is not None
         )
@@ -84,10 +71,7 @@ def project_confirmation_keys(
     title_normalized: str | None,
     publication_year: int | None,
 ) -> ConfirmationKeys:
-    """Extrait les clés de confirmation normalisées d'une `source_record`.
-
-    Le DOI est lu sur la colonne (déjà corrigée, concept Zenodo inclus). `identifiers` sont les identifiants de l'enregistrement source, avec leur rôle et leur statut (`confirmation_identifiers`). `metadata_block` est posée pour toute `source_record` à `doc_type` présent, `publication_year` présent et `title_normalized` plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`.
-    """
+    """Clés de confirmation d'un enregistrement source. `identifiers` : ses identifiants, avec leur rôle et leur statut. Le bloc de métadonnées demande un type de document, une année et un titre normalisé plus long que `DISCRIMINANT_TITLE_MIN_LENGTH`."""
     doi_vo = DOI.try_parse(doi) if isinstance(doi, str) else None
     metadata_block = (
         f"{doc_type}|{title_normalized}|{publication_year}"
