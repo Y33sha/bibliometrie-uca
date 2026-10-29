@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict wr6KbyQqo4TkDQ9QxaK74Nio6RTHrCwHrWhGHvulLYgZj4FLwzhp5r3S0fMawJz
+\restrict 10pFFsCU0jYfTKEy8Y0W3IuFYlJk8sjjgpFfpPObSZlQNu0MvNKVVVVDdg0Umeu
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -672,6 +672,7 @@ CREATE TABLE ops.config (
     CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
+    CONSTRAINT config_institution_country_is_code CHECK (((key <> 'institution_country'::text) OR ((jsonb_typeof(value) = 'string'::text) AND ((value #>> '{}'::text[]) ~ '^[a-z]{2}$'::text) AND ((value #>> '{}'::text[]) <> 'xx'::text)))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
     CONSTRAINT config_year_is_in_range CHECK (((key <> 'pipeline_start_year_full'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (1970)::numeric) AND ((value)::numeric <= (2100)::numeric)) AND ((value)::numeric = trunc((value)::numeric)))))
 );
@@ -5616,5 +5617,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict wr6KbyQqo4TkDQ9QxaK74Nio6RTHrCwHrWhGHvulLYgZj4FLwzhp5r3S0fMawJz
+\unrestrict 10pFFsCU0jYfTKEy8Y0W3IuFYlJk8sjjgpFfpPObSZlQNu0MvNKVVVVDdg0Umeu
 
