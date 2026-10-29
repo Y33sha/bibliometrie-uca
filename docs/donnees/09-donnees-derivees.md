@@ -6,7 +6,7 @@ Les données dérivées sont recalculées à partir d'autres tables : vues maté
 
 ## Vues matérialisées
 
-Le pipeline les rafraîchit, la plupart en `REFRESH … CONCURRENTLY`, qui suppose un index unique. Aucune n'est écrite directement.
+Le pipeline les rafraîchit. Aucune n'est écrite directement.
 
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
@@ -18,8 +18,8 @@ Le pipeline les rafraîchit, la plupart en `REFRESH … CONCURRENTLY`, qui suppo
 
 ## Tables dérivées
 
-- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_parents`. Rematérialisée avant la première phase du pipeline et à chaque édition admin qui touche une tutelle ou un périmètre.
-- **`publications_detail`** : satellite 1:1 de `publications` (`abstract`, `keywords`, `topics`, `biblio`), recalculé depuis les `source_records` rattachées.
+- **`perimeter_structures`** : appartenance au périmètre, matérialisée par clôture récursive de `structure_parents`. Rematérialisée avant la première phase du pipeline et à chaque modification depuis l'administration qui touche une tutelle ou un périmètre.
+- **`publications_detail`** : une ligne par publication (`abstract`, `keywords`, `topics`, `biblio`), recalculé depuis les `source_records` rattachées.
 
 ## Colonnes dérivées
 
@@ -28,7 +28,7 @@ Certaines colonnes dupliquent une information calculable, pour éviter une joint
 | Colonne | Tables | Rafraîchie par |
 |---|---|---|
 | `perimeter_evidence`, d'où `in_perimeter` | `source_contributions` | phase `affiliations` |
-| `perimeter_evidence`, d'où `in_perimeter` | `contributions`, `publications` | phase `finalize` |
+| `perimeter_evidence`, d'où `in_perimeter` | `publications` | phase `finalize` |
 | `countries[]` | `addresses`, `source_contributions`, `source_records`, `publications` | phase `countries` |
 | `is_corresponding`, `roles`, `perimeter_evidence` | `contributions` | phase `author_grouping` |
 | `publication_count` | `serials`, `publishers` | phase `finalize` |
