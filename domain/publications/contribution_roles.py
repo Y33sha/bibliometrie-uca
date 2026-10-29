@@ -1,14 +1,7 @@
-"""Rôles canoniques des contributions et mappings par source.
-
-Chaque contribution peut avoir un ou plusieurs rôles (text[]). Les normalizers appellent `map_role(source, raw_role)` pour obtenir la liste de rôles canoniques + un flag `is_corresponding`.
-"""
+"""Rôles des contributions sources, et traduction des rôles bruts de chaque source."""
 
 from collections.abc import Sequence
 from enum import StrEnum
-
-# ═══════════════════════════════════════════════════════════════════
-# Enum canonique
-# ═══════════════════════════════════════════════════════════════════
 
 
 class ContributionRole(StrEnum):
@@ -27,13 +20,7 @@ class ContributionRole(StrEnum):
     OTHER = "other"  # autre rôle non classifiable
 
 
-# ═══════════════════════════════════════════════════════════════════
-# Mappings par source
-# ═══════════════════════════════════════════════════════════════════
-
-# HAL : codes MARC relator + extensions HAL
-# crp (correspondent) → author + is_corresponding=True
-# co_first_author / co_last_author → author (la position est déjà dans author_position)
+# HAL : codes MARC relator et extensions HAL. La position d'un co-premier ou co-dernier auteur est dans `author_position`.
 _HAL_MAP = {
     "aut": ([ContributionRole.AUTHOR], False),
     "crp": ([ContributionRole.AUTHOR], True),  # auteur correspondant
@@ -153,8 +140,7 @@ _SCANR_MAP = {
     "oth": ([ContributionRole.OTHER], False),
 }
 
-# theses.fr : les rôles sont structurels (champs séparés dans le JSON)
-# Le mapping est direct, pas besoin de table — voir THESES_FIELD_ROLES ci-dessous
+# theses.fr donne un champ par rôle.
 THESES_FIELD_ROLES = {
     "auteurs": [ContributionRole.AUTHOR],
     "directeurs": [ContributionRole.THESIS_DIRECTOR],
@@ -173,8 +159,7 @@ THESIS_JURY_ROLES: frozenset[str] = frozenset(
     }
 )
 
-# Rôles thèse qui impliquent l'appartenance au jury
-# → pas besoin d'ajouter jury_member si un de ceux-ci est déjà présent
+# Rôles de thèse qui impliquent l'appartenance au jury, et rendent `JURY_MEMBER` superflu.
 _THESIS_ROLES_IMPLYING_JURY = {
     ContributionRole.THESIS_DIRECTOR,
     ContributionRole.RAPPORTEUR,
@@ -188,16 +173,8 @@ _SOURCE_MAPS: dict[str, dict[str, tuple[list[ContributionRole], bool]]] = {
 }
 
 
-# ═══════════════════════════════════════════════════════════════════
-# API publique
-# ═══════════════════════════════════════════════════════════════════
-
-
 def map_role(source: str, raw_role: str | None) -> tuple[list[ContributionRole], bool]:
-    """Mappe un rôle brut d'une source vers le(s) rôle(s) canonique(s).
-
-    Retourne (roles, is_corresponding). Un rôle absent, ou une source sans table, donne `AUTHOR` ; un rôle inconnu de la table de la source donne `OTHER`.
-    """
+    """Rôles d'une contribution source d'après son rôle brut, et si elle est l'auteur correspondant. Un rôle absent, ou une source sans table, donne `AUTHOR`. Un rôle inconnu donne `OTHER`. La casse est ignorée."""
     if not raw_role:
         return [ContributionRole.AUTHOR], False
 
@@ -209,7 +186,6 @@ def map_role(source: str, raw_role: str | None) -> tuple[list[ContributionRole],
     if raw_role in source_map:
         return source_map[raw_role]
 
-    # Fallback insensible à la casse
     raw_lower = raw_role.lower()
     for key, val in source_map.items():
         if key.lower() == raw_lower:
@@ -219,15 +195,11 @@ def map_role(source: str, raw_role: str | None) -> tuple[list[ContributionRole],
 
 
 def merge_roles(role_lists: list[list[ContributionRole]]) -> list[ContributionRole]:
-    """Fusionne plusieurs listes de rôles en supprimant les redondances.
-
-    Applique la règle : si un rôle thèse impliquant le jury est présent, `JURY_MEMBER` est superflu.
-    """
+    """Union de listes de rôles, sans `JURY_MEMBER` si un autre rôle de thèse l'implique."""
     all_roles: set[ContributionRole] = set()
     for roles in role_lists:
         all_roles.update(roles)
 
-    # Si un rôle thèse spécifique est présent, retirer jury_member
     if all_roles & _THESIS_ROLES_IMPLYING_JURY:
         all_roles.discard(ContributionRole.JURY_MEMBER)
 
@@ -235,5 +207,5 @@ def merge_roles(role_lists: list[list[ContributionRole]]) -> list[ContributionRo
 
 
 def is_individual_author(roles: Sequence[str] | None, collective: bool) -> bool:
-    """La contribution source compte dans la liste d'auteurs de son enregistrement source : elle a le rôle `AUTHOR` et n'est pas collective."""
+    """Vrai si la contribution source compte dans la liste d'auteurs de son enregistrement source : elle a le rôle `AUTHOR` et n'est pas collective."""
     return not collective and ContributionRole.AUTHOR in (roles or ())
