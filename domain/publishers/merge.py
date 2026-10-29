@@ -1,6 +1,6 @@
 """Revues homonymes de deux éditeurs à fusionner.
 
-La fusion de deux éditeurs fusionne aussi leurs revues de même titre normalisé. Certaines paires de revues bloquent la fusion des éditeurs : l'utilisatrice les traite d'abord dans l'administration des revues.
+La fusion de deux éditeurs fusionne aussi leurs revues de même titre normalisé. Certaines paires de revues bloquent la fusion des éditeurs : elles se traitent d'abord dans l'administration des revues.
 """
 
 from collections import Counter

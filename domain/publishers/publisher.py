@@ -1,16 +1,11 @@
-"""Aggregate root `Publisher` — un éditeur.
-
-Clé surrogate : `id`. Identifiant naturel : `name`, via la normalisation de `publisher_name_forms`.
-
-`PUBLISHER_TYPES` reste synchronisé avec l'enum SQL `publisher_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
-"""
+"""Éditeurs et types d'éditeur."""
 
 from dataclasses import dataclass
 from enum import StrEnum
 
 
 class PublisherType(StrEnum):
-    """Type d'éditeur — les membres portent les libellés de l'enum PostgreSQL `publisher_type`."""
+    """Type d'éditeur. Reflet du type PostgreSQL `publisher_type`."""
 
     COMMERCIAL = "commercial"
     LEARNED_SOCIETY = "learned_society"
@@ -24,7 +19,7 @@ class PublisherType(StrEnum):
 PUBLISHER_TYPES: tuple[PublisherType, ...] = tuple(PublisherType)
 PUBLISHER_TYPES_SET: frozenset[str] = frozenset(PublisherType)
 
-# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/publishers/types`.
+# Libellés français des types d'éditeur, servis à l'interface par `/api/publishers/types`.
 PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
     PublisherType.COMMERCIAL: "Éditeur commercial",
     PublisherType.LEARNED_SOCIETY: "Société savante",
@@ -38,8 +33,6 @@ PUBLISHER_TYPE_LABELS_FR: dict[PublisherType, str] = {
 
 @dataclass(slots=True)
 class Publisher:
-    """Éditeur (aggregate root)."""
-
     id: int | None
     name: str
     country: str | None = None
