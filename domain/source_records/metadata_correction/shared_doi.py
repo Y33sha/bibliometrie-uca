@@ -17,15 +17,18 @@ from domain.sources.registry import Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
-class DoiClusterCase(StrEnum):
-    """Cas de correction d'un groupe partageant un DOI. Inscrit dans `doi_targets.rule` pour une forme secondaire, dans `corrections.doi.corrected_by` pour un membre qui perd le DOI."""
+class DoiTargetRule(StrEnum):
+    """Règle qui donne une cible au DOI d'une forme secondaire DataCite. Inscrite dans `doi_targets.rule`."""
 
-    # Formes secondaires DataCite d'une œuvre présente en base.
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
     DATACITE_VARIANT_TO_PRIMARY = (
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
     DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
+
+
+class DoiClusterCase(StrEnum):
+    """Cas de retrait du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `corrections.doi.corrected_by` et dans `source_record_identifiers.removed_by`."""
 
     # Ouvrage et chapitre partageant un DOI : le DOI est celui de l'ouvrage, le chapitre d'un autre titre le perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
@@ -44,9 +47,9 @@ class DoiClusterCase(StrEnum):
 
 
 # Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre.
-DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
-    "IsVersionOf": DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-    "IsVariantFormOf": DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+DATACITE_DIRECT_CONVERGENCE: dict[str, DoiTargetRule] = {
+    "IsVersionOf": DoiTargetRule.DATACITE_VERSION_TO_CONCEPT,
+    "IsVariantFormOf": DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY,
 }
 # Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
@@ -59,25 +62,32 @@ FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file( [0-9]+)? of "
 
 
 def meme_oeuvre_declaree(
-    case: DoiClusterCase, doc_type: str | None, own_doi: str | None, target_doi: str | None
+    case: DoiTargetRule, doc_type: str | None, own_doi: str | None, target_doi: str | None
 ) -> bool:
     """Vrai si la relation déclarée par un enregistrement source réunit son DOI `own_doi` et `target_doi` en une seule œuvre.
 
     Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf un enregistrement source `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
     """
-    if case is DoiClusterCase.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
+    if case is DoiTargetRule.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
         return True
-    return case is DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
+    return case is DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
+
+
+class SecondaryFormDeclaration(NamedTuple):
+    """Enregistrement source qui déclare son DOI forme secondaire de l'œuvre principale `target_doi`, présente en base, sous la règle `rule`. `doc_type` : type après la correction unaire."""
+
+    id: int
+    doc_type: str | None
+    target_doi: str
+    rule: DoiTargetRule
 
 
 class DoiClusterMember(NamedTuple):
-    """Membre d'un groupe d'enregistrements sources qui partagent un DOI. `doc_type` : type après la correction unaire. `canonical_doi` : DOI de l'œuvre principale, présente en base, quand le membre en est une forme secondaire ; `same_work_case` dit laquelle."""
+    """Membre d'un groupe d'enregistrements sources qui partagent un DOI. `doc_type` : type après la correction unaire."""
 
     id: int
     doc_type: str | None
     title_normalized: str | None
-    canonical_doi: str | None = None
-    same_work_case: DoiClusterCase | None = None
     # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type.
     confirmation_ids: Mapping[str, tuple[str, ...]] = {}
     # Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr.
@@ -95,11 +105,11 @@ class DoiClusterDecision(NamedTuple):
 
 
 class DoiTarget(NamedTuple):
-    """Cible du DOI d'une forme secondaire : le DOI de l'œuvre principale, et le cas qui relie les deux DOI."""
+    """Cible du DOI d'une forme secondaire : le DOI de l'œuvre principale, et la règle qui relie les deux DOI."""
 
     doi: str
     target_doi: str
-    case: DoiClusterCase
+    rule: DoiTargetRule
 
 
 class ConfirmationIdRemoval(NamedTuple):
@@ -261,39 +271,30 @@ def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClu
     ]
 
 
-def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
-    """Vrai si la relation déclarée par `member` désigne une autre forme de la même œuvre que le DOI partagé (cf. `meme_oeuvre_declaree`)."""
-    if (
-        member.same_work_case is None
-        or member.canonical_doi is None
-        or member.canonical_doi == shared_doi
-    ):
-        return False
-    return meme_oeuvre_declaree(
-        member.same_work_case, member.doc_type, shared_doi, member.canonical_doi
+def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) -> DoiTarget | None:
+    """Cible de `doi` quand un enregistrement source le déclare forme secondaire d'une autre forme de la même œuvre (cf. `meme_oeuvre_declaree`) : version → concept, variante → version publiée, fichier → dépôt parent."""
+    declaration = next(
+        (
+            d
+            for d in declarations
+            if d.target_doi != doi and meme_oeuvre_declaree(d.rule, d.doc_type, doi, d.target_doi)
+        ),
+        None,
     )
-
-
-def doi_target(
-    group: list[DoiClusterMember], *, shared_doi: str, unresolved: bool = False
-) -> DoiTarget | None:
-    """Cible de `shared_doi` quand un membre du groupe le déclare forme secondaire de l'œuvre de son `canonical_doi` (cf. `_meme_oeuvre`) : version → concept, variante → version publiée, fichier → dépôt parent. Un DOI inconnu de doi.org (`unresolved`) n'a pas de cible."""
-    if unresolved:
-        return None
-    canonical = next((m for m in group if _meme_oeuvre(m, shared_doi)), None)
-    if canonical is None:
-        return None
-    assert canonical.canonical_doi is not None and canonical.same_work_case is not None
-    return DoiTarget(shared_doi, canonical.canonical_doi, canonical.same_work_case)
+    return DoiTarget(doi, declaration.target_doi, declaration.rule) if declaration else None
 
 
 def resolve_cluster_doi_corrections(
-    group: list[DoiClusterMember], *, shared_doi: str, unresolved: bool = False
+    group: list[DoiClusterMember],
+    *,
+    shared_doi: str,
+    unresolved: bool = False,
+    has_target: bool = False,
 ) -> list[DoiClusterDecision]:
     """Membres d'un groupe qui partagent `shared_doi` et le perdent, avec le cas qui le décide.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
-    - **Même œuvre DataCite** (`doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
+    - **DOI d'une forme secondaire** (`has_target`, cf. `doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
     - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI, celui de l'ouvrage. Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
     - **Chapitres seuls, de titres différents** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
@@ -301,7 +302,7 @@ def resolve_cluster_doi_corrections(
     """
     if unresolved:
         return [DoiClusterDecision(m.id, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for m in group]
-    if doi_target(group, shared_doi=shared_doi) is not None:
+    if has_target:
         return []
 
     decisions = _divergence_decisions(group)

@@ -31,6 +31,8 @@ from domain.source_records.metadata_correction.shared_doi import (
     FIGSHARE_ITEM_DOI_PATTERN,
     DoiClusterCase,
     DoiTarget,
+    DoiTargetRule,
+    SecondaryFormDeclaration,
 )
 from domain.source_records.metadata_correction.source_record import UnaryCorrection
 from domain.source_records.source_extras import SourceExtra
@@ -102,10 +104,17 @@ class SerialCorrectionUpdate(NamedTuple):
     corrections: dict[str, JsonValue]
 
 
-class DoiClusterRow(NamedTuple):
-    """Une `source_record` candidate à la correction de DOI par cluster.
+class SecondaryFormRow(NamedTuple):
+    """Déclaration de forme secondaire d'un enregistrement source, et son DOI d'avant correction, en minuscules."""
 
-    `raw_doi` est le DOI **source reconstruit** (`corrections.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre. `canonical_doi` est le DOI de l'œuvre principale, présente en base, quand `raw_doi` en est une **forme secondaire** DataCite (version, forme variante, ou fichier de package), sinon `None` ; `same_work_case` donne alors le cas correspondant."""
+    doi: str
+    declaration: SecondaryFormDeclaration
+
+
+class DoiClusterRow(NamedTuple):
+    """Une `source_record` candidate au retrait de DOI par groupe.
+
+    `raw_doi` est le DOI **source reconstruit** (`corrections.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre."""
 
     id: int
     doc_type: str | None
@@ -113,10 +122,10 @@ class DoiClusterRow(NamedTuple):
     title_normalized: str | None
     corrections: dict[str, JsonValue]
     raw_doi: str
-    canonical_doi: str | None
-    same_work_case: DoiClusterCase | None
     # `raw_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
     unresolved: bool = False
+    # `raw_doi` a une cible dans `doi_targets`.
+    has_target: bool = False
     identifiers: tuple[SourceIdentifier, ...] = ()
     source: str = ""
     source_id: str = ""
@@ -263,11 +272,6 @@ _HAS_INDIVIDUAL_SOURCE_CONTRIBUTION = (
 )
 
 
-def _cluster_case(value: str | None) -> DoiClusterCase | None:
-    """Convertit le cas rendu par le `CASE` SQL, dont les littéraux sont ceux de l'enum."""
-    return DoiClusterCase(value) if value is not None else None
-
-
 class SourceRecordCorrectionStore:
     """Requêtes de la phase `metadata_correction`."""
 
@@ -393,13 +397,12 @@ class SourceRecordCorrectionStore:
         """UPDATE en lot de la colonne `serial_id` + `corrections`, bump `updated_at`, marque pour la réconciliation (pour que la réconciliation rafraîchisse le `serial_id` de la publication — bien que `serial_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
-    def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats à la correction par cluster, avec leur `canonical_doi` éventuel : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est un DOI de version DataCite (`IsVersionOf`), groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref, et `source_records` déjà corrigées (`corrections.doi`, ou identifiant retiré par un cas de cluster) pour la ré-évaluation auto-cicatrisante."""
+    def fetch_secondary_form_declarations(self) -> list[SecondaryFormRow]:
+        """Les enregistrements sources qui déclarent leur DOI forme secondaire d'une œuvre principale présente en base et connue de doi.org, un par enregistrement source. Un DOI inconnu de doi.org est écarté."""
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, doi, title_normalized, publication_year,
-                           corrections, source_extras,
+                    SELECT id, source, doc_type, title_normalized, publication_year, source_extras,
                            lower({raw_column("doi", "source_records")}) AS eff_doi
                     FROM source_records
                 ),
@@ -421,24 +424,23 @@ class SourceRecordCorrectionStore:
                     GROUP BY title_normalized, publication_year
                     HAVING count(DISTINCT eff_doi) = 1
                 ),
-                -- DOI présents en base : DOI non liés des enregistrements sources, actifs avant cette sous-étape.
+                -- DOI présents en base : DOI non liés des enregistrements sources, hors retraits de la correction unaire.
                 present_dois AS (
                     SELECT DISTINCT id_value AS d FROM source_record_identifiers
                     WHERE id_type = '{SourceIdentifierType.DOI.value}'
                       AND role <> '{SourceIdentifierRole.RELATED.value}'
                       AND (removed_by IS NULL OR removed_by IN ({_CLUSTER_CASES_SQL}))
                 ),
-                -- La cible reste attachée à l'enregistrement source DataCite dont les `related_identifiers`
-                -- la mentionnent : la règle de même œuvre lit le type de cet enregistrement, et les
-                -- autres enregistrements au même DOI suivent la décision du groupe. Quand un enregistrement
-                -- mentionne plusieurs cibles, la version (concept) prime sur la variante. Une cible absente
-                -- de la base, ou que doi.org ne connaît pas, est écartée.
+                -- La règle de même œuvre lit le type de l'enregistrement source DataCite dont les
+                -- `related_identifiers` mentionnent la cible. Quand un enregistrement mentionne plusieurs
+                -- cibles, la version (concept) prime sur la variante.
                 same_work AS (
                     SELECT DISTINCT ON (declarant_id)
-                           declarant_id, secondary_doi, canonical_doi, same_work_case
+                           declarant_id, doc_type, secondary_doi, canonical_doi, same_work_case
                     FROM (
                         SELECT
                             sr.id AS declarant_id,
+                            sr.doc_type,
                             sr.eff_doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
                             {_DATACITE_CASE_SQL} AS same_work_case
@@ -457,9 +459,10 @@ class SourceRecordCorrectionStore:
                         -- n'intervient pas : les pièces portent souvent un DOI frère, pas suffixé.
                         SELECT
                             sr.id AS declarant_id,
+                            sr.doc_type,
                             sr.eff_doi AS secondary_doi,
                             lower(rel->>'doi') AS canonical_doi,
-                            '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
+                            '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
                         CROSS JOIN LATERAL jsonb_array_elements({source_extra_json(SourceExtra.RELATED_IDENTIFIERS)}) rel
                         WHERE sr.source = '{Source.DATACITE.value}'
@@ -475,9 +478,10 @@ class SourceRecordCorrectionStore:
                         -- quels que soient sa source et son type.
                         SELECT
                             sr.id AS declarant_id,
+                            sr.doc_type,
                             sr.eff_doi AS secondary_doi,
                             c.doi AS canonical_doi,
-                            '{DoiClusterCase.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
+                            '{DoiTargetRule.DATACITE_PACKAGE_PIECE.value}' AS same_work_case
                         FROM sr_eff sr
                         JOIN figshare_collections c
                           ON c.title_normalized = regexp_replace(
@@ -488,9 +492,38 @@ class SourceRecordCorrectionStore:
                           AND sr.title_normalized ~ '{FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN}'
                     ) s
                     WHERE s.canonical_doi NOT IN (SELECT d FROM unresolved_dois)
+                      AND s.secondary_doi NOT IN (SELECT d FROM unresolved_dois)
                     ORDER BY declarant_id,
-                             same_work_case = '{DoiClusterCase.DATACITE_VERSION_TO_CONCEPT.value}' DESC,
+                             same_work_case = '{DoiTargetRule.DATACITE_VERSION_TO_CONCEPT.value}' DESC,
                              canonical_doi
+                )
+                SELECT declarant_id AS id, doc_type, secondary_doi AS doi,
+                       canonical_doi AS target_doi, same_work_case AS rule
+                FROM same_work
+            """)
+        ).all()
+        return [
+            SecondaryFormRow(
+                row.doi,
+                SecondaryFormDeclaration(
+                    row.id, row.doc_type, row.target_doi, DoiTargetRule(row.rule)
+                ),
+            )
+            for row in rows
+        ]
+
+    def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
+        """Les membres des groupes-DOI candidats au retrait du DOI : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref, et `source_records` déjà corrigées (`corrections.doi`, ou identifiant retiré par un cas de `DoiClusterCase`) pour la ré-évaluation auto-cicatrisante."""
+        rows = self._conn.execute(
+            text(f"""
+                WITH sr_eff AS (
+                    SELECT id, source, source_id, doc_type, doi, title_normalized, corrections,
+                           lower({raw_column("doi", "source_records")}) AS eff_doi
+                    FROM source_records
+                ),
+                unresolved_dois AS (
+                    SELECT id_value AS d FROM failed_lookups
+                    WHERE source = '{DOI_ORG}' AND id_type = 'doi'
                 ),
                 -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref,
                 -- les deux ayant des contributions sources individuelles.
@@ -517,8 +550,6 @@ class SourceRecordCorrectionStore:
                       )
                 ),
                 candidate_dois AS (
-                    SELECT secondary_doi AS d FROM same_work
-                    UNION
                     SELECT eff_doi AS d FROM sr_eff
                     WHERE doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
                       AND eff_doi IS NOT NULL
@@ -539,8 +570,8 @@ class SourceRecordCorrectionStore:
                        sr.source::text AS source, sr.source_id,
                        {identifiers_json_sql("sr.id")} AS identifiers,
                        sr.eff_doi AS raw_doi,
-                       sw.canonical_doi, sw.same_work_case,
                        sr.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
+                       EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = sr.eff_doi) AS has_target,
                        CASE WHEN sr.eff_doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
                            SELECT DISTINCT ci.last_name_normalized
                            FROM source_contributions sc
@@ -550,7 +581,6 @@ class SourceRecordCorrectionStore:
                        ) ELSE ARRAY[]::text[] END AS author_names
                 FROM sr_eff sr
                 JOIN candidate_dois c ON c.d = sr.eff_doi
-                LEFT JOIN same_work sw ON sw.declarant_id = sr.id
             """)
         ).all()
         return [
@@ -561,9 +591,8 @@ class SourceRecordCorrectionStore:
                 title_normalized=row.title_normalized,
                 corrections=row.corrections,
                 raw_doi=row.raw_doi,
-                canonical_doi=row.canonical_doi,
-                same_work_case=_cluster_case(row.same_work_case),
                 unresolved=row.unresolved,
+                has_target=row.has_target,
                 identifiers=parse_identifiers(row.identifiers),
                 source=row.source,
                 source_id=row.source_id,
@@ -578,7 +607,7 @@ class SourceRecordCorrectionStore:
             r.doi: (r.target_doi, r.rule)
             for r in self._conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets"))
         }
-        new = {t.doi: (t.target_doi, t.case.value) for t in targets}
+        new = {t.doi: (t.target_doi, t.rule.value) for t in targets}
         changed = sorted(d for d in current.keys() | new.keys() if current.get(d) != new.get(d))
         if not changed:
             return 0

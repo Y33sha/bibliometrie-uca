@@ -104,6 +104,7 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 - [x] Code mort des formes secondaires rattachées à une publication : priorité de la consolidation, groupement des contributions sources, copies et sources secondaires de l'API.
 - [x] Table `doi_targets`, écrite par la correction par DOI partagé et lue par la réconciliation et la consolidation. Enregistrement source DataCite de la forme secondaire écarté.
+- [x] Sous-étapes distinctes de `metadata_correction` : `doi_targets` écrit les cibles, `remove_identifiers` les retraits. DOI des formes secondaires rendus au stock par une migration.
 - [ ] Cible appliquée aux DOI secondaires des enregistrements sources, par exemple les localisations OpenAlex.
 - [ ] DOI d'un enregistrement source à plusieurs DOI actifs.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.
@@ -120,3 +121,4 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 ## Questions ouvertes
 
 - DOI d'un enregistrement source à plusieurs DOI actifs. La colonne `doi` contient le DOI que la source donne au document (`doi` du work OpenAlex, `doiId_s` HAL). Les autres DOI d'un work OpenAlex sont secondaires, comme celui-ci. Sur 10 000 works OpenAlex, 777 ont plusieurs DOI actifs : 423 un DOI Crossref et des DOI DataCite (arXiv, Zenodo, DESY), 242 seulement des DOI DataCite, 112 plusieurs DOI Crossref (bioRxiv, SSRN, Research Square).
+- Hors périmètre : retrait des identifiants secondaires trop éloignés de l'enregistrement source qui les cite, par comparaison deux à deux des titres par exemple. Ce serait une généralisation de `remove_identifiers` à tous les identifiants.

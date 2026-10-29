@@ -837,7 +837,30 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "metadata_correction.cluster",
+        "metadata_correction.doi_targets",
+        "metadata_correction",
+        reads=tuple(
+            f"source_records.{column}"
+            for column in (
+                "id",
+                "source",
+                "doc_type",
+                "doi",
+                "title_normalized",
+                "publication_year",
+                "corrections",
+                "source_extras",
+            )
+        )
+        # DOI présents en base.
+        + ("source_record_identifiers",)
+        # DOI que doi.org ne connaît pas.
+        + ("failed_lookups",),
+        writes=("doi_targets", "source_record_keys_queue"),
+        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
+    ),
+    _task(
+        "metadata_correction.remove_identifiers",
         "metadata_correction",
         reads=tuple(
             f"source_records.{column}"
@@ -848,12 +871,10 @@ TASKS: tuple[Task, ...] = (
                 "doi",
                 "title_normalized",
                 "corrections",
-                "source_extras",
                 "source_id",
-                "publication_id",
             )
         )
-        + ("source_record_identifiers",)
+        + ("source_record_identifiers", "doi_targets")
         # DOI que doi.org ne connaît pas.
         + ("failed_lookups",)
         # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
@@ -867,10 +888,9 @@ TASKS: tuple[Task, ...] = (
             "source_records.doi",
             "source_records.corrections",
             "source_record_identifiers.removed_by",
-            "doi_targets",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
+        previous_run=("source_records", "source_record_identifiers.removed_by"),
     ),
     _task(
         "metadata_correction.matchable",

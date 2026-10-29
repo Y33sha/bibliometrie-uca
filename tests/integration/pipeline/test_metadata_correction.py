@@ -14,14 +14,12 @@ from domain.source_records.identifiers import (
 )
 from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.correction import serial_by_doi
-from pipeline.transformation.publications.correction.correct_by_cluster import (
-    compute_doi_targets,
-    compute_updates,
-)
 from pipeline.transformation.publications.correction.correct_unary import compute_update
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
+from pipeline.transformation.publications.correction.doi_targets import compute_doi_targets
+from pipeline.transformation.publications.correction.remove_identifiers import compute_updates
 from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.serials import (
     insert_doi_prefix,
@@ -341,11 +339,10 @@ def test_active_embargo_not_promoted(sa_sync_conn):
 
 
 def _apply_cluster(conn) -> int:
-    """Passe cluster : réécrit `doi_targets`, puis corrige les DOI. Retourne le nombre d'enregistrements sources corrigés."""
+    """Sous-étapes `doi_targets` puis `remove_identifiers`. Retourne le nombre d'enregistrements sources corrigés."""
     store = SourceRecordCorrectionStore(conn)
-    rows = store.fetch_doi_cluster_candidates()
-    store.replace_doi_targets(compute_doi_targets(rows))
-    return store.persist_doi_corrections(compute_updates(rows))
+    store.replace_doi_targets(compute_doi_targets(store.fetch_secondary_form_declarations()))
+    return store.persist_doi_corrections(compute_updates(store.fetch_doi_cluster_candidates()))
 
 
 def _targets(conn) -> dict[str, str]:
@@ -564,13 +561,6 @@ def _seed_work(conn, *, source_id, doi):
     )
 
 
-def _doi_correction(conn, source_record_id: int) -> tuple:
-    return conn.execute(
-        text("SELECT doi, corrections->'doi' FROM source_records WHERE id = :id"),
-        {"id": source_record_id},
-    ).one()
-
-
 def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(sa_sync_conn):
     """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite ne fait pas converger le groupe.
 
@@ -589,28 +579,6 @@ def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(
     assert _apply_cluster(conn) == 0
     assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
     assert _targets(conn) == {}
-
-
-def test_un_groupe_prive_de_doi_a_tort_retrouve_ses_doi(sa_sync_conn):
-    conn = sa_sync_conn
-    _seed_work(conn, source_id="arxiv", doi="10.48550/arxiv.1")
-    stash = {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}}
-    wp = _seed_datacite(
-        conn,
-        source_id="wp",
-        doi=None,
-        doc_type="preprint",
-        relations=[("IsVariantFormOf", "10.48550/arxiv.1")],
-        corrections=stash,
-    )
-    oa = _typed_source_record(conn, source_id="oa", doi=None, doc_type="article")
-    conn.execute(
-        text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE id = :id"),
-        {"raw": json.dumps(stash), "id": oa},
-    )
-    assert _apply_cluster(conn) == 2
-    assert _apply_cluster(conn) == 0
-    assert (_doi(conn, wp), _doi(conn, oa)) == ("10.18154/rwth-1", "10.18154/rwth-1")
 
 
 def test_le_doi_d_une_copie_de_l_article_a_pour_cible_l_article(sa_sync_conn):
@@ -642,18 +610,16 @@ def test_le_doi_d_une_copie_de_l_article_absent_de_la_base_n_a_pas_de_cible(sa_s
     assert _targets(conn) == {}
 
 
-def test_une_cible_inconnue_de_doi_org_laisse_le_doi(sa_sync_conn):
-    """Régression : une copie de repository perdait son DOI au profit de l'article qu'elle déclare, que doi.org ne connaît pas."""
+def test_une_cible_inconnue_de_doi_org_n_est_pas_une_cible(sa_sync_conn):
+    """Régression : une copie de repository convergeait sur l'article qu'elle déclare, que doi.org ne connaît pas."""
     conn = sa_sync_conn
     _seed_work(conn, source_id="article", doi="10.1103/inconnu")
-    stash = {"doi": {"raw": "10.15120/gsi-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}}
-    copie = _seed_datacite(
+    _seed_datacite(
         conn,
         source_id="copie",
-        doi=None,
+        doi="10.15120/gsi-1",
         doc_type="article",
         relations=[("IsVariantFormOf", "10.1103/inconnu")],
-        corrections=stash,
     )
     conn.execute(
         text(
@@ -662,8 +628,27 @@ def test_une_cible_inconnue_de_doi_org_laisse_le_doi(sa_sync_conn):
         )
     )
     _apply_cluster(conn)
-    assert _doi(conn, copie) == "10.15120/gsi-1"
     assert "10.15120/gsi-1" not in _targets(conn)
+
+
+def test_un_doi_inconnu_de_doi_org_n_a_pas_de_cible(sa_sync_conn):
+    conn = sa_sync_conn
+    _seed_work(conn, source_id="concept", doi="10.5281/zenodo.9")
+    _seed_datacite(
+        conn,
+        source_id="v",
+        doi="10.5281/zenodo.20",
+        doc_type="software",
+        relations=[("IsVersionOf", "10.5281/zenodo.9")],
+    )
+    conn.execute(
+        text(
+            "INSERT INTO failed_lookups (source, id_type, id_value, not_found_at)"
+            " VALUES ('doi_org', 'doi', '10.5281/zenodo.20', now())"
+        )
+    )
+    _apply_cluster(conn)
+    assert _targets(conn) == {}
 
 
 def test_la_version_prime_sur_la_variante(sa_sync_conn):
@@ -682,25 +667,6 @@ def test_la_version_prime_sur_la_variante(sa_sync_conn):
     assert conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets")).all() == [
         ("10.5281/zenodo.20", "10.5281/zenodo.9", "DATACITE_VERSION_TO_CONCEPT")
     ]
-
-
-def test_une_version_privee_de_son_doi_le_retrouve(sa_sync_conn):
-    """Une version qui avait perdu son DOI sous un cas de convergence le récupère."""
-    conn = sa_sync_conn
-    _seed_work(conn, source_id="concept", doi="10.5281/zenodo.9")
-    version = _seed_datacite(
-        conn,
-        source_id="v",
-        doi=None,
-        doc_type="software",
-        relations=[("IsVersionOf", "10.5281/zenodo.9")],
-        corrections={
-            "doi": {"raw": "10.5281/zenodo.20", "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}
-        },
-    )
-    assert _apply_cluster(conn) == 1
-    assert _doi_correction(conn, version) == ("10.5281/zenodo.20", None)
-    assert _targets(conn) == {"10.5281/zenodo.20": "10.5281/zenodo.9"}
 
 
 def test_un_changement_de_cible_marque_les_enregistrements_sources_du_doi(sa_sync_conn):
@@ -936,7 +902,7 @@ def test_dataset_piece_target_idempotent_and_self_heals_when_parent_retyped(sa_s
     parent = _typed_source_record(conn, source_id="d-parent", doi="10.9001/set", doc_type="dataset")
     _seed_datacite_piece(conn, source_id="d-piece", doi="10.9002/file1", parent_doi="10.9001/set")
     store = SourceRecordCorrectionStore(conn)
-    targets = compute_doi_targets(store.fetch_doi_cluster_candidates())
+    targets = compute_doi_targets(store.fetch_secondary_form_declarations())
     assert store.replace_doi_targets(targets) == 1
     assert store.replace_doi_targets(targets) == 0  # idempotent
 

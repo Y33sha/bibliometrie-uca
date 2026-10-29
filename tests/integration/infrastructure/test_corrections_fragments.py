@@ -11,7 +11,7 @@ from tests.integration.helpers.sources import insert_source_record
 
 _CORRECTIONS = {
     "doc_type": stash_entry("thesis", MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE),
-    "doi": stash_entry("10.1/version", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
+    "doi": stash_entry("10.1/chapitre", DoiClusterCase.OUVRAGE_VS_CHAPITRE),
 }
 
 
