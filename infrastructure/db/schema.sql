@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vakRLZoPgOfLleJqFyUtAIu7KaueE9QUVLogsk109UPeQdbGxaQ0ko2RFJn6irm
+\restrict Y2GMOVUaw7o1KWQxuHcit71w8su3pjKzsGiMWxMMBgNFfXhPDfmf3MKGeDmIAND
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -4387,17 +4387,17 @@ CREATE INDEX idx_publications_sources ON publications.publications USING gin (so
 
 
 --
+-- Name: idx_publications_title_normalized; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publications_title_normalized ON publications.publications USING hash (title_normalized);
+
+
+--
 -- Name: idx_publications_title_trgm; Type: INDEX; Schema: publications; Owner: -
 --
 
 CREATE INDEX idx_publications_title_trgm ON publications.publications USING gin (title_normalized public.gin_trgm_ops);
-
-
---
--- Name: idx_publications_titlenorm_year; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_publications_titlenorm_year ON publications.publications USING btree (title_normalized, publication_year);
 
 
 --
@@ -4579,7 +4579,7 @@ CREATE INDEX idx_monographs_serial ON publishing.monographs USING btree (serial_
 -- Name: idx_monographs_title_normalized; Type: INDEX; Schema: publishing; Owner: -
 --
 
-CREATE INDEX idx_monographs_title_normalized ON publishing.monographs USING btree (title_normalized);
+CREATE INDEX idx_monographs_title_normalized ON publishing.monographs USING hash (title_normalized);
 
 
 --
@@ -4625,10 +4625,10 @@ CREATE INDEX idx_serials_publisher ON publishing.serials USING btree (publisher_
 
 
 --
--- Name: idx_serials_titlenorm; Type: INDEX; Schema: publishing; Owner: -
+-- Name: idx_serials_title_normalized; Type: INDEX; Schema: publishing; Owner: -
 --
 
-CREATE INDEX idx_serials_titlenorm ON publishing.serials USING btree (title_normalized);
+CREATE INDEX idx_serials_title_normalized ON publishing.serials USING hash (title_normalized);
 
 
 --
@@ -4786,13 +4786,6 @@ CREATE INDEX idx_source_records_hal_collections ON sources.source_records USING 
 
 
 --
--- Name: idx_source_records_metadata_block; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_metadata_block ON sources.source_records USING btree (title_normalized, publication_year, doc_type);
-
-
---
 -- Name: idx_source_records_monograph; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4825,6 +4818,13 @@ CREATE INDEX idx_source_records_serial ON sources.source_records USING btree (se
 --
 
 CREATE INDEX idx_source_records_staging ON sources.source_records USING btree (staging_id) WHERE (staging_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_records_title_normalized; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_source_records_title_normalized ON sources.source_records USING hash (title_normalized);
 
 
 --
@@ -5635,5 +5635,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vakRLZoPgOfLleJqFyUtAIu7KaueE9QUVLogsk109UPeQdbGxaQ0ko2RFJn6irm
+\unrestrict Y2GMOVUaw7o1KWQxuHcit71w8su3pjKzsGiMWxMMBgNFfXhPDfmf3MKGeDmIAND
 
