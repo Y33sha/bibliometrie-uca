@@ -4,21 +4,19 @@
 
 La phase `normalize` transforme les données moissonnées (`staging`) en [enregistrements sources](../donnees/02-sources.md) et en contributions sources. Elle écrit aussi les localisations, les adresses, et crée ou reconnaît les publications en série, les monographies, les éditeurs et les plateformes.
 
-L'enregistrement source reçoit l'éditeur que nomme sa source, sauf une production hébergée sans être publiée : preprint, jeu de données, rapport, thèse, ou document DataCite sans publication en série ni monographie (`domain/publishers/attribution.py`). Les localisations et leurs plateformes sont décrites avec l'[édition](../donnees/07-publishing.md#plateformes).
-
-Le conteneur d'un livre ou d'un chapitre sans ISSN est le livre lui-même : son titre reste dans `container_title`, sans créer de publication en série. Seul un recueil d'actes existant de même titre le rattache. OpenAlex nomme la plateforme d'ebooks d'un éditeur « *éditeur* eBooks », et ScanR reprend ce nom comme revue. Ce titre n'est celui d'aucun conteneur : il ne crée pas de publication en série et ne reste pas dans `container_title`. De même, le nom d'une archive, d'un entrepôt ou d'un serveur de preprints, source de la localisation principale OpenAlex, n'est pas un titre de conteneur. Une localisation principale OpenAlex sur une telle plateforme donne l'éditeur de son organisation hôte.
+L'enregistrement source reçoit l'éditeur que nomme sa source, sauf pour un document hébergé sans être publié (preprint, jeu de données, rapport, thèse). Les localisations et leurs plateformes sont décrites avec l'[édition](../donnees/07-publishing.md#plateformes).
 
 Chaque normaliseur reporte dans `source_contributions` ce que sa source fournit pour chaque contribution source : identifiants de l'auteur (ORCID, IdRef…) et affiliations. Chaque identifiant prend sa forme canonique ; une valeur mal formée est écartée et journalisée.
 
 Une contribution source collective (collaboration, consortium, groupe d'étude…) reste à sa position, marquée `collective`. La marque vient de la source quand elle distingue les collectifs : entrée Crossref à `name` seul, créateur DataCite `Organizational`. Sinon, une règle sur le nom décide (`domain/persons/collective_names.py`).
 
-Le type de document et la langue de la source sont traduits dans le vocabulaire du référentiel : `doc_type` par la table de correspondance de la source, `language` par les formes de `language_forms`. `raw_doc_type` et `raw_language` gardent la valeur de la source. Un type absent de la table de la source devient `other` et est journalisé. Une langue absente du référentiel, comme `und`, devient NULL.
+Le type de document et la langue de la source sont traduits dans le vocabulaire du référentiel : `doc_type` par la table de correspondance de la source, `language` par les formes de `language_forms`. `raw_doc_type` et `raw_language` gardent la valeur de la source.
 
 Chaque normaliseur pose aussi la licence de l'enregistrement source (`source_records.license`), ramenée au vocabulaire fermé de `domain/publications/licenses.py`. La forme brute reste dans `source_extras`.
 
 En fin de phase, les `source_records` d'un document marqué `disappeared_at` par [`fetch_stale`](02-harvest.md#documents-périmés-et-disparus-fetch_stale) sont supprimées ; leurs `source_contributions` sont supprimées en cascade. La ligne de `staging` reste, avec sa marque.
 
-En fin de phase, le `raw_data` de `staging` est vidé, puis un `VACUUM` récupère l'espace.
+En fin de phase, le `raw_data` de `staging` est vidé.
 
 ## Synchronisation des contributions sources
 
@@ -28,6 +26,6 @@ Un enregistrement source dont la partie auteurs du payload est inchangée depuis
 
 ## Archivage du payload brut
 
-Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le raw store (`infrastructure/raw_store/`) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option [`--raw-store`](../exploitation/03-pipeline.md#divers) déclenche cet archivage : sans elle, le payload est perdu à la vidange. Cette option est inopérante en production, où la racine du conteneur est en lecture seule.
+Avant de vider `raw_data`, la normalisation dépose le payload hors base, dans le raw store (`infrastructure/raw_store/`) : un fichier `data/raw_store/{source}/{source_id}.json.gz` par document. L'option [`--raw-store`](../exploitation/03-pipeline.md#divers) déclenche cet archivage : sans elle, le payload est perdu à la vidange.
 
 Le script `interfaces/cli/maintenance/rehydrate_staging_from_raw_store.py` réinjecte les payloads d'une source, pour rejouer sa normalisation.
