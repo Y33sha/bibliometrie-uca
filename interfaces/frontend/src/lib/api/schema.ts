@@ -4292,7 +4292,7 @@ export interface components {
         };
         /**
          * PersonExclusion
-         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching.
+         * @description Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching.
          * @enum {string}
          */
         PersonExclusion: "not_a_person" | "out_of_perimeter";

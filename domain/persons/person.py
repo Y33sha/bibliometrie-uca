@@ -1,13 +1,4 @@
-"""Aggregate root `Person` — référentiel chercheur unifié multi-sources.
-
-Une `Person` réunit les contributions sources d'un même chercheur à travers les sources (HAL, OpenAlex, WoS, …). Clé surrogate : `id`.
-
-Composition / associations :
-- `identifiers: tuple[IdentifierAttribution, ...]` — projection lecture (chaque `IdentifierAttribution` est un aggregate séparé).
-- `name_forms: tuple[PersonNameForm, ...]` — formes textuelles connues (VOs).
-
-`hal_person_id` est un `IdentifierAttribution` d'`id_type` = `"hal_person_id"`.
-"""
+"""Personne, et motifs de son exclusion."""
 
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -18,7 +9,7 @@ from domain.persons.name_forms import PersonNameForm
 
 
 def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
-    """Nom et prénom débarrassés de leurs espaces de bord. Lève `ValidationError` sans patronyme : c'est de lui que dérivent les formes qui rendent une personne matchable."""
+    """Nom et prénom sans les espaces qui les entourent. Lève `ValidationError` sans nom de famille : les formes de nom en dérivent."""
     last_name, first_name = last_name.strip(), first_name.strip()
     if not last_name:
         raise ValidationError("Le nom est requis")
@@ -26,7 +17,7 @@ def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
 
 
 class PersonExclusion(StrEnum):
-    """Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'UI publique et du périmètre ; ses formes de nom restent des ancres du matching."""
+    """Motif d'exclusion d'une personne, décidé à la main. Une personne exclue est absente de l'interface publique et du périmètre. Ses formes de nom servent au matching."""
 
     # Fausse entité : nom d'équipe, plusieurs noms dans un même champ…
     NOT_A_PERSON = "not_a_person"
@@ -36,7 +27,7 @@ class PersonExclusion(StrEnum):
 
 @dataclass(slots=True)
 class Person:
-    """Référentiel chercheur unifié (aggregate root)."""
+    """Chercheur, qui réunit ses contributions sources de toutes les sources."""
 
     id: int | None
     last_name: str
