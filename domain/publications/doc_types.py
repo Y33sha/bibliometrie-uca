@@ -110,11 +110,10 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         "Publications",
         (
             DocType.ARTICLE,
+            DocType.REVIEW,
             DocType.CONFERENCE_PAPER,
             DocType.BOOK,
             DocType.BOOK_CHAPTER,
-            DocType.REVIEW,
-            DocType.DATA_PAPER,
         ),
     ),
     "conferences": DocTypeFamily(
@@ -126,7 +125,8 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         "Thèses", (DocType.THESIS, DocType.ONGOING_THESIS, DocType.HDR, DocType.MEMOIR)
     ),
     "data": DocTypeFamily(
-        "Données & logiciels", (DocType.DATASET, DocType.SOFTWARE, DocType.PATENT)
+        "Données & logiciels",
+        (DocType.DATASET, DocType.DATA_PAPER, DocType.SOFTWARE, DocType.PATENT),
     ),
     "misc": DocTypeFamily(
         "Annexes & divers",
