@@ -23,7 +23,7 @@ class StatsCollaborationQueries:
     _conn: Connection
 
     def collaborations(self, *, filters: PublicationFilters) -> CollaborationsResponse:
-        """Collaborations internationales sous les filtres. Retourne les lignes `{code, value}` (un pays étranger, nombre de publications co-affiliées) triées par décompte décroissant, ainsi que le nombre de publications en collaboration internationale (au moins un pays étranger) et le total du corpus filtré — de quoi exprimer une part."""
+        """Collaborations internationales sous les filtres : nombre de publications co-affiliées à chaque pays étranger, du plus fréquent au moins fréquent, nombre de publications en collaboration internationale (au moins un pays étranger) et total du corpus filtré, pour exprimer une part."""
         where, binds = publication_filter_where(filters, filter_context(self._conn, filters))
         binds["non_international"] = _NON_INTERNATIONAL
         self._conn.execute(text("SET LOCAL jit = off"))

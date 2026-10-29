@@ -1,4 +1,4 @@
-"""Query services pour /api/structures/* (structures et leurs formes de nom)."""
+"""Lectures des routes `/api/structures/*` : structures et formes de nom."""
 
 from collections.abc import Iterator
 from typing import Literal
@@ -327,10 +327,7 @@ class StructuresQueries:
         )
 
     def get_structure_detail(self, structure_id: int) -> StructureDetailResponse | None:
-        """Détail complet : structure + parents + enfants + formes de noms.
-
-        Retourne `None` si la structure n'existe pas (caller = 404).
-        """
+        """Détail complet : structure, tutelles, sous-structures et formes de nom ; `None` si la structure n'existe pas."""
         struct_row = self._conn.execute(
             text("""
                 SELECT id, code, name, acronym, structure_type::text AS type,
@@ -444,7 +441,7 @@ class StructuresQueries:
     def get_structure_subjects(self, structure_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Sujets des publications d'une structure, les plus fréquents d'abord.
 
-        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
+        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui a une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(

@@ -1,17 +1,17 @@
 """Moteur d'agrégation générique (pivot) : registre des dimensions et des mesures, et constructeur de requête.
 
-Une vue est une **mesure** agrégée selon un ou plusieurs **groupements**, sous des filtres. Le registre décrit chaque dimension et chaque mesure, avec sa liaison SQL. Ajouter une dimension ou une mesure = une entrée du registre.
+Une vue est une **mesure** agrégée selon un ou plusieurs **groupements**, sous des filtres. Le registre décrit chaque dimension et chaque mesure, avec sa liaison SQL. Une dimension ou une mesure s'ajoute par une entrée du registre.
 
 Propriétés d'une dimension :
-- **cardinalité** — `low` (peu de valeurs, portables sur un axe) ou `high` (milliers de valeurs : table classée ou top-N).
-- **ordinal** — axe ordonné (l'année) ou catégoriel, qui change le tri et l'éligibilité au filtrage par plage.
-- **comparable** — la dimension sert aussi d'axe de comparaison (abscisse). Toute dimension sert de ventilation.
+- **cardinalité** : `low` (peu de valeurs, portables sur un axe) ou `high` (milliers de valeurs : table classée ou top-N).
+- **ordinal** : axe ordonné (l'année) ou catégoriel, qui change le tri et l'éligibilité au filtrage par plage.
+- **comparable** : la dimension sert aussi d'axe de comparaison (abscisse). Toute dimension sert de ventilation.
 
 Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nombre, ou le montant des APC que l'établissement a payées pour elles. Le taux d'open access relève de la présentation.
 
 Un **indicateur** est ce que l'interface propose d'afficher : une mesure, ventilée par une dimension empilée dans chaque barre. L'indicateur impose sa mesure. Un axe de comparaison facultatif s'ajoute à la ventilation (`indicator_pivot`).
 
-La requête est composée sur **liste blanche** : `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` utilise seulement les expressions du registre, indexées par des clés validées (`validate_pivot`). Le grain est tenu par une sous-requête qui rend chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui démultiplie les lignes (`lab`) ne fait donc compter ni sommer deux fois la même publication.
+La requête est composée sur **liste blanche** : `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` utilise seulement les expressions du registre, indexées par des clés validées (`validate_pivot`). Le grain est tenu par une sous-requête qui rend chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui multiplie les lignes (`lab`) compte et somme ainsi chaque publication une fois.
 """
 
 from collections.abc import Sequence
@@ -72,7 +72,7 @@ class Measure:
 
 
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
-    """Expression SQL `CASE` projetant `column` (enum `doc_type`) sur la clé de groupement du pivot : les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin, les autres familles restent agrégées sous leur clé de famille. Le détail là où il porte le plus d'information (les publications au sens strict, dont la répartition varie fortement d'un laboratoire à l'autre), le grossier ailleurs. Couvre exhaustivement l'enum ; les types non listés tombent dans `misc` (filet)."""
+    """Expression `CASE` qui projette une colonne `doc_type` sur la clé de groupement du pivot : les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin, les autres familles se regroupent sous leur clé de famille. Le détail sert là où il informe le plus : la répartition des publications au sens strict varie fortement d'un laboratoire à l'autre. L'expression couvre toute l'enum ; un type non listé tombe dans `misc`."""
     expanded = DOC_TYPE_FAMILIES["publications"]
     whens = [
         f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in expanded)}) THEN {column}::text"
@@ -125,7 +125,7 @@ DIMENSIONS: dict[str, Dimension] = {
             comparable=False,
             group_sql=doc_type_grouped_sql("p.doc_type"),
         ),
-        # Forte cardinalité : comparaison paginée, pas de groupement primaire. Une publication compte dans chacun des labos de ses auteurs. Alias dédiés (`lps`/`ls`), distincts de la sous-requête de `lab_clause`.
+        # Forte cardinalité : comparaison paginée, sans groupement primaire. Une publication compte dans chacun des laboratoires de ses auteurs. Alias dédiés (`lps`/`ls`), distincts de la sous-requête de `lab_clause`.
         Dimension(
             "lab",
             "Laboratoire",
@@ -239,7 +239,7 @@ assert all(
 def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[Dimension]]:
     """Valide une requête de pivot contre le registre (liste blanche).
 
-    Retourne la mesure et les dimensions de groupement résolues. Lève `ValidationError` (→ 400) si une clé est inconnue ou si un groupement est répété — aucune entrée hors du vocabulaire déclaré ne peut atteindre le constructeur SQL.
+    Rend la mesure et les dimensions de groupement. Lève `ValidationError` (400) pour une clé inconnue ou un groupement répété : seul le vocabulaire déclaré atteint le constructeur SQL.
     """
     if measure not in MEASURES:
         raise ValidationError(f"Mesure inconnue : {measure!r}")
@@ -258,7 +258,7 @@ def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[D
 def validate_indicator(indicator: str, compare: str) -> tuple[str, list[str]]:
     """Résout un indicateur et son axe de comparaison facultatif en mesure et groupements du moteur.
 
-    Lève `ValidationError` si l'indicateur est inconnu ou si `compare` n'est pas une dimension comparable.
+    Lève `ValidationError` si l'indicateur est inconnu ou si `compare` nomme une dimension hors des dimensions comparables.
     """
     if indicator not in INDICATORS:
         raise ValidationError(f"Indicateur inconnu : {indicator!r}")

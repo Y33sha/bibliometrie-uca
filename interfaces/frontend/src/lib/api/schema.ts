@@ -3172,7 +3172,7 @@ export interface components {
          * CollaborationsResponse
          * @description Collaborations internationales ventilées par pays étranger (source `publications.countries`).
          *
-         *     `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré. Leur rapport donne la part de publications en collaboration internationale.
+         *     `international_count` compte les publications avec au moins un pays étranger, `total_count` le corpus filtré ; leur rapport donne la part de publications en collaboration internationale.
          */
         CollaborationsResponse: {
             /** Rows */
@@ -4554,7 +4554,7 @@ export interface components {
         };
         /**
          * PivotResponse
-         * @description Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
+         * @description Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés de `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul).
          */
         PivotResponse: {
             /** Measure */
@@ -4974,7 +4974,7 @@ export interface components {
         };
         /**
          * RelatedStructureOut
-         * @description Structure voisine (parent/enfant) dans le détail d'une structure.
+         * @description Structure voisine (tutelle ou sous-structure) dans le détail d'une structure.
          */
         RelatedStructureOut: {
             /** Id */
@@ -5527,7 +5527,7 @@ export interface components {
         };
         /**
          * StructureOut
-         * @description Structure complète — renvoyée par GET/POST/PUT sur `/api/structures`.
+         * @description Structure complète, rendue par GET, POST et PUT sur `/api/structures`.
          */
         StructureOut: {
             /** Id */
@@ -5669,7 +5669,7 @@ export interface components {
         };
         /**
          * SubjectFrequency
-         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs dashboards.
+         * @description Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs tableaux de bord.
          */
         SubjectFrequency: {
             /** Id */

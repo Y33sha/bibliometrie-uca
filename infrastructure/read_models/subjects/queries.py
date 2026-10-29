@@ -1,6 +1,6 @@
-"""Query service : lectures des sujets servies par les routes `/api/subjects/*`.
+"""Lectures des sujets servies par les routes `/api/subjects/*`.
 
-Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subjects_queries.py`).
+Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subject_store.py`).
 """
 
 from collections.abc import Iterator
