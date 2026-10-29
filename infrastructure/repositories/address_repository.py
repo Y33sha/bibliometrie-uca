@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL sync pour le cluster `addresses` : liens adresse ↔ structure, pays saisis à la main (candidats `manual`, unitairement ou par lot).
+"""Repository PostgreSQL des adresses : liens entre adresse et structure, pays saisis à la main (candidats `manual`, un par un ou par lot).
 
 La résolution des pays d'une adresse et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline (`pipeline/transformation/countries/`). Chaque saisie met l'adresse dans la file `address_candidates_queue` : le run suivant résout l'adresse si la résolution immédiate a échoué.
 """
@@ -68,7 +68,7 @@ class PgAddressRepository(AddressRepository):
         address_ids: list[int],
         structure_id: int,
     ) -> int:
-        # Un rattachement est unique par (address_id, structure_id) : une ligne est soit supprimée (purement manuelle), soit repassée à pending — jamais les deux. Les deux compteurs se cumulent (ensembles disjoints).
+        # Un rattachement est unique par (address_id, structure_id) : une ligne est supprimée (rattachement manuel seul) ou repasse en attente. Les deux comptes concernent des ensembles disjoints et s'additionnent.
         deleted = self._conn.execute(
             delete(address_structures)
             .where(address_structures.c.address_id.in_(address_ids))
@@ -96,7 +96,7 @@ class PgAddressRepository(AddressRepository):
             index_elements=["address_id", "structure_id"],
             set_={"is_confirmed": stmt.excluded.is_confirmed},
         )
-        # SQLAlchemy exécute en mode "executemany" si on passe une liste de dicts.
+        # Une liste de paramètres s'exécute en `executemany`.
         self._conn.execute(
             stmt,
             [
@@ -110,10 +110,7 @@ class PgAddressRepository(AddressRepository):
         address_ids: list[int],
         structure_id: int,
     ) -> set[int]:
-        """Cf. docstring du port.
-
-        Condition miroir du lien adresse → structure de la matview `source_contribution_structures`, à garder synchronisée.
-        """
+        """Condition miroir du lien entre adresse et structure de la vue matérialisée `source_contribution_structures`, à tenir alignée."""
         if not address_ids:
             return set()
         result = self._conn.execute(

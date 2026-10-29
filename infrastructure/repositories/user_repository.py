@@ -48,7 +48,7 @@ class PgUserRepository(UserRepository):
         return [(login, frozenset(roles)) for login, roles in by_login.items()]
 
     def revoke(self, login: str, roles: Iterable[str]) -> None:
-        """Retire `roles` à l'utilisateur `login`."""
+        """Retire des rôles à un utilisateur."""
         user_id = select(users.c.id).where(users.c.login == login).scalar_subquery()
         self._conn.execute(
             delete(user_roles).where(
@@ -57,5 +57,5 @@ class PgUserRepository(UserRepository):
         )
 
     def remove_user(self, login: str) -> bool:
-        """Supprime l'utilisateur `login` et ses rôles. Rend `False` s'il était absent."""
+        """Supprime un utilisateur et ses rôles. Rend `False` s'il était absent."""
         return bool(self._conn.execute(delete(users).where(users.c.login == login)).rowcount)

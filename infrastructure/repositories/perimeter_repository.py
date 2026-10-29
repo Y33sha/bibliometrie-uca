@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL sync pour l'agrégat Perimeter."""
+"""Repository PostgreSQL de l'agrégat Perimeter."""
 
 from typing import NamedTuple
 
@@ -22,7 +22,7 @@ class _PerimeterRow(NamedTuple):
 
 
 def _perimeter_from_row(row: _PerimeterRow) -> Perimeter:
-    """Mapping d'une row `perimeters` SQL vers l'aggregate `Perimeter`."""
+    """Périmètre de domaine d'une ligne de `perimeters`."""
     return Perimeter(
         id=row.id,
         code=row.code,
@@ -37,7 +37,7 @@ class PgPerimeterRepository(PerimeterRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── Chargement ─────────────────────────────────────────────────
 
     def find_by_id(self, perimeter_id: int) -> Perimeter | None:
         row = self._conn.execute(
@@ -70,7 +70,7 @@ class PgPerimeterRepository(PerimeterRepository):
         return result.first() is not None
 
     def add(self, perimeter: Perimeter) -> int:
-        """Insère un périmètre neuf et retourne son id."""
+        """Insère un périmètre et rend son id."""
         return scalar_int(
             self._conn.execute(
                 perimeters.insert()
@@ -84,7 +84,7 @@ class PgPerimeterRepository(PerimeterRepository):
         )
 
     def save(self, perimeter: Perimeter) -> None:
-        """Persiste un périmètre chargé : UPDATE de ses champs éditables (`code` immuable exclu). Lève `NotFoundError` si l'id est absent."""
+        """Écrit les champs modifiables d'un périmètre chargé ; le code reste. Lève `NotFoundError` si l'id est absent."""
         result = self._conn.execute(
             update(perimeters)
             .where(perimeters.c.id == perimeter.id)

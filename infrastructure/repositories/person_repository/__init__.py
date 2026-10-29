@@ -1,10 +1,6 @@
-"""Adapter PostgreSQL pour l'agrégat Person.
+"""Repository PostgreSQL de l'agrégat Person.
 
 Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms`. `PgPersonRepository` borne la connexion et délègue. Le renommage et l'attribution d'un identifiant y appliquent les règles de `domain.persons`, pour l'API comme pour la phase `persons`.
-
-Usage :
-    repo = PgPersonRepository(conn)
-    repo.set_exclusion(person_id, PersonExclusion.NOT_A_PERSON)
 """
 
 from typing import TYPE_CHECKING

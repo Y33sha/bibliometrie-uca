@@ -14,7 +14,7 @@ class PgConfigRepository(ConfigRepository):
         self._conn = conn
 
     def config_keys_referencing_perimeter(self, perimeter_code: str) -> list[str]:
-        # `#>> '{}'` extrait le scalaire JSON ; faute d'opérateur SA Core direct, on passe par text() avec un bind nommé.
+        # `#>> '{}'` extrait le scalaire JSON ; SQLAlchemy Core est sans opérateur pour lui, d'où `text()` et un paramètre nommé.
         result = self._conn.execute(
             text("SELECT key FROM config WHERE key LIKE 'perimeter_%' AND value #>> '{}' = :code"),
             {"code": perimeter_code},

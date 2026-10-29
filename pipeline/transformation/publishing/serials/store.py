@@ -1,6 +1,6 @@
 """Store des revues : recherche, création, enrichissement, ISSN, formes de nom et type de la table `serials`, pour le pipeline.
 
-L'édition dans l'administration et la fusion passent par `infrastructure/repositories/serial_repository.py`.
+L'édition dans l'administration passe par `infrastructure/repositories/serial_repository.py`, la fusion par `serial_merge`.
 """
 
 from collections.abc import Sequence

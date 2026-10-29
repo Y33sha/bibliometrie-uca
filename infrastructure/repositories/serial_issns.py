@@ -22,7 +22,7 @@ def journal_issn(row: Row[tuple[object, ...]]) -> SerialIssn:
 def issn_values(
     row: SerialIssn, *, serial_id: int | None, checked_at: datetime | None = None
 ) -> dict[str, object]:
-    """Valeurs d'insertion d'un ISSN. Un ISSN sans revue n'est pas un ISSN-L."""
+    """Valeurs d'insertion d'un ISSN. Un ISSN sans revue reste sans marque ISSN-L."""
     return {
         "issn": row.issn,
         "serial_id": serial_id,
