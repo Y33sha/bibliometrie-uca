@@ -1,6 +1,6 @@
-"""Semis des contributions et des informations du contributeur, sur la connexion SQLAlchemy ou un curseur psycopg.
+"""Semis des contributions et des informations du contributeur, sur une connexion SQLAlchemy.
 
-Le nom normalisé et les identifiants d'une contribution source sont dans la table dédupliquée `contributor_information`. `source_contributions` a seulement la clé étrangère `contributor_information_id`, que donnent `upsert_contributor_information` (connexion SQLAlchemy) et `upsert_contributor_information_on_cursor` (curseur psycopg).
+Le nom normalisé et les identifiants d'une contribution source sont dans la table dédupliquée `contributor_information`. `source_contributions` a seulement la clé étrangère `contributor_information_id`, que donne `upsert_contributor_information`.
 """
 
 import json
@@ -49,16 +49,6 @@ def upsert_split_contributor_information(
 ) -> int:
     """`upsert_contributor_information` d'après un nom et un prénom normalisés explicites."""
     return _upsert(conn, _params(last, first, identifiers))
-
-
-def upsert_contributor_information_on_cursor(
-    cur, author_name_normalized=None, identifiers=None
-) -> int:
-    """`upsert_contributor_information` sur un curseur psycopg à lignes en dictionnaire."""
-    params = _form_params(author_name_normalized, identifiers)
-    cur.execute(_INSERT_SQL, params)
-    cur.execute(_SELECT_SQL, params)
-    return cur.fetchone()["id"]
 
 
 def insert_contribution(

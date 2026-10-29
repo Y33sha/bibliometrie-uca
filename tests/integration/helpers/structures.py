@@ -31,8 +31,15 @@ def insert_structure(
     structure_type: str = "labo",
     hal_collection: str | None = None,
     api_ids: dict[str, object] | None = None,
+    reuse: bool = False,
 ) -> int:
-    """Insère une structure et renvoie son `id`. `row_id` fixe l'`id`. Le nom vaut le code par défaut."""
+    """Insère une structure et renvoie son `id`. `row_id` fixe l'`id`. Le nom vaut le code par défaut. `reuse` renvoie la structure de même code si elle existe."""
+    if reuse:
+        existing = conn.execute(
+            text("SELECT id FROM structures WHERE code = :code"), {"code": code}
+        ).scalar_one_or_none()
+        if existing is not None:
+            return existing
     return insert_row(
         conn,
         "structures",

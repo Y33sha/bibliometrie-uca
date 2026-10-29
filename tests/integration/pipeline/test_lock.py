@@ -15,7 +15,7 @@ from pipeline.runtime.lock import (
     _holder,
     pipeline_lock,
 )
-from tests.integration.conftest import _database_url
+from tests.integration.helpers.db import database_url
 
 
 def test_une_seconde_execution_est_refusee(sa_engine_pipeline) -> None:  # noqa: ARG001 — installe l'engine
@@ -57,7 +57,7 @@ def test_une_execution_interrompue_rend_le_verrou(sa_engine_pipeline) -> None:  
 
 def test_une_autre_base_du_cluster_ne_passe_pas_pour_le_detenteur(sa_engine_pipeline) -> None:
     """`pg_locks` couvre tout le cluster : le détenteur se cherche dans la base courante seule."""
-    ailleurs = create_engine(_database_url().set(database="postgres"))
+    ailleurs = create_engine(database_url().set(database="postgres"))
     try:
         with ailleurs.connect() as conn:
             conn.execute(

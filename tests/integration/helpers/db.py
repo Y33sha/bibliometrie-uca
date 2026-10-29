@@ -1,38 +1,73 @@
-"""Connexion à la base de test sous le propriétaire du schéma.
+"""Connexions à la base de test.
 
-Les tests d'intégration de l'API sèment leur jeu de données dans toutes les tables. Ce gestionnaire de contexte leur ouvre un curseur sous le propriétaire, en validation immédiate : ce qu'un module sème est visible du serveur d'API que le test interroge. `reset_database` remet la base dans son état d'après les migrations.
+`database_url` donne l'URL de la base de test sous un rôle de connexion. Les tests d'intégration de l'API sèment leur jeu de données sous le propriétaire du schéma, en validation immédiate : ce qu'un module sème est visible du serveur d'API que le test interroge. `owner_connection` ouvre cette connexion SQLAlchemy, `owner_pool` un curseur psycopg sur elle. `reset_database` remet la base dans son état d'après les migrations.
 """
 
 from __future__ import annotations
 
 import os
+import pathlib
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
+from functools import cache
 from typing import Any
 
 import psycopg
+from dotenv import load_dotenv
 from psycopg.rows import dict_row
+from sqlalchemy import URL, Connection, Engine, create_engine
 
-_ARGS: dict[str, Any] = {
-    "dbname": "bibliometrie_test",
-    "user": os.environ["DB_OWNER_USER"],
-    "host": os.environ.get("DB_HOST", "127.0.0.1"),
-    "port": int(os.environ.get("DB_PORT", "5432")),
-}
-if os.environ.get("DB_OWNER_PASSWORD"):
-    _ARGS["password"] = os.environ["DB_OWNER_PASSWORD"]
+# Charge .env avant de lire os.environ, comme infrastructure/__init__.py : `pytest` lancé depuis un shell sans DB_OWNER_USER exporté trouve la valeur dans le .env du projet.
+load_dotenv(pathlib.Path(__file__).resolve().parents[3] / ".env")
+
+DB_NAME = "bibliometrie_test"
+DB_OWNER_USER = os.environ["DB_OWNER_USER"]
+DB_OWNER_PASSWORD = os.environ.get("DB_OWNER_PASSWORD", "")
+DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
+DB_PORT = int(os.environ.get("DB_PORT", "5432"))
+
+
+def database_url(*, identity: str = "pipeline") -> URL:
+    """URL SQLAlchemy de la base de test, sous le rôle `identity` (`pipeline`, `app` ou `owner`).
+
+    Le propriétaire du schéma sert aux migrations et au semis des tests d'API. Les fixtures de données passent par le rôle du pipeline, celles qui exercent une opération de l'API par le rôle de l'API.
+    """
+    from infrastructure.settings import settings
+
+    if identity == "owner":
+        username, password = DB_OWNER_USER, DB_OWNER_PASSWORD
+    else:
+        username = getattr(settings, f"db_{identity}_user")
+        password = getattr(settings, f"db_{identity}_password").get_secret_value()
+    return URL.create(
+        drivername="postgresql+psycopg",
+        username=username,
+        password=password or None,
+        host=DB_HOST,
+        port=DB_PORT,
+        database=DB_NAME,
+    )
+
+
+@cache
+def _owner_engine() -> Engine:
+    """Engine du propriétaire du schéma en `AUTOCOMMIT`, créé au premier appel."""
+    return create_engine(database_url(identity="owner"), isolation_level="AUTOCOMMIT")
+
+
+@contextmanager
+def owner_connection() -> Iterator[Connection]:
+    """Connexion SQLAlchemy sous le propriétaire du schéma, en validation immédiate, rendue au pool à la sortie."""
+    with _owner_engine().connect() as conn:
+        yield conn
 
 
 @contextmanager
 def owner_pool() -> Iterator[psycopg.Cursor[dict[str, Any]]]:
-    """Curseur sur la base de test, en validation immédiate, fermé à la sortie."""
-    conn = psycopg.connect(**_ARGS, row_factory=dict_row)
-    conn.autocommit = True
-    try:
-        with conn.cursor(row_factory=dict_row) as cur:
+    """Curseur psycopg à lignes en dictionnaire sur une connexion `owner_connection`, fermé à la sortie."""
+    with owner_connection() as conn:
+        with conn.connection.driver_connection.cursor(row_factory=dict_row) as cur:
             yield cur
-    finally:
-        conn.close()
 
 
 # Contenu posé par les migrations : le schéma `ref`, la version Alembic, les rôles et les réglages par défaut de `ops.config`.

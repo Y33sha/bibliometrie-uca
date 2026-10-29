@@ -3,15 +3,10 @@
 L'application se connecte à bibliometrie_test : son constructeur d'engine est substitué avant son import.
 """
 
-import os
-
 import pytest
-from sqlalchemy import URL, Engine, create_engine
+from sqlalchemy import Engine, create_engine
 
-DB_OWNER_USER = os.environ["DB_OWNER_USER"]
-DB_OWNER_PASSWORD = os.environ.get("DB_OWNER_PASSWORD", "")
-DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
-DB_PORT = int(os.environ.get("DB_PORT", "5432"))
+from tests.integration.helpers.db import database_url
 
 
 def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
@@ -20,22 +15,10 @@ def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
     `identity` choisit le rôle de connexion : celui de l'API pour l'application, celui du pipeline ou du propriétaire du schéma pour les jeux de données. Les tests exercent donc les droits de production.
     """
     from infrastructure.db.engine import install_engine_guards
-    from infrastructure.settings import settings as _s
 
-    if identity == "owner":
-        username, password = DB_OWNER_USER, DB_OWNER_PASSWORD
-    else:
-        username = getattr(_s, f"db_{identity}_user")
-        password = getattr(_s, f"db_{identity}_password").get_secret_value()
-    url = URL.create(
-        drivername="postgresql+psycopg",
-        username=username,
-        password=password or None,
-        host=DB_HOST,
-        port=DB_PORT,
-        database="bibliometrie_test",
+    engine = create_engine(
+        database_url(identity=identity), pool_size=1, max_overflow=2, pool_pre_ping=True
     )
-    engine = create_engine(url, pool_size=1, max_overflow=2, pool_pre_ping=True)
     install_engine_guards(engine)
     return engine
 

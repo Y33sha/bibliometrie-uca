@@ -1,41 +1,42 @@
 """Fusion manuelle de deux publications : GET /api/publications/{id}/merge-candidates, POST /api/publications/{id}/merge et /merge-preview, sous le rôle de l'API."""
 
-from tests.integration.helpers.contributions import upsert_contributor_information_on_cursor
-from tests.integration.helpers.db import owner_pool
+from sqlalchemy import text
+
+from tests.integration.helpers.alignment import (
+    align_source_contributions,
+    set_perimeter_author_contribution,
+)
+from tests.integration.helpers.db import owner_connection, owner_pool
 from tests.integration.helpers.seeds import seed_person, seed_publication, seed_source_record, uniq
+from tests.integration.helpers.sources import insert_source_contribution
 
 
 def _authored_publication(*, doi: str | None, person_id: int | None) -> int:
     """Publication d'un enregistrement source et d'une contribution du périmètre « Martin, Anne », rattachée par le nom à `person_id` quand il est fourni."""
     publication = seed_publication(uniq("Titre"), doc_type="article")
-    source_record = seed_source_record(
-        "crossref" if doi else "hal", publication_id=publication, doi=doi
-    )
-    with owner_pool() as cur:
+    source = "crossref" if doi else "hal"
+    source_record = seed_source_record(source, publication_id=publication, doi=doi)
+    with owner_connection() as conn:
         if doi:
-            cur.execute("UPDATE publications SET doi = %s WHERE id = %s", (doi, publication))
-        information = upsert_contributor_information_on_cursor(cur, "martin anne")
-        cur.execute(
-            "INSERT INTO source_contributions (source, source_record_id, author_position, "
-            "perimeter_evidence, raw_last_name, raw_first_name, roles, "
-            "contributor_information_id) "
-            "SELECT source, id, 0, CAST('{hr_record}' AS perimeter_evidence[]), "
-            "'Martin', 'Anne', ARRAY['author'], %s FROM source_records WHERE id = %s RETURNING id",
-            (information, source_record),
+            conn.execute(
+                text("UPDATE publications SET doi = :doi WHERE id = :id"),
+                {"doi": doi, "id": publication},
+            )
+        source_contribution = insert_source_contribution(
+            conn,
+            source_record,
+            source=source,
+            raw_last_name="Martin",
+            raw_first_name="Anne",
+            author_name_normalized="martin anne",
+            in_perimeter=True,
+            roles=["author"],
         )
-        source_contribution = cur.fetchone()["id"]
-        cur.execute(
-            "INSERT INTO contributions (publication_id, person_id, resolution_mode, "
-            "perimeter_evidence, roles) VALUES (%s, %s, CAST(%s AS resolution_mode), "
-            "CAST('{hr_record}' AS perimeter_evidence[]), ARRAY['author']) RETURNING id",
-            (publication, person_id, "name" if person_id else None),
+        contribution = align_source_contributions(
+            conn, publication, [(source_contribution, source_record)]
         )
-        contribution = cur.fetchone()["id"]
-        cur.execute(
-            "INSERT INTO aligned_source_contributions "
-            "(source_contribution_id, contribution_id, source_record_id, method) "
-            "VALUES (%s, %s, %s, 'reference')",
-            (source_contribution, contribution, source_record),
+        set_perimeter_author_contribution(
+            conn, contribution, person_id=person_id, mode="name" if person_id else None
         )
     return publication
 

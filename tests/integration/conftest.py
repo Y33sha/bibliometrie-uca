@@ -5,25 +5,23 @@ Avant la session, recrée la base `bibliometrie_test` par `alembic upgrade head`
 Tout passe par psycopg, sans commande shell (dropdb, createdb, psql) : la configuration fonctionne en local comme dans Docker.
 """
 
-import os
 import pathlib
 
 import psycopg
 import pytest
 from alembic.config import Config
-from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
 from alembic import command
+from tests.integration.helpers.db import (
+    DB_HOST,
+    DB_NAME,
+    DB_OWNER_PASSWORD,
+    DB_OWNER_USER,
+    DB_PORT,
+    database_url,
+)
 
-# Charge .env avant de lire os.environ, comme infrastructure/__init__.py : `pytest` lancé depuis un shell sans DB_OWNER_USER exporté trouve la valeur dans le .env du projet.
-load_dotenv(pathlib.Path(__file__).resolve().parent.parent.parent / ".env")
-
-DB_NAME = "bibliometrie_test"
-DB_OWNER_USER = os.environ["DB_OWNER_USER"]
-DB_OWNER_PASSWORD = os.environ.get("DB_OWNER_PASSWORD", "")
-DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
-DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 
@@ -127,7 +125,7 @@ def _alembic_config() -> Config:
     `configure_logger` à faux empêche `env.py` d'appeler `fileConfig`, pour tout usage d'Alembic dans une session de test. `fileConfig` désactive les loggers déjà créés que `alembic.ini` omet, donc ceux de l'application : un test qui observe le journal le trouverait vide.
     """
     cfg = Config(str(ALEMBIC_INI))
-    url = _database_url(identity="owner").render_as_string(hide_password=False)
+    url = database_url(identity="owner").render_as_string(hide_password=False)
     cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     cfg.attributes["configure_logger"] = False
     return cfg
@@ -149,30 +147,6 @@ def db():
     conn.close()
 
 
-def _database_url(*, identity: str = "pipeline"):
-    """URL SQLAlchemy de la base de test, sous le rôle `identity` (`pipeline`, `app` ou `owner`).
-
-    Le propriétaire du schéma sert aux migrations ; les fixtures de données passent par le rôle du pipeline, celles qui exercent une opération de l'API par le rôle de l'API.
-    """
-    from sqlalchemy import URL
-
-    from infrastructure.settings import settings
-
-    if identity == "owner":
-        username, password = DB_OWNER_USER, DB_OWNER_PASSWORD
-    else:
-        username = getattr(settings, f"db_{identity}_user")
-        password = getattr(settings, f"db_{identity}_password").get_secret_value()
-    return URL.create(
-        drivername="postgresql+psycopg",
-        username=username,
-        password=password or None,
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-    )
-
-
 @pytest.fixture(scope="session")
 def alembic_config() -> Config:
     """Configuration Alembic pointée sur la base de test, que `pytest_configure` monte à `head`."""
@@ -187,7 +161,7 @@ def sa_sync_conn_owner():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_database_url(identity="owner"))
+    engine = create_engine(database_url(identity="owner"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -205,7 +179,7 @@ def sa_sync_conn_app():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_database_url(identity="app"))
+    engine = create_engine(database_url(identity="app"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -225,7 +199,7 @@ def sa_engine_app():
 
     from infrastructure.db.engine import install_engine_guards
 
-    engine = create_engine(_database_url(identity="app"))
+    engine = create_engine(database_url(identity="app"))
     install_engine_guards(engine)
     yield engine
     engine.dispose()
@@ -241,7 +215,7 @@ def sa_engine_pipeline():
 
     from infrastructure.db.engine import set_sync_engine
 
-    engine = create_engine(_database_url())
+    engine = create_engine(database_url())
     set_sync_engine(engine)
     yield engine
     set_sync_engine(None)
@@ -253,7 +227,7 @@ def sa_sync_conn():
     """Connexion SQLAlchemy sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
     from sqlalchemy import create_engine
 
-    engine = create_engine(_database_url())
+    engine = create_engine(database_url())
     with engine.connect() as conn:
         trans = conn.begin()
         try:

@@ -1,16 +1,54 @@
-"""Semis de données pour les tests d'API, sur le pool propriétaire (`owner_pool`).
+"""Semis de données pour les tests d'API, sous le propriétaire du schéma en validation immédiate.
 
-Chaque fonction insère une ligne, valeurs par défaut uniques quand la table l'exige, et renvoie son `id`.
+Le serveur d'API lit les données sur sa propre connexion. Chaque fonction ouvre donc `owner_connection`, calcule ses valeurs par défaut, uniques quand la table l'exige, et délègue l'écriture à la fonction de semis du module de la table. Les fonctions qui insèrent une ligne renvoient son `id`.
 """
 
-import json
+import datetime
 import uuid
 
+from sqlalchemy import text
+
 from domain.normalize import normalize_text
-from tests.integration.helpers.contributions import upsert_contributor_information_on_cursor
-from tests.integration.helpers.db import owner_pool
-from tests.integration.helpers.persons import NORMALIZERS
-from tests.integration.helpers.rows import perimeter_evidence
+from infrastructure.db.queues import Queue
+from tests.integration.helpers.addresses import (
+    ensure_country,
+    insert_address,
+    insert_address_structure,
+)
+from tests.integration.helpers.alignment import (
+    align_source_contributions,
+    contribution_person as _contribution_person,
+    set_perimeter_author_contribution,
+)
+from tests.integration.helpers.config import set_config
+from tests.integration.helpers.contributions import insert_contribution
+from tests.integration.helpers.db import owner_connection
+from tests.integration.helpers.persons import (
+    insert_person,
+    insert_person_identifier,
+    insert_person_name_form,
+    insert_rejected_contribution,
+)
+from tests.integration.helpers.pipeline_runs import insert_phase_execution
+from tests.integration.helpers.publications import insert_publication
+from tests.integration.helpers.queues import queued
+from tests.integration.helpers.serials import (
+    insert_doi_prefix,
+    insert_monograph,
+    insert_publisher,
+    insert_serial,
+    insert_serial_doi_namespace,
+    insert_serial_issn,
+)
+from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.structures import (
+    add_to_perimeter,
+    insert_perimeter,
+    insert_structure,
+    insert_structure_name_form,
+    insert_tutelle,
+)
+from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
 
 
 def uniq(prefix: str, sep: str = "_") -> str:
@@ -18,20 +56,13 @@ def uniq(prefix: str, sep: str = "_") -> str:
     return f"{prefix}{sep}{uuid.uuid4().hex[:8]}"
 
 
-def _insert(sql: str, params: tuple) -> int:
-    with owner_pool() as cur:
-        cur.execute(sql, params)
-        return cur.fetchone()["id"]
-
-
 def seed_address(
     raw_text: str, *, countries: list[str] | None = None, publication_count: int = 1
 ) -> int:
-    return _insert(
-        "INSERT INTO addresses (raw_text, normalized_text, countries, publication_count) "
-        "VALUES (%s, lower(%s), %s, %s) RETURNING id",
-        (raw_text, raw_text, countries, publication_count),
-    )
+    with owner_connection() as conn:
+        return insert_address(
+            conn, raw_text, countries=countries, publication_count=publication_count
+        )
 
 
 def seed_structure(
@@ -44,29 +75,21 @@ def seed_structure(
 ) -> int:
     """Structure de code unique par défaut ; le nom vaut le code par défaut. `reuse` renvoie la structure de même code si elle existe."""
     code = code or uniq("STR")
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO structures (code, name, structure_type, hal_collection) "
-            "VALUES (%s, %s, CAST(%s AS structure_type), %s)"
-            + (" ON CONFLICT (code) DO NOTHING" if reuse else "")
-            + " RETURNING id",
-            (code, name or code, type_, hal_collection),
+    with owner_connection() as conn:
+        return insert_structure(
+            conn,
+            code,
+            name=name or code,
+            structure_type=type_,
+            hal_collection=hal_collection,
+            reuse=reuse,
         )
-        row = cur.fetchone()
-        if row is None:
-            cur.execute("SELECT id FROM structures WHERE code = %s", (code,))
-            row = cur.fetchone()
-        return row["id"]
 
 
 def seed_structure_name_form(structure_id: int, form_text: str | None = None) -> int:
     """Forme de nom de structure ; une forme de 6 caractères au plus est en mots entiers, comme l'exige la table."""
-    form_text = form_text or uniq("form")
-    return _insert(
-        "INSERT INTO structure_name_forms (structure_id, form_text, is_word_boundary) "
-        "VALUES (%s, %s, char_length(%s) <= 6) RETURNING id",
-        (structure_id, form_text, form_text),
-    )
+    with owner_connection() as conn:
+        return insert_structure_name_form(conn, structure_id, form_text=form_text or uniq("form"))
 
 
 def seed_perimeter(
@@ -78,41 +101,22 @@ def seed_perimeter(
 ) -> int:
     """Périmètre de code unique par défaut. `replace` remplace les racines d'un périmètre de même code."""
     code = code or uniq("perim")
-    conflict = (
-        " ON CONFLICT (code) DO UPDATE SET root_structure_ids = EXCLUDED.root_structure_ids"
-        if replace
-        else ""
-    )
-    return _insert(
-        "INSERT INTO perimeters (code, name, root_structure_ids) VALUES (%s, %s, %s)"
-        + conflict
-        + " RETURNING id",
-        (code, name or code, root_structure_ids or []),
-    )
+    with owner_connection() as conn:
+        return insert_perimeter(
+            conn, code, root_structure_ids=root_structure_ids, name=name or code, replace=replace
+        )
 
 
 def seed_add_to_perimeter(structure_id: int, *, code: str, name: str) -> int:
     """Rattache `structure_id` au périmètre `code`, créé sous le nom `name` s'il est absent, et renvoie l'`id` du périmètre."""
-    perimeter_id = _insert(
-        "INSERT INTO perimeters (code, name) VALUES (%s, %s) "
-        "ON CONFLICT (code) DO UPDATE SET code = EXCLUDED.code RETURNING id",
-        (code, name),
-    )
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO perimeter_structures (perimeter_id, structure_id) "
-            "VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (perimeter_id, structure_id),
-        )
-    return perimeter_id
+    with owner_connection() as conn:
+        return add_to_perimeter(conn, structure_id, code=code, name=name)
 
 
 def seed_tutelle(parent_id: int, *, child_id: int) -> int:
     """Tutelle de `parent_id` sur `child_id`."""
-    return _insert(
-        "INSERT INTO structure_parents (parent_id, child_id) VALUES (%s, %s) RETURNING id",
-        (parent_id, child_id),
-    )
+    with owner_connection() as conn:
+        return insert_tutelle(conn, parent_id, child_id=child_id)
 
 
 def seed_address_structure(
@@ -123,39 +127,37 @@ def seed_address_structure(
     is_confirmed: bool | None = None,
 ) -> int:
     """Lien de l'adresse `address_id` à la structure `structure_id`."""
-    return _insert(
-        "INSERT INTO address_structures (address_id, structure_id, matched_form_id, is_confirmed) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
-        (address_id, structure_id, matched_form_id, is_confirmed),
-    )
+    with owner_connection() as conn:
+        return insert_address_structure(
+            conn,
+            address_id,
+            structure_id=structure_id,
+            matched_form_id=matched_form_id,
+            is_confirmed=is_confirmed,
+        )
 
 
 def seed_country(code: str, name: str) -> None:
     """Pays `code`, s'il est absent du référentiel."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO countries (code, name) VALUES (%s, %s) ON CONFLICT DO NOTHING",
-            (code, name),
-        )
+    with owner_connection() as conn:
+        ensure_country(conn, code, name)
 
 
 def seed_config(key: str, value: object) -> None:
     """Paramètre `key` à `value`, sérialisé en jsonb, en remplaçant une valeur existante."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO config (key, value) VALUES (%s, CAST(%s AS jsonb)) "
-            "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-            (key, json.dumps(value)),
-        )
+    with owner_connection() as conn:
+        set_config(conn, key, value)
 
 
 def seed_publisher(name: str | None = None, *, name_normalized: str | None = None) -> int:
     """Éditeur de nom unique par défaut, normalisé par `normalize_text` sauf `name_normalized`."""
     name = name or uniq("Publisher")
-    return _insert(
-        "INSERT INTO publishers (name, name_normalized) VALUES (%s, %s) RETURNING id",
-        (name, normalize_text(name) if name_normalized is None else name_normalized),
-    )
+    with owner_connection() as conn:
+        return insert_publisher(
+            conn,
+            name,
+            name_normalized=normalize_text(name) if name_normalized is None else name_normalized,
+        )
 
 
 def seed_serial(
@@ -167,16 +169,16 @@ def seed_serial(
 ) -> int:
     """Revue de titre unique par défaut, normalisé par `normalize_text` sauf `title_normalized`. Le type par défaut est celui du schéma."""
     title = title or uniq("Journal")
-    return _insert(
-        "INSERT INTO serials (title, title_normalized, publisher_id, serial_type) "
-        "VALUES (%s, %s, %s, CAST(%s AS serial_type)) RETURNING id",
-        (
+    with owner_connection() as conn:
+        return insert_serial(
+            conn,
             title,
-            normalize_text(title) if title_normalized is None else title_normalized,
-            publisher_id,
-            serial_type,
-        ),
-    )
+            title_normalized=normalize_text(title)
+            if title_normalized is None
+            else title_normalized,
+            publisher_id=publisher_id,
+            serial_type=serial_type,
+        )
 
 
 def seed_serial_issn(
@@ -188,20 +190,22 @@ def seed_serial_issn(
     status: str = "active",
 ) -> int:
     """ISSN de la revue `serial_id`. Les valeurs par défaut sont celles du schéma."""
-    return _insert(
-        "INSERT INTO serial_issns (issn, serial_id, support, linking, status) "
-        "VALUES (%s, %s, CAST(%s AS issn_support), %s, CAST(%s AS issn_status)) RETURNING id",
-        (issn, serial_id, support, linking, status),
-    )
+    with owner_connection() as conn:
+        return insert_serial_issn(
+            conn, serial_id, issn=issn, support=support, linking=linking, status=status
+        )
 
 
 def seed_monograph(title: str, *, proceedings: bool = False, isbn: str | None = None) -> int:
     """Monographie de titre normalisé par `normalize_text`."""
-    return _insert(
-        "INSERT INTO monographs (title, title_normalized, proceedings, isbn)"
-        " VALUES (%s, %s, %s, %s) RETURNING id",
-        (title, normalize_text(title), proceedings, isbn),
-    )
+    with owner_connection() as conn:
+        return insert_monograph(
+            conn,
+            title,
+            title_normalized=normalize_text(title),
+            proceedings=proceedings,
+            isbn=isbn,
+        )
 
 
 def seed_person(
@@ -212,54 +216,36 @@ def seed_person(
     first_name_normalized: str | None = None,
 ) -> int:
     """Personne aux nom et prénom normalisés par `normalizer` (`lower` ou `normalize_text`). `first_name_normalized` impose le prénom normalisé."""
-    normalize = NORMALIZERS[normalizer]
-    return _insert(
-        "INSERT INTO persons (last_name, first_name, last_name_normalized, first_name_normalized) "
-        "VALUES (%s, %s, %s, %s) RETURNING id",
-        (
+    with owner_connection() as conn:
+        return insert_person(
+            conn,
             last,
-            first,
-            normalize(last),
-            normalize(first) if first_name_normalized is None else first_name_normalized,
-        ),
-    )
+            first_name=first,
+            normalizer=normalizer,
+            first_name_normalized=first_name_normalized,
+        )
 
 
 def seed_person_identifier(
     person_id: int, *, id_type: str, id_value: str, source: str = "manual", status: str = "pending"
 ) -> int:
     """Identifiant de la personne `person_id`. Le statut par défaut est celui du schéma."""
-    return _insert(
-        "INSERT INTO person_identifiers (person_id, id_type, id_value, source, status) "
-        "VALUES (%s, %s, %s, CAST(%s AS identifier_origin), CAST(%s AS identifier_status)) "
-        "RETURNING id",
-        (person_id, id_type, id_value, source, status),
-    )
+    with owner_connection() as conn:
+        return insert_person_identifier(
+            conn, person_id, id_type=id_type, id_value=id_value, source=source, status=status
+        )
 
 
 def seed_person_name_form(person_id: int, *, name_form: str, sources: list[str]) -> None:
     """Forme de nom de la personne `person_id`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO person_name_forms (name_form, person_id, sources) VALUES (%s, %s, %s)",
-            (name_form, person_id, sources),
-        )
+    with owner_connection() as conn:
+        insert_person_name_form(conn, person_id, name_form=name_form, sources=sources)
 
 
 def seed_rejected_contribution(publication_id: int, *, person_id: int) -> None:
     """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit un."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO source_records (source, source_id, title, publication_id) "
-            "SELECT 'hal', 'rejet-' || %s, 'X', %s "
-            "WHERE NOT EXISTS (SELECT 1 FROM source_records WHERE publication_id = %s)",
-            (publication_id, publication_id, publication_id),
-        )
-        cur.execute(
-            "INSERT INTO rejected_contributions (source_record_id, person_id) "
-            "SELECT id, %s FROM source_records WHERE publication_id = %s",
-            (person_id, publication_id),
-        )
+    with owner_connection() as conn:
+        insert_rejected_contribution(conn, publication_id, person_id=person_id)
 
 
 def seed_publication(
@@ -275,24 +261,21 @@ def seed_publication(
     in_perimeter: bool = False,
 ) -> int:
     """Publication de titre normalisé `lower(title)`, NULL si `normalize_title` est faux. Les valeurs par défaut sont celles du schéma ; `None` écrit NULL."""
-    return _insert(
-        "INSERT INTO publications (title, title_normalized, publication_year, doc_type, oa_status, "
-        "serial_id, monograph_id, publisher_id, perimeter_evidence) "
-        "VALUES (%s, lower(%s), %s, CAST(%s AS doc_type), CAST(%s AS oa_type), %s, %s, %s, "
-        "CAST(%s AS perimeter_evidence[])) "
-        "RETURNING id",
-        (
+    with owner_connection() as conn:
+        return insert_publication(
+            conn,
             title,
-            title if normalize_title else None,
-            year,
-            doc_type,
-            oa_status,
-            serial_id,
-            monograph_id,
-            publisher_id,
-            perimeter_evidence(in_perimeter) or [],
-        ),
-    )
+            title_normalized=title.lower() if normalize_title else None,
+            normalize_title=normalize_title,
+            publication_year=year,
+            doc_type=doc_type,
+            oa_status=oa_status,
+            serial_id=serial_id,
+            monograph_id=monograph_id,
+            publisher_id=publisher_id,
+            in_perimeter=in_perimeter,
+            nullable=("doc_type", "oa_status"),
+        )
 
 
 def seed_contribution(
@@ -303,47 +286,55 @@ def seed_contribution(
     roles: list[str] | None = None,
 ) -> int:
     """Contribution de la personne `person_id` à la publication `publication_id`, en mode de résolution `manual`. Les valeurs par défaut sont celles du schéma."""
-    return _insert(
-        "INSERT INTO contributions "
-        "(publication_id, person_id, resolution_mode, perimeter_evidence, roles) "
-        "VALUES (%s, %s, 'manual', CAST(%s AS perimeter_evidence[]), %s) RETURNING id",
-        (publication_id, person_id, perimeter_evidence(in_perimeter) or [], roles),
-    )
+    with owner_connection() as conn:
+        return insert_contribution(
+            conn, publication_id, person_id=person_id, in_perimeter=in_perimeter, roles=roles
+        )
 
 
 def seed_in_perimeter_contributions(serial_id: int) -> None:
     """Pose une contribution du périmètre (personne non rejetée) sur chaque publication de la revue, puis calcule comme le pipeline `publications.in_perimeter` et les `publication_count` de la revue et de son éditeur."""
-    with owner_pool() as cur:
-        cur.execute("SELECT id FROM publications WHERE serial_id = %s", (serial_id,))
-        publication_ids = [r["id"] for r in cur.fetchall()]
-        for pid in publication_ids:
-            person_id = seed_person(
-                uniq("Author"),
-                "Jane",
-                normalizer="normalize_text",
-                first_name_normalized="jane",
+    with owner_connection() as conn:
+        publication_ids = (
+            conn.execute(
+                text("SELECT id FROM publications WHERE serial_id = :serial"), {"serial": serial_id}
             )
-            seed_contribution(pid, person_id=person_id, in_perimeter=True, roles=["author"])
-        cur.execute(
-            "UPDATE publications p SET perimeter_evidence = coalesce(("
-            "SELECT array_agg(DISTINCT e ORDER BY e) FROM contributions a JOIN persons pe "
-            "ON pe.id = a.person_id AND pe.exclusion IS NULL "
-            "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
-            "WHERE a.publication_id = p.id), '{}') "
-            "WHERE p.serial_id = %s",
-            (serial_id,),
+            .scalars()
+            .all()
         )
-        cur.execute(
-            "UPDATE serials j SET publication_count = COALESCE((SELECT COUNT(*) "
-            "FROM publications p WHERE p.serial_id = j.id AND p.in_perimeter "
-            "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = %s",
-            (serial_id,),
+        for publication_id in publication_ids:
+            person_id = insert_person(
+                conn, uniq("Author"), first_name="Jane", first_name_normalized="jane"
+            )
+            insert_contribution(
+                conn, publication_id, person_id=person_id, in_perimeter=True, roles=["author"]
+            )
+        conn.execute(
+            text(
+                "UPDATE publications p SET perimeter_evidence = coalesce(("
+                "SELECT array_agg(DISTINCT e ORDER BY e) FROM contributions a JOIN persons pe "
+                "ON pe.id = a.person_id AND pe.exclusion IS NULL "
+                "CROSS JOIN LATERAL unnest(a.perimeter_evidence) e "
+                "WHERE a.publication_id = p.id), '{}') "
+                "WHERE p.serial_id = :serial"
+            ),
+            {"serial": serial_id},
         )
-        cur.execute(
-            "UPDATE publishers pub SET publication_count = COALESCE((SELECT SUM(j.publication_count) "
-            "FROM serials j WHERE j.publisher_id = pub.id), 0) "
-            "WHERE pub.id = (SELECT publisher_id FROM serials WHERE id = %s)",
-            (serial_id,),
+        conn.execute(
+            text(
+                "UPDATE serials j SET publication_count = COALESCE((SELECT COUNT(*) "
+                "FROM publications p WHERE p.serial_id = j.id AND p.in_perimeter "
+                "AND p.doc_type NOT IN ('memoir', 'peer_review')), 0) WHERE j.id = :serial"
+            ),
+            {"serial": serial_id},
+        )
+        conn.execute(
+            text(
+                "UPDATE publishers pub SET publication_count = COALESCE((SELECT SUM(j.publication_count) "
+                "FROM serials j WHERE j.publisher_id = pub.id), 0) "
+                "WHERE pub.id = (SELECT publisher_id FROM serials WHERE id = :serial)"
+            ),
+            {"serial": serial_id},
         )
 
 
@@ -361,25 +352,20 @@ def seed_source_record(
     corrections: dict[str, object] | None = None,
 ) -> int:
     """Enregistrement source d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma. `raw_doc_type` vaut par défaut `doc_type`."""
-    values = {
-        "source": source,
-        "source_id": source_id or uniq("sid"),
-        "title": title,
-        "publication_year": publication_year,
-        "publication_id": publication_id,
-        "serial_id": serial_id,
-        "doc_type": doc_type,
-        "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,
-        "doi": doi,
-        "corrections": json.dumps(corrections) if corrections is not None else None,
-    }
-    values = {column: value for column, value in values.items() if value is not None}
-    placeholders = ["CAST(%s AS jsonb)" if column == "corrections" else "%s" for column in values]
-    return _insert(
-        f"INSERT INTO source_records ({', '.join(values)}) "
-        f"VALUES ({', '.join(placeholders)}) RETURNING id",
-        tuple(values.values()),
-    )
+    with owner_connection() as conn:
+        return insert_source_record(
+            conn,
+            publication_id,
+            source=source,
+            source_id=source_id or uniq("sid"),
+            title=title,
+            publication_year=publication_year,
+            serial_id=serial_id,
+            doc_type=doc_type,
+            raw_doc_type=raw_doc_type,
+            doi=doi,
+            corrections=corrections,
+        )
 
 
 def seed_source_contribution(
@@ -392,105 +378,64 @@ def seed_source_contribution(
 ) -> int:
     """Contribution source de nom brut `raw_author_name` et d'identifiants `identifiers`, sur un enregistrement source semé au besoin."""
     source_record = source_record_id or seed_source_record(source=source)
-    with owner_pool() as cur:
-        iid = upsert_contributor_information_on_cursor(cur, raw_author_name.lower(), identifiers)
-        cur.execute(
-            "INSERT INTO source_contributions (source, source_record_id, author_position, "
-            "perimeter_evidence, raw_author_name, contributor_information_id) "
-            "VALUES (%s, %s, %s, CAST(%s AS perimeter_evidence[]), %s, %s) RETURNING id",
-            (
-                source,
-                source_record,
-                author_position,
-                perimeter_evidence(in_perimeter) or [],
-                raw_author_name,
-                iid,
-            ),
+    with owner_connection() as conn:
+        return insert_source_contribution(
+            conn,
+            source_record,
+            source=source,
+            author_position=author_position,
+            raw_author_name=raw_author_name,
+            author_name_normalized=raw_author_name.lower(),
+            identifiers=identifiers,
+            in_perimeter=in_perimeter,
         )
-        return cur.fetchone()["id"]
 
 
 def seed_alignment(publication_id: int, source_contributions: list[tuple[int, int]]) -> int:
     """Contribution des contributions sources `(contribution source, enregistrement source)` de la publication `publication_id` ; la première la fonde, les autres la rejoignent par le nom."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO contributions (publication_id) VALUES (%s) RETURNING id",
-            (publication_id,),
-        )
-        contribution_id = cur.fetchone()["id"]
-        for rank, (source_contribution, source_record) in enumerate(source_contributions):
-            cur.execute(
-                "INSERT INTO aligned_source_contributions "
-                "(source_contribution_id, contribution_id, source_record_id, method) "
-                "VALUES (%s, %s, %s, CAST(%s AS grouping_method))",
-                (
-                    source_contribution,
-                    contribution_id,
-                    source_record,
-                    "reference" if rank == 0 else "name",
-                ),
-            )
-        return contribution_id
+    with owner_connection() as conn:
+        return align_source_contributions(conn, publication_id, source_contributions)
 
 
 def seed_perimeter_author_contribution(
     contribution_id: int, *, person_id: int | None = None, mode: str | None = None
 ) -> None:
     """Fait de la contribution `contribution_id` une contribution d'auteur du périmètre (rôle d'auteur, indice `address`), rattachée à la personne `person_id` par le mode de résolution `mode`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "UPDATE contributions SET person_id = %s, "
-            "resolution_mode = CAST(%s AS resolution_mode), roles = ARRAY['author'], "
-            "perimeter_evidence = ARRAY['address']::perimeter_evidence[] WHERE id = %s",
-            (person_id, mode, contribution_id),
-        )
+    with owner_connection() as conn:
+        set_perimeter_author_contribution(conn, contribution_id, person_id=person_id, mode=mode)
 
 
 def publication_perimeter_evidence(publication_id: int) -> list[str]:
     """Indices d'appartenance au périmètre de la publication `publication_id`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "SELECT perimeter_evidence::text[] AS evidence FROM publications WHERE id = %s",
-            (publication_id,),
-        )
-        return cur.fetchone()["evidence"]
+    with owner_connection() as conn:
+        return conn.execute(
+            text("SELECT perimeter_evidence::text[] FROM publications WHERE id = :id"),
+            {"id": publication_id},
+        ).scalar_one()
 
 
 def contribution_to_resolve(contribution_id: int) -> bool:
     """La contribution `contribution_id` est dans la file des contributions dont la personne est à redécider."""
-    with owner_pool() as cur:
-        cur.execute("SELECT 1 FROM contribution_resolution_queue WHERE id = %s", (contribution_id,))
-        return cur.fetchone() is not None
+    with owner_connection() as conn:
+        return contribution_id in queued(conn, Queue.CONTRIBUTION_RESOLUTION)
 
 
 def contribution_person(contribution_id: int) -> tuple[int | None, str | None]:
     """Personne et mode de résolution de la contribution `contribution_id`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "SELECT person_id, resolution_mode::text AS mode FROM contributions WHERE id = %s",
-            (contribution_id,),
-        )
-        row = cur.fetchone()
-        return row["person_id"], row["mode"]
+    with owner_connection() as conn:
+        return _contribution_person(conn, contribution_id)
 
 
 def seed_subject(label: str | None = None, *, usage_count: int = 0) -> int:
     """Sujet de libellé unique par défaut. Le compte d'usage par défaut est celui du schéma."""
-    label = label or uniq("Subject")
-    return _insert(
-        "INSERT INTO subjects (label, label_normalized, usage_count) VALUES (%s, %s, %s) RETURNING id",
-        (label, normalize_text(label), usage_count),
-    )
+    with owner_connection() as conn:
+        return insert_subject(conn, label or uniq("Subject"), usage_count=usage_count)
 
 
 def seed_publication_subject(publication_id: int, *, subject_id: int, source: str = "hal") -> None:
     """Lien de la publication `publication_id` au sujet `subject_id`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO publication_subjects (publication_id, subject_id, source) "
-            "VALUES (%s, %s, CAST(%s AS source_type))",
-            (publication_id, subject_id, source),
-        )
+    with owner_connection() as conn:
+        insert_publication_subject(conn, publication_id, subject_id=subject_id, source=source)
 
 
 def seed_doi_prefix(
@@ -501,22 +446,16 @@ def seed_doi_prefix(
     crossref_member_id: int | None = None,
 ) -> None:
     """Préfixe DOI `prefix` de l'agence `ra`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO doi_prefixes (prefix, ra, publisher_id, crossref_member_id) "
-            "VALUES (%s, %s, %s, %s)",
-            (prefix, ra, publisher_id, crossref_member_id),
+    with owner_connection() as conn:
+        insert_doi_prefix(
+            conn, prefix, ra=ra, publisher_id=publisher_id, crossref_member_id=crossref_member_id
         )
 
 
 def seed_serial_doi_namespace(namespace: str, *, serial_id: int, dois: int, share: float) -> None:
     """Espace de noms DOI `namespace` appris pour la revue `serial_id`."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO serial_doi_namespaces (namespace, serial_id, dois, share) "
-            "VALUES (%s, %s, %s, %s)",
-            (namespace, serial_id, dois, share),
-        )
+    with owner_connection() as conn:
+        insert_serial_doi_namespace(conn, namespace, serial_id=serial_id, dois=dois, share=share)
 
 
 def seed_phase_execution(
@@ -531,20 +470,16 @@ def seed_phase_execution(
     details: dict[str, object],
 ) -> None:
     """Exécution de la phase `phase` du run `run_id`, commencée et finie à l'instant présent."""
-    with owner_pool() as cur:
-        cur.execute(
-            "INSERT INTO pipeline_phase_executions "
-            "(run_id, phase, started_at, ended_at, mode, sources, status, signals, metrics, details) "
-            "VALUES (%s, %s, now(), now(), %s, %s, %s, "
-            "CAST(%s AS jsonb), CAST(%s AS jsonb), CAST(%s AS jsonb))",
-            (
-                run_id,
-                phase,
-                mode,
-                sources,
-                status,
-                json.dumps(signals),
-                json.dumps(metrics),
-                json.dumps(details),
-            ),
+    with owner_connection() as conn:
+        insert_phase_execution(
+            conn,
+            run_id,
+            phase=phase,
+            started_at=datetime.datetime.now(datetime.UTC),
+            mode=mode,
+            status=status,
+            sources=sources,
+            signals=signals,
+            metrics=metrics,
+            details=details,
         )
