@@ -25,12 +25,6 @@ class IdentifiedPerson(NamedTuple):
     first_name: str
 
 
-# TODO(scanr-idref-asymetrie) : l'IdRef est matché sans restriction de source
-# (`decide_match_by_identifier(idref, idref_map)`), alors que l'IdRef ScanR provient
-# du même bloc `denormalized` que son ORCID exclu. Asymétrie possiblement défendable
-# (ScanR relève de l'autorité française IdRef/SUDOC) mais à objectiver : mesurer le
-# taux d'accord de l'IdRef ScanR vs sources fiables avant de le garder ou de le
-# source-restreindre comme l'ORCID.
 ORCID_MATCH_SOURCES = frozenset({"crossref", "datacite", "openalex", "hal"})
 """Sources dont l'ORCID est déposé par l'auteur : auprès de l'éditeur (Crossref, et OpenAlex qui le recopie), de DataCite ou de HAL. Dans WoS et ScanR, l'ORCID résulte d'un matching automatique."""
 
