@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict XkYdtH3b5Vv6qRd9lV1E1sVHb7YHzTBdGEH3c4CZuoATWHtvhlv1pI8Mbgq8BS8
+\restrict wr6KbyQqo4TkDQ9QxaK74Nio6RTHrCwHrWhGHvulLYgZj4FLwzhp5r3S0fMawJz
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -1423,16 +1423,16 @@ CREATE MATERIALIZED VIEW sources.source_contribution_structures AS
              JOIN ref.hal_structure_relations r ON ((r.child_id = a.ancestor_id)))
           WHERE (a.depth < 10)
         ), hal_direct AS (
-         SELECT DISTINCT sah.source_contribution_id AS source_authorship_id,
+         SELECT DISTINCT sah.source_contribution_id,
             COALESCE(al.hal_structure_id, sah.hal_structure_id) AS hal_structure_id
            FROM (sources.source_contribution_hal_structures sah
              LEFT JOIN ref.hal_structure_aliases al ON ((al.alias_id = sah.hal_structure_id)))
         ), hal_lowest AS (
-         SELECT hal_direct.source_authorship_id,
+         SELECT hal_direct.source_contribution_id,
             hal_direct.hal_structure_id
            FROM hal_direct
         EXCEPT
-         SELECT d.source_authorship_id,
+         SELECT d.source_contribution_id,
             a.ancestor_id
            FROM (hal_direct d
              JOIN hal_ancestors a ON ((a.child_id = d.hal_structure_id)))
@@ -1472,12 +1472,9 @@ UNION
    FROM (sources.source_contribution_rors sar
      JOIN structures.structures s ON ((s.ror_id = sar.ror_id)))
   WHERE ((s.id IN ( SELECT perimeter.structure_id
-           FROM perimeter)) AND ((sar.address_id IS NULL) OR (EXISTS ( SELECT 1
-           FROM structures.address_structures ast
-          WHERE ((ast.address_id = sar.address_id) AND (ast.is_confirmed IS DISTINCT FROM false) AND (ast.structure_id IN ( SELECT perimeter.structure_id
-                   FROM perimeter)))))))
+           FROM perimeter)) AND (sar.address_id IS NULL))
 UNION
- SELECT l.source_authorship_id AS source_contribution_id,
+ SELECT l.source_contribution_id,
     r.structure_id,
     'hal_structure'::public.perimeter_evidence AS evidence
    FROM (hal_lowest l
@@ -5619,5 +5616,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict XkYdtH3b5Vv6qRd9lV1E1sVHb7YHzTBdGEH3c4CZuoATWHtvhlv1pI8Mbgq8BS8
+\unrestrict wr6KbyQqo4TkDQ9QxaK74Nio6RTHrCwHrWhGHvulLYgZj4FLwzhp5r3S0fMawJz
 
