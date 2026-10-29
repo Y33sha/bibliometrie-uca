@@ -10,13 +10,13 @@ class CountryRecompute(Protocol):
     """Résolution des pays d'adresses, et recalcul ciblé des caches de pays à partir de `addresses.countries`."""
 
     def resolve_address_countries(self, address_ids: list[int]) -> int:
-        """Compose `addresses.countries` des `address_ids` à partir de leurs candidats, par la préséance du domaine. Retourne le nombre d'adresses dont le pays change."""
+        """Compose les pays des adresses données à partir de leurs candidats, par la préséance du domaine. Rend le nombre d'adresses dont le pays change."""
         ...
 
     def refresh_source_records_countries_for_addresses(self, address_ids: list[int]) -> int:
-        """Recalcule `source_records.countries` (union des pays des adresses de leurs contributions sources) pour les enregistrements sources rattachés à l'une des `address_ids`. Idempotent. Retourne le nombre d'enregistrements sources mis à jour."""
+        """Recalcule les pays des enregistrements sources rattachés à ces adresses : union des pays des adresses de leurs contributions sources. Rend le nombre d'enregistrements sources changés."""
         ...
 
     def refresh_publications_countries_for_addresses(self, address_ids: list[int]) -> int:
-        """Recalcule `publications.countries` (union des `source_records.countries`) pour les publications rattachées à l'une des `address_ids`. Idempotent. Retourne le nombre de publications mises à jour."""
+        """Recalcule les pays des publications rattachées à ces adresses : union des pays de leurs enregistrements sources. Rend le nombre de publications changées."""
         ...

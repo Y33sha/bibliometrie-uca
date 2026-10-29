@@ -4044,7 +4044,7 @@ export interface components {
         };
         /**
          * NameFormUpdate
-         * @description Champs éditables d'une forme de nom de structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface `requires_context_of`.
+         * @description Champs modifiables d'une forme de nom de structure ; seuls les champs fournis sont écrits, et `null` efface `requires_context_of`.
          */
         NameFormUpdate: {
             /** Form Text */
@@ -4241,9 +4241,9 @@ export interface components {
         };
         /**
          * PerimeterUpdate
-         * @description Champs éditables d'un périmètre, en modification sélective.
+         * @description Champs modifiables d'un périmètre ; seuls les champs fournis sont écrits.
          *
-         *     Seuls les champs explicitement fournis sont écrits (`model_dump(exclude_unset=True)`). `root_structure_ids` liste les structures racines ; la clôture qui en descend est matérialisée à part, et son recalcul revient au caller.
+         *     `root_structure_ids` liste les structures racines ; le recalcul de leurs sous-structures (`perimeter_structures`) revient à l'appelant.
          */
         PerimeterUpdate: {
             /** Name */
@@ -4906,7 +4906,7 @@ export interface components {
         PublisherType: "commercial" | "learned_society" | "academic_institution" | "repository" | "aggregator" | "media" | "unknown";
         /**
          * PublisherUpdate
-         * @description Champs éditables d'un éditeur, en modification sélective : seuls les champs explicitement fournis sont écrits.
+         * @description Champs modifiables d'un éditeur ; seuls les champs fournis sont écrits.
          */
         PublisherUpdate: {
             /** Name */
@@ -5125,7 +5125,7 @@ export interface components {
         };
         /**
          * SerialIssnInput
-         * @description Un ISSN d'une revue, saisi à l'administration.
+         * @description Un ISSN d'une revue, saisi dans l'administration.
          */
         SerialIssnInput: {
             /** Issn */
@@ -5198,7 +5198,7 @@ export interface components {
         };
         /**
          * SerialUpdate
-         * @description Champs éditables d'une revue, en modification sélective : seuls les champs explicitement fournis sont écrits.
+         * @description Champs modifiables d'une revue ; seuls les champs fournis sont écrits.
          */
         SerialUpdate: {
             /** Title */
@@ -5623,7 +5623,7 @@ export interface components {
         StructureType: "universite" | "chu" | "ecole" | "labo" | "equipe" | "site" | "onr" | "admin" | "autre";
         /**
          * StructureUpdate
-         * @description Champs éditables d'une structure, en modification sélective : seuls les champs explicitement fournis sont écrits, et `null` efface un champ facultatif.
+         * @description Champs modifiables d'une structure ; seuls les champs fournis sont écrits, et `null` efface un champ facultatif.
          */
         StructureUpdate: {
             /** Name */

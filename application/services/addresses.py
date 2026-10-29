@@ -1,10 +1,10 @@
-"""Service Adresses — corrections à la main sur les adresses (écritures API).
+"""Service des adresses : corrections à la main (écritures de l'API).
 
-L'adresse n'a pas d'objet de domaine. `AddressRepository` gère ses tables ; le SQL et ce service appliquent ses règles. La détection appartient au pipeline — matching des structures en phase `affiliations`, détection des pays en phase `countries` ; ce service corrige ses résultats à la main.
+L'adresse n'a pas d'objet de domaine. `AddressRepository` gère ses tables ; le SQL et ce service appliquent ses règles. La détection appartient au pipeline : reconnaissance des structures dans la phase `affiliations`, détection des pays dans la phase `countries`. Ce service corrige ses résultats à la main.
 
 Deux sujets :
 - validation manuelle des rattachements adresse ↔ structure (table `address_structures`) : confirmer, rejeter ou réinitialiser une détection, puis propager vers le périmètre des contributions sources ;
-- saisie manuelle des pays, puis propagation vers les `source_records` et les `publications`.
+- saisie manuelle des pays, puis propagation vers les enregistrements sources et les publications.
 
 Une saisie manuelle de pays s'écrit en candidats `manual` par `AddressRepository`, qui l'emportent sur les autres moyens. La résolution de `addresses.countries` et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline, qui les expose par `CountryRecompute`.
 
@@ -53,13 +53,9 @@ class AddressService:
     def review_structure_link(
         self, address_id: int, structure_id: int, is_confirmed: bool | None
     ) -> list[int]:
-        """Insère ou met à jour le lien adresse ↔ structure (validation manuelle).
+        """Pose la décision manuelle sur le lien entre une adresse et une structure : vrai confirme, faux rejette (le lien est créé au besoin), `None` annule la décision (le lien manuel est supprimé, la détection repasse en attente).
 
-        - is_confirmed = True  → confirme (crée le lien si besoin)
-        - is_confirmed = False → rejette (crée le lien si besoin)
-        - is_confirmed = None  → reset (supprime le lien manuel, remet l'auto à NULL)
-
-        Retourne `[address_id]` si la contribution de l'adresse au calcul in_perimeter a changé (à propager en tâche de fond), `[]` sinon — ce qui évite les cascades massives sur les no-op (ex : confirmer une adresse déjà auto-détectée).
+        Rend l'adresse si sa contribution au périmètre change, à propager en tâche de fond, sinon `[]` : une décision sans effet, comme la confirmation d'une détection, évite une propagation massive.
         """
         before = self._addresses.which_contribute_to_perimeter([address_id], structure_id)
 
@@ -82,9 +78,9 @@ class AddressService:
     ) -> tuple[int, list[int]]:
         """Comme `review_structure_link` mais sur un lot d'adresses.
 
-        Retourne `(nombre d'adresses touchées, adresses dont la contribution au calcul in_perimeter a changé)`. Pour les reset, le nombre touché est le nombre de lignes mises à jour ; pour les upserts, la taille du lot. La propagation des adresses changées est lancée en tâche de fond par l'appelant.
+        Rend le nombre d'adresses touchées et les adresses dont la contribution au périmètre change. Pour une annulation, le nombre touché est celui des lignes modifiées ; pour une décision, la taille du lot. L'appelant propage les adresses changées en tâche de fond.
 
-        Un lot est une décision unique : l'événement d'audit est unique lui aussi, sans identifiant d'agrégat, et contient les adresses visées et le nombre effectivement touché.
+        Un lot est une décision unique : un seul événement d'audit, sans identifiant d'agrégat, avec les adresses visées et le nombre touché.
         """
         if not address_ids:
             return 0, []
@@ -112,7 +108,7 @@ class AddressService:
         return updated, list(before ^ after)
 
     def propagate_in_perimeter_for_addresses(self, address_ids: list[int]) -> None:
-        """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs groupes et de leurs publications."""
+        """Recalcule le périmètre des contributions sources liées aux adresses données, de leurs contributions et de leurs publications."""
         if not address_ids:
             return
 
@@ -133,7 +129,7 @@ class AddressService:
     # ── Pays ──
 
     def set_country(self, address_id: int, countries: list[str] | None) -> None:
-        """Saisit à la main les pays d'une adresse, puis résout l'adresse. `countries=None` ou `[]` rend l'adresse aux moyens automatiques.
+        """Saisit à la main les pays d'une adresse, puis résout l'adresse. Sans pays, l'adresse revient aux moyens automatiques.
 
         Lève `ValidationError` sur un code absent du référentiel, `NotFoundError` sur une adresse introuvable.
         """
@@ -153,7 +149,7 @@ class AddressService:
     ) -> list[int]:
         """Ajoute un pays à des adresses, désignées par leurs identifiants ou, à défaut, par filtre (`batch_set_country_by_ids`, `batch_set_country_by_filter`).
 
-        Retourne les identifiants des adresses modifiées, à propager vers les publications en tâche de fond.
+        Rend les identifiants des adresses modifiées, à propager vers les publications en tâche de fond.
         """
         if address_ids:
             modified_ids = self.batch_set_country_by_ids(country_code, address_ids)
@@ -164,8 +160,7 @@ class AddressService:
                 has_country=has_country,
                 country_code_filter=country_code_filter,
             )
-        # Une sélection par filtre peut couvrir toute la table : c'est le critère qui exprime la
-        # décision, non la liste qu'il rend. L'appel par identifiants, lui, les consigne.
+        # Une sélection par filtre peut couvrir toute la table : l'événement consigne le critère, qui exprime la décision. L'appel par identifiants consigne ses identifiants.
         decision: dict[str, JsonValue] = {"country_code": country_code}
         if address_ids:
             decision["address_ids"] = address_ids
@@ -184,9 +179,9 @@ class AddressService:
         return modified_ids
 
     def batch_set_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
-        """Ajoute `country_code` aux pays des adresses données : leurs pays retenus et `country_code` deviennent leurs pays saisis à la main. Résout ensuite les adresses.
+        """Ajoute le pays aux adresses données : leurs pays retenus et ce pays deviennent leurs pays saisis à la main. Résout ensuite les adresses.
 
-        Retourne les IDs atteints. Lève `ValidationError` sur un code absent du référentiel.
+        Rend les ids atteints. Lève `ValidationError` sur un code absent du référentiel.
         """
         self._require_known_countries([country_code])
         ids = self._addresses.add_manual_country_by_ids(country_code, address_ids)
@@ -201,11 +196,11 @@ class AddressService:
         has_country: bool | None = None,
         country_code_filter: str | None = None,
     ) -> list[int]:
-        """Ajoute `country_code` aux pays des adresses correspondant aux filtres, comme `batch_set_country_by_ids`.
+        """Ajoute le pays aux adresses qui répondent aux filtres, comme `batch_set_country_by_ids`.
 
-        Filtres combinés en AND (tous doivent correspondre). **Au moins un filtre est exigé** : un appel sans aucun filtre est refusé (`ValidationError`), garde-fou contre l'application d'un pays à toutes les adresses en masse (~475k → cascade de propagation). Pour viser un grand ensemble explicitement, passer par `batch_set_country_by_ids`.
+        Les filtres se combinent en AND. Un appel sans filtre est refusé (`ValidationError`) : il appliquerait le pays à toutes les adresses, quelque 475 000, avec une propagation à l'avenant. Un grand ensemble se vise par `batch_set_country_by_ids`.
 
-        Retourne les IDs modifiés. Lève `ValidationError` sur un code absent du référentiel.
+        Rend les ids modifiés. Lève `ValidationError` sur un code absent du référentiel.
         """
         self._require_known_countries([country_code])
         criteria = AddressCountryFilter(
@@ -224,10 +219,7 @@ class AddressService:
         return ids
 
     def propagate_countries_to_publications(self, address_ids: list[int]) -> None:
-        """Propage addresses.countries → source_records.countries → publications.countries.
-
-        Appelée après une modification de pays sur les adresses (typiquement en tâche de fond). Recalcule depuis les adresses, idempotent.
-        """
+        """Recalcule les pays des enregistrements sources, puis des publications, d'après ceux des adresses. Appelée après une modification des pays des adresses, en général en tâche de fond."""
         if not address_ids:
             return
 

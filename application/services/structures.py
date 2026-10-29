@@ -1,6 +1,6 @@
-"""Service Structures — écritures sur l'agrégat Structure.
+"""Service des structures : écritures sur l'agrégat Structure, ses tutelles et ses formes de nom.
 
-Couvre les tables `structures`, `structure_parents` et `structure_name_forms`. La validation du JSONB `api_ids` se fait à la frontière infra (repo) : tout chemin d'écriture y passe, la validation s'y applique uniformément.
+Le repository valide `api_ids` : toute écriture y passe.
 """
 
 from application.audit_log import emit_event
@@ -47,7 +47,7 @@ def _structure_edit(update: StructureUpdate) -> StructureEdit:
 class StructureService:
     """Écritures sur les structures, leurs tutelles et leurs formes de nom.
 
-    Une suppression de structure ou un changement de tutelle recalcule la clôture des périmètres (`PerimeterStructures`).
+    Une suppression de structure ou un changement de tutelle recalcule les structures des périmètres (`PerimeterStructures`).
     """
 
     def __init__(
@@ -61,7 +61,7 @@ class StructureService:
         self._perimeters = perimeters
         self._perimeter_structures = perimeter_structures
 
-    # ── Structures : charger-muter-sauver l'agrégat ──
+    # ── Structures ──
 
     def create_structure(self, create: StructureCreate) -> Structure:
         """Crée une structure et la rend. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
@@ -85,7 +85,7 @@ class StructureService:
         return structure
 
     def update_structure(self, structure_id: int, update: StructureUpdate) -> Structure:
-        """Met à jour une structure. Charge l'agrégat, applique les champs fournis (validés), persiste. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
+        """Met à jour une structure. Charge l'agrégat, applique les champs fournis, validés, et l'écrit. `null` efface un champ facultatif ; sur le nom ou le type, il vaut champ non fourni.
 
         Lève `NotFoundError` si la structure n'existe pas, `ValidationError` si aucun champ n'est fourni ou si une valeur est invalide.
         """
@@ -107,9 +107,9 @@ class StructureService:
         return structure
 
     def delete_structure(self, structure_id: int) -> None:
-        """Supprime une structure. Lève NotFoundError si elle n'existe pas.
+        """Supprime une structure. Lève `NotFoundError` si elle n'existe pas.
 
-        La base supprime en cascade ses formes de nom, ses tutelles et ses liens adresse-structure, confirmés compris (`ON DELETE CASCADE`). La structure quitte les racines de tout périmètre, puis la clôture des périmètres est recalculée : la structure et ses tutelles en modifient la descente.
+        La base supprime en cascade ses formes de nom, ses tutelles et ses liens adresse-structure, confirmés compris (`ON DELETE CASCADE`). La structure quitte les racines de tout périmètre, puis les structures des périmètres se recalculent sans elle.
         """
         snapshot = self._structures.delete_structure(structure_id)
         if snapshot is None:
@@ -122,9 +122,9 @@ class StructureService:
     # ── Tutelles (structure_parents) ──
 
     def create_tutelle(self, *, parent_id: int, child_id: int) -> StructureTutelleRow | None:
-        """Crée une tutelle, puis recalcule la clôture des périmètres, dont une tutelle modifie la descente. Retourne la ligne insérée, ou None si elle existait déjà.
+        """Crée une tutelle, puis recalcule les structures des périmètres. Rend la ligne insérée, ou `None` si elle existait déjà.
 
-        Lève `ValidationError` si la tutelle viole l'invariant de graphe (auto-référence `parent_id == child_id` ou cycle : `child_id` est déjà un ancêtre de `parent_id`). Les ancêtres sont préchargés via `StructureRepository.get_ancestor_ids` et la validation est déléguée au domaine.
+        Lève `ValidationError` si la tutelle viole le graphe : structure tutelle d'elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Le domaine valide, d'après les ancêtres que lit `StructureRepository.get_ancestor_ids`.
         """
         check_can_create_tutelle(
             parent_id=parent_id,
@@ -144,7 +144,7 @@ class StructureService:
         return row
 
     def delete_tutelle(self, tutelle_id: int) -> None:
-        """Supprime une tutelle, puis recalcule la clôture des périmètres. Lève NotFoundError si elle n'existe pas."""
+        """Supprime une tutelle, puis recalcule les structures des périmètres. Lève `NotFoundError` si elle n'existe pas."""
         row = self._structures.delete_tutelle(tutelle_id)
         if not row:
             raise NotFoundError(f"Tutelle {tutelle_id} introuvable")
@@ -163,12 +163,12 @@ class StructureService:
     # ── Formes de nom (structure_name_forms) ──
 
     def create_name_form(self, create: NameFormCreate) -> StructureNameFormRow:
-        """Crée une forme de nom. Retourne la ligne insérée."""
+        """Crée une forme de nom et rend la ligne insérée."""
         form_text_normalized = normalize_text(create.form_text)
         row = self._structures.create_name_form(
             structure_id=create.structure_id,
             form_text_normalized=form_text_normalized,
-            # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
+            # Une forme courte impose la frontière de mot ; une contrainte CHECK garde l'invariant.
             is_word_boundary=create.is_word_boundary or is_short_form(form_text_normalized),
             is_excluding=create.is_excluding,
             requires_context_of=create.requires_context_of,
@@ -182,9 +182,9 @@ class StructureService:
         return row
 
     def update_name_form(self, form_id: int, update: NameFormUpdate) -> StructureNameFormRow:
-        """Met à jour une forme de nom. Retourne la ligne modifiée. `null` sur `requires_context_of` efface le contexte ; sur un autre champ, il vaut champ non fourni.
+        """Met à jour une forme de nom et rend la ligne modifiée. `null` sur `requires_context_of` efface le contexte ; sur un autre champ, il vaut champ non fourni.
 
-        Lève NotFoundError si la forme n'existe pas, ValidationError si aucun champ n'est fourni.
+        Lève `NotFoundError` si la forme n'existe pas, `ValidationError` si aucun champ n'est fourni.
         """
         existing = self._structures.find_name_form(form_id)
         if existing is None:
@@ -204,7 +204,7 @@ class StructureService:
         if not update_fields:
             raise ValidationError("Aucun champ à mettre à jour")
 
-        # Forme courte ⇒ frontière de mot forcée (invariant verrouillé par une CHECK).
+        # Une forme courte impose la frontière de mot ; une contrainte CHECK garde l'invariant.
         # Texte effectif : le nouveau s'il est fourni, sinon celui déjà en base.
         effective_form_text = update_fields.get("form_text", existing["form_text"])
         if is_short_form(effective_form_text):
@@ -220,7 +220,7 @@ class StructureService:
         return row
 
     def delete_name_form(self, form_id: int) -> None:
-        """Supprime une forme de nom. Lève NotFoundError si elle n'existe pas."""
+        """Supprime une forme de nom. Lève `NotFoundError` si elle n'existe pas."""
         row = self._structures.delete_name_form(form_id)
         if not row:
             raise NotFoundError(f"Forme {form_id} introuvable")

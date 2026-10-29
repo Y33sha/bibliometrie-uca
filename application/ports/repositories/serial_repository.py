@@ -1,4 +1,4 @@
-"""Port SerialRepository — édition de l'agrégat Serial dans l'administration."""
+"""Port SerialRepository : édition de l'agrégat Serial dans l'administration."""
 
 from typing import Protocol
 
@@ -10,7 +10,7 @@ from domain.serials.serial import OaModel, Serial, SerialType
 
 
 class SerialIssnInput(BaseModel):
-    """Un ISSN d'une revue, saisi à l'administration."""
+    """Un ISSN d'une revue, saisi dans l'administration."""
 
     issn: str
     support: IssnSupport | None = None
@@ -19,7 +19,7 @@ class SerialIssnInput(BaseModel):
 
 
 class SerialUpdate(BaseModel):
-    """Champs éditables d'une revue, en modification sélective : seuls les champs explicitement fournis sont écrits."""
+    """Champs modifiables d'une revue ; seuls les champs fournis sont écrits."""
 
     title: str | None = None
     issns: list[SerialIssnInput] | None = None
@@ -36,7 +36,7 @@ class SerialRepository(Protocol):
         ...
 
     def save(self, serial: Serial) -> None:
-        """Enregistre les champs éditables d'une revue chargée. Lève `NotFoundError` si la revue n'existe pas."""
+        """Enregistre les champs modifiables d'une revue chargée. Lève `NotFoundError` si la revue n'existe pas."""
         ...
 
     def find_shared_title_serial_pairs(
@@ -44,5 +44,5 @@ class SerialRepository(Protocol):
         target_publisher_id: int,
         source_publisher_id: int,
     ) -> list[SharedTitlePair]:
-        """Paires de revues de même titre normalisé, l'une de `target_publisher_id`, l'autre de `source_publisher_id`, avec leurs titres et leurs ISSN."""
+        """Paires de revues de même titre normalisé, l'une de l'éditeur cible, l'autre de l'éditeur absorbé, avec leurs titres et leurs ISSN."""
         ...

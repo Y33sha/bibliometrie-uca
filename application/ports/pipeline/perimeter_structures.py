@@ -7,12 +7,12 @@ from typing import Protocol
 
 
 class PerimeterStructures(Protocol):
-    """Clôture des tutelles des périmètres : rematérialisation et lecture."""
+    """Structures des périmètres : recalcul et lecture."""
 
     def refresh(self) -> None:
-        """Recompute la table matérialisée `perimeter_structures` (clôture des tutelles). Idempotent. Commit laissé au caller."""
+        """Recalcule `perimeter_structures`. L'appelant commite."""
         ...
 
     def persons_structure_ids(self) -> list[int]:
-        """Structures du périmètre personnes, en liste — forme attendue d'un paramètre lié `ANY(:ids)`."""
+        """Structures du périmètre des personnes, en liste, la forme qu'attend `ANY(:ids)`."""
         ...

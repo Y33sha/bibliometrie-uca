@@ -1,6 +1,6 @@
-"""Port AddressRepository — contrat d'accès au cluster de tables des adresses.
+"""Port AddressRepository : écritures sur les adresses et leurs liens.
 
-L'adresse n'a pas d'objet de domaine : « agrégat » désigne ici le cluster que ce repository possède, sans racine d'entité côté `domain/`. Le domaine, le SQL et les services garantissent les invariants : préséance des pays candidats, états d'un rattachement.
+L'adresse est sans objet de domaine. Le domaine, le SQL et les services garantissent les invariants : préséance des pays candidats, états d'un rattachement.
 """
 
 from dataclasses import dataclass
@@ -11,7 +11,7 @@ from typing import Protocol
 class AddressCountryFilter:
     """Critères de sélection d'adresses par leur pays, pour la liste d'attribution et l'attribution en masse.
 
-    Combinés en AND. `search` : sous-chaîne cherchée dans le texte de l'adresse, insensible à la casse et aux accents. `has_country` : True → pays renseigné, False → aucun pays, None → critère inactif. `country_code` : pays retenu."""
+    Combinés en AND. `search` : sous-chaîne cherchée dans le texte de l'adresse, insensible à la casse et aux accents. `has_country` : vrai pour un pays renseigné, faux pour aucun, `None` sans critère. `country_code` : pays retenu."""
 
     search: str | None = None
     has_country: bool | None = None
@@ -46,7 +46,7 @@ class AddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> int:
-        """`reset_manual_link` sur un lot. Retourne le nombre de rattachements touchés : liens purement manuels supprimés + détections repassées à pending."""
+        """`reset_manual_link` sur un lot. Rend le nombre de rattachements touchés : liens manuels supprimés et détections remises en attente."""
         ...
 
     def batch_upsert_structure_links(
@@ -63,13 +63,13 @@ class AddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> set[int]:
-        """Sous-ensemble de `address_ids` dont le lien à `structure_id` compte pour le périmètre : lien confirmé ou non décidé."""
+        """Adresses, parmi celles données, dont le lien à la structure compte pour le périmètre : lien confirmé ou non décidé."""
         ...
 
     # ── Pays ───────────────────────────────────────────────────────
 
     def country_exists(self, code: str) -> bool:
-        """Le code figure-t-il au référentiel `countries` ? Les saisies de pays s'appuient sur cette lecture pour refuser un code inconnu."""
+        """Vrai si le code figure au référentiel `countries`. Les saisies de pays refusent ainsi un code inconnu."""
         ...
 
     def set_manual_countries(self, address_id: int, countries: list[str] | None) -> None:
@@ -77,11 +77,11 @@ class AddressRepository(Protocol):
         ...
 
     def add_manual_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
-        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la met dans la file `address_candidates_queue`. Retourne les ids atteints."""
+        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la met dans la file `address_candidates_queue`. Rend les ids atteints."""
         ...
 
     def add_manual_country_by_filter(
         self, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
-        """Comme `add_manual_country_by_ids`, sur les adresses retenues par `criteria`. Retourne les ids atteints ; critères tous vides : aucune écriture, `[]`."""
+        """Comme `add_manual_country_by_ids`, sur les adresses retenues par les critères. Rend les ids atteints ; sans critère, n'écrit rien et rend `[]`."""
         ...

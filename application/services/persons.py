@@ -1,4 +1,4 @@
-"""Service Personnes — écritures sur l'agrégat Person.
+"""Service des personnes : écritures sur l'agrégat Person.
 
 Couvre les tables `persons`, `person_identifiers` et `person_name_forms`, et le détachement des contributions (`contributions`). Le renommage et l'attribution d'un identifiant passent par le repository des personnes, que la phase `persons` du pipeline utilise aussi.
 """
@@ -82,7 +82,7 @@ class PersonService:
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
         """Exclut une personne pour le motif `exclusion`, ou la retient si `exclusion` est `None`.
 
-        L'exclusion fait basculer l'appartenance au périmètre de ses publications : le pipeline la recalcule. Lève NotFoundError si la personne n'existe pas.
+        L'exclusion change l'appartenance au périmètre de ses publications, que le pipeline recalcule. Lève `NotFoundError` si la personne n'existe pas.
         """
         self._persons.set_exclusion(person_id, exclusion)
         self._perimeter_recompute.refresh_publications_of_person(person_id)
@@ -94,11 +94,11 @@ class PersonService:
         )
 
     def update_name(self, person_id: int, last_name: str, first_name: str) -> None:
-        """Met à jour le nom/prénom d'une personne et rafraîchit ses formes de nom.
+        """Met à jour le nom et le prénom d'une personne, et recalcule ses formes de nom.
 
         Le nom est ce par quoi les contributions sources reviennent à une personne : en changer déplace des publications d'une personne à une autre, d'où l'événement d'audit.
 
-        Lève `ValidationError` sans patronyme : le rafraîchissement retirerait alors à la personne les formes de nom qui dérivent de son seul nom. Lève `NotFoundError` si la personne n'existe pas.
+        Lève `ValidationError` sans nom de famille : le recalcul retirerait alors à la personne les formes de nom qui dérivent de son seul nom. Lève `NotFoundError` si la personne n'existe pas.
         """
         last_name, first_name = self._persons.rename(person_id, last_name, first_name)
         emit_event(
@@ -113,9 +113,9 @@ class PersonService:
     def add_identifier(self, person_id: int, id_type: str, id_value: str) -> AddIdentifierResult:
         """Attribue à la main un identifiant (ORCID, idHAL, IdRef) à une personne.
 
-        L'attribution passe par `PersonRepository.attribute_identifier`, qui normalise la valeur et suit `attribution_outcome`. Le type se restreint à `PUBLIC_PERSON_IDENTIFIER_TYPES` : `hal_person_id` est la référence d'un compte HAL, que l'extraction observe dans le TEI.
+        L'attribution passe par `PersonRepository.attribute_identifier`, qui normalise la valeur et suit `attribution_outcome`. Le type se restreint à `PUBLIC_PERSON_IDENTIFIER_TYPES` : `hal_person_id` est la référence d'un compte HAL, que le moissonnage lit dans le TEI.
 
-        Lève `ValidationError` sur un type hors de cette liste ou une valeur malformée, `NotFoundError` sur une personne absente, `IdentifierAttributionConflictError` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
+        Lève `ValidationError` sur un type hors de cette liste ou une valeur mal formée, `NotFoundError` sur une personne absente, `IdentifierAttributionConflictError` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
         """
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")
@@ -141,7 +141,7 @@ class PersonService:
     ) -> IdentifierStatusResult:
         """Met à jour le statut d'un identifiant (pending/confirmed/rejected).
 
-        Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent (`mark_contributions_of_rejected_identifiers`) : le run suivant les redécide. Lève NotFoundError si l'identifiant n'existe pas.
+        Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL (`propagate_status_to_hal_accounts`). Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent (`mark_contributions_of_rejected_identifiers`) : le run suivant les redécide. Lève `NotFoundError` si l'identifiant n'existe pas.
         """
         row = self._persons.update_identifier_status(ident_id, status)
         propagated = (
@@ -166,9 +166,9 @@ class PersonService:
     ) -> NameFormStatusRow:
         """Met à jour le statut d'une forme de nom (pending/confirmed/rejected).
 
-        `confirmed` valide le lien. `rejected` est le verrou de non-retour. Il marque aussi pour la redécision de leur personne les contributions de la personne rattachées par le nom dont une contribution source contient la forme (`mark_contributions_for_name_form`) : le run suivant les redécide. Les contributions épinglées restent en l'état.
+        Une forme confirmée valide le lien. Une forme rejetée sort durablement du rattachement par nom ; le rejet marque aussi pour la redécision de leur personne les contributions de la personne rattachées par le nom dont une contribution source contient la forme (`mark_contributions_for_name_form`) : le run suivant les redécide. Les contributions épinglées restent en l'état.
 
-        Retourne la ligne {person_id, name_form, status}. Lève NotFoundError si le couple (name_form, person_id) n'existe pas, et ConflictError si la forme dérive du nom de la personne, confirmée d'office.
+        Rend la ligne `{person_id, name_form, status}`. Lève `NotFoundError` si le couple (forme, personne) n'existe pas, et `ConflictError` si la forme dérive du nom de la personne, confirmée d'office.
         """
         row = self._persons.update_name_form_status(person_id, name_form, status)
         if status == AttributionStatus.REJECTED:
@@ -184,11 +184,11 @@ class PersonService:
     def detach_contributions(
         self, person_id: int, contributions: list[ContributionRef]
     ) -> DetachResult:
-        """Rejette durablement les paires (publication, personne) couvertes par un lot de contributions sources sélectionnées.
+        """Rejette durablement les paires (publication, personne) des contributions sources sélectionnées.
 
-        Le rejet porte sur la publication entière : on résout l'ensemble distinct des `publication_id` des sources sélectionnées et on applique `reject_pair` à chaque paire (enregistrement du rejet, détachement de la contribution de la personne). Puis on supprime les formes de nom de la personne qu'aucune source restante n'atteste.
+        Le rejet vaut pour la publication entière : chaque publication des contributions sources sélectionnées reçoit `reject_pair`. Les formes de nom de la personne qu'aucune source restante ne contient sont ensuite supprimées.
 
-        Retourne {"detached": N, "cleaned_forms": K}, N contributions détachées.
+        Rend le nombre de contributions détachées et de formes supprimées.
         """
         publication_ids: set[int] = set()
         for a in contributions:
@@ -218,7 +218,7 @@ class PersonService:
     # ── Fusion ──
 
     def mark_distinct(self, person_id_a: int, person_id_b: int) -> None:
-        """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. Idempotent : l'événement d'audit n'est émis que si la paire vient d'être insérée.
+        """Marque deux personnes comme distinctes (non-doublon) dans `distinct_persons`. L'événement d'audit est émis seulement si la paire est insérée.
 
         Lève `ValidationError` sur deux identifiants égaux : une personne n'est pas un non-doublon d'elle-même.
         """
@@ -234,7 +234,7 @@ class PersonService:
             )
 
     def unmark_distinct(self, person_id_a: int, person_id_b: int) -> None:
-        """Annule la décision qui déclare deux personnes distinctes. Idempotent : l'événement d'audit est émis seulement si la paire existait."""
+        """Annule la décision qui déclare deux personnes distinctes. L'événement d'audit est émis seulement si la paire existait."""
         removed = self._persons.unmark_distinct(person_id_a, person_id_b)
         if removed:
             emit_event(
@@ -245,11 +245,11 @@ class PersonService:
             )
 
     def merge_person(self, target_id: int, source_id: int) -> tuple[int, int]:
-        """Fusionne les personnes `target_id` et `source_id`, et retourne (id conservé, id absorbé).
+        """Fusionne deux personnes, et rend l'id conservé et l'id absorbé.
 
         Les rôles demandés sont inversés si seule `source_id` a une fiche RH (`merge_roles`). Le repository reprend ensuite les clés étrangères (`PersonRepository.merge_into`).
 
-        Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si les deux ont une fiche RH. Émet un événement d'audit `person.merged` si un utilisateur est dans le contexte.
+        Lève `ValidationError` sur deux identifiants égaux, `NotFoundError` si target ou source n'existe pas, `ConflictError` si les deux ont une fiche RH. Émet l'événement d'audit `person.merged` dans une requête d'administration.
         """
         check_merge_pair(target_id, source_id, self._persons.find_by_id, label="Personne")
         target_id, source_id = merge_roles(

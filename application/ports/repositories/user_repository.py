@@ -1,4 +1,4 @@
-"""Port UserRepository — utilisateurs autorisés et leurs rôles (`ops.users`, `ops.user_roles`)."""
+"""Port UserRepository : utilisateurs autorisés et leurs rôles (`ops.users`, `ops.user_roles`)."""
 
 from collections.abc import Iterable
 from typing import Protocol
@@ -12,5 +12,5 @@ class UserRepository(Protocol):
         ...
 
     def ensure_user(self, login: str, roles: Iterable[str]) -> None:
-        """Crée l'utilisateur s'il manque et lui attribue `roles`, en gardant les rôles qu'il a déjà."""
+        """Crée l'utilisateur s'il manque et lui attribue les rôles donnés, en gardant les rôles qu'il a déjà."""
         ...

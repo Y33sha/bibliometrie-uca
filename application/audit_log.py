@@ -1,7 +1,6 @@
 """Journal d'audit : consigne dans `audit_log` les décisions prises par une utilisatrice de l'administration.
 
-Usage, depuis un service, après l'écriture que l'événement décrit :
-    emit_event("person.merged", "person", target_id, {"source_id": source_id})
+Un service émet l'événement après l'écriture qu'il décrit : `emit_event("person.merged", "person", target_id, {"source_id": source_id})`.
 
 L'événement rejoint la file de la requête en cours. `db_conn` écrit cette file dans `audit_log` juste avant le commit de la requête (`record_pending_events`) : la trace partage le sort de l'écriture qu'elle décrit.
 
@@ -39,10 +38,7 @@ _session: contextvars.ContextVar[_AuditSession | None] = contextvars.ContextVar(
 
 
 def set_current_user(user_id: str | None) -> contextvars.Token[_AuditSession | None]:
-    """Ouvre la session d'audit de la requête en cours, au nom de `user_id` (aucune si `None`).
-
-    Retourne un Token à passer à `reset_current_user()` pour restaurer l'état précédent.
-    """
+    """Ouvre la session d'audit de la requête en cours, au nom de l'utilisatrice (aucune avec `None`), et rend le jeton qui restaure l'état précédent (`reset_current_user`)."""
     return _session.set(_AuditSession(user_id) if user_id is not None else None)
 
 
@@ -52,7 +48,7 @@ def reset_current_user(token: contextvars.Token[_AuditSession | None]) -> None:
 
 
 def get_current_user() -> str | None:
-    """Retourne l'utilisatrice de la requête en cours, ou None hors requête d'administration."""
+    """Utilisatrice de la requête en cours, ou `None` hors requête d'administration."""
     session = _session.get()
     return session.user_id if session is not None else None
 
@@ -63,13 +59,9 @@ def emit_event(
     aggregate_id: int | None = None,
     payload: dict[str, JsonValue] | None = None,
 ) -> None:
-    """Ajoute un événement à la file de la requête en cours. Sans requête d'administration, ne consigne rien.
+    """Ajoute un événement à la file de la requête en cours ; sans requête d'administration, ne consigne rien.
 
-    Args:
-        event_type: notation pointée, ex. "person.merged", "structure.deleted".
-        aggregate_type: type de l'entité affectée (person, publication, structure, serial, publisher, address…).
-        aggregate_id: id de l'entité affectée. NULL si l'entité n'a pas d'équivalent survivant, ou si l'événement porte sur un lot.
-        payload: données utiles, sérialisables en JSON (source d'une fusion, champs modifiés…).
+    `event_type` est en notation pointée (`person.merged`, `structure.deleted`), `aggregate_type` est le type de l'entité touchée (person, publication, structure, serial, publisher, address…). `aggregate_id` est nul quand l'entité disparaît sans équivalent, ou quand l'événement concerne un lot. `payload` contient les données utiles, sérialisables en JSON (source d'une fusion, champs modifiés…).
     """
     session = _session.get()
     if session is not None:

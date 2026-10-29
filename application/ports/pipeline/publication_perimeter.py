@@ -14,5 +14,5 @@ class PublicationPerimeterRecompute(Protocol):
         ...
 
     def refresh_publications(self, publication_ids: list[int]) -> int:
-        """Recalcule `publications.perimeter_evidence` pour les publications `publication_ids`. Rend le nombre de publications changées."""
+        """Recalcule `publications.perimeter_evidence` pour les publications données. Rend le nombre de publications changées."""
         ...

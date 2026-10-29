@@ -1,4 +1,4 @@
-"""Service Éditeurs — écritures sur l'agrégat Publisher : mise à jour, fusion."""
+"""Service des éditeurs : écritures sur l'agrégat Publisher : mise à jour, fusion."""
 
 from application.audit_log import emit_event
 from application.ports.pipeline.publication_count import PublicationCountRecompute
@@ -36,7 +36,7 @@ class PublisherService:
         self._publication_count_recompute = publication_count_recompute
 
     def update_publisher(self, publisher_id: int, update: PublisherUpdate) -> None:
-        """Charge l'éditeur, applique les champs explicitement fournis, persiste.
+        """Charge l'éditeur, applique les champs fournis et l'écrit.
 
         L'événement d'audit contient seulement les champs soumis.
 
@@ -72,8 +72,7 @@ class PublisherService:
         ):
             raise ConflictError(f"Fusion refusée, {conflict} (cible / source)")
 
-        # 2. Les revues homonymes des deux éditeurs fusionnent, sauf si une paire bloque. Toutes les
-        #    paires bloquantes partent ensemble dans l'erreur : l'UI les affiche d'un coup.
+        # 2. Les revues homonymes des deux éditeurs fusionnent, sauf si une paire bloque. Toutes les paires bloquantes partent ensemble dans l'erreur : l'interface les affiche d'un coup.
         mergeable_pairs, blockers = split_shared_title_pairs(
             self._serials.find_shared_title_serial_pairs(target_id, source_id)
         )

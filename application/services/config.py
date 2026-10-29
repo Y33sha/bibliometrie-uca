@@ -14,9 +14,9 @@ class ConfigService:
         self._config = config
 
     def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue]:
-        """Met à jour la valeur d'un paramètre de config existant. `value` est ramené à la forme que la clé impose (`normalize_config_value`) puis sérialisé en JSON. Retourne la ligne mise à jour ; lève `NotFoundError` si la clé n'existe pas.
+        """Met à jour la valeur d'un paramètre de config existant. `value` est ramené à la forme que la clé impose (`normalize_config_value`) puis sérialisé en JSON. Rend la ligne mise à jour ; lève `NotFoundError` si la clé n'existe pas.
 
-        Un réglage d'exploitation change le comportement de l'application sans rien changer aux données : le changement ne se relit nulle part ensuite, d'où l'événement d'audit. La clé étant un texte, elle vit dans la charge utile, l'identifiant d'agrégat n'accueillant qu'un entier. La valeur antérieure n'y figure pas : le journal la contient déjà, sous la forme de l'événement qui l'a posée.
+        Un réglage change le comportement de l'application sans trace dans les données : l'événement d'audit garde le changement. La clé, un texte, va dans la charge utile : l'identifiant d'agrégat est un entier. La valeur précédente est absente : le journal la contient déjà, dans l'événement qui l'a posée.
         """
         normalisee = normalize_config_value(key, value)
         row = self._config.update_config_value(key, normalisee)
