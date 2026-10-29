@@ -1,4 +1,4 @@
-"""Normalisation des données ScanR : staging → tables structurées."""
+"""Normalisation des enregistrements sources ScanR."""
 
 from collections.abc import Mapping
 from urllib.parse import urlsplit
@@ -45,10 +45,6 @@ from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
 
-# =============================================================
-# UTILITAIRES
-# =============================================================
-
 
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     for entry in as_sequence(doc.get("externalIds")):
@@ -74,10 +70,7 @@ def get_publisher(doc: Mapping[str, JsonValue]) -> PublisherFacts | None:
 
 
 def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Extrait (issn, eissn) depuis `source.journalIssns` (array ScanR).
-
-    Heuristique : 1er = print/issn, 2e = electronic/eissn. Les éventuelles entrées supplémentaires (alias, ISSN-L, variantes historiques) sont ignorées. Cohérent avec ce qu'on fait pour OpenAlex.
-    """
+    """ISSN papier et électronique de `source.journalIssns` : le premier, puis le second. Les entrées suivantes (alias, ISSN-L, variantes historiques) sont écartées."""
     issns = as_sequence(source.get("journalIssns"))
     issn = as_str(issns[0]) if len(issns) >= 1 else None
     eissn = as_str(issns[1]) if len(issns) >= 2 else None
@@ -85,7 +78,7 @@ def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, 
 
 
 def is_thesis(doc: Mapping[str, JsonValue]) -> bool:
-    """Indique si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, qui n'est pas un conteneur."""
+    """Vrai si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, hors conteneur."""
     return map_doc_type(as_str(doc.get("type")) or "", "scanr") in DOC_TYPE_FAMILIES["theses"]
 
 
@@ -155,11 +148,6 @@ def get_oa_status(doc: Mapping[str, JsonValue]) -> str | None:
     )
 
 
-# =============================================================
-# SOURCE DOCUMENTS (SCANR)
-# =============================================================
-
-
 # Type d'identifiant de chaque type d'`externalIds` lu.
 _EXTERNAL_ID_TYPES = {
     "doi": SourceIdentifierType.DOI,
@@ -189,7 +177,7 @@ def scanr_source_record(  # noqa: C901
 ) -> SourceRecordUpsert:
     """Enregistrement source ScanR d'un document.
 
-    Le titre du contenant (`source.title`) est gardé seulement en l'absence de revue. L'API ScanR n'expose pas la langue.
+    Le titre du conteneur (`source.title`) est gardé seulement sans revue. L'API ScanR est sans langue.
     """
     doi = extract_doi(doc)
     abstract = as_str(as_mapping(doc.get("summary")).get("default"))
@@ -202,7 +190,7 @@ def scanr_source_record(  # noqa: C901
     else:
         keywords = None
 
-    # `domains` porte les concepts ScanR : wikidata et mots-clés rejoignent les mots-clés, les vedettes sudoc forment les sujets. `topics` reprend les topics OpenAlex, que la source OpenAlex fournit : il n'est pas lu.
+    # `domains` contient les concepts ScanR : wikidata et mots-clés rejoignent les mots-clés, les vedettes sudoc forment les sujets. `topics` reprend les topics OpenAlex, que la source OpenAlex fournit : il n'est pas lu.
     concept_keywords, subjects = split_scanr_concepts(doc.get("domains"))
     known = {k.lower() for k in keywords or ()}
     keywords = [*(keywords or ()), *(k for k in concept_keywords if k.lower() not in known)] or None
@@ -226,7 +214,7 @@ def scanr_source_record(  # noqa: C901
             seen.add(u)
             urls.append(u)
 
-    # Publisher + journal bruts (traçabilité du nom tel que vu par ScanR, en parallèle des publishers/serials créés via find_or_create_*).
+    # Éditeur et revue tels que ScanR les nomme.
     source = as_mapping(doc.get("source"))
     jissn, jeissn = _extract_serial_issns(source)
     biblio_json = compact_biblio(
@@ -263,19 +251,13 @@ def scanr_source_record(  # noqa: C901
     )
 
 
-# =============================================================
-# SCANR CONTRIBUTIONS
-# =============================================================
-
-
 def build_scanr_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Parse les auteurs d'un document ScanR en `AuthorRecord` (sans I/O).
+    """Contributions sources d'un document ScanR.
 
-    - identifiants `orcid`/`idref` (sous `denormalized`) ;
-    - `roles` via `map_role('scanr', role)` ;
-    - affiliations feuilles sans `structId` → adresses, chacune avec ses `detected_countries` en `countries` (pays d'autorité détectés dans le texte de l'affiliation) ;
-    - affiliations feuilles avec `structId` → structures HAL de la contribution source. Leur nom est celui d'une fiche du référentiel HAL : il n'est pas une adresse ;
-    - ROR de chaque affiliation : sur son adresse, sur la contribution source pour les affiliations sans adresse.
+    - Les identifiants `orcid` et `idref` viennent de `denormalized`, les rôles de `map_role`.
+    - Une affiliation feuille sans `structId` devient une adresse, avec les pays que ScanR détecte dans son texte (`detected_countries`).
+    - Une affiliation feuille avec `structId` est une structure HAL de la contribution source : son nom est celui d'une fiche du référentiel HAL, et reste hors des adresses.
+    - Le ROR d'une affiliation va sur son adresse, ou sur la contribution source pour une affiliation sans adresse.
     """
     authors = [as_mapping(a) for a in as_sequence(doc.get("authors"))]
     ids_by_position = [

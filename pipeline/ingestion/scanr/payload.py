@@ -1,6 +1,6 @@
 """Lecture des enregistrements sources ScanR par la normalisation : affiliations feuilles, identifiants, concepts, statut open access.
 
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API ScanR (frontière dynamique avec une source externe, schéma non typé)."""
+Les payloads sont les objets JSON bruts de l'API, sans schéma typé."""
 
 import re
 from collections.abc import Mapping
@@ -22,22 +22,20 @@ _KEYWORD_CONCEPT_TYPES = frozenset({"wikidata", "keyword"})
 def select_leaf_affiliations(
     affiliations: list[Mapping[str, JsonValue]],
 ) -> list[Mapping[str, JsonValue]]:
-    """Filtre les affiliations ScanR aux entrées marquées labo.
+    """Affiliations ScanR marquées laboratoire, à défaut toutes les affiliations.
 
-    ScanR renvoie côte à côte l'affiliation labo (champ `id_name_author_labo` rempli, c'est la seule affichée publiquement côté ScanR) et les pures tutelles, déjà dérivables via `structures_parents`. Ne garder que la labo évite la double-comptabilisation des tutelles parentes en aval.
-
-    Fallback sur la liste complète si aucune entrée n'est marquée labo (auteur non rattaché à un labo identifié côté ScanR) — sinon on perdrait toute affiliation pour cet auteur.
+    ScanR donne côte à côte l'affiliation au laboratoire (`id_name_author_labo` rempli, seule affichée sur ScanR) et les tutelles, que donnent déjà les tutelles des structures. Le laboratoire seul évite de compter deux fois les tutelles. Un auteur sans laboratoire identifié par ScanR garde toutes ses affiliations.
     """
     labo = [a for a in affiliations if a.get("id_name_author_labo")]
     return labo or affiliations
 
 
-# Identifiant ScanR d'une thèse soutenue : `nnt<NNT>` ou `these<NNT>`, le NNT commençant par l'année de soutenance. Une thèse en préparation (`nnts<numéro>`) n'a pas de NNT.
+# Identifiant ScanR d'une thèse soutenue : `nnt<NNT>` ou `these<NNT>`, le NNT commençant par l'année de soutenance. Une thèse en préparation (`nnts<numéro>`) est sans NNT.
 _THESIS_ID_RE = re.compile(r"^(?:nnt|these)(\d{4}[A-Za-z0-9]+)$")
 
 
 def extract_nnt_from_scanr_id(scanr_id: str | None) -> str | None:
-    """Extrait le NNT d'un `scanr_id` de thèse soutenue (`nnt2019clfad020` → `2019CLFAD020`). `None` pour tout autre identifiant."""
+    """NNT d'un identifiant ScanR de thèse soutenue (`nnt2019clfad020` → `2019CLFAD020`), `None` pour tout autre identifiant."""
     match = _THESIS_ID_RE.match(scanr_id or "")
     nnt = NNT.try_parse(match.group(1)) if match else None
     return str(nnt) if nnt else None
@@ -64,7 +62,7 @@ def scanr_derived_identifier(scanr_id: str) -> SourceIdentifier | None:
 def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:
     """Répartit les concepts ScanR (`domains`) en mots-clés libres et en sujets.
 
-    Renvoie d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc telles que ScanR les donne, avec leur code. Un concept d'un autre type est écarté.
+    Rend d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc telles que ScanR les donne, avec leur code. Un concept d'un autre type est écarté.
     """
     keywords: list[str] = []
     seen: set[str] = set()
@@ -85,15 +83,14 @@ def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]
 def derive_scanr_oa_status(
     is_oa: bool | None, oa_evidence: Mapping[str, JsonValue] | None
 ) -> str | None:
-    """Mapping (isOa, oaEvidence) ScanR → enum oa_status canonique.
+    """Statut open access d'un document ScanR, déduit de `isOa` et de `oaEvidence` (hôte et licence de la copie ouverte).
 
-    ScanR n'expose pas de statut OA nuancé ; il faut l'inférer de `isOa` (bool) et de `oaEvidence.hostType` / `oaEvidence.license` :
-      - is_oa=None → None (pas d'assertion ; délégation aux autres sources via `best_oa_status`)
-      - is_oa=False → 'closed' (assertion explicite : aucun accès ouvert trouvé)
-      - is_oa=True + hostType='repository' → 'green' (dépôt en archive ouverte)
-      - is_oa=True + hostType='publisher' + license cc-* → 'hybrid' (défaut conservatif, arbitré vers 'gold' en aval par `best_oa_status` si une autre source le confirme)
-      - is_oa=True + hostType='publisher' sans license cc-* → 'bronze' (accès libre chez l'éditeur, licence ouverte non déclarée)
-      - is_oa=True + hostType absent / inconnu → None (délégation)
+    - `isOa` absent → `None` : les autres sources en décident (`best_oa_status`) ;
+    - `isOa` faux → `closed` ;
+    - copie ouverte dans une archive (`repository`) → `green` ;
+    - copie ouverte chez l'éditeur, sous licence Creative Commons → `hybrid`, que `best_oa_status` remplace par `gold` si une autre source le dit ;
+    - copie ouverte chez l'éditeur, sans licence Creative Commons → `bronze` ;
+    - hôte absent ou inconnu → `None`.
     """
     if is_oa is None:
         return None

@@ -1,6 +1,6 @@
 """Nouvelle lecture d'un document ScanR par son identifiant natif : tâche `fetch_stale.scanr`.
 
-Refetch d'une row par son id ScanR (`staging.source_id`) via une requête ElasticSearch `term` sur `id.keyword`. Une réponse ES valide sans hit = id confirmé absent.
+Une requête Elasticsearch `term` sur `id.keyword` relit le document. Une réponse valide sans résultat confirme l'absence.
 """
 
 from __future__ import annotations
