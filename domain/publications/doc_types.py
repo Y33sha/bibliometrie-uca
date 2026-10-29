@@ -1,13 +1,10 @@
-"""Taxonomie canonique des `doc_type` : enum, ensembles et familles.
-
-Vocabulaire partagé de la couche canonique — la valeur de l'enum PostgreSQL `doc_type` de la table `publications`, ses sous-types d'article prioritaires à l'arbitrage, et le regroupement en familles pour la ventilation. Le mapping des nomenclatures sources vers cette taxonomie vit côté source (`domain/source_records/doc_types.py`).
-"""
+"""Types de document des publications, et leurs familles."""
 
 from enum import StrEnum
 
 
 class DocType(StrEnum):
-    """Type de document canonique — les membres portent les libellés de l'enum PostgreSQL `doc_type`."""
+    """Type de document d'une publication. Reflet du type PostgreSQL `doc_type`."""
 
     ARTICLE = "article"
     CONFERENCE_PAPER = "conference_paper"
@@ -41,16 +38,7 @@ class DocType(StrEnum):
 DOC_TYPES: tuple[DocType, ...] = tuple(DocType)
 DOC_TYPES_SET: frozenset[str] = frozenset(DocType)
 
-# Sous-types qui priment sur "article" générique : si une source prioritaire
-# (typiquement CrossRef avec "journal-article") dit "article", mais qu'une
-# source moins prioritaire (HAL, OA…) reconnaît un sous-type plus précis,
-# on préfère le sous-type pour ne pas perdre l'information.
-#
-# CrossRef ne distingue pas ces sous-types (tout est "journal-article") ;
-# HAL fait la distinction via ses combinaisons type_sous-type
-# ("art_artrev" → "review", "art_bookreview" → "book_review", etc.).
-# L'arbitrage vit dans `domain/publications/aggregation.py`
-# (`arbitrate_doc_type_with_article_subtype`).
+# Sous-types d'article, qui l'emportent sur `article` à l'agrégation (`arbitrate_doc_type_with_article_subtype`).
 ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     {
         DocType.REVIEW,
@@ -65,8 +53,7 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     }
 )
 
-# Famille → types fins. Mémoires/thèses en cours filtrés ailleurs, mais classés ici pour
-# l'exhaustivité de la couverture de l'enum. L'ordre est celui d'affichage.
+# Familles de types de document, dans l'ordre d'affichage. Chaque type appartient à une famille.
 DOC_TYPE_FAMILIES: dict[str, tuple[DocType, ...]] = {
     "publications": (
         DocType.ARTICLE,
