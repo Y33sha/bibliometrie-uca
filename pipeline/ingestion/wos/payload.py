@@ -57,7 +57,6 @@ def is_wos_author_usable(author: Mapping[str, JsonValue]) -> bool:
     return bool(author.get("daisng_id") and author.get("full_name"))
 
 
-# TODO: quand `serials.oa_model` sera disponible côté pipeline, ce mapping devient superflu (signal OA WoS trop pauvre) : retirer `journal_oas_gold` de la fonction de lecture et supprimer cette fonction.
 def derive_wos_api_oa_status(journal_oas_gold: str | None) -> str | None:
     """Statut open access d'un record de l'API WoS, d'après `pub_info.journal_oas_gold`.
 
