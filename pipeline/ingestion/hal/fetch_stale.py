@@ -1,6 +1,6 @@
 """Nouvelle lecture d'un document HAL par son hal-id : tâche `fetch_stale.hal`.
 
-Requête Solr `halId_s:<id>`. Absence confirmée = réponse Solr valide, zéro document.
+Requête Solr `halId_s:<id>`. Une réponse Solr valide sans document confirme l'absence.
 """
 
 from __future__ import annotations

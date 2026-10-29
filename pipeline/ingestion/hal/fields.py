@@ -15,6 +15,6 @@ def extract_id(doc: Mapping[str, JsonValue]) -> str:
 def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
     """DOI nettoyé d'un enregistrement source HAL (champ `doiId_s`).
 
-    `doiId_s` arrive en scalaire depuis le moissonnage, en liste depuis la recherche par identifiant HAL : les deux formes sont gérées avant nettoyage.
+    `doiId_s` arrive en scalaire depuis le moissonnage, en liste depuis la recherche par identifiant HAL : les deux formes passent au nettoyage.
     """
     return clean_doi(hal_text_field(doc.get("doiId_s")))

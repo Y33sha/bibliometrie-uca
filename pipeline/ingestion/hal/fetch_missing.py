@@ -1,10 +1,10 @@
 """Recherches dans HAL de la phase `fetch_missing`.
 
-- `fetch_missing_hal_by_id` (tâche `fetch_missing.hal_by_id`) : hal-ids portés par des documents OpenAlex et ScanR, absents du staging HAL ; requête Solr `halId_s`.
+- `fetch_missing_hal_by_id` (tâche `fetch_missing.hal_by_id`) : hal-id des documents OpenAlex et ScanR, absents du staging HAL ; requête Solr `halId_s`.
 - `fetch_missing_hal_by_nnt` (tâche `fetch_missing.hal_by_nnt`) : NNT de thèses soutenues sans document HAL ; requête Solr `nntId_s`. Réservé au mode `full`.
 - `HalDoiSearch` (tâche `fetch_missing.doi.hal`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
 
-Les deux premières passent par la boucle commune (`pipeline.ingestion.common.lookup`), sur `HAL_MAX_CONCURRENT` workers.
+Les deux premières passent par la boucle commune (`pipeline.ingestion.common.lookup`), avec au plus `HAL_MAX_CONCURRENT` requêtes simultanées.
 """
 
 from __future__ import annotations
@@ -83,11 +83,11 @@ _MISSING_NNTS_SQL = text(
 
 
 def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """hal-ids actifs des `source_records` OpenAlex ou ScanR, absents du staging HAL.
+    """hal-id actifs des enregistrements sources OpenAlex ou ScanR, absents du staging HAL.
 
-    Seules comptent les publications in-périmètre : un document hors périmètre n'entraîne aucune recherche dans HAL. La sélection lit les `source_records` du run précédent : les documents extraits pendant le run y entrent au run suivant.
+    Seules comptent les publications du périmètre. La sélection lit les enregistrements sources du run précédent : les documents extraits pendant le run y entrent au run suivant.
 
-    Écarte les hal-ids déjà cherchés en vain : HAL attribue les hal-ids, l'échec est définitif.
+    Un hal-id déjà cherché en vain est écarté : HAL attribue les hal-id, l'échec est définitif.
     """
     return list(
         conn.execute(_MISSING_HAL_IDS_SQL, {"retry_after_days": retry_after_days}).scalars()
@@ -95,7 +95,7 @@ def get_missing_hal_ids(conn: Connection, *, retry_after_days: int) -> list[str]
 
 
 def get_missing_nnts(conn: Connection, *, retry_after_days: int) -> list[str]:
-    """NNT des `source_records` theses.fr des publications in-périmètre, hors thèses en cours, dont la publication n'a aucune `source_records` HAL. Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur.
+    """NNT des enregistrements sources theses.fr des publications du périmètre, hors thèses en cours, dont la publication est sans enregistrement source HAL. Le NNT d'un enregistrement source est son NNT actif de rôle le plus fort, puis de plus petite valeur.
 
     Écarte les NNT qu'un document HAL contient déjà, et ceux cherchés en vain il y a moins de `retry_after_days` jours.
     """
@@ -114,7 +114,7 @@ async def _fetch_ids(
 ) -> PhaseMetrics:
     """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`. Un identifiant introuvable est inscrit dans `failed_lookups`.
 
-    Compteurs de `look_up`, et `extras["not_found"]` = identifiants introuvables.
+    Rend les compteurs de `look_up`, avec le nombre d'identifiants introuvables (`not_found`).
     """
     entry_mode = (
         StagingEntryMode.FETCH_MISSING_HAL_ID

@@ -6,23 +6,11 @@ from datetime import date
 from domain.source_records.source_extras import SourceExtra
 from domain.types import JsonValue, as_strs
 
-# Repositories ouverts reconnus par HAL via `linkExtId_s` qu'on traite
-# comme green OA (= dépôt en archive ouverte).
-#
-# - `arxiv` : preprint server fondateur, contenu intégralement en libre
-#   accès.
-# - `pubmedcentral` (PMC) : repository biomédical archivant les articles
-#   accessibles librement (NIH-mandate + dépôts volontaires). Le contenu
-#   n'est pas uniformément sous licence OA (certains articles "free to
-#   read" sans droits de réutilisation, embargos), mais la lecture est
-#   ouverte → traité comme green (= accès lecture libre via repo).
-#
-# Ne sont PAS dans cette liste :
-# - `openaccess` : lien vers DOI éditeur, statut réel gold/hybrid/
-#   bronze indéterminable depuis HAL seul.
-# - `istex` : plateforme CNRS d'accès aux contenus payants, l'inclusion
-#   ne garantit pas l'OA réel (et empiriquement ces docs ont aussi un
-#   fileMain_s, donc capturés en green par la règle file_main).
+# Archives ouvertes que HAL reconnaît dans `linkExtId_s`, tenues pour du green open access :
+# - `arxiv` : serveur de preprints, entièrement en open access ;
+# - `pubmedcentral` : archive biomédicale ; ses articles sont tous en lecture libre, sans être tous sous licence ouverte.
+# `openaccess`, lien vers le DOI de l'éditeur, reste hors de la liste : HAL seul ne dit pas si l'accès est gold, hybrid ou bronze.
+# `istex` aussi : la plateforme donne accès à des contenus payants. Ses documents ont en général un `fileMain_s`, tenu pour green.
 GREEN_LINK_EXT_IDS = frozenset({"arxiv", "pubmedcentral"})
 
 
@@ -32,16 +20,16 @@ def derive_hal_oa_status(
     link_ext_id: str | None,
     embargo_until: date | None = None,
 ) -> str | None:
-    """Mapping HAL → enum oa_status canonique.
+    """Statut open access d'un dépôt HAL.
 
-    `openAccess_bool=true` recouvre plusieurs réalités ; l'arbitrage se fait sur `fileMain_s`, `linkExtId_s` et l'embargo :
-      - file_main présent + embargo actif (`embargo_until` renseigné) → 'embargoed' (fichier déposé, accès légalement différé ; la levée à l'échéance est portée par une règle de correction `oa_status`, pas ici)
-      - file_main présent → 'green' (dépôt effectif en HAL)
-      - link_ext_id ∈ GREEN_LINK_EXT_IDS (arxiv, pubmedcentral) → 'green'
-      - link_ext_id == 'openaccess' → 'hybrid' (lien vers le DOI éditeur, voie non nuancée ; défaut conservatif, arbitré vers 'gold' en aval par `best_oa_status` si une autre source le confirme)
-      - open_access_bool=False → 'closed'
-      - open_access_bool=True sans autre signal (istex, etc.) → None (délégation à OpenAlex/Unpaywall)
-      - open_access_bool=None → None
+    `openAccess_bool` vrai recouvre plusieurs cas, que départagent le fichier déposé, `linkExtId_s` et l'embargo :
+
+    - fichier déposé sous embargo actif → `embargoed` ; une règle de correction de `oa_status` lève l'embargo à son échéance ;
+    - fichier déposé → `green` ;
+    - lien vers arXiv ou PubMed Central (`GREEN_LINK_EXT_IDS`) → `green` ;
+    - lien `openaccess` vers le DOI de l'éditeur → `hybrid`, que `best_oa_status` remplace par `gold` si une autre source le dit ;
+    - `openAccess_bool` faux → `closed` ;
+    - `openAccess_bool` vrai sans autre signal, ou absent → `None` : OpenAlex et Unpaywall en décident.
     """
     if file_main and embargo_until is not None:
         return "embargoed"
@@ -59,7 +47,7 @@ def derive_hal_oa_status(
 
 
 def hal_text_field(value: JsonValue) -> str | None:
-    """Chaîne portée par un champ HAL, qui arrive en texte ou en liste de textes (convention Solr).
+    """Chaîne d'un champ HAL, qui arrive en texte ou en liste de textes (convention Solr).
 
     Les champs de l'index HAL sont multivalués par construction : un titre unique y arrive tout de même en liste. La première valeur fait foi.
     """

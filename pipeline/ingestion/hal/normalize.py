@@ -1,4 +1,4 @@
-"""Normalisation des données HAL : staging → tables structurées."""
+"""Normalisation des enregistrements sources HAL."""
 
 from collections.abc import Mapping
 from datetime import date
@@ -54,19 +54,10 @@ from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
 
-# =============================================================
-# UTILITAIRES
-# =============================================================
-
 
 def get_title(doc: Mapping[str, JsonValue]) -> str:
-    """Extrait le titre depuis les données HAL."""
+    """Titre du dépôt."""
     return hal_text_field(doc.get("title_s")) or hal_text_field(doc.get("label_s")) or ""
-
-
-# =============================================================
-# PUBLISHERS & SERIALS
-# =============================================================
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
@@ -95,11 +86,6 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
         isbns=isbns,
         year=as_int(doc.get("producedDateY_i")),
     )
-
-
-# =============================================================
-# PUBLICATIONS
-# =============================================================
 
 
 def get_doc_type(doc: Mapping[str, JsonValue]) -> str | None:
@@ -144,10 +130,6 @@ def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> l
         )
     ]
 
-
-# =============================================================
-# SOURCE DOCUMENTS (HAL)
-# =============================================================
 
 _BOOK_TYPES = frozenset({DocType.BOOK, DocType.BOOK_CHAPTER})
 
@@ -200,13 +182,13 @@ def hal_source_record(
 ) -> SourceRecordUpsert:
     """Enregistrement source HAL d'un dépôt, identifié par son `hal_id`.
 
-    `container_title` est posé seulement en l'absence de revue.
+    Le titre libre du conteneur se pose seulement sans revue.
     """
     doc_type = get_doc_type(doc)
     nnt = normalize_nnt(hal_text_field(doc.get("nntId_s")))
     embargo_until = active_embargo_until(hal_text_field(doc.get("label_xml")), today())
 
-    # Collections : `collCode_s` du raw_data (liste complète des collections du record).
+    # Toutes les collections du dépôt.
     collections_array = sorted(set(as_strs(doc.get("collCode_s")))) or None
 
     # Abstract
@@ -219,7 +201,7 @@ def hal_source_record(
     domain_raw = doc.get("fr_domainAllCodeLabel_fs")
     topics = {"hal_domains": domain_raw} if isinstance(domain_raw, list) and domain_raw else None
 
-    # Éditeur et revue tels que HAL les nomme, en parallèle des publishers/serials créés via find_or_create_*.
+    # Éditeur et revue tels que HAL les nomme.
     biblio_json = compact_biblio(
         volume=hal_text_field(doc.get("volume_s")),
         issue=hal_text_field(doc.get("issue_s")),
@@ -261,11 +243,6 @@ def hal_source_record(
     )
 
 
-# =============================================================
-# HAL AUTHORS — parsing identifiants depuis le TEI
-# =============================================================
-
-
 _TEI_NS = {"tei": "http://www.tei-c.org/ns/1.0"}
 
 
@@ -275,15 +252,15 @@ def _parse_tei(label_xml: str) -> Element:
 
     Le cache garde l'arbre du dernier dépôt : les lecteurs du TEI (ISBN, embargo, identifiants d'auteurs) reçoivent la même chaîne pendant la normalisation d'un dépôt, et partagent une seule analyse. Ils ne modifient pas l'arbre.
 
-    L'analyseur refuse les déclarations de type de document et d'entités, que l'analyseur de la bibliothèque standard développe : quelques centaines d'octets y suffisent à en produire des milliards. Lève `ParseError` sur un document mal formé, une sous-classe de `DefusedXmlException` sur un document qui en porte.
+    L'analyseur refuse les déclarations de type de document et d'entités, que l'analyseur de la bibliothèque standard développe : quelques centaines d'octets y suffisent à en produire des milliards. Lève `ParseError` sur un document mal formé, une sous-classe de `DefusedXmlException` sur un document qui en contient.
     """
     return cast("Element", ET.fromstring(label_xml))
 
 
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
-    """Date de fin d'un embargo HAL **encore actif** (future), sinon None.
+    """Date de fin d'un embargo HAL encore actif, sinon `None`.
 
-    Lit `ref[@type='file']/date/@notBefore` du TEI (`label_xml`) : la date à laquelle le fichier déposé devient accessible. Plusieurs refs `type='file'` (page + document) : on retient la plus tardive. Une date déjà échue (fichier accessible) renvoie None — pas d'embargo actif, on ne stocke pas d'historique. La levée à l'échéance d'une date future stockée est portée par une règle de correction `oa_status`, sans dépendre d'un ré-import HAL.
+    Lit `ref[@type='file']/date/@notBefore` du TEI : la date à laquelle le fichier déposé devient accessible. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue rend `None` : un embargo levé reste hors de la base. À l'échéance d'un embargo stocké, une règle de correction de `oa_status` le lève, sans nouvel import HAL.
     """
     if not label_xml:
         return None
@@ -311,9 +288,9 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
 
 
 def parse_tei_isbns(label_xml: str | None) -> list[str]:
-    """ISBN portés par le TEI HAL (`idno[@type='isbn']`), le seul endroit où HAL les donne.
+    """ISBN du TEI HAL (`idno[@type='isbn']`), seul endroit où HAL les donne.
 
-    Une zone porte parfois deux ISBN, un EAN qui répète l'ISBN, ou un numéro de chapitre à la suite : `find_isbns` en tire les ISBN valides.
+    Une zone contient parfois deux ISBN, un EAN qui répète l'ISBN, ou un numéro de chapitre à la suite : `find_isbns` en tire les ISBN valides.
     """
     if not label_xml:
         return []
@@ -367,11 +344,9 @@ def parse_tei_author_names(label_xml: str | None) -> list[list[str]]:
 
 
 def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
-    """Extrait les identifiants par position d'auteur depuis le TEI HAL.
+    """ORCID, IdRef et idHAL de chaque auteur du TEI HAL, dans l'ordre des auteurs.
 
-    L'API search HAL ne fournit pas de champ Solr aligné positionnellement pour ORCID/IdRef (les listes `authORCIDIdExt_s`/`authIdRefIdExt_s` sont compactées). Seul le TEI (`label_xml`) attache proprement chaque identifiant à son auteur.
-
-    Retourne une liste indexée sur la position d'auteur ; chaque entrée est un dict pouvant contenir `orcid`, `idref`, `idhal`, avec les valeurs du TEI. Renvoie `[]` si `label_xml` est absent ou mal formé.
+    Le TEI est le seul champ qui rattache chaque identifiant à son auteur : les listes Solr `authORCIDIdExt_s` et `authIdRefIdExt_s` omettent les valeurs nulles et perdent l'alignement. Liste vide si `label_xml` est absent ou mal formé.
     """
     out: list[dict[str, str]] = []
     for author in _tei_title_authors(label_xml):
@@ -387,8 +362,8 @@ def parse_tei_author_identifiers(label_xml: str | None) -> list[dict[str, str]]:
             elif typ == "IDREF":
                 ids["idref"] = val
             elif typ == "IDHAL":
-                # HAL émet souvent deux <idno type="idhal"> par auteur, distingués par notation="string" (slug `prenom-nom`, le vrai idhal) et notation="numeric" (le hal_person_id ré-étiqueté idhal).
-                # Seul le slug nous intéresse ici — le hal_person_id est capturé via le composite Solr.
+                # HAL donne souvent deux <idno type="idhal"> par auteur : notation="string", le slug `prenom-nom`, qui est l'idHAL, et notation="numeric", le hal_person_id réétiqueté.
+                # Seul le slug compte ici ; le hal_person_id vient du champ composite Solr.
                 if notation != "string":
                     continue
                 ids["idhal"] = val
@@ -440,11 +415,6 @@ def parse_tei_author_structures(label_xml: str | None) -> list[list[int]]:
     ]
 
 
-# =============================================================
-# HAL CONTRIBUTIONS
-# =============================================================
-
-
 _HAL_AUTHOR_FIELDS = (
     "authFullNameFormIDPersonIDIDHal_fs",
     "authQuality_s",
@@ -463,7 +433,7 @@ def extract_hal_author_block(doc: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Parse les auteurs d'un document HAL en `AuthorRecord` (sans I/O).
+    """Contributions sources d'un dépôt HAL.
 
     Les champs Solr alignés donnent le nom, le rôle et le `hal_person_id` de chaque auteur. Le TEI donne ses identifiants (ORCID, IdRef, idHAL), ses nom et prénom, ses structures directes (`hal_structure_ids`) et leurs ROR (`ror_ids`). HAL donne des structures de son référentiel, sans texte d'affiliation : les contributions sources sont sans adresse.
     """
@@ -485,11 +455,8 @@ def build_hal_author_records(doc: Mapping[str, JsonValue]) -> list[AuthorRecord]
         for e in as_sequence(doc.get("tei_author_structures"))
     ]
 
-    # authFullNameFormIDPersonIDIDHal_fs :
-    #   "Nom_FacetSep_formId-personId_FacetSep_idhal" — aligné par position.
-    # Présence validée par le caller ; on en extrait nom et person_id.
-    # Le 3e segment (idhal) est IGNORÉ : non fiable — quand l'auteur n'a pas de slug, HAL y recopie le person_id numérique, ce qui injecterait de faux idhal numériques (== hal_person_id).
-    # L'idhal vient du seul TEI (`parse_tei_author_identifiers`, qui ne garde que notation="string").
+    # `authFullNameFormIDPersonIDIDHal_fs` : « Nom_FacetSep_formId-personId_FacetSep_idhal », aligné par position. L'appelant en vérifie la présence.
+    # Le troisième segment (idhal) reste inutilisé : pour un auteur sans slug, HAL y recopie le person_id numérique. L'idHAL vient du seul TEI (`parse_tei_author_identifiers`).
     composite = [
         entry
         for e in as_sequence(doc.get("authFullNameFormIDPersonIDIDHal_fs"))
