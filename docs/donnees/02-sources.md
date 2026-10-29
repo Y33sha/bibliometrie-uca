@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-28.*
 
-Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref ou DataCite. Une contribution source est un auteur tel que la source le donne dans un enregistrement source. Ces tables conservent ce que dit chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
+Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref ou DataCite. Une contribution source est une personne telle que la source la nomme dans un enregistrement source, avec son rôle. Ces tables conservent ce que dit chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
 
 Seul le pipeline écrit ces tables. Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06-metadata-correction.md), qui garde la valeur d'origine.
 
@@ -16,6 +16,11 @@ Schéma PostgreSQL `sources`.
 |---|---|---|
 | `staging` | Document moissonné : identifiant dans la source, payload brut, empreinte (`raw_hash`), date de disparition de la source (`disappeared_at`). Le payload est vidé après la normalisation | Un document par source et identifiant |
 | `failed_lookups` | Identifiant (DOI, identifiant HAL, NNT) cherché en vain dans une source ou auprès de doi.org, avec la date de l'échec | |
+
+**Enrichissement**
+
+| Table | Contenu | Contrainte |
+|---|---|---|
 | `unpaywall` | Statut d'accès que donne Unpaywall pour un DOI, avec la date de l'interrogation | Un statut par DOI |
 
 **Enregistrements sources**
