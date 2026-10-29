@@ -85,7 +85,7 @@ _SNAPSHOT = "source_record_keys_marks"
 # (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
 _COLS = (
     "{a}.id, "
-    + doi_or_target_sql("{a}")
+    + doi_or_target_sql("{a}.doi")
     + " AS doi, "
     + identifiers_json_sql("{a}.id")
     + " AS identifiers, {a}.publication_id, "

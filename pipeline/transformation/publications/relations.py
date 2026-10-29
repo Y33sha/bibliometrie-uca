@@ -34,6 +34,7 @@ from domain.source_records.keys import (
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.types import JsonValue
+from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
@@ -229,14 +230,15 @@ def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSo
 
 
 def fetch_publications_by_doi(conn: Connection, dois: list[str]) -> dict[str, DoiPublication]:
-    """Publications du corpus que désignent ces DOI, indexées par DOI en minuscules."""
+    """Publications du corpus que désignent ces DOI, indexées par DOI en minuscules. Le DOI d'une forme secondaire désigne la publication de sa cible (`doi_targets`)."""
     if not dois:
         return {}
     rows = conn.execute(
-        text(
-            "SELECT lower(doi) AS doi, id, doc_type::text AS doc_type "
-            "FROM publications WHERE lower(doi) = ANY(:dois)"
-        ),
+        text(f"""
+            SELECT d.doi, p.id, p.doc_type::text AS doc_type
+            FROM unnest(CAST(:dois AS text[])) AS d (doi)
+            JOIN publications p ON lower(p.doi) = {doi_or_target_sql("d.doi")}
+        """),  # noqa: S608 — fragment rendu depuis un alias de la requête
         {"dois": dois},
     ).all()
     return {r.doi: DoiPublication(r.id, r.doc_type) for r in rows}
@@ -330,12 +332,13 @@ def _insert_edges(conn: Connection, edges: list[RelationEdge]) -> int:
         }
         for e in edges
     ]
-    stmt = text("""
+    stmt = text(f"""
         INSERT INTO publication_relations
             (from_publication_id, relation_type, target_doi, target_publication_id, source)
         SELECT e.f, e.t::relation_type, e.d, COALESCE(e.p, p.id), e.s
         FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, p int, s text)
-        LEFT JOIN publications p ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = e.d
+        LEFT JOIN publications p
+          ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = {doi_or_target_sql("e.d")}
         WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
         ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
     """).bindparams(bindparam("payload", type_=Jsonb))

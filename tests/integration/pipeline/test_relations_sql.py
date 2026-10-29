@@ -31,6 +31,16 @@ _source_record = partial(insert_source_record, title="t")
 PARENT_TITLE = "measurement of differential cross sections in proton collisions"
 
 
+def _add_doi_target(conn, doi, target_doi) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO doi_targets (doi, target_doi, rule)"
+            " VALUES (:doi, :target, 'DATACITE_VERSION_TO_CONCEPT')"
+        ),
+        {"doi": doi, "target": target_doi},
+    )
+
+
 def _publication(conn, *, doc_type, title_normalized, doi, publication_year=2024) -> int:
     return insert_publication(
         conn,
@@ -295,6 +305,16 @@ class TestRelationsDeMemeOeuvre:
     def test_aucun_doi_aucune_requete(self, sa_sync_conn):
         assert relations.fetch_publications_by_doi(sa_sync_conn, []) == {}
 
+    def test_le_doi_d_une_forme_secondaire_designe_la_publication_de_sa_cible(self, sa_sync_conn):
+        """Le DOI d'une version Zenodo désigne la publication de son concept."""
+        concept = _publication(
+            sa_sync_conn, doc_type="dataset", title_normalized="jeu", doi="10.5281/zenodo.100"
+        )
+        _add_doi_target(sa_sync_conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
+        assert relations.fetch_publications_by_doi(sa_sync_conn, ["10.5281/zenodo.101"]) == {
+            "10.5281/zenodo.101": DoiPublication(concept, "dataset")
+        }
+
 
 class TestCountByRelationType:
     """Distribution par type, exposée en `details` de la phase `relations`.
@@ -341,6 +361,24 @@ class TestRebuildRelations:
 
     def _edge(self, from_id, relation_type, target_doi):
         return RelationEdge(from_id, relation_type, target_doi, "crossref")
+
+    def test_la_cible_d_une_relation_au_doi_d_une_forme_secondaire_est_sa_cible(self, sa_sync_conn):
+        """Une relation vers le DOI d'une version Zenodo pointe la publication du concept."""
+        article = _publication(
+            sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/a"
+        )
+        concept = _publication(
+            sa_sync_conn, doc_type="dataset", title_normalized="jeu", doi="10.5281/zenodo.100"
+        )
+        _add_doi_target(sa_sync_conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
+
+        relations.rebuild_relations(
+            sa_sync_conn, [self._edge(article, "has_supplement", "10.5281/zenodo.101")]
+        )
+
+        assert sa_sync_conn.execute(
+            text("SELECT target_publication_id, target_doi FROM publication_relations")
+        ).all() == [(concept, "10.5281/zenodo.101")]
 
     def test_une_reconstruction_a_l_identique_ne_change_rien(self, sa_sync_conn):
         publication = _publication(

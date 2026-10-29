@@ -89,7 +89,7 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
         text(f"""
             SELECT sr.id, sr.source::text AS source, sr.source_id,
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
-                   {doi_or_target_sql("sr")} AS doi,
+                   {doi_or_target_sql("sr.doi")} AS doi,
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,

@@ -105,9 +105,9 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 - [x] Code mort des formes secondaires rattachées à une publication : priorité de la consolidation, groupement des contributions sources, copies et sources secondaires de l'API.
 - [x] Table `doi_targets`, écrite par la correction par DOI partagé et lue par la réconciliation et la consolidation. Enregistrement source DataCite de la forme secondaire écarté.
 - [x] Sous-étapes distinctes de `metadata_correction` : `doi_targets` écrit les cibles, `remove_identifiers` les retraits. DOI des formes secondaires rendus au stock par une migration.
-- [ ] Cible appliquée aux DOI secondaires des enregistrements sources, par exemple les localisations OpenAlex.
+- [x] Cible appliquée au DOI cible d'une relation entre publications (`doi_or_target_sql`).
 - [ ] DOI d'un enregistrement source à plusieurs DOI actifs.
-- [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.
+- [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [ ] Suppression de la colonne.
 
 ### Phase 7 — DOI bioRxiv et medRxiv
