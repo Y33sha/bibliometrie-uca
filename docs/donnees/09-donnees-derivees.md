@@ -10,7 +10,7 @@ Le pipeline les rafraîchit. Aucune n'est écrite directement.
 
 | Vue matérialisée | Dérivée de | Rafraîchie par |
 |---|---|---|
-| `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
+| `source_contribution_structures` | adresses (`address_structures` non rejetés), ROR sans adresse, structures HAL et structures de thèse des contributions sources ⋈ `perimeter_structures` | phase `affiliations` |
 | `contribution_structures` | `source_contribution_structures` ⋈ `aligned_source_contributions`, pour les contributions d'une personne non exclue | phase `finalize` |
 | `publication_structures` | `contributions` ⋈ `contribution_structures` | phase `finalize` |
 | `publication_rors` | ROR des contributions sources alignées des auteurs (`source_contribution_rors`) et des structures de `publication_structures`, avec leurs ancêtres de `ror_relations` ; `cited` distingue les ROR cités | phase `finalize` |

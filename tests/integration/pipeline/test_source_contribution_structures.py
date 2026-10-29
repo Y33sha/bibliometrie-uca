@@ -9,9 +9,13 @@ from domain.structures.hal_structures import parse_hal_structure
 from pipeline.transformation.structures.hal_structures import HalStructureStore
 from pipeline.transformation.structures.idref_resolution import resolve_thesis_partners
 from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
-from tests.integration.helpers.addresses import insert_address
+from tests.integration.helpers.addresses import insert_address, insert_address_structure
 from tests.integration.helpers.config import set_config
-from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
+from tests.integration.helpers.sources import (
+    insert_source_contribution,
+    insert_source_contribution_address,
+    insert_source_record,
+)
 from tests.integration.helpers.structures import (
     insert_persons_perimeter,
     insert_structure,
@@ -106,18 +110,26 @@ def test_structure_hal_remonte_jusqu_a_la_premiere_correspondance(sa_sync_conn):
     }
 
 
-def test_ror_de_la_contribution_source_et_ror_d_une_adresse_hors_perimetre(sa_sync_conn):
-    _, lab = _perimeter(sa_sync_conn)
+def test_ror_sans_adresse_seulement(sa_sync_conn):
+    univ, lab = _perimeter(sa_sync_conn)
     record = insert_source_record(sa_sync_conn)
     seul = _source_contribution(sa_sync_conn, record, 0, ror=_LAB_ROR)
     hors = _source_contribution(
         sa_sync_conn, record, 1, ror=_LAB_ROR, address_id=insert_address(sa_sync_conn, "Ailleurs")
     )
+    # L'adresse, résolue vers l'université, fait autorité : le ROR du laboratoire est écarté.
+    univ_address = insert_address(sa_sync_conn, "Université")
+    insert_address_structure(sa_sync_conn, univ_address, structure_id=univ)
+    dans = _source_contribution(sa_sync_conn, record, 2, ror=_LAB_ROR, address_id=univ_address)
+    insert_source_contribution_address(sa_sync_conn, dans, address_id=univ_address)
 
     reached = _reached(sa_sync_conn)
 
     assert (seul, lab, "ror") in reached
     assert not any(source_contribution == hors for source_contribution, _, _ in reached)
+    assert {(s, structure, e) for s, structure, e in reached if s == dans} == {
+        (dans, univ, "address")
+    }
 
 
 def test_structure_hal_rattachee_explicitement(sa_sync_conn):
