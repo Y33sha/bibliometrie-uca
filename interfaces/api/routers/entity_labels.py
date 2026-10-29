@@ -20,6 +20,6 @@ def resolve_entity_label(
 ) -> EntityLabelResponse:
     """Libellé d'une entité de facette par son identifiant : un entier, ou un ROR pour une organisation partenaire.
 
-    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection. Le libellé étant le même sous tous les jeux de filtres, la lecture est unique quel que soit le contexte qui affiche la facette.
+    Sert à réafficher une pastille de facette restaurée depuis l'URL, qui contient l'identifiant seul, état de référence de la sélection. Le libellé est le même sous tous les filtres : une seule lecture sert tous les contextes.
     """
     return queries.resolve_entity_label(kind=kind, entity_id=entity_id)

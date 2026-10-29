@@ -2,7 +2,7 @@
 
 Les lectures passent par `PublicationsQueries`.
 
-Les chemins littéraux — `/licenses`, `/facets`, `/export.csv`, `/export-theses.csv` — précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux (`/licenses`, `/facets`, `/export.csv`, `/export-theses.csv`) précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -96,7 +96,7 @@ def export_publications_csv(
 ) -> StreamingResponse:
     """Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
 
-    Le nombre de lignes est plafonné, et la fréquence des demandes l'est aussi (429 au-delà) : l'export balaie la table sous les seuls filtres reçus, et rien n'oblige un appelant à s'arrêter."""
+    Le nombre de lignes est plafonné, et la fréquence des demandes aussi (429 au-delà) : l'export parcourt la table sous les seuls filtres reçus."""
     return csv_response(
         queries.export_publications_csv(
             filters=filters.to_filters(),
@@ -126,7 +126,7 @@ def export_theses_csv(
 
     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
 
-    La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
+    Ses filtres, moins nombreux que ceux des publications, sont tous appliqués. Sans `doc_type`, l'export couvre les thèses soutenues et en cours.
     """
     lab_ids, lab_none = parse_lab_id(lab_id)
     filters = PublicationFilters(
@@ -210,7 +210,7 @@ def preview_merge(
 ) -> PublicationMergeResult:
     """Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
 
-    L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite, donc aucune écriture ne survit. Il est en POST pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+    L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite : aucune écriture ne survit. Il est en POST, pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
     """
     outcome = merges.preview_merge(publication_id, body.other_id)
     return PublicationMergeResult(

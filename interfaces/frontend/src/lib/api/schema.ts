@@ -79,7 +79,7 @@ export interface paths {
          * Collaborations
          * @description Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
          *
-         *     Le décompte se lit dans la colonne `countries` des publications, le pays domestique écarté.
+         *     Le décompte se lit dans la colonne `countries` des publications, le pays de l'établissement écarté.
          */
         get: operations["collaborations_api_stats_collaborations_get"];
         put?: never;
@@ -207,7 +207,7 @@ export interface paths {
          * Export Publications Csv
          * @description Export CSV des publications, fidèle au tableau affiché : mêmes filtres, et mêmes colonnes que celles listées dans `columns`.
          *
-         *     Le nombre de lignes est plafonné, et la fréquence des demandes l'est aussi (429 au-delà) : l'export balaie la table sous les seuls filtres reçus, et rien n'oblige un appelant à s'arrêter.
+         *     Le nombre de lignes est plafonné, et la fréquence des demandes aussi (429 au-delà) : l'export parcourt la table sous les seuls filtres reçus.
          */
         get: operations["export_publications_csv_api_publications_export_csv_get"];
         put?: never;
@@ -231,7 +231,7 @@ export interface paths {
          *
          *     Plafonné en nombre de lignes et en fréquence, comme l'export des publications.
          *
-         *     La surface de filtres est plus étroite que celle des publications, et n'annonce que ce que l'export honore. Sans `doc_type`, il porte sur les thèses soutenues et en cours.
+         *     Ses filtres, moins nombreux que ceux des publications, sont tous appliqués. Sans `doc_type`, l'export couvre les thèses soutenues et en cours.
          */
         get: operations["export_theses_csv_api_publications_export_theses_csv_get"];
         put?: never;
@@ -355,7 +355,7 @@ export interface paths {
          * Preview Merge
          * @description Résultat qu'aurait la fusion manuelle des deux publications : publication conservée, conflits d'auteurs.
          *
-         *     L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite, donc aucune écriture ne survit. Il est en POST pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
+         *     L'aperçu applique réellement la fusion dans un `SAVEPOINT` annulé ensuite : aucune écriture ne survit. Il est en POST, pour passer par la garde d'authentification des méthodes d'écriture. Renvoie 422 sur deux identifiants égaux ou deux DOI distincts, 404 sur une publication introuvable.
          */
         post: operations["preview_merge_api_publications__publication_id__merge_preview_post"];
         delete?: never;
@@ -419,7 +419,7 @@ export interface paths {
          * Resolve Entity Label
          * @description Libellé d'une entité de facette par son identifiant : un entier, ou un ROR pour une organisation partenaire.
          *
-         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui porte l'identifiant seul : il est l'état canonique de la sélection. Le libellé étant le même sous tous les jeux de filtres, la lecture est unique quel que soit le contexte qui affiche la facette.
+         *     Sert à réafficher une pastille de facette restaurée depuis l'URL, qui contient l'identifiant seul, état de référence de la sélection. Le libellé est le même sous tous les filtres : une seule lecture sert tous les contextes.
          */
         get: operations["resolve_entity_label_api_entity_labels_get"];
         put?: never;
@@ -439,7 +439,7 @@ export interface paths {
         };
         /**
          * List Addresses
-         * @description Liste les adresses rattachées à une structure, avec prédicats texte/structure composables.
+         * @description Liste les adresses rattachées à une structure, avec des prédicats de texte et de structure combinables.
          */
         get: operations["list_addresses_api_addresses_get"];
         put?: never;
@@ -563,9 +563,9 @@ export interface paths {
         put?: never;
         /**
          * Batch Set Country
-         * @description Ajoute un pays à des adresses (par IDs ou par filtre).
+         * @description Ajoute un pays à des adresses, par identifiants ou par filtre.
          *
-         *     Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
+         *     Renvoie 422 sur un code pays absent du référentiel, chaîne vide comprise, et sur un appel par filtre sans filtre (`batch_set_country_by_filter`).
          */
         post: operations["batch_set_country_api_addresses_batch_country_post"];
         delete?: never;
@@ -645,7 +645,7 @@ export interface paths {
         };
         /**
          * Feedback False Negatives
-         * @description Adresses confirmées manuellement pour cette structure mais non détectées par le script.
+         * @description Adresses confirmées à la main pour cette structure, mais absentes de la détection.
          */
         get: operations["feedback_false_negatives_api_feedback_false_negatives_get"];
         put?: never;
@@ -665,7 +665,7 @@ export interface paths {
         };
         /**
          * Feedback False Positives
-         * @description Adresses détectées pour cette structure mais rejetées manuellement.
+         * @description Adresses détectées pour cette structure, mais rejetées à la main.
          */
         get: operations["feedback_false_positives_api_feedback_false_positives_get"];
         put?: never;
@@ -691,7 +691,7 @@ export interface paths {
         put?: never;
         /**
          * Create Structure
-         * @description Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé.
+         * @description Crée une structure. Renvoie 409 si le `code` ou le `ror_id` est déjà utilisé.
          */
         post: operations["create_structure_api_structures_post"];
         delete?: never;
@@ -773,9 +773,9 @@ export interface paths {
         put?: never;
         /**
          * Create Tutelle
-         * @description Crée une tutelle parent-enfant entre deux structures.
+         * @description Crée une tutelle entre deux structures.
          *
-         *     Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 422 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+         *     Une tutelle existante (même parent, même enfant) laisse la table inchangée et rend `{"status": "already_exists"}`. Renvoie 422 si la tutelle viole le graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Renvoie 409 si `parent_id` ou `child_id` désigne une structure inexistante.
          */
         post: operations["create_tutelle_api_structures_tutelles_post"];
         delete?: never;
@@ -796,7 +796,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Tutelle
-         * @description Supprime une tutelle. 404 si l'id n'existe pas.
+         * @description Supprime une tutelle. Renvoie 404 si elle n'existe pas.
          */
         delete: operations["delete_tutelle_api_structures_tutelles__tutelle_id__delete"];
         options?: never;
@@ -815,9 +815,9 @@ export interface paths {
         put?: never;
         /**
          * Create Name Form
-         * @description Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
+         * @description Crée une forme de nom pour une structure, qui sert à la reconnaître dans les adresses.
          *
-         *     `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
+         *     Le service normalise `form_text` (accents, casse, ponctuation) avant l'insertion. `is_word_boundary` : la forme doit former un mot entier dans l'adresse. `is_excluding` : la présence de la forme retire la structure du résultat. `requires_context_of` : structures dont l'une doit aussi être reconnue dans l'adresse pour que la forme vaille. Renvoie 409 si `structure_id` désigne une structure inexistante.
          */
         post: operations["create_name_form_api_structures_name_forms_post"];
         delete?: never;
@@ -835,18 +835,18 @@ export interface paths {
         };
         /**
          * Get Name Form
-         * @description Récupère une forme de nom par son id. 404 si inconnue.
+         * @description Forme de nom, par son identifiant. Renvoie 404 si elle est inconnue.
          */
         get: operations["get_name_form_api_structures_name_forms__form_id__get"];
         /**
          * Update Name Form
-         * @description Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue.
+         * @description Met à jour les champs fournis d'une forme de nom. Renvoie 404 si elle est inconnue.
          */
         put: operations["update_name_form_api_structures_name_forms__form_id__put"];
         post?: never;
         /**
          * Delete Name Form
-         * @description Supprime une forme de nom. 404 si inconnue.
+         * @description Supprime une forme de nom. Renvoie 404 si elle est inconnue.
          */
         delete: operations["delete_name_form_api_structures_name_forms__form_id__delete"];
         options?: never;
@@ -863,9 +863,7 @@ export interface paths {
         };
         /**
          * Get Structure
-         * @description Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
-         *
-         *     Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_parents` ; les enfants inversement. 404 si la structure n'existe pas.
+         * @description Détail complet d'une structure : `{structure, parents, children, forms}`, soit la structure, ses tutelles, ses sous-structures et ses formes de nom. Renvoie 404 si la structure n'existe pas.
          */
         get: operations["get_structure_api_structures__structure_id__get"];
         /**
@@ -878,7 +876,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Structure
-         * @description Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue.
+         * @description Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). Renvoie 404 si elle est inconnue.
          */
         delete: operations["delete_structure_api_structures__structure_id__delete"];
         options?: never;
@@ -955,7 +953,7 @@ export interface paths {
         };
         /**
          * Get Structure Deletion Impact
-         * @description Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. 404 si la structure n'existe pas.
+         * @description Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. Renvoie 404 si la structure n'existe pas.
          */
         get: operations["get_structure_deletion_impact_api_structures__structure_id__deletion_impact_get"];
         put?: never;
@@ -975,7 +973,7 @@ export interface paths {
         };
         /**
          * Search Persons
-         * @description Recherche rapide de personnes (autocomplete).
+         * @description Recherche rapide de personnes (autocomplétion).
          */
         get: operations["search_persons_api_persons_search_get"];
         put?: never;
@@ -997,7 +995,7 @@ export interface paths {
          * List Persons
          * @description Liste paginée des personnes.
          *
-         *     L'annuaire public et la liste de curation appellent tous deux cette lecture, avec des filtres différents.
+         *     L'annuaire public et la liste de l'administration appellent tous deux cette lecture, avec des filtres différents.
          */
         get: operations["list_persons_api_persons_get"];
         put?: never;
@@ -1077,7 +1075,7 @@ export interface paths {
         };
         /**
          * Ambiguous Name Forms
-         * @description Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées.
+         * @description Formes de nom d'au moins deux personnes, dont au moins un lien en attente, paginées.
          */
         get: operations["ambiguous_name_forms_api_persons_ambiguous_name_forms_get"];
         put?: never;
@@ -1119,7 +1117,7 @@ export interface paths {
          * Identifier Conflicts
          * @description Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
          *
-         *     Ce sont des doublons probables ou des erreurs d'attribution, que la curation tranche à l'œil.
+         *     Ce sont des doublons probables ou des erreurs d'attribution, que l'administration tranche.
          */
         get: operations["identifier_conflicts_api_persons_identifier_conflicts_get"];
         put?: never;
@@ -1209,7 +1207,7 @@ export interface paths {
         head?: never;
         /**
          * Update Identifier Status
-         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
+         * @description Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
          *
          *     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
          */
@@ -1245,9 +1243,9 @@ export interface paths {
         };
         /**
          * Person Curation
-         * @description Une personne sous la projection de la liste de curation : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
+         * @description Une personne sous la projection de la liste de l'administration : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
          *
-         *     Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui porte normalement ces données.
+         *     Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui contient d'ordinaire ces données.
          */
         get: operations["person_curation_api_persons__person_id__curation_get"];
         put?: never;
@@ -1267,7 +1265,7 @@ export interface paths {
         };
         /**
          * Person Theses
-         * @description Thèses liées à cette personne avec un rôle non-auteur.
+         * @description Thèses liées à cette personne par un rôle autre qu'auteur.
          */
         get: operations["person_theses_api_persons__person_id__theses_get"];
         put?: never;
@@ -1307,7 +1305,7 @@ export interface paths {
         };
         /**
          * Person Subjects
-         * @description Top sujets des publications de cette personne (nuage de mots).
+         * @description Sujets les plus fréquents des publications de cette personne (nuage de mots).
          */
         get: operations["person_subjects_api_persons__person_id__subjects_get"];
         put?: never;
@@ -1327,7 +1325,7 @@ export interface paths {
         };
         /**
          * Persons Sharing Name Form
-         * @description Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption).
+         * @description Personnes qui partagent au moins une forme de nom avec celle-ci, candidates à l'absorption.
          */
         get: operations["persons_sharing_name_form_api_persons__person_id__sharing_name_forms_get"];
         put?: never;
@@ -1369,7 +1367,7 @@ export interface paths {
          * Person Name Forms
          * @description Formes de nom de la personne, avec leur état d'arbitrage.
          *
-         *     Servies à part de la liste : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la réponse.
+         *     Servies à part de la liste : seule la fiche d'une personne les affiche, et les inclure dans chaque ligne pèserait les deux tiers de la réponse.
          */
         get: operations["person_name_forms_api_persons__person_id__name_forms_get"];
         put?: never;
@@ -1389,7 +1387,7 @@ export interface paths {
         };
         /**
          * Name Form Contributions
-         * @description Contributions sources + autres personnes partageant une forme de nom.
+         * @description Contributions sources d'une forme de nom, et autres personnes qui la partagent.
          */
         get: operations["name_form_contributions_api_persons__person_id__name_form_contributions_get"];
         put?: never;
@@ -1413,7 +1411,7 @@ export interface paths {
          * Add Person Identifier
          * @description Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
          *
-         *     La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`IdentifierAttributionConflictError`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
+         *     La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`IdentifierAttributionConflictError`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
          */
         post: operations["add_person_identifier_api_persons__person_id__identifiers_post"];
         delete?: never;
@@ -1459,9 +1457,9 @@ export interface paths {
         head?: never;
         /**
          * Update Person Name
-         * @description Modifie le nom/prénom d'une personne.
+         * @description Modifie le nom et le prénom d'une personne.
          *
-         *     Renvoie 422 sans patronyme, 404 sur une personne introuvable (`update_name`).
+         *     Renvoie 422 sans nom de famille, 404 sur une personne introuvable (`update_name`).
          */
         patch: operations["update_person_name_api_persons__person_id__name_patch"];
         trace?: never;
@@ -1519,7 +1517,7 @@ export interface paths {
         put?: never;
         /**
          * Detach Contributions
-         * @description Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet.
+         * @description Rejette durablement les paires (publication, personne) des contributions sources choisies, et supprime les formes de nom devenues sans objet.
          */
         post: operations["detach_contributions_api_persons__person_id__detach_contributions_post"];
         delete?: never;
@@ -1545,7 +1543,7 @@ export interface paths {
          * Update Name Form Status
          * @description Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
          *
-         *     `rejected` pose un verrou durable. Les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne : le run suivant les redécide. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+         *     Une forme rejetée sort durablement du rattachement par nom ; les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne, au run suivant. Une forme confirmée valide le lien, et corrobore les rattachements par identifiant, faits sans test du nom.
          */
         patch: operations["update_name_form_status_api_persons__person_id__name_forms_status_patch"];
         trace?: never;
@@ -1623,7 +1621,7 @@ export interface paths {
          * Assign Orphan Contribution
          * @description Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
          *
-         *     Renvoie 422 sans `person_id` ni `create_person`, et sans patronyme à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou une contribution introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), à moins que `force` ne lève le rejet au passage, sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
+         *     Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou une contribution introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage, sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
          */
         post: operations["assign_orphan_contribution_api_contributions_orphans_assign_post"];
         delete?: never;
@@ -1645,7 +1643,7 @@ export interface paths {
          * Batch Assign Orphan Contributions
          * @description Attribue plusieurs contributions orphelines à une personne existante.
          *
-         *     Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, à moins que `force` ne lève les rejets au passage.
+         *     Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
          */
         post: operations["batch_assign_orphan_contributions_api_contributions_orphans_batch_assign_post"];
         delete?: never;
@@ -1669,9 +1667,9 @@ export interface paths {
         head?: never;
         /**
          * Exclude Contribution
-         * @description Rejette une contribution : cette personne n'a pas signé cette publication.
+         * @description Rejette une contribution : la personne n'a pas signé la publication.
          *
-         *     `contribution_id` désigne la contribution de la personne dans la publication. Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache la contribution et les contributions sources de la personne. La table de rejet vaut verrou : les reconstructions ultérieures respectent l'arbitrage. Le geste est à sens unique.
+         *     Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache la contribution et les contributions sources de la personne. Le rejet survit aux runs suivants ; seule une attribution forcée d'une contribution orpheline le retire.
          */
         patch: operations["exclude_contribution_api_contributions__contribution_id__exclude_patch"];
         trace?: never;
@@ -1685,7 +1683,7 @@ export interface paths {
         };
         /**
          * Hal Duplicate Accounts
-         * @description Personnes liées à 2+ comptes HAL distincts.
+         * @description Personnes liées à au moins deux comptes HAL distincts.
          */
         get: operations["hal_duplicate_accounts_api_hal_problems_duplicate_accounts_get"];
         put?: never;
@@ -1747,7 +1745,7 @@ export interface paths {
          * Hal Missing Collections
          * @description Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
          *
-         *     Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
+         *     Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire sans collection HAL configurée : la question est alors sans objet.
          */
         get: operations["hal_missing_collections_api_hal_problems_missing_collections_get"];
         put?: never;
@@ -1767,7 +1765,7 @@ export interface paths {
         };
         /**
          * Hal Missing Collections Labs
-         * @description Liste des labos avec collection HAL.
+         * @description Laboratoires dotés d'une collection HAL.
          */
         get: operations["hal_missing_collections_labs_api_hal_problems_missing_collections_labs_get"];
         put?: never;
@@ -1787,7 +1785,7 @@ export interface paths {
         };
         /**
          * Hal Affiliation Conflicts
-         * @description Publications affiliées à l'établissement dans HAL mais pas dans une autre source.
+         * @description Publications que HAL met dans le périmètre, et que WoS et OpenAlex, seules sources à donner des adresses, laissent hors du périmètre.
          */
         get: operations["hal_affiliation_conflicts_api_hal_problems_affiliation_conflicts_get"];
         put?: never;
@@ -1911,7 +1909,7 @@ export interface paths {
          * List Config
          * @description Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
          *
-         *     Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+         *     Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé absente de cette liste reste réservée.
          */
         get: operations["list_config_api_config_get"];
         put?: never;
@@ -1954,7 +1952,7 @@ export interface paths {
          * Update Config
          * @description Met à jour la valeur d'un paramètre applicatif.
          *
-         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
+         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue rend 404.
          */
         put: operations["update_config_api_config__key__put"];
         post?: never;
@@ -1975,7 +1973,7 @@ export interface paths {
          * List Perimeters
          * @description Liste les périmètres avec leurs structures racines.
          *
-         *     `structures` porte les seules racines ; `structure_count` compte l'ensemble effectif, racines et descendants réunis.
+         *     `structures` contient seulement les racines ; `structure_count` compte toutes les structures du périmètre, racines et descendantes.
          */
         get: operations["list_perimeters_api_perimeters_get"];
         put?: never;
@@ -1983,7 +1981,7 @@ export interface paths {
          * Create Perimeter
          * @description Crée un périmètre avec ses structures racines, la liste pouvant être vide.
          *
-         *     Le code sert d'identifiant naturel — la configuration du pipeline désigne un périmètre par sa valeur — et doit être un jeton unique, sans espace : un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
+         *     Le code est un identifiant naturel : la configuration du pipeline désigne un périmètre par sa valeur. C'est un jeton unique, sans espace ; un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
          */
         post: operations["create_perimeter_api_perimeters_post"];
         delete?: never;
@@ -2004,7 +2002,7 @@ export interface paths {
          * Update Perimeter
          * @description Met à jour un périmètre (nom, structures racines).
          *
-         *     Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. La clôture matérialisée suit le changement de racines.
+         *     Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. Les structures du périmètre suivent le changement de racines.
          */
         put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
         post?: never;
@@ -2012,7 +2010,7 @@ export interface paths {
          * Delete Perimeter
          * @description Supprime un périmètre.
          *
-         *     Renvoie 409 si une clé de configuration le désigne encore — le pipeline s'y appuierait sans le trouver. Les lignes de la clôture matérialisée s'en vont avec lui, par cascade.
+         *     Renvoie 409 si une clé de configuration le désigne : le pipeline le chercherait en vain. Ses lignes de `perimeter_structures` partent en cascade.
          */
         delete: operations["delete_perimeter_api_perimeters__perimeter_id__delete"];
         options?: never;
@@ -2031,7 +2029,7 @@ export interface paths {
          * List Publisher Types
          * @description Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
          *
-         *     La source de vérité côté Python est `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des éditeurs et la colonne « Type » des pages publiques.
+         *     Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
          */
         get: operations["list_publisher_types_api_publishers_types_get"];
         put?: never;
@@ -2117,14 +2115,14 @@ export interface paths {
          * Get Publisher
          * @description Profil complet d'un éditeur, pour sa page publique.
          *
-         *     Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
+         *     Contient ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
          */
         get: operations["get_publisher_api_publishers__publisher_id__get"];
         /**
          * Update Publisher
          * @description Met à jour un éditeur, champ par champ.
          *
-         *     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
+         *     Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur un éditeur inconnu.
          */
         put: operations["update_publisher_api_publishers__publisher_id__put"];
         post?: never;
@@ -2171,9 +2169,9 @@ export interface paths {
          *
          *     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
          *
-         *     Deux éditeurs qui portent des membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
+         *     Deux éditeurs aux membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
          *
-         *     Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+         *     La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'administration les traite dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
          */
         post: operations["merge_api_publishers__publisher_id__merge_post"];
         delete?: never;
@@ -2193,7 +2191,7 @@ export interface paths {
          * List Oa Models
          * @description Valeurs possibles de `oa_model` avec leur libellé français.
          *
-         *     La source de vérité côté Python est `domain.serials.journal.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la modale d'édition admin.
+         *     Les valeurs viennent de `domain.serials.serial.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
          */
         get: operations["list_oa_models_api_serials_oa_models_get"];
         put?: never;
@@ -2215,7 +2213,7 @@ export interface paths {
          * List Serial Types
          * @description Valeurs possibles de l'enum `serial_type` avec leur libellé français.
          *
-         *     La source de vérité côté Python est `domain.serials.journal.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
+         *     Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
          */
         get: operations["list_serial_types_api_serials_types_get"];
         put?: never;
@@ -2261,7 +2259,7 @@ export interface paths {
          *
          *     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre et leurs ISSN.
          *
-         *     `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
+         *     `kind` admet seulement `publisher` : il tient au contrat de la facette d'entité, commun aux listes de publications et aux tableaux de bord.
          */
         get: operations["serials_entity_facet_api_serials_facets_entities_get"];
         put?: never;
@@ -2465,7 +2463,7 @@ export interface paths {
         };
         /**
          * Doi Namespace Conflicts
-         * @description Paires de revues dont l'une porte des enregistrements dont le DOI tombe dans l'espace de noms de l'autre.
+         * @description Paires de revues dont l'une a des enregistrements dont le DOI relève de l'espace de noms de l'autre.
          */
         get: operations["doi_namespace_conflicts_api_serials_doi_namespace_conflicts_get"];
         put?: never;
@@ -2487,16 +2485,16 @@ export interface paths {
          * Get Serial
          * @description Profil complet d'une revue, pour sa page publique.
          *
-         *     Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
+         *     Contient ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
          */
         get: operations["get_serial_api_serials__serial_id__get"];
         /**
          * Update Serial
          * @description Met à jour une revue, champ par champ.
          *
-         *     Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur une revue inconnue.
+         *     Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une revue inconnue.
          *
-         *     Un `serial_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_serial`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
+         *     Un changement de type de la revue requalifie ses publications, dans la même transaction (`requalify_publications_for_serial`). La route `type-change-impact` en donne l'ampleur avant confirmation.
          */
         put: operations["update_serial_api_serials__serial_id__put"];
         post?: never;
@@ -2539,11 +2537,11 @@ export interface paths {
         put?: never;
         /**
          * Get Type Change Impact
-         * @description Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à la valeur demandée.
+         * @description Compte les publications de la revue dont le type changerait avec le type de revue demandé.
          *
-         *     L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
+         *     L'aperçu applique réellement le changement (écriture du type, recalcul des corrections des enregistrements sources, recalcul des publications) dans un `SAVEPOINT` annulé ensuite : il emprunte le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
          *
-         *     La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
+         *     La méthode est POST, bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et échapperait à la garde d'authentification des méthodes d'écriture.
          */
         post: operations["get_type_change_impact_api_serials__serial_id__type_change_impact_post"];
         delete?: never;
@@ -2685,7 +2683,7 @@ export interface paths {
         };
         /**
          * List Phases
-         * @description Ordre canonique des phases du pipeline (graphe), pour la trame du ruban.
+         * @description Ordre des phases du pipeline (`pipeline.graph`), pour la trame du ruban.
          */
         get: operations["list_phases_api_pipeline_phases_get"];
         put?: never;
@@ -2745,7 +2743,7 @@ export interface paths {
         };
         /**
          * List Subjects
-         * @description Liste paginée des sujets, les plus portés par des publications d'abord.
+         * @description Liste paginée des sujets, les plus fréquents dans les publications d'abord.
          */
         get: operations["list_subjects_api_subjects_get"];
         put?: never;

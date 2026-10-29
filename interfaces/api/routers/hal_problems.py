@@ -29,7 +29,7 @@ def hal_duplicate_accounts(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalDuplicateAccountsResponse:
-    """Personnes liées à 2+ comptes HAL distincts."""
+    """Personnes liées à au moins deux comptes HAL distincts."""
     return queries.hal_duplicate_accounts(page=page, per_page=per_page)
 
 
@@ -62,7 +62,7 @@ def hal_missing_collections(
 ) -> HalMissingCollectionsResponse:
     """Publications affiliées à un laboratoire dans HAL mais absentes de sa collection.
 
-    Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire dont aucune collection HAL n'est configurée — la question est sans objet, faute de collection à laquelle comparer.
+    Renvoie 404 sur un laboratoire introuvable, 422 sur un laboratoire sans collection HAL configurée : la question est alors sans objet.
     """
     result = queries.hal_missing_collections(lab_id=lab_id, page=page, per_page=per_page)
     if result is NoMissingCollections.UNKNOWN_LAB:
@@ -76,7 +76,7 @@ def hal_missing_collections(
 def hal_missing_collections_labs(
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> list[HalCollectionLab]:
-    """Liste des labos avec collection HAL."""
+    """Laboratoires dotés d'une collection HAL."""
     return queries.hal_missing_collections_labs()
 
 
@@ -86,7 +86,7 @@ def hal_affiliation_conflicts(
     per_page: int = Query(50, ge=1, le=200),
     queries: HalProblemsQueries = Depends(hal_problems_queries),
 ) -> HalAffiliationConflictsResponse:
-    """Publications affiliées à l'établissement dans HAL mais pas dans une autre source."""
+    """Publications que HAL met dans le périmètre, et que WoS et OpenAlex, seules sources à donner des adresses, laissent hors du périmètre."""
     return queries.hal_affiliation_conflicts(page=page, per_page=per_page)
 
 

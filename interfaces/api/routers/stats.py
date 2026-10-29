@@ -21,7 +21,7 @@ def collaborations(
 ) -> CollaborationsResponse:
     """Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
 
-    Le décompte se lit dans la colonne `countries` des publications, le pays domestique écarté.
+    Le décompte se lit dans la colonne `countries` des publications, le pays de l'établissement écarté.
     """
     return queries.collaborations(filters=filters.to_filters())
 

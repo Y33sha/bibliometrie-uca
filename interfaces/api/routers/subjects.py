@@ -48,7 +48,7 @@ def list_subjects(
     per_page: int = Query(50, ge=1, le=200),
     queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectListResponse:
-    """Liste paginée des sujets, les plus portés par des publications d'abord."""
+    """Liste paginée des sujets, les plus fréquents dans les publications d'abord."""
     return queries.list_subjects(
         search=filters.search, page=page, per_page=per_page, min_usage_count=filters.min_count
     )
