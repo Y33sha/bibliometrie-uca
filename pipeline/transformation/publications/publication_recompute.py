@@ -17,7 +17,7 @@ class PublicationRecompute:
         self._conn = conn
 
     def reconcile(self, source_record_ids: Sequence[int]) -> frozenset[int]:
-        """Réconcilie le voisinage des enregistrements sources `source_record_ids` et recalcule les métadonnées consolidées des publications conservées. Rend ces publications."""
+        """Réconcilie le voisinage des enregistrements sources donnés et recalcule les métadonnées consolidées des publications conservées. Rend ces publications."""
         return reconcile_source_records(self._conn, source_record_ids).survivors
 
     def realign(self, publication_id: int) -> None:
