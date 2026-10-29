@@ -1,10 +1,6 @@
-"""Normalisation des données theses.fr : staging → tables structurées.
+"""Normalisation des enregistrements sources theses.fr.
 
-Particularités theses.fr :
-- Les personnes liées aux thèses peuvent avoir différent rôles : auteur, directeur, rapporteur, examinateur, président de jury
-- Le PPN IdRef sert de clé de déduplication pour les auteurs
-- Le NNT sert d'identifiant pour les thèses soutenues
-- Les thèses en cours n'ont ni NNT ni DOI
+Une thèse soutenue a pour identifiant son NNT ; une thèse en cours est sans NNT ni DOI. Les personnes d'une thèse ont un ou plusieurs rôles : auteur, direction, rapport, jury, présidence du jury.
 """
 
 from collections.abc import Mapping
@@ -35,10 +31,6 @@ from pipeline.ingestion.theses.payload import (
 )
 from pipeline.transformation.publishing.find_or_create import Containers
 
-# =============================================================
-# PUBLICATIONS
-# =============================================================
-
 
 def _defense_date(thesis: Mapping[str, JsonValue]) -> str | None:
     """Date de soutenance ISO."""
@@ -59,11 +51,6 @@ def get_publication_year(thesis: Mapping[str, JsonValue]) -> int | None:
     """Année de soutenance, à défaut année de première inscription."""
     year_source = _defense_date(thesis) or _enrollment_date(thesis)
     return int(year_source[:4]) if year_source else None
-
-
-# =============================================================
-# SOURCE DOCUMENTS
-# =============================================================
 
 
 def _build_source_extras(thesis: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
@@ -116,7 +103,7 @@ def theses_source_record(
 ) -> SourceRecordUpsert:
     """Enregistrement source theses.fr d'une thèse, d'après son détail.
 
-    Sans conteneur. Le doc_type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue qui en a un.
+    Sans conteneur. Le type dépend de la présence d'une date de soutenance, le statut open access de la diffusion de la thèse (`thesis_oa_status`). La langue est la première de `langues`, le résumé celui de la première langue qui en a un.
     """
     doi = clean_doi(as_str(thesis.get("doi")))
     identifiers: list[SourceIdentifier] = []
@@ -139,7 +126,7 @@ def theses_source_record(
     ]
     keywords = _subject_labels(subjects, "sujet") or None
 
-    # Topics : discipline + sujets Rameau
+    # Topics : discipline et vedettes RAMEAU.
     topics: dict[str, JsonValue] = {}
     discipline = as_str(thesis.get("discipline"))
     if discipline:
@@ -158,7 +145,6 @@ def theses_source_record(
         source="theses",
         source_id=theses_id,
         staging_id=staging_id,
-        doi=doi,
         identifiers=tuple(identifiers),
         title=get_title(thesis) or "",
         publication_year=get_publication_year(thesis),
@@ -175,11 +161,6 @@ def theses_source_record(
     )
 
 
-# =============================================================
-# SOURCE CONTRIBUTIONS
-# =============================================================
-
-
 def extract_theses_author_block(thesis: Mapping[str, JsonValue]) -> AuthorBlock:
     """Bloc auteurs d'une thèse : les personnes de chaque rôle."""
     return {field: thesis.get(field) for field in THESES_FIELD_ROLES}
@@ -188,7 +169,7 @@ def extract_theses_author_block(thesis: Mapping[str, JsonValue]) -> AuthorBlock:
 def build_theses_author_records(block: AuthorBlock) -> list[AuthorRecord]:
     """Une contribution source par personne de la thèse, rôles fusionnés (`aggregate_thesis_persons`) ; seuls les auteurs ont une position.
 
-    theses.fr ne donne pas d'adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `source_extras` avec leur PPN, rattachent les contributions sources à leurs structures (vue `source_contribution_structures`).
+    theses.fr est sans adresse par personne. L'établissement de soutenance et les laboratoires partenaires, gardés dans `source_extras` avec leur PPN, rattachent les contributions sources à leurs structures (vue `source_contribution_structures`).
     """
     return [
         AuthorRecord(
@@ -211,7 +192,7 @@ class ThesesNormalizer(SourceNormalizer):
     def source_record(
         self, row: StagingRow, doc: Document, containers: Containers
     ) -> SourceRecordUpsert:
-        """Une thèse n'a ni éditeur ni conteneur."""
+        """Une thèse est sans éditeur ni conteneur."""
         return theses_source_record(doc, row.id, row.source_id)
 
     def author_block(self, doc: Document) -> AuthorBlock:

@@ -1,8 +1,8 @@
 """Router des adresses brutes des sources : leur rattachement aux structures et l'attribution de leurs pays. Sert `/api/addresses/*`.
 
-Les lectures passent par `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays, qui n'est pas une lecture d'adresse, vit dans `countries.py`.
+Les lectures passent par `AddressesQueries`, les écritures par le service `AddressService`. Le référentiel des pays vit dans `countries.py`.
 
-Les routes sont groupées par sujet, et dans chaque groupe les chemins littéraux précèdent ceux qui portent un identifiant — un chemin littéral déclaré après `/{addr_id}` s'y ferait absorber.
+Les routes sont groupées par sujet. Dans chaque groupe, les chemins littéraux précèdent ceux à identifiant : déclaré après `/{addr_id}`, un chemin littéral s'y ferait absorber.
 """
 
 from typing import Annotated, cast
@@ -45,8 +45,7 @@ from interfaces.api.params import SearchTerm
 
 router = APIRouter(prefix="/api/addresses", tags=["addresses"])
 
-# Chaque occurrence répétée porte `<opérateur>:<charge>`. Le motif déclare la forme et le
-# vocabulaire : FastAPI refuse l'occurrence malformée par un 422, et le contrat OpenAPI la publie.
+# Chaque occurrence répétée a la forme `<opérateur>:<charge>`. Le motif déclare la forme et le vocabulaire : FastAPI refuse une occurrence mal formée par un 422, et le contrat OpenAPI publie le motif.
 TextPredicateParam = Annotated[str, Query(pattern=r"^(contains|not_contains):.+$")]
 StructurePredicateParam = Annotated[str, Query(pattern=r"^(recognized|not_recognized):\d+(,\d+)*$")]
 
@@ -88,16 +87,13 @@ def list_addresses(
     struct: list[StructurePredicateParam] = Query(default=[]),
     queries: AddressesQueries = Depends(addresses_queries),
 ) -> AddressListResponse:
-    """Liste les adresses rattachées à une structure, avec prédicats texte/structure composables."""
+    """Liste les adresses rattachées à une structure, avec des prédicats de texte et de structure combinables."""
     text_predicates = _parse_text_predicates(text)
     structure_predicates = _parse_structure_predicates(struct)
 
-    # `detected=yes` borne la lecture à la structure demandée ; `no` et `all` cherchent au
-    # contraire les adresses qui ne lui sont pas rattachées, et portent donc sur toute la base.
-    # Croisés avec `pending` ou `all`, qui laissent passer les centaines de milliers d'adresses
-    # jamais arbitrées, ils demandent un balayage complet — là où `confirmed` et `rejected` se
-    # limitent à ce qu'une main a tranché pour cette structure. Un prédicat de texte ou de
-    # structure suffit à réduire l'ensemble ; sans lui, la lecture est refusée.
+    # `detected=yes` borne la lecture à la structure demandée ; `no` et `all` cherchent les adresses hors de ses rattachements, donc dans toute la base.
+    # Croisés avec `pending` ou `all`, qui laissent passer les centaines de milliers d'adresses jamais arbitrées, ils demandent un balayage complet ; `confirmed` et `rejected` se limitent aux arbitrages de cette structure.
+    # Un prédicat de texte ou de structure réduit l'ensemble ; sans lui, la lecture est refusée.
     has_narrowing = bool(text_predicates) or bool(structure_predicates)
     if detected in ("no", "all") and not has_narrowing and validation in ("all", "pending"):
         return AddressListResponse(
@@ -213,9 +209,9 @@ def batch_set_country(
     bg: BackgroundTasks,
     addresses: AddressService = Depends(address_service),
 ) -> BatchCountryResponse:
-    """Ajoute un pays à des adresses (par IDs ou par filtre).
+    """Ajoute un pays à des adresses, par identifiants ou par filtre.
 
-    Renvoie 422 sur un code pays absent du référentiel — la chaîne vide comprise — et sur un appel par filtre qui n'en porte aucun (`batch_set_country_by_filter`).
+    Renvoie 422 sur un code pays absent du référentiel, chaîne vide comprise, et sur un appel par filtre sans filtre (`batch_set_country_by_filter`).
     """
     modified_ids = addresses.batch_set_country(
         body.country_code,

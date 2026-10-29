@@ -1,10 +1,6 @@
-"""Régressions sur la phase `fetch_stale` / `_run_fetch_stale`.
+"""Phase `fetch_stale` : sources rafraîchies, fenêtre d'années, circuit-breaker de chaque source.
 
-1. WoS est opt-in (`--include-wos`) : exclu par défaut du refresh, comme
-   `harvest` et `fetch_missing`.
-2. Le refetch d'une source pose un circuit-breaker (coupe sur 429 répétés),
-   au même titre que fetch_missing — sinon fetch_stale martèle une source
-   à bout de budget API.
+WoS est rafraîchie seulement sur demande (`--include-wos`), comme dans `harvest` et `fetch_missing`. Chaque source est rafraîchie sous son circuit-breaker, qui coupe les appels après des réponses 429 répétées.
 """
 
 from contextlib import ExitStack
@@ -26,11 +22,11 @@ def _run_phase(options: RunOptions) -> PhaseMetrics:
 
 
 def _called_targets(stack) -> MagicMock:
-    """Patche les I/O de la phase `fetch_stale` et retourne le mock des sources refetch."""
+    """Simule les entrées-sorties de la phase `fetch_stale` ; renvoie le mock de `_run_fetch_stale`, appelé pour chaque source rafraîchie."""
     run_one = stack.enter_context(
         patch.object(fetch_stale, "_run_fetch_stale", return_value=PhaseMetrics())
     )
-    # Fenêtre d'années : évite tout accès base (window_years lit la config).
+    # Fenêtre d'années simulée : `window_years` lit la configuration en base.
     stack.enter_context(
         patch("pipeline.runtime.execution.get_sync_engine", return_value=MagicMock())
     )
@@ -49,7 +45,7 @@ def test_fetch_stale_excludes_wos_by_default():
         _run_phase(RunOptions())
     targets = [c.args[1] for c in run_one.call_args_list]
     assert "wos" not in targets
-    assert targets  # d'autres sources sont bien refetch
+    assert targets  # les autres sources sont rafraîchies
 
 
 def test_fetch_stale_includes_wos_when_opted_in():
@@ -61,8 +57,7 @@ def test_fetch_stale_includes_wos_when_opted_in():
 
 
 def test_fetch_stale_covers_theses():
-    # theses entre dans le refresh (refetch par id natif), contrairement à la
-    # recherche par DOI de fetch_missing, qui l'exclut.
+    # theses est rafraîchie par son identifiant natif ; la recherche par DOI de `fetch_missing` l'exclut.
     with ExitStack() as stack:
         run_one = _called_targets(stack)
         _run_phase(RunOptions())
@@ -118,5 +113,5 @@ def test_la_relecture_d_une_source_tourne_sous_son_circuit_breaker():
         _run_phase(RunOptions(sources={"hal"}))
 
     assert sources == ["hal"]
-    # La ContextVar est restaurée en sortie (pas de fuite de breaker).
+    # Le circuit-breaker est retiré en sortie.
     assert get_current_breaker() is None

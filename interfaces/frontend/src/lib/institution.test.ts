@@ -12,7 +12,7 @@ describe('siteTitle', () => {
 		expect(siteTitle()).toBe('Bibliométrie UCA');
 	});
 
-	it('rend le titre configuré', () => {
+	it('renvoie le titre configuré', () => {
 		institution.name = 'UCA';
 		institution.title = 'Observatoire des publications';
 		expect(siteTitle()).toBe('Observatoire des publications');

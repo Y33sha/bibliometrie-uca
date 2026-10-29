@@ -15,12 +15,11 @@ _SECRET = "s" * MIN_SESSION_SECRET_LENGTH
 
 @pytest.fixture
 def auth_settings(monkeypatch):
-    """Pose une configuration d'authentification valide, que chaque test dégrade sur un point."""
+    """Renseigne une configuration d'authentification valide ; chaque test en modifie un élément."""
 
     def _apply(**overrides):
         for name, value in {"admin_hash": _HASH, "session_secret": _SECRET, **overrides}.items():
-            # Les champs secrets sont typés `SecretStr` : les poser en clair les rendrait
-            # inutilisables par le code testé, qui lit par `.get_secret_value()`.
+            # Le code testé lit les champs secrets par `.get_secret_value()` : ils sont typés `SecretStr`.
             monkeypatch.setattr(session_mod.settings, name, SecretStr(value))
 
     return _apply
@@ -37,14 +36,14 @@ def test_refuse_sans_empreinte_de_mot_de_passe(auth_settings):
         check_auth_config()
 
 
-def test_refuse_une_cle_de_contribution_source_absente(auth_settings):
+def test_refuse_une_cle_de_signature_absente(auth_settings):
     auth_settings(session_secret="")
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):
         check_auth_config()
 
 
-def test_refuse_une_cle_de_contribution_source_trop_courte(auth_settings):
-    """Une clé courte se retrouve hors ligne, et le jeton de session se forge alors sans mot de passe."""
+def test_refuse_une_cle_de_signature_trop_courte(auth_settings):
+    """Une clé de signature courte se retrouve par force brute hors ligne ; le jeton de session se forge alors sans mot de passe."""
     auth_settings(session_secret="s" * (MIN_SESSION_SECRET_LENGTH - 1))
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):
         check_auth_config()

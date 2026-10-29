@@ -1,6 +1,6 @@
-"""Un paramètre texte portant un caractère de contrôle est refusé par le contrat de la route.
+"""Un paramètre texte qui contient un caractère de contrôle est refusé en 422 par le contrat de la route ; tabulation et fins de ligne passent.
 
-PostgreSQL n'accepte l'octet NUL dans aucun champ texte, et le driver écarte la valeur à l'adaptation des paramètres. Sans refus en amont, la valeur traverse la route et rompt au moment de la requête, en 500. Les chemins couverts ici sont ceux qu'une analyse de sécurité a fait tomber.
+PostgreSQL refuse l'octet NUL dans tout champ texte, et le driver lève une exception à l'adaptation du paramètre. Sans refus en amont, la requête échoue en 500. Les chemins listés sont ceux qu'une analyse de sécurité a signalés.
 """
 
 import pytest

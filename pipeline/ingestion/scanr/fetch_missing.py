@@ -3,7 +3,7 @@
 - `ScanrDoiSearch` (tâche `fetch_missing.doi.scanr`) : recherche par DOI, pilotée par `pipeline.ingestion.common.doi_search`.
 - `fetch_missing_scanr_by_hal_id` (tâche `fetch_missing.scanr_by_hal_id`) : hal-id des documents HAL et OpenAlex, absents de ScanR.
 
-API ElasticSearch — requête `terms` sur `externalIds.id.keyword` pour un lot de 50 identifiants en un seul appel. Authentification basic.
+Une requête Elasticsearch `terms` sur `externalIds.id.keyword` cherche un lot de 50 identifiants, en authentification basique.
 
 ScanR stocke les DOI en casse variable : les DOI de ses réponses passent par `clean_doi` avant d'être comparés aux DOI demandés.
 """
@@ -27,7 +27,7 @@ from pipeline.ingestion.scanr.api import search
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 BATCH_SIZE = 50
-# API ElasticSearch publique, pas de rate limit documenté — 5 req concurrentes reste courtois sur une API interne DataESR.
+# L'API Elasticsearch publique est sans plafond documenté : 5 requêtes simultanées restent courtoises.
 MAX_CONCURRENT = 5
 
 
@@ -38,7 +38,7 @@ async def search_by_external_ids(
     id_type: str,
     normalize: Callable[[str | None], str | None] = lambda value: value,
 ) -> LookupBatch | Unavailable:
-    """Documents ScanR dont `externalIds` contient l'un des identifiants `ids` de type `id_type`.
+    """Documents ScanR dont les `externalIds` contiennent l'un des identifiants, de ce type.
 
     Un identifiant sans document est confirmé absent. `normalize` ramène les identifiants de la réponse à la forme des identifiants demandés.
     """
@@ -128,7 +128,7 @@ async def fetch_missing_scanr_by_hal_id(
 ) -> PhaseMetrics:
     """Cherche dans ScanR les documents repérés par hal-id (HAL, OpenAlex) et les écrit dans `staging`.
 
-    Un hal-id introuvable est inscrit dans `failed_lookups`. Compteurs de `look_up`, et `extras["not_found"]` = hal-id introuvables.
+    Un hal-id introuvable est inscrit dans `failed_lookups`. Renvoie les compteurs de `look_up`, avec le nombre de hal-id introuvables (`not_found`).
     """
     return await look_up(
         conn,

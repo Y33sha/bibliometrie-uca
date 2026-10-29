@@ -1,7 +1,6 @@
-"""Tests des deux passes de résolution des préfixes DOI :
-`ResolveRaPhase` (RA seule, via doi.org) et les étapes Crossref et DataCite de
-`resolve_publishers` (publisher via les API /prefixes). Fakes pour les ports, callables locales pour les clients HTTP —
-pas de réseau, pas de DB.
+"""Tests des deux passes de résolution des préfixes DOI : `ResolveRaPhase` (agence d'enregistrement, par doi.org) et les étapes Crossref et DataCite de `resolve_publishers` (éditeur, par les API /prefixes).
+
+Faux dépôts pour les ports, fonctions locales pour les clients HTTP, sans réseau ni base de données.
 """
 
 from __future__ import annotations
@@ -37,8 +36,7 @@ class _Row:
 
 @dataclass
 class FakeDoiPrefixRepo:
-    """Repo de test : `candidates` (préfixes du pool `candidate_dois`) alimente `resolve_ra` ;
-    `rows` modélise la table `doi_prefixes` (clé = prefix)."""
+    """Faux dépôt : `candidates` (préfixes des DOI candidats) alimente `resolve_ra` ; `rows` simule la table `doi_prefixes`, indexée par préfixe."""
 
     candidates: list[str] = field(default_factory=list)
     rows: dict[str, _Row] = field(default_factory=dict)
@@ -108,8 +106,7 @@ class FakeDoiPrefixRepo:
 
 @dataclass
 class FakePublisherRepo:
-    """`find_publisher_by_name_form` lit `name_to_id` ; `create_publisher` incrémente un
-    id ; `add_publisher_name_form` enrichit `name_to_id` (dédoublonnage intra-run)."""
+    """Faux dépôt des éditeurs : `name_to_id` associe une forme de nom à un éditeur, enrichi par chaque création pour dédoublonner au sein du run."""
 
     name_to_id: dict[str, int] = field(default_factory=dict)
     created: list[dict] = field(default_factory=list)
@@ -154,7 +151,7 @@ class StubResolveRas:
 
 @dataclass
 class StubCrossref:
-    """Rend la réponse déclarée pour un préfixe, `NOT_FOUND` sinon."""
+    """Renvoie la réponse déclarée pour un préfixe, `NOT_FOUND` sinon."""
 
     answers: dict[str, object] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
@@ -168,7 +165,7 @@ class StubCrossref:
 
 @dataclass
 class StubDataCite:
-    """Rend la réponse déclarée pour un préfixe, `NOT_FOUND` sinon."""
+    """Renvoie la réponse déclarée pour un préfixe, `NOT_FOUND` sinon."""
 
     answers: dict[str, object] = field(default_factory=dict)
     calls: list[str] = field(default_factory=list)
@@ -186,7 +183,7 @@ def _run_ra(contexte, repo, ras_fn):
 
 
 def _run_publication(repo, pubrepo, cr=None, dc=None):
-    """Étape Crossref puis étape DataCite, dans l'ordre de la phase ; rend les métriques des deux."""
+    """Exécute l'étape Crossref puis l'étape DataCite, dans l'ordre de la phase ; renvoie les métriques des deux."""
     crossref = run_resolve_crossref_publishers(
         MagicMock(),
         _LOG,
@@ -205,7 +202,7 @@ def _run_publication(repo, pubrepo, cr=None, dc=None):
     return crossref
 
 
-# ── ResolveRaPhase ─────────────────────────────────────────────────
+# ResolveRaPhase
 
 
 def test_resolve_ra_inserts_ra_only(contexte):
@@ -216,13 +213,13 @@ def test_resolve_ra_inserts_ra_only(contexte):
 
     assert ras.calls == [["10.1038"]]  # le préfixe seul, sans DOI
     assert repo.rows["10.1038"].ra == "Crossref"
-    assert repo.rows["10.1038"].publisher_id is None  # aucun publisher en resolve_ra
+    assert repo.rows["10.1038"].publisher_id is None  # resolve_ra pose seulement l'agence
     assert metrics.new == 1
     assert metrics.extras.get("resolved") == 1
 
 
 def test_resolve_ra_ecarte_les_prefixes_malformes(contexte):
-    """Régression : « doi:10.5194 » et « https: » entraient dans doi_prefixes, et le premier y recevait un éditeur."""
+    """Régression : les préfixes malformés « doi:10.5194 » et « https: » restent hors de doi_prefixes."""
     repo = FakeDoiPrefixRepo(candidates=["doi:10.5194", "https:", "10.5194"])
     ras = StubResolveRas(answers={"10.5194": "Crossref"})
 
@@ -243,10 +240,10 @@ def test_resolve_ra_expose_la_repartition_par_ra(contexte):
 
     assert metrics.details["summary"] == {"new_prefixes": 1, "resolved": 1}
     rows = metrics.details["table"]["rows"]
-    # Le run a inséré le préfixe Crossref → +1 sur la ligne Crossref.
+    # Le préfixe Crossref inséré par le run compte sur la ligne Crossref.
     assert rows[0] == {"key": "Crossref", "dois": 80, "prefixes": 12, "new": 1}
     assert {r["key"] for r in rows} == {"Crossref", "DataCite", "unknown"}
-    assert rows[1]["new"] == 0  # DataCite non touché ce run
+    assert rows[1]["new"] == 0  # aucun préfixe DataCite inséré par ce run
 
 
 def test_resolve_ra_unknown_when_doi_org_ignores_the_prefix(contexte):
@@ -285,7 +282,7 @@ def test_resolve_ra_doi_org_indisponible_garde_les_prefixes_inseres(open_tx, con
     assert [s["code"] for s in metrics.signals] == ["source_unavailable"]
 
 
-# ── resolve_publishers ─────────────────────────────────────────
+# resolve_publishers
 
 
 def test_publishers_crossref_match():
@@ -345,7 +342,7 @@ def test_publishers_datacite_provider_and_client():
 
 
 def test_publishers_unknown_tries_both_and_corrects_ra():
-    """ra=unknown → tente crossref (muet) puis datacite (répond) → RA corrigée."""
+    """Agence inconnue : Crossref est interrogé sans réponse, puis DataCite répond, et l'agence est corrigée."""
     repo = FakeDoiPrefixRepo(rows={"10.14758": _Row("10.14758", "unknown")})
     pubrepo = FakePublisherRepo()
     cr = StubCrossref()
@@ -361,8 +358,7 @@ def test_publishers_unknown_tries_both_and_corrects_ra():
 
 
 def test_publishers_unknown_both_muet_marks_checked_no_publisher():
-    """ra=unknown, /prefixes muet partout → pas de publisher, mais row marquée vue par les deux
-    agences (garde : ne sera plus reprise au run suivant)."""
+    """Agence inconnue, sans réponse de Crossref ni de DataCite : aucun éditeur, et la ligne est marquée vérifiée par les deux agences."""
     repo = FakeDoiPrefixRepo(rows={"10.9012": _Row("10.9012", "unknown")})
     pubrepo = FakePublisherRepo()
     cr = StubCrossref()
@@ -372,9 +368,9 @@ def test_publishers_unknown_both_muet_marks_checked_no_publisher():
 
     row = repo.rows["10.9012"]
     assert row.publisher_id is None
-    assert row.crossref_checked and row.datacite_checked  # garde anti-réinterrogation
+    assert row.crossref_checked and row.datacite_checked  # marques de vérification
     assert metrics.extras.get("no_publisher") == 2  # inconnu de Crossref, puis de DataCite
-    # Un second run ne reprend plus cette row.
+    # Le run suivant ignore cette ligne.
     assert repo.get_prefixes_pending_publisher("Crossref") == []
     assert repo.get_prefixes_pending_publisher("DataCite") == []
 
@@ -391,13 +387,12 @@ def test_publishers_skips_already_checked_and_unmanaged_ra():
 
     metrics = _run_publication(repo, pubrepo, cr)
 
-    assert cr.calls == []  # ni la row déjà vérifiée, ni la RA non gérée
+    assert cr.calls == []  # ni la ligne déjà vérifiée, ni l'agence non gérée
     assert metrics.total == 0
 
 
 def test_publishers_name_present_attaches_without_fetch():
-    """Row héritée avec nom déjà renseigné mais publisher NULL → match/attache sans
-    re-fetch /prefixes."""
+    """Une ligne au nom d'éditeur renseigné, sans éditeur rattaché, est rattachée par ce nom sans nouvel appel à /prefixes."""
     repo = FakeDoiPrefixRepo(
         rows={
             "10.1234": _Row(
@@ -413,7 +408,7 @@ def test_publishers_name_present_attaches_without_fetch():
 
     _run_publication(repo, pubrepo, cr)
 
-    assert cr.calls == []  # pas de fetch, nom déjà là
+    assert cr.calls == []  # aucun appel : le nom est connu
     assert repo.rows["10.1234"].publisher_id == 777
 
 

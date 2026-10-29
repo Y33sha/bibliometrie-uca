@@ -1,11 +1,4 @@
-"""Aggregate root `Publication` — référence biblio canonique.
-
-Une `Publication` unifie les images qu'une ou plusieurs `SourceRecord` donnent d'un même document scientifique. Clé surrogate : `id`. Identifiant naturel principal : `doi` (quand renseigné ; les autres identifiants — HALId, NNT — sont dans `source_record_identifiers`).
-
-Les `source_records` attachées sont lues en projection (`SourceRecord`), jamais comme un agrégat mutable.
-
-L'entité contient les métadonnées retenues pour la publication. Les règles qui la calculent vivent dans les modules voisins du domaine : agrégation cross-sources (`aggregation`), arbitrage des statuts et canonicalisation des titres (`metadata`), assignation et réconciliation (`reconciliation`).
-"""
+"""Publication : l'entité unifiée que le pipeline dérive des enregistrements sources d'un même document."""
 
 from dataclasses import dataclass, field
 
@@ -15,10 +8,7 @@ from domain.types import JsonValue
 
 @dataclass(slots=True)
 class Publication:
-    """Référence biblio canonique (aggregate root).
-
-    Le champ `id` est None tant que la publication n'a pas été persistée ; il est positionné par le repository après insertion.
-    """
+    """Publication ; `id` vaut `None` avant son insertion en base."""
 
     id: int | None
     title: str

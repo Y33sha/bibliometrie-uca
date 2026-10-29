@@ -1,12 +1,12 @@
 """Phase `fetch_missing` : rattrapage des documents repérés dans une source mais absents d'une autre. Trois mécanismes, dans cet ordre :
 
 1. **Recherche par hal-id** : dans HAL, les hal-id repérés dans OpenAlex et ScanR (`pipeline.ingestion.hal.fetch_missing`) ; dans ScanR, les hal-id repérés dans HAL et OpenAlex (`pipeline.ingestion.scanr.fetch_missing`). Les deux tâches forment un groupe parallèle.
-2. **Recherche par NNT** : dans HAL, les thèses de theses.fr sans document HAL (`pipeline.ingestion.hal.fetch_missing`) ; dans theses.fr, les NNT repérés dans une autre source (`pipeline.ingestion.theses.fetch_missing`). Les deux tâches forment un groupe parallèle.
+2. **Recherche par NNT** : dans HAL, en mode `full`, les thèses de theses.fr sans document HAL (`pipeline.ingestion.hal.fetch_missing`) ; dans theses.fr, les NNT repérés dans une autre source (`pipeline.ingestion.theses.fetch_missing`). Les deux tâches forment un groupe parallèle.
 3. **Recherche par DOI** : pour chaque source cible, les DOI vus ailleurs et absents de la cible. Les tâches `fetch_missing.doi.<source>` forment un groupe parallèle.
 
-Une recherche sans identifiant à chercher n'écrit rien. Une section dont aucune recherche n'a rien cherché se ferme sur « Rien à faire » (`silent_when_empty`).
+Une section sans identifiant à chercher se ferme sur « Rien à faire ».
 
-Un identifiant cherché en vain est inscrit dans `failed_lookups` (`pipeline.ingestion.common.failed_lookups`). Il est cherché de nouveau après le délai `fetch_missing_retry_after_days`, sauf s'il est absent de son registre. WoS est opt-in (`--include-wos`).
+Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`. Auprès du registre qui l'attribue (HAL pour un hal-id, theses.fr pour un NNT, doi.org pour un DOI), l'échec est définitif. WoS est opt-in (`--include-wos`).
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 FetchChannel = Callable[[PhaseContext], PhaseMetrics]
-"""Recherche par hal-id ou par NNT : rend les métriques du canal."""
+"""Recherche par hal-id ou par NNT : renvoie les métriques du canal."""
 FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
 """Recherche par DOI dans une source cible."""
 
@@ -145,9 +145,6 @@ class FetchMissingPhase:
                 "rows": [{"key": channel, **summary} for channel, summary in by_channel.items()]
             }
         return metrics
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

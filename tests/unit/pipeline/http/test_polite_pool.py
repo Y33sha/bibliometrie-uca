@@ -44,7 +44,7 @@ class TestAdressePolitePool:
         assert get_polite_pool_email_optional() is None
 
     def test_absence_refusee_par_ceux_qui_l_exigent(self, monkeypatch):
-        """Aucune adresse de repli : une adresse inventée expose à un blocage côté serveur."""
+        """Sans adresse configurée, aucune adresse par défaut : une adresse inventée expose à un blocage côté serveur."""
         monkeypatch.setattr(settings, "polite_pool_email", "")
 
         with pytest.raises(RuntimeError, match="POLITE_POOL_EMAIL"):

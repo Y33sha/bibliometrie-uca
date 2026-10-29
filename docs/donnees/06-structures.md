@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-Une structure est un établissement (université, école, CHU, organisme de recherche), un laboratoire, un site ou un service administratif. Les structures forment un référentiel saisi à la main. Un périmètre est un ensemble de structures, désigné par ses racines. Une adresse est le texte d'affiliation qu'une source donne pour une contribution source. Le pipeline reconnaît des structures dans les adresses, et en déduit l'appartenance des contributions sources au périmètre.
+Une structure est un établissement (université, école, CHU, organisme de recherche), un laboratoire, une équipe, un site ou un service administratif. Un périmètre est un ensemble de structures, désigné par ses racines. Une adresse est le texte d'affiliation qu'une source donne pour une contribution source. Le pipeline reconnaît des structures dans les adresses, et en déduit l'appartenance des contributions sources au périmètre.
 
 Schéma PostgreSQL `structures`.
 
@@ -10,7 +10,7 @@ Schéma PostgreSQL `structures`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `structures` | Code court (`uca`, `cnrs`), nom, acronyme, type, identifiants [ROR](../glossaire.md#ror) et RNSR, collection HAL, identifiants dans les sources (`api_ids`) | Code unique, ROR unique |
+| `structures` | Code court (`cnrs`, `inserm`), nom, acronyme, type, identifiants [ROR](../glossaire.md#ror) et RNSR, collection HAL, identifiants dans les sources (`api_ids`) | Code unique, ROR unique |
 | `structure_parents` | Tutelle : rattachement d'une structure à une structure parente | Le graphe des tutelles est sans cycle |
 | `structure_name_forms` | Formes de nom qui désignent la structure dans une adresse | Une forme de six caractères ou moins exige une frontière de mot |
 | `idref_structures` | Structure d'un laboratoire partenaire de thèse, désigné par son PPN IdRef | |
@@ -25,8 +25,6 @@ Les options `is_word_boundary`, `is_excluding` et `requires_context_of` règlent
 | `perimeter_structures` | Racines du périmètre et tous leurs descendants par les tutelles | |
 
 Deux clés de la [configuration](08-ref-et-ops.md) désignent les périmètres en service. `perimeter_extraction` désigne les structures interrogées au moissonnage et l'appartenance des contributions sources au périmètre. `perimeter_persons` désigne le périmètre de création des personnes.
-
-`root_structure_ids` est un tableau sans clé étrangère. La suppression d'une structure la retire des racines de chaque périmètre.
 
 ## Adresses
 

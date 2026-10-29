@@ -8,6 +8,7 @@
   import SourceTag from "#lib/components/SourceTag.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { contributionRoleLabels } from "#lib/labels.js";
+  import { isAdmin } from "#lib/session.svelte.js";
   import { structsTooltip } from "#lib/structureLabels.js";
   import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
 
@@ -130,7 +131,7 @@
         {#each authors as row (row.key)}
           <tr class:divergent={row.divergent}>
             <th
-              class="field"
+              class="field unlabeled"
               scope="row"
               title={row.divergent ? "Contribution source absente d'un enregistrement source" : undefined}
             ></th>
@@ -174,7 +175,9 @@
         {/each}
       </tbody>
     </table>
-    <PublicationMergeSection {publicationId} onmerged={merged} />
+    {#if isAdmin()}
+      <PublicationMergeSection {publicationId} onmerged={merged} />
+    {/if}
   {/if}
 </Drawer>
 
@@ -192,7 +195,6 @@
   .comparison {
     border-collapse: collapse;
     font-size: var(--fs-sm);
-    min-width: 100%;
   }
   .comparison th,
   .comparison td {
@@ -207,13 +209,15 @@
     text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
     text-underline-offset: 2px;
   }
-  /* En-têtes des sources figés au bord haut du volet, qui défile dans les deux sens. Le décalage de -16px compense la marge haute du corps du volet, dans laquelle `top: 0` laisserait passer les lignes défilées ; la marge négative du tableau colle l'en-tête à ce bord dès l'ouverture. Le filet du bas est une ombre : une bordure de tableau fusionnée reste en place au défilement. */
+  /* En-têtes des sources et des champs figés aux bords haut et gauche du volet, qui défile dans les deux sens. Les décalages négatifs compensent les marges intérieures du corps du volet, dans lesquelles `top: 0` et `left: 0` laisseraient passer les cellules défilées ; les marges négatives du tableau collent les en-têtes à ces bords dès l'ouverture. Le filet du bas est une ombre : une bordure de tableau fusionnée reste en place au défilement. */
   .comparison {
-    margin-top: -16px;
+    margin-top: calc(-1 * var(--drawer-padding-y));
+    margin-left: calc(-1 * var(--drawer-padding-x));
+    min-width: calc(100% + var(--drawer-padding-x));
   }
   .comparison thead th {
     position: sticky;
-    top: -16px;
+    top: calc(-1 * var(--drawer-padding-y));
     z-index: 2;
     background: var(--card);
     border-bottom: none;
@@ -233,21 +237,33 @@
     max-width: 320px;
     overflow-wrap: anywhere;
   }
+  /* Le retrait des libellés les aligne sur le reste du volet. */
+  .comparison .field {
+    padding-left: calc(10px + var(--drawer-padding-x));
+  }
   .field {
     position: sticky;
-    left: 0;
+    left: calc(-1 * var(--drawer-padding-x));
     z-index: 1;
-    background: var(--card);
+    background: var(--row-bg);
     color: var(--muted);
     font-weight: 600;
     white-space: nowrap;
   }
+  /* Les lignes d'auteurs n'ont pas de libellé : seule la marge du volet y reste opaque. */
+  .field.unlabeled {
+    background: linear-gradient(to right, var(--row-bg) var(--drawer-padding-x), transparent 0);
+  }
   .comparison thead th.field {
     z-index: 3;
   }
-  tr.divergent td,
-  tr.divergent .field {
-    background: var(--warning-light);
+  .comparison {
+    --row-bg: var(--card);
+  }
+  /* La couleur de la ligne est peinte sous la partie transparente des cellules sans libellé. */
+  tr.divergent {
+    --row-bg: var(--warning-light);
+    background: var(--row-bg);
   }
   tr.divergent .field {
     box-shadow: inset 3px 0 0 var(--warning);

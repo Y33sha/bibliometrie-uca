@@ -1,4 +1,4 @@
-"""Tests d'intégration de la suppression des éditeurs vides (`delete_empty_publishers`)."""
+"""Suppression des éditeurs vides (`delete_empty_publishers`)."""
 
 from sqlalchemy import text
 

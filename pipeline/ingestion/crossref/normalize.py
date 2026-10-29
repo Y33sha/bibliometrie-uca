@@ -1,8 +1,7 @@
-"""Normalisation des données CrossRef : staging → tables structurées.
+"""Normalisation des enregistrements sources Crossref.
 
-Particularités CrossRef :
-- `raw_doc_type` : `msg["type"]`, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). `arbitrate_doc_type_with_article_subtype` arbitre ensuite le `journal-article` indistinct contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
-- `oa_status` non dérivé de CrossRef (pas fiable) ; laissé à NULL pour que les autres sources arbitrent via `refresh_from_sources`.
+- Le type brut est le `type` Crossref, suivi du sous-type quand Crossref en donne un (`crossref_raw_doc_type`). `arbitrate_doc_type_with_article_subtype` arbitre ensuite un `journal-article` contre les sous-types plus précis des autres sources (`ARTICLE_SUBTYPES`).
+- Le statut open access de Crossref est peu fiable : il reste vide, et les autres sources en décident (`refresh_from_sources`).
 """
 
 from __future__ import annotations
@@ -52,13 +51,9 @@ from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
 
-# =============================================================
-# EXTRACTEURS DE CHAMPS
-# =============================================================
-
 
 def get_doi(msg: Mapping[str, JsonValue]) -> str | None:
-    """DOI normalisé en lowercase. CrossRef expose le DOI tel que déposé."""
+    """DOI normalisé ; Crossref le donne tel que déposé."""
     return clean_doi(as_str(msg.get("DOI")))
 
 
@@ -161,10 +156,7 @@ def page_range(page: str | None, article_number: str | None) -> PageRange:
 
 
 def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Volume, issue, pages, article-number + publisher/journal bruts.
-
-    `publisher` et `journal` (object) tracent le nom tel que vu par CrossRef en parallèle des publishers/serials créés via `find_or_create_*`.
-    """
+    """Volume, numéro, pages et numéro d'article, avec l'éditeur et la revue tels que Crossref les nomme."""
     issn_val, eissn_val = get_issns(msg)
     article_number = as_text(msg.get("article-number"))
     return compact_biblio(
@@ -179,11 +171,6 @@ def get_biblio(msg: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
     )
 
 
-# =============================================================
-# PUBLISHER + JOURNAL
-# =============================================================
-
-
 def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
     cts = msg.get("container-title")
     values = cts if isinstance(cts, list) else [cts]
@@ -193,7 +180,7 @@ def _container_titles(msg: Mapping[str, JsonValue]) -> list[str]:
 def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que Crossref dit du conteneur d'un document.
 
-    Un livre porte sa collection dans `container-title`. Un chapitre ou un article de congrès y porte la collection et le livre ou le volume d'actes (`split_collection_and_volume`), ou le seul livre, ou la seule collection quand un ISSN la désigne. Sous une collection seule, le volume d'actes prend le nom du congrès.
+    Un livre donne sa collection dans `container-title`. Un chapitre ou un article de congrès y donne la collection et le livre ou le volume d'actes (`split_collection_and_volume`), ou le seul livre, ou la seule collection quand un ISSN la désigne. Sous une collection seule, le volume d'actes prend le nom du congrès.
     """
     raw_type = crossref_raw_doc_type(msg)
     conference = extract_crossref_conference(msg)
@@ -227,11 +214,6 @@ def get_container_facts(msg: Mapping[str, JsonValue]) -> ContainerDescription:
     )
 
 
-# =============================================================
-# AUTEURS
-# =============================================================
-
-
 def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
     return ContributorName.from_parts(as_str(author.get("family")), as_str(author.get("given")))
 
@@ -256,14 +238,13 @@ def _author_affiliations(
 
 
 def build_crossref_author_records(msg: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Parse les auteurs d'un message Crossref en `AuthorRecord` (sans I/O).
+    """Contributions sources d'un message Crossref.
 
-    - nom et prénom séparés (`family`, `given`) ;
-    - entrée à `name` seul : contribution source collective ;
-    - ORCID (seul identifiant exploitable côté CrossRef) sur `identifiers` ;
-    - affiliations brutes → adresses (sans pays) — c'est ce qui permet à la phase `affiliations` de poser `in_perimeter` sur les source_contributions crossref ;
-    - identifiants ROR de chaque affiliation : sur son adresse, sur la contribution source pour une affiliation sans nom ;
-    - `roles=['author']` explicite (Crossref ne distingue pas les rôles).
+    - Le nom et le prénom sont séparés (`family`, `given`) ; une entrée au seul `name` est collective.
+    - L'ORCID est le seul identifiant exploitable.
+    - Les affiliations deviennent des adresses, sans pays, que la phase `affiliations` rattache aux structures.
+    - Les ROR d'une affiliation vont sur son adresse, ou sur la contribution source pour une affiliation sans nom.
+    - Le rôle est toujours `author` : Crossref ne distingue pas les rôles.
     """
     authors = msg.get("author") or []
     if not isinstance(authors, list):
@@ -308,7 +289,7 @@ def extract_crossref_author_block(msg: Mapping[str, JsonValue]) -> AuthorBlock:
 
 
 def get_locations(msg: Mapping[str, JsonValue]) -> list[LocationFacts]:
-    """Page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte, pas à des copies consultables."""
+    """Page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte : elles restent hors des localisations."""
     url = as_str(as_mapping(as_mapping(msg.get("resource")).get("primary")).get("URL"))
     return [LocationFacts(url=url, license=crossref_license(msg.get("license")))] if url else []
 
@@ -326,7 +307,6 @@ def crossref_source_record(
         source="crossref",
         source_id=doi,
         staging_id=staging_id,
-        doi=doi,
         identifiers=crossref_identifiers(msg, doi),
         title=title,
         publication_year=publication_year,

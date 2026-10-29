@@ -57,8 +57,6 @@ class PublisherStore:
         self.add_publisher_name_form(new_id, name_key)
         return new_id, True
 
-    # ── Helpers internes de `match_or_create_by_name_form` ─────────
-
     def find_publisher_by_name_form(self, form_normalized: str) -> int | None:
         return self._conn.execute(
             select(publisher_name_forms.c.publisher_id)

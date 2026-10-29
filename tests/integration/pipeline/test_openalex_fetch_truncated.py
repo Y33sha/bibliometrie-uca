@@ -1,15 +1,6 @@
-"""Tests d'intégration — UPSERT bulk OpenAlex + préservation des authorships
-refetchées via raw_hash.
+"""Moissonnage OpenAlex en masse, et conservation des auteurs complets relus par `fetch_truncated`.
 
-OpenAlex bulk tronque à 100 auteurs. `fetch_truncated` re-télécharge
-ces publications individuellement pour obtenir la liste complète. Le
-mécanisme de préservation lors des bulks ultérieurs repose sur une
-dissymétrie volontaire : **refetch ne recalcule pas `raw_hash`**, donc
-la ligne refetchée garde le hash du payload bulk. Tant que le bulk
-renvoie le même payload, l'UPSERT ne touche pas `raw_data` (qui contient
-pourtant les auteurs complets). Quand le bulk renvoie un payload
-différent, l'UPSERT écrase `raw_data` avec la version tronquée et le
-refetch suivant (dans le même run pipeline) ré-amorce le cycle.
+Le moissonnage en masse d'OpenAlex tronque la liste des auteurs à 100. `fetch_truncated` relit ces documents un par un pour obtenir la liste complète. Cette relecture réécrit `raw_data` sans recalculer `raw_hash` : la ligne garde l'empreinte du document tronqué. Tant que le moissonnage suivant renvoie le même document, `raw_data` garde les auteurs complets. Quand le document change, la version tronquée remplace `raw_data`, et `fetch_truncated` la relit dans le même run.
 """
 
 from sqlalchemy import text
@@ -30,7 +21,7 @@ def insert_batch(conn, works):
 
 
 def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=10):
-    """Crée un work OpenAlex synthétique avec n auteurs."""
+    """Document OpenAlex synthétique à `n_authors` auteurs."""
     authorships = [
         {
             "author_position": "first" if i == 0 else "middle",
@@ -65,13 +56,7 @@ def _make_work(openalex_id, n_authors, title="Test Publication", cited_by_count=
 
 
 def _seed_refetched(conn, *, source_id, full_work, bulk_payload, processed):
-    """Pose une ligne staging dans l'état post-refetch.
-
-    `full_work` est la version complète (>100 auteurs) qui a été
-    persistée par le refetch. `bulk_payload` est la version tronquée
-    initiale dont le hash est conservé en base (c'est l'invariant
-    de préservation : refetch ne recalcule pas `raw_hash`).
-    """
+    """Ligne de staging relue par `fetch_truncated` : `raw_data` contient la version complète `full_work`, `raw_hash` l'empreinte de la version tronquée `bulk_payload`."""
     insert_staging(
         conn,
         "openalex",
@@ -95,7 +80,7 @@ def _get_staging(conn, source_id):
 
 class TestRawHashUpsert:
     def test_new_row(self, sa_sync_conn):
-        """Insert nouveau via bulk → raw_data + raw_hash posés, processed=FALSE."""
+        """Un document inconnu est inséré avec `raw_data` et `raw_hash`, à normaliser."""
         work = _make_work("W001", 50)
         insert_batch(sa_sync_conn, [work])
 
@@ -105,7 +90,7 @@ class TestRawHashUpsert:
         assert row.processed is False
 
     def test_bulk_unchanged_no_op(self, sa_sync_conn):
-        """Bulk identique → raw_data inchangé, processed préservé."""
+        """Un document identique laisse la ligne en l'état, `processed` compris."""
         work = _make_work("W002", 50)
         insert_batch(sa_sync_conn, [work])
         sa_sync_conn.execute(
@@ -116,13 +101,13 @@ class TestRawHashUpsert:
 
         row = _get_staging(sa_sync_conn, "W002")
         assert row.processed is True
-        # Hash identique → ni insertion ni réécriture : compté `unchanged`.
+        # Même hash : ni insertion ni réécriture, la ligne compte comme inchangée.
         assert counts.new == 0
         assert counts.updated == 0
         assert counts.unchanged == 1
 
     def test_bulk_changed_replaces(self, sa_sync_conn):
-        """Bulk modifié → raw_data remplacé, processed=FALSE."""
+        """Un document modifié remplace `raw_data` et remet la ligne à normaliser."""
         work = _make_work("W003", 50, title="Original")
         insert_batch(sa_sync_conn, [work])
         sa_sync_conn.execute(
@@ -141,9 +126,9 @@ class TestRawHashUpsert:
 
 class TestRefetchPreservation:
     def test_refetched_bulk_unchanged_preserves_full_authors(self, sa_sync_conn):
-        """Bulk identique sur ligne refetchée → 150 auteurs en base, inchangés."""
+        """Un document tronqué identique laisse en place les 150 auteurs de la ligne relue."""
         bulk_payload = _make_work("W100", 100, title="Stable")
-        full = _make_work("W100", 150, title="Stable")  # mêmes métadonnées, plus d'auteurs
+        full = _make_work("W100", 150, title="Stable")  # mêmes métadonnées, 150 auteurs
         _seed_refetched(
             sa_sync_conn,
             source_id="W100",
@@ -157,14 +142,12 @@ class TestRefetchPreservation:
         row = _get_staging(sa_sync_conn, "W100")
         assert len(row.raw_data["authorships"]) == 150
         assert row.processed is True
-        # Hash identique → no-op : compté `unchanged`, raw_data (150 auteurs) préservé.
+        # Même hash : la ligne compte comme inchangée et garde ses 150 auteurs.
         assert counts.new == 0
         assert counts.unchanged == 1
 
     def test_refetched_bulk_changed_overwrites(self, sa_sync_conn):
-        """Bulk modifié sur ligne refetchée → écrasement par la version tronquée
-        (le refetch suivant dans le même run pipeline ré-amorcera le cycle).
-        """
+        """Un document modifié remplace la version complète de la ligne relue par la version tronquée."""
         bulk_payload_v1 = _make_work("W101", 100, title="Original")
         full = _make_work("W101", 150, title="Original")
         _seed_refetched(
@@ -179,12 +162,10 @@ class TestRefetchPreservation:
         counts = insert_batch(sa_sync_conn, [bulk_payload_v2])
 
         row = _get_staging(sa_sync_conn, "W101")
-        # raw_data écrasé par la version tronquée v2
         assert row.raw_data["title"] == "Updated"
         assert row.raw_data["cited_by_count"] == 42
         assert len(row.raw_data["authorships"]) == 100
-        # processed remis à FALSE + flag re-posé (bulk re-tronqué à 100) → normalize
-        # re-passera et refetch re-pickera la ligne.
+        # La ligne est à normaliser et marquée tronquée : `fetch_truncated` la relit.
         assert row.processed is False
         assert row.authors_truncated is True
         assert counts.new == 0 and counts.updated == 1
@@ -192,29 +173,28 @@ class TestRefetchPreservation:
 
 class TestAuthorsTruncatedFlag:
     def test_bulk_100_authors_flags_truncated(self, sa_sync_conn):
-        """Bulk à 100 auteurs (plafond OpenAlex) → authors_truncated = TRUE."""
+        """Un document à 100 auteurs (plafond d'OpenAlex) est marqué tronqué."""
         insert_batch(sa_sync_conn, [_make_work("W200", 100)])
         assert _get_staging(sa_sync_conn, "W200").authors_truncated is True
 
     def test_fetch_missing_100_authors_flags_truncated(self, sa_sync_conn):
-        """La recherche par DOI passe par l'endpoint de liste : un work à 100 auteurs est marqué comme au moissonnage."""
+        """La recherche par DOI passe par l'endpoint de liste : un document à 100 auteurs est marqué tronqué, comme au moissonnage."""
         StagingStore(sa_sync_conn).stage(
             "openalex", _make_work("W210", 100), entry_mode=StagingEntryMode.FETCH_MISSING_DOI
         )
         assert _get_staging(sa_sync_conn, "W210").authors_truncated is True
 
     def test_bulk_under_100_not_flagged(self, sa_sync_conn):
-        """Bulk sous le plafond → flag FALSE."""
+        """Un document sous le plafond est marqué complet."""
         insert_batch(sa_sync_conn, [_make_work("W201", 50)])
         assert _get_staging(sa_sync_conn, "W201").authors_truncated is False
 
     def test_unchanged_bulk_preserves_cleared_flag(self, sa_sync_conn):
-        """Ligne refetchée (flag effacé) re-vue à l'identique → le flag reste FALSE
-        (ne re-déclenche pas un refetch sur un work déjà complété)."""
+        """Une ligne relue, revue à l'identique, reste marquée complète : `fetch_truncated` la laisse de côté."""
         bulk = _make_work("W202", 100, title="Stable")
         full = _make_work("W202", 150, title="Stable")
         _seed_refetched(
             sa_sync_conn, source_id="W202", full_work=full, bulk_payload=bulk, processed=True
         )
-        insert_batch(sa_sync_conn, [bulk])  # hash identique → flag préservé (FALSE)
+        insert_batch(sa_sync_conn, [bulk])  # même hash : marque inchangée
         assert _get_staging(sa_sync_conn, "W202").authors_truncated is False

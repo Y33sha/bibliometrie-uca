@@ -1,4 +1,4 @@
-"""Vérification des ISSN des revues dans le Sudoc : orchestration concurrente, lecture des notices, échecs de requête et arrêt sur coupe-circuit."""
+"""Vérification des ISSN des revues dans le Sudoc : orchestration concurrente, lecture des notices, échecs de requête et arrêt sur circuit-breaker."""
 
 from unittest.mock import MagicMock
 
@@ -170,14 +170,14 @@ async def test_stops_when_breaker_trips():
         breaker.tripped = True
 
     repo, conn, _, calls = await _run(rows, on_fetch_ppns=trip)
-    assert len(calls["ppns"]) == 1  # plus aucune revue tirée après la coupure
+    assert len(calls["ppns"]) == 1  # aucune revue cherchée après la coupure
     assert repo.record_sudoc_check.call_count == 1
     conn.commit.assert_called()
 
 
 @pytest.mark.asyncio
 async def test_serie_titree_comme_un_volume_recoit_son_titre_de_serie():
-    """Cas réel : la série ICORES porte le titre de son volume de 2023, absent du Sudoc."""
+    """Cas réel : la série ICORES a pour titre celui de son volume de 2023, absent du Sudoc."""
     title = (
         "Proceedings of the 12th International Conference on Operations Research"
         " and Enterprise Systems (ICORES 2023)"

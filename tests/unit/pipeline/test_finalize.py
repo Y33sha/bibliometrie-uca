@@ -1,6 +1,6 @@
-"""Orchestrateur de la phase `finalize` : synchronisation, purge des publications, référentiels vides, refresh des compteurs.
+"""Orchestrateur de la phase `finalize` : synchronisation, purge des publications, référentiels vides, rafraîchissement des compteurs.
 
-Le propos testé ici est l'enchaînement des tâches et la boucle de purge : celle-ci supprime par lots jusqu'à épuisement, en committant chaque lot, et rapporte son total dans le résumé de la phase.
+Les tests vérifient l'enchaînement des tâches et la boucle de purge. Celle-ci supprime par lots jusqu'à épuisement, commite chaque lot et rapporte son total dans le résumé de la phase.
 """
 
 import logging
@@ -12,7 +12,7 @@ from pipeline.transformation import finalize as phase
 
 
 class _FakePurgeQueries:
-    """Rend les tailles de lots successives, puis zéro — ce qui arrête la boucle."""
+    """Renvoie les tailles de lots successives, puis zéro, qui arrête la boucle."""
 
     def __init__(self, lots: list[int]) -> None:
         self._lots = [*lots, 0]
@@ -38,7 +38,7 @@ class _Counts:
 
 
 def _patch_sql(counts: _Counts) -> list:
-    """Remplace les requêtes de synchronisation et les décomptes de la phase."""
+    """Simule les requêtes de synchronisation et les décomptes de la phase."""
     return [
         patch.object(phase, name, counts.counter(label, n))
         for name, label, n in (
@@ -72,7 +72,7 @@ def test_purge_par_lots_jusqu_a_epuisement(open_tx, contexte):
     rendu, purge, publication_counts = _run(contexte, [5000, 5000, 120])
 
     assert rendu.details["summary"]["publications_purged"] == 10120
-    assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui rend zéro
+    assert purge.limites == [5000] * 4  # trois lots pleins, puis l'appel qui renvoie zéro
     assert open_tx.conn.commits == 3  # un commit par lot supprimé, aucun pour le lot vide
     assert publication_counts.appels[-3:] == ["adresses", "revues", "éditeurs"]
 
@@ -87,7 +87,7 @@ def test_rien_a_purger(open_tx, contexte):
 def test_chaque_tache_dans_sa_transaction(open_tx, contexte):
     _run(contexte, [10])
 
-    # périmètre des publications, matviews, purge, éditeur des revues, puis un décompte par famille : adresses, revues, éditeurs
+    # périmètre des publications, vues matérialisées, purge, éditeur des revues, puis un décompte par famille : adresses, revues, éditeurs
     assert open_tx.transactions == 7
 
 

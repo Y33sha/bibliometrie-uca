@@ -1,4 +1,4 @@
-"""Adapter de lecture des monographies : liste paginée et fiche d'une monographie."""
+"""Lectures des monographies : liste paginée et fiche d'une monographie."""
 
 from collections.abc import Iterator
 from typing import Literal

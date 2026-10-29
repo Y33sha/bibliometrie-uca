@@ -18,7 +18,7 @@ _ORCID = "0000-0001-2345-6789"
 
 
 def _source_contribution(conn, neutralized, *, name="dupont jean", source_id="c-neutralisation"):
-    """Contribution source crossref du périmètre avec un ORCID et la carte `neutralized`. Retourne `(contribution source, informations du contributeur)`."""
+    """Contribution source crossref du périmètre avec un ORCID et les neutralisations `neutralized`. Renvoie `(contribution source, informations du contributeur)`."""
     source_record = insert_source_record(
         conn, insert_publication(conn), source="crossref", source_id=source_id
     )
@@ -80,7 +80,7 @@ def test_vote_sans_les_contributions_sources_neutralisees_pour_partage(sa_sync_c
 
 
 def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
-    """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand les informations du contributeur sont désignées, effacée sinon. La contribution source qui la gagne est rendue avec les types gagnés."""
+    """La neutralisation `misplaced` suit le calcul de l'exécution : posée quand les informations du contributeur sont désignées, effacée sinon. La fonction renvoie chaque contribution source qui la reçoit, avec les types d'identifiants reçus."""
     source_contribution_id, contributor_information_id = _source_contribution(
         sa_sync_conn, None, name="t dado", source_id="c-requalification"
     )
@@ -95,7 +95,7 @@ def test_requalification_pose_puis_efface_misplaced(sa_sync_conn):
 
 
 def test_requalification_marque_la_publication_a_realigner(sa_sync_conn):
-    """Les contributions d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change les remet à calculer."""
+    """Les contributions d'auteurs lisent les identifiants non neutralisés : une neutralisation qui change met la publication en file pour les recalculer."""
     source_contribution_id, contributor_information_id = _source_contribution(
         sa_sync_conn, None, source_id="c-réaligne"
     )

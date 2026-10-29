@@ -1,6 +1,6 @@
 """Router de la qualité de la détection des structures dans les adresses. Sert `/api/feedback/*`.
 
-Alimente le tableau de bord qui confronte la détection automatique aux arbitrages manuels : taux de détection, faux négatifs (adresses confirmées à la main mais non détectées) et faux positifs (adresses détectées mais rejetées à la main). Les trois lectures portent sur une structure, que l'appelant désigne — il la choisit dans `/api/structures`.
+Alimente le tableau de bord qui confronte la détection automatique aux arbitrages manuels : taux de détection, faux négatifs (adresses confirmées à la main mais non détectées) et faux positifs (adresses détectées mais rejetées à la main). Les trois lectures concernent une structure, que l'appelant choisit dans `/api/structures`.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -33,7 +33,7 @@ def feedback_false_negatives(
     search: SearchTerm = "",
     queries: FeedbackQueries = Depends(feedback_queries),
 ) -> FeedbackAddressesResponse:
-    """Adresses confirmées manuellement pour cette structure mais non détectées par le script."""
+    """Adresses confirmées à la main pour cette structure, mais absentes de la détection."""
     return queries.feedback_false_negatives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )
@@ -47,7 +47,7 @@ def feedback_false_positives(
     search: SearchTerm = "",
     queries: FeedbackQueries = Depends(feedback_queries),
 ) -> FeedbackAddressesResponse:
-    """Adresses détectées pour cette structure mais rejetées manuellement."""
+    """Adresses détectées pour cette structure, mais rejetées à la main."""
     return queries.feedback_false_positives(
         structure_id=structure_id, page=page, per_page=per_page, search=search
     )

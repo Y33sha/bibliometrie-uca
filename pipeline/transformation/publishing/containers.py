@@ -1,4 +1,4 @@
-"""Stores des conteneurs d'un document : revues et monographies, sur une même connexion."""
+"""Stores des conteneurs d'un document : revues et monographies."""
 
 from typing import NamedTuple, Self
 

@@ -1,11 +1,6 @@
 """Semis de structures et de périmètres, et liens contribution ↔ structure, sur la connexion SQLAlchemy (`sa_sync_conn`).
 
-`contribution_structures` et `source_contribution_structures` sont des
-MATERIALIZED VIEW (migrations a2c6e4f8b1d7, e8f1a3c5d7b9) — les tests ne peuvent
-plus les `INSERT` directement. Ce helper sème la chaîne source minimale
-(source_contribution → adresse → address_structures, structure rattachée au
-périmètre d'affiliation) puis rafraîchit les deux matviews (transactionnel :
-rollback avec le test).
+Les liens contribution ↔ structure sont des vues matérialisées. Pour en créer un, ce module sème la chaîne contribution source → adresse → structure, puis rafraîchit les vues.
 """
 
 import itertools
@@ -36,8 +31,15 @@ def insert_structure(
     structure_type: str = "labo",
     hal_collection: str | None = None,
     api_ids: dict[str, object] | None = None,
+    reuse: bool = False,
 ) -> int:
-    """Insère une structure et renvoie son `id`. `row_id` fixe l'`id`. Le nom vaut le code par défaut."""
+    """Insère une structure et renvoie son `id`. `row_id` fixe l'`id`. Le nom vaut le code par défaut. `reuse` renvoie la structure de même code si elle existe."""
+    if reuse:
+        existing = conn.execute(
+            text("SELECT id FROM structures WHERE code = :code"), {"code": code}
+        ).scalar_one_or_none()
+        if existing is not None:
+            return existing
     return insert_row(
         conn,
         "structures",
@@ -190,7 +192,7 @@ def add_contribution_structure(conn, contribution_id: int, structure_id: int) ->
 
 
 def add_source_contribution_ror(conn, source_contribution_id: int, structure_id: int) -> None:
-    """Lie la contribution source `source_contribution_id` à `structure_id` par un ROR propre à la contribution source (indice `ror`), en donnant un ROR à la structure qui n'en a pas, puis rafraîchit les matviews de structures. La structure doit appartenir au périmètre d'extraction : `add_source_contribution_structure` l'y rattache."""
+    """Lie la contribution source `source_contribution_id` à `structure_id` par un ROR propre à la contribution source (indice `ror`), en donnant un ROR à la structure qui n'en a pas, puis rafraîchit les vues des structures. La structure doit appartenir au périmètre d'extraction : `add_source_contribution_structure` l'y rattache."""
     ror = conn.execute(
         text(
             "UPDATE structures SET ror_id = COALESCE(ror_id, :ror) WHERE id = :id RETURNING ror_id"
@@ -207,15 +209,12 @@ def add_source_contribution_ror(conn, source_contribution_id: int, structure_id:
 
 
 def add_source_contribution_structure(conn, source_contribution_id: int, structure_id: int) -> None:
-    """Lie la contribution source `source_contribution_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les matviews de structures."""
+    """Lie la contribution source `source_contribution_id` à `structure_id` par une adresse, rattache la structure au périmètre d'extraction, puis rafraîchit les vues des structures."""
     raw_text = f"as-test-addr-{next(_seq)}"
     addr_id = insert_address(conn, raw_text, normalized_text=raw_text)
     insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)
     insert_address_structure(conn, addr_id, structure_id=structure_id)
-    # La matview SAS filtre sur le périmètre d'extraction : garantir qu'un
-    # périmètre d'extraction existe (config + ligne perimeters) et y rattacher
-    # la structure pour que le lien apparaisse. Coopère avec les tests qui
-    # configurent déjà `perimeter_extraction`.
+    # La vue `source_contribution_structures` retient seulement les structures du périmètre d'extraction. Un périmètre d'extraction déjà configuré par le test est gardé.
     set_config(conn, "perimeter_extraction", "alliance_uca", replace=False)
     code = conn.execute(
         text("SELECT value #>> '{}' FROM config WHERE key = 'perimeter_extraction'")

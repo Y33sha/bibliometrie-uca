@@ -1,4 +1,4 @@
-"""Arbitrage des identifiants de personne au niveau des contributions, sur vraie base : vote des contributions sur les conflits d'attribution, libération des contributions après un transfert ou une neutralisation `misplaced`."""
+"""Arbitrage des identifiants de personne au niveau des contributions : vote des contributions sur les conflits d'attribution, libération des contributions après un transfert ou une neutralisation `misplaced`."""
 
 import logging
 
@@ -80,7 +80,7 @@ class TestConflicts:
     def test_la_majorite_des_voix_transfere_et_marque_les_contributions_du_titulaire(
         self, sa_sync_conn
     ):
-        """Le titulaire a quatre voix (deux contributions rattachées par l'ORCID, une contribution manuel, une contribution rattachée par IdRef), l'autre personne cinq : l'ORCID passe à l'autre personne. Seuls les contributions du titulaire rattachées par l'ORCID sont marqués pour la redécision de leur personne."""
+        """Le titulaire a quatre voix (deux contributions rattachées par l'ORCID, une contribution manuelle, une contribution rattachée par IdRef), l'autre personne cinq : l'ORCID passe à l'autre personne. Seules les contributions du titulaire rattachées par l'ORCID sont marquées pour la redécision de leur personne."""
         conn = sa_sync_conn
         owner, other = _persons(conn)
         by_orcid = _contributions(conn, 2, owner, "orcid")
@@ -95,7 +95,7 @@ class TestConflicts:
         assert _person_of(conn, by_orcid[0]) == (owner, "orcid")
 
     def test_les_contributions_rattachees_par_l_identifiant_votent(self, sa_sync_conn):
-        """Trois contributions du titulaire rattachées par l'ORCID contre une contribution de l'autre personne rattaché par le nom : le titulaire garde l'ORCID. Un rattachement par identifiant suppose que le nom corrobore la personne."""
+        """Trois contributions du titulaire rattachées par l'ORCID contre une contribution de l'autre personne rattachée par le nom : le titulaire garde l'ORCID. Un rattachement par identifiant suppose que le nom corrobore la personne."""
         conn = sa_sync_conn
         owner, other = _persons(conn)
         _contributions(conn, 3, owner, "orcid")
@@ -128,7 +128,7 @@ class TestConflicts:
 
 
 def test_une_contribution_rattachee_par_un_identifiant_mal_place_est_marquee(sa_sync_conn, caplog):
-    """Quatre « jean martin » portent l'ORCID, trois « pierre dupont » aussi : leur ORCID est mal placé. La contribution de « pierre dupont » rattachée par l'ORCID est marquée pour la redécision de sa personne ; les contributions manuelle et rattachée par le nom restent en l'état."""
+    """Quatre contributions sources « jean martin » et trois « pierre dupont » contiennent l'ORCID : il est mal placé chez « pierre dupont ». La contribution de « pierre dupont » rattachée par l'ORCID est marquée pour la redécision de sa personne ; les contributions manuelle et rattachée par le nom restent en l'état."""
     conn = sa_sync_conn
     martin = insert_person(conn, "Martin", first_name="Jean")
     dupont = insert_person(conn, "Dupont", first_name="Pierre")

@@ -44,7 +44,7 @@ def build_query(
 ) -> Mapping[str, JsonValue]:
     """Requête Elasticsearch d'une page.
 
-    Tout est en **contexte `filter`** : un `term` sur l'année et un `terms` sur les affiliations (au moins une de la liste). Le contexte `filter` ne calcule aucun `_score` et est mis en cache par le cluster : mesuré ~9× plus rapide que l'équivalent `must`/`should` (≈1 s contre ≈9,5 s par page de 200), pour un résultat identique. Le tri sur `id.keyword` permet la pagination `search_after`.
+    Les clauses sont en contexte `filter` : un `term` sur l'année et un `terms` sur les affiliations. Ce contexte se passe de `_score`, et le cluster le met en cache : il répond neuf fois plus vite que l'équivalent `must`/`should` (1 s contre 9,5 s pour une page de 200), pour le même résultat. Le tri sur `id.keyword` sert la pagination `search_after`.
 
     `track_total` demande le comptage exact (`track_total_hits`), que seul `count` consomme. Les pages le coupent : Elasticsearch recompterait sinon tous les résultats à chaque page.
     """

@@ -23,7 +23,7 @@ _CREATE = text("""
     RETURNING id
 """)
 
-# Un ISBN déjà attribué à une autre monographie reste hors des colonnes : la contrainte d'unicité le refuserait.
+# La contrainte d'unicité refuse un ISBN déjà attribué à une autre monographie.
 _ENRICH = text("""
     UPDATE monographs m SET
         proceedings = m.proceedings OR :proceedings,
@@ -49,11 +49,11 @@ class MonographStore:
         self._conn = conn
 
     def find_monograph_by_isbn(self, isbn: str) -> int | None:
-        """La monographie qui a `isbn` dans `isbn` ou `eisbn`."""
+        """Monographie qui a cet ISBN, papier ou électronique."""
         return self._conn.execute(_FIND_BY_ISBN, {"isbn": isbn}).scalar_one_or_none()
 
     def find_monographs_by_title(self, title_normalized: str) -> list[MonographCandidate]:
-        """Les monographies de ce titre normalisé, par `id`."""
+        """Monographies de ce titre normalisé, de la plus ancienne à la plus récente."""
         rows = self._conn.execute(_FIND_BY_TITLE, {"title_normalized": title_normalized})
         return [MonographCandidate(r.id, r.isbn, r.eisbn, r.publisher_id) for r in rows]
 
@@ -69,7 +69,7 @@ class MonographStore:
         publisher_id: int | None,
         serial_id: int | None,
     ) -> int:
-        """Insère une monographie et retourne son `id`."""
+        """Insère une monographie et renvoie son id."""
         return scalar_int(
             self._conn.execute(
                 _CREATE,
@@ -97,7 +97,7 @@ class MonographStore:
         publisher_id: int | None,
         serial_id: int | None,
     ) -> None:
-        """Complète les champs vides d'une monographie. Un ISBN déjà attribué à une autre monographie reste hors de ses colonnes. `proceedings` vrai fait d'un livre un volume d'actes."""
+        """Complète les champs vides d'une monographie. Un ISBN déjà attribué à une autre monographie reste à celle-ci. Un livre devient volume d'actes si `proceedings` est vrai ; l'inverse est exclu."""
         self._conn.execute(
             _ENRICH,
             {

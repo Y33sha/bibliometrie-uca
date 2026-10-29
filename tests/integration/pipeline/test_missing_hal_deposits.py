@@ -1,4 +1,4 @@
-"""Intégration : dépôts HAL introuvables retirés des enregistrements sources, et enregistrements sources écartés de la réconciliation (`is_matchable`)."""
+"""Dépôts HAL introuvables retirés des enregistrements sources, et enregistrements sources écartés de la réconciliation (`is_matchable`)."""
 
 import logging
 

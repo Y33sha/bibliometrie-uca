@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` — fusionne dans le titulaire de préfixe un autre nom du même éditeur.
 
-Un éditeur que nomment les sources, sans préfixe DOI, rejoint le titulaire des préfixes Crossref de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs ne comptent pas : ils désignent la plateforme. La fusion, injectée par le composition-root, est celle de l'administration des éditeurs, sans les revues homonymes : ses formes de nom passent au titulaire, qui reconnaît ensuite ce nom. Le journal garde les deux noms.
+Un éditeur que nomment les sources, sans préfixe DOI, rejoint le titulaire des préfixes Crossref de ses enregistrements sources quand leurs noms sont compatibles (`domain.publishers.aliases`). Les préfixes des plateformes d'éditeurs sont écartés : ils désignent la plateforme. La fusion est celle de l'administration des éditeurs, sans les revues homonymes : les formes de nom passent au titulaire, qui reconnaît ensuite ce nom. Le journal garde les deux noms.
 """
 
 import logging

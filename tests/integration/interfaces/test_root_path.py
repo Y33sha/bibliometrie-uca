@@ -1,10 +1,10 @@
 """Comportement de l'API servie sous un préfixe de déploiement (`ROOT_PATH`).
 
-Le serveur ASGI ne retire pas le préfixe du chemin : conformément à la spécification, il le laisse dans `scope["path"]` et signale à part, dans `scope["root_path"]`, la part qui relève du montage. C'est le routage qui l'ôte, juste avant d'apparier les routes — donc après les middlewares.
+Conformément à la spécification ASGI, le serveur laisse le préfixe dans `scope["path"]` et le signale à part, dans `scope["root_path"]`. Le routage l'ôte juste avant d'apparier les routes, donc après les middlewares.
 
-Le middleware d'authentification décide sur le chemin, et exempte la connexion des écritures qu'il garde : cette exemption porte sur le chemin de routage, celui privé du préfixe. La connexion en dépend, et l'ouverture de toute session avec elle.
+Le middleware d'authentification décide sur le chemin et exempte la connexion. Cette exemption vise le chemin de routage, sans le préfixe ; l'ouverture de toute session en dépend.
 
-Deux sortes de reverse-proxy existent : celui qui retire le préfixe avant de transmettre, et celui qui le transmet tel quel. L'application répond à l'identique sous les deux, le routage ôtant le préfixe quand il est là et laissant le chemin intact quand il est absent.
+Un reverse-proxy retire le préfixe avant de transmettre, ou le transmet tel quel. L'application répond à l'identique dans les deux cas : le routage ôte le préfixe quand il est présent.
 
 Ces tests sont les seuls à monter l'application sous un préfixe.
 """
@@ -48,7 +48,7 @@ class TestConnexionSousPrefixe:
         assert r.status_code == 200
 
     def test_les_ecritures_restent_gardees(self, client_prefixe):
-        """Le préfixe ne desserre rien : hors de la connexion, une écriture sans session est refusée comme ailleurs."""
+        """Sous le préfixe, une écriture sans session, hors de la connexion, est refusée comme ailleurs."""
         r = client_prefixe.patch(
             f"{PREFIXE}/api/persons/1/exclusion", json={"exclusion": "not_a_person"}
         )
@@ -60,9 +60,9 @@ class TestConnexionSousPrefixe:
 
 
 class TestProxyQuiNeRetirePasLePrefixe:
-    """Le proxy transmet le chemin préfixé tel quel : l'application doit le reconnaître aussi.
+    """Le proxy transmet le chemin préfixé tel quel : l'application le reconnaît aussi.
 
-    Non-régression sur une panne muette : quand le chemin ne correspond à aucune route, la requête retombe sur le service du frontend monté en dernier recours, et un appel d'API reçoit la page d'accueil sous un code 200 — le client attend du JSON, reçoit du HTML, et rien ne signale l'erreur.
+    Régression : un chemin sans route retombe sur le frontend, monté en dernier. Sans cette reconnaissance, un appel d'API reçoit la page d'accueil en HTML sous un code 200, sans signal d'erreur.
     """
 
     @pytest.fixture
@@ -77,13 +77,13 @@ class TestProxyQuiNeRetirePasLePrefixe:
         assert r.headers["content-type"].startswith("application/json")
 
     def test_un_chemin_d_api_inconnu_rend_404_et_non_la_page_d_accueil(self, client_nu):
-        """Même décalé par un préfixe mal retiré, un chemin d'API est reconnu comme tel."""
+        """Sous un préfixe non retiré, un chemin d'API inconnu renvoie 404, sans la page d'accueil."""
         r = client_nu.get("/bibliometrie/api/inconnu")
         assert r.status_code == 404
         assert not r.headers["content-type"].startswith("text/html")
 
     def test_une_page_du_frontend_reste_servie(self, client_nu):
-        """La garde ne mord que sur les chemins d'API : aucune page du frontend ne porte ce segment."""
+        """La garde vise seulement les chemins d'API : les pages du frontend restent servies."""
         r = client_nu.get("/publications")
-        assert r.status_code in (200, 404)  # 200 avec un frontend buildé, 404 sans
+        assert r.status_code in (200, 404)  # 200 si le frontend est construit, 404 sinon
         assert r.headers["content-type"].startswith("text/html") or r.status_code == 404

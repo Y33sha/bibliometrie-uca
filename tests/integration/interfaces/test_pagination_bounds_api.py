@@ -1,6 +1,6 @@
-"""Le plafond de décalage s'applique à la surface HTTP entière.
+"""Le plafond de décalage de la pagination s'applique à toutes les routes de l'API.
 
-La garde vit au niveau du transport : une route paginée ajoutée plus tard en hérite sans intervention, comme les écritures héritent de la garde d'authentification.
+La garde est un middleware : toute route paginée en hérite, comme les écritures héritent de la garde d'authentification.
 """
 
 from infrastructure.settings import settings
@@ -23,15 +23,14 @@ class TestPlafondDeDecalage:
             assert r.status_code == 422, chemin
 
     def test_un_rang_illisible_reste_refuse_par_la_route(self, client):
-        # La garde de transport laisse passer ce qu'elle ne sait pas lire : c'est la validation
-        # de la route qui le refuse, dans les termes du contrat d'API.
+        # Le middleware laisse passer un rang illisible ; la validation de la route le refuse.
         r = client.get("/api/publications?page=deux")
         assert r.status_code == 422
 
 
 class TestPlafondReglable:
     def test_un_plafond_abaisse_refuse_plus_tot(self, client, monkeypatch):
-        """Le franchissement se traite par la configuration : le middleware lit le réglage à chaque requête."""
+        """Le middleware lit le réglage à chaque requête : un plafond abaissé prend effet aussitôt."""
         monkeypatch.setattr(settings, "max_pagination_offset", 100)
         assert client.get("/api/publications?page=2&per_page=50").status_code == 200
         assert client.get("/api/publications?page=4&per_page=50").status_code == 422

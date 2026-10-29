@@ -1,10 +1,8 @@
 """Recherche par DOI dans Crossref : tâche `fetch_missing.doi.crossref`.
 
-CrossRef est ingérée DOI-driven : pour chaque DOI présent dans une autre source mais absent du staging CrossRef, on interroge l'endpoint `GET /works/{doi}` et on insère le `message` dans `staging` avec `source='crossref'`.
+Chaque DOI vu dans une autre source et absent de Crossref s'interroge par `GET /works/{doi}` ; le `message` reçu s'écrit dans `staging`. Le polite pool de Crossref admet 10 requêtes par seconde, dont 3 simultanées.
 
-Polite pool obtenu via le header `User-Agent` qui inclut un mailto. Doc CrossRef : polite = 10 req/s + 3 concurrentes. On colle exactement à ces limites (max_concurrent=3, request_delay=0.1 s) pour éviter les 429.
-
-Un 404 inscrit le DOI dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org. Un DOI alias est redirigé par Crossref vers son DOI principal : le document principal est inséré, et l'alias inscrit comme introuvable.
+Un 404 inscrit le DOI dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org. Crossref redirige un DOI alias vers son DOI principal : le document principal s'écrit, et l'alias est inscrit comme introuvable.
 """
 
 from __future__ import annotations
@@ -32,11 +30,11 @@ class CrossrefDoiSearch:
         doi = dois[0]
         message = await fetch_work(client, doi)
         if isinstance(message, NotFound):
-            # 404 = DOI confirmé absent de Crossref.
+            # 404 : DOI absent de Crossref.
             return LookupBatch(absent=[doi])
         if isinstance(message, Unavailable):
             return UNAVAILABLE
         if clean_doi(as_str(message.get("DOI"))) != doi:
-            # DOI alias, que Crossref redirige vers son DOI principal : le document reçu a ce dernier pour DOI. L'alias est inscrit comme introuvable.
+            # DOI alias, redirigé vers le DOI principal du document reçu.
             return LookupBatch(records=[message], absent=[doi])
         return LookupBatch(records=[message])

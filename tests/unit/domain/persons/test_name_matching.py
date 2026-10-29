@@ -1,6 +1,6 @@
-"""Tests de `names_compatible` — prédicat « même personne » à la graphie près.
+"""Tests de `names_compatible` : deux noms désignent la même personne, à la graphie près.
 
-Cas réels observés sur le canal identifiant (noms des porteurs d'une valeur vs son propriétaire) et sur les listes de collaboration.
+Les cas viennent des données réelles : noms des contributions sources qui ont un identifiant de personne, comparés au nom de la personne à qui il est attribué ; listes de collaboration.
 """
 
 import pytest
@@ -20,18 +20,18 @@ SAME = [
     (("martin", "jean"), ("jean", "martin")),
     # Initiales d'un prénom composé.
     (("bailly", "j l"), ("bailly", "jean luc")),
-    # Initiales des deux côtés, patronyme entier en commun.
+    # Initiales des deux côtés, nom de famille entier en commun.
     (("martin", "j pierre"), ("martin", "jean p")),
-    # Typo ou translittération du prénom (distance 1).
+    # Faute de frappe ou translittération du prénom (distance 1).
     (("beyssac", "erick"), ("beyssac", "eric")),
     (("khalil", "toufik"), ("khalil", "toufic")),
     (("durand", "denys"), ("durand", "denis")),
     (("lavrentiev", "alexey"), ("lavrentiev", "alexei")),
-    # Typo du patronyme (transposition), prénom identique.
+    # Faute de frappe du nom de famille (transposition), prénom identique.
     (("blanquet doit", "stephanie"), ("blanquet diot", "stephanie")),
-    # Année de naissance d'une contribution source SUDOC, retirée.
+    # Année de naissance d'une contribution source du Sudoc, retirée.
     (("chiari 1977", "sophie"), ("chiari", "sophie")),
-    # Graphie proche du patronyme et initiale du prénom, cumulées.
+    # Graphie proche du nom de famille et initiale du prénom, cumulées.
     (("mueller", "roman"), ("muller", "r")),
     # Formes normalisées entières, dont l'ordre des parties dépend de la source.
     (("dupont jean", ""), ("jean dupont", "")),
@@ -40,22 +40,21 @@ SAME = [
 ]
 
 DISTINCT = [
-    # Homonyme de patronyme, prénom franchement autre.
+    # Même nom de famille, prénom franchement autre.
     (("chanal", "herve"), ("chanal", "helene")),
     (("verdier", "cyril"), ("verdier", "cecile")),
     (("duclos", "martine"), ("duclos", "michel")),
-    # Deux initiales différentes (pas de signal de distance).
+    # Deux initiales différentes.
     (("zhang", "b"), ("zhang", "x")),
-    # Graphie proche du patronyme, deux initiales différentes.
+    # Graphie proche du nom de famille, deux initiales différentes.
     (("mueller", "b"), ("muller", "x")),
-    # Distance 2 sur le prénom : tenu pour distinct (choix conservateur).
+    # Distance 2 sur le prénom : personnes distinctes.
     (("bonin", "patrick"), ("bonin", "patricia")),
-    # Patronyme différent (nom marié : hors périmètre du prédicat, réglé
-    # ailleurs par les formes de nom).
+    # Nom de famille différent (nom d'usage après mariage, traité par les formes de nom).
     (("houssais", "sarah"), ("porteboeuf", "sarah")),
-    # Sans aucun rapport (capture franche).
+    # Noms sans rapport.
     (("bouchhar", "n"), ("bouaouda", "k")),
-    # Patronyme absent d'un côté : le prénom proche ne suffit pas.
+    # Nom de famille absent d'un côté : le prénom proche ne suffit pas.
     (("", "eric"), ("beyssac", "erick")),
     # Voisins alphabétiques d'une liste de collaboration.
     (("t dado", ""), ("s dahbi", "")),

@@ -62,7 +62,7 @@ class TestSansTerminal:
 
 
 class TestAvecTerminal:
-    """Terminal : la barre porte l'avancement, le journal reste muet."""
+    """Terminal : la barre affiche l'avancement, le journal reste muet."""
 
     def test_la_barre_est_ouverte(self, avec_terminal):
         with module.track_progress(10, "hal", logging.getLogger(__name__)) as p:
@@ -144,7 +144,7 @@ class TestRedessinDeLaBarre:
 
     @staticmethod
     def _redessine(barre: module._Bar, stream: io.StringIO) -> str:
-        """Vide le flux, redessine la barre, rend ce que le redessin a écrit."""
+        """Vide le flux, redessine la barre, renvoie ce que le redessin a écrit."""
         stream.seek(0)
         stream.truncate(0)
         barre.refresh()
@@ -187,7 +187,7 @@ class TestRedessinDeLaBarre:
             assert module.disp_len(str(barre)) == module.LINE_WIDTH
 
     def test_un_compteur_au_dela_du_total_annonce_affiche_100_pourcent(self):
-        """Une source rend plus de documents qu'elle n'en annonçait : le total affiché suit le compteur."""
+        """Une source renvoie plus de documents qu'elle n'en annonçait : le total affiché suit le compteur."""
         stream = io.StringIO()
         with self._bar(stream, 80) as barre:
             barre.update(103)
@@ -233,14 +233,14 @@ class TestEcritureHorsBarre:
         assert module.CLEAR_TO_END_OF_LINE in stream.getvalue()
 
     def test_une_sortie_capturee_reste_sans_sequence_d_effacement(self, sans_terminal):
-        """Un fichier de journal porterait la séquence telle quelle."""
+        """Un fichier de journal contiendrait la séquence telle quelle."""
         stream = io.StringIO()
         module.write_above_bars("[HAL · 2018] 13 nouveaux", stream)
         assert module.CLEAR_TO_END_OF_LINE not in stream.getvalue()
 
 
 class TestCompteurDeRetenus:
-    """Le compteur porte les éléments retenus ; le remplissage suit les éléments parcourus."""
+    """Le compteur compte les éléments retenus ; le remplissage suit les éléments parcourus."""
 
     def test_le_compteur_part_de_zero(self, avec_terminal):
         with module.track_progress(25, "HAL", None, count_kept=True) as p:

@@ -1,10 +1,6 @@
-"""Pool de workers pour les phases qui fetchent une source HTTP puis écrivent en base.
+"""Pool de workers pour les tâches qui interrogent une source HTTP puis écrivent en base.
 
-Motif partagé par les phases async du pipeline (`fetch_missing`, `fetch_stale`, `fetch_truncated`, enrichissements) : un client `httpx2` partagé, un pool borné de workers qui se répartissent les items via un itérateur commun (aucune barrière — un fetch lent n'occupe que son propre worker, les autres continuent), des écritures sérialisées sous un lock (la `Connection` SA sync n'est pas thread-safe, or `asyncio.to_thread` s'exécute dans un pool de threads), et un commit tous les `commit_every` items plus un commit final.
-
-`prepare`, facultatif, complète un item par une lecture en base avant son fetch, sous le même lock que les écritures.
-
-`write` ne commite pas : la boucle commite par lot. Dès que le circuit-breaker de la source coupe, les workers cessent de tirer de nouveaux items. C'est celui que l'accès à la source pose dans la ContextVar et que les clients HTTP alimentent.
+Les workers partagent un client `httpx2` et tirent les éléments d'un même itérateur : un fetch lent occupe seulement son worker. Les écritures passent sous un verrou : la `Connection` SQLAlchemy synchrone n'est pas thread-safe, et `asyncio.to_thread` s'exécute dans un pool de threads.
 """
 
 from __future__ import annotations
@@ -29,7 +25,10 @@ async def run_fetch_pool[Item, Fetched](
     write: Callable[[Connection, Item, Fetched], None],
     prepare: Callable[[Connection, Item], Item] | None = None,
 ) -> None:
-    """Traite `items` par un pool de `max_concurrent` workers : `fetch` async concurrent puis `write` sync sérialisé, commit tous les `commit_every` items. S'arrête quand le circuit-breaker courant coupe."""
+    """Traite `items` avec `max_concurrent` workers : `fetch` asynchrone et concurrent, puis `write` synchrone et sérialisé, sans commit. Le pool commite tous les `commit_every` éléments, et à la fin. Il s'arrête quand le circuit-breaker de la source coupe.
+
+    `prepare`, facultatif, complète un élément par une lecture en base avant son fetch, sous le verrou des écritures.
+    """
     db_lock = asyncio.Lock()
     item_iter = iter(items)
     done = 0

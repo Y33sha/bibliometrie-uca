@@ -1,8 +1,8 @@
-"""Tests pour `pipeline.transformation.publications.oa_status.OaStatusPhase` (async), avec le `fetcher` concret de `pipeline.ingestion.complements.unpaywall`.
+"""Phase asynchrone `OaStatusPhase` (`pipeline.transformation.publications.oa_status`), avec la requête Unpaywall de `pipeline.ingestion.complements.unpaywall`.
 
-Les règles du statut sont testées dans `tests/unit/domain/publications/test_metadata.py` (`publication_oa_status`). Ici : verdicts écrits par DOI, recalcul des publications de ces DOI, DOI absent ou Unpaywall indisponible, 429, plafond de concurrence.
+Les règles du statut sont testées dans `tests/unit/domain/publications/test_metadata.py` (`publication_oa_status`). Ce module teste les verdicts écrits par DOI, le recalcul des publications de ces DOI, le DOI absent, Unpaywall indisponible, la réponse 429 et le plafond de concurrence.
 
-Mocks : `OaStatusStore` (lectures + écritures capturées) ; requêtes HTTP via la fixture `http_mock`.
+Le store est simulé et capture les écritures. Les réponses HTTP viennent de la fixture `http_mock`.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ TEST_EMAIL = "test@example.com"
 
 
 def _make_fetcher():
-    """Compose le fetcher infrastructure pour les tests (couverture end-to-end)."""
+    """Requête Unpaywall réelle, sur l'URL et l'adresse de test."""
 
     async def fetcher(client: httpx2.AsyncClient, doi: str) -> LookupOutcome[str]:
         return await fetch_oa_status(client, doi, base_url=UNPAYWALL_BASE, email=TEST_EMAIL)
@@ -42,12 +42,7 @@ def _make_fetcher():
 
 
 def _route(http_mock, doi: str, *, status: str | None = None, http_status: int = 200):
-    """Déclare la réponse Unpaywall servie pour un DOI.
-
-    `status` = chaîne Unpaywall (`'gold'`, `'closed'`, etc.) ou None pour
-    `http_status=404`. Si `http_status != 200/404`, on renvoie ce status
-    avec un body vide.
-    """
+    """Déclare la réponse Unpaywall pour un DOI : le statut `status` (`'gold'`, `'closed'`…) sous le code `http_status`, ou un corps vide quand `status` vaut `None`."""
     body = {"oa_status": status} if status is not None else None
     return http_mock.get(f"{UNPAYWALL_BASE}/{doi}").mock(
         return_value=httpx2.Response(http_status, json=body)
@@ -175,7 +170,7 @@ def test_happy_path_updates_each_publication(logger, http_mock):
     assert summary["stale"] == 42
     assert summary["checked"] == 3
     assert (summary["new"], summary["updated"], summary["unchanged"]) == (1, 1, 1)
-    # before == after (fake renvoie la même distribution) → delta nul, trié par count.
+    # Le store simulé renvoie la même distribution avant et après : écart nul, lignes triées par effectif.
     assert metrics.details["table"]["rows"][0] == {"key": "gold", "count": 7, "delta": 0}
 
 
@@ -204,7 +199,7 @@ def test_unavailable_leaves_doi_unchecked(logger, http_mock):
 
 
 def test_le_statut_suit_les_enregistrements_sources_de_la_publication(logger, http_mock):
-    """Le dépôt HAL d'un enregistrement source tient face au closed d'Unpaywall (`publication_oa_status`)."""
+    """Le dépôt HAL d'un enregistrement source l'emporte sur le statut `closed` d'Unpaywall : la publication reste `green`."""
     publications = [
         _publication(1, "10.1/deposit", "green", ("hal", "green"), ("openalex", "closed"))
     ]
@@ -244,7 +239,7 @@ def test_le_bilan_du_journal_classe_les_verdicts(logger, http_mock, caplog):
 
 
 def test_429_retries_transparently(logger, http_mock):
-    """Un 429 puis 200 : `http_request_with_retry_async` re-essaie en interne."""
+    """Après une réponse 429, la requête est relancée et la réponse 200 suivante est prise en compte."""
     http_mock.get(f"{UNPAYWALL_BASE}/10.1/r").mock(
         side_effect=[
             httpx2.Response(429),
@@ -258,10 +253,7 @@ def test_429_retries_transparently(logger, http_mock):
 
 
 def test_semaphore_caps_concurrent_fetches(logger):
-    """Avec max_concurrent=3, jamais plus de 3 fetches en vol.
-
-    On injecte un fetcher instrumenté, sans passer par le routeur HTTP, pour mesurer la concurrence.
-    """
+    """Avec `max_concurrent=3`, au plus trois requêtes sont en cours à la fois. Une requête simulée compte les requêtes en cours."""
     in_flight = 0
     peak = [0]
 
@@ -270,7 +262,7 @@ def test_semaphore_caps_concurrent_fetches(logger):
         in_flight += 1
         peak[0] = max(peak[0], in_flight)
         try:
-            await asyncio.sleep(0.01)  # laisser le scheduler interleaver
+            await asyncio.sleep(0.01)  # laisse les autres requêtes démarrer
             return "green"
         finally:
             in_flight -= 1

@@ -44,11 +44,11 @@ class AddressListFilters:
     structure_predicates: tuple[StructurePredicate, ...] = ()
 
 
-# ----- DTOs de retour -----
+# ----- Réponses -----
 
 
 class AddressStructureSummary(BaseModel):
-    """Lien adresse ↔ structure (élément de `structures` dans la liste/review)."""
+    """Lien entre une adresse et une structure, dans la liste des adresses."""
 
     id: int
     name: str
@@ -58,10 +58,7 @@ class AddressStructureSummary(BaseModel):
 
 
 class StructureLinkState(BaseModel):
-    """État d'un lien adresse ↔ structure : détection automatique et arbitrage manuel.
-
-    `is_confirmed` : `None` en attente d'arbitrage, `True` confirmé, `False` rejeté.
-    """
+    """État d'un lien entre adresse et structure : détection automatique et arbitrage manuel. `is_confirmed` : `None` en attente, vrai si confirmé, faux si rejeté."""
 
     is_confirmed: bool | None
     is_detected: bool
@@ -81,7 +78,7 @@ class AddressOut(BaseModel):
 class AddressListResponse(PaginatedResponse):
     """Réponse paginée de `/api/addresses`.
 
-    `requires_search=True` signale que le garde-fou du router a court-circuité la lecture et rendu une liste vide : la combinaison de filtres demandée porte sur toute la base plutôt que sur une structure, faute d'un prédicat de texte ou de structure pour la réduire.
+    `requires_search` vrai signale une liste vide rendue sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base.
     """
 
     addresses: list[AddressOut]

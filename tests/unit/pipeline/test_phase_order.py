@@ -14,7 +14,7 @@ def test_ordre_colonne_vertebrale():
 
 
 def test_les_enrichissements_ferment_la_sequence():
-    """Les omettre ne coupe pas la séquence en deux : ils sont les derniers."""
+    """Les enrichissements sont les dernières phases : les omettre laisse une séquence continue."""
     rangs = sorted(PHASE_ORDER.index(p) for p in EXTRA_PHASES)
 
     assert rangs == list(range(len(PHASE_ORDER) - len(EXTRA_PHASES), len(PHASE_ORDER)))

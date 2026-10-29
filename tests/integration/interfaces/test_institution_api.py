@@ -13,7 +13,7 @@ def _cleanup():
     yield
     with owner_pool() as cur:
         cur.execute("TRUNCATE TABLE perimeters, structures RESTART IDENTITY CASCADE")
-        # Seule la clé posée par les tests part : les autres viennent de la migration.
+        # La migration pose les autres clés : seule `perimeter_persons` est supprimée, les autres reprennent leur valeur par défaut.
         cur.execute("DELETE FROM config WHERE key = 'perimeter_persons'")
         cur.execute("""UPDATE config SET value = '""' WHERE key = 'site_title'""")
         cur.execute("UPDATE config SET value = '196' WHERE key = 'brand_hue'")

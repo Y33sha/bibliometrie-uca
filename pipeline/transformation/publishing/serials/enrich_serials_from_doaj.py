@@ -1,8 +1,8 @@
-"""Import du dump CSV DOAJ dans `serials.doaj_payload` (DOAJ = source de vérité), et typage en revue des entrées présentes dans le DOAJ.
+"""Import du dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, et typage en revue des entrées présentes dans le DOAJ.
 
-Bulk, set-based : indexe les `serials` par leurs ISSN en O(1), remet `is_in_doaj = FALSE` partout, puis pour chaque row du dump matchée par ISSN écrit `doaj_payload` (dict CSV mis à plat) + `doaj_imported_at` + `is_in_doaj = TRUE`.
+Chaque ligne du dump retrouve sa revue par ISSN. La revue reçoit la ligne nettoyée (`doaj_payload`), la date de l'import et `is_in_doaj`, que l'import efface d'abord sur toutes les revues.
 
-Découplé de la source des rows : la CLI `import_doaj_csv` lit un fichier local, le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_serials_from_doaj`). Les deux passent un itérable de dicts `{colonne CSV: valeur}`.
+La commande `import_doaj_csv` lit un fichier local ; le pipeline télécharge le dump quand le dernier import date de plus que le délai de rafraîchissement (`run_enrich_serials_from_doaj`).
 """
 
 import logging
@@ -42,15 +42,15 @@ ISSN_KEYS = (
 COMMIT_EVERY = 1000
 
 DownloadDump = Callable[[], AbstractContextManager[Iterable[dict[str, str]]]]
-"""Télécharge le dump DOAJ et rend ses rows, le temps du bloc."""
+"""Télécharge le dump DOAJ et renvoie ses rows, le temps du bloc."""
 
 
 @dataclass
 class DoajImportStats:
     total_rows: int = 0
-    no_issn_rows: int = 0  # rows du dump sans aucun ISSN valide
-    orphan_rows: int = 0  # rows du dump dont l'ISSN est inconnu côté UCA
-    matched: int = 0  # journaux UCA mis à is_in_doaj = TRUE
+    no_issn_rows: int = 0  # lignes du dump sans ISSN valide
+    orphan_rows: int = 0  # lignes du dump dont l'ISSN est inconnu de la base
+    matched: int = 0  # revues mises à is_in_doaj
 
 
 class SerialIssnRow(NamedTuple):
@@ -61,7 +61,7 @@ class SerialIssnRow(NamedTuple):
 
 
 def find_serial_issn_index(conn: Connection) -> list[SerialIssnRow]:
-    """Les ISSN valides des revues, quel que soit leur statut : matière de l'index ISSN → revue à l'import du dump DOAJ."""
+    """ISSN valides des revues, quel que soit leur statut, pour retrouver la revue d'une ligne du dump."""
     return [
         SerialIssnRow(r.serial_id, r.issn)
         for r in conn.execute(
@@ -92,7 +92,7 @@ def update_serial_doaj(
 
 
 def reset_is_in_doaj(conn: Connection) -> int:
-    """Efface le drapeau `is_in_doaj` de toutes les revues où il est posé, le dump DOAJ faisant autorité — l'import le re-pose ensuite sur les revues matchées. Retourne le nombre de drapeaux effacés."""
+    """Efface `is_in_doaj` de toutes les revues ; l'import le pose ensuite sur les revues du dump. Renvoie le nombre de revues concernées."""
     return conn.execute(
         update(serials).where(serials.c.is_in_doaj).values(is_in_doaj=False)
     ).rowcount
@@ -108,12 +108,12 @@ def type_doaj_serials_as_journals(conn: Connection) -> int:
 
 
 def doaj_last_import_at(conn: Connection) -> datetime | None:
-    """Date du dernier import DOAJ (`max(doaj_imported_at)`), `None` si jamais importé. Commande la staleness du téléchargement du dump."""
+    """Date du dernier import DOAJ (`max(doaj_imported_at)`), `None` sans import. Décide du téléchargement du dump."""
     return scalar_datetime_or_none(conn.execute(select(func.max(serials.c.doaj_imported_at))))
 
 
 def clean_doaj_row(row: dict[str, str]) -> dict[str, str]:
-    """Met les valeurs à plat et retire les clés vides — réduit le bruit JSONB.
+    """Ligne du dump aux valeurs nettoyées, sans clé vide.
 
     Le payload alimente l'affichage d'une fiche de revue et les requêtes qui le lisent par clé : ses valeurs reçoivent la même mise à plat que les champs moissonnés (balises, entités HTML et caractères invisibles retirés).
     """
@@ -126,7 +126,7 @@ def clean_doaj_row(row: dict[str, str]) -> dict[str, str]:
 
 
 def _extract_issns(row: dict[str, str]) -> list[str]:
-    """ISSN papier et électronique valides de la row CSV, normalisés."""
+    """ISSN papier et électronique valides de la ligne du dump, normalisés."""
     return [
         str(issn)
         for key in ISSN_KEYS
@@ -142,13 +142,11 @@ def run_import_doaj_dump(
     dry_run: bool = False,
     commit: bool = True,
 ) -> DoajImportStats:
-    """Importe les rows du dump DOAJ. L'orchestrateur gère la transaction
-    (commits par batch) sauf si `commit=False` (tests sous transaction
-    rollbackée). Retourne les stats.
+    """Importe les lignes du dump DOAJ, avec un commit par lot, sauf si `commit` est faux. Renvoie les compteurs.
 
-    Un dump où aucune revue n'est reconnue laisse les revues en l'état : il signale un format de dump changé plutôt qu'un DOAJ vidé.
+    Un dump où aucune revue n'est reconnue laisse les revues en l'état : il signale un format de dump changé.
     """
-    # Index ISSN normalisé → serial_id (premier gagnant) pour matcher en O(1).
+    # Revue de chaque ISSN ; le premier ISSN rencontré l'emporte.
     issn_to_serial_id: dict[str, int] = {}
     for indexed_serial_id, issn in find_serial_issn_index(conn):
         issn_to_serial_id.setdefault(issn, indexed_serial_id)
@@ -167,7 +165,7 @@ def run_import_doaj_dump(
             stats.orphan_rows += 1
             continue
         if serial_id in seen:
-            # 2 rows DOAJ pour le même journal local : la 1re l'emporte.
+            # Deux lignes du dump pour une même revue : la première l'emporte.
             continue
         seen.add(serial_id)
         stats.matched += 1
@@ -175,7 +173,7 @@ def run_import_doaj_dump(
 
     if dry_run or not matches:
         return stats
-    # Le dump fait autorité : reset global avant de re-poser les TRUE.
+    # Le dump fait autorité : `is_in_doaj` s'efface partout avant d'être posé.
     reset_is_in_doaj(conn)
     now = datetime.now(UTC)
     for written, (serial_id, row) in enumerate(matches, 1):

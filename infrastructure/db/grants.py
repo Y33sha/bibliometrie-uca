@@ -33,7 +33,7 @@ def grant_statements() -> list[str]:
 
 
 def apply_grants(conn: Connection) -> bool:
-    """Applique `grants.sql` quand les rôles de `GRANTED_ROLES` existent. Rend vrai quand les droits sont appliqués."""
+    """Applique `grants.sql` quand les rôles de `GRANTED_ROLES` existent. Renvoie vrai quand les droits sont appliqués."""
     existing = conn.execute(
         text("SELECT count(*) FROM pg_roles WHERE rolname = ANY(:roles)"),
         {"roles": list(GRANTED_ROLES)},

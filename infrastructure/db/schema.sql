@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pnKtdU7zK3uYdE1M3Hxnd0bwJ7rWhZLvWRjRLxeyGIUIIwdLCdNoh3iVRIYdJtE
+\restrict hbcMQh2XX1e8CajAfjrnr3yT3vgWlZHF0oDkDDemjGM6hvas3sFwLuYnYvv6veK
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -437,6 +437,34 @@ CREATE TYPE public.serial_type AS ENUM (
 
 
 --
+-- Name: source_identifier_role; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.source_identifier_role AS ENUM (
+    'primary',
+    'derived',
+    'secondary',
+    'related'
+);
+
+
+--
+-- Name: source_identifier_type; Type: TYPE; Schema: public; Owner: -
+--
+
+CREATE TYPE public.source_identifier_type AS ENUM (
+    'doi',
+    'hal_id',
+    'nnt',
+    'pmid',
+    'pmcid',
+    'arxiv_id',
+    'isbn',
+    'eisbn'
+);
+
+
+--
 -- Name: source_type; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -639,6 +667,7 @@ CREATE TABLE ops.config (
     value jsonb NOT NULL,
     description text,
     created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT config_brand_hue_is_angle CHECK (((key <> 'brand_hue'::text) OR ((jsonb_typeof(value) = 'number'::text) AND (((value)::numeric >= (0)::numeric) AND ((value)::numeric <= (359)::numeric)) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_cap_is_non_negative_integer CHECK (((key <> ALL (ARRAY['fetch_missing_max_per_source'::text, 'sudoc_max_per_run'::text, 'unpaywall_max_per_run'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (0)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_delay_is_positive_integer CHECK (((key <> ALL (ARRAY['doaj_refresh_after_days'::text, 'fetch_missing_retry_after_days'::text, 'fetch_stale_after_days'::text, 'unpaywall_recheck_after_days'::text])) OR ((jsonb_typeof(value) = 'number'::text) AND ((value)::numeric >= (1)::numeric) AND ((value)::numeric = trunc((value)::numeric))))),
     CONSTRAINT config_site_title_is_text CHECK (((key <> 'site_title'::text) OR (jsonb_typeof(value) = 'string'::text))),
@@ -1196,7 +1225,6 @@ CREATE TABLE sources.source_records (
     id integer NOT NULL,
     source public.source_type NOT NULL,
     source_id text NOT NULL,
-    doi text,
     title text NOT NULL,
     publication_year smallint,
     doc_type public.doc_type,
@@ -1205,7 +1233,6 @@ CREATE TABLE sources.source_records (
     created_at timestamp with time zone DEFAULT now(),
     countries text[],
     hal_collections text[],
-    external_ids jsonb DEFAULT '{}'::jsonb NOT NULL,
     urls text[],
     serial_id integer,
     oa_status text,
@@ -1230,8 +1257,8 @@ CREATE TABLE sources.source_records (
     raw_doc_type text,
     raw_language text,
     publisher_id integer,
+    is_matchable boolean DEFAULT true NOT NULL,
     CONSTRAINT source_records_corrections_is_object CHECK ((jsonb_typeof(corrections) = 'object'::text)),
-    CONSTRAINT source_records_external_ids_is_object CHECK ((jsonb_typeof(external_ids) = 'object'::text)),
     CONSTRAINT source_records_impact_is_object CHECK (((impact IS NULL) OR (jsonb_typeof(impact) = 'object'::text)))
 );
 
@@ -1276,6 +1303,13 @@ COMMENT ON COLUMN sources.source_records.raw_language IS 'Langue donnée par la 
 --
 
 COMMENT ON COLUMN sources.source_records.publisher_id IS 'Éditeur que nomme la source. Nul pour une production hébergée sans être publiée.';
+
+
+--
+-- Name: COLUMN source_records.is_matchable; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_records.is_matchable IS 'Faux pour un enregistrement source écarté de la réconciliation : préfixe DOI exclu, titre de paratexte, enregistrement ScanR issu d''un dépôt HAL introuvable, enregistrement d''agrégateur sans DOI, lien ni clé de confirmation.';
 
 
 --
@@ -2158,7 +2192,7 @@ COMMENT ON COLUMN publishing.serial_issns.linking IS 'Vrai pour l''ISSN-L de la 
 -- Name: COLUMN serial_issns.status; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
+COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (ISSN des enregistrements sources, sans notice Sudoc).';
 
 
 --
@@ -2547,22 +2581,57 @@ COMMENT ON TABLE ref.ror_organizations IS 'Organisations du Research Organizatio
 
 
 --
+-- Name: source_record_identifiers; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.source_record_identifiers (
+    source_record_id integer NOT NULL,
+    id_type public.source_identifier_type NOT NULL,
+    id_value text NOT NULL,
+    role public.source_identifier_role NOT NULL,
+    removed_by text
+);
+
+
+--
+-- Name: TABLE source_record_identifiers; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.source_record_identifiers IS 'Identifiants d''un enregistrement source, réécrits à chaque normalisation.';
+
+
+--
+-- Name: COLUMN source_record_identifiers.id_value; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_identifiers.id_value IS 'Forme normalisée de l''identifiant.';
+
+
+--
+-- Name: COLUMN source_record_identifiers.role; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_identifiers.role IS 'primary : identifiant de l''enregistrement dans la source. derived : identifiant de l''enregistrement d''une autre source dont l''enregistrement source est dérivé. Un enregistrement source a au plus un identifiant dérivé. secondary : identifiant que la source attribue au même document. related : identifiant d''un document lié.';
+
+
+--
+-- Name: COLUMN source_record_identifiers.removed_by; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.source_record_identifiers.removed_by IS 'Règle de correction qui retire l''identifiant. NULL : identifiant actif.';
+
+
+--
 -- Name: known_dois; Type: VIEW; Schema: sources; Owner: -
 --
 
 CREATE VIEW sources.known_dois AS
- SELECT sp.doi,
-    sp.source,
-    sp.publication_id
-   FROM sources.source_records sp
-  WHERE (sp.doi IS NOT NULL)
-UNION
- SELECT d.value AS doi,
+ SELECT i.id_value AS doi,
     sp.source,
     sp.publication_id
    FROM (sources.source_records sp
-     CROSS JOIN LATERAL jsonb_array_elements_text((sp.external_ids -> 'related_dois'::text)) d(value))
-  WHERE (jsonb_typeof((sp.external_ids -> 'related_dois'::text)) = 'array'::text)
+     JOIN sources.source_record_identifiers i ON ((i.source_record_id = sp.id)))
+  WHERE ((i.id_type = 'doi'::public.source_identifier_type) AND (i.removed_by IS NULL))
 UNION
  SELECT pr.target_doi AS doi,
     NULL::public.source_type AS source,
@@ -2570,18 +2639,35 @@ UNION
    FROM publications.publication_relations pr
   WHERE (pr.target_doi IS NOT NULL)
 UNION
- SELECT ('10.48550/arxiv.'::text || lower((sp.external_ids ->> 'arxiv_id'::text))) AS doi,
+ SELECT ('10.48550/arxiv.'::text || lower(i.id_value)) AS doi,
     sp.source,
     sp.publication_id
-   FROM sources.source_records sp
-  WHERE ((sp.external_ids ->> 'arxiv_id'::text) IS NOT NULL);
+   FROM (sources.source_records sp
+     JOIN sources.source_record_identifiers i ON ((i.source_record_id = sp.id)))
+  WHERE ((i.id_type = 'arxiv_id'::public.source_identifier_type) AND (i.removed_by IS NULL) AND (NOT (EXISTS ( SELECT 1
+           FROM sources.source_record_identifiers x
+          WHERE ((x.source_record_id = i.source_record_id) AND (x.id_type = i.id_type) AND (x.removed_by IS NULL) AND (ROW(
+                CASE x.role
+                    WHEN 'primary'::public.source_identifier_role THEN 1
+                    WHEN 'derived'::public.source_identifier_role THEN 2
+                    WHEN 'secondary'::public.source_identifier_role THEN 3
+                    WHEN 'related'::public.source_identifier_role THEN 4
+                    ELSE NULL::integer
+                END, (x.id_value COLLATE "C")) < ROW(
+                CASE i.role
+                    WHEN 'primary'::public.source_identifier_role THEN 1
+                    WHEN 'derived'::public.source_identifier_role THEN 2
+                    WHEN 'secondary'::public.source_identifier_role THEN 3
+                    WHEN 'related'::public.source_identifier_role THEN 4
+                    ELSE NULL::integer
+                END, (i.id_value COLLATE "C"))))))));
 
 
 --
 -- Name: VIEW known_dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI des enregistrements sources, DOI liés, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
+COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI actifs des enregistrements sources, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
 
 
 --
@@ -2634,6 +2720,45 @@ CREATE SEQUENCE sources.contributor_information_id_seq
 --
 
 ALTER SEQUENCE sources.contributor_information_id_seq OWNED BY sources.contributor_information.id;
+
+
+--
+-- Name: doi_targets; Type: TABLE; Schema: sources; Owner: -
+--
+
+CREATE TABLE sources.doi_targets (
+    doi text NOT NULL,
+    target_doi text NOT NULL,
+    rule text NOT NULL
+);
+
+
+--
+-- Name: TABLE doi_targets; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON TABLE sources.doi_targets IS 'Cible du DOI d''une forme secondaire, réécrite par la correction par DOI partagé. La cible tient lieu du DOI pour la réconciliation et la consolidation.';
+
+
+--
+-- Name: COLUMN doi_targets.doi; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.doi_targets.doi IS 'DOI d''une version, d''une variante ou d''une pièce de dataset.';
+
+
+--
+-- Name: COLUMN doi_targets.target_doi; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.doi_targets.target_doi IS 'DOI de l''œuvre principale, présent en base.';
+
+
+--
+-- Name: COLUMN doi_targets.rule; Type: COMMENT; Schema: sources; Owner: -
+--
+
+COMMENT ON COLUMN sources.doi_targets.rule IS 'Règle de correction qui relie les deux DOI.';
 
 
 --
@@ -3780,6 +3905,14 @@ ALTER TABLE ONLY sources.contributor_information
 
 
 --
+-- Name: doi_targets doi_targets_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.doi_targets
+    ADD CONSTRAINT doi_targets_pkey PRIMARY KEY (doi);
+
+
+--
 -- Name: failed_lookups failed_lookups_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -3833,6 +3966,14 @@ ALTER TABLE ONLY sources.source_contributions
 
 ALTER TABLE ONLY sources.source_contributions
     ADD CONSTRAINT source_contributions_record_position_key UNIQUE (source_record_id, author_position) DEFERRABLE;
+
+
+--
+-- Name: source_record_identifiers source_record_identifiers_pkey; Type: CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_identifiers
+    ADD CONSTRAINT source_record_identifiers_pkey PRIMARY KEY (source_record_id, id_type, id_value);
 
 
 --
@@ -4235,17 +4376,17 @@ CREATE INDEX idx_publications_sources ON publications.publications USING gin (so
 
 
 --
+-- Name: idx_publications_title_normalized; Type: INDEX; Schema: publications; Owner: -
+--
+
+CREATE INDEX idx_publications_title_normalized ON publications.publications USING hash (title_normalized);
+
+
+--
 -- Name: idx_publications_title_trgm; Type: INDEX; Schema: publications; Owner: -
 --
 
 CREATE INDEX idx_publications_title_trgm ON publications.publications USING gin (title_normalized public.gin_trgm_ops);
-
-
---
--- Name: idx_publications_titlenorm_year; Type: INDEX; Schema: publications; Owner: -
---
-
-CREATE INDEX idx_publications_titlenorm_year ON publications.publications USING btree (title_normalized, publication_year);
 
 
 --
@@ -4427,7 +4568,7 @@ CREATE INDEX idx_monographs_serial ON publishing.monographs USING btree (serial_
 -- Name: idx_monographs_title_normalized; Type: INDEX; Schema: publishing; Owner: -
 --
 
-CREATE INDEX idx_monographs_title_normalized ON publishing.monographs USING btree (title_normalized);
+CREATE INDEX idx_monographs_title_normalized ON publishing.monographs USING hash (title_normalized);
 
 
 --
@@ -4473,10 +4614,10 @@ CREATE INDEX idx_serials_publisher ON publishing.serials USING btree (publisher_
 
 
 --
--- Name: idx_serials_titlenorm; Type: INDEX; Schema: publishing; Owner: -
+-- Name: idx_serials_title_normalized; Type: INDEX; Schema: publishing; Owner: -
 --
 
-CREATE INDEX idx_serials_titlenorm ON publishing.serials USING btree (title_normalized);
+CREATE INDEX idx_serials_title_normalized ON publishing.serials USING hash (title_normalized);
 
 
 --
@@ -4564,6 +4705,13 @@ CREATE INDEX contributor_information_orcid_idx ON sources.contributor_informatio
 
 
 --
+-- Name: idx_doi_targets_target_doi; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_doi_targets_target_doi ON sources.doi_targets USING btree (target_doi);
+
+
+--
 -- Name: idx_saa_address; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4592,6 +4740,13 @@ CREATE INDEX idx_source_contributions_in_perimeter ON sources.source_contributio
 
 
 --
+-- Name: idx_source_record_identifiers_value; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_source_record_identifiers_value ON sources.source_record_identifiers USING btree (id_type, id_value);
+
+
+--
 -- Name: idx_source_record_locations_platform; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4606,27 +4761,6 @@ CREATE INDEX idx_source_records_countries ON sources.source_records USING gin (c
 
 
 --
--- Name: idx_source_records_doi; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_doi ON sources.source_records USING btree (doi) WHERE (doi IS NOT NULL);
-
-
---
--- Name: idx_source_records_external_ids; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_external_ids ON sources.source_records USING gin (external_ids) WHERE (external_ids <> '{}'::jsonb);
-
-
---
--- Name: idx_source_records_first_hal_id; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_first_hal_id ON sources.source_records USING btree ((((external_ids -> 'hal_id'::text) ->> 0))) WHERE (((external_ids -> 'hal_id'::text) ->> 0) IS NOT NULL);
-
-
---
 -- Name: idx_source_records_hal_collections; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -4634,31 +4768,10 @@ CREATE INDEX idx_source_records_hal_collections ON sources.source_records USING 
 
 
 --
--- Name: idx_source_records_metadata_block; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_metadata_block ON sources.source_records USING btree (title_normalized, publication_year, doc_type);
-
-
---
 -- Name: idx_source_records_monograph; Type: INDEX; Schema: sources; Owner: -
 --
 
 CREATE INDEX idx_source_records_monograph ON sources.source_records USING btree (monograph_id) WHERE (monograph_id IS NOT NULL);
-
-
---
--- Name: idx_source_records_nnt; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_nnt ON sources.source_records USING btree (((external_ids ->> 'nnt'::text))) WHERE ((external_ids ->> 'nnt'::text) IS NOT NULL);
-
-
---
--- Name: idx_source_records_pmid; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_pmid ON sources.source_records USING btree (((external_ids ->> 'pmid'::text))) WHERE ((external_ids ->> 'pmid'::text) IS NOT NULL);
 
 
 --
@@ -4687,6 +4800,13 @@ CREATE INDEX idx_source_records_serial ON sources.source_records USING btree (se
 --
 
 CREATE INDEX idx_source_records_staging ON sources.source_records USING btree (staging_id) WHERE (staging_id IS NOT NULL);
+
+
+--
+-- Name: idx_source_records_title_normalized; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE INDEX idx_source_records_title_normalized ON sources.source_records USING hash (title_normalized);
 
 
 --
@@ -4750,6 +4870,13 @@ CREATE UNIQUE INDEX source_contribution_structures_pkey ON sources.source_contri
 --
 
 CREATE INDEX source_contributions_duplicate_of_idx ON sources.source_contributions USING btree (duplicate_of) WHERE (duplicate_of IS NOT NULL);
+
+
+--
+-- Name: uq_source_record_identifiers_derived; Type: INDEX; Schema: sources; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_source_record_identifiers_derived ON sources.source_record_identifiers USING btree (source_record_id) WHERE (role = 'derived'::public.source_identifier_role);
 
 
 --
@@ -5327,6 +5454,14 @@ ALTER TABLE ONLY sources.source_contributions
 
 
 --
+-- Name: source_record_identifiers source_record_identifiers_source_record_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
+--
+
+ALTER TABLE ONLY sources.source_record_identifiers
+    ADD CONSTRAINT source_record_identifiers_source_record_id_fkey FOREIGN KEY (source_record_id) REFERENCES sources.source_records(id) ON DELETE CASCADE;
+
+
+--
 -- Name: source_record_locations source_record_locations_platform_id_fkey; Type: FK CONSTRAINT; Schema: sources; Owner: -
 --
 
@@ -5482,5 +5617,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pnKtdU7zK3uYdE1M3Hxnd0bwJ7rWhZLvWRjRLxeyGIUIIwdLCdNoh3iVRIYdJtE
+\unrestrict hbcMQh2XX1e8CajAfjrnr3yT3vgWlZHF0oDkDDemjGM6hvas3sFwLuYnYvv6veK
 

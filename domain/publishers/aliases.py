@@ -35,7 +35,7 @@ def _forms(name: str) -> set[str]:
 
 
 def compatible_publisher_names(a: str, b: str) -> bool:
-    """Indique si deux noms désignent le même éditeur : égaux, emboîtés ou abrégés l'un dans l'autre (`compatible_titles`), tels quels ou privés des mots génériques et des formes juridiques."""
+    """Vrai si deux noms désignent le même éditeur : égaux, emboîtés ou abrégés l'un dans l'autre (`compatible_titles`), tels quels ou privés des mots génériques et des formes juridiques."""
     return any(
         x.casefold() == y.casefold() or compatible_titles(x, y) or nested_titles(x, y)
         for x in _forms(a)

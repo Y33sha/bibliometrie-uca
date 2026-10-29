@@ -1,6 +1,6 @@
 """Filtre par auteur de la liste des publications.
 
-Sur une page personne, la personne de la page et l'auteur choisi en facette filtrent ensemble (publications cosignées) : un même paramètre lié ferait écraser l'un par l'autre.
+Sur la page d'une personne, la personne et l'auteur choisi en facette filtrent ensemble (publications cosignées). Les deux clauses lient donc des paramètres distincts.
 """
 
 from infrastructure.read_models.filters import author_clause, person_clause

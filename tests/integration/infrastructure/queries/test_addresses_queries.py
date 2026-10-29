@@ -37,7 +37,6 @@ def _q(conn) -> AddressesQueries:
 class TestListAddresses:
     def test_lists_detected_and_pending_by_default(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
-        # Form pour matched_form_id
         form_row_id = insert_structure_name_form(sa_sync_conn, struct, form_text="x")
         form_id = form_row_id
 
@@ -60,7 +59,8 @@ class TestListAddresses:
         )
         ids = [a.id for a in res.addresses]
         assert addr_pending in ids
-        assert addr_confirmed not in ids  # validation=pending → exclut confirmed
+        # Le filtre de validation par défaut écarte les liens confirmés.
+        assert addr_confirmed not in ids
 
     def test_lists_confirmed_only(self, sa_sync_conn):
         struct = insert_structure(sa_sync_conn, "UCA", name="X", structure_type="universite")
@@ -101,7 +101,7 @@ class TestListAddresses:
         assert a2 not in ids
 
     def test_text_predicates_combined_and(self, sa_sync_conn):
-        # contient « Clermont » ET ne contient pas « Toulouse » → ET entre prédicats.
+        # Deux prédicats de texte se combinent par ET : contient « Clermont », ne contient pas « Toulouse ».
         scope = insert_structure(sa_sync_conn, "SCOPE-T", name="X", structure_type="universite")
         a1 = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         a2 = insert_address(sa_sync_conn, "Université Clermont Toulouse")
@@ -125,7 +125,7 @@ class TestListAddresses:
 
 
 class TestStructurePredicates:
-    """Prédicats « structure reconnue » (reconnue = lien pending ou confirmé)."""
+    """Prédicats « structure reconnue » : une structure est reconnue par un lien en attente ou confirmé."""
 
     def test_recognized_matches_pending_and_confirmed_only(self, sa_sync_conn):
         scope = insert_structure(sa_sync_conn, "SCOPE-R", name="X", structure_type="universite")
@@ -139,7 +139,7 @@ class TestStructurePredicates:
         a_confirmed = insert_address(sa_sync_conn, "confirmed")
         insert_address_structure(
             sa_sync_conn, a_confirmed, structure_id=k, is_confirmed=True
-        )  # relié manuel
+        )  # relié à la main
         a_rejected = insert_address(sa_sync_conn, "rejected")
         insert_address_structure(
             sa_sync_conn, a_rejected, structure_id=k, is_confirmed=False, matched_form_id=form_id
@@ -302,7 +302,6 @@ class TestAddressesCountries:
         )
         ids = [a.id for a in res.addresses]
         assert a_fr in ids
-        # La facette countries doit être présente
         assert res.country_facets is not None
 
     def test_le_compte_sans_pays_ignore_le_filtre_de_pays(self, sa_sync_conn):

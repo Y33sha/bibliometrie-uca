@@ -1,9 +1,4 @@
-"""Value object `StructureNameForm` — forme du nom d'une structure.
-
-Une forme de nom de structure comporte des options de matching en plus de la string : `is_word_boundary` (exiger une frontière de mot), `is_excluding` (la forme provoque un *rejet* du match), `requires_context_of` (le match est valide seulement si l'une des structures de contexte est reconnue dans la même adresse).
-
-Ces attributs étant tous des valeurs (booléens, tuple d'entiers), la classe reste un VO : égalité par contenu, immuable.
-"""
+"""Formes de nom d'une structure, avec leurs options de matching."""
 
 from dataclasses import dataclass, field
 
@@ -12,14 +7,12 @@ from domain.errors import ValidationError
 
 @dataclass(frozen=True)
 class StructureNameForm:
-    """Forme du nom d'une structure, avec options de matching (VO).
+    """Forme de nom d'une structure (table `structure_name_forms`).
 
-    Champs (miroir de la table `structure_name_forms`) :
-
-    - `form_text` : la string à matcher (déjà normalisée).
-    - `is_word_boundary` : exige une frontière de mot avant/après la forme pour valider un match (évite p. ex. de matcher « ica » dans « africa »).
-    - `is_excluding` : si la forme matche, le match global est rejeté (forme négative).
-    - `requires_context_of` : tuple d'ids de structures dont l'une doit aussi être reconnue, son propre contexte compris, pour valider ce match (désambiguïsation).
+    - `form_text` : texte normalisé à reconnaître dans une adresse.
+    - `is_word_boundary` : la forme exige une frontière de mot de chaque côté.
+    - `is_excluding` : la forme reconnue rejette la structure.
+    - `requires_context_of` : structures dont l'une doit aussi être reconnue dans l'adresse, son propre contexte compris.
     """
 
     form_text: str
@@ -35,10 +28,7 @@ class StructureNameForm:
         return self.form_text
 
 
-# En dessous de ce seuil (caractères, sur le texte normalisé), une forme doit exiger une
-# frontière de mot : matchée en sous-chaîne, une forme courte produit trop de faux positifs
-# (« ica » dans « africa »). L'invariant « forme courte ⇒ is_word_boundary » est verrouillé
-# par une contrainte CHECK sur `structure_name_forms`, appliquée à l'écriture.
+# Longueur maximale, en caractères de texte normalisé, d'une forme courte. Une forme courte exige une frontière de mot (« ica » dans « africa ») ; une contrainte CHECK de `structure_name_forms` l'impose.
 SHORT_FORM_MAX_LENGTH = 6
 
 

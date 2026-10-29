@@ -1,11 +1,4 @@
-"""
-Tests de re-traitement : quand le raw_data du staging change,
-les métadonnées de la publication doivent être mises à jour.
-
-Vérifie la correction du bug où le court-circuit d'idempotence
-(source_document existant → skip find_or_create) empêchait
-la mise à jour des métadonnées lors d'un re-traitement.
-"""
+"""Retraitement : quand le `raw_data` d'une ligne de staging change, la normalisation puis la phase `publications` mettent à jour les métadonnées de la publication."""
 
 import copy
 import logging
@@ -18,8 +11,7 @@ from tests.integration.helpers.publications_phase import (
 )
 from tests.integration.helpers.staging import insert_staging, normalize_pending
 
-# ── Données HAL minimales ───────────────────────────────────────
-
+# Document HAL minimal, sans dépôt de fichier.
 HAL_DOC_CLOSED = {
     "halId_s": "tel-99990001",
     "doiId_s": None,
@@ -33,14 +25,14 @@ HAL_DOC_CLOSED = {
 
 
 def _insert_hal_staging(conn, doc):
-    """Insère un document HAL dans staging."""
+    """Insère un document HAL dans le staging, ou remplace son contenu et le remet à traiter."""
     insert_staging(
         conn,
         source_id=doc["halId_s"],
         doi=doc.get("doiId_s"),
         raw_data=doc,
         processed=False,
-        upsert="raw_data",
+        replace=True,
     )
 
 
@@ -49,7 +41,7 @@ def _run_normalize_hal(conn):
 
 
 def _get_publication_oa_status(conn, hal_id):
-    """Retourne le oa_status de la publication liée à un source_document HAL."""
+    """Renvoie le statut open access de la publication de l'enregistrement source HAL `hal_id`."""
     return conn.execute(
         text("""
             SELECT p.oa_status::text AS oa_status
@@ -62,11 +54,9 @@ def _get_publication_oa_status(conn, hal_id):
 
 
 def _fetch_stale_publications(conn):
-    """Rejoue la phase publications après un re-normalize, pour propager les métadonnées modifiées.
+    """Rejoue `metadata_correction` puis la réconciliation, comme le pipeline après une renormalisation.
 
-    Le re-normalize a marqué pour la réconciliation les enregistrements sources touchés ; la réconciliation les reprend donc et `refresh_from_sources` recompute les métadonnées de leurs publications. La réconciliation reprend tout enregistrement source modifié.
-
-    Rejoue d'abord `metadata_correction` : le re-normalize a réécrit les colonnes enregistrement source avec le brut source (`THESE`, `ART`…), or `refresh_from_sources` lit la valeur corrigée en place sans re-mapper. C'est l'ordre du pipeline (phase `metadata_correction` avant la phase `publications`).
+    La renormalisation marque les enregistrements sources modifiés pour la réconciliation, qui recalcule les métadonnées de leurs publications (`refresh_from_sources`). Elle réécrit aussi les valeurs brutes de la source (`THESE`, `ART`…) : `metadata_correction` les corrige d'abord, et `refresh_from_sources` lit les valeurs corrigées.
     """
     from pipeline.transformation.publications.reconciliation import reconcile
 
@@ -75,45 +65,34 @@ def _fetch_stale_publications(conn):
     reconcile(conn, logging.getLogger("test_reprocessing"))
 
 
-# ── Tests ───────────────────────────────────────────────────────
-
-
 class TestHalReprocessingUpdatesOaStatus:
-    """Quand openAccess_bool passe de false à true dans le staging,
-    le re-traitement doit mettre à jour oa_status de closed à green."""
+    """Au retraitement, le statut open access d'une publication HAL suit le dépôt du fichier (`fileMain_s`)."""
 
     def test_closed_then_green(self, sa_sync_conn):
         hal_id = HAL_DOC_CLOSED["halId_s"]
 
-        # 1. Premier traitement : openAccess_bool = false → closed
+        # Premier traitement, sans dépôt : closed.
         _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
         _run_normalize_hal(sa_sync_conn)
         create_all_publications(sa_sync_conn)
 
         assert _get_publication_oa_status(sa_sync_conn, hal_id) == "closed"
 
-        # 2. Re-traitement : un fileMain_s apparaît (dépôt effectif en HAL)
-        #    → green. `openAccess_bool=True` seul ne suffit plus depuis la
-        #    refonte de derive_hal_oa_status (003a4bc, 16a5b14).
+        # Retraitement avec un fichier déposé dans HAL (`fileMain_s`) : green. `openAccess_bool` seul donne closed.
         updated_doc = copy.deepcopy(HAL_DOC_CLOSED)
         updated_doc["openAccess_bool"] = True
         updated_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
-        _insert_hal_staging(sa_sync_conn, updated_doc)  # remet processed = FALSE
+        _insert_hal_staging(sa_sync_conn, updated_doc)  # remet la ligne à traiter
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)
 
         assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
 
     def test_closed_replaces_green_on_reprocessing(self, sa_sync_conn):
-        """Un re-traitement où le dépôt HAL disparaît met à jour le statut.
-
-        Avec refresh_from_sources, le statut est recalculé depuis les
-        source_records : si HAL n'a plus de fileMain_s et que
-        openAccess_bool passe à false, c'est closed.
-        """
+        """Au retraitement, une publication HAL dont le fichier déposé disparaît passe de green à closed."""
         hal_id = HAL_DOC_CLOSED["halId_s"]
 
-        # 1. Premier traitement avec green : fileMain_s présent → green
+        # Premier traitement, avec dépôt : green.
         open_doc = copy.deepcopy(HAL_DOC_CLOSED)
         open_doc["openAccess_bool"] = True
         open_doc["fileMain_s"] = "https://hal.science/tel-99990001/document"
@@ -123,8 +102,7 @@ class TestHalReprocessingUpdatesOaStatus:
 
         assert _get_publication_oa_status(sa_sync_conn, hal_id) == "green"
 
-        # 2. Re-traitement : fileMain_s retiré, openAccess_bool = false
-        #    → refresh_from_sources recalcule en closed.
+        # Retraitement sans `fileMain_s`, avec `openAccess_bool` faux : closed.
         _insert_hal_staging(sa_sync_conn, HAL_DOC_CLOSED)
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)
@@ -132,7 +110,7 @@ class TestHalReprocessingUpdatesOaStatus:
         assert _get_publication_oa_status(sa_sync_conn, hal_id) == "closed"
 
     def test_deposit_floor_reopens_frozen_closed(self, sa_sync_conn):
-        """Unpaywall donne closed pour le DOI, sans voir le dépôt, mais HAL détient le fichier (green) : la phase publications garde green."""
+        """Unpaywall donne closed pour le DOI sans voir le dépôt, mais HAL a le fichier : la phase `publications` garde green."""
         hal_id = HAL_DOC_CLOSED["halId_s"]
         open_doc = copy.deepcopy(HAL_DOC_CLOSED)
         open_doc["doiId_s"] = "10.9999/tel-99990001"
@@ -156,7 +134,7 @@ class TestHalReprocessingUpdatesOaStatus:
             {"hid": hal_id},
         )
 
-        # Re-dirty l'enregistrement source et rejouer la seule phase publications : le dépôt tient.
+        # La renormalisation marque l'enregistrement source ; la phase `publications` rejouée garde le statut du dépôt.
         _insert_hal_staging(sa_sync_conn, open_doc)
         _run_normalize_hal(sa_sync_conn)
         _fetch_stale_publications(sa_sync_conn)

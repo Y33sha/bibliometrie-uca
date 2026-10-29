@@ -1,4 +1,4 @@
-"""Facettes dynamiques + listes de référence (départements, rôles, stats)."""
+"""Facettes de la liste des personnes : départements, rôles, identifiants, fiche RH, éléments à confirmer."""
 
 from sqlalchemy import Connection, text
 
@@ -43,7 +43,7 @@ class PersonFacetQueries:
         """Facettes dynamiques (chaque facette exclut son propre filtre)."""
 
         def base_clauses(*, skip: str) -> list[WhereClause | None]:
-            # Scope labo, recherche nom, exclusion et activité délimitent la population décomptée : ils s'appliquent à toutes les facettes, quand les autres filtres sont chacun exclu de leur propre facette.
+            # Laboratoire, recherche par nom, exclusion et activité délimitent la population décomptée : ils valent pour toutes les facettes. Chaque autre filtre est exclu de sa propre facette.
             out: list[WhereClause | None] = [
                 person_exclusion_clause(filters.exclusions),
                 person_active_clause(filters.active),
@@ -111,7 +111,7 @@ class PersonFacetQueries:
             binds,
         ).one()
 
-        # FORMES DE NOM À CONFIRMER (≥1 forme `pending`)
+        # FORMES DE NOM À CONFIRMER (au moins une forme en attente)
         where_sql, binds = assemble_where(base_clauses(skip="pending_forms"))
         pending_forms = self._conn.execute(
             text(

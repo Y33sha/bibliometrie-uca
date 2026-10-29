@@ -108,7 +108,7 @@ def fetch_ror_dump(
     user_agent: str,
     logger: logging.Logger,
 ) -> RorDumpFile:
-    """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la rend."""
+    """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la renvoie."""
     dump = find_latest_ror_dump(user_agent=user_agent)
     download_dump(
         dump.url,
@@ -124,7 +124,7 @@ def fetch_ror_dump(
 def read_ror_dump(archive_path: str) -> Iterator[RorOrganization]:
     """Itère les organisations du CSV de l'archive.
 
-    Lève `ValueError` ou `ValidationError` sur une ligne inexploitable : un dump incomplet ne doit pas remplacer le référentiel.
+    Lève `ValueError` ou `ValidationError` sur une ligne inexploitable : un dump incomplet laisse le référentiel en place.
     """
     with zipfile.ZipFile(archive_path) as archive:
         member = next((n for n in archive.namelist() if n.endswith(_CSV_SUFFIX)), None)

@@ -1,32 +1,32 @@
-"""Paramètres d'API invariants, codés en dur : URLs de base, débits et tailles de page, par source.
+"""Paramètres invariants des API des sources : URL de base, tailles de page et débits.
 
-Centralise ces réglages pour éviter la dérive entre scripts. Modifier une valeur ici s'applique à tous les scripts qui interrogent l'API concernée. Les comportements spécifiques (reprise après erreur, pauses longues après quota dépassé) restent codés en dur dans chaque script.
+Chaque valeur vaut pour tous les modules qui interrogent l'API. La reprise après erreur et les pauses après un dépassement de quota relèvent de chaque module.
 """
 
 API_BASE_URLS: dict[str, str] = {
-    # Moissonneurs principaux (un endpoint par source)
+    # Moissonnage
     "hal": "https://api.archives-ouvertes.fr/search/",
     "openalex": "https://api.openalex.org/works",
     "wos": "https://api.clarivate.com/api/wos",
     "scanr": "https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search",
     "theses": "https://theses.fr/api/v1/theses/recherche/",
-    # theses.fr : détail d'une thèse, l'adapter compose `<identifiant>`.
+    # theses.fr : détail d'une thèse ; l'adaptateur compose `<identifiant>`.
     "theses_detail": "https://theses.fr/api/v1/theses/these/",
-    # CrossRef : racine sans /works, l'adapter compose le chemin selon l'usage (/works/<doi>, /works?filter=orcid:...)
+    # Crossref : racine ; l'adaptateur compose `/works/<doi>` ou `/works?filter=…`.
     "crossref": "https://api.crossref.org",
-    # DataCite : racine, l'adapter compose `/dois` (query batch) ou `/dois/<doi>`.
+    # DataCite : racine ; l'adaptateur compose `/dois` (requête par lot) ou `/dois/<doi>`.
     "datacite": "https://api.datacite.org",
-    # doi.org : agence d'enregistrement, l'adapter compose `/<préfixe>,<préfixe>,…`.
+    # doi.org : agence d'enregistrement ; l'adaptateur compose `/<préfixe>,<préfixe>,…`.
     "doi_org": "https://doi.org/ra",
-    # doi.org : registre des DOI, l'adapter compose `/<doi>` ; un DOI inconnu répond 404.
+    # doi.org : registre des DOI ; l'adaptateur compose `/<doi>`. Un DOI inconnu répond 404.
     "doi_org_handles": "https://doi.org/api/handles",
-    # Endpoints secondaires
+    # Référentiels et compléments
     "hal_structures": "https://api.archives-ouvertes.fr/ref/structure/",
     "openalex_sources": "https://api.openalex.org/sources",
     "openalex_publishers": "https://api.openalex.org/publishers",
     "openalex_institutions": "https://api.openalex.org/institutions",
     "unpaywall": "https://api.unpaywall.org/v2",
-    # Sudoc : racine, l'adapter compose `/services/issn2ppn/<ISSN>` et `/<ppn>.xml`.
+    # Sudoc : racine ; l'adaptateur compose `/services/issn2ppn/<ISSN>` et `/<ppn>.xml`.
     "sudoc": "https://www.sudoc.fr",
     # Versions du dump ROR publiées sur Zenodo, communauté `ror-data`.
     "zenodo_ror": "https://zenodo.org/api/communities/ror-data/records",
@@ -34,7 +34,7 @@ API_BASE_URLS: dict[str, str] = {
 
 
 # Archives ouvertes HAL — API SolR (https://api.archives-ouvertes.fr/search/)
-# 100 records/page (union de toutes les collections en une requête). Au-delà, les payloads label_xml (TEI) des collections à méga-contributions (CERN/ATLAS/CMS) font time-out le serveur HAL.
+# Une requête couvre toutes les collections. Au-delà de 100 documents par page, les TEI (`label_xml`) des collections aux milliers d'auteurs (CERN, ATLAS, CMS) font expirer la requête.
 HAL_PER_PAGE = 100
 
 
@@ -45,7 +45,7 @@ OPENALEX_PER_PAGE = 200  # max imposé par l'API
 WOS_PER_PAGE = 10  # recommandation Clarivate (timeouts fréquents au-delà)
 
 # ScanR — Elasticsearch public
-# Batchs search_after. 1000 retenu empiriquement : le cluster ScanR inflige des stalls intermittents (~10s) dont la fréquence suit le nombre de requêtes ; 2000 fait couper la connexion, 1000 est l'équilibre.
+# Pagination par `search_after`. Le cluster ScanR marque des pauses intermittentes (~10 s), d'autant plus fréquentes que les requêtes sont nombreuses. À 2000 documents par page, il coupe la connexion.
 SCANR_PER_PAGE = 1000
 
 # theses.fr — API publique

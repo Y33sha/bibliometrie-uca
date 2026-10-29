@@ -1,6 +1,6 @@
 """Contraintes du téléchargement du dump DOAJ : destination de la redirection et volume accepté.
 
-C'est la seule requête sortante du projet qui suive une redirection. Deux propriétés en découlent, qu'on veut tenues par des tests plutôt que par la confiance accordée à la source : la redirection ne mène qu'à des hôtes nommés, et le corps reçu est borné.
+C'est la seule requête sortante qui suive une redirection vers un autre hôte. La redirection mène seulement à des hôtes nommés, et la taille du corps reçu est bornée.
 """
 
 import logging

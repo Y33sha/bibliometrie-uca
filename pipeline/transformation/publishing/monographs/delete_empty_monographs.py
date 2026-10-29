@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `contributions` — supprime les monographies vides.
+"""Sous-étape de la phase `finalize` — supprime les monographies vides.
 
-Une monographie vide n'est portée par aucun enregistrement ni aucune publication. Elle se vide quand ses enregistrements rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore portée par une publication attend que la phase `publications` recalcule celle-ci. Le journal garde le titre de chaque monographie supprimée.
+Une monographie vide est sans enregistrement source et sans publication. Elle se vide quand ses enregistrements rejoignent une autre monographie, par exemple quand l'ISBN arrive sur une monographie créée par son titre. Une monographie encore rattachée à une publication attend que la phase `publications` recalcule celle-ci. Le journal garde le titre de chaque monographie supprimée.
 """
 
 import logging
@@ -22,7 +22,7 @@ _DELETE_EMPTY = text("""
 
 
 def delete_empty_monographs(conn: Connection) -> list[tuple[int, str]]:
-    """Supprime les monographies sans enregistrement ni publication, et rend `(id, titre)` de chacune."""
+    """Supprime les monographies sans enregistrement ni publication, et renvoie l'id et le titre de chacune."""
     return sorted((r.id, r.title) for r in conn.execute(_DELETE_EMPTY))
 
 

@@ -1,6 +1,6 @@
 """Retrait des documents marqués disparus.
 
-Un `staging` portant `disappeared_at` perd ses `source_records`, et celles-ci emportent leurs `source_contributions` par cascade. La ligne de `staging` reste, avec sa marque.
+Une ligne de staging marquée disparue (`disappeared_at`) perd ses enregistrements sources, et leurs contributions sources sont supprimées en cascade. La ligne de staging reste, avec sa marque.
 """
 
 from functools import partial
@@ -19,7 +19,7 @@ from tests.integration.helpers.staging import insert_staging
 # Ligne de staging HAL traitée.
 _staging = partial(insert_staging, processed=True)
 
-# Enregistrement source de titre « Titre », aux clés à jour.
+# Enregistrement source de titre « Titre », absent de la file de la réconciliation.
 _source_record = partial(insert_source_record, title="Titre", marked=False)
 
 
@@ -80,7 +80,7 @@ def test_les_contributions_sources_suivent_par_cascade(sa_sync_conn_owner):
 
 
 def test_les_soeurs_du_document_disparu_sont_a_reconcilier(sa_sync_conn_owner):
-    """La publication perd une source : ses autres sources la font réconcilier et rafraîchir."""
+    """La publication perd un enregistrement source : seuls ses autres enregistrements sources sont marqués pour la réconciliation."""
     conn = sa_sync_conn_owner
     publication = _publication(conn)
     _source_record(
@@ -161,7 +161,6 @@ def test_la_ligne_de_staging_reste_avec_sa_marque(sa_sync_conn_owner):
 
 
 def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
-    """Balayage idempotent : rien ne subsiste à retirer au passage suivant."""
     staging_id = _staging(sa_sync_conn_owner, source_id="hal-idempotent", disappeared=True)
     _source_record(sa_sync_conn_owner, source_id="hal-idempotent", staging_id=staging_id)
 
@@ -170,7 +169,7 @@ def test_le_second_passage_ne_retire_rien(sa_sync_conn_owner):
 
 
 def test_un_enregistrement_source_sans_metadonnees_minimales_est_supprime(sa_sync_conn_owner):
-    """Un enregistrement moissonné, renormalisé sans année, supprime l'enregistrement source qu'il avait produit, et seul celui-là ; ses frères sont marqués à réconcilier."""
+    """Une ligne de staging renormalisée sans année perd son enregistrement source, et seulement celui-là ; les autres enregistrements sources de la publication sont marqués pour la réconciliation."""
     publication = _publication(sa_sync_conn_owner)
     staging_id = _staging(sa_sync_conn_owner, source_id="W3131333980")
     source_record_id = _source_record(

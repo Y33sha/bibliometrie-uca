@@ -1,11 +1,8 @@
-"""Normalisation des données DataCite : staging → tables structurées.
+"""Normalisation des enregistrements sources DataCite.
 
-Particularités DataCite :
-- Le staging stocke le nœud JSON:API `data` ; les métadonnées sont dans `data.attributes`.
-- `creators` : nom + ORCID éventuel (`nameIdentifiers` scheme ORCID) + affiliations textuelles. Les creators `Organizational` donnent des contributions sources collectives. Affiliations routées vers `addresses` via le writer batch partagé, comme HAL / OpenAlex / CrossRef.
-- `raw_doc_type` : token brut issu de `types` (cf. `pipeline.ingestion.datacite.payload.extract_datacite_doc_type_token`).
-- `relatedIdentifiers` (type DOI) → identifiants liés (recherche par DOI + relations) et `source_extras.related_identifiers` (avec `relationType`, pour la résolution concept/version et les relations entre publications).
-- `oa_status` non dérivé de DataCite ; laissé à NULL pour arbitrage aval.
+- `staging` garde la ressource JSON:API `data` ; les métadonnées sont dans ses `attributes`.
+- Les `relatedIdentifiers` de type DOI donnent des identifiants liés, que la phase `fetch_missing` cherche, et `source_extras.related_identifiers`, qui garde leur `relationType` pour les relations entre publications.
+- Le statut open access reste vide : les autres sources en décident.
 """
 
 from __future__ import annotations
@@ -63,10 +60,6 @@ from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
 
-# =============================================================
-# PUBLISHER + JOURNAL
-# =============================================================
-
 
 def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescription:
     """Ce que DataCite dit du conteneur d'un document.
@@ -91,10 +84,7 @@ def get_container_facts(attributes: Mapping[str, JsonValue]) -> ContainerDescrip
 
 
 def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | None:
-    """Volume / issue / pages depuis `container` + publisher/journal bruts.
-
-    Trace le nom de l'éditeur et de la revue tels que vus par DataCite, en parallèle des publishers/serials créés via `find_or_create_*`.
-    """
+    """Volume, numéro et pages du conteneur, avec l'éditeur et la revue tels que DataCite les nomme."""
     container = as_mapping(attributes.get("container"))
     title, issn = get_container(attributes)
     return compact_biblio(
@@ -108,13 +98,8 @@ def get_biblio(attributes: Mapping[str, JsonValue]) -> dict[str, JsonValue] | No
     )
 
 
-# =============================================================
-# AUTEURS
-# =============================================================
-
-
 def _creator_name(creator: Mapping[str, JsonValue]) -> ContributorName | None:
-    """Nom et prénom séparés quand `familyName` et `givenName` sont tous deux renseignés. Sinon la chaîne brute : `familyName` seul porte souvent le nom complet."""
+    """Nom et prénom séparés quand `familyName` et `givenName` sont tous deux renseignés. Sinon la chaîne brute : `familyName` seul contient souvent le nom complet."""
     given = (as_str(creator.get("givenName")) or "").strip()
     family = (as_str(creator.get("familyName")) or "").strip()
     if given and family:
@@ -160,9 +145,9 @@ def _creator_affiliations(
 
 
 def build_datacite_author_records(attributes: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Parse les `creators` DataCite en `AuthorRecord` (sans I/O).
+    """Contributions sources des `creators` DataCite.
 
-    Un creator `Organizational` donne une contribution source collective. ORCID sur `identifiers`, affiliations brutes → adresses (sans pays), ROR de chaque affiliation sur son adresse, ou sur la contribution source pour une affiliation sans texte, `roles=['author']` explicite.
+    Un créateur `Organizational` donne une contribution source collective. L'ORCID vient de `nameIdentifiers`. Les affiliations deviennent des adresses, sans pays ; le ROR d'une affiliation va sur son adresse, ou sur la contribution source pour une affiliation sans texte. Le rôle est toujours `author`.
     """
     creators = attributes.get("creators") or []
     if not isinstance(creators, list):
@@ -202,7 +187,7 @@ def extract_datacite_author_block(attributes: Mapping[str, JsonValue]) -> Author
 
 
 def datacite_doi(attributes: Mapping[str, JsonValue], staging_doi: str | None) -> str | None:
-    """DOI du nœud : `attributes.doi`, à défaut celui de sa ligne de `staging`."""
+    """DOI de la ressource : `attributes.doi`, à défaut celui de sa ligne de `staging`."""
     return clean_doi(as_str(attributes.get("doi"))) or staging_doi
 
 
@@ -225,7 +210,7 @@ def datacite_identifiers(
 def datacite_source_record(
     attributes: Mapping[str, JsonValue], staging_id: int, doi: str, containers: Containers
 ) -> SourceRecordUpsert:
-    """Enregistrement source DataCite d'un nœud, identifié par son DOI."""
+    """Enregistrement source DataCite d'une ressource, identifié par son DOI."""
     title = get_title(attributes)
     publication_year = extract_datacite_publication_year(attributes, max_year=today().year + 1)
     # Garanti par `SourceNormalizer`, qui filtre les enregistrements sources sans titre ou sans année.
@@ -235,7 +220,6 @@ def datacite_source_record(
         source="datacite",
         source_id=doi,
         staging_id=staging_id,
-        doi=doi,
         identifiers=datacite_identifiers(attributes, doi),
         title=title,
         publication_year=publication_year,
@@ -267,9 +251,9 @@ class DataciteNormalizer(SourceNormalizer):
         )
 
     def parse(self, row: StagingRow) -> Document | None:
-        """Les `attributes` du nœud JSON:API, refusés sans DOI."""
+        """Les `attributes` de la ressource JSON:API, refusés sans DOI."""
         attributes = row.raw_data.get("attributes")
-        # Garanti par `SourceNormalizer` : `minimal_metadata` rend (None, None) sinon.
+        # Garanti par `SourceNormalizer` : `minimal_metadata` renvoie (None, None) sinon.
         assert isinstance(attributes, dict)
         return attributes if datacite_doi(attributes, row.doi) else None
 

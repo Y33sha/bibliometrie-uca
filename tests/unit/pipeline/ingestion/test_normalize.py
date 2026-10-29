@@ -1,12 +1,12 @@
 """Tests unitaires de `pipeline.ingestion.common.normalizer.SourceNormalizer`.
 
-Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur les métadonnées minimales, et la template method `run()` et ses chemins :
-- `total == 0` (rien à faire)
-- happy path (success / skip / error mélangés, batch commit, summary)
-- exception dans `process_work` (log de l'échec + rollback au SAVEPOINT)
-- `KeyboardInterrupt` (rollback du batch en cours + re-raise pour arrêt propre)
-- exception fatale en dehors de la boucle (rollback + relève)
-- `_iter_rows` mode `FETCH_SUB_BATCH` (chargement par sous-lots)
+Couvre la séquence d'écriture `normalize_record`, le tri de `process_work` sur les métadonnées minimales, et la méthode `run()` :
+- aucun document en attente ;
+- succès, documents ignorés et erreurs mêlés, commit par lot, bilan ;
+- exception dans `process_work` (journalisation, rollback au SAVEPOINT) ;
+- `KeyboardInterrupt` (rollback du lot en cours, exception relevée) ;
+- exception fatale hors de la boucle (rollback, exception relevée) ;
+- chargement par sous-lots (`FETCH_SUB_BATCH`).
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def _stores(staging) -> dict[str, Any]:
 
 
 class _StubNorm(SourceNormalizer):
-    """Normalizer dont l'analyse d'une ligne est sans objet pour le test."""
+    """Normaliseur dont l'analyse d'une ligne est sans objet pour le test."""
 
     SOURCE = "test"
 
@@ -101,7 +101,7 @@ class _StubNorm(SourceNormalizer):
 
 
 class _Norm(_StubNorm):
-    """Normalizer instrumenté pour pinguer `run()`."""
+    """Normaliseur instrumenté pour observer `run()`."""
 
     SOURCE = "test"
     DEFAULT_BATCH_SIZE = 2
@@ -124,7 +124,7 @@ class _Norm(_StubNorm):
         self.processed_rows.append(row)
         if row.source_id in self.raises_on:
             raise RuntimeError(f"boom on {row.source_id}")
-        # Retourne le résultat indexé par position (True/None/False).
+        # Renvoie le résultat de même position dans `results` (True, None ou False).
         idx = len(self.processed_rows) - 1
         if idx < len(self.results):
             return self.results[idx]
@@ -137,9 +137,6 @@ class _Norm(_StubNorm):
         self.cleanup_called = True
 
 
-# ── total == 0 ────────────────────────────────────────────────────
-
-
 class TestRunNoWork:
     def test_nothing_to_do(self, caplog):
         """Une source sans document en attente se tait : la barre des autres reste lisible."""
@@ -148,12 +145,9 @@ class TestRunNoWork:
         norm = _Norm(staging)
         with caplog.at_level(logging.INFO):
             norm.run()
-        # Pas de preload sur total=0 (sortie avant).
+        # Sans document en attente, le préchargement des caches est sauté.
         assert norm.preload_called is False
         assert caplog.text == ""
-
-
-# ── Happy path ────────────────────────────────────────────────────
 
 
 class TestRunHappyPath:
@@ -198,7 +192,7 @@ class TestRunHappyPath:
         assert norm.conn.commit.call_count == 3
 
     def test_un_run_sans_erreur_se_tait(self, caplog):
-        """La barre porte l'avancement ; le compte des ignorés remonte par les métriques."""
+        """La barre affiche l'avancement ; le compte des documents ignorés passe par les métriques."""
         staging = _FakeStaging()
         staging.count_returns = 2
         staging.pending_rows = [_row("a"), _row("b")]
@@ -209,9 +203,6 @@ class TestRunHappyPath:
         assert stats.skipped == 1
 
 
-# ── Exception dans un work ────────────────────────────────────────
-
-
 class TestRunWorkException:
     def test_savepoint_rollback_continues_batch(self, caplog):
         staging = _FakeStaging()
@@ -220,15 +211,12 @@ class TestRunWorkException:
         norm = _Norm(staging, results=[True, True], raises_on={"a"})
         with caplog.at_level(logging.INFO):
             norm.run()
-        # Le work en échec est loggé par la boucle (les process_work ne loggent pas eux-mêmes).
+        # La boucle journalise le document en échec.
         assert "Erreur sur a" in caplog.text
-        # Le 2e row est quand même traité après le rollback du 1er.
+        # Le deuxième document est traité après le rollback du premier.
         assert "b" in [r.source_id for r in norm.processed_rows]
-        # Une exception n'est pas un document incomplet : elle sort sur-le-champ, avec son motif.
+        # Une exception est journalisée avec son motif, distincte d'un document incomplet.
         assert "métadonnées incomplètes" not in caplog.text
-
-
-# ── KeyboardInterrupt ─────────────────────────────────────────────
 
 
 class TestRunKeyboardInterrupt:
@@ -244,10 +232,7 @@ class TestRunKeyboardInterrupt:
         norm = _Kb(staging, results=[True])
         with caplog.at_level(logging.WARNING), pytest.raises(KeyboardInterrupt):
             norm.run()
-        # Le batch en cours est rollbacké (la transaction est avortée par le Ctrl+C ;
-        # `commit()` lèverait `PendingRollbackError`), et le KeyboardInterrupt est
-        # re-levé pour que `run_pipeline` arrête proprement (les batches committés
-        # restent durables).
+        # Le lot en cours est annulé par un rollback, et le KeyboardInterrupt est relevé pour que `run_pipeline` s'arrête. Les lots commités restent écrits.
         assert "Interruption" in caplog.text
         norm.conn.rollback.assert_called()
 
@@ -267,12 +252,9 @@ class TestRunKeyboardInterrupt:
             _Kb(staging, results=[True]).run()
 
 
-# ── Exception fatale ──────────────────────────────────────────────
-
-
 class TestRunFatalException:
     def test_rollback_and_reraise(self, caplog):
-        """Si `preload_caches` lève (avant la boucle), c'est une erreur fatale : rollback + log + reraise."""
+        """Une exception de `preload_caches`, avant la boucle, est fatale : rollback, journalisation, exception relevée."""
         staging = _FakeStaging()
         staging.count_returns = 1
         staging.pending_rows = [_row("a")]
@@ -288,12 +270,9 @@ class TestRunFatalException:
         assert norm.conn.rollback.called is True  # type: ignore[attr-defined]
 
 
-# ── _iter_rows avec FETCH_SUB_BATCH ───────────────────────────────
-
-
 class TestIterRowsSubBatch:
     def test_loads_by_subbatches(self):
-        """`FETCH_SUB_BATCH=2` → chargement par sous-lots de 2 ids."""
+        """Avec `FETCH_SUB_BATCH=2`, les documents sont chargés par sous-lots de deux identifiants."""
 
         class _SubBatch(_Norm):
             FETCH_SUB_BATCH = 2
@@ -307,11 +286,8 @@ class TestIterRowsSubBatch:
         assert rows == [a, b, c]
 
 
-# ── process_work : métadonnées minimales ─────────────────────────
-
-
 class _MinimalNorm(_StubNorm):
-    """Normalizer qui lit titre et année dans le payload, pour la méthode de gabarit `process_work`."""
+    """Normaliseur qui lit le titre et l'année dans le payload, pour `process_work`."""
 
     def __init__(self, staging: MagicMock) -> None:
         super().__init__(**_stores(staging))
@@ -345,7 +321,7 @@ class TestProcessWorkMinimalMetadata:
         assert norm.normalized == []
 
     def test_enregistrement_source_refuse_par_la_source(self):
-        """`normalize_record` rend False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplet."""
+        """`normalize_record` renvoie False (Crossref sans DOI, HAL sans auteur) : même sort qu'un enregistrement source incomplet."""
         staging = MagicMock()
         norm = _MinimalNorm(staging)
         norm.normalize_record = lambda row: False  # type: ignore[method-assign]
@@ -353,6 +329,18 @@ class TestProcessWorkMinimalMetadata:
         assert norm.process_work(row) is False
         staging.discard_source_record.assert_called_once_with(3)
         staging.mark_done.assert_called_once_with(3)
+
+    def test_enregistrement_source_au_titre_trop_long_ecarte(self):
+        """Régression : OpenAlex donne pour titre de W7223893444 le programme d'un congrès, d'environ 5 000 caractères."""
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        title = "Outcomes of minimally invasive spine surgery. " * 100
+        row = StagingRow(
+            id=4, source_id="W7223893444", doi=None, raw_data={"title": title, "year": 2026}
+        )
+        assert norm.process_work(row) is False
+        staging.discard_source_record.assert_called_once_with(4)
+        assert norm.normalized == []
 
     def test_enregistrement_source_complet_normalise(self):
         staging = MagicMock()
@@ -363,14 +351,10 @@ class TestProcessWorkMinimalMetadata:
         staging.discard_source_record.assert_not_called()
 
 
-# ── normalize_record : séquence d'écriture ───────────────────────
-
-
 _RECORD = SourceRecordUpsert(
     source="test",
     source_id="a",
     staging_id=1,
-    doi=None,
     title="T",
     publication_year=2020,
     raw_doc_type=None,
@@ -389,7 +373,7 @@ _RECORD = SourceRecordUpsert(
 
 
 class _WritingNorm(_StubNorm):
-    """Normalizer dont l'analyse est réglable : document lu, éditeur, conteneurs."""
+    """Normaliseur dont l'analyse est réglable : document lu, éditeur, conteneurs."""
 
     def __init__(
         self,

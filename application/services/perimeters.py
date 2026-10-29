@@ -1,6 +1,6 @@
-"""Service Périmètres — écritures sur l'agrégat Perimeter.
+"""Service des périmètres : écritures sur l'agrégat Perimeter.
 
-Un périmètre a des structures **racines** (`perimeters.root_structure_ids`) ; la clôture récursive de ces racines est matérialisée dans `perimeter_structures`, reconstruite par le pipeline. La création et la mise à jour recalculent cette clôture, que les racines commandent.
+Un périmètre a des structures racines (`perimeters.root_structure_ids`) ; leurs sous-structures sont dans `perimeter_structures`, que le pipeline recalcule. La création et la mise à jour d'un périmètre recalculent cette table.
 """
 
 from application.audit_log import emit_event
@@ -17,7 +17,7 @@ from domain.perimeters.perimeter import Perimeter
 class PerimeterService:
     """Écritures sur les périmètres.
 
-    `delete_perimeter` consulte la table `config` (`ConfigRepository`) pour refuser la suppression d'un périmètre encore référencé par la configuration pipeline.
+    `delete_perimeter` consulte la table `config` (`ConfigRepository`) pour refuser la suppression d'un périmètre que la configuration du pipeline désigne.
     """
 
     def __init__(
@@ -32,7 +32,7 @@ class PerimeterService:
         self._config = config
 
     def create_perimeter(self, *, code: str, name: str, root_structure_ids: list[int]) -> int:
-        """Crée un périmètre avec ses structures racines, puis recalcule la clôture des périmètres. Retourne l'id créé.
+        """Crée un périmètre avec ses structures racines, puis recalcule les structures des périmètres. Renvoie son id.
 
         Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
         """
@@ -54,7 +54,7 @@ class PerimeterService:
         return perimeter_id
 
     def update_perimeter(self, perimeter_id: int, update: PerimeterUpdate) -> None:
-        """Charge le périmètre, applique les champs explicitement fournis (validés), persiste, puis recalcule la clôture des périmètres.
+        """Charge le périmètre, applique les champs fournis, validés, l'écrit, puis recalcule les structures des périmètres.
 
         L'événement d'audit contient seulement les champs soumis.
 
@@ -85,9 +85,9 @@ class PerimeterService:
         )
 
     def delete_perimeter(self, perimeter_id: int) -> None:
-        """Supprime un périmètre. Ses lignes de clôture partent en cascade (FK `ON DELETE CASCADE`).
+        """Supprime un périmètre. Ses lignes de `perimeter_structures` partent en cascade.
 
-        Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` s'il est référencé par la configuration pipeline — le message donne alors la liste des clés qui le référencent.
+        Lève `NotFoundError` si le périmètre n'existe pas, `ConflictError` si la configuration du pipeline le désigne : le message liste les clés concernées.
         """
         code = self._perimeters.get_perimeter_code(perimeter_id)
         if code is None:

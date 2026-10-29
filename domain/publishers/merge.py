@@ -1,6 +1,6 @@
 """Revues homonymes de deux éditeurs à fusionner.
 
-La fusion de deux éditeurs fusionne aussi leurs revues de même titre normalisé. Certaines paires de revues bloquent la fusion des éditeurs : l'utilisatrice les traite d'abord dans l'administration des revues.
+La fusion de deux éditeurs fusionne aussi leurs revues de même titre normalisé. Certaines paires de revues bloquent la fusion des éditeurs : elles se traitent d'abord dans l'administration des revues.
 """
 
 from collections import Counter
@@ -28,7 +28,7 @@ def split_shared_title_pairs(
 ) -> tuple[list[SharedTitlePair], list[BlockingSerial]]:
     """Sépare les paires fusionnables des paires qui bloquent la fusion des éditeurs.
 
-    Une paire bloque dans deux cas. Ses ISSN se contredisent (`issn_conflict`). Ou l'une de ses revues figure dans une autre paire : son éditeur contient alors deux revues de même titre normalisé, doublon à résoudre avant la fusion.
+    Une paire bloque dans deux cas. Ses ISSN se contredisent (`issn_conflict`). Ou l'une de ses revues figure dans une autre paire : l'autre éditeur contient alors deux revues de même titre normalisé, doublon à résoudre avant la fusion.
     """
     target_seen = Counter(pair.target_serial_id for pair in pairs)
     source_seen = Counter(pair.source_serial_id for pair in pairs)
@@ -37,9 +37,9 @@ def split_shared_title_pairs(
     for pair in pairs:
         reasons: list[str] = []
         if target_seen[pair.target_serial_id] > 1:
-            reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
-        if source_seen[pair.source_serial_id] > 1:
             reasons.append("doublon interne dans l'éditeur source (titre dédupliqué)")
+        if source_seen[pair.source_serial_id] > 1:
+            reasons.append("doublon interne dans l'éditeur cible (titre dédupliqué)")
         if conflict := issn_conflict(pair.target_issns, pair.source_issns):
             reasons.append(f"{conflict} (cible / source)")
         if reasons:

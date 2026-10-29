@@ -48,13 +48,11 @@
     ...referencedBy.filter((s) => !sourceOrder().includes(s.source)),
   ]);
 
-  // Les formes secondaires convergées (pièces d'un jeu de données, versions, variantes) sont repliées : un jeu de données rattachant chacun de ses fichiers en aligne des dizaines.
   // L'enregistrement source theses mène à la même fiche theses.fr que le NNT, identifiant de la thèse : seul le NNT est listé quand il existe.
   const hasNnt = $derived(externalIds.some((e) => e.type === "nnt"));
-  const primarySources = $derived(
-    orderedSources.filter((s) => !s.is_secondary && !(hasNnt && s.source === "theses")),
+  const listedSources = $derived(
+    orderedSources.filter((s) => !(hasNnt && s.source === "theses")),
   );
-  const secondarySources = $derived(orderedSources.filter((s) => s.is_secondary));
 
   const accessState = $derived(accessTag(pub.oa_status));
 
@@ -133,7 +131,7 @@
     <div class="sidebar-block">
       <h2 class="sidebar-title">Référencé dans</h2>
       <div class="sidebar-sources">
-        {#each primarySources as s (s.source + s.source_id)}
+        {#each listedSources as s (s.source + s.source_id)}
           {@render sourceRow(s)}
         {/each}
         {#each externalIds as e (e.type + e.value)}
@@ -153,16 +151,6 @@
           </a>
         {/each}
       </div>
-      {#if secondarySources.length}
-        <details class="folded">
-          <summary>{secondarySources.length} sources secondaires (pièces, versions)</summary>
-          <div class="sidebar-sources">
-            {#each secondarySources as s (s.source + s.source_id)}
-              {@render sourceRow(s)}
-            {/each}
-          </div>
-        </details>
-      {/if}
     </div>
   {/if}
 </aside>

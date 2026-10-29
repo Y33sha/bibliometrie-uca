@@ -1,9 +1,6 @@
-"""Garde-fous sur la conformité de la recherche par DOI dans Crossref au polite pool.
+"""Conformité de la recherche par DOI dans Crossref aux limites du polite pool.
 
-Le polite pool Crossref autorise 10 req/s et 3 requêtes simultanées au plus.
-Dépasser l'un ou l'autre déclenche des 429 immédiats (max_concurrent=5 en
-produisait dès la première vague). Ces tests verrouillent le budget de débit
-et la concurrence de la recherche.
+Le polite pool Crossref autorise au plus 10 requêtes par seconde et 3 requêtes simultanées. Au-delà, Crossref répond 429.
 """
 
 from pipeline.ingestion.api_params import MAX_PER_SECOND

@@ -53,7 +53,7 @@ class TableSpec(_TableExportee, total=False):
 
 @dataclass(frozen=True)
 class SeedSpec:
-    """Seed à produire : description en tête de fichier, tables dans l'ordre d'insertion (respect des FK), fichier par défaut."""
+    """Seed à produire : description en tête de fichier, tables dans l'ordre d'insertion (celui des clés étrangères), fichier par défaut."""
 
     description: str
     tables: tuple[TableSpec, ...]
@@ -119,10 +119,7 @@ def row_key(table: SeedTable, key: Sequence[str] | None = None) -> list[str]:
 
 
 def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
-    """Échappe une valeur pour insertion SQL.
-
-    Si is_jsonb=True, la valeur est sérialisée en JSON valide (nécessaire pour les colonnes JSONB de PostgreSQL).
-    """
+    """Échappe une valeur pour une insertion SQL ; une valeur de colonne JSONB devient du JSON valide."""
     if value is None:
         return "NULL"
     if is_jsonb:
@@ -202,7 +199,7 @@ def render_seed(description: str, output_path: Path, sections: Sequence[SeedSect
             )
             lines.append(f"INSERT INTO {table} ({col_list}) VALUES ({values}){upsert};")
 
-        # Recaler les séquences pour les tables avec id serial
+        # Recalage des séquences des tables à id serial.
         if "id" in columns:
             lines.append(
                 f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), "

@@ -132,7 +132,7 @@ def test_chapitre_sans_titre_ni_isbn_sans_volume():
 
 
 def test_un_isbn_dans_le_champ_issn_est_rejete():
-    """Cas réel : HAL et ScanR portent l'ISBN des actes « Processing HRI 2017 » dans le champ ISSN."""
+    """Cas réel : HAL et scanR donnent l'ISBN des actes « Processing HRI 2017 » dans le champ ISSN."""
     description = _describe(
         raw_doc_type="journal-article", journal_title="Processing HRI 2017", issn="9781450348850"
     )

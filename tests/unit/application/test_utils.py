@@ -1,4 +1,4 @@
-"""Tests unitaires — fonctions pures, sans base de données."""
+"""Normalisation de texte, nettoyage de DOI, découpage et comparaison de noms d'auteurs."""
 
 import pytest
 
@@ -8,8 +8,6 @@ from domain.persons.name_matching import (
     parse_raw_author_name,
 )
 from domain.publications.identifiers import clean_doi
-
-# ── normalize_text ──
 
 
 class TestNormalizeName:
@@ -37,20 +35,15 @@ class TestNormalizeName:
         assert normalize_text("  Jean   Dupont  ") == "jean dupont"
 
     def test_unicode_hyphen(self):
-        """Les tirets Unicode (U+2010, U+2013, etc.) doivent être traités
-        comme le tiret ASCII — sinon les mots sont collés et les formes
-        de nom divergent (bug doublons Abeywickrama‐Samarakoon)."""
+        """Les tirets Unicode (U+2010, U+2013) séparent les mots comme le tiret ASCII : les trois graphies d'un nom composé donnent la même forme."""
         assert normalize_text("Abeywickrama\u2010Samarakoon") == "abeywickrama samarakoon"
         assert normalize_text("Abeywickrama\u2013Samarakoon") == "abeywickrama samarakoon"
         assert normalize_text("Abeywickrama-Samarakoon") == "abeywickrama samarakoon"
 
     def test_unicode_apostrophe(self):
-        """Les apostrophes typographiques doivent être traitées comme l'apostrophe ASCII."""
+        """L'apostrophe typographique sépare les mots comme l'apostrophe ASCII."""
         assert normalize_text("O\u2019Brien") == "o brien"
         assert normalize_text("O'Brien") == "o brien"
-
-
-# ── clean_doi ──
 
 
 class TestCleanDoi:
@@ -79,11 +72,8 @@ class TestCleanDoi:
         assert clean_doi("10.36227/techrxiv.19754971.v2") == "10.36227/techrxiv.19754971"
 
     def test_no_false_positive_on_v_in_doi(self):
-        """Un .v suivi de non-chiffre ne doit pas être strippé."""
+        """Un `.v` suivi d'autre chose qu'un chiffre est conservé."""
         assert clean_doi("10.1234/journal.v12.issue3") == "10.1234/journal.v12.issue3"
-
-
-# ── parse_raw_author_name ──
 
 
 class TestParseRawAuthorName:
@@ -94,7 +84,6 @@ class TestParseRawAuthorName:
         assert parse_raw_author_name("Martin, Jean-Luc, Jr.") == ("Martin", "Jean-Luc, Jr.")
 
     def test_space_format(self):
-        # "Jean Dupont" → last=Dupont, first=Jean
         assert parse_raw_author_name("Jean Dupont") == ("Dupont", "Jean")
 
     def test_multiple_first_names(self):
@@ -143,9 +132,6 @@ class TestParseRawAuthorName:
         assert parse_raw_author_name("") == ("", "")
 
 
-# ── names_compatible ──
-
-
 class TestNamesCompatible:
     def test_identical(self):
         assert names_compatible("dupont", "jean", "dupont", "jean") is True
@@ -160,7 +146,7 @@ class TestNamesCompatible:
         assert names_compatible("dupont", "jean", "dupont", "pierre") is False
 
     def test_inverted(self):
-        # Inversion nom/prénom (les tokens sont mis en commun).
+        # Nom et prénom inversés : les tokens des deux champs sont comparés ensemble.
         assert names_compatible("jean", "dupont", "dupont", "jean") is True
 
     def test_composite_last_name_reordered(self):
@@ -176,11 +162,9 @@ class TestNamesCompatible:
         assert names_compatible("bailly", "j l", "bailly", "jean luc") is True
 
     def test_surname_only_is_compatible(self):
-        # Contribution source réduite au nom de famille : compatible avec un nom complet — le
-        # sous-ensemble de tokens matche. Évite de rejeter une contribution source trop pauvre
-        # pour être comparée sur le prénom.
+        # Contribution source réduite au nom de famille : ses tokens sont un sous-ensemble du nom complet, donc compatibles.
         assert names_compatible("dupont", "", "dupont", "jean") is True
 
     def test_digits_ignored(self):
-        # Les chiffres (années de naissance type SUDOC) sont retirés avant comparaison.
+        # Les chiffres (année de naissance du Sudoc) sont retirés avant la comparaison.
         assert names_compatible("chiari", "sophie 1977", "chiari lasserre", "sophie") is True

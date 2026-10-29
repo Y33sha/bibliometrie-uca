@@ -22,7 +22,7 @@ class TestMapRole:
         assert map_role("scanr", "presenter") == (["author", "speaker"], False)
 
     def test_contributeur_est_aussi_auteur(self):
-        """Un contributeur HAL ou scanR figure dans la liste d'auteurs, à sa place."""
+        """Un contributeur HAL ou scanR (`ctb`) figure dans la liste d'auteurs, à sa place ; un conseiller scientifique HAL (`sad`) est seulement contributeur."""
         assert map_role("hal", "ctb") == (["author", "contributor"], False)
         assert map_role("scanr", "ctb") == (["author", "contributor"], False)
         assert map_role("hal", "sad") == (["contributor"], False)
@@ -60,13 +60,13 @@ class TestMergeRoles:
         assert result == sorted(result)
 
     def test_drops_jury_member_when_specific_role_present(self):
-        """Si thesis_director/rapporteur/jury_president → jury_member redondant."""
+        """Un rôle de jury spécifique (directeur de thèse, rapporteur, président du jury) absorbe `jury_member`."""
         assert "jury_member" not in merge_roles([["thesis_director", "jury_member"]])
         assert "jury_member" not in merge_roles([["rapporteur", "jury_member"]])
         assert "jury_member" not in merge_roles([["jury_president", "jury_member"]])
 
     def test_keeps_jury_member_alone(self):
-        """Sans rôle spécifique, jury_member est conservé."""
+        """Sans rôle de jury spécifique, `jury_member` est conservé."""
         assert merge_roles([["jury_member"]]) == ["jury_member"]
 
     def test_empty(self):

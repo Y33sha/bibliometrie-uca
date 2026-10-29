@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=ENV_FILES,
         env_file_encoding="utf-8",
-        extra="ignore",  # ignore les env vars non déclarées (POSTGRES_*, FORWARDED_ALLOW_IPS, etc.)
+        extra="ignore",  # Les variables d'environnement non déclarées (POSTGRES_*, FORWARDED_ALLOW_IPS…) sont ignorées.
         case_sensitive=False,
     )
 

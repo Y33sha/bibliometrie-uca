@@ -1,8 +1,6 @@
 """Détection du pays d'une adresse par **nom de lieu** : candidats `institution` et `city`.
 
-Cherche dans tout le texte normalisé des adresses en file (`address_candidates_queue`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée.
-
-Le commit est laissé au caller.
+Cherche dans tout le texte normalisé des adresses en file (`address_candidates_queue`) les noms d'institutions et de villes connus (`place_name_forms`), chacun rattaché à un pays, via un automate Aho-Corasick (`PlaceNameDetector`) par nature de lieu. Chaque pays trouvé devient un candidat du moyen de même nature : des lieux de pays différents donnent plusieurs candidats. Les candidats de ces deux moyens sont recalculés en entier pour chaque adresse traitée. L'appelant commite.
 """
 
 import logging

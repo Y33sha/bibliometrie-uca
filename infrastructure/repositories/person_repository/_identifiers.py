@@ -155,7 +155,7 @@ def propagate_status_to_hal_accounts(conn: Connection, ident_id: int, status: st
     ).rowcount
 
 
-# Contribution de la personne rattachée par un identifiant rejeté : son mode de résolution est le type de l'identifiant, et l'une de ses contributions sources porte la valeur.
+# Contribution de la personne rattachée par un identifiant rejeté : son mode de résolution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur.
 _MARK_CONTRIBUTIONS_OF_REJECTED_IDENTIFIERS_SQL = text(
     enqueue_sql(
         Queue.CONTRIBUTION_RESOLUTION,

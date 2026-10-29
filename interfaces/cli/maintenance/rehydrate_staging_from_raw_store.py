@@ -1,19 +1,19 @@
 # STATUS: maintenance
-"""Réhydrate `staging.raw_data` depuis le raw store, pour renormaliser une source.
+"""Réhydrate `staging.raw_data` depuis le raw store, pour normaliser de nouveau une source.
 
-Opération inverse de `StagingStore.mark_done` (`pipeline/ingestion/common/staging.py`), qui archive le payload au raw store puis vide `staging.raw_data` (`= '{}'`) et pose `processed = TRUE`. Une fois une source normalisée, son payload brut ne subsiste qu'au raw store ; ce script le réinjecte en base pour rejouer la normalisation.
+Opération inverse de `StagingStore.mark_done` (`pipeline/ingestion/common/staging.py`), qui archive le payload au raw store, vide `staging.raw_data` et marque la ligne traitée. Une source normalisée garde son payload brut seulement dans le raw store ; ce script le remet en base pour rejouer la normalisation.
 
-Pour chaque source demandée, parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data = <payload>`, `raw_hash` recalculé via `change_detection_hash` (même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant), `processed = FALSE`.
+Pour chaque source demandée, le script parcourt les clés du raw store (`data/raw_store/{source}/{source_id}.json.gz`), lit chaque payload et réhydrate la ligne `(source, source_id)` : `raw_data` reçoit le payload, `raw_hash` son empreinte (`change_detection_hash`, celle du moissonnage), et la ligne repasse à normaliser.
 
 Deux modes :
 
-- défaut : ne met à jour que les lignes `staging` déjà présentes. Une clé du store sans ligne correspondante est comptée comme orpheline et signalée.
-- `--full` : réinsère aussi les orphelins (cas d'un `TRUNCATE staging`, où tout est orphelin par définition). Le `source_id` est la clé du store et le `doi` est ré-extrait du payload par la logique propre à chaque source. Les drapeaux de provenance non reconstructibles depuis le seul payload (`entry_mode`, `authors_truncated`) reprennent leur défaut et se recalculent au prochain extract bulk réel.
+- par défaut, seules les lignes `staging` présentes sont mises à jour ; une clé du store sans ligne est comptée comme orpheline et signalée ;
+- `--full` réinsère aussi les orphelines, par exemple après un `TRUNCATE staging`. Le `source_id` est la clé du store, et le DOI se relit dans le payload par l'adaptateur de la source. La provenance (`entry_mode`) et le marqueur de troncature (`authors_truncated`), que le payload seul ne donne pas, reprennent leur défaut et se recalculent au moissonnage suivant.
 
-Ne lance PAS la normalisation : une fois réhydraté, relancer le pipeline depuis la normalisation (qui réenchaîne toutes les phases aval) :
+La normalisation se lance ensuite, avec les phases qui la suivent :
     run_pipeline --from normalize --sources <sources>
 
-`--doi-prefix` limite une source DOI-native (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite ces seuls documents.
+`--doi-prefix` limite une source dont l'identifiant natif est le DOI (crossref, datacite) aux DOI d'un préfixe. `--id-prefix` limite toute source aux identifiants d'un préfixe. La normalisation traite ensuite ces seuls documents.
 
 Usage :
     python -m interfaces.cli.maintenance.rehydrate_staging_from_raw_store \
@@ -71,10 +71,7 @@ _REHYDRATE_UPSERT_SQL = text(
 def rehydrate_staging_row(
     conn: Connection, source: str, source_id: str, raw_data: Mapping[str, JsonValue]
 ) -> bool:
-    """Réinjecte un payload archivé dans une ligne `staging` existante, prête à renormaliser.
-
-    Inverse de `mark_done` : repose `raw_data`, recalcule `raw_hash` (`change_detection_hash`, même empreinte que l'UPSERT d'extraction, pour qu'une ligne réhydratée ne re-diverge pas au moissonnage suivant) et remet `processed = FALSE`. Ne touche que les lignes déjà présentes : retourne `False` si `(source, source_id)` est absent (clé orpheline au raw store).
-    """
+    """Remet un payload archivé dans une ligne `staging` existante, prête à normaliser : `raw_data`, `raw_hash` (`change_detection_hash`) et état à traiter. Renvoie faux si la ligne est absente (clé orpheline du raw store)."""
     return (
         conn.execute(
             _REHYDRATE_UPDATE_SQL,
@@ -98,7 +95,7 @@ def rehydrate_or_create_staging_row(
 ) -> bool:
     """Réhydrate une ligne `staging`, en la créant si elle manque (après un `TRUNCATE staging`, où tout est orphelin).
 
-    Upsert : réinsère les clés orphelines et écrase inconditionnellement les existantes. `doi` n'est posé qu'à l'insertion — une ligne préexistante garde son `doi` d'origine. Retourne `True` si la ligne vient d'être insérée, `False` si elle existait et a été mise à jour.
+    Réinsère les clés orphelines et écrase les lignes existantes. Le DOI se pose seulement à l'insertion : une ligne existante garde le sien. Renvoie vrai pour une ligne insérée, faux pour une ligne mise à jour.
     """
     return bool(
         conn.execute(
@@ -120,7 +117,7 @@ def _doi_for(source: str, raw_data: Mapping[str, JsonValue]) -> str | None:
     return identity.doi if identity else None
 
 
-# Sources dont l'identifiant natif est le DOI : leur clé d'archive porte un préfixe de DOI.
+# Sources dont l'identifiant natif est le DOI : leur clé d'archive commence par un préfixe de DOI.
 _DOI_NATIVE_SOURCES = frozenset({"crossref", "datacite"})
 
 

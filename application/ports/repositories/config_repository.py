@@ -1,6 +1,6 @@
-"""Port ConfigRepository — écritures sur la table `config` (paramètres applicatifs clé/valeur), et les lectures qui les conditionnent.
+"""Port ConfigRepository : écritures sur la table `config` (paramètres applicatifs), et lectures qui les conditionnent, pour l'administration.
 
-Sert l'admin qui édite les paramètres. Les lookups par clé du pipeline vivent dans `pipeline/runtime/config.py`, hors de ce port.
+Les lectures par clé du pipeline vivent dans `pipeline/runtime/config.py`.
 """
 
 from typing import Protocol
@@ -16,5 +16,5 @@ class ConfigRepository(Protocol):
         ...
 
     def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:
-        """Met à jour la valeur d'un paramètre. Retourne la ligne `{key, value, description}`, ou `None` si la clé n'existe pas."""
+        """Met à jour la valeur d'un paramètre. Renvoie la ligne `{key, value, description}`, ou `None` si la clé n'existe pas."""
         ...

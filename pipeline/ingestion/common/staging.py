@@ -47,20 +47,20 @@ _UPSERT_STAGING_SQL = text(
             ELSE staging.raw_data
         END,
         raw_hash = COALESCE(EXCLUDED.raw_hash, staging.raw_hash),
-        -- Renseigne le DOI quand la ligne existait sans (doc moissonné avant que la source ne porte le DOI) ; ne clobbe jamais un DOI déjà posé.
+        -- Renseigne le DOI d'une ligne qui en est dépourvue ; un DOI déjà posé reste.
         doi = COALESCE(staging.doi, EXCLUDED.doi),
         processed = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN FALSE
             ELSE staging.processed
         END,
-        -- Suit `raw_hash` comme `processed` : un payload bulk inchangé n'écrase pas le flag (préserve l'effacement posé par fetch_truncated) ; un payload modifié le recalcule depuis le nouveau contenu.
+        -- Suit `raw_hash`, comme `processed` : un payload inchangé garde le marqueur, y compris son effacement par `fetch_truncated` ; un payload modifié le recalcule.
         authors_truncated = CASE
             WHEN staging.raw_hash IS DISTINCT FROM EXCLUDED.raw_hash
                 THEN EXCLUDED.authors_truncated
             ELSE staging.authors_truncated
         END,
-        -- `entry_mode` n'est PAS réécrit : il garde la provenance de première création.
+        -- `entry_mode` garde la provenance de la création.
         -- Un document rendu par sa source efface le marqueur de disparition.
         disappeared_at = NULL,
         last_seen_at = now()
@@ -71,11 +71,11 @@ _UPSERT_STAGING_SQL = text(
 
 
 class UpsertOutcome(StrEnum):
-    """Issue de l'UPSERT d'une ligne `staging` unique, dérivée des signaux `(inserted, changed)` du helper canonique.
+    """Issue de l'écriture d'une ligne de `staging`.
 
-    - `NEW` : vraie insertion (`RETURNING (xmax = 0)`).
-    - `UPDATED` : ligne existante dont le **contenu a changé** (`raw_data` réécrit, `raw_hash` distinct de celui en base).
-    - `UNCHANGED` : ligne re-vue à contenu identique (seul `last_seen_at` bumpé).
+    - `NEW` : ligne insérée ;
+    - `UPDATED` : ligne existante au contenu changé, réécrite ;
+    - `UNCHANGED` : ligne revue au contenu identique, dont seule la date de dernière lecture change.
     """
 
     NEW = "new"
@@ -84,7 +84,7 @@ class UpsertOutcome(StrEnum):
 
     @classmethod
     def of(cls, *, inserted: bool, changed: bool) -> UpsertOutcome:
-        """Classe le résultat d'`StagingStore.upsert` : `inserted` prime, le `changed` d'une insertion étant sans objet."""
+        """Classe le résultat de `StagingStore.upsert`. Une insertion prime : son changement de contenu est sans objet."""
         if inserted:
             return cls.NEW
         return cls.UPDATED if changed else cls.UNCHANGED
@@ -134,7 +134,7 @@ _CLEAR_TRUNCATED_SQL = text(
 class StagingStore:
     """Écritures des documents rendus par les sources, lectures et marquages de `staging` par la normalisation.
 
-    `raw_store` (défaut : `get_raw_store()`, lu au premier `mark_done`) reçoit chaque payload `raw_data` juste avant sa vidange par `mark_done` (archivage hors base).
+    Le raw store reçoit chaque payload juste avant que `mark_done` le vide de la base. Par défaut, c'est celui de `get_raw_store()`, lu au premier `mark_done`.
     """
 
     def __init__(self, conn: Connection, raw_store: RawStore | None = None) -> None:
@@ -151,7 +151,7 @@ class StagingStore:
     ) -> UpsertOutcome | None:
         """Écrit un document de `source`, identifié par l'adaptateur de la source, et efface les recherches infructueuses que le document dément.
 
-        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Rend `None` pour un document sans identifiant, qui n'est pas écrit.
+        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Renvoie `None`, sans rien écrire, pour un document sans identifiant.
         """
         adapter = ADAPTERS[Source(source)]
         identity = adapter.identify(record)
@@ -180,7 +180,7 @@ class StagingStore:
     ) -> UpsertOutcome | None:
         """Réécrit un document marqué tronqué par sa version complète, sans recalculer son empreinte.
 
-        Tant que le moissonnage rend le même document tronqué, son empreinte égale celle en base, et l'écriture laisse la version complète en place. Rend `UPDATED`, ou `None` pour un document sans identifiant.
+        Tant que le moissonnage renvoie le même document tronqué, son empreinte égale celle en base, et l'écriture laisse la version complète en place. Renvoie `UPDATED`, ou `None` pour un document sans identifiant.
         """
         identity = ADAPTERS[Source(source)].identify(record)
         if identity is None:
@@ -205,15 +205,13 @@ class StagingStore:
         authors_truncated: bool = False,
         entry_mode: StagingEntryMode = StagingEntryMode.BULK,
     ) -> tuple[bool, bool]:
-        """UPSERT d'une ligne `staging`, sous `stage` et pour les imports qui identifient eux-mêmes leurs lignes.
+        """Écrit une ligne de `staging`, pour `stage` et pour les imports qui identifient eux-mêmes leurs lignes. L'appelant commite.
 
-        `INSERT … ON CONFLICT (source, source_id) DO UPDATE` piloté par `raw_hash` : réécrit `raw_data` (et repasse `processed=FALSE`) seulement si le hash a changé, met toujours à jour `last_seen_at`, et renseigne `doi` s'il manquait (jamais d'écrasement). Un `raw_hash=null` en base force le re-import (`NULL IS DISTINCT FROM <hash>`). Le hash est calculé via `change_detection_hash`, qui neutralise le bruit volatil propre à la source avant l'empreinte (le payload stocké reste, lui, fidèle).
+        Le contenu se réécrit, et la ligne repasse à normaliser, seulement si l'empreinte change (`change_detection_hash`). Une empreinte nulle en base force la réécriture. La date de dernière lecture change toujours. Un DOI manquant se renseigne, un DOI présent reste.
 
-        `authors_truncated` (OpenAlex : payload bulk plafonné à 100 auteurs) suit la même logique que `processed` — (re)posé seulement quand le hash change, sinon préservé (n'écrase pas l'effacement de `fetch_truncated`). Les sources non plafonnées laissent le défaut `False`.
+        Le marqueur de troncature des auteurs suit la même règle : il se pose seulement quand l'empreinte change, et garde sinon son effacement par `fetch_truncated`. La provenance (`entry_mode`) se pose à la création seulement.
 
-        `entry_mode` (`StagingEntryMode`) enregistre comment la ligne est **entrée**. Posé à la création, jamais réécrit.
-
-        Retourne `(inserted, changed)` : `inserted` = vraie insertion (`xmax = 0`), `changed` = contenu réécrit (hash distinct de celui déjà en base). Le commit est à la charge de l'appelant.
+        Renvoie `(inserted, changed)` : ligne insérée, contenu réécrit.
         """
         row = self._conn.execute(
             _UPSERT_STAGING_SQL,
@@ -277,9 +275,9 @@ class StagingStore:
         delete_source_record_of_staging(self._conn, staging_id)
 
     def mark_done(self, staging_id: int) -> None:
-        # `old` capture le payload avant vidange ; l'archivage au raw store est best-effort (un échec ne casse pas la normalisation, la base reste la source de vérité).
+        # `old` capture le payload avant de le vider. L'archivage au raw store se fait au mieux : un échec laisse la normalisation continuer, et la base reste la référence.
         row = self._conn.execute(_MARK_DONE_SQL, {"sid": staging_id}).one_or_none()
-        if row is None or not row.raw_data:  # `{}` (stub not-found) → rien à archiver
+        if row is None or not row.raw_data:  # payload vide : rien à archiver
             return
         if self._raw_store is None:
             self._raw_store = get_raw_store()

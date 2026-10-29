@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Supprime les payloads orphelins d'un raw store : fichiers dont le `source_id` est absent de `staging`.
 
-Le raw store ne fait que croître — `mark_done` n'y écrit que des `put`, aucune suppression. Au fil des re-imports, changements d'identifiants et purges de staging, des payloads y subsistent sans ligne `staging` correspondante. Ce script confronte chaque clé du store au set des `source_id` présents en staging (par source) et supprime celles absentes. La base reste la source de vérité : un payload supprimé du store est ré-archivé au prochain passage de normalisation s'il revient en staging.
+Le raw store grossit seulement : `mark_done` y écrit sans jamais supprimer. Au fil des imports, des changements d'identifiants et des purges de `staging`, des payloads y restent sans ligne `staging`. Le script confronte chaque clé du store aux `source_id` de `staging`, source par source, et supprime les clés absentes. La base reste la référence : un payload supprimé du store est archivé de nouveau à la prochaine normalisation, s'il revient dans `staging`.
 
 Le store élagué est celui de la configuration (`BIBLIO_RAW_STORE_DIR`). `--root` en désigne un autre, par exemple une copie hors ligne.
 
@@ -26,7 +26,7 @@ log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 
 
 def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
-    """Set des `source_id` déjà présents en staging pour une source."""
+    """`source_id` présents dans `staging` pour une source."""
     rows: ScalarResult[str] = conn.execute(
         text("SELECT source_id FROM staging WHERE source = :source"),
         {"source": source},

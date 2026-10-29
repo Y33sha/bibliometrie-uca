@@ -32,9 +32,7 @@ def auth_login(
 
     Renvoie 401 si les identifiants ne correspondent pas à ceux configurés côté serveur (`ADMIN_USER` et `ADMIN_HASH`) ou si `ADMIN_USER` est absent de `ops.users`, 429 au-delà du plafond de tentatives par IP (`login_rate_limit`). Sur succès, un cookie `session` (httponly, samesite=strict, durée `SESSION_MAX_AGE`) est posé et autorise les écritures, que le middleware garde.
     """
-    # Les deux confrontations sont évaluées quel que soit le sort de la première : la
-    # vérification du mot de passe coûte quelques centaines de millisecondes, sa comparaison
-    # une fraction de microseconde, et un refus immédiat désignerait un nom inconnu.
+    # Les deux confrontations s'évaluent quel que soit le sort de la première : la vérification du mot de passe coûte quelques centaines de millisecondes, la comparaison du nom une fraction de microseconde, et un refus immédiat désignerait un nom inconnu.
     nom_correspond = check_username(data.username)
     mot_de_passe_correspond = check_password(data.password)
     if not (nom_correspond and mot_de_passe_correspond):

@@ -31,7 +31,7 @@ def _author(last="dupont", first="jean", orcid="", idref="", gap=0):
 
 
 def _source_record(source_record, names, start=0):
-    """Contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (patronyme, prénom)."""
+    """Contributions sources d'un enregistrement source, numérotées `source_record * 100 + position`, à partir de couples (nom de famille, prénom)."""
     return [
         SourceContribution(source_record * 100 + pos, source_record, pos, last, first)
         for pos, (last, first) in enumerate(names, start)
@@ -86,7 +86,7 @@ class TestAlignPublication:
         )
 
     def test_une_paire_seule_dans_un_trou_se_lie_dans_l_ordre(self):
-        """« Ahmad T » n'est unique ni par le patronyme ni par l'initiale, à cause de « Ahmad Tahania » plus loin ; seul de sa clé dans son trou, il se lie par l'ordre."""
+        """« Ahmad T » n'est unique ni par le nom de famille ni par l'initiale, à cause de « Ahmad Tahania » plus loin ; seul de sa clé dans son trou, il se lie par l'ordre."""
         reference = _source_record(
             1,
             [
@@ -142,7 +142,7 @@ class TestAlignPublication:
         )
 
     def test_un_lien_qui_croise_l_ordre_est_ecarte(self):
-        """Patronyme unique à l'autre bout de la liste : sans filtre d'ordre, « Ferrer » serait lié à « Ferrer » malgré les auteurs liés entre eux."""
+        """Nom de famille unique à l'autre bout de la liste : sans filtre d'ordre, « Ferrer » serait lié à « Ferrer » malgré les auteurs liés entre eux."""
         reference = [("martin", "a"), ("petit", "b"), ("durand", "c"), ("ferrer", "j")]
         other = [("ferrer", "a"), ("martin", "a"), ("petit", "b"), ("durand", "c")]
         source_records = {1: _source_record(1, reference), 2: _source_record(2, other)}
@@ -151,7 +151,7 @@ class TestAlignPublication:
         )
 
     def test_un_patronyme_rendu_unique_par_un_lien_se_lie_au_second_passage(self):
-        """Deux « Martin » de chaque côté : le prénom complet lie Anne, puis le patronyme lie le Martin sans prénom à la seule contribution « Martin » restée libre."""
+        """Deux « Martin » de chaque côté : le prénom complet lie Anne, puis le nom de famille lie le Martin sans prénom à la seule contribution « Martin » restée libre."""
         reference = _source_record(1, [("martin", "anne"), ("martin", "bruno"), ("petit", "c")])
         other = _source_record(2, [("martin", "anne"), ("martin", "")])
         assert _aligned(align_publication({1: reference, 2: other})) == [
@@ -195,7 +195,7 @@ class TestAlignPublication:
         ]
 
     def test_un_enregistrement_source_qui_intervertit_nom_et_prenom_s_aligne_dans_l_ordre(self):
-        """Les quatre autres sources donnent « Roger-Leroi Valerie » : le prénom tient la place du patronyme pour tout l'enregistrement source."""
+        """Un enregistrement source donne le prénom à la place du nom de famille pour tous ses auteurs : chacun se lie par le nom à son auteur de la référence."""
         reference = [("piaton", "sophie"), ("roger leroi", "valerie"), ("vallet", "guillaume t")]
         inverted = [("sophie", "piaton"), ("valerie", "roger leroi"), ("guillaume", "vallet")]
         contributions = align_publication(
@@ -378,7 +378,7 @@ class TestWithKnownFirstName:
 
 class TestLongestOrdered:
     def test_un_lien_qui_croise_les_autres_est_ecarte(self):
-        """Patronyme unique lié à 1 800 positions d'écart : « A. Ferrer » en 757, « J. A. Valls Ferrer » en 2579."""
+        """Nom de famille unique lié à 1 800 positions d'écart : « A. Ferrer » en 757, « J. A. Valls Ferrer » en 2579."""
         links = [(10, 1, 1), (20, 2, 2), (757, 2579, 3), (800, 800, 4), (900, 900, 5)]
         assert longest_ordered(links) == {1, 2, 4, 5}
 

@@ -1,7 +1,4 @@
-"""Registre des sources bibliographiques : profil de chaque source et ordres de priorité.
-
-Si une source est ajoutée ou supprimée, modifier ce fichier ET l'enum `source_type` en base (via une migration). Le test `tests/integration/test_scenarios.py::TestPgEnumsMatchDb` vérifie la cohérence. Le pipeline implémente le profil de chaque source dans son adaptateur.
-"""
+"""Registre des sources bibliographiques : profil de chaque source et ordre d'autorité."""
 
 from dataclasses import dataclass
 from enum import StrEnum
@@ -12,7 +9,7 @@ from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 
 
 class Source(StrEnum):
-    """Source bibliographique — les membres ont les libellés de l'enum PostgreSQL `source_type`."""
+    """Source bibliographique. Reflet du type PostgreSQL `source_type`."""
 
     HAL = "hal"
     OPENALEX = "openalex"
@@ -70,7 +67,7 @@ PROFILES: dict[Source, SourceProfile] = {
         person_identifiers=frozenset({PersonIdentifierType.ORCID, PersonIdentifierType.IDREF}),
         aggregator=True,
     ),
-    # Son API se requête par NNT, pas par DOI.
+    # Son API se requête par NNT.
     Source.THESES: SourceProfile(label="theses.fr", harvested=True),
     # Interrogé par DOI et par personne, sans moissonnage.
     Source.CROSSREF: SourceProfile(
@@ -97,7 +94,7 @@ SEARCHED_IDENTIFIER_STATUSES: frozenset[AttributionStatus] = frozenset(
 
 
 def source_label(source: str) -> str:
-    """Nom lisible d'une source. Une clé inconnue se rend telle quelle."""
+    """Nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
     return SOURCE_LABELS.get(source, source)
 
 
@@ -127,14 +124,11 @@ def source_record_url(source: str, source_id: str, oa_status: str | None = None)
             return f"https://doi.org/{quote(source_id, safe='/:')}"
 
 
-# Toutes les sources, dans l'ordre conventionnel (chronologique d'intégration)
+# Toutes les sources, dans leur ordre d'intégration.
 ALL_SOURCES: tuple[Source, ...] = tuple(Source)
-
-# Sources comme set (pour les tests d'appartenance et les valeurs par défaut)
 ALL_SOURCES_SET: frozenset[str] = frozenset(Source)
 
-# Préfixe sous lequel une source se désigne dans une requête de lecture. Court, parce qu'il
-# voyage dans une URL ; distinct du libellé de l'enum SQL, que `Source` contient.
+# Préfixe d'une source dans un filtre de lecture, court parce qu'il figure dans une URL.
 SOURCE_FILTER_PREFIXES: dict[str, Source] = {
     "hal": Source.HAL,
     "oa": Source.OPENALEX,
@@ -143,10 +137,7 @@ SOURCE_FILTER_PREFIXES: dict[str, Source] = {
     "theses": Source.THESES,
 }
 
-# Vocabulaire du filtre par source : un préfixe suffixé de la présence attendue. `hal_yes`
-# retient les publications présentes dans HAL, `hal_no` les autres ; les deux ensemble ne
-# contraignent rien. Valide le filtre `source_filter` des lectures ; une valeur hors
-# vocabulaire est refusée.
+# Valeurs du filtre `source_filter` des lectures : un préfixe suivi de la présence attendue. `hal_yes` retient les publications présentes dans HAL, `hal_no` les autres.
 SOURCE_FILTER_VALUES: frozenset[str] = frozenset(
     f"{prefixe}_{presence}" for prefixe in SOURCE_FILTER_PREFIXES for presence in ("yes", "no")
 )
@@ -170,23 +161,8 @@ REGISTRY_LOOKUPS: frozenset[tuple[str, str]] = frozenset(
 )
 
 
-# ── Ordres de priorité entre sources ─────────────────────────────
-
-# Ordre général d'autorité des sources — utilisé partout où la
-# question est « quelle source gagne ? ». Couvre :
-#
-# - l'agrégation multi-sources des métadonnées publication
-#   (`refresh_from_sources` dans `pipeline/transformation/publications/consolidation.py`)
-# - la résolution de `author_position` quand plusieurs sources
-#   attestent une même contribution
-# - l'ordre d'exécution des normaliseurs dans le pipeline
-#
-# theses.fr fait autorité sur les métadonnées de thèse ; CrossRef et DataCite
-# sont les autorités officielles de l'enregistrement DOI
-# pour leurs périmètres respectifs et passent juste après theses ;
-# pour les documents hors-thèse la clé `theses` n'apparaît simplement pas dans
-# les rows et l'ordre se réduit aux sources restantes. Crossref et DataCite ne
-# se concurrencent pas : chaque RA fait autorité sur ses propres DOI.
+# Ordre d'autorité des sources, pour l'agrégation des métadonnées, la position d'auteur et l'ordre des normaliseurs.
+# theses.fr fait autorité sur les thèses. Crossref et DataCite font chacun autorité sur leurs propres DOI.
 SOURCE_PRIORITY: tuple[Source, ...] = (
     Source.THESES,
     Source.CROSSREF,
@@ -198,9 +174,7 @@ SOURCE_PRIORITY: tuple[Source, ...] = (
 )
 
 
-# Sources qui peuvent apparaître comme clés du JSONB `structures.api_ids` : identifiants
-# d'organisation côté sources externes, ou chaînes d'affiliation interrogées en texte (WoS,
-# mots-clés DataCite). Sert de whitelist stricte au modèle JSONB `StructureApiIds` côté infra.
+# Sources admises comme clés de `structures.api_ids` : identifiant d'organisation dans la source, ou chaîne d'affiliation interrogée en texte (WoS, mots-clés DataCite).
 STRUCTURE_API_SOURCES: tuple[Source, ...] = (
     Source.OPENALEX,
     Source.WOS,
@@ -210,14 +184,8 @@ STRUCTURE_API_SOURCES: tuple[Source, ...] = (
 )
 
 
-# ── Contrôle d'appartenance ──────────────────────────────────────
-
-
 def require_known_source(source: str) -> None:
-    """Vérifie qu'une source appartient au registre. Lève `ValidationError` sinon.
-
-    Les colonnes `source` sont typées par l'enum Postgres `source_type` : une valeur hors registre y produit une erreur de coercition, dont le message ne nomme ni l'appelant ni le champ fautif.
-    """
+    """Lève `ValidationError` pour une source hors du registre. Le message nomme la source, que l'erreur PostgreSQL sur `source_type` tait."""
     if source not in ALL_SOURCES_SET:
         raise ValidationError(
             f"Source inconnue : {source!r}. Sources valides : {', '.join(sorted(ALL_SOURCES))}."

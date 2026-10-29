@@ -1,6 +1,6 @@
 """SQL pour `person_name_forms`.
 
-Table dénormalisée `(name_form, person_id, sources text[])` avec PK composite `(name_form, person_id)`. Toutes les opérations s'expriment en INSERT/UPDATE/DELETE directs sur la table.
+Une ligne par couple (forme, personne), avec les sources de la forme (`sources`).
 """
 
 from typing import cast
@@ -80,7 +80,7 @@ def update_name_form_status(
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
-    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des contributions sources de ses contributions. Rend le nombre de formes supprimées."""
+    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des contributions sources de ses contributions. Renvoie le nombre de formes supprimées."""
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf
@@ -100,11 +100,9 @@ def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int
 def add_person_source(
     conn: Connection, *, name_form: str, person_id: int, source: str | None
 ) -> None:
-    """Ajoute une source au couple `(name_form, person_id)`, idempotent.
+    """Ajoute une source au couple (forme, personne), et crée la ligne si elle manque. Les sources restent triées, sans doublon.
 
-    Crée la row si elle est absente (avec `sources = [source]` ou `sources = []` si `source is None`). Sur conflit, fusionne la source dans le tableau existant — déduplication + tri stable via `array_agg(DISTINCT ... ORDER BY ...)`.
-
-    Statut : toute forme entre en `pending` ; seule une action admin la confirme ou la rejette. L'appartenance d'une forme au nom canonique (source `'persons'`) se lit dans `sources`, non dans le statut. Une fusion préserve le verdict existant.
+    Toute forme entre en attente ; seule l'administration la confirme ou la rejette. L'appartenance d'une forme au nom de la personne (source `persons`) se lit dans les sources. Un ajout à une forme existante garde son statut.
     """
     new_sources = [source] if source else []
     conn.execute(

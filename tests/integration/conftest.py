@@ -1,42 +1,33 @@
-"""Configuration pytest pour les tests d'intégration (avec base de données).
+"""Configuration pytest des tests d'intégration.
 
-Recrée la base `bibliometrie_test` via `alembic upgrade head` avant la
-session, et fournit une fixture `db` qui donne un curseur dans une
-transaction rollbackée après chaque test (isolation complète).
+Avant la session, recrée la base `bibliometrie_test` par `alembic upgrade head` et y crée les rôles de connexion. Les fixtures fournissent des connexions dont la transaction est annulée à la fin de chaque test.
 
-Fonctionne en local (PostgreSQL natif) et dans Docker (conteneur db).
-N'utilise pas de commandes shell (dropdb, createdb, psql) — tout passe
-par psycopg3 pour être portable.
+Tout passe par psycopg, sans commande shell (dropdb, createdb, psql) : la configuration fonctionne en local comme dans Docker.
 """
 
-import os
 import pathlib
 
 import psycopg
 import pytest
 from alembic.config import Config
-from dotenv import load_dotenv
 from psycopg.rows import dict_row
 
 from alembic import command
+from tests.integration.helpers.db import (
+    DB_HOST,
+    DB_NAME,
+    DB_OWNER_PASSWORD,
+    DB_OWNER_USER,
+    DB_PORT,
+    database_url,
+)
 
-# Charge .env avant lecture de os.environ — cohérent avec
-# infrastructure/__init__.py côté code applicatif. Sinon les commandes
-# `pytest` lancées depuis un shell qui n'a pas exporté DB_OWNER_USER échouent
-# avec KeyError, alors que l'info est disponible dans le .env du projet.
-load_dotenv(pathlib.Path(__file__).resolve().parent.parent.parent / ".env")
-
-DB_NAME = "bibliometrie_test"
-DB_OWNER_USER = os.environ["DB_OWNER_USER"]
-DB_OWNER_PASSWORD = os.environ.get("DB_OWNER_PASSWORD", "")
-DB_HOST = os.environ.get("DB_HOST", "127.0.0.1")
-DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 PROJECT_ROOT = pathlib.Path(__file__).parent.parent.parent
 ALEMBIC_INI = PROJECT_ROOT / "alembic.ini"
 
 
 def _admin_connect_args() -> dict:
-    """Connexion à la base postgres (pour créer/supprimer des bases)."""
+    """Paramètres de connexion à la base `postgres`, pour créer et supprimer des bases."""
     args = {"dbname": "postgres", "user": DB_OWNER_USER, "host": DB_HOST, "port": DB_PORT}
     if DB_OWNER_PASSWORD:
         args["password"] = DB_OWNER_PASSWORD
@@ -44,9 +35,9 @@ def _admin_connect_args() -> dict:
 
 
 def _db_connect_args() -> dict:
-    """Connexion à la base de test sous le rôle du pipeline.
+    """Paramètres de connexion à la base de test sous le rôle du pipeline.
 
-    Les fixtures qui posent et lisent des données passent par là, comme le pipeline en production : une écriture hors des droits de ce rôle échoue ici, nommément, plutôt qu'une fois déployée. La création de la base et les migrations, elles, gardent le propriétaire du schéma.
+    Les fixtures qui posent et lisent des données passent par ce rôle, comme le pipeline en production : une écriture hors de ses droits échoue dans les tests, avant le déploiement. La création de la base et les migrations passent par le propriétaire du schéma.
     """
     from infrastructure.settings import settings
 
@@ -68,7 +59,7 @@ def _create_test_db():
     conn.autocommit = True
     cur = conn.cursor()
 
-    # Fermer les connexions existantes et recréer la base
+    # Ferme les connexions ouvertes sur la base, puis la recrée.
     cur.execute(f"""
         SELECT pg_terminate_backend(pid)
         FROM pg_stat_activity
@@ -79,9 +70,7 @@ def _create_test_db():
     cur.close()
     conn.close()
 
-    # `alembic upgrade head` sur la base fraîche. Alembic est la source
-    # de vérité du schéma — `schema.sql` n'est qu'un snapshot descriptif
-    # régénéré par `python -m interfaces.cli.dev.dump_schema`.
+    # Alembic fait foi pour le schéma ; `schema.sql` est un snapshot descriptif, régénéré par `python -m interfaces.cli.dev.dump_schema`.
     command.upgrade(_alembic_config(), "head")
     _apply_role_grants()
 
@@ -89,7 +78,7 @@ def _create_test_db():
 def _apply_role_grants() -> None:
     """Crée les rôles de connexion sur la base de test et leur accorde les droits de `grants.sql`.
 
-    Les tests se connectent sous ces rôles, comme les processus en production : les tests d'API sous celui de l'API, ceux du pipeline sous le sien. Une écriture hors des droits accordés échoue alors en erreur de permission, nommément, au lieu d'aboutir ici et de casser une fois déployée.
+    Les tests se connectent sous ces rôles, comme les processus en production : les tests d'API sous celui de l'API, ceux du pipeline sous le sien. Une écriture hors des droits accordés lève une erreur de permission dans les tests, avant le déploiement.
     """
     from psycopg import sql
 
@@ -117,8 +106,7 @@ def _apply_role_grants() -> None:
         for _, nom, mot_de_passe in roles:
             cur.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", (nom,))
             if cur.fetchone() is None:
-                # `CREATE ROLE` est une instruction utilitaire : PostgreSQL n'y planifie
-                # aucun paramètre, la valeur est donc composée et échappée.
+                # `CREATE ROLE` est une instruction utilitaire, sans paramètres côté PostgreSQL : la valeur est donc composée et échappée.
                 cur.execute(
                     sql.SQL("CREATE ROLE {} LOGIN PASSWORD {}").format(
                         sql.Identifier(nom), sql.Literal(mot_de_passe.get_secret_value())
@@ -132,67 +120,31 @@ def _apply_role_grants() -> None:
 def _alembic_config() -> Config:
     """Configuration Alembic pointée sur la base de test.
 
-    L'URL passe par `set_main_option`, qui la range dans un `configparser` : le `%` y ouvre une interpolation. Or le rendu d'une URL encode en `%XX` tout caractère non alphanumérique d'un mot de passe — un mot de passe solide en produit forcément. Doubler le `%` le rend littéral.
+    L'URL passe par `set_main_option`, qui la range dans un `configparser` où `%` ouvre une interpolation. Le rendu d'une URL encode en `%XX` les caractères non alphanumériques d'un mot de passe : doubler `%` le rend littéral.
 
-    `configure_logger` à faux vaut pour tout usage d'Alembic dans une session de test. `env.py` appellerait sinon `fileConfig`, qui reconfigure le logging du processus et désactive tous les loggers déjà créés que `alembic.ini` ne nomme pas — c'est-à-dire ceux de l'application. Un test qui observe le journal ne verrait alors plus rien, et le silence passerait pour un succès partout où il vaut assertion.
+    `configure_logger` à faux empêche `env.py` d'appeler `fileConfig`, pour tout usage d'Alembic dans une session de test. `fileConfig` désactive les loggers déjà créés que `alembic.ini` omet, donc ceux de l'application : un test qui observe le journal le trouverait vide.
     """
     cfg = Config(str(ALEMBIC_INI))
-    url = _source_contribution_url(identity="owner").render_as_string(hide_password=False)
+    url = database_url(identity="owner").render_as_string(hide_password=False)
     cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     cfg.attributes["configure_logger"] = False
     return cfg
 
 
 def pytest_configure(config):
-    """Crée la base de test avant la collecte des modules.
-
-    S'exécute avant l'import des fichiers de test, ce qui permet
-    à test_api.py de créer son pool de connexions au module-level.
-    """
+    """Crée la base de test avant la collecte, donc avant l'import des modules de test."""
     _create_test_db()
 
 
 @pytest.fixture
 def db():
-    """Connexion à la base de test, dans une transaction rollbackée à la fin.
-
-    Usage dans un test :
-        def test_something(db):
-            db.execute("INSERT INTO ...")
-            db.execute("SELECT ...")
-            row = db.fetchone()
-            assert row["id"] == 1
-    """
+    """Curseur psycopg sur la base de test, sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
     conn = psycopg.connect(**_db_connect_args(), row_factory=dict_row)
     conn.autocommit = False
     cur = conn.cursor()
     yield cur
     conn.rollback()
     conn.close()
-
-
-def _source_contribution_url(*, identity: str = "pipeline"):
-    """URL SQLAlchemy sur la base de test, sous le rôle nommé.
-
-    Le propriétaire du schéma est réservé aux migrations ; les fixtures de données passent par le rôle du pipeline, et celles qui exercent une opération de l'API par le sien.
-    """
-    from sqlalchemy import URL
-
-    from infrastructure.settings import settings
-
-    if identity == "owner":
-        username, password = DB_OWNER_USER, DB_OWNER_PASSWORD
-    else:
-        username = getattr(settings, f"db_{identity}_user")
-        password = getattr(settings, f"db_{identity}_password").get_secret_value()
-    return URL.create(
-        drivername="postgresql+psycopg",
-        username=username,
-        password=password or None,
-        host=DB_HOST,
-        port=DB_PORT,
-        database=DB_NAME,
-    )
 
 
 @pytest.fixture(scope="session")
@@ -203,13 +155,13 @@ def alembic_config() -> Config:
 
 @pytest.fixture
 def sa_sync_conn_owner():
-    """Connection SQLAlchemy sous le propriétaire du schéma, transaction rollbackée.
+    """Connexion SQLAlchemy sous le propriétaire du schéma ; la transaction est annulée à la fin du test.
 
-    Pour les rares tests qui, dans une même transaction, posent des données qu'un processus crée et exercent une opération qu'un autre conduit. La frontière des droits, elle, se tient dans les tests qui se connectent sous le rôle exerçant l'opération.
+    Pour les rares tests qui, dans une même transaction, posent des données créées par un processus et exercent une opération conduite par un autre. Les droits se vérifient dans les tests qui se connectent sous le rôle qui exerce l'opération.
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_source_contribution_url(identity="owner"))
+    engine = create_engine(database_url(identity="owner"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -221,13 +173,13 @@ def sa_sync_conn_owner():
 
 @pytest.fixture
 def sa_sync_conn_app():
-    """Connection SQLAlchemy sous le rôle de l'API, transaction rollbackée.
+    """Connexion SQLAlchemy sous le rôle de l'API ; la transaction est annulée à la fin du test.
 
-    Pour les tests qui exercent une opération dont l'API est l'auteur — l'écriture de la trace d'audit, par exemple, que le pipeline ne porte pas.
+    Pour les tests d'une opération réservée à l'API, comme l'écriture de la trace d'audit.
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_source_contribution_url(identity="app"))
+    engine = create_engine(database_url(identity="app"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -239,15 +191,15 @@ def sa_sync_conn_app():
 
 @pytest.fixture
 def sa_engine_app():
-    """Engine SQLAlchemy sous le rôle de l'API, garde-fous installés comme en production.
+    """Engine SQLAlchemy sous le rôle de l'API, avec les garde-fous de production.
 
-    Pour les tests qui pilotent une dépendance ouvrant elle-même sa connexion, `db_conn` en tête.
+    Pour les tests d'une dépendance qui ouvre elle-même sa connexion, comme `db_conn`.
     """
     from sqlalchemy import create_engine
 
     from infrastructure.db.engine import install_engine_guards
 
-    engine = create_engine(_source_contribution_url(identity="app"))
+    engine = create_engine(database_url(identity="app"))
     install_engine_guards(engine)
     yield engine
     engine.dispose()
@@ -263,7 +215,7 @@ def sa_engine_pipeline():
 
     from infrastructure.db.engine import set_sync_engine
 
-    engine = create_engine(_source_contribution_url())
+    engine = create_engine(database_url())
     set_sync_engine(engine)
     yield engine
     set_sync_engine(None)
@@ -272,14 +224,10 @@ def sa_engine_pipeline():
 
 @pytest.fixture
 def sa_sync_conn():
-    """Connection SQLAlchemy sur la base test, transaction rollbackée.
-
-    Consommée par les tests qui passent par les query services SA Core
-    (cohabite avec le curseur psycopg `db` côté pipeline).
-    """
+    """Connexion SQLAlchemy sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
     from sqlalchemy import create_engine
 
-    engine = create_engine(_source_contribution_url())
+    engine = create_engine(database_url())
     with engine.connect() as conn:
         trans = conn.begin()
         try:

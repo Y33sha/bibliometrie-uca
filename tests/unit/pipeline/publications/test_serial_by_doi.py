@@ -18,12 +18,13 @@ _NAMESPACES = [
 _STASH = stash_entry(None, "SERIAL_BY_DOI_NAMESPACE")
 
 
-def _row(**overrides: object) -> SerialCorrectionRow:
+def _row(doi: str | None = None, **overrides: object) -> SerialCorrectionRow:
+    """Ligne candidate ; `doi` : son seul DOI propre actif."""
     base: dict[str, object] = {
         "id": 1,
         "source": "crossref",
         "raw_doc_type": "journal-article",
-        "doi": None,
+        "dois": frozenset({doi} if doi else ()),
         "serial_id": None,
         "corrections": {},
     }
@@ -44,6 +45,19 @@ def test_doi_hors_espace_de_noms_intact():
 
 def test_enregistrement_sans_doi_intact():
     assert compute_updates([_row(doi=None)], _NAMESPACES) == []
+
+
+def test_un_seul_des_doi_designe_une_revue():
+    """Cas réel : un work OpenAlex a le DOI arXiv et le DOI des actes, que désigne un espace de noms."""
+    row = _row(dois=frozenset({"10.48550/arxiv.2310.05120", "10.64628/aak.335cx4kw5"}))
+    assert compute_updates([row], _NAMESPACES) == [
+        SerialCorrectionUpdate(1, 7, {"serial_id": _STASH})
+    ]
+
+
+def test_doi_designant_deux_revues_sans_rattachement():
+    row = _row(dois=frozenset({"10.64628/aak.335cx4kw5", "10.5194/acp-20-1-2020"}))
+    assert compute_updates([row], _NAMESPACES) == []
 
 
 def test_revue_de_la_source_conservee():

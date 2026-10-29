@@ -22,8 +22,7 @@ class TestNormalizeText:
             ("l’histoire", "l histoire"),
             # Tirets Unicode → ASCII
             ("Abeywickrama‐Samarakoon", "abeywickrama samarakoon"),
-            # Ligatures œ/æ : sans expansion explicite elles disparaîtraient
-            # (NFKD ne les décompose pas, encode("ascii", "ignore") les avale).
+            # Ligatures œ et æ, que NFKD laisse entières : développées explicitement.
             ("œuvres", "oeuvres"),
             ("Œuvres", "oeuvres"),
             ("Lire les œuvres littéraires", "lire les oeuvres litteraires"),
@@ -32,13 +31,12 @@ class TestNormalizeText:
             # Cohérence : avec ou sans ligature, même résultat
             ("oeuvres", "oeuvres"),
             ("aethelstan", "aethelstan"),
-            # Lettres latines autonomes (translittérées comme unaccent, pas
-            # supprimées) : sinon "straße" collerait en "strae".
+            # Lettres latines autonomes : translittérées comme par `unaccent` (« straße » donne « strasse »).
             ("Meyerhofstraße", "meyerhofstrasse"),
             ("Øresund", "oresund"),
             ("Łódź", "lodz"),
             ("Reykjavík þingvellir", "reykjavik thingvellir"),
-            # I turc avec point → i (lower()+NFKD le replie)
+            # I turc avec point → i
             ("İstanbul", "istanbul"),
             # Fractions vulgaires → chiffres espacés (comme "1/4" tapé à la main)
             ("½ litre", "1 2 litre"),
@@ -95,7 +93,7 @@ class TestNormalizeText:
         )
 
     def test_oeuvres_oe_ligature_match_oe(self) -> None:
-        """Régression : deux formes équivalentes du même titre matchent après normalisation."""
+        """Régression : deux graphies équivalentes du même titre sont égales après normalisation."""
         assert normalize_text("œuvres littéraires") == normalize_text("oeuvres littéraires")
 
 
@@ -130,11 +128,11 @@ class TestSanitizeRawText:
             # Casse, accents et ponctuation préservés (≠ normalize_text)
             ("Université Clermont Auvergne", "Université Clermont Auvergne"),
             ("Hello, World!", "Hello, World!"),
-            # Espace insécable (U+00A0) → espace simple : le cas du bug
+            # Espace insécable (U+00A0) → espace simple
             ("Université Clermont Auvergne", "Université Clermont Auvergne"),
             # Fine insécable (U+202F) → espace simple
             ("12 000 €", "12 000 €"),
-            # Tabulation / retour ligne → espace, collapse
+            # Tabulation et retour à la ligne → un seul espace
             ("a\tb\nc", "a b c"),
             # Zero-width space / non-joiner / joiner supprimés
             ("a​b‌c‍d", "abcd"),

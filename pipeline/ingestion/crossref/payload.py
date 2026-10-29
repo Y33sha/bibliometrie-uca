@@ -1,8 +1,6 @@
-"""Lecture des enregistrements sources Crossref par la normalisation.
+"""Lecture des enregistrements sources Crossref par la normalisation : conventions des champs de l'API Works.
 
-Interprétation des champs propres au schéma CrossRef Works API — fonctions de lecture et nettoyeurs qui encapsulent les conventions CrossRef.
-
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API CrossRef (frontière dynamique avec une source externe, schéma non typé). Le `JsonValue` est délibéré : forcer `JsonValue` exigerait des `isinstance` partout sur le dict-walking interne, sans gain métier. Idem pour le retour de `extract_crossref_meta`, qui est un sous-ensemble destiné à `source_records.source_extras` (JSONB).
+Les payloads sont les objets JSON bruts de l'API, sans schéma typé.
 """
 
 from __future__ import annotations
@@ -18,27 +16,22 @@ _JATS_TAG_RE = re.compile(r"</?jats:[A-Za-z][^<>]*>")
 
 
 def strip_jats_tags(s: str) -> str:
-    """Retire les balises XML JATS d'une chaîne.
-
-    CrossRef stocke l'abstract en JATS XML (balises `<jats:p>`, `<jats:sec>`, etc.) ; on les retire pour exposer le texte brut.
-    """
+    """Retire les balises JATS d'une chaîne : Crossref donne le résumé en XML JATS (`<jats:p>`, `<jats:sec>`…)."""
     return _JATS_TAG_RE.sub("", s)
 
 
 def extract_crossref_publication_year(msg: Mapping[str, JsonValue], *, max_year: int) -> int | None:
-    """Année de publication CrossRef, dans l'ordre `published > issued > published-online > published-print > approved`.
+    """Année de publication Crossref : la première année plausible parmi `published`, `issued`, `published-online`, `published-print` et `approved`.
 
-    Sémantique CrossRef : `published` = min(published-online, published-print) ; `issued` = date déclarée par l'éditeur (peut être prospective sur des « futur numéro » 2030+ déposés avant publication réelle) ; `approved` = date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
+    `published` est la plus ancienne des dates en ligne et papier. `issued` est la date que déclare l'éditeur ; elle peut viser un numéro futur, déposé avant parution. `approved` est la date de soutenance d'une thèse, seule date des thèses déposées par l'ABES.
 
-    Borne supérieure `max_year` (typiquement `current_year + 1` — un preprint daté de l'année suivante reste plausible). Au-dessus, on considère la donnée polluée et on retourne None ; le caller skippera la normalisation, et `refresh_from_sources` arbitrera depuis les autres sources. Borne inférieure 1500 (un DOI antérieur est manifestement aberrant).
-
-    `max_year` est un paramètre injecté pour la testabilité (sinon couplage au calendrier réel rendrait les tests fragiles).
+    Une année plausible tient entre 1500 et `max_year`, en général l'année suivante : un preprint peut être daté de l'année à venir. Sans année plausible, la normalisation refuse l'enregistrement, et les autres sources donnent l'année de la publication. `max_year` est un paramètre pour que les tests restent indépendants du calendrier.
     """
     for field in ("published", "issued", "published-online", "published-print", "approved"):
         date_parts = as_sequence(as_mapping(msg.get(field)).get("date-parts"))
         if not date_parts:
             continue
-        # `date-parts` porte une liste de dates, chacune décomposée en [année, mois, jour].
+        # `date-parts` contient une liste de dates, chacune décomposée en [année, mois, jour].
         first = as_sequence(date_parts[0])
         year = as_int(first[0]) if first else None
         if year is not None and 1500 <= year <= max_year:
@@ -63,7 +56,7 @@ def crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[SerialIssn, ...]:
 
 
 def parse_crossref_issns(msg: Mapping[str, JsonValue]) -> tuple[str | None, str | None]:
-    """Retourne `(issn_print, eissn)` : le premier ISSN de chaque support, ou à défaut le premier ISSN de support inconnu comme ISSN papier."""
+    """ISSN papier et électronique : le premier de chaque support, à défaut le premier ISSN de support inconnu comme ISSN papier."""
     issns = crossref_issns(msg)
 
     def first(support: IssnSupport | None) -> str | None:
@@ -111,11 +104,9 @@ def extract_crossref_conference(msg: Mapping[str, JsonValue]) -> dict[str, JsonV
 
 
 def extract_crossref_source_extras(msg: Mapping[str, JsonValue]) -> Mapping[str, JsonValue] | None:
-    """Extrait les champs CrossRef-spécifiques à conserver en JSONB.
+    """Champs propres à Crossref gardés dans `source_records.source_extras` : licence, financeurs, relations, congrès, titre de groupe d'un `posted-content`, nombre de références s'il est positif, date d'indexation. Le reste du payload est écarté.
 
-    Whitelist explicite : `license`, `funder`, `relation`, `conference` (nom et acronyme du congrès), `references_count` (si > 0), `indexed.timestamp`. Décision métier « ces champs ont une valeur, les autres on jette » — évite d'embarquer la totalité du payload CrossRef et fige le contrat de la colonne `source_records.source_extras`.
-
-    Le sous-objet `source_extras->'relation'` est consommé par l'étape « relations » de l'ingestion des sujets.
+    Les relations servent à la phase `relations`.
     """
     source_extras: dict[str, JsonValue] = {}
     for key in (SourceExtra.LICENSE, SourceExtra.FUNDER, SourceExtra.RELATION):

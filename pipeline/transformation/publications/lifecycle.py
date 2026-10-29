@@ -1,6 +1,6 @@
 """Cycle de vie d'une publication : création, suppression après recalcul, dissolution, purge.
 
-Une publication existe si elle a au moins une `source_record`, un type admissible et au moins une contribution rattachée à une personne. `refresh` vérifie la `source_record` et le type après le recalcul d'une publication. `purge_publications` vérifie la `source_record` et la contribution sur toute la table, une fois les personnes résolues.
+Une publication existe si elle a au moins un enregistrement source, un type admissible et au moins une contribution rattachée à une personne. `refresh` vérifie les deux premières conditions après le recalcul d'une publication. `purge_publications` vérifie la première et la dernière sur toute la table, une fois les personnes résolues.
 """
 
 from sqlalchemy import Connection, text
@@ -20,9 +20,9 @@ def create(
     publication_year: int,
     doi: str | None,
 ) -> int:
-    """Crée une publication semée sur le minimum requis par les colonnes NOT NULL, et rend son id.
+    """Crée une publication avec les seules valeurs que la table exige, et renvoie son id.
 
-    Les valeurs de semis tiennent jusqu'au premier `refresh` : `title` reçoit le titre normalisé, `doc_type` vaut `other` quand la source n'en donne aucun, `oa_status` vaut la valeur par défaut.
+    Ces valeurs tiennent jusqu'au premier `refresh` : le titre est le titre normalisé, le type vaut `other` quand la source n'en donne aucun, le statut open access vaut la valeur par défaut.
     """
     return PublicationStore(conn).create(
         title=title_normalized,
@@ -35,7 +35,7 @@ def create(
 
 
 def refresh(conn: Connection, publication_id: int) -> RefreshVerdict:
-    """Recalcule la publication depuis ses `source_records`, et la supprime si elle n'en a plus ou si son type n'est pas admissible. Rend le verdict du recalcul."""
+    """Recalcule la publication depuis ses enregistrements sources. La supprime si elle est sans enregistrement source ou si son type est inadmissible. Renvoie le verdict du recalcul."""
     verdict = refresh_from_sources(conn, publication_id)
     if verdict in _DELETION_VERDICTS:
         PublicationStore(conn).delete(publication_id)
@@ -43,9 +43,9 @@ def refresh(conn: Connection, publication_id: int) -> RefreshVerdict:
 
 
 def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
-    """Supprime une publication dont toutes les `source_records` ont rejoint `successor_id`. Ses paiements APC passent au successeur, et son identifiant redirige vers lui.
+    """Supprime une publication dont tous les enregistrements sources ont rejoint le successeur. Ses paiements APC passent au successeur, et son identifiant redirige vers lui.
 
-    Lève `ValueError` si une `source_record` est encore rattachée à la publication.
+    Lève `ValueError` si un enregistrement source reste rattaché à la publication.
     """
     store = PublicationStore(conn)
     if store.has_source_records(publication_id):
@@ -57,9 +57,9 @@ def dissolve(conn: Connection, publication_id: int, successor_id: int) -> None:
 
 
 def purge_publications(conn: Connection, *, limit: int | None = None) -> int:
-    """Supprime les publications sans `source_record` ou sans contribution, un lot de `limit` au plus. Rend le nombre de publications supprimées.
+    """Supprime les publications sans enregistrement source ou sans contribution rattachée à une personne, `limit` au plus. Renvoie le nombre de publications supprimées.
 
-    Une publication perd sa dernière `source_record` quand la phase `normalize` retire un document disparu de sa source. Elle perd sa dernière contribution quand sa dernière contribution rattachée à une personne perd sa personne : rejet, forme de nom rejetée, personne supprimée. `publication_subjects` suit par `ON DELETE CASCADE`.
+    Une publication perd son dernier enregistrement source quand la phase `normalize` retire un document disparu de sa source. Elle perd sa dernière contribution rattachée à une personne par un rejet, une forme de nom rejetée ou une personne supprimée. Ses sujets partent avec elle (`ON DELETE CASCADE`).
     """
     limit_clause = "LIMIT :lim" if limit is not None else ""
     return conn.execute(

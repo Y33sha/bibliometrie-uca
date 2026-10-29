@@ -32,7 +32,7 @@ def _file_values(path: Path) -> dict[str, str]:
 
 
 def load_env_files(project_root: Path, environ: MutableMapping[str, str]) -> Path | None:
-    """Charge le fichier de l'instance et le `.env` racine dans `environ`, et rend le fichier de l'instance.
+    """Charge le fichier de l'instance et le `.env` racine dans `environ`, et renvoie le fichier de l'instance.
 
     Le fichier de l'instance prime sur l'environnement du processus, où un terminal VSCode injecte le `.env` racine. Le `.env` racine complète seulement les variables absentes : celles que l'orchestrateur injecte en production restent prioritaires. Les variables non déclarées dans `Settings` (LOG_TO_FILE, LOG_FORMAT, ROOT_PATH…) se lisent par `os.environ.get(...)`.
     """

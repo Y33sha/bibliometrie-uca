@@ -1,12 +1,10 @@
-"""Métriques de phase : `total` dérivé (≥ ventilation) et sérialisation."""
+"""Métriques de phase : `total`, au moins égal à la somme de la ventilation, et sérialisation."""
 
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
 
 def test_total_derives_from_breakdown_without_explicit_denominator():
-    # Régression : un moissonneur qui catégorise sans renseigner le dénominateur
-    # (cas OpenAlex/WoS, qui faisaient diverger total < new+updated+unchanged)
-    # reporte quand même total = somme catégorisée.
+    # Régression : sans dénominateur renseigné, `total` vaut la somme de new, updated et unchanged.
     m = PhaseMetrics()
     m.add(new=204)
     m.add(updated=3891)
@@ -15,14 +13,14 @@ def test_total_derives_from_breakdown_without_explicit_denominator():
 
 
 def test_total_uses_explicit_denominator_when_larger():
-    # fetch_missing : `total=` (DOI interrogés) dépasse les catégorisés (insérés).
+    # Cas de fetch_missing : les DOI cherchés (`seen`) dépassent les documents insérés.
     m = PhaseMetrics()
     m.add(new=10, seen=100)
     assert m.total == 100
 
 
 def test_total_never_below_breakdown():
-    # Même dénominateur sous-évalué, total ≥ catégorisés (le max() protège).
+    # Un dénominateur inférieur à la ventilation : `total` vaut la ventilation.
     m = PhaseMetrics(seen=2)
     m.add(new=5)
     assert m.total == 5
@@ -35,7 +33,7 @@ def test_merge_sums_denominator_and_breakdown():
     b.add(updated=2, seen=4)
     a.merge(b)
     assert (a.new, a.updated) == (1, 2)
-    assert a.total == 7  # seen 3+4, ≥ catégorisés 3
+    assert a.total == 7  # seen 3 + 4, au-dessus de la ventilation (3)
 
 
 def test_to_payload():

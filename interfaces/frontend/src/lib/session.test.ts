@@ -8,13 +8,13 @@ const { loginUrl, returnPath } = await import('./session.svelte');
 const ORIGIN = 'https://exemple.fr';
 
 describe('returnPath', () => {
-	it('rend une page du site, avec ses paramètres', () => {
+	it('renvoie une page du site, avec ses paramètres', () => {
 		expect(returnPath('/bibliometrie/persons/12?tab=publications', ORIGIN)).toBe(
 			'/bibliometrie/persons/12?tab=publications',
 		);
 	});
 
-	it('rend la page Statistiques sans redirection', () => {
+	it('renvoie la page Statistiques sans redirection', () => {
 		expect(returnPath(null, ORIGIN)).toBe('/bibliometrie/stats');
 	});
 
@@ -23,7 +23,7 @@ describe('returnPath', () => {
 		'//ailleurs.fr/bibliometrie/stats',
 		'/\\ailleurs.fr/bibliometrie/stats',
 		'/autre-site',
-	])('rend la page Statistiques pour %s, hors du site', (redirect) => {
+	])('renvoie la page Statistiques pour %s, hors du site', (redirect) => {
 		expect(returnPath(redirect, ORIGIN)).toBe('/bibliometrie/stats');
 	});
 });

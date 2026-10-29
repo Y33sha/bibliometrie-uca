@@ -1,8 +1,8 @@
-"""Les gestionnaires d'erreur de l'API rendent le code attendu, et rien d'autre.
+"""Les gestionnaires d'erreur de l'API renvoient le code attendu, et rien d'autre.
 
-Ils décident de ce qu'un appelant apprend d'un échec : un conflit se lit 409, et une erreur imprévue ne doit rendre qu'un message générique — la trace part au journal, jamais dans la réponse.
+Ils décident de ce qu'un appelant apprend d'un échec : un conflit donne 409, et une erreur imprévue donne seulement un message générique ; la trace part au journal.
 
-Les gestionnaires sont éprouvés directement plutôt qu'à travers un point d'entrée : ils reçoivent une exception et une requête, et rien de ce qu'ils font ne dépend du chemin par lequel l'exception est arrivée.
+Les gestionnaires sont testés directement : ils reçoivent une exception et une requête, et leur comportement est indépendant de la route qui a levé l'exception.
 """
 
 import json
@@ -66,7 +66,7 @@ async def test_fusion_editeurs_bloquee_enumere_les_paires():
 
 @pytest.mark.asyncio
 async def test_erreur_imprevue_ne_rend_pas_la_trace(caplog):
-    """Le 500 porte un message fixe ; le détail de l'échec reste au journal."""
+    """Le 500 contient un message fixe, sans le détail de l'échec."""
     reponse = await unhandled_exception_handler(_requete(), RuntimeError("mot de passe = hunter2"))
     assert reponse.status_code == 500
     assert _corps(reponse) == {"detail": "Erreur interne du serveur"}

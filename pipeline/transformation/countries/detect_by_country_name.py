@@ -1,8 +1,6 @@
 """Détection du pays d'une adresse par **nom de pays** en fin d'adresse : candidat `country_name`.
 
-Confronte les derniers tokens du `normalized_text` de chaque adresse en file (`address_candidates_queue`) aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations), le plus long l'emportant. Un nom de pays clôt typiquement l'adresse, avec ou sans virgule ; les noms de lieux (institutions, villes) relèvent de la détection par nom de lieu. Le candidat `country_name` est recalculé en entier pour chaque adresse traitée.
-
-Le commit est laissé au caller.
+Confronte les derniers tokens du `normalized_text` de chaque adresse en file (`address_candidates_queue`) aux noms de pays de `place_name_forms` (`kind = 'country'` : variantes anglais/français, codes ISO, abréviations), le plus long l'emportant. Le candidat `country_name` est recalculé en entier pour chaque adresse traitée. L'appelant commite.
 """
 
 import logging

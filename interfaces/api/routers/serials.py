@@ -1,6 +1,6 @@
 """Router des revues : listes, recherche, édition, fusion. Sert `/api/serials/*`.
 
-Les chemins littéraux — `/oa-models`, `/types`, `/facets`, `/export.csv` — précèdent `/{serial_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux (`/oa-models`, `/types`, `/facets`, `/export.csv`) précèdent `/{serial_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from typing import Literal
@@ -53,7 +53,7 @@ router = APIRouter(prefix="/api/serials", tags=["serials"])
 def list_oa_models() -> list[EnumOption]:
     """Valeurs possibles de `oa_model` avec leur libellé français.
 
-    La source de vérité côté Python est `domain.serials.journal.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la modale d'édition admin.
+    Les valeurs viennent de `domain.serials.serial.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
     """
     return [EnumOption(value=v, label_fr=OA_MODEL_LABELS_FR[v]) for v in OA_MODELS]
 
@@ -62,7 +62,7 @@ def list_oa_models() -> list[EnumOption]:
 def list_serial_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `serial_type` avec leur libellé français.
 
-    La source de vérité côté Python est `domain.serials.journal.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des revues et la colonne « Type » des pages publiques.
+    Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
     """
     return [EnumOption(value=v, label_fr=SERIAL_TYPE_LABELS_FR[v]) for v in SERIAL_TYPES]
 
@@ -77,7 +77,7 @@ def serial_filters(
 ) -> SerialFilters:
     """Filtres communs à la liste des revues et à ses facettes.
 
-    `serial_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue rend 422. `search` porte sur le titre et sur les ISSN de la revue, et est ignoré en deçà de deux caractères.
+    `serial_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue renvoie 422. `search` vise le titre et les ISSN de la revue, à partir de deux caractères.
     """
     return SerialFilters(
         search=search,
@@ -112,7 +112,7 @@ def serials_entity_facet(
 
     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre et leurs ISSN.
 
-    `kind` n'admet que `publisher` : il tient au contrat de la facette d'entité, partagé avec les listes de publications et les tableaux de bord.
+    `kind` admet seulement `publisher` : il tient au contrat de la facette d'entité, commun aux listes de publications et aux tableaux de bord.
     """
     return queries.serials_publisher_facet(search=entity_search, filters=filters)
 
@@ -127,7 +127,7 @@ def list_serials(
 ) -> SerialListResponse:
     """Liste paginée des revues, avec le décompte de leurs publications.
 
-    `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
     """
     return queries.list_serials(filters=filters, sort=sort, page=page, per_page=per_page)
 
@@ -214,7 +214,7 @@ def doi_namespace_conflicts_count(
 def doi_namespace_conflicts(
     queries: SerialQueries = Depends(serial_queries),
 ) -> DoiNamespaceConflictsResponse:
-    """Paires de revues dont l'une porte des enregistrements dont le DOI tombe dans l'espace de noms de l'autre."""
+    """Paires de revues dont l'une a des enregistrements dont le DOI relève de l'espace de noms de l'autre."""
     return queries.doi_namespace_conflicts()
 
 
@@ -226,7 +226,7 @@ def get_serial(
 ) -> SerialDetailResponse:
     """Profil complet d'une revue, pour sa page publique.
 
-    Porte ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
+    Contient ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
     """
     return detail.found(queries.get_serial_detail(serial_id))
 
@@ -253,11 +253,11 @@ def get_type_change_impact(
     body: SerialTypeChange,
     serials: SerialService = Depends(serial_service),
 ) -> SerialTypeChangeImpact:
-    """Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à la valeur demandée.
+    """Compte les publications de la revue dont le type changerait avec le type de revue demandé.
 
-    L'aperçu applique réellement le changement — écriture du type, recalcul des corrections sur les publications sources, rafraîchissement — dans un `SAVEPOINT` annulé ensuite. Il emprunte donc le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
+    L'aperçu applique réellement le changement (écriture du type, recalcul des corrections des enregistrements sources, recalcul des publications) dans un `SAVEPOINT` annulé ensuite : il emprunte le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
 
-    La méthode est POST bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et la garde d'authentification, qui s'applique aux méthodes d'écriture, laisserait passer une action admin.
+    La méthode est POST, bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et échapperait à la garde d'authentification des méthodes d'écriture.
     """
     count = serials.preview_type_change_impact(serial_id, body.serial_type)
     return SerialTypeChangeImpact(count=count)
@@ -271,9 +271,9 @@ def update_serial(
 ) -> OkResponse:
     """Met à jour une revue, champ par champ.
 
-    Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur une revue inconnue.
+    Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur une revue inconnue.
 
-    Un `serial_type` qui change de valeur entraîne la requalification du `doc_type` des publications rattachées, dans la même transaction (`requalify_publications_for_serial`). L'endpoint `type-change-impact` en donne l'ampleur avant confirmation.
+    Un changement de type de la revue requalifie ses publications, dans la même transaction (`requalify_publications_for_serial`). La route `type-change-impact` en donne l'ampleur avant confirmation.
     """
     serials.update_serial(serial_id, body)
     return OkResponse()

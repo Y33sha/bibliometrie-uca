@@ -1,6 +1,6 @@
 """Recherches dans HAL de la phase `fetch_missing` : par hal-id, et par NNT.
 
-Deux pistes, même forme : sélectionner les identifiants absents, puis les chercher par un pool de workers et écrire les documents trouvés. Le pool réel est exercé ; la sélection, la requête HTTP, l'écriture dans `staging`, l'inscription et l'effacement des échecs sont remplacés.
+Les deux recherches sélectionnent les identifiants absents, les cherchent par un pool de workers et écrivent les documents trouvés. Le pool est réel ; la sélection, la requête HTTP, l'écriture dans `staging`, l'inscription et l'effacement des échecs sont simulés.
 """
 
 import logging
@@ -28,7 +28,7 @@ class _FakeConnection:
 class _HalSimule:
     """HAL et la base, simulés.
 
-    `docs` porte les documents rendus, indexés par identifiant cherché ; un identifiant absent vaut « introuvable ». `en_echec` désigne les identifiants pour lesquels HAL est indisponible. `deja_en_staging` désigne les hal-ids des documents déjà présents.
+    `docs` contient les documents rendus, indexés par identifiant cherché ; un identifiant absent vaut « introuvable ». `en_echec` désigne les identifiants pour lesquels HAL est indisponible. `deja_en_staging` désigne les hal-ids des documents déjà présents.
     """
 
     def __init__(self, monkeypatch, *, ids=(), docs=None, en_echec=(), deja_en_staging=()):
@@ -82,7 +82,7 @@ class TestParHalId:
         assert hal.oublies == ["hal-1"]
 
     async def test_hal_indisponible_ni_ecrit_ni_compte(self, monkeypatch):
-        # Une source indisponible ne prouve pas l'absence : l'identifiant attend le run suivant.
+        # Une source indisponible laisse l'absence non établie : l'identifiant attend le run suivant.
         hal = _HalSimule(
             monkeypatch,
             ids=["hal-1", "hal-2"],
@@ -97,7 +97,7 @@ class TestParHalId:
         assert (metrics.new, metrics.extras.get("not_found", 0)) == (1, 0)
 
     async def test_commit_par_lot(self, monkeypatch):
-        # Au-delà du pas de commit, le pool commite en cours de route.
+        # Au-delà du pas de commit, le pool commite en cours d'exécution.
         hal_ids = [f"hal-{i}" for i in range(60)]
         _HalSimule(monkeypatch, ids=hal_ids, docs={h: {"halId_s": h} for h in hal_ids})
         conn = _FakeConnection()
@@ -124,7 +124,7 @@ class TestParHalId:
         assert hal.cherches == ["hal-0"]
 
     async def test_sans_hal_id_a_chercher_rien_n_est_ecrit(self, monkeypatch, caplog):
-        """L'exécuteur des tâches ferme la section quand aucune recherche n'a rien cherché."""
+        """Sans identifiant à chercher, la recherche n'écrit rien au journal : l'exécuteur des tâches ferme la section."""
         hal = _HalSimule(monkeypatch)
 
         with caplog.at_level(logging.INFO):
@@ -147,7 +147,7 @@ class TestParNnt:
         metrics = await fetch_missing_hal_by_nnt(_FakeConnection(), _LOG, retry_after_days=30)
 
         assert (metrics.seen, metrics.new) == (1, 0)
-        # HAL a répondu : la thèse n'est pas portée manquante.
+        # HAL a répondu : la thèse reste hors des introuvables.
         assert metrics.extras.get("not_found", 0) == 0
 
     async def test_un_nnt_introuvable_est_inscrit(self, monkeypatch):

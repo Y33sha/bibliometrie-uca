@@ -68,7 +68,7 @@ def correct_source_record(
     origin_doc_type: str | None = None,
     missing_hal_ids: Set[str] = frozenset(),
 ) -> UnaryCorrection | None:
-    """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` et ses `identifiers` permettent de reconstruire. Rend `None` si les valeurs courantes sont déjà les valeurs corrigées.
+    """Corrige un enregistrement source depuis ses valeurs d'avant correction, que `corrections` et ses `identifiers` permettent de reconstruire. Renvoie `None` si les valeurs courantes sont déjà les valeurs corrigées.
 
     `facts` et `corrections` sont les valeurs courantes, éventuellement corrigées par un passage précédent. `identifiers` sont tous les identifiants de l'enregistrement source, avec leur statut courant. `origin_doc_type` est le type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu ; il prime sur son type. `missing_hal_ids` : dépôts HAL introuvables dans HAL.
 

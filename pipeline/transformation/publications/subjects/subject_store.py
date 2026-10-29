@@ -11,7 +11,7 @@ from infrastructure.db.scalars import scalar_int
 
 
 class SourceRecordTopics(NamedTuple):
-    """Le champ `topics` d'une `source_record`, avec sa publication et sa source — matière première par-source de la ré-ingestion des concepts."""
+    """Champ `topics` d'un enregistrement source, avec sa publication et sa source."""
 
     publication_id: int
     source: str
@@ -48,9 +48,7 @@ class SubjectStore:
         label: str,
         language: str | None = None,
     ) -> int:
-        """UPSERT d'un sujet (clé d'unicité = lower(label)). Retourne l'id.
-
-        Au `ON CONFLICT`, la `language` déjà posée est conservée (premier non-null gagne)."""
+        """Écrit un sujet, unique par libellé en minuscules, et renvoie son identifiant. Une langue déjà posée reste."""
         label = to_plain_text(label)
         return scalar_int(
             self._conn.execute(
@@ -69,7 +67,7 @@ class SubjectStore:
         source: str,
         rows: list[PublicationSubjectLink],
     ) -> int:
-        """Bulk INSERT (avec ON CONFLICT) de liens publication↔subject pour une source. Dédoublonne `(publication_id, subject_id)` côté client."""
+        """Insère les liens publication-sujet d'une source, sans doublon. Renvoie le nombre de liens insérés."""
         if not rows:
             return 0
         payload = [{"pid": link.publication_id, "sid": link.subject_id} for link in rows]
@@ -86,7 +84,7 @@ class SubjectStore:
         ).rowcount
 
     def clear_publication_subjects_for_publications(self, *, publication_ids: list[int]) -> int:
-        """`DELETE` des liens (non rejetés) des publications données, toutes sources. Préserve les liens rejetés. Retourne le rowcount."""
+        """Supprime les liens non rejetés de ces publications, toutes sources. Renvoie leur nombre."""
         if not publication_ids:
             return 0
         return self._conn.execute(
@@ -97,7 +95,7 @@ class SubjectStore:
         ).rowcount
 
     def select_publications_to_reingest(self) -> list[int]:
-        """Ids des publications dont les sujets sont à (ré)ingérer : `publications.subjects_ingested_at` vide, soit jamais ingérées, soit recalculées depuis leurs sources après leur dernière ingestion."""
+        """Publications dont `subjects_ingested_at` est vide : jamais ingérées, ou recalculées depuis leurs enregistrements sources après leur dernière ingestion."""
         return [
             r.id
             for r in self._conn.execute(
@@ -115,7 +113,7 @@ class SubjectStore:
         )
 
     def mark_all_publications_to_reingest(self) -> int:
-        """Vide `subjects_ingested_at` sur toutes les publications : elles entrent toutes dans la sélection. Rend le nombre de publications marquées."""
+        """Vide `subjects_ingested_at` sur toutes les publications : elles entrent toutes dans la sélection. Renvoie le nombre de publications marquées."""
         return self._conn.execute(
             text(
                 "UPDATE publications SET subjects_ingested_at = NULL "
@@ -126,7 +124,7 @@ class SubjectStore:
     def select_source_records_for_publications(
         self, *, publication_ids: list[int]
     ) -> list[SourceRecordTopics]:
-        """Le `topics` de chaque `source_record` des publications données, avec sa source."""
+        """Champ `topics` de chaque enregistrement source de ces publications, avec sa source."""
         if not publication_ids:
             return []
         rows = self._conn.execute(
@@ -146,7 +144,7 @@ class SubjectStore:
         ]
 
     def purge_orphan_subjects(self) -> int:
-        """`DELETE` des sujets sans aucun lien `publication_subjects` (tous statuts). Retourne le nombre supprimé."""
+        """Supprime les sujets sans lien dans `publication_subjects`, rejeté ou non. Renvoie leur nombre."""
         return self._conn.execute(
             text(
                 "DELETE FROM subjects s WHERE NOT EXISTS "
@@ -155,7 +153,7 @@ class SubjectStore:
         ).rowcount
 
     def count_all_subjects(self) -> int:
-        """Nombre total de sujets du référentiel (`COUNT(*)` sur `subjects`)."""
+        """Nombre de sujets du référentiel."""
         return scalar_int(self._conn.execute(text("SELECT COUNT(*) FROM subjects")))
 
     def recompute_usage_counts(self) -> int:

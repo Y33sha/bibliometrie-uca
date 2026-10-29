@@ -11,26 +11,27 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.corrections import stash_entry
+from domain.source_records.identifiers import SourceIdentifier
+from domain.source_records.keys import doi_keys
 from domain.source_records.metadata_correction.rules import (
     MetadataForCorrection,
     effective_metadata,
 )
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
+from infrastructure.db.doi_targets import fetch_doi_targets
 from infrastructure.db.rows import rows_as
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.read_models.publications.copies import publication_copies
-from infrastructure.sql_fragments import corrected_by
 from pipeline.transformation.publications.store import PublicationStore
 
 
 class _SourceRecordRow(NamedTuple):
-    """Projection SQL `get_source_records` : colonnes de `source_records` consommées par l'agrégation canonique (`refresh_from_sources` côté domain)."""
+    """Colonnes de `source_records` que lit l'agrégation."""
 
     id: int
     source: str
@@ -38,7 +39,7 @@ class _SourceRecordRow(NamedTuple):
     title: str
     publication_year: int | None
     doc_type: str | None
-    doi: str | None
+    identifiers: list[dict[str, str | None]]
     serial_id: int | None
     monograph_id: int | None
     container_title: str | None
@@ -56,8 +57,10 @@ class _SourceRecordRow(NamedTuple):
     publisher_id: int | None
 
 
-def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
-    """Mapping d'une row SQL `source_records` ⨝ `serials` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
+def _source_record_from_row(
+    row: _SourceRecordRow, identifiers: tuple[SourceIdentifier, ...], doi_targets: dict[str, str]
+) -> SourceRecord:
+    """`SourceRecord` d'une ligne de `source_records`, tableaux convertis en tuples. `doi_targets` : cible du DOI de chaque forme secondaire."""
     return SourceRecord(
         id=row.id,
         source=row.source,
@@ -65,7 +68,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
         title=row.title,
         publication_year=row.publication_year,
         doc_type=row.doc_type,
-        doi=row.doi,
+        dois=doi_keys(identifiers, doi_targets),
         serial_id=row.serial_id,
         monograph_id=row.monograph_id,
         container_title=row.container_title,
@@ -84,17 +87,13 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
     )
 
 
-# ── Lectures du recalcul ──────────────────────────────────────────────
-
-
 def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
-    # Le `doi` projeté est la colonne nue ; la substitution Zenodo (concept plutôt que version) est déjà persistée par `metadata_correction`.
-    """Les `SourceRecord` attachées à une publication canonique, matière de l'agrégation."""
+    """Enregistrements sources d'une publication, pour l'agrégation. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
     result = conn.execute(
-        text("""
+        text(f"""
             SELECT sr.id, sr.source::text AS source, sr.source_id,
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
-                   sr.doi,
+                   {identifiers_json_sql("sr.id")} AS identifiers,
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
@@ -105,20 +104,9 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
         """),
         {"id": publication_id},
     )
-    return [_source_record_from_row(row) for row in rows_as(_SourceRecordRow, result)]
-
-
-def converged_secondary_ids(conn: Connection, publication_id: int) -> frozenset[int]:
-    """Ids des `source_records` de `publication_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
-    result = conn.execute(
-        text(f"""
-            SELECT id FROM source_records
-            WHERE publication_id = :id
-              AND {corrected_by("doi", "source_records")} = ANY(:cases)
-        """),
-        {"id": publication_id, "cases": list(CONVERGENCE_CASES)},
-    )
-    return frozenset(row.id for row in result)
+    rows = [(row, parse_identifiers(row.identifiers)) for row in rows_as(_SourceRecordRow, result)]
+    doi_targets = fetch_doi_targets(conn, (i for _, ids in rows for i in ids))
+    return [_source_record_from_row(row, ids, doi_targets) for row, ids in rows]
 
 
 def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict[int, int | None]:
@@ -155,7 +143,7 @@ def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dic
 
 
 def serial_type_of(conn: Connection, serial_id: int) -> str | None:
-    """`serial_type` d'un journal, pour le rejeu des corrections qui dépendent de la revue. None si le journal n'existe pas ou son type n'est pas posé."""
+    """Type d'une revue, ou `None`, pour le rejeu des corrections qui en dépendent."""
     return conn.execute(
         text("SELECT serial_type::text FROM serials WHERE id = :id"),
         {"id": serial_id},
@@ -192,13 +180,13 @@ class RefreshVerdict(StrEnum):
 
 
 def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
-    """Recalcule les métadonnées canoniques d'une publication depuis ses `source_records`.
+    """Recalcule les métadonnées d'une publication depuis ses enregistrements sources.
 
     Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, retient la meilleure copie ouverte (`domain.publications.access`), pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
     Une publication sans source rattachée (`NO_SOURCE`), ou dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
-    Ne touche que la publication reçue et ses sources : quelles `source_records` forment une même œuvre relève de la réconciliation. Laisse `notes` inchangé.
+    Touche seulement la publication reçue : la réconciliation décide quels enregistrements sources forment une même œuvre. Laisse `notes` inchangé.
     """
     store = PublicationStore(conn)
     publication = store.find_by_id(publication_id)
@@ -209,15 +197,13 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
     if not sources:
         return RefreshVerdict.NO_SOURCE
 
-    secondary_ids = converged_secondary_ids(conn, publication_id)
-    # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
+    # L'agrégation part des colonnes corrigées par la phase `metadata_correction`.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
-    dois = sorted({doi.value for s in sources if (doi := DOI.try_parse(s.doi)) is not None})
+    dois = sorted({d for s in sources for d in s.dois.all})
     _refresh_aggregate(
         publication,
         sources,
         source_priority=SOURCE_PRIORITY,
-        secondary_ids=secondary_ids,
         monograph_serials=monograph_serial_ids(conn, monograph_ids) if monograph_ids else {},
         unpaywall=unpaywall_verdicts(conn, dois) if dois else {},
     )
@@ -236,7 +222,6 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         publication,
         sources,
         source_priority=SOURCE_PRIORITY,
-        secondary_ids=secondary_ids,
         prefix_publishers=crossref_prefix_publishers(conn, prefixes) if prefixes else {},
     )
 
@@ -251,7 +236,7 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
 def _apply_canonical_doc_type_correction(
     publication: Publication, *, serial_type: str | None
 ) -> None:
-    """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
+    """Rejoue les corrections de `doc_type` sur la publication, après l'arbitrage.
 
     L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication réunit alors un `doc_type` d'une source et un `serial_id` d'une autre, combinaison qu'aucune correction par source n'a vue.
 

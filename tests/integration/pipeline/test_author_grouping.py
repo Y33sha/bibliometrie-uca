@@ -1,4 +1,4 @@
-"""Intégration : phase `author_grouping`, sur vraie base (`conn.commit` neutralisé)."""
+"""Phase `author_grouping`, sans validation de la transaction (`conn.commit` neutralisé)."""
 
 import logging
 
@@ -26,7 +26,7 @@ def conn(sa_sync_conn, monkeypatch):
 
 
 def _source_record(conn, publication_id, source, source_id, names, roles=None, positions=True):
-    """Enregistrement source et ses contributions sources, à partir de couples (patronyme, prénom). Rend les identifiants des contributions sources."""
+    """Enregistrement source et ses contributions sources, à partir de couples (nom de famille, prénom). Renvoie les identifiants des contributions sources."""
     source_record = insert_source_record(conn, publication_id, source=source, source_id=source_id)
     return [
         insert_source_contribution(
@@ -94,7 +94,7 @@ def test_les_contributions_sources_d_un_meme_auteur_sont_alignees(conn):
 
 
 def _attached_contribution(conn, publication, source_contribution):
-    """Rattache à une personne la contribution de `source_contribution` et rend son identifiant."""
+    """Rattache à une personne la contribution de `source_contribution` et renvoie son identifiant."""
     contribution = next(
         gid
         for gid, members in _contributions(conn, publication).items()
@@ -133,7 +133,7 @@ def test_une_contribution_aux_contributions_sources_inchangees_garde_sa_personne
 def test_une_contribution_recomposee_garde_son_identifiant_et_sa_personne_et_entre_dans_la_file(
     conn,
 ):
-    """Une nouvelle contribution source ne vide pas la contribution : sa personne est à redécider."""
+    """Un enregistrement source ajouté à la publication étend la contribution, qui garde son identifiant et sa personne ; sa personne est à redécider."""
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne"), ("petit", "b")])
     _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
@@ -244,37 +244,6 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
         {"p": publication},
     ).scalars()
     assert set(crossref) <= set(references)
-
-
-def _corrected_doi(conn, source_contribution, rule):
-    """Marque le DOI de l'enregistrement source de `source_contribution` comme corrigé par `rule`."""
-    conn.execute(
-        text("""
-            UPDATE source_records sr
-            SET corrections = jsonb_build_object('doi', jsonb_build_object('corrected_by', CAST(:rule AS text)))
-            FROM source_contributions sc WHERE sc.id = :sc AND sr.id = sc.source_record_id
-        """),
-        {"sc": source_contribution, "rule": rule},
-    )
-
-
-@pytest.mark.parametrize(
-    ("rule", "grouped"),
-    [
-        ("DATACITE_VERSION_TO_CONCEPT", False),
-        ("DATACITE_PACKAGE_PIECE", False),
-        ("DATACITE_VARIANT_TO_PRIMARY", True),
-    ],
-)
-def test_seules_les_versions_et_les_pieces_sont_ecartees_de_l_alignement(conn, rule, grouped):
-    publication = insert_publication(conn)
-    hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne")])
-    oa = _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
-    _corrected_doi(conn, oa[0], rule)
-
-    _run(conn)
-
-    assert ({hal[0], oa[0]} in _contributions(conn, publication).values()) is grouped
 
 
 def test_scanr_issu_d_un_depot_hal_present_s_aligne(conn):
@@ -448,7 +417,7 @@ def test_le_marquage_d_une_publication_supprimee_est_ignore_puis_supprime(conn):
 
 
 def test_un_marquage_fait_pendant_l_alignement_reste_en_file(conn):
-    """Régression : le alignement effaçait le marquage d'une publication remarquée après son relevé."""
+    """Régression : l'alignement effaçait le marquage d'une publication remarquée après son relevé."""
     publication = insert_publication(conn)
     store = AuthorGroupingStore(conn)
     store.snapshot_queued_publications()

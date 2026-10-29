@@ -1,6 +1,6 @@
 """Détournement de l'écriture des lignes de console.
 
-Le pipeline y branche un écrivain qui pose ses lignes au-dessus des barres de progression.
+Le pipeline y branche un écrivain qui affiche les lignes au-dessus des barres de progression.
 """
 
 import io
@@ -27,7 +27,7 @@ def test_l_ecrivain_branche_recoit_la_ligne_et_le_flux():
 
 
 def test_une_ligne_vide_part_sur_le_flux():
-    """Le saut de ligne isolé qu'un handler émet ne vaut pas un message."""
+    """Un saut de ligne isolé, émis par un handler, part directement sur le flux sans passer par l'écrivain."""
     flux = io.StringIO()
     module.set_console_writer(lambda ligne, f: None)
     try:

@@ -1,6 +1,6 @@
-"""Query services pour les paramètres applicatifs (table `config`).
+"""Lectures des paramètres applicatifs (table `config`), pour l'administration.
 
-Ce module sert la couche requêtes-API : `ConfigQueries` rend au router admin le listing des paramètres. L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`. Les lookups par clé du pipeline — années, plafonds et délais d'interrogation — vivent à part, dans `pipeline/runtime/config.py`.
+L'écriture d'une valeur vit dans `infrastructure/repositories/config_repository.py`, les lectures par clé du pipeline (années, plafonds, délais) dans `pipeline/runtime/config.py`.
 """
 
 from sqlalchemy import Connection, select

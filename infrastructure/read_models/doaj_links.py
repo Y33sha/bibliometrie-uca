@@ -5,21 +5,18 @@ from __future__ import annotations
 from urllib.parse import urlparse
 
 DOAJ_TOC_URL = "https://doaj.org/toc/{id}"
-"""URL canonique d'une fiche journal DOAJ (table des matières)."""
+"""Modèle d'URL de la fiche d'une revue du DOAJ (table des matières)."""
 
 
 def build_doaj_toc_url(doaj_id: str | None) -> str | None:
-    """Reconstruit l'URL de la fiche DOAJ à partir d'un `DOAJ id`.
-
-    Retourne `None` si l'id est absent — cas d'un payload sans `DOAJ id` (le dump CSV stocke l'URL toute faite sous `URL in DOAJ`).
-    """
+    """URL de la fiche DOAJ d'après un `DOAJ id`, ou `None` sans identifiant."""
     if not doaj_id:
         return None
     return DOAJ_TOC_URL.format(id=doaj_id)
 
 
 DOAJ_HOST = urlparse(DOAJ_TOC_URL).netloc
-"""Hôte des fiches DOAJ, dérivé de l'URL canonique : une seule valeur à tenir à jour."""
+"""Hôte des fiches DOAJ, dérivé de `DOAJ_TOC_URL`."""
 
 
 def _est_une_fiche_doaj(url: str) -> bool:

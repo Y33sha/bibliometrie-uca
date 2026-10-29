@@ -1,8 +1,8 @@
-"""Router des personnes : annuaire, profil, files de triage et gestes de curation. Sert `/api/persons/*`.
+"""Router des personnes : annuaire, profil, files de triage et décisions de l'administration. Sert `/api/persons/*`.
 
-Les lectures passent par `PersonsQueries`, les écritures par le service `PersonService`. Les gestes qui portent sur les contributions sources elles-mêmes vivent dans `contributions.py`.
+Les lectures passent par `PersonsQueries`, les écritures par le service `PersonService`. Les décisions qui concernent les contributions vivent dans `contributions.py`.
 
-L'ordre de déclaration obéit à une contrainte : les chemins littéraux — `/search`, `/export.csv`, `/facets`, les files de triage, le registre des identifiants — précèdent tous `/{person_id}`, qui accepterait n'importe lequel d'entre eux comme identifiant.
+Les chemins littéraux (`/search`, `/export.csv`, `/facets`, files de triage, registre des identifiants) précèdent tous `/{person_id}`, qui accepterait sinon n'importe lequel comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -118,7 +118,7 @@ def search_persons(
     limit: int = Query(10, ge=1, le=30),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> list[PersonSearchResult]:
-    """Recherche rapide de personnes (autocomplete)."""
+    """Recherche rapide de personnes (autocomplétion)."""
     return queries.search_persons(search=search, limit=limit)
 
 
@@ -132,7 +132,7 @@ def list_persons(
 ) -> PersonListResponse:
     """Liste paginée des personnes.
 
-    L'annuaire public et la liste de curation appellent tous deux cette lecture, avec des filtres différents.
+    L'annuaire public et la liste de l'administration appellent tous deux cette lecture, avec des filtres différents.
     """
     return queries.list_persons(filters=filters, page=page, per_page=per_page, sort=sort)
 
@@ -179,7 +179,7 @@ def ambiguous_name_forms(
     per_page: int = Query(50, ge=1, le=200),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> AmbiguousNameFormsResponse:
-    """Formes de nom portées par ≥2 personnes avec ≥1 lien pending, paginées."""
+    """Formes de nom d'au moins deux personnes, dont au moins un lien en attente, paginées."""
     return queries.ambiguous_name_forms(page=page, per_page=per_page)
 
 
@@ -199,7 +199,7 @@ def identifier_conflicts(
 ) -> IdentifierConflictsResponse:
     """Paires de personnes partageant un identifiant brut (ORCID, IdRef, hal_person_id ou idHAL), paginées.
 
-    Ce sont des doublons probables ou des erreurs d'attribution, que la curation tranche à l'œil.
+    Ce sont des doublons probables ou des erreurs d'attribution, que l'administration tranche.
     """
     return queries.identifier_conflicts(page=page, per_page=per_page)
 
@@ -247,7 +247,7 @@ def update_identifier_status(
     body: UpdateIdentifierStatus,
     persons: PersonService = Depends(person_service),
 ) -> IdentifierStatusResponse:
-    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne portés par les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
+    """Met à jour le statut d'un identifiant (pending/confirmed/rejected). Une confirmation ou un rejet s'étend aux identifiants `pending` de la même personne que contiennent les mêmes comptes HAL ; `propagated` les compte. Un rejet marque pour la redécision de leur personne les contributions que ses identifiants rejetés lui rattachent : le run suivant les redécide.
 
     Renvoie 404 sur un identifiant introuvable (`update_identifier_status`).
     """
@@ -275,9 +275,9 @@ def person_curation(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonOut:
-    """Une personne sous la projection de la liste de curation : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
+    """Une personne sous la projection de la liste de l'administration : drapeau de rejet, identifiants avec leur statut et leur source, formes de nom avec leur état d'arbitrage.
 
-    Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui porte normalement ces données.
+    Alimente le panneau latéral ouvert directement par son URL, hors de la liste qui contient d'ordinaire ces données.
     """
     person = queries.person_curation(person_id)
     if person is None:
@@ -290,7 +290,7 @@ def person_theses(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries),
 ) -> PersonThesesResponse:
-    """Thèses liées à cette personne avec un rôle non-auteur."""
+    """Thèses liées à cette personne par un rôle autre qu'auteur."""
     return queries.person_theses(person_id)
 
 
@@ -311,7 +311,7 @@ def person_subjects(
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: PersonsQueries = Depends(persons_queries),
 ) -> list[SubjectFrequency]:
-    """Top sujets des publications de cette personne (nuage de mots)."""
+    """Sujets les plus fréquents des publications de cette personne (nuage de mots)."""
     return queries.person_subjects(person_id, limit=limit)
 
 
@@ -320,7 +320,7 @@ def persons_sharing_name_form(
     person_id: int,
     queries: PersonsQueries = Depends(persons_queries),
 ) -> list[SharingPersonOut]:
-    """Personnes partageant ≥1 forme de nom avec celle-ci (candidates à l'absorption)."""
+    """Personnes qui partagent au moins une forme de nom avec celle-ci, candidates à l'absorption."""
     return queries.persons_sharing_name_form(person_id)
 
 
@@ -340,7 +340,7 @@ def person_name_forms(
 ) -> list[NameFormSummaryOut]:
     """Formes de nom de la personne, avec leur état d'arbitrage.
 
-    Servies à part de la liste : seule la fiche d'une personne les affiche, et les porter par ligne pesait les deux tiers de la réponse.
+    Servies à part de la liste : seule la fiche d'une personne les affiche, et les inclure dans chaque ligne pèserait les deux tiers de la réponse.
     """
     return queries.person_name_forms(person_id)
 
@@ -351,7 +351,7 @@ def name_form_contributions(
     name_form: TextParam = Query(...),
     queries: PersonsQueries = Depends(persons_queries),
 ) -> NameFormContributionsResponse:
-    """Contributions sources + autres personnes partageant une forme de nom."""
+    """Contributions sources d'une forme de nom, et autres personnes qui la partagent."""
     return queries.name_form_contributions(person_id, name_form)
 
 
@@ -367,7 +367,7 @@ def add_person_identifier(
 ) -> AddIdentifierResponse:
     """Ajoute à la main un identifiant (ORCID, idHAL ou IdRef) à une personne.
 
-    La cascade de décision — insertion, idempotence, réattribution, conflit — appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`IdentifierAttributionConflictError`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
+    La décision (insertion, idempotence, réattribution, conflit) appartient à `add_identifier`, dont l'origine par défaut est manuelle (`IdentifierOrigin.MANUAL`) : il refuse alors les types qu'aucun humain n'attribue, et vérifie l'existence de la personne. Le router traduit l'issue en réponse. Les handlers globaux traduisent la personne absente (`NotFoundError`) en 404, le conflit (`IdentifierAttributionConflictError`) en 409, le type ou la valeur refusés (`ValidationError`) en 422.
     """
     result = persons.add_identifier(person_id, data.id_type, data.id_value)
     if result.outcome is AttributionOutcome.ALREADY_EXISTS:
@@ -403,9 +403,9 @@ def update_person_name(
     body: UpdatePersonName,
     persons: PersonService = Depends(person_service),
 ) -> OkResponse:
-    """Modifie le nom/prénom d'une personne.
+    """Modifie le nom et le prénom d'une personne.
 
-    Renvoie 422 sans patronyme, 404 sur une personne introuvable (`update_name`).
+    Renvoie 422 sans nom de famille, 404 sur une personne introuvable (`update_name`).
     """
     persons.update_name(person_id, body.last_name, body.first_name)
     return OkResponse()
@@ -442,7 +442,7 @@ def detach_contributions(
     body: DetachContributions,
     persons: PersonService = Depends(person_service),
 ) -> DetachContributionsResponse:
-    """Rejette durablement les paires (publication, personne) des contributions sources choisies, et nettoie les formes de nom devenues sans objet."""
+    """Rejette durablement les paires (publication, personne) des contributions sources choisies, et supprime les formes de nom devenues sans objet."""
     return DetachContributionsResponse.model_validate(
         persons.detach_contributions(
             person_id,
@@ -462,7 +462,7 @@ def update_name_form_status(
 ) -> NameFormStatusResponse:
     """Met à jour le statut d'une forme de nom : `pending`, `confirmed` ou `rejected`.
 
-    `rejected` pose un verrou durable. Les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne : le run suivant les redécide. `confirmed` valide le lien et corrobore les rapprochements faits par identifiant, qui n'éprouvent pas le nom.
+    Une forme rejetée sort durablement du rattachement par nom ; les contributions de la personne rattachées par le nom sous cette forme sont marquées pour la redécision de leur personne, au run suivant. Une forme confirmée valide le lien, et corrobore les rattachements par identifiant, faits sans test du nom.
     """
     row = persons.update_name_form_status(person_id, body.name_form, body.status)
     return NameFormStatusResponse(**row)

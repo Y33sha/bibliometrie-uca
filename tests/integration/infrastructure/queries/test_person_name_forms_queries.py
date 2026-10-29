@@ -77,7 +77,7 @@ class TestSyncFromRawForms:
         assert inserted == 1 and updated == 0 and deleted == 0
 
     def test_aggregates_sources_across_aligned_source_contributions_and_persons(self, sa_sync_conn):
-        """Une forme présente en `_raw_forms` (source 'persons') et portée par une contribution source HAL d'une contribution de la personne réunit les deux sources."""
+        """Une forme présente en `_raw_forms` (source 'persons') et présente dans une contribution source HAL d'une contribution de la personne réunit les deux sources."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         insert_person_contribution(
             sa_sync_conn, _source_contribution(sa_sync_conn, "dupond j", "hal"), person_id=pid
@@ -88,7 +88,7 @@ class TestSyncFromRawForms:
         assert ("dupond j", ["hal", "persons"]) in _fetch_pnf_for(sa_sync_conn, pid)
 
     def test_deletes_missing_form(self, sa_sync_conn):
-        """Une forme en base absente de l'état attendu (ni dans `_raw_forms`, ni portée par une contribution source des contributions de la personne) est supprimée."""
+        """Une forme en base absente de l'état attendu (ni dans `_raw_forms`, ni dans une contribution source des contributions de la personne) est supprimée."""
         pid = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         insert_person_name_form(sa_sync_conn, pid, name_form="obsolete", sources=["persons"])
 

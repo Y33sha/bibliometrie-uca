@@ -37,9 +37,7 @@ PublicationSort = Literal[
 ]
 
 
-# Vocabulaire des colonnes que l'export des publications sait émettre, dans l'ordre où elles
-# paraissent. L'appelant nomme celles qu'il veut voir ; une liste vide les demande toutes. Le
-# titre et les liens paraissent quoi qu'il arrive.
+# Vocabulaire des colonnes que l'export des publications sait émettre, dans l'ordre où elles paraissent. L'appelant nomme celles qu'il veut voir ; une liste vide les demande toutes. Le titre et les liens paraissent quoi qu'il arrive.
 EXPORT_COLUMNS: frozenset[str] = frozenset(
     {
         "type",
@@ -85,9 +83,9 @@ LICENSE_FILTER_VALUES: frozenset[str] = frozenset({*License, NO_LICENSE})
 class PublicationFilters:
     """Filtres de la page publications, partagés par la liste, les facettes et l'export.
 
-    Les trois lectures répondent aux mêmes questions sur le même ensemble : leurs décomptes, leurs lignes et leur export ne se recouperaient pas si elles n'écoutaient pas les mêmes filtres. Tous les champs ont un défaut, ce qui autorise les constructions partielles.
+    Les trois lectures comptent le même ensemble sous les mêmes filtres. Tous les champs ont un défaut : une construction partielle est possible.
 
-    Les listes valent absence de filtre quand elles sont vides. `lab_none` retient les publications qu'aucun laboratoire ne signe ; `is_corresponding`, `in_perimeter` et `has_apc` prennent des valeurs de `yes` / `no` combinées en OR, où cocher les deux ne contraint rien. `has_apc` retient les publications dont un paiement d'APC est imputé au budget d'une structure du périmètre.
+    Une liste vide laisse tout passer. `lab_none` retient les publications sans laboratoire ; `is_corresponding`, `in_perimeter` et `has_apc` prennent des valeurs `yes` et `no` combinées en OR : cocher les deux laisse tout passer. `has_apc` retient les publications dont un paiement d'APC est imputé au budget d'une structure du périmètre.
 
     `person_id` définit l'ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui. `author_id` restreint l'ensemble courant aux publications d'un auteur ; les deux se combinent.
     """
@@ -118,7 +116,7 @@ class PublicationFilters:
 
 
 # ---------------------------------------------------------------------------
-# DTOs Listing
+# Liste
 # ---------------------------------------------------------------------------
 
 
@@ -140,7 +138,7 @@ class PublicationApcPayment(BaseModel):
 
 
 class PublicationListItem(BaseModel):
-    """Ligne de `/api/publications` (liste + recherche)."""
+    """Ligne de `/api/publications` (liste et recherche)."""
 
     id: int
     title: str
@@ -195,14 +193,14 @@ class PublicationListResponse(PaginatedResponse):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Facettes
+# Facettes
 # ---------------------------------------------------------------------------
 
 
 class PublicationsFacetsResponse(BaseModel):
     """Facettes dynamiques pour la page publications.
 
-    Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est vide tant qu'un labo unique n'est pas sélectionné. `corresponding`, `in_perimeter` sont vides sans `person_id`.
+    Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est rempli seulement quand un seul laboratoire est sélectionné, `corresponding` et `in_perimeter` seulement avec `person_id`.
     """
 
     years: list[FacetOption]
@@ -222,7 +220,7 @@ class PublicationsFacetsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Détail publication
+# Détail d'une publication
 # ---------------------------------------------------------------------------
 
 
@@ -233,7 +231,9 @@ class PublicationDetailCore(BaseModel):
     title: str
     publication_year: int | None
     doi: str | None
-    doi_ra: str | None  # registration agency du préfixe DOI (Crossref / DataCite), via doi_prefixes
+    doi_ra: (
+        str | None
+    )  # Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`.
     doc_type: str
     oa_status: str
     license: str | None  # licence de la version éditeur
@@ -261,9 +261,6 @@ class SourceRecordOut(BaseModel):
     doi: str | None
     hal_collections: list[str] | None
     countries: list[str] | None
-    # Forme secondaire convergée (pièce, version ou variante dont le DOI a été substitué par
-    # celui de l'œuvre principale). La fiche replie ces sources sous un groupe dépliable.
-    is_secondary: bool
 
     @computed_field
     @property
@@ -289,7 +286,7 @@ class AccessLinkOut(BaseModel):
 
 
 class ConsolidatedContributionOut(BaseModel):
-    """Contribution consolidée (liens certifiés person ↔ publication)."""
+    """Contribution d'une personne à la publication."""
 
     author_position: int | None
     in_perimeter: bool
@@ -315,25 +312,19 @@ class ThesesContributionOut(BaseModel):
 
 
 class EcoleDoctorale(BaseModel):
-    """École doctorale d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
-
-    Lu depuis la colonne JSONB `source_extras.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
-    """
+    """École doctorale d'une thèse, d'après theses.fr (`source_extras.ecoles_doctorales`). `extra="allow"` accepte les clés inconnues."""
 
     model_config = ConfigDict(extra="allow")
     nom: str
-    ppn: str | None = None  # IdRef de l'ED quand disponible
+    ppn: str | None = None  # PPN IdRef de l'école doctorale, s'il est connu.
 
 
 class PartenaireThese(BaseModel):
-    """Partenaire de recherche d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
-
-    Lu depuis la colonne JSONB `source_extras.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
-    """
+    """Partenaire de recherche d'une thèse, d'après theses.fr (`source_extras.partenaires`). `extra="allow"` accepte les clés inconnues."""
 
     model_config = ConfigDict(extra="allow")
     nom: str
-    type: str | None = None  # ex: "etablissement", "laboratoire", …
+    type: str | None = None  # `etablissement`, `laboratoire`…
 
 
 class ThesisMeta(BaseModel):
@@ -353,7 +344,8 @@ class StructureInfo(BaseModel):
 class RelatedPublicationOut(BaseModel):
     """Une publication apparentée, vue depuis la publication courante.
 
-    `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`publication_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`."""
+    `relation_type` se lit depuis la publication courante : les relations entrantes sont inversées. Une cible du corpus a son identifiant, son titre, son année et son type, et son DOI s'il existe ; elle se lie par son identifiant. Une cible hors corpus a son seul DOI.
+    """
 
     relation_type: str
     doi: str | None = None
@@ -365,7 +357,7 @@ class RelatedPublicationOut(BaseModel):
 
 
 class PublicationDetailResponse(BaseModel):
-    """Détail complet d'une publication : métadonnées + sources + contributions."""
+    """Détail complet d'une publication : métadonnées, sources et contributions."""
 
     publication: PublicationDetailCore
     sources: list[SourceRecordOut]
@@ -395,7 +387,7 @@ class SourceRecordMetadataOut(BaseModel):
     source: str
     source_id: str
     doi: str | None
-    identifiers: list[ExternalIdentifierOut]  # identifiants actifs, hors DOI de la colonne `doi`
+    identifiers: list[ExternalIdentifierOut]  # identifiants actifs, hors DOI du champ `doi`
     title: str
     title_normalized: str | None  # forme de comparaison du titre
     doc_type: str | None
@@ -428,7 +420,7 @@ class SourceRecordMetadataOut(BaseModel):
 class SourceContributionOut(BaseModel):
     """Contribution source d'un enregistrement source, avec sa contribution : les contributions sources d'un même auteur dans la publication.
 
-    `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `reference_position`, position de la contribution source de référence de la contribution : absents pour une contribution source hors des contributions (collective, ou enregistrement écarté de l'alignement). `person_id` : personne de la contribution. `method`, `score`, `margin` : entrée de la contribution source dans sa contribution ; score et marge en bits, pour le modèle.
+    `position` est le rang d'auteur dans l'enregistrement source, à partir de 0 ; il manque pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes. `contribution_id` et `reference_position` (position de la contribution source de référence de la contribution) manquent pour une contribution source hors contribution : collective, ou d'un enregistrement écarté de l'alignement. `person_id` est la personne de la contribution. `method`, `score` et `margin` décrivent l'entrée de la contribution source dans sa contribution ; score et marge sont en bits.
     """
 
     id: int

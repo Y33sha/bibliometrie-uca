@@ -2,7 +2,7 @@
 
 Pas de réseau ni de base : un faux client sert des réponses scriptées, la configuration et l'écriture dans `staging` sont remplacées, et la fixture `pauses` intercepte `time.sleep`.
 
-Ce qui est éprouvé ici est le pilotage : pagination sur `firstRecord`, abandon après trois pages vides consécutives, plafond de l'API, isolement de l'échec d'une année, refus d'une configuration incomplète, arrêt sur circuit-breaker.
+Les tests vérifient le pilotage : pagination sur `firstRecord`, abandon après trois pages vides consécutives, plafond de l'API, isolement de l'échec d'une année, refus d'une configuration incomplète, arrêt sur circuit-breaker.
 """
 
 from __future__ import annotations

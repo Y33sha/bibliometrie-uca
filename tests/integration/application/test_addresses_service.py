@@ -48,7 +48,7 @@ def contribution_repo(sa_sync_conn):
     return contribution_repository(sa_sync_conn)
 
 
-# ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
+# ── Helpers ───────────────────────────────────────────────────────
 
 
 def _get_link(conn, address_id, structure_id):
@@ -96,7 +96,7 @@ class TestReviewStructureLink:
         assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is True
 
     def test_reset_deletes_manual_link(self, sa_sync_conn, service):
-        """Reset supprime le lien manuel (matched_form_id IS NULL)."""
+        """La réinitialisation supprime un lien manuel, sans forme de nom détectée."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=True)  # manuel
@@ -106,7 +106,7 @@ class TestReviewStructureLink:
         assert _get_link(sa_sync_conn, addr, uca) is None
 
     def test_reset_preserves_auto_link_but_clears_confirmation(self, sa_sync_conn, service):
-        """Reset sur un lien auto-détecté : le lien reste, is_confirmed → NULL."""
+        """La réinitialisation d'un lien détecté par une forme de nom garde le lien et remet sa confirmation à NULL."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         form_id = insert_structure_name_form(sa_sync_conn, uca, form_text="uca")
@@ -117,8 +117,8 @@ class TestReviewStructureLink:
         service.review_structure_link(addr, uca, None)
 
         link = _get_link(sa_sync_conn, addr, uca)
-        assert link is not None  # lien auto préservé
-        assert link["is_confirmed"] is None  # confirmation nettoyée
+        assert link is not None  # lien détecté gardé
+        assert link["is_confirmed"] is None  # confirmation remise à NULL
         assert link["matched_form_id"] == form_id
 
 
@@ -205,7 +205,7 @@ class TestSetCountry:
         assert _get_countries(sa_sync_conn, addr) is None
 
     def test_raises_on_unknown_address(self, sa_sync_conn, service):
-        """L'`UPDATE` n'apparie aucune ligne : sans cette garde, l'API répondrait 200 sans rien faire."""
+        """Une adresse inconnue lève `NotFoundError` au lieu d'une mise à jour sans effet."""
         ensure_country(sa_sync_conn, "FR")
         with pytest.raises(NotFoundError):
             service.set_country(999999, ["FR"])
@@ -249,7 +249,7 @@ class TestBatchSetCountryByIds:
             service.batch_set_country_by_ids("ZZ", [addr])
 
     def test_raises_on_empty_country_code(self, sa_sync_conn, service):
-        """La chaîne vide ne figure pas au référentiel : le contrôle référentiel la couvre."""
+        """La chaîne vide est refusée comme code pays inconnu."""
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         with pytest.raises(ValidationError, match="Code pays inconnu"):
             service.batch_set_country_by_ids("", [addr])
@@ -298,7 +298,7 @@ class TestBatchSetCountryByFilter:
         assert addr_yes not in modified
 
     def test_empty_filter_raises(self, sa_sync_conn, service):
-        """Aucun filtre → refus (garde-fou : ne pas viser toutes les adresses)."""
+        """Un appel sans filtre est refusé : il viserait toutes les adresses."""
         with pytest.raises(ValidationError):
             service.batch_set_country_by_filter("FR")
 
@@ -308,7 +308,7 @@ def _marked(conn, address_id):
 
 
 class TestAddressCountriesQueue:
-    """Une saisie de pays marque l'adresse : le run suivant reprend la propagation vers les publications si le recalcul ciblé a échoué."""
+    """Une saisie de pays met l'adresse en file : si le recalcul ciblé échoue, le run suivant reprend la propagation vers les publications."""
 
     def test_set_country_marks_the_address(self, sa_sync_conn, service):
         ensure_country(sa_sync_conn, "FR")
@@ -343,8 +343,7 @@ class TestPropagateCountriesToPublications:
         service.propagate_countries_to_publications([])  # pas d'exception
 
     def test_propagates_to_source_record_and_publication(self, sa_sync_conn, service):
-        """Test d'intégration minimal : une adresse avec countries liée à
-        une source_contribution, le pays doit remonter jusqu'à publications.countries."""
+        """Le pays d'une adresse remonte à l'enregistrement source puis à la publication de la contribution source liée à l'adresse."""
         ensure_country(sa_sync_conn, "FR")
         publication_id = insert_publication(
             sa_sync_conn, "Test", normalize_title=False, doc_type=None
@@ -362,48 +361,43 @@ class TestPropagateCountriesToPublications:
 
         service.propagate_countries_to_publications([addr])
 
-        # source_records.countries mis à jour
+        # Pays de l'enregistrement source.
         source_record_countries = sa_sync_conn.execute(
             text("SELECT countries FROM source_records WHERE id = :id"), {"id": source_record_id}
         ).scalar_one()
         assert source_record_countries == ["FR"]
-        # publications.countries mis à jour
+        # Pays de la publication.
         p_countries = sa_sync_conn.execute(
             text("SELECT countries FROM publications WHERE id = :id"), {"id": publication_id}
         ).scalar_one()
         assert p_countries == ["FR"]
 
 
-# ── No-op skip (éviter les cascades massives inutiles) ────────────
+# ── Propagation limitée aux changements du périmètre ──────────────
 
 
 class TestPropagationSkipsNoOp:
-    """Vérifie que `changed` (les adresses à propager) est vide quand le
-    changement de is_confirmed n'affecte pas le calcul in_perimeter — la
-    propagation (désormais lancée en tâche de fond par le caller) n'est alors
-    pas planifiée.
+    """La revue d'un lien renvoie seulement les adresses dont la contribution au périmètre change : seules celles-ci sont à propager.
 
-    Règle : contribue au périmètre ssi le lien existe ET
-    is_confirmed IS DISTINCT FROM FALSE (NULL ou TRUE).
-    Donc NULL ↔ TRUE ne changent rien, seuls les passages par FALSE comptent.
+    Une adresse contribue au périmètre si le lien existe et que sa confirmation diffère de FALSE (NULL ou TRUE). Seuls les passages par FALSE changent donc la contribution.
     """
 
     def test_confirm_auto_detected_skips_propagation(self, sa_sync_conn, service):
-        """Click Relier sur une adresse auto-détectée (NULL → TRUE) = no-op."""
+        """Confirmer un lien détecté (NULL → TRUE) laisse le périmètre inchangé."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        # Lien auto-détecté, is_confirmed=NULL (cas reproducteur du bug initial)
+        # Lien détecté par une forme de nom, sans confirmation.
         form_id = insert_structure_name_form(sa_sync_conn, uca, form_text="uca")
         insert_address_structure(sa_sync_conn, addr, structure_id=uca, matched_form_id=form_id)
 
         changed = service.review_structure_link(addr, uca, True)
 
         assert changed == []
-        # Le lien a bien été mis à jour
+        # Le lien est confirmé.
         assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is True
 
     def test_reconfirm_already_confirmed_skips_propagation(self, sa_sync_conn, service):
-        """Cliquer Relier sur un lien déjà TRUE = no-op."""
+        """Confirmer un lien déjà confirmé laisse le périmètre inchangé."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=True)
@@ -413,7 +407,7 @@ class TestPropagationSkipsNoOp:
         assert changed == []
 
     def test_confirm_rejected_triggers_propagation(self, sa_sync_conn, service):
-        """FALSE → TRUE : vrai changement, propagation attendue."""
+        """Confirmer un lien rejeté (FALSE → TRUE) fait entrer l'adresse dans le périmètre."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=False)
@@ -423,7 +417,7 @@ class TestPropagationSkipsNoOp:
         assert changed == [addr]
 
     def test_reject_confirmed_triggers_propagation(self, sa_sync_conn, service):
-        """TRUE → FALSE : vrai changement (sort du périmètre), propagation."""
+        """Rejeter un lien confirmé (TRUE → FALSE) sort l'adresse du périmètre."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
         insert_address_structure(sa_sync_conn, addr, structure_id=uca, is_confirmed=True)
@@ -432,31 +426,30 @@ class TestPropagationSkipsNoOp:
 
         assert changed == [addr]
 
-    def test_reject_absent_creates_and_triggers_propagation(self, sa_sync_conn, service):
-        """Pas de lien → FALSE : pas de contribution avant ni après, no-op."""
+    def test_reject_absent_creates_rejected_link_without_propagation(self, sa_sync_conn, service):
+        """Rejeter un lien absent crée un lien rejeté : l'adresse reste hors du périmètre."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = service.review_structure_link(addr, uca, False)
 
-        # Avant = pas de lien (ne contribue pas), après = lien FALSE (ne contribue pas)
-        # → no-op
         assert changed == []
+        assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is False
 
     def test_confirm_absent_creates_and_triggers_propagation(self, sa_sync_conn, service):
-        """Pas de lien → TRUE : contribue maintenant, propagation attendue."""
+        """Confirmer un lien absent crée un lien confirmé, qui fait entrer l'adresse dans le périmètre."""
         uca = insert_persons_perimeter(sa_sync_conn)
         addr = insert_address(sa_sync_conn, "Université Clermont Auvergne")
 
         changed = service.review_structure_link(addr, uca, True)
 
         assert changed == [addr]
+        assert _get_link(sa_sync_conn, addr, uca)["is_confirmed"] is True
 
     def test_batch_only_propagates_changed(self, sa_sync_conn, service):
-        """Batch mixte : certaines adresses changent, d'autres non.
-        `changed` restreint aux adresses effectivement impactées."""
+        """En lot, seules les adresses dont la contribution au périmètre change sont renvoyées."""
         uca = insert_persons_perimeter(sa_sync_conn)
-        # a1 : auto-détectée NULL → TRUE (no-op)
+        # a1 : détectée, NULL → TRUE (sans changement)
         # a2 : rejetée FALSE → TRUE (changement)
         # a3 : pas de lien → TRUE (changement)
         a1 = insert_address(sa_sync_conn, "a1")
@@ -468,5 +461,5 @@ class TestPropagationSkipsNoOp:
 
         _, changed = service.batch_review_structure_link([a1, a2, a3], uca, True)
 
-        # a1 inchangée (déjà contribuait), a2 et a3 nouvellement contribuent
+        # a1 contribuait déjà ; a2 et a3 entrent dans le périmètre.
         assert set(changed) == {a2, a3}

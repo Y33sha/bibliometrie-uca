@@ -1,4 +1,4 @@
-"""Service du frontend SvelteKit buildé, monté à la racine par `app.py`."""
+"""Service du frontend SvelteKit compilé, monté à la racine par `app.py`."""
 
 import pathlib
 
@@ -11,7 +11,7 @@ from infrastructure import PROJECT_ROOT
 
 BUILD_DIR = PROJECT_ROOT / "interfaces" / "frontend" / "build"
 
-# `StaticFiles` rend le chemin relatif au point de montage et normalisé par le système :
+# `StaticFiles` renvoie le chemin relatif au point de montage et normalisé par le système :
 # le séparateur est celui de la plateforme, d'où la comparaison sur les segments.
 _API_SEGMENT = "api"
 
@@ -26,9 +26,9 @@ class SPAStaticFiles(StaticFiles):
 
     Seul le fichier absent (404) déclenche ces reprises ; les autres erreurs remontent, plutôt que de servir `index.html` à leur place.
 
-    Le repli s'arrête à la frontière de l'API. Monté à la racine, ce service reçoit tout ce qu'aucun router n'a pris, `/api/*` compris : un chemin d'API inconnu doit rendre un 404, non la page d'accueil du frontend sous un code 200.
+    Le repli s'arrête à la frontière de l'API. Monté à la racine, ce service reçoit tout ce qu'aucun router n'a pris, `/api/*` compris : un chemin d'API inconnu renvoie un 404, et la page d'accueil du frontend reste hors de l'API.
 
-    Le segment `api` est reconnu où qu'il se trouve dans le chemin : un préfixe de déploiement laissé en place le décale d'un cran, et un appel d'API qui recevrait la page d'accueil sous un code 200 serait une panne muette. Aucune page du frontend ne porte ce segment.
+    Le segment `api` est reconnu où qu'il se trouve dans le chemin : un préfixe de déploiement laissé en place le décale d'un cran, et un appel d'API qui recevrait la page d'accueil sous un code 200 serait une panne muette. Aucune page du frontend ne contient ce segment.
     """
 
     async def get_response(self, path: str, scope: Scope) -> Response:

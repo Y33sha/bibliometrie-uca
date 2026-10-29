@@ -1,6 +1,6 @@
 """Lecture d'un relevé SQL à une seule valeur.
 
-Une requête écrite en texte ignore le type de ses colonnes : `scalar_one` rend une valeur dont le vérificateur de types ne sait rien, et la déclaration de retour de l'appelant l'affirme sans que rien ne l'établisse. Ces fonctions font le contrôle, une fois, à l'endroit où la valeur passe du SQL au Python.
+Une requête écrite en texte ignore le type de ses colonnes : `scalar_one` renvoie une valeur dont le vérificateur de types ne sait rien, et la déclaration de retour de l'appelant l'affirme sans que rien ne l'établisse. Ces fonctions font le contrôle, une fois, à l'endroit où la valeur passe du SQL au Python.
 
 Elles s'appliquent aux relevés d'une ligne et d'une colonne — un `COUNT`, un identifiant rendu par `RETURNING`, un agrégat. Une valeur d'une autre nature que celle attendue signale une requête qui ne dit pas ce que son appelant croit, et lève.
 """
@@ -31,7 +31,7 @@ def scalar_int(result: ScalarResult) -> int:
 
 
 def scalar_datetime_or_none(result: ScalarResult) -> datetime | None:
-    """L'instant unique du relevé, ou `None` — le cas d'un agrégat sur un ensemble vide."""
+    """L'instant unique du relevé, ou `None` : le cas d'un agrégat sur un ensemble vide."""
     value = result.scalar_one()
     if value is None or isinstance(value, datetime):
         return value

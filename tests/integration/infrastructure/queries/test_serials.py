@@ -11,6 +11,11 @@ from sqlalchemy import text
 from domain.serials.doi_namespaces import DoiNamespace
 from domain.serials.issns import IssnStatus, IssnSupport, SerialIssn
 from domain.serials.serial import SerialType
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.transformation.publishing.serials.check_serials_in_sudoc import (
     find_serials_to_check_in_sudoc,
     find_titles_of_serials_with_issn,
@@ -92,7 +97,7 @@ class TestSudocCheck:
         assert checked not in rows
 
     def test_queue_holds_serials_whose_records_carry_an_unknown_issn(self, sa_sync_conn, repo):
-        """Une revue vérifiée revient dans la file quand un de ses enregistrements, quelle que soit sa source, porte un ISSN absent de ses ISSN. La valeur reçue est normalisée ; une valeur invalide est ignorée."""
+        """Une revue vérifiée revient dans la file quand un de ses enregistrements, quelle que soit sa source, contient un ISSN absent de ses ISSN. La valeur reçue est normalisée ; une valeur invalide est ignorée."""
         serial_id = _serial(sa_sync_conn, issn="0149-5992", sudoc_checked=True)
         _article(
             sa_sync_conn,
@@ -136,7 +141,7 @@ class TestSudocCheck:
         assert serial_id not in {r.id for r in find_serials_to_check_in_sudoc(sa_sync_conn)}
 
     def test_find_by_issn_reaches_inactive_issns(self, sa_sync_conn, repo):
-        """Un ISSN inactif sert au rapprochement ; une revue où il est actif passe avant ; une valeur mal formée n'en sert pas."""
+        """Un ISSN inactif sert à retrouver la revue ; une revue où il est actif passe avant ; une valeur mal formée ne sert pas."""
         holding = _serial(sa_sync_conn, issn="0305-1048")
         insert_serial_issn(sa_sync_conn, holding, issn="1362-4954", status=IssnStatus.RELATED_TITLE)
         insert_serial_issn(sa_sync_conn, holding, issn="1950-2051", status=IssnStatus.MALFORMED)
@@ -146,7 +151,7 @@ class TestSudocCheck:
         assert repo.find_serial_by_issn_any("1362-4954") == carrying
 
     def test_merge_groups_hold_checked_serials_sharing_an_issnl(self, sa_sync_conn, repo):
-        """La revue qui porte le plus de publications vient en tête du groupe ; une revue non vérifiée en est exclue."""
+        """La revue qui a le plus de publications vient en tête du groupe ; une revue non vérifiée en est exclue."""
         keeper = _serial(sa_sync_conn, issnl="2999-0001", sudoc_checked=True)
         absorbed = _serial(sa_sync_conn, issnl="2999-0001", sudoc_checked=True)
         unchecked = _serial(sa_sync_conn, issnl="2999-0001")
@@ -252,7 +257,7 @@ class TestSudocCheck:
         assert unchecked not in {i for ids in groups.values() for i in ids}
 
     def test_serials_sharing_a_publication(self, sa_sync_conn, repo):
-        """Deux revues que les enregistrements d'une publication portent forment une paire."""
+        """Deux revues désignées par les enregistrements d'une même publication forment une paire."""
         full = _serial(sa_sync_conn, title="Journal test complet", issn="2999-0009")
         abbreviated = _serial(sa_sync_conn, title="J.Test Compl.")
         publication_id = insert_publication(
@@ -497,11 +502,49 @@ class TestDoiNamespaces:
             serial_id=serial_id,
         )
         sa_sync_conn.execute(
-            text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE doi = :doi"),
-            {"raw": '{"serial_id": {"raw": null, "corrected_by": "X"}}', "doi": "10.9001/abc.2"},
+            text(
+                "UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE source_id = :sid"
+            ),
+            {
+                "raw": '{"serial_id": {"raw": null, "corrected_by": "X"}}',
+                "sid": f"sp-{serial_id}-10.9001/abc.2",
+            },
         )
         pairs = [p for p in find_doi_serial_pairs(sa_sync_conn) if p.serial_id == serial_id]
         assert [(p.doi, p.serial_type) for p in pairs] == [("10.9001/abc.1", SerialType.UNKNOWN)]
+
+    def test_doi_secondaire_d_agregateur_exclu_des_temoins(self, sa_sync_conn, repo):
+        """Régression : des works OpenAlex sans DOI `derived`, rattachés à tort à une revue, faisaient voter leurs copies de repository Apollo (`10.17863/cam.`) pour elle."""
+        serial_id = _serial(sa_sync_conn)
+        secondary = SourceIdentifierRole.SECONDARY
+        _article(
+            sa_sync_conn,
+            source="openalex",
+            source_id="W1",
+            serial_id=serial_id,
+            identifiers=[SourceIdentifier(SourceIdentifierType.DOI, "10.17863/cam.1", secondary)],
+        )
+        _article(
+            sa_sync_conn,
+            source="hal",
+            source_id="hal-1",
+            serial_id=serial_id,
+            identifiers=[SourceIdentifier(SourceIdentifierType.DOI, "10.9001/abc.1", secondary)],
+        )
+        _article(
+            sa_sync_conn,
+            source="openalex",
+            source_id="W2",
+            serial_id=serial_id,
+            identifiers=[
+                SourceIdentifier(
+                    SourceIdentifierType.DOI, "10.9001/abc.2", SourceIdentifierRole.DERIVED
+                ),
+                SourceIdentifier(SourceIdentifierType.DOI, "10.17863/cam.2", secondary),
+            ],
+        )
+        pairs = [p for p in find_doi_serial_pairs(sa_sync_conn) if p.serial_id == serial_id]
+        assert sorted(p.doi for p in pairs) == ["10.9001/abc.1", "10.9001/abc.2"]
 
     def test_store_vide_puis_ecrit(self, sa_sync_conn, repo):
         serial_id = _serial(sa_sync_conn)

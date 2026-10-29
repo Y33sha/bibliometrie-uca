@@ -1,4 +1,4 @@
-"""Tests de l'aggregate `IdentifierAttribution` (scaffolding Phase 1)."""
+"""Tests de l'aggregate `IdentifierAttribution`."""
 
 import pytest
 
@@ -64,7 +64,7 @@ class TestTransferTo:
         assert ident.source == "auto"
 
     def test_raises_on_confirmed(self):
-        # Attribution verrouillée admin : jamais transférée automatiquement.
+        # Une attribution confirmée reste à sa personne.
         ident = _make(status=AttributionStatus.CONFIRMED)
         with pytest.raises(IdentifierAttributionConflictError):
             ident.transfer_to(99, source="auto")
@@ -72,7 +72,7 @@ class TestTransferTo:
         assert ident.status is AttributionStatus.CONFIRMED
 
     def test_raises_on_rejected(self):
-        # Le rejeté relève de reattribute_to, pas du transfert automatique.
+        # Une attribution rejetée change de personne seulement par `reattribute_to`.
         ident = _make(status=AttributionStatus.REJECTED)
         with pytest.raises(IdentifierAttributionConflictError):
             ident.transfer_to(99, source="auto")

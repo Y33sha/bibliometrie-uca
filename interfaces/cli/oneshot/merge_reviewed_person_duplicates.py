@@ -48,7 +48,7 @@ def current_person(conn: Connection, person_id: int) -> int | None:
 
 
 def merge_pairs(conn: Connection, pairs: Iterable[tuple[int, int]], *, apply: bool) -> Counter[str]:
-    """Fusionne chaque couple (conservée, absorbée), commite chaque fusion si `apply`, et rend le décompte des issues."""
+    """Fusionne chaque couple (conservée, absorbée), commite chaque fusion si `apply`, et renvoie le décompte des issues."""
     outcomes: Counter[str] = Counter()
     persons = person_service(conn)
     for kept, absorbed in pairs:

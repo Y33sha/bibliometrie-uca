@@ -52,7 +52,7 @@
 
 ## Phases du pipeline
 
-A jour au 2026-10-25
+A jour au 2026-10-29
 
 `harvest` — Moissonnage HAL/OpenAlex/WoS/ScanR/theses/DataCite
 `harvest_by_person` — Moissonnage par identifiant des personnes RH (ORCID, idHAL, IdRef)
@@ -65,6 +65,7 @@ A jour au 2026-10-25
 `publishing` — Référentiels de l'édition : éditeurs, publications en série, monographies (DOI, APC, DOAJ)
 `metadata_correction` — Corrections métadonnées
 `publications` — Création/rattachement publications
+`author_grouping` — Alignement des auteurs des enregistrements sources d'une même publication
 `persons` — Création personnes
 `finalize` — Périmètre des publications, vues des structures, purges et compteurs
 `relations` — Relations sémantiques entre publications

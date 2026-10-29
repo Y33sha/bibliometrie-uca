@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/services/perimeters.py et l'hydratation du PerimeterRepository."""
+"""Tests de caractérisation du service des périmètres et de la lecture d'un périmètre par son repository."""
 
 import pytest
 from sqlalchemy import text
@@ -21,10 +21,7 @@ def service(sa_sync_conn):
     return perimeter_service(sa_sync_conn)
 
 
-# ── Helpers ────────────────────────────────────────────────────────
-
-
-# ── find_by_id (hydratation Perimeter) ─────────────────────────────
+# ── find_by_id ─────────────────────────────────────────────────────
 
 
 class TestPerimeterFindById:
@@ -118,13 +115,13 @@ class TestDeletePerimeter:
         assert result.first() is None
 
     def test_raises_if_used_by_config(self, sa_sync_conn, service):
-        """Si le périmètre est référencé dans config (perimeter_*), refus."""
+        """La suppression d'un périmètre désigné par une clé de configuration `perimeter_*` est refusée."""
         p = insert_perimeter(sa_sync_conn, "used_perim", name="Test")
         set_config(sa_sync_conn, "perimeter_extraction", "used_perim")
 
         with pytest.raises(ConflictError, match="utilisé par"):
             service.delete_perimeter(p)
 
-        # Le périmètre existe toujours
+        # Le périmètre reste en base.
         result = sa_sync_conn.execute(text("SELECT id FROM perimeters WHERE id = :p"), {"p": p})
         assert result.first() is not None

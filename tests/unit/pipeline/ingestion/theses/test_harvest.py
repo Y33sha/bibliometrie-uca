@@ -58,7 +58,7 @@ def _these(identifiant: str, **champs) -> dict:
 
 
 def _client(pages: list[list[dict]], *, total: int | None = None) -> MagicMock:
-    """Faux client servant `pages` successivement, chacune portant le `totalHits` de la recherche."""
+    """Faux client servant `pages` successivement, chacune avec le `totalHits` de la recherche."""
     client = MagicMock()
     total_hits = total if total is not None else sum(len(p) for p in pages)
     client.fetch_page.side_effect = [{"totalHits": total_hits, "theses": p} for p in pages or [[]]]
@@ -106,7 +106,7 @@ def test_page_vide_interrompt_la_boucle():
 
 @pytest.fixture
 def details(monkeypatch):
-    """Simule les thèses présentes dans `staging` (`presentes`) et la lecture du détail. Rend les identifiants dont le détail est lu, et `presentes`."""
+    """Simule les thèses présentes dans `staging` (`presentes`) et la lecture du détail. Renvoie les identifiants dont le détail est lu, et `presentes`."""
     lus: list[str] = []
     presentes: set[str] = set()
 

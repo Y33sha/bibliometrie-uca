@@ -1,4 +1,6 @@
-"""Indices de l'entrée des contributions sources dans le périmètre : synchronisation de `source_contributions.perimeter_evidence` sur la vue `source_contribution_structures` et les identifiants des personnes qui ont une fiche RH. Partagée par la phase `affiliations` et le recalcul ciblé après une correction d'adresse (`SourceContributionPerimeterRecompute`)."""
+"""Indices de l'entrée des contributions sources dans le périmètre (`source_contributions.perimeter_evidence`), d'après les structures qu'elles atteignent et les identifiants des personnes qui ont une fiche RH.
+
+Le module sert la phase `affiliations` et le recalcul ciblé après une correction d'adresse (`SourceContributionPerimeterRecompute`)."""
 
 from typing import NamedTuple
 
@@ -16,14 +18,14 @@ from pipeline.transformation.publications.publication_perimeter import (
 
 
 class InPerimeterSyncCounts(NamedTuple):
-    """Nombre de `source_contributions` entrées dans le périmètre et sorties du périmètre lors d'une synchronisation."""
+    """Nombre de contributions sources entrées dans le périmètre et sorties du périmètre lors d'une synchronisation."""
 
     added: int
     removed: int
 
 
 def _sync_sql(scoped: bool) -> str:
-    """Synchronisation de `perimeter_evidence` sur les indices calculés, restreinte aux contributions sources `:source_contribution_ids` quand `scoped` est vrai.
+    """Requête de synchronisation des indices, restreinte à une liste de contributions sources si `scoped` est vrai.
 
     Seules les contributions sources dont les indices changent sont écrites. Un enregistrement source sans publication dont une contribution source entre dans le périmètre est marqué pour la réconciliation : la phase `publications` le met alors en publication. Les contributions des contributions sources écrites sont marquées pour la recomposition de leurs attributs.
     """
@@ -71,7 +73,7 @@ _SYNC_SCOPED = text(_sync_sql(scoped=True))
 
 
 def refresh_source_contribution_structures(conn: Connection) -> None:
-    """Rafraîchit la matview `source_contribution_structures`, qui alimente `sync_perimeter_evidence`.
+    """Rafraîchit la vue matérialisée `source_contribution_structures`, qui alimente `sync_perimeter_evidence`.
 
     À appeler après la matérialisation de `perimeter_structures` et la résolution des adresses, et avant le rafraîchissement de `contribution_structures`, qui en dérive.
     """
@@ -81,7 +83,7 @@ def refresh_source_contribution_structures(conn: Connection) -> None:
 def sync_perimeter_evidence(
     conn: Connection, *, perimeter_ids: list[int], source_contribution_ids: list[int] | None = None
 ) -> InPerimeterSyncCounts:
-    """Aligne `source_contributions.perimeter_evidence` sur les indices calculés (`source_contribution_perimeter_evidence`), pour toutes les contributions sources ou pour `source_contribution_ids`."""
+    """Aligne les indices des contributions sources sur leur calcul, pour toutes ou pour la liste donnée. Renvoie le nombre d'entrées et de sorties du périmètre."""
     if source_contribution_ids is None:
         row = conn.execute(_SYNC_ALL, {"perimeter_ids": perimeter_ids}).one()
     else:
@@ -93,7 +95,7 @@ def sync_perimeter_evidence(
 
 
 class SourceContributionPerimeterRecompute:
-    """Recalcul ciblé du périmètre après une correction d'adresse par l'administration (port injecté par l'API)."""
+    """Recalcul ciblé du périmètre après une correction d'adresse par l'administration, pour l'API."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -103,7 +105,7 @@ class SourceContributionPerimeterRecompute:
         source_contribution_ids: list[int],
         perimeter_structure_ids: list[int],
     ) -> None:
-        """Rafraîchit la matview `source_contribution_structures`, puis recalcule les indices des contributions sources données, de leurs contributions et de leurs publications, par les mêmes requêtes que le pipeline."""
+        """Rafraîchit la vue matérialisée `source_contribution_structures`, puis recalcule les indices des contributions sources données, de leurs contributions et de leurs publications, par les mêmes requêtes que le pipeline."""
         refresh_source_contribution_structures(self._conn)
         sync_perimeter_evidence(
             self._conn,

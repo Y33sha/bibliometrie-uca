@@ -1,6 +1,6 @@
 """Store des revues : recherche, création, enrichissement, ISSN, formes de nom et type de la table `serials`, pour le pipeline.
 
-L'édition dans l'administration et la fusion passent par `infrastructure/repositories/serial_repository.py`.
+L'édition dans l'administration passe par `infrastructure/repositories/serial_repository.py`, la fusion par `serial_merge`.
 """
 
 from collections.abc import Sequence
@@ -45,15 +45,13 @@ class SerialStore:
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── serial_name_forms ─────────────────────────────────────────
-
     def add_serial_name_form(
         self,
         serial_id: int,
         form_normalized: str,
         publisher_id: int | None,
     ) -> None:
-        """Ajoute une forme de nom normalisée pour une revue, si absente (idempotent). No-op si `form_normalized` est vide."""
+        """Ajoute une forme de nom normalisée à une revue, si elle est absente et non vide."""
         if not form_normalized:
             return
         stmt = (
@@ -72,7 +70,7 @@ class SerialStore:
         form_normalized: str,
         publisher_id: int | None,
     ) -> int | None:
-        """Cherche un `serial_id` par forme de nom normalisée. En cas d'ambiguïté, privilégie les revues à ISSN électronique actif. `publisher_id` fourni : restreint aux formes de cet éditeur ou sans éditeur."""
+        """Revue d'une forme de nom normalisée. Une revue à ISSN électronique actif passe en premier. Avec un éditeur, seules comptent les formes de cet éditeur ou sans éditeur."""
         stmt = (
             select(serial_name_forms.c.serial_id)
             .select_from(
@@ -100,15 +98,13 @@ class SerialStore:
             )
         return self._conn.execute(stmt).scalar_one_or_none()
 
-    # ── Recherche, création, enrichissement ────────────────────────
-
     def find_serial_by_openalex_id(self, openalex_id: str) -> int | None:
         return self._conn.execute(
             select(serials.c.id).where(serials.c.openalex_id == openalex_id)
         ).scalar_one_or_none()
 
     def find_serial_by_issn_any(self, issn_value: str) -> int | None:
-        """Cherche une revue qui a l'ISSN `issn_value`, quel que soit son statut, hors valeur mal formée. Une revue où l'ISSN est actif passe en premier."""
+        """Revue qui a l'ISSN, quel que soit son statut, hors valeur mal formée. Une revue où l'ISSN est actif passe en premier."""
         return self._conn.execute(
             select(serial_issns.c.serial_id)
             .where(
@@ -116,7 +112,6 @@ class SerialStore:
                 serial_issns.c.serial_id.is_not(None),
                 serial_issns.c.status != IssnStatus.MALFORMED,
             )
-            # Une revue où l'ISSN est actif passe avant une revue où il ne l'est pas.
             .order_by(
                 case((serial_issns.c.status == IssnStatus.ACTIVE, 0), else_=1),
                 serial_issns.c.serial_id,
@@ -131,7 +126,7 @@ class SerialStore:
         openalex_id: str | None,
         oa_model: OaModel | None,
     ) -> int:
-        """Insère un journal et retourne son id. `title_normalized` est dérivé de `title` ; l'éditeur se calcule d'après les publications (`refresh_serial_publishers`)."""
+        """Insère une revue et renvoie son id. L'éditeur se calcule d'après les publications (`refresh_serial_publishers`)."""
         stmt = (
             serials.insert()
             .values(
@@ -151,8 +146,7 @@ class SerialStore:
         openalex_id: str | None = None,
         oa_model: OaModel | None = None,
     ) -> None:
-        # L'UPDATE n'est émis que si au moins une colonne NULL recevrait une valeur.
-        """Complète une revue existante avec les champs non nuls fournis, en COALESCE par champ : une valeur déjà en place est conservée."""
+        """Complète les champs vides d'une revue avec les valeurs fournies ; une valeur déjà en place reste."""
         fillable = (
             (serials.c.openalex_id, openalex_id),
             (serials.c.oa_model, oa_model),
@@ -165,8 +159,7 @@ class SerialStore:
             .where(serials.c.id == serial_id, or_(*null_targets))
             .values(
                 openalex_id=func.coalesce(serials.c.openalex_id, openalex_id),
-                # Le littéral est lié au type de la colonne : `coalesce` ne le lui emprunte pas, et
-                # `oa_model` est une enum, qu'un paramètre texte ne rejoint pas.
+                # Le littéral reçoit le type enum de la colonne ; sans lui, `coalesce` reçoit un paramètre texte.
                 # Un modèle OA saisi à la main reste, même vide.
                 oa_model=case(
                     (
@@ -180,10 +173,8 @@ class SerialStore:
             )
         )
 
-    # ── ISSN ───────────────────────────────────────────────────────
-
     def issns_are_manual(self, serial_id: int) -> bool:
-        """Les ISSN de la revue sont saisis à la main : ils font autorité, le pipeline ne les écrit pas."""
+        """Vrai si les ISSN de la revue sont saisis à la main : ils font autorité, et le pipeline les laisse."""
         return bool(
             self._conn.execute(
                 select(literal(ManualField.ISSNS.value) == any_(serials.c.manual_fields)).where(
@@ -232,8 +223,6 @@ class SerialStore:
                     .on_conflict_do_nothing()
                 )
 
-    # ── Type ───────────────────────────────────────────────────────
-
     def set_serial_type_if_unknown(self, serial_id: int, serial_type: SerialType) -> None:
         """Pose le `serial_type` d'une revue encore de type inconnu."""
         self._conn.execute(
@@ -247,14 +236,12 @@ class SerialStore:
         )
 
     def set_serial_type(self, serial_id: int, serial_type: SerialType) -> None:
-        """Pose le `serial_type` d'une revue. Écriture directe, sans requalification des publications — c'est l'édition admin, elle, qui rejoue les corrections de `doc_type`."""
+        """Pose le `serial_type` d'une revue, sans requalifier ses publications. L'édition par l'administration rejoue, elle, les corrections de `doc_type`."""
         self._conn.execute(
             update(serials)
             .where(serials.c.id == serial_id, TYPE_NOT_MANUAL)
             .values(serial_type=serial_type)
         )
-
-    # ── Journalisation ─────────────────────────────────────────────
 
     def describe_serials(self, serial_ids: Sequence[int]) -> dict[int, SerialSummary]:
         """Titre, éditeur et ISSN de chaque revue, pour la journalisation."""

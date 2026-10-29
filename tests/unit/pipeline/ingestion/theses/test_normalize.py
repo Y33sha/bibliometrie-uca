@@ -1,8 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.theses.normalize`.
 
-Couvre `get_title` et `get_publication_year` (cascade soutenance/inscription), `_build_source_extras` (date_soutenance, date_inscription, écoles doctorales, partenaires), `theses_source_record` (métadonnées canoniques, keywords sujets, topics discipline+rameau, NNT), `build_theses_author_records` (rôles, positions, adresses du document) et les méthodes de `ThesesNormalizer` (métadonnées minimales, éditeur et conteneur absents, enregistrement source, contributions sources).
-
-Pattern : doublures de `tests.helpers.normalize_doubles` + `MagicMock`, pas de DB.
+Couvre le titre et l'année (soutenance, sinon inscription), les champs propres à theses.fr, l'enregistrement source construit par `theses_source_record`, la lecture des auteurs et les méthodes de `ThesesNormalizer`. Doublures de `tests.helpers.normalize_doubles` et `MagicMock`, sans base de données.
 """
 
 from __future__ import annotations
@@ -159,7 +157,8 @@ class TestThesesSourceRecord:
         assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
 
     def test_doi_passthrough(self):
-        assert self._call({"titrePrincipal": "T", "doi": "10.1/abc"}).doi == "10.1/abc"
+        record = self._call({"titrePrincipal": "T", "doi": "10.1/abc"})
+        assert identifier_values(record)["doi"] == ["10.1/abc"]
 
     def test_nnt_goes_in_identifiers(self):
         record = self._call({"nnt": "2024CLFAC001"})
@@ -227,7 +226,7 @@ class TestThesesSourceRecord:
         ],
     )
     def test_statut_open_access_selon_la_diffusion(self, diffusion, expected):
-        """Régression : toutes les thèses étaient `closed`, y compris les thèses en accès libre sur theses.fr."""
+        """Régression : le statut open access suit la diffusion de la thèse ; une thèse accessible sur theses.fr est `green`."""
         assert self._call(diffusion).oa_status == expected
 
     def test_langue_et_resume_de_la_premiere_langue(self):

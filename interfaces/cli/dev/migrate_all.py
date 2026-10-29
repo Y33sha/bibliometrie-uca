@@ -40,7 +40,7 @@ def _exists(database: str | None) -> bool:
 
 
 def _upgrade(instance: str | None) -> int:
-    """`alembic upgrade head` sur la base de `instance`, ou sur la base par défaut quand `instance` est vide. Rend le code de sortie."""
+    """`alembic upgrade head` sur la base de `instance`, ou sur la base par défaut quand `instance` est vide. Renvoie le code de sortie."""
     env = {key: value for key, value in os.environ.items() if key != "BIBLIO_INSTANCE"}
     if instance:
         env["BIBLIO_INSTANCE"] = instance

@@ -1,5 +1,4 @@
-"""Tests d'intégration de la sous-étape cooccurrences de la phase `subjects` (recompute
-usage_count + refresh matview subject_cooccurrences)."""
+"""Sous-étape des cooccurrences de la phase `subjects` : recalcul de `usage_count` et rafraîchissement de la vue `subject_cooccurrences`."""
 
 import logging
 
@@ -16,7 +15,7 @@ class TestRecomputeUsageCounts:
         s_id = insert_subject(sa_sync_conn, "ai")
         p1 = insert_publication(sa_sync_conn, "p1")
         p2 = insert_publication(sa_sync_conn, "p2")
-        # Même publi liée par 2 sources différentes : ne compte qu'une fois.
+        # Une publication liée au sujet par deux sources compte une fois.
         insert_publication_subject(sa_sync_conn, p1, subject_id=s_id, source="hal")
         insert_publication_subject(sa_sync_conn, p1, subject_id=s_id, source="openalex")
         insert_publication_subject(sa_sync_conn, p2, subject_id=s_id, source="hal")
@@ -28,7 +27,7 @@ class TestRecomputeUsageCounts:
         assert usage == 2
 
     def test_resets_orphaned_subject_to_zero(self, sa_sync_conn):
-        # Sujet avec usage_count=5 mais plus aucun lien → doit retomber à 0.
+        # Un sujet sans lien revient à 0.
         s_id = insert_subject(sa_sync_conn, "orphan")
         sa_sync_conn.execute(
             text("UPDATE subjects SET usage_count = 5 WHERE id = :id"), {"id": s_id}
@@ -47,14 +46,14 @@ class TestRefreshCooccurrences:
         c = insert_subject(sa_sync_conn, "c")
         p1 = insert_publication(sa_sync_conn, "p1")
         p2 = insert_publication(sa_sync_conn, "p2")
-        # a+b co-occurrent dans 2 publis ; a+c seulement 1.
+        # a et b sont ensemble dans deux publications, a et c dans une seule.
         for s in (a, b):
             insert_publication_subject(sa_sync_conn, p1, subject_id=s)
         for s in (a, b, c):
             insert_publication_subject(sa_sync_conn, p2, subject_id=s)
 
         n = SubjectStore(sa_sync_conn).refresh_cooccurrences()
-        assert n == 1  # Seule la paire (a,b) avec count=2 passe le seuil de la matview.
+        assert n == 1  # Seule la paire (a, b) atteint le seuil de la vue.
 
         row = sa_sync_conn.execute(
             text("SELECT subject_a_id, subject_b_id, count FROM subject_cooccurrences")
@@ -65,9 +64,7 @@ class TestRefreshCooccurrences:
         assert {row.subject_a_id, row.subject_b_id} == {a, b}
 
     def test_self_pairs_excluded(self, sa_sync_conn):
-        # Un sujet ne co-occurre pas avec lui-même même s'il apparaît dans
-        # 2+ publications (deux publications nécessaires pour que le seuil count >= 2
-        # ne masque pas l'effet du filtre `subject_id < subject_id`).
+        # Un sujet ne forme pas de paire avec lui-même. Deux publications le contiennent, donc le seuil de la vue laisserait passer cette paire.
         s = insert_subject(sa_sync_conn, "solo")
         p1 = insert_publication(sa_sync_conn, "p1")
         p2 = insert_publication(sa_sync_conn, "p2")
@@ -105,7 +102,7 @@ class TestRunOrchestrator:
 
         stats = run(SubjectStore(sa_sync_conn), logging.getLogger("test"))
         assert stats["cooccurrence_pairs"] == 1  # (a,b) count=2
-        # usage_count des deux sujets = 2.
+        # Chacun des deux sujets est dans deux publications.
         rows = sa_sync_conn.execute(
             text("SELECT id, usage_count FROM subjects WHERE id = ANY(:ids) ORDER BY id"),
             {"ids": [a, b]},

@@ -1,6 +1,6 @@
 """Préfixe de déploiement : son inscription dans la requête et son retrait du chemin.
 
-Le serveur ASGI laisse le chemin entier dans le `scope` et signale le préfixe à part ; le routage l'ôte lui-même avant d'apparier ses routes. Un middleware qui décide sur le chemin — celui qui garde les écritures, notamment — doit l'ôter à son tour, aux mêmes règles.
+Le serveur ASGI laisse le chemin entier dans le `scope` et signale le préfixe à part ; le routage le retire lui-même avant de chercher la route. Un middleware qui décide d'après le chemin, comme celui qui protège les écritures, le retire aussi, avec les mêmes règles.
 """
 
 import pytest
@@ -15,7 +15,7 @@ CAS = [
     ("/bibliometrie", "/bibliometrie", ""),
     ("/bibliometrie", "/bibliometrie/", "/"),
     ("/recherche/bibliometrie", "/recherche/bibliometrie/api/publications", "/api/publications"),
-    # Même début de chaîne, mais hors du préfixe : le chemin doit rester entier.
+    # Même début de chaîne, mais hors du préfixe : le chemin reste entier.
     ("/bibliometrie", "/bibliometrie-bis/api", "/bibliometrie-bis/api"),
     # Préfixe annoncé mais absent du chemin : rien à retirer.
     ("/bibliometrie", "/api/auth/login", "/api/auth/login"),
@@ -32,7 +32,7 @@ def test_retire_le_prefixe(root_path: str, path: str, attendu: str):
 
 
 def test_sans_prefixe_declare():
-    """Un `scope` sans `root_path` du tout — le cas du développement local."""
+    """Un `scope` sans `root_path`, comme en développement local."""
     assert route_path({"type": "http", "path": "/api/auth/login"}) == "/api/auth/login"
 
 
@@ -40,14 +40,14 @@ def test_sans_prefixe_declare():
 def test_accorde_avec_le_routage_de_starlette(root_path: str, path: str, _attendu: str):
     """Les deux implémentations s'accordent sur chaque cas.
 
-    Starlette range ce calcul dans un module privé, que le projet n'importe pas. Une divergence entre les deux ferait décider le middleware sur un chemin étranger au routage ; ce test la signale.
+    Starlette range ce calcul dans un module privé, que le code de l'application n'importe pas. Une divergence ferait décider le middleware sur un autre chemin que celui du routage ; ce test la signale.
     """
     scope = _scope(root_path, path)
     assert route_path(scope) == _starlette_route_path(scope)
 
 
 async def _traverser(scope: dict, prefixe: str) -> dict:
-    """Fait traverser `RootPath` à `scope` et rend le `scope` que reçoit l'application enveloppée."""
+    """Fait traverser `RootPath` à `scope` et renvoie le `scope` que reçoit l'application enveloppée."""
     recu: dict = {}
 
     async def application(scope, receive, send):

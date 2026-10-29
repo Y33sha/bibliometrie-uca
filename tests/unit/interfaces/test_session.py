@@ -20,7 +20,7 @@ class TestReadSession:
         assert read_session(issue_token("admin")) == "admin"
 
     def test_rejects_a_tampered_payload(self):
-        """Le nom est en clair dans le jeton : seule la signature interdit de le réécrire."""
+        """Le nom est en clair dans le jeton ; seule la signature empêche de le réécrire."""
         token = issue_token("admin")
         payload, signature = token.rsplit(".", 1)
         forged = payload.replace("admin", "pirate", 1) + "." + signature
@@ -42,9 +42,9 @@ class TestReadSession:
         assert read_session(token) is None
 
     def test_rejects_a_signed_payload_without_a_timestamp(self):
-        """Signature valable, payload amputé de son horodatage : le jeton est refusé.
+        """Un jeton bien signé, sans horodatage, est refusé.
 
-        Le jeton est forgé avec la clé du service : c'est le seul moyen d'atteindre le contrôle de forme, la signature étant vérifiée d'abord.
+        Le jeton est signé avec la clé du service : la signature est vérifiée d'abord, et seul un jeton bien signé atteint le contrôle de forme.
         """
         payload = "admin"
         assert read_session(f"{payload}.{session_module._sign(payload)}") is None
@@ -66,7 +66,7 @@ class TestCheckPassword:
         assert check_password("mauvais") is False
 
     def test_rejects_a_malformed_hash_without_erroring(self, monkeypatch):
-        """Un hash mal formé (placeholder de config) refuse la connexion, sans erreur serveur."""
+        """Un hash mal formé (valeur d'exemple de la configuration) refuse la connexion, sans erreur serveur."""
         monkeypatch.setattr(session_module.settings, "admin_hash", SecretStr("pas-un-hash-bcrypt"))
         assert check_password("peu importe") is False
 

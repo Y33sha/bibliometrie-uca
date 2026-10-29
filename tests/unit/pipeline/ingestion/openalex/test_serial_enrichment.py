@@ -1,4 +1,4 @@
-"""Adapter OpenAlex Sources → enrichissement des revues : fetch batch du type de source."""
+"""Lecture par lots du type des sources OpenAlex, pour l'enrichissement des revues."""
 
 from pipeline.http.circuit_breaker import SourceUnavailableError
 from pipeline.ingestion.openalex import serial_enrichment as mod

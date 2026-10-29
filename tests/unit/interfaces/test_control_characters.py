@@ -1,4 +1,4 @@
-"""Refus des caractères de contrôle dans les paramètres texte, et filet couvrant ce que le contrat ne borne pas."""
+"""Refus des caractères de contrôle dans les paramètres texte. Une valeur refusée par le driver, hors de ce contrôle, donne 422."""
 
 import pytest
 from fastapi import FastAPI
@@ -30,7 +30,7 @@ def test_les_separateurs_passent(caractere):
 
 
 def _client_levant(exception: Exception) -> TestClient:
-    """Application minimale dont la route lève l'exception donnée, munie des handlers de la surface HTTP."""
+    """Application minimale dont la route lève l'exception donnée, avec les handlers d'erreur de l'API."""
     app = FastAPI()
     app.add_exception_handler(DataError, data_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)

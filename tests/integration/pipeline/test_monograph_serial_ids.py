@@ -1,4 +1,4 @@
-"""Tests d'intégration de `consolidation.monograph_serial_ids`."""
+"""Collection (`serial_id`) de chaque monographie (`consolidation.monograph_serial_ids`)."""
 
 from pipeline.transformation.publications.consolidation import monograph_serial_ids
 from tests.integration.helpers.serials import insert_monograph, insert_serial

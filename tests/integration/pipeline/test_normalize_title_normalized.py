@@ -1,4 +1,4 @@
-"""Intégration : l'upsert normalize écrit `title_normalized` au même mouvement que `title`."""
+"""La normalisation écrit `title_normalized` en même temps que `title`."""
 
 from sqlalchemy import text
 

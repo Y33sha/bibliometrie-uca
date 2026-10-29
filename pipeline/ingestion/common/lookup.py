@@ -39,7 +39,7 @@ type Fetch = Callable[[httpx2.AsyncClient, list[str]], Awaitable[LookupBatch | U
 """Interroge la source pour un lot d'identifiants."""
 
 type Stage = Callable[[StagingStore, Mapping[str, JsonValue]], UpsertOutcome | None]
-"""Écrit un document trouvé dans `staging`. Rend `None` pour un document sans identifiant, qui n'est pas écrit."""
+"""Écrit un document trouvé dans `staging`. Renvoie `None` pour un document sans identifiant, qui n'est pas écrit."""
 
 
 def one_at_a_time(
@@ -70,7 +70,7 @@ class LookupChannel:
     on_absent: Callable[[Connection, str], None]
     """Ce que devient un identifiant dont la source confirme l'absence. Ne commite pas."""
     stage: Stage | None = None
-    """`None` : la source rend seulement la présence des identifiants, sans document à écrire."""
+    """`None` : la source renvoie seulement la présence des identifiants, sans document à écrire."""
     absent_metric: str = "not_found"
     """Compteur des identifiants absents."""
     batch_size: int = 1
@@ -82,9 +82,9 @@ class LookupChannel:
 async def look_up(
     conn: Connection, log: logging.Logger, channel: LookupChannel, keys: Sequence[str]
 ) -> PhaseMetrics:
-    """Cherche `keys` dans la source de `channel`, écrit les documents trouvés et range les absents.
+    """Cherche les identifiants dans la source du canal, écrit les documents trouvés et range les absents.
 
-    `total` = identifiants cherchés ; `new`, `updated`, `unchanged` = documents écrits ; `errors` = identifiants des lots que la source n'a pas servis ; `extras[channel.absent_metric]` = identifiants absents. Le compteur de la barre porte les documents trouvés.
+    Les compteurs rendus : identifiants cherchés (`total`), documents écrits (`new`, `updated`, `unchanged`), identifiants des lots que la source n'a pas servis (`errors`), identifiants absents (compteur du canal). La barre compte les documents trouvés.
     """
     metrics = PhaseMetrics(seen=len(keys))
     if not keys:
@@ -149,7 +149,7 @@ def _stage(
     records: list[Mapping[str, JsonValue]],
     metrics: PhaseMetrics,
 ) -> int:
-    """Écrit `records` par `stage`, les compte dans `metrics`, et rend le nombre de documents écrits."""
+    """Écrit `records` par `stage`, les compte dans `metrics`, et renvoie le nombre de documents écrits."""
     written = 0
     for record in records:
         match stage(staging, record):

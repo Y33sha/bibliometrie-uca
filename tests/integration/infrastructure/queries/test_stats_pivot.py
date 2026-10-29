@@ -40,8 +40,7 @@ class TestPivotEngine:
         assert by_access == {"ouvert": 2, "ferme": 1}
 
     def test_doc_type_grouped_expands_publications(self, sa_sync_conn):
-        # Les publications au sens strict se ventilent par type fin ; les autres familles restent
-        # agrégées sous leur clé de famille.
+        # Les publications au sens strict se ventilent par type fin ; les autres familles restent agrégées sous leur clé de famille.
         insert_publication(
             sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"], doc_type="article"
         )  # → article
@@ -57,17 +56,14 @@ class TestPivotEngine:
         assert by_type == {"article": 1, "book": 1, "theses": 1}
 
     def test_group_by_lab_executes(self, sa_sync_conn):
-        # Le groupement par laboratoire compose une requête valide (jointures de rattachement).
-        # Smoke test : on vérifie que la requête s'exécute et renvoie la forme attendue, sans
-        # dépendre des matviews de rattachement peuplées.
+        # Le groupement par laboratoire compose une requête valide : elle s'exécute et renvoie la forme attendue, sans rattachement aux laboratoires.
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
         res = _piv(sa_sync_conn, "publication_count", ["lab"])
         assert isinstance(res.rows, list)
         assert res.groups == ["lab"]
 
     def test_group_by_publisher_and_serial_execute(self, sa_sync_conn):
-        # Éditeur et revue composent des requêtes valides (jointures internes). Smoke test : la
-        # requête s'exécute et renvoie la forme attendue, sans dépendre de données peuplées.
+        # Éditeur et revue composent des requêtes valides : elles s'exécutent et renvoient la forme attendue, pour une publication sans éditeur ni revue.
         insert_publication(sa_sync_conn, in_perimeter=True, oa_status="gold", sources=["hal"])
         for dim in ("publisher", "serial"):
             res = _piv(sa_sync_conn, "publication_count", [dim])

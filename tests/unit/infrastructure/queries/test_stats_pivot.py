@@ -1,4 +1,4 @@
-"""Validation du registre de pivot (pur, sans base)."""
+"""Validation d'une demande de pivot : mesure, dimensions de groupement et indicateurs."""
 
 import pytest
 

@@ -12,8 +12,7 @@ class TestExtractUt:
         assert extract_ut({"UID": "WOS:000819841500009"}) == "WOS:000819841500009"
 
     def test_raises_when_missing(self):
-        # `UID` est censé être toujours présent dans une réponse WoS — toute
-        # absence est anormale et doit remonter (pas de fallback silencieux).
+        # Toute réponse WoS a un `UID` : son absence lève une erreur.
         with pytest.raises(KeyError):
             extract_ut({})
 
@@ -39,8 +38,7 @@ class TestExtractDoi:
         assert extract_doi(rec) == "10.1000/abc"
 
     def test_handles_single_identifier_as_dict(self):
-        # WoS retourne tantôt une liste, tantôt un dict unique quand il n'y
-        # a qu'un seul identifiant. `extract_doi` doit gérer les deux.
+        # WoS renvoie une liste, ou un dict seul pour un identifiant unique.
         rec = {
             "dynamic_data": {
                 "cluster_related": {
@@ -51,8 +49,7 @@ class TestExtractDoi:
         assert extract_doi(rec) == "10.1000/abc"
 
     def test_normalizes_value_via_clean_doi(self):
-        # Le DOI extrait passe par `clean_doi` : préfixe URL, casse et espaces
-        # sont normalisés à la source (forme canonique unique).
+        # Le DOI extrait passe par `clean_doi`, qui normalise préfixe URL, casse et espaces.
         rec = {
             "dynamic_data": {
                 "cluster_related": {
@@ -73,7 +70,7 @@ class TestExtractDoi:
         assert extract_doi(rec) is None
 
     def test_returns_none_on_missing_levels(self):
-        # Chaque niveau peut manquer : on doit tomber sur None proprement.
+        # Un niveau manquant donne None.
         assert extract_doi({}) is None
         assert extract_doi({"dynamic_data": {}}) is None
         assert extract_doi({"dynamic_data": {"cluster_related": {}}}) is None
@@ -88,7 +85,7 @@ class TestExtractDoi:
         assert extract_doi(rec) is None
 
     def test_returns_none_when_identifier_unexpected_shape(self):
-        # `identifier` n'est ni dict ni list → retour silencieux à None.
+        # Un `identifier` d'une autre forme qu'un dict ou une liste donne None.
         rec = {
             "dynamic_data": {
                 "cluster_related": {"identifiers": {"identifier": "not-a-list-nor-dict"}}

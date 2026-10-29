@@ -1,6 +1,6 @@
 """Visibilité des identifiants de personne.
 
-L'administration voit et arbitre tous les types, `hal_person_id` compris. Le profil public rend seulement les types publics non rejetés."""
+L'administration voit et arbitre tous les types, `hal_person_id` compris. Le profil public renvoie seulement les types publics non rejetés."""
 
 from infrastructure.read_models.persons.models import PersonFilters
 from infrastructure.read_models.persons.queries import PersonsQueries
@@ -19,7 +19,7 @@ def _pending_identifier_person_ids(conn):
 
 class TestHalPersonIdVisibility:
     def test_administration_reads_hal_person_id(self, sa_sync_conn):
-        """La lecture d'administration rend le `hal_person_id` avec son statut."""
+        """La lecture d'administration renvoie le `hal_person_id` avec son statut."""
         person = insert_person(sa_sync_conn, "Administered")
         insert_person_identifier(
             sa_sync_conn, person, id_type="hal_person_id", id_value="12345", status="pending"

@@ -66,7 +66,7 @@ class TestSlashInsideLabel:
 
 
 class TestGenericLabels:
-    """Les feuilles fourre-tout sont écartées ; leur parent porte le signal."""
+    """Les feuilles génériques (« Autre », « Autres ») sont écartées ; leur parent est gardé."""
 
     def test_autre(self):
         assert hal_domain_labels("chim.othe_FacetSep_Chimie/Autre") == ["Chimie"]
@@ -90,7 +90,7 @@ class TestMalformedEntries:
         assert hal_domain_labels("") == []
 
     def test_code_holding_a_label_path(self):
-        """Quelques entrées du référentiel portent un chemin de libellés en guise de code."""
+        """Quelques entrées du référentiel ont pour code un chemin de libellés."""
         entry = "Informatique [cs]/Biotechnologie_FacetSep_domain_Informatique [cs]/Biotechnologie"
         assert hal_domain_labels(entry) == []
 

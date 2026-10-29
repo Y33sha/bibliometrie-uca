@@ -1,8 +1,6 @@
-"""Intégration : back-fill du `doi` sur conflit, via `StagingStore.upsert`.
+"""`StagingStore.upsert` renseigne le `doi` vide d'une ligne existante, sans écraser un `doi` présent.
 
-Régression : sur conflit `(source, source_id)`, le `DO UPDATE` doit renseigner `doi` quand la ligne existait sans (doc moissonné avant que la source ne porte le DOI). Sinon le DOI trouvé par la phase `fetch_missing` n'atterrit jamais et le même lot est re-cherché à chaque run. Comportement mutualisé dans `StagingStore.upsert`, commun à toutes les voies d'entrée du staging.
-
-Appelle `StagingStore.upsert` directement (ne committe pas, l'isolation du fixture est préservée).
+Une ligne moissonnée avant que la source ait le DOI reçoit celui que trouve la phase `fetch_missing`. Sans cela, le même lot serait recherché à chaque run.
 """
 
 from sqlalchemy import text

@@ -35,7 +35,7 @@ def test_process_environment_wins_over_root_env(tmp_path):
 
 
 def test_instance_file_wins_over_process_and_root_env(tmp_path):
-    # Un terminal VSCode injecte le `.env` racine dans l'environnement : la valeur de l'instance doit l'emporter.
+    # Un terminal VS Code injecte le `.env` racine dans l'environnement : la valeur de l'instance l'emporte.
     root = _project(tmp_path)
     _instance(root, "lorraine", "DB_NAME=bibliometrie_lorraine\n")
     environ = {"BIBLIO_INSTANCE": "lorraine", "DB_NAME": "racine"}

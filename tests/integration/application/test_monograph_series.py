@@ -1,4 +1,4 @@
-"""Tests d'intégration du rattachement des monographies à leur série (`run_link_monographs_to_collections` sur la base)."""
+"""Rattachement des monographies à leur série (`run_link_monographs_to_collections`)."""
 
 import logging
 

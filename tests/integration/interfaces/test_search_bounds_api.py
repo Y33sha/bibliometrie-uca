@@ -1,6 +1,6 @@
 """La borne de longueur des termes de recherche se traduit en refus sur la surface HTTP.
 
-La couverture appartient à `tests/unit/interfaces/test_search_bounds.py`, qui confronte le contrat d'API publié à l'invariant sur ses vingt paramètres. Ces deux appels vérifient que la borne déclarée produit bien un refus jusqu'au bout de la pile.
+La couverture des paramètres de recherche est testée par `tests/unit/interfaces/test_search_bounds.py`, qui confronte la borne au contrat d'API publié. Ces deux appels vérifient le refus de bout en bout.
 """
 
 from interfaces.api.params import MAX_SEARCH_LENGTH

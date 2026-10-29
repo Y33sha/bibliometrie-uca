@@ -1,6 +1,6 @@
 """Écriture des exports CSV : assainissement des cellules et plafond de lignes.
 
-Une valeur venue d'une source externe ne doit pas être évaluée comme formule par le tableur qui ouvre le fichier, et un export coupé au plafond doit le dire.
+Une valeur venue d'une source externe reste du texte pour le tableur qui ouvre le fichier. Un export coupé au plafond se termine par un avertissement.
 """
 
 import csv
@@ -25,8 +25,7 @@ class TestNeutralizeFormula:
         assert neutralize_formula("   =1+1") == "'   =1+1"
 
     def test_keeps_the_value_whole(self):
-        # Un titre qui commence par un tiret garde son tiret : la cellule est marquée
-        # comme texte, la valeur n'est pas amputée.
+        # Un titre qui commence par un tiret garde son tiret : la cellule est marquée comme texte, la valeur reste entière.
         assert neutralize_formula("-omics approaches") == "'-omics approaches"
 
     def test_leaves_ordinary_text_untouched(self):
@@ -34,8 +33,7 @@ class TestNeutralizeFormula:
         assert neutralize_formula("") == ""
 
     def test_leaves_non_text_values_typed(self):
-        # Préfixer une année ou un montant les ferait lire comme du texte : plus de tri
-        # chronologique, plus de somme.
+        # Une année ou un montant préfixé se lirait comme du texte, sans tri chronologique ni somme.
         assert neutralize_formula(2024) == 2024
         assert neutralize_formula(None) is None
 
@@ -46,7 +44,7 @@ class TestCsvWriter:
         assert list(csv.reader(io.StringIO(line))) == [["'=cmd|' /C calc'!A0", "2024", "Nature"]]
 
     def test_returns_the_line_instead_of_accumulating_it(self):
-        """Le writer rend chaque ligne formatée, ce qui permet de servir l'export en flux."""
+        """Le writer renvoie chaque ligne formatée sans l'accumuler : l'export se sert en flux."""
         writer = CsvWriter()
         assert writer.line(["a"]) == "a\r\n"
         assert writer.line(["b"]) == "b\r\n"
@@ -59,8 +57,7 @@ class TestExportCap:
         assert truncated is False
 
     def test_the_extra_row_reveals_the_overflow_without_being_emitted(self):
-        # Les requêtes demandent une ligne de plus que le plafond : sa présence signale
-        # le dépassement, elle ne sort pas du fichier.
+        # Les requêtes demandent une ligne de plus que le plafond. Sa présence signale le dépassement ; elle est absente du fichier.
         rows, truncated = cap_export_rows([1, 2, 3, 4], 3)
         assert list(rows) == [1, 2, 3]
         assert truncated is True
@@ -70,7 +67,7 @@ class TestExportCap:
 
 
 class TestChunked:
-    """Les lignes partent groupées : une ligne par envoi ferait des dizaines de milliers d'allers-retours pour un export, un groupe trop gros ramènerait le tampon qu'on supprime."""
+    """Les lignes de l'export partent en blocs d'au moins `size` caractères ; le dernier bloc contient le reste."""
 
     def test_groups_lines_up_to_the_target_size(self):
         assert list(chunked(iter(["ab", "cd", "ef", "gh"]), size=4)) == ["abcd", "efgh"]

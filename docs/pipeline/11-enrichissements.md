@@ -16,14 +16,14 @@ La table est reconstruite à chaque exécution, à partir de signaux indépendan
 
 ## Sujets (`subjects`)
 
-**Étape 1 — Ingestion.**
+**Ingestion.**
 Les sujets que les sources déclarent sur chaque `source_record` sont rattachés à la publication, dans les tables `subjects` et `publication_subjects`. Le lien garde la source qui a fourni le sujet. Seuls les concepts issus des ontologies des sources entrent dans `subjects`. Les mots-clés libres restent dans les enregistrements sources.
 
 Les publications traitées sont celles dont `publications.subjects_ingested_at` est vide : jamais ingérées, ou recalculées depuis leurs sources après la dernière ingestion de leurs sujets. L'ingestion pose cette date, y compris pour une publication sans sujet. Leurs liens existants sont supprimés — sauf ceux marqués `rejected` — puis reconstruits depuis les sources. L'option `--rebuild-subjects` vide cette date sur toutes les publications : la phase re-traite alors le stock entier.
 
 Les sujets qu'aucun lien ne référence plus sont supprimés.
 
-**Étape 2 — Co-occurrences.**
+**Co-occurrences.**
 Recalcule depuis `publication_subjects` :
 1. `subjects.usage_count` — nombre de publications distinctes par sujet.
 2. `subject_cooccurrences` — paires de sujets co-présents sur une même publication, avec leur effectif. Seules les paires co-présentes sur au moins 2 publications sont conservées, pour borner la cardinalité.

@@ -1,14 +1,4 @@
-"""Orchestrateur unique de la phase personnes.
-
-Quatre tâches (`pipeline.graph`), chacune sur sa transaction :
-
-1. **arbitrate_identifiers** — neutralise les identifiants mal placés d'après le consensus de nom de leurs porteurs, puis tranche les conflits d'attribution par le vote des contributions. Les contributions rattachées par un identifiant neutralisé ou transféré sont marquées pour la redécision de leur personne (`pipeline.transformation.persons.identifier_arbitration`).
-2. **resolve_contributions** — applique les épinglages aux contributions, complète les prénoms réduits, puis rattache les contributions sans personne à une personne existante, ou à une personne créée de leur nom (`pipeline.transformation.persons.contribution_resolution`).
-3. **populate** — régénère les formes de nom des personnes et des contributions sources de leurs contributions.
-4. **purge** — marque pour la redécision les contributions dont la forme de nom devient ambiguë après régénération, supprime les attributions d'identifiant automatiques qu'aucune contribution source des contributions de leur personne ne contient, et supprime les personnes sans contribution du périmètre.
-
-`open_tx` gère le commit : `managed_transaction` commite en sortie de bloc si succès, rollback sinon.
-"""
+"""Phase `persons` : arbitrage des identifiants (`identifier_arbitration`), rattachement des contributions aux personnes (`contribution_resolution`), formes de nom (`populate_person_name_forms`), puis purge (`purge`). Chaque tâche a sa transaction."""
 
 from __future__ import annotations
 
@@ -36,7 +26,7 @@ class PersonsPhase:
     repo_factory: Callable[[Connection], PgPersonRepository]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les quatre tâches de la phase personnes et rend ses métriques."""
+        """Exécute les quatre tâches de la phase personnes et renvoie ses métriques."""
         by_task = run_tasks(
             "persons",
             {
@@ -84,9 +74,6 @@ class PersonsPhase:
         with ctx.open_tx() as conn:
             counts = purge(conn)
         return PhaseMetrics(extras=dict(counts))
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

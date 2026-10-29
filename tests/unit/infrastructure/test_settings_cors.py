@@ -1,6 +1,6 @@
 """Réglage `cors_origins` : découpage de la liste et refus du joker.
 
-Le middleware CORS répond aux appels porteurs du cookie de session : `*` y autoriserait toute origine à s'en servir. Le refus tient dans les settings, donc au démarrage.
+Le middleware CORS accepte les appels munis du cookie de session : `*` autoriserait toute origine à s'en servir. Le refus a lieu dans les settings, donc au démarrage.
 """
 
 import pytest

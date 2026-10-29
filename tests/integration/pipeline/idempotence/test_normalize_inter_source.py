@@ -1,4 +1,4 @@
-"""Idempotence : combinatoire multi-sources (HAL + OpenAlex)."""
+"""Idempotence de la normalisation de deux sources successives (HAL et OpenAlex)."""
 
 from tests.integration.helpers.publications_phase import create_all_publications
 from tests.integration.pipeline.idempotence.test_normalize_hal import (
@@ -11,7 +11,7 @@ from tests.integration.pipeline.idempotence.test_normalize_openalex import (
 )
 
 SHARED_DOI = "10.9999/shared-article-001"
-# Un enregistrement OpenAlex sans DOI, lien ni clé de confirmation est écarté de la réconciliation.
+# L'article propre à OpenAlex a un DOI : sans DOI, lien ni clé de confirmation, un enregistrement OpenAlex est écarté de la réconciliation.
 OA_ONLY_DOI = "10.9999/oa-only-article-002"
 
 INTER_HAL_DOCS = [
@@ -118,7 +118,7 @@ INTER_OA_DOCS = [
 
 
 class TestNormalizeInterSourceIdempotence:
-    """Normaliser HAL puis OA puis relancer HAL ne crée pas de doublons."""
+    """Normaliser HAL, puis OpenAlex, puis HAL de nouveau crée chaque publication une seule fois."""
 
     def test_hal_then_oa_then_hal_again(self, sa_sync_conn):
         from sqlalchemy import text
@@ -133,27 +133,27 @@ class TestNormalizeInterSourceIdempotence:
             text("SELECT COUNT(*) AS cnt FROM publications")
         ).scalar_one()
 
-        # Passe 2 : OA
+        # Passe 2 : OpenAlex
         run_normalize_oa(sa_sync_conn)
         create_all_publications(sa_sync_conn)
         publications_after_oa = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS cnt FROM publications")
         ).scalar_one()
 
-        # L'article partagé ne doit pas être dupliqué (même DOI)
+        # L'article partagé, au même DOI, donne une seule publication.
         cnt = sa_sync_conn.execute(
             text("SELECT COUNT(*) AS cnt FROM publications WHERE lower(doi) = lower(:doi)"),
             {"doi": SHARED_DOI},
         ).scalar_one()
         assert cnt == 1, "L'article partagé ne doit exister qu'une fois"
 
-        # Seul l'article OA-only crée une publication
+        # L'article propre à OpenAlex ajoute une seule publication.
         assert publications_after_oa == publications_after_hal + 1, (
             f"OA devrait ajouter 1 publication (OA-only), pas plus. "
             f"HAL={publications_after_hal}, après OA={publications_after_oa}"
         )
 
-        # Passe 3 : relancer HAL
+        # Passe 3 : HAL de nouveau
         insert_hal_staging(sa_sync_conn, INTER_HAL_DOCS)
         run_normalize_hal(sa_sync_conn)
         publications_after_hal2 = sa_sync_conn.execute(
@@ -165,7 +165,7 @@ class TestNormalizeInterSourceIdempotence:
         )
 
     def test_shared_doi_same_serial(self, sa_sync_conn):
-        """L'article partagé pointe vers le même journal, pas un doublon."""
+        """L'article partagé est rattaché à une seule revue."""
         from sqlalchemy import text
 
         insert_hal_staging(sa_sync_conn, INTER_HAL_DOCS)

@@ -1,4 +1,4 @@
-"""Langue d'une `source_record` : ramène la valeur donnée par la source au code du référentiel `languages`."""
+"""Langue d'un enregistrement source : la valeur donnée par la source, ramenée au code du référentiel `languages`."""
 
 from collections.abc import Mapping
 

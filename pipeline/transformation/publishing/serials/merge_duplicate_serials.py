@@ -8,7 +8,7 @@ Cinq règles désignent la même publication :
 4. elles sont seules à avoir leur titre normalisé, au moins une est sans ISSN, et leurs enregistrements partagent un préfixe DOI ;
 5. des enregistrements d'une même publication y sont rattachés, leurs titres sont compatibles (« Phys.Rev.Lett. » et « Physical Review Letters », voir `compatible_titles`), et elles n'ont pas chacune des ISSN sans aucun en commun.
 
-L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion elle-même est celle de l'administration des revues, injectée par le composition-root : publications, métadonnées et ISSN passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
+L'éditeur ne sert pas de contrôle : deux fiches d'éditeur désignent souvent la même maison. La fusion est celle de l'administration des revues : publications, métadonnées et ISSN passent à la cible, qui requalifie les publications absorbées, puis la source est supprimée. Le journal garde le titre, l'éditeur et les ISSN des deux revues.
 """
 
 import logging
@@ -18,6 +18,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.serials.titles import compatible_titles, nested_titles
+from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.sql_fragments import active_issns, has_active_issn
 from pipeline.runtime.observability.log_format import BRANCH, quantity
 from pipeline.runtime.observability.metrics import PhaseMetrics
@@ -125,8 +126,8 @@ _SERIALS_SHARING_ACTIVE_ISSN = text(f"""
 """)
 
 
-# Paires de revues vérifiées dont l'une a, inactif, un ISSN actif dans l'autre. La cible de la fusion en tête : la
-# revue dont le premier document est le plus tardif, puis celle qui a le plus de publications.
+# Paires de revues vérifiées dont l'une a, inactif, un ISSN actif dans l'autre.
+# La cible de la fusion en tête : la revue dont le premier document est le plus tardif, puis celle qui a le plus de publications.
 _SERIALS_SHARING_AN_INACTIVE_ISSN = text(f"""
     WITH {_VERIFIED}, paires AS (
         SELECT DISTINCT a.issn, least(a.serial_id, b.serial_id) AS x_id,
@@ -150,15 +151,15 @@ _SERIALS_SHARING_AN_INACTIVE_ISSN = text(f"""
     ORDER BY p.issn
 """)
 
-# Paires de revues seules à avoir leur titre, dont au moins une sans ISSN, et dont les
-# enregistrements partagent un préfixe DOI. La cible de la fusion en tête. Un titre normalisé vide
-# (alphabet non latin, symboles) ne rapproche aucune revue.
+# Paires de revues seules à avoir leur titre, dont au moins une sans ISSN, et dont les enregistrements sources partagent un préfixe DOI. La cible de la fusion en tête.
+# Un titre normalisé vide (alphabet non latin, symboles) ne rapproche aucune revue.
 _SAME_TITLE_DUPLICATES = text(f"""
     WITH prefixes AS (
-        SELECT serial_id AS id, array_agg(DISTINCT split_part(doi, '/', 1)) AS pfx
-        FROM source_records
-        WHERE serial_id IS NOT NULL AND doi IS NOT NULL
-        GROUP BY serial_id
+        SELECT s.serial_id AS id, array_agg(DISTINCT split_part(d.id_value, '/', 1)) AS pfx
+        FROM source_records s
+        JOIN source_record_identifiers d ON d.source_record_id = s.id AND {serial_doi_sql("d", "s")}
+        WHERE s.serial_id IS NOT NULL
+        GROUP BY s.serial_id
     ), paires_de_titre AS (
         SELECT title_normalized FROM serials
         WHERE title_normalized <> ''

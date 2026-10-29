@@ -28,7 +28,7 @@ _DELETE_EMPTY_PUBLISHERS = text("""
 
 
 def delete_empty_publishers(conn: Connection) -> list[tuple[int, str]]:
-    """Supprime les éditeurs vides et rend `(id, nom)` de chacun."""
+    """Supprime les éditeurs vides et renvoie `(id, nom)` de chacun."""
     rows = conn.execute(_DELETE_EMPTY_PUBLISHERS).all()
     return sorted((r.id, r.name) for r in rows)
 

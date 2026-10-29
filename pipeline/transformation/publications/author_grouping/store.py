@@ -6,11 +6,9 @@ from dataclasses import dataclass
 from sqlalchemy import Connection, text
 
 from domain.persons.identifiers import AttributionStatus
-from domain.publications.author_grouping import REPEATED_LIST_CASES
 from infrastructure.db.queues import Queue, delete_processed, enqueue, enqueue_sql, snapshot
 from infrastructure.db.rows import rows_as
 from infrastructure.sql_fragments import (
-    corrected_by,
     in_clause,
     propagate_contribution_attributes_sql,
     usable_identifier,
@@ -43,28 +41,19 @@ def _known_first_name(id_type: str) -> str:
     )"""
 
 
-# Contributions sources à aligner, hors collectifs, hors enregistrements sources à liste répétée (`REPEATED_LIST_CASES`).
+# Contributions sources à aligner, hors collectifs.
 _SOURCE_CONTRIBUTIONS_SQL = text(f"""
-    WITH records AS (
-        SELECT sr.id, sr.publication_id, sr.source::text AS source,
-               ({corrected_by("doi")}) = ANY(:repeated) IS TRUE AS repeated
-        FROM source_records sr
-        WHERE sr.publication_id = ANY(:publications)
-    ), kept AS (
-        SELECT n.* FROM records n
-        WHERE NOT (n.repeated AND EXISTS (
-                SELECT 1 FROM records o WHERE o.publication_id = n.publication_id AND NOT o.repeated))
-    )
-    SELECT k.publication_id, k.id AS source_record, k.source, sc.id, sc.author_position AS position,
+    SELECT sr.publication_id, sr.id AS source_record, sr.source::text AS source,
+           sc.id, sc.author_position AS position,
            ci.last_name_normalized AS last_name,
            coalesce(ci.first_name_normalized, '') AS first_name,
            coalesce({usable_identifier("'orcid'")}, '') AS orcid,
            coalesce({usable_identifier("'idref'")}, '') AS idref,
            coalesce({_known_first_name("orcid")}, {_known_first_name("idref")}, '') AS known_first_name
-    FROM kept k
-    JOIN source_contributions sc ON sc.source_record_id = k.id
+    FROM source_records sr
+    JOIN source_contributions sc ON sc.source_record_id = sr.id
     JOIN contributor_information ci ON ci.id = sc.contributor_information_id
-    WHERE NOT sc.collective
+    WHERE sr.publication_id = ANY(:publications) AND NOT sc.collective
 """)
 
 _CONTRIBUTIONS_SQL = text("""
@@ -130,7 +119,7 @@ _INSERT_MEMBERSHIPS_SQL = text("""
 
 @dataclass(frozen=True, slots=True)
 class SourceContributionRow:
-    """Contribution source à aligner, telle que la base la rend."""
+    """Contribution source à aligner, telle que la base la renvoie."""
 
     publication_id: int
     source_record: int
@@ -177,7 +166,7 @@ class BatchPlan:
     memberships: list[MembershipRow]
     """Appartenances à insérer."""
     unmatched: list[int]
-    """Contributions en base sans correspondant, supprimés."""
+    """Contributions en base sans correspondant, à supprimer."""
     recomposed: list[int]
     """Contributions en base dont les contributions sources changent : elles perdent leur personne, que la phase `persons` redécide."""
     copies: dict[int, int]
@@ -191,7 +180,7 @@ class AuthorGroupingStore:
         self._conn = conn
 
     def propagate_attributes(self) -> tuple[int, int]:
-        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de contributions en file et le nombre de contributions mis à jour."""
+        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Renvoie le nombre de contributions en file et le nombre de contributions mises à jour."""
         queue = Queue.CONTRIBUTION_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(
@@ -216,13 +205,13 @@ class AuthorGroupingStore:
         )
 
     def mark_all(self) -> int:
-        """Marque toutes les publications pour le alignement. Rend le nombre de publications marquées."""
+        """Marque toutes les publications pour l'alignement. Renvoie le nombre de publications marquées."""
         return enqueue(
             self._conn, Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM publications", {}
         )
 
     def snapshot_queued_publications(self) -> list[tuple[int, int]]:
-        """Relève la file des publications à réaligner. Rend celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
+        """Relève la file des publications à réaligner. Renvoie celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         snapshot(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT)
         rows = self._conn.execute(
             text(f"""
@@ -250,7 +239,7 @@ class AuthorGroupingStore:
         """Contributions sources à aligner de ces publications."""
         rows = self._conn.execute(
             _SOURCE_CONTRIBUTIONS_SQL,
-            {"publications": list(publication_ids), "repeated": list(REPEATED_LIST_CASES)},
+            {"publications": list(publication_ids)},
         )
         return rows_as(SourceContributionRow, rows)
 
@@ -283,7 +272,7 @@ class AuthorGroupingStore:
     def write(self, plan: BatchPlan) -> None:
         """Écrit les contributions et les doublons d'auteur des publications du lot, et marque leurs contributions pour la recomposition de leurs attributs.
 
-        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution dont les contributions sources changent est marqué pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution dont les contributions sources changent est marquée pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, contributions, removed = (
             plan.publication_ids,

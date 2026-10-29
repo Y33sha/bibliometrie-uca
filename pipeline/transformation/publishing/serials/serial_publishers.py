@@ -38,5 +38,5 @@ _REFRESH = text("""
 
 
 def refresh_serial_publishers(conn: Connection, serial_id: int | None = None) -> int:
-    """Recalcule l'éditeur de chaque revue, ou de la seule revue `serial_id`. Rend le nombre de revues dont l'éditeur change."""
+    """Recalcule l'éditeur de chaque revue, ou de la seule revue `serial_id`. Renvoie le nombre de revues dont l'éditeur change."""
     return conn.execute(_REFRESH, {"serial_id": serial_id}).rowcount

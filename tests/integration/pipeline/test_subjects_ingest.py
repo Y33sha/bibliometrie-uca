@@ -1,5 +1,4 @@
-"""Tests des fonctions de lecture des libellés par source (`extractors`, purs) et de
-l'orchestrateur d'ingestion des sujets (`ingestion.run`, intégration)."""
+"""Lecture des libellés de sujets par source (`extractors`, fonctions pures) et ingestion des sujets en base (`ingestion.run`)."""
 
 import json
 import logging
@@ -84,7 +83,7 @@ class TestExtractors:
         assert theses_labels(None) == []
 
 
-# ── Orchestrateur (intégration) ──────────────────────────────────
+# Ingestion en base
 
 
 @pytest.fixture
@@ -93,7 +92,7 @@ def queries(sa_sync_conn):
 
 
 def _subjects_of(conn, publication_id):
-    """Sujets liés à une publication, triés par label."""
+    """Sujets liés à une publication, triés par libellé."""
     return conn.execute(
         text(
             """
@@ -121,12 +120,12 @@ class TestRunOrchestrator:
         )
         logger = logging.getLogger("test")
 
-        # Jamais ingérée → ingérée.
+        # Publication jamais ingérée : ingérée.
         m1 = run(queries, logger)
         assert m1.new == 1
         assert len(_subjects_of(sa_sync_conn, publication)) == 1
 
-        # Déjà ingérée : `subjects_ingested_at` est posé → ignorée.
+        # Publication déjà ingérée (`subjects_ingested_at` renseigné) : ignorée.
         m2 = run(queries, logger)
         assert m2.new == 0
         assert len(_subjects_of(sa_sync_conn, publication)) == 1
@@ -139,8 +138,7 @@ class TestRunOrchestrator:
         logger = logging.getLogger("test")
         run(queries, logger)
 
-        # Changement de contenu : nouveau topic, puis enregistrement de la publication
-        # recalculée depuis ses sources, qui vide `subjects_ingested_at`.
+        # Le topic de l'enregistrement source change. L'enregistrement de la publication recalculée depuis ses sources vide `subjects_ingested_at`.
         sa_sync_conn.execute(
             text("UPDATE source_records SET topics = CAST(:t AS jsonb) WHERE source_id = 'h1'"),
             {"t": json.dumps({"hal_domains": ["phys_FacetSep_Physique [physics]"]})},
@@ -155,7 +153,7 @@ class TestRunOrchestrator:
         assert rows[0].label == "Physique"
 
     def test_publication_without_subject_not_reselected(self, sa_sync_conn, queries):
-        # Une publication sans sujet est datée comme les autres : elle ne revient pas.
+        # Une publication sans sujet reçoit aussi sa date d'ingestion : le passage suivant l'ignore.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(sa_sync_conn, publication)
         logger = logging.getLogger("test")
@@ -164,7 +162,7 @@ class TestRunOrchestrator:
         assert _publications_updated(run(queries, logger)) == 0
 
     def test_other_writes_do_not_reselect(self, sa_sync_conn, queries):
-        # Une écriture étrangère aux sources (statut OA…) laisse la date d'ingestion en place.
+        # Une écriture sans rapport avec les sources (statut open access…) laisse la date d'ingestion en place.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
@@ -179,7 +177,7 @@ class TestRunOrchestrator:
         assert _publications_updated(run(queries, logger)) == 0
 
     def test_reingests_all_sources_of_changed_publication(self, sa_sync_conn, queries):
-        # Publication-centré : toutes les sources d'une publication changée sont ré-ingérées.
+        # L'ingestion lit les sujets de tous les enregistrements sources de la publication.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
@@ -196,7 +194,7 @@ class TestRunOrchestrator:
         assert labels == {"Informatique", "Physics"}
 
     def test_same_label_across_sources_merges(self, sa_sync_conn, queries):
-        # Un même label depuis deux sources → un seul subject, deux liens (un par source).
+        # Un même libellé dans deux sources donne un seul sujet et deux liens, un par source.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
@@ -218,21 +216,20 @@ class TestRunOrchestrator:
         assert {r.id for r in rows} == {subjects[0].id}
 
     def test_rebuild_reingests_all(self, sa_sync_conn, queries):
-        # `rebuild=True` ré-ingère même une publication non modifiée.
+        # `rebuild=True` ingère aussi une publication non modifiée.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn, publication, topics={"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         )
         logger = logging.getLogger("test")
         run(queries, logger)
-        # Sans rebuild : rien à faire (non modifiée).
+        # Sans `rebuild` : rien à faire.
         assert run(queries, logger).new == 0
-        # Avec rebuild : ré-ingérée quand même.
+        # Avec `rebuild` : ingérée de nouveau.
         assert run(queries, logger, rebuild=True).new == 1
 
     def test_ignores_unlinked_source_records(self, sa_sync_conn, queries):
-        # source_pub orphelin (publication_id NULL) : jamais sélectionné, son concept
-        # n'est pas ingéré.
+        # Les sujets d'un enregistrement source sans publication sont ignorés.
         insert_source_record(
             sa_sync_conn, source="openalex", source_id="oa-orphan", topics=[{"topic": "ghosttopic"}]
         )
@@ -243,7 +240,7 @@ class TestRunOrchestrator:
         assert n_ghost == 0
 
     def test_purges_orphan_subjects(self, sa_sync_conn, queries):
-        # Un sujet sans aucun lien est purgé en fin de phase.
+        # Un sujet sans lien est supprimé en fin de phase.
         orphan = insert_subject(sa_sync_conn, "orphelin sans lien")
         run(queries, logging.getLogger("test"))
         still = sa_sync_conn.execute(

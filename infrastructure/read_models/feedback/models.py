@@ -18,7 +18,7 @@ class FeedbackStats(BaseModel):
 
 
 class FeedbackMatchedForm(BaseModel):
-    """Forme de nom ayant matché lors de la détection (faux positif)."""
+    """Forme de nom reconnue par la détection, dans un faux positif."""
 
     form_id: int
     form_text: str
@@ -28,10 +28,7 @@ class FeedbackMatchedForm(BaseModel):
 
 
 class FeedbackAddressItem(BaseModel):
-    """Ligne d'adresse dans false-negatives / false-positives.
-
-    `matched_forms` n'est rempli que pour les faux positifs.
-    """
+    """Adresse d'une liste de faux négatifs ou de faux positifs. `matched_forms` est rempli seulement pour les faux positifs."""
 
     id: int
     raw_text: str

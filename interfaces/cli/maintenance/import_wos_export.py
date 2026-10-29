@@ -1,11 +1,11 @@
 # STATUS: maintenance
 """Importe dans `staging` des exports tabulés de l'interface Web of Science.
 
-Chaque ligne d'export devient une ligne `staging` de la source `wos`, identifiée par son UT, avec le mode d'entrée `manual_export`. Le payload est la ligne elle-même : un objet dont les clés sont les balises WoS non vides (`UT`, `TI`, `AF`, `C1`, `RP`…). L'écriture passe par l'UPSERT commun aux extractions : une ligne inchangée n'est pas réécrite. Un UT présent dans plusieurs fichiers est importé une fois.
+Chaque ligne d'export devient une ligne `staging` de la source `wos`, identifiée par son UT, avec le mode d'entrée `manual_export`. Le payload est la ligne elle-même : un objet dont les clés sont les balises WoS non vides (`UT`, `TI`, `AF`, `C1`, `RP`…). L'écriture passe par l'écriture commune au moissonnage : une ligne inchangée reste en l'état. Un UT présent dans plusieurs fichiers est importé une fois.
 
 L'export attendu est « Tab delimited file », contenu « Full Record ». Sans les balises `RP` (auteur correspondant) et `C1` (adresses), les contributions sources perdent l'auteur correspondant et les affiliations.
 
-La commande ne lance pas la normalisation :
+La normalisation se lance à part :
     run_pipeline --from normalize --sources wos
 
 Usage :

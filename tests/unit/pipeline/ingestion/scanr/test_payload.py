@@ -7,8 +7,7 @@ from pipeline.ingestion.scanr.payload import (
 
 class TestSelectLeafAffiliations:
     def test_filters_to_labo(self):
-        """ScanR : seule l'affiliation labo (champ `id_name_author_labo`)
-        est conservée ; les pures tutelles sont jetées."""
+        """Seule l'affiliation à un laboratoire (champ `id_name_author_labo`) est conservée ; les tutelles sont écartées."""
         labo = {"name": "IHRIM blob", "id_name_author_labo": "idref###X###RNSR###IHRIM"}
         tutelle = {"name": "ENS Lyon, ..."}
         assert select_leaf_affiliations([labo, tutelle]) == [labo]
@@ -46,8 +45,7 @@ class TestExtractNntFromScanrId:
         assert extract_nnt_from_scanr_id("doi:10.1234/foo") is None
 
     def test_uppercase_prefix_does_not_match(self):
-        # ScanR émet le préfixe en minuscules ; un input non conforme
-        # n'est pas une thèse au sens ScanR.
+        # ScanR écrit le préfixe en minuscules : un préfixe en majuscules ne désigne aucune thèse.
         assert extract_nnt_from_scanr_id("THESE2021CLFAC030") is None
 
 

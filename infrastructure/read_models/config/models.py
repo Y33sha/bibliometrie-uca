@@ -9,10 +9,6 @@ class ConfigItem(BaseModel):
     """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
 
     key: str
-    # `Any` plutôt que `JsonValue` (récursif PEP 695) : le schéma JSON
-    # généré par pydantic 2.12 contient des références circulaires
-    # (`JsonValue-Input` / `JsonValue-Output`) que `openapi-typescript`
-    # traduit en `components["schemas"]["JsonValue-Input"][]` self-ref,
-    # ce que TypeScript refuse d'instancier. Frontière JSONB libre côté API.
+    # `Any` plutôt que `JsonValue` : pydantic 2.12 génère pour `JsonValue`, récursif, des références circulaires (`JsonValue-Input`, `JsonValue-Output`). `openapi-typescript` les traduit en type autoréférent, que TypeScript refuse. La valeur JSONB reste libre côté API.
     value: Any
     description: str | None

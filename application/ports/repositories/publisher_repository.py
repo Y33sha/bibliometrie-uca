@@ -1,4 +1,4 @@
-"""Port PublisherRepository — édition et fusion de l'agrégat Publisher."""
+"""Port PublisherRepository : édition et fusion de l'agrégat Publisher."""
 
 from typing import Protocol
 
@@ -8,7 +8,7 @@ from domain.publishers.publisher import Publisher, PublisherType
 
 
 class PublisherUpdate(BaseModel):
-    """Champs éditables d'un éditeur, en modification sélective : seuls les champs explicitement fournis sont écrits."""
+    """Champs modifiables d'un éditeur ; seuls les champs fournis sont écrits."""
 
     name: str | None = None
     country: str | None = None
@@ -17,7 +17,7 @@ class PublisherUpdate(BaseModel):
     @field_validator("country")
     @classmethod
     def _country_lowercase(cls, v: str | None) -> str | None:
-        # Code pays en minuscule (cf. countries.code / addresses.countries).
+        # Code pays en minuscules (comme countries.code et addresses.countries).
         return v.lower() if v else v
 
 
@@ -29,7 +29,7 @@ class PublisherRepository(Protocol):
         ...
 
     def save(self, publisher: Publisher) -> None:
-        """Enregistre les champs éditables d'un éditeur chargé. Lève `NotFoundError` si l'éditeur n'existe pas."""
+        """Enregistre les champs modifiables d'un éditeur chargé. Lève `NotFoundError` si l'éditeur n'existe pas."""
         ...
 
     # ── Fusion ─────────────────────────────────────────────────────

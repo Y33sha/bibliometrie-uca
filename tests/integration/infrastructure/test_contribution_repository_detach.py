@@ -11,7 +11,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 
 def _contribution(conn, publication, person, *, mode):
-    """Contribution d'une contribution source de forme « jean dupont », rattaché à la personne `person` par le mode `mode`."""
+    """Contribution d'une contribution source de forme « jean dupont », rattachée à la personne `person` par le mode `mode`."""
     source_record = insert_source_record(conn, publication, source_id=f"hal-detach-{publication}")
     source_contribution = insert_source_contribution(
         conn, source_record, author_name_normalized="jean dupont"

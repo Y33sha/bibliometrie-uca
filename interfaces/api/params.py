@@ -1,7 +1,4 @@
-"""Query params déclarés à l'identique par plusieurs routers.
-
-Un paramètre partagé se déclare ici une fois, avec ses bornes ; le type annoté porte la validation et part dans le contrat OpenAPI.
-"""
+"""Paramètres de requête communs à plusieurs routers, déclarés ici une fois avec leurs bornes. Le type annoté contient la validation, qui part dans le contrat OpenAPI."""
 
 from collections.abc import Mapping
 from typing import Annotated
@@ -9,7 +6,7 @@ from typing import Annotated
 from fastapi import Query
 from pydantic import AfterValidator
 
-# Nombre de sujets que rendent les nuages de mots (éditeur, revue, laboratoire, personne).
+# Nombre de sujets que renvoient les nuages de mots (éditeur, revue, laboratoire, personne).
 TOP_SUBJECTS_LIMIT = 30
 
 TopSubjectsLimit = Annotated[int, Query(ge=1, le=200)]
@@ -17,16 +14,16 @@ TopSubjectsLimit = Annotated[int, Query(ge=1, le=200)]
 MAX_SEARCH_LENGTH = 500
 """Longueur maximale d'un terme de recherche.
 
-Le terme part dans un motif `ILIKE '%…%'`, dont le coût croît avec sa longueur : sans borne, une requête fait balayer la table sur un motif arbitrairement long, et le plafond de fréquence est la seule digue. La valeur laisse passer ce qu'une personne cherche réellement, jusqu'à une adresse d'affiliation entière recopiée dans la recherche d'adresses, et arrête le reste.
+Le terme part dans un motif `ILIKE '%…%'`, dont le coût croît avec sa longueur. La borne laisse passer ce qu'une personne cherche, jusqu'à une adresse d'affiliation entière recopiée dans la recherche d'adresses.
 """
 
 
 def reject_control_characters(value: str) -> str:
-    """Refuse une valeur portant un caractère de contrôle, l'octet NUL en tête.
+    """Refuse une valeur qui contient un caractère de contrôle, à commencer par l'octet NUL.
 
-    PostgreSQL n'accepte pas l'octet NUL dans un champ texte, et le driver refuse la valeur à l'adaptation des paramètres : sans ce contrôle, une recherche qui en porte un traverse la route et casse au moment de la requête, hors de portée du contrat d'API. Les autres caractères de contrôle sont refusés avec lui — aucun ne désigne un texte cherché.
+    PostgreSQL refuse l'octet NUL dans un champ texte, et le driver refuse la valeur : sans ce contrôle, une recherche qui en contient un échouerait au moment de la requête, hors du contrat d'API. Les autres caractères de contrôle sont refusés avec lui : aucun ne sert à chercher un texte.
 
-    La tabulation, le retour chariot et le saut de ligne restent admis : un terme recopié depuis un document en porte.
+    La tabulation, le retour chariot et le saut de ligne restent admis : un terme recopié depuis un document en contient.
     """
     intrus = sorted({c for c in value if (c < " " or c == "\x7f") and c not in "\t\r\n"})
     if intrus:
@@ -36,7 +33,7 @@ def reject_control_characters(value: str) -> str:
 
 
 TextParam = Annotated[str, AfterValidator(reject_control_characters)]
-"""Valeur textuelle libre reçue d'un appelant, refusée si elle porte un caractère de contrôle.
+"""Valeur textuelle libre reçue d'un appelant, refusée si elle contient un caractère de contrôle.
 
 Sert les paramètres qui reçoivent du texte sans vocabulaire fermé ni format imposé. Le refus emprunte le code de la validation native, la valeur étant écartée par le contrat de la route.
 """
@@ -49,9 +46,9 @@ _DEFAULT_PER_PAGE = 50
 
 
 def requested_offset(query_params: Mapping[str, str]) -> int | None:
-    """Décalage qu'une requête demande — `(page - 1) * per_page` —, ou `None` faute de pagination lisible.
+    """Décalage qu'une requête demande, `(page - 1) * per_page`, ou `None` sans pagination lisible.
 
-    Rend `None` quand la requête ne porte pas de rang de page, et quand les valeurs sont illisibles ou hors bornes : leur refus appartient à la validation de la route, qui le formule dans les termes du contrat d'API.
+    Renvoie `None` quand la requête est sans rang de page, et quand les valeurs sont illisibles ou hors bornes : leur refus appartient à la validation de la route, qui le formule dans les termes du contrat d'API.
     """
     if "page" not in query_params:
         return None

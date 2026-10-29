@@ -1,8 +1,6 @@
-"""Lecture des enregistrements sources theses.fr par la normalisation.
+"""Lecture des enregistrements sources theses.fr par la normalisation : conventions des champs de theses.fr.
 
-Interprétation des champs propres au schéma theses.fr — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique theses.fr.
-
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API theses.fr (frontière dynamique avec une source externe, schéma non typé). Le champ `person` du dataclass `ThesisContribution` transmet tel quel le sous-objet personne au caller.
+Les payloads sont les objets JSON bruts de l'API, sans schéma typé.
 """
 
 from collections.abc import Mapping
@@ -31,21 +29,13 @@ def thesis_oa_status(thesis: Mapping[str, JsonValue]) -> OaStatus:
 
 
 def derive_theses_doc_type(defense_date: str | None) -> str:
-    """Mapping date_soutenance → doc_type canonique pour theses.fr.
-
-    theses.fr distribue à la fois les thèses soutenues et les thèses en préparation. La date de soutenance est le seul signal fiable pour distinguer les deux états :
-      - dateSoutenance présent → 'thesis' (soutenue)
-      - dateSoutenance absent → 'ongoing_thesis' (en cours)
-    """
+    """Type d'une thèse theses.fr : `thesis` avec une date de soutenance, `ongoing_thesis` sans. La date de soutenance est le seul signal fiable qui distingue thèse soutenue et thèse en préparation."""
     return "thesis" if defense_date else "ongoing_thesis"
 
 
 @dataclass(frozen=True)
 class ThesisContribution:
-    """Une personne d'une thèse, avec ses rôles fusionnés.
-
-    Produite par `aggregate_thesis_persons` à partir du dict `thesis` de l'API theses.fr. `person` est le dict brut, transmis tel quel au caller pour les effets (extraction d'identifiants, écriture sur `source_contributions`).
-    """
+    """Une personne d'une thèse, avec ses rôles fusionnés (`aggregate_thesis_persons`). `person` est l'objet brut de l'API."""
 
     person: Mapping[str, JsonValue]
     roles: list[ContributionRole]
@@ -56,13 +46,11 @@ class ThesisContribution:
 
 
 def aggregate_thesis_persons(thesis: Mapping[str, JsonValue]) -> list[ThesisContribution]:
-    """Agrège les personnes d'une thèse depuis `thesis` (API theses.fr).
+    """Personnes d'une thèse, une fois chacune, avec leurs rôles fusionnés.
 
-    Itère sur les champs `auteurs`, `directeurs`, `rapporteurs`, `membresJury`, `presidentJury` (cf. `THESES_FIELD_ROLES`). Une personne qui apparaît dans plusieurs champs est dédupliquée (clé : PPN si présent, sinon `(nom, prenom)`) et ses rôles sont fusionnés via `merge_roles`.
+    Les personnes viennent des champs `auteurs`, `directeurs`, `rapporteurs`, `membresJury` et `presidentJury` (`THESES_FIELD_ROLES`). Une personne présente dans plusieurs champs est identifiée par son PPN, à défaut par son nom et son prénom ; ses rôles se fusionnent (`merge_roles`). C'est presque toujours le président du jury qui est aussi rapporteur.
 
-    En pratique, le cas multi-rôles concerne presque exclusivement le président du jury qui est aussi rapporteur (~1 % des contributions theses au 2026-05-08).
-
-    `author_position` est incrémenté seulement pour les personnes dont les rôles fusionnés contiennent `'author'` ; `None` pour les autres rôles (directeurs/rapporteurs/jury/président). Ordre des auteurs : celui de la liste `thesis["auteurs"]`.
+    Seuls les auteurs ont une position, dans l'ordre de `auteurs`.
     """
     # Une personne apparaissant dans plusieurs champs est retenue une fois, ses rôles cumulés.
     persons_by_key: dict[str, Mapping[str, JsonValue]] = {}

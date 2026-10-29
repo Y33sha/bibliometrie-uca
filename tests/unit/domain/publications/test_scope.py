@@ -20,7 +20,7 @@ class TestOutOfScopeDocTypes:
             assert active not in OUT_OF_SCOPE_DOC_TYPES
 
     def test_is_frozenset(self):
-        """Immuable pour éviter les modifications accidentelles."""
+        """L'ensemble est immuable."""
         assert isinstance(OUT_OF_SCOPE_DOC_TYPES, frozenset)
 
 
@@ -28,27 +28,69 @@ def _facts(
     source="hal",
     source_id="hal-04000000",
     *,
-    raw_doi=None,
     doi=None,
+    removed_doi=None,
     title="observation of",
     urls=(),
     identifiers=(),
+    has_target=False,
 ):
-    return MatchabilityFacts(source, source_id, raw_doi, doi, title, list(urls), list(identifiers))
+    """Faits d'un enregistrement source. `doi` : son DOI actif ; `removed_doi` : son DOI retiré par la correction. Le rôle du DOI est `primary` chez Crossref et DataCite, `secondary` ailleurs."""
+    role = (
+        SourceIdentifierRole.PRIMARY
+        if source in ("crossref", "datacite")
+        else SourceIdentifierRole.SECONDARY
+    )
+    dois = [SourceIdentifier(SourceIdentifierType.DOI, doi, role)] if doi else []
+    if removed_doi:
+        dois.append(
+            SourceIdentifier(SourceIdentifierType.DOI, removed_doi, role, "UNRESOLVED_DOI_TO_NULL")
+        )
+    return MatchabilityFacts(
+        source, source_id, title, list(urls), [*dois, *identifiers], has_target
+    )
 
 
-def _id(id_type, value, removed_by=None):
-    return SourceIdentifier(id_type, value, SourceIdentifierRole.SECONDARY, removed_by)
+def _id(id_type, value, removed_by=None, role=SourceIdentifierRole.SECONDARY):
+    return SourceIdentifier(id_type, value, role, removed_by)
 
 
 class TestIsMatchable:
     def test_gresis_doi_is_excluded(self):
         """Régression : les copies GRESIS d'enregistrements OpenAlex (DOI 10.60692) dédoublaient les publications de revue."""
         gresis = "10.60692/m2raz-tjw54"
-        assert not is_matchable(_facts("datacite", gresis, raw_doi=gresis, doi=gresis), set())
+        assert not is_matchable(_facts("datacite", gresis, doi=gresis), set())
 
     def test_gresis_doi_nulled_by_correction_is_still_excluded(self):
-        assert not is_matchable(_facts("datacite", raw_doi="10.60692/m2raz-tjw54"), set())
+        assert not is_matchable(_facts("datacite", removed_doi="10.60692/m2raz-tjw54"), set())
+
+    def test_work_citing_gresis_copies_among_other_dois_is_kept(self):
+        """Un work OpenAlex cite deux copies GRESIS parmi ses DOI `secondary`."""
+        identifiers = [
+            _id(SourceIdentifierType.DOI, d)
+            for d in ("10.17863/cam.81732", "10.60692/qcqdd-snd87", "10.60692/sx4sn-0x050")
+        ]
+        assert is_matchable(_facts("openalex", "W4226288546", identifiers=identifiers), set())
+
+    def test_work_whose_derived_doi_is_a_gresis_copy_is_excluded(self):
+        identifiers = [
+            _id(
+                SourceIdentifierType.DOI, "10.60692/j1b6z-6b197", role=SourceIdentifierRole.DERIVED
+            ),
+            _id(SourceIdentifierType.DOI, "10.60692/xswt9-t1f39"),
+        ]
+        assert not is_matchable(_facts("openalex", "W1", identifiers=identifiers), set())
+
+    def test_datacite_record_of_a_secondary_form_is_excluded(self):
+        """L'enregistrement DataCite d'une version Zenodo dont le concept est en base."""
+        version = "10.5281/zenodo.10"
+        record = _facts("datacite", version, doi=version, has_target=True)
+        assert not is_matchable(record, set())
+
+    def test_other_record_with_the_doi_of_a_secondary_form_is_kept(self):
+        """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté avec la version."""
+        record = _facts(doi="10.5281/zenodo.10", has_target=True)
+        assert is_matchable(record, set())
 
     def test_paratext_title_is_excluded(self):
         for title in ("List of Contributors", "README.txt", "Table des matières"):
@@ -78,9 +120,16 @@ class TestIsMatchable:
         )
 
     def test_related_doi_alone_does_not_keep_an_aggregator_record(self):
-        """Un DOI apparenté désigne une autre œuvre."""
-        record = _facts("openalex", "W1", identifiers=[_id(SourceIdentifierType.DOI, "10.1/x")])
-        assert not is_matchable(record, set())
+        """Un DOI `related` désigne une autre œuvre."""
+        related = _id(SourceIdentifierType.DOI, "10.1/x", role=SourceIdentifierRole.RELATED)
+        assert not is_matchable(_facts("openalex", "W1", identifiers=[related]), set())
+
+    def test_secondary_doi_keeps_an_aggregator_record(self):
+        record = _facts("scanr", "pmid1", identifiers=[_id(SourceIdentifierType.DOI, "10.1/x")])
+        assert is_matchable(record, set())
+
+    def test_removed_doi_does_not_keep_an_aggregator_record(self):
+        assert not is_matchable(_facts("openalex", "W1", removed_doi="10.1/x"), set())
 
     def test_removed_key_does_not_keep_an_aggregator_record(self):
         removed = _id(SourceIdentifierType.HAL_ID, "hal-03178520", "HAL_DEPOSIT_MISSING_TO_REMOVED")

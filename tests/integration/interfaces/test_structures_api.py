@@ -1,11 +1,11 @@
-"""Tests de caractérisation pour le router structures.
+"""Tests de caractérisation du router des structures.
 
 Couvre :
-- GET /api/structures (list + filtres)
-- GET /api/structures/{id} (detail, 404)
-- POST/PUT/DELETE /api/structures (mutations, auth requise)
-- POST/DELETE /api/structures/tutelles (relations, auth requise)
-- GET/POST/PUT/DELETE /api/structures/name-forms (formes de noms, auth requise)
+- GET /api/structures (liste, filtres)
+- GET /api/structures/{id} (fiche, 404)
+- POST/PUT/DELETE /api/structures (écritures, authentification requise)
+- POST/DELETE /api/structures/tutelles (relations de tutelle, authentification requise)
+- GET/POST/PUT/DELETE /api/structures/name-forms (formes de nom, authentification requise)
 """
 
 import json
@@ -18,7 +18,7 @@ from tests.integration.helpers.seeds import (
     uniq,
 )
 
-# ── GET /api/structures (list) ──────────────────────────────────
+# ── GET /api/structures (liste) ─────────────────────────────────
 
 
 class TestListStructures:
@@ -167,8 +167,7 @@ class TestCreateStructure:
         assert r.status_code == 409
 
     def test_create_visible_immediately(self, auth_client):
-        # La requête est committée avant l'envoi de la réponse : la structure est lisible
-        # depuis une connexion indépendante.
+        # La requête est committée avant l'envoi de la réponse : la structure est lisible depuis une connexion indépendante.
         code = uniq("READBACK")
         r = auth_client.post(
             "/api/structures",
@@ -260,7 +259,7 @@ class TestDeletionImpact:
         }
 
 
-# ── structure-relations ─────────────────────────────────────────
+# ── Relations de tutelle ────────────────────────────────────────
 
 
 class TestCreateRelation:
@@ -283,7 +282,7 @@ class TestCreateRelation:
         )
         assert r.status_code == 200
         body = r.json()
-        # Peut renvoyer la ligne ou {"status": "already_exists"}
+        # La route renvoie la relation créée, ou {"status": "already_exists"}.
         assert "status" in body or "id" in body or "relation_id" in body
 
     def test_duplicate_already_exists(self, auth_client):
@@ -301,7 +300,7 @@ class TestCreateRelation:
         assert r.json().get("status") == "already_exists"
 
     def test_conflict_when_a_structure_is_missing(self, auth_client):
-        """`parent_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
+        """`parent_id` inexistant : la violation de clé étrangère renvoie 409."""
         child = seed_structure(type_="labo")
         r = auth_client.post(
             "/api/structures/tutelles",
@@ -328,7 +327,7 @@ class TestDeleteRelation:
         assert r.json()["deleted"] is True
 
 
-# ── name-forms ──────────────────────────────────────────────────
+# ── Formes de nom ───────────────────────────────────────────────
 
 
 class TestGetNameForm:
@@ -377,7 +376,7 @@ class TestCreateNameForm:
         assert r.status_code == 200
 
     def test_conflict_when_structure_is_missing(self, auth_client):
-        """`structure_id` inexistant : la clé étrangère rend 409, non un 500 opaque."""
+        """`structure_id` inexistant : la violation de clé étrangère renvoie 409."""
         r = auth_client.post(
             "/api/structures/name-forms",
             json={"structure_id": 999999999, "form_text": uniq("Fghost")},

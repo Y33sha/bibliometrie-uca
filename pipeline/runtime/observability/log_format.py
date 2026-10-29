@@ -73,7 +73,7 @@ def nothing_to_do(logger: ScopedOrPlainLogger, subject: str | None = None) -> No
 
 
 def inflect(n: int, singular: str, plural: str | None = None) -> str:
-    """Rend « préfixe » ou « préfixes » selon `n`. Zéro prend le singulier, comme le veut le français.
+    """Renvoie « préfixe » ou « préfixes » selon `n`. Zéro prend le singulier, comme le veut le français.
 
     `plural` couvre les formes que le `s` final ne donne pas.
     """
@@ -83,7 +83,7 @@ def inflect(n: int, singular: str, plural: str | None = None) -> str:
 
 
 def quantity(n: int, singular: str, plural: str | None = None) -> str:
-    """Rend « 1 préfixe » ou « 3 préfixes »."""
+    """Renvoie « 1 préfixe » ou « 3 préfixes »."""
     return f"{n} {inflect(n, singular, plural)}"
 
 

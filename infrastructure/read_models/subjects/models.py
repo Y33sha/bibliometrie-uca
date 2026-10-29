@@ -1,6 +1,6 @@
 """Modèles de réponse : lectures sur les sujets.
 
-Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subjects_queries.py`).
+Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/transformation/publications/subjects/subject_store.py`).
 
 `SubjectFrequency` sert aussi les nuages de sujets des personnes, des laboratoires, des revues et des éditeurs.
 """
@@ -58,7 +58,7 @@ class SubjectDetailResponse(BaseModel):
 
 
 class SubjectFrequency(BaseModel):
-    """Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs dashboards."""
+    """Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs tableaux de bord."""
 
     id: int
     label: str

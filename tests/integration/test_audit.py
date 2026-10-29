@@ -1,9 +1,8 @@
-"""Tests du journal d'audit (`application/audit_log.py`).
+"""Journal d'audit (`application/audit_log.py`).
 
-Vérifie trois comportements :
-1. Hors requête d'administration (pipeline, scripts) → `emit_event` ne consigne rien.
-2. Dans une requête d'administration → l'événement rejoint la file de la requête, écrite dans `audit_log` avant le commit.
-3. Un événement émis dans un bloc `discarded_events` → écarté avec l'écriture annulée qu'il décrit.
+- Hors requête d'administration (pipeline, scripts), `emit_event` est sans effet.
+- Dans une requête d'administration, l'événement rejoint la file de la requête, écrite dans `audit_log` avant le commit.
+- Un événement émis dans un bloc `discarded_events` est écarté avec l'écriture annulée qu'il décrit.
 """
 
 from collections.abc import Iterator
@@ -59,10 +58,7 @@ def _last_event(conn: Connection):
 
 @pytest.fixture
 def sa_sync_conn(sa_sync_conn_app):
-    """La trace d'audit est écrite par l'API, seule à en porter le droit.
-
-    Ces tests se connectent donc sous son rôle. Le pipeline en est écarté : il ne prend aucune décision humaine, et pouvoir en déposer la trace ôterait à la table ce qu'elle vaut.
-    """
+    """Connexion sous le rôle de l'API, seul rôle autorisé à écrire la trace d'audit."""
     return sa_sync_conn_app
 
 
@@ -120,7 +116,7 @@ class TestEmitEvent:
             reset_current_user(token)
 
     def test_accepts_null_aggregate_id(self, sa_sync_conn):
-        """Cas d'une entité supprimée sans équivalent survivant."""
+        """Un événement sans identifiant d'agrégat, comme la suppression d'une entité sans successeur, est consigné."""
         with _requete_admin(sa_sync_conn):
             emit_event("structure.deleted", "structure", None, {"name": "X"})
         assert _last_event(sa_sync_conn).aggregate_id is None
@@ -147,13 +143,13 @@ class TestEmitEvent:
 
 
 class TestEndToEndServiceIntegration:
-    """Vérifie que les services émettent les événements attendus dans une requête d'administration."""
+    """Les services émettent les événements attendus dans une requête d'administration."""
 
     @pytest.fixture
     def sa_sync_conn(self, sa_sync_conn_owner):
-        """Ces tests posent des publications, que le pipeline crée, puis exercent des opérations que l'API conduit — deux rôles dans une même transaction.
+        """Connexion sous le propriétaire du schéma : ces tests posent des publications, que crée le pipeline, puis exercent des opérations de l'API, dans une même transaction.
 
-        Ils se connectent donc sous le propriétaire du schéma. Ce qu'ils éprouvent est l'enchaînement des services et l'émission de la trace, non la frontière des droits, tenue par les tests d'API et ceux du pipeline, qui se connectent chacun sous le rôle exerçant l'opération.
+        Ils vérifient l'émission de la trace ; les droits se vérifient dans les tests de l'API et du pipeline.
         """
         return sa_sync_conn_owner
 
@@ -180,7 +176,7 @@ class TestEndToEndServiceIntegration:
         assert _count(sa_sync_conn) == 0
 
     def test_mark_distinct_emits_only_on_actual_insert(self, sa_sync_conn):
-        """`mark_distinct` est idempotent : un appel sur une paire déjà marquée n'émet pas d'événement supplémentaire."""
+        """`mark_distinct` est idempotent : une paire marquée plusieurs fois, dans un sens ou dans l'autre, émet un seul événement."""
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         persons = person_service(sa_sync_conn)
@@ -208,7 +204,7 @@ class TestEndToEndServiceIntegration:
 
     @pytest.mark.parametrize("status", ["confirmed", "rejected"])
     def test_name_form_status_emits_event(self, sa_sync_conn, status):
-        """La confirmation comme le rejet d'une forme (action « détacher l'intrus ») émettent l'événement."""
+        """La confirmation comme le rejet d'une forme de nom émettent l'événement."""
         person_id = _person(sa_sync_conn)
         insert_person_name_form(
             sa_sync_conn, person_id, name_form="x x", sources=["hal"], status="pending"
@@ -222,7 +218,7 @@ class TestEndToEndServiceIntegration:
         assert row.payload == {"name_form": "x x", "status": status}
 
     def test_reject_pair_emits_event(self, sa_sync_conn):
-        """Le détachement d'une paire (publication, personne) émet l'événement."""
+        """Le rejet d'une paire (publication, personne) émet l'événement."""
         from application.services.contributions import reject_pair
         from infrastructure.repositories import contribution_repository
 

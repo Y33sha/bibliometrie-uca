@@ -16,7 +16,7 @@ describe('membres Crossref', () => {
 		expect(crossrefMemberIds(prefixes)).toEqual([297, 93]);
 	});
 
-	it('rend une liste vide quand aucun préfixe ne porte de membre', () => {
+	it('renvoie une liste vide quand aucun préfixe ne porte de membre', () => {
 		expect(crossrefMemberIds([{ crossref_member_id: null }])).toEqual([]);
 	});
 });

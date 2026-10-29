@@ -1,10 +1,6 @@
-"""Semis des contributions et des informations du contributeur, sur la connexion SQLAlchemy ou un curseur psycopg.
+"""Semis des contributions et des informations du contributeur, sur une connexion SQLAlchemy.
 
-Le nom normalisé et les identifiants d'une contribution source vivent dans la table
-dédupliquée `contributor_information` ; `source_contributions` ne
-a seulement une FK `contributor_information_id`. Les tests qui sèment des contributions sources passent par
-`upsert_contributor_information` (connexion SQLAlchemy) ou `upsert_contributor_information_on_cursor` (curseur
-psycopg) pour obtenir l'`contributor_information_id` correspondant.
+Le nom normalisé et les identifiants d'une contribution source sont dans la table dédupliquée `contributor_information`. `source_contributions` a seulement la clé étrangère `contributor_information_id`, que donne `upsert_contributor_information`.
 """
 
 import json
@@ -55,16 +51,6 @@ def upsert_split_contributor_information(
     return _upsert(conn, _params(last, first, identifiers))
 
 
-def upsert_contributor_information_on_cursor(
-    cur, author_name_normalized=None, identifiers=None
-) -> int:
-    """`upsert_contributor_information` sur un curseur psycopg à lignes en dictionnaire."""
-    params = _form_params(author_name_normalized, identifiers)
-    cur.execute(_INSERT_SQL, params)
-    cur.execute(_SELECT_SQL, params)
-    return cur.fetchone()["id"]
-
-
 def insert_contribution(
     conn: Connection,
     publication_id: int,
@@ -74,7 +60,7 @@ def insert_contribution(
     in_perimeter: bool | None = None,
     roles: list[str] | None = None,
 ) -> int:
-    """Insère une contribution : contribution sans contribution source, rattachée à la personne en mode `manual`. Renvoie l'`id` de la contribution. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
+    """Insère une contribution sans contribution source, rattachée à la personne `person_id` en mode `manual`, et renvoie son `id`. Une colonne laissée à `None` prend la valeur par défaut du schéma. `in_perimeter` pose l'indice `address`."""
     return insert_row(
         conn,
         "contributions",

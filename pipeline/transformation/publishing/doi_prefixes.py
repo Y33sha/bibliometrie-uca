@@ -1,13 +1,13 @@
-"""Table `doi_prefixes` : agence d'enregistrement (Registration Agency) et éditeur de chaque préfixe DOI.
+"""Store de la table `doi_prefixes` : agence d'enregistrement (Registration Agency) et éditeur de chaque préfixe DOI.
 
-Peuplée en deux temps : la phase `resolve_ra` insère `(prefix, ra)` ; le volet publisher de la phase `publishing` interroge l'API `/prefixes` de Crossref, puis celle de DataCite, renseigne les métadonnées et attache l'éditeur. `crossref_checked_at` et `datacite_checked_at` retiennent que l'agence a répondu, préfixe connu ou non. Pour un préfixe DataCite, le nom et le symbole du client DataCite (repository) occupent des colonnes dédiées (`client_name_*`, `datacite_client_symbol`) ; le provider DataCite occupe les colonnes `publisher_*`, comme l'éditeur Crossref.
-
-Sert la phase `resolve_ra` (lecture des préfixes à résoudre, insertion de leur Registration Agency) et le volet publisher de `publishing` (attache de l'éditeur Crossref / repository DataCite).
+La phase `resolve_ra` insère chaque préfixe avec son agence. La phase `publishing` interroge ensuite l'API `/prefixes` de Crossref, puis celle de DataCite, et attache l'éditeur. Pour un préfixe DataCite, l'éditeur est le provider DataCite ; le client DataCite (repository) a ses propres colonnes.
 """
 
 from typing import Literal, NamedTuple
 
 from sqlalchemy import Connection, text
+
+from domain.source_records.identifiers import SourceIdentifierType
 
 type Agency = Literal["Crossref", "DataCite"]
 """Agence dont l'API `/prefixes` donne l'éditeur d'un préfixe."""
@@ -28,14 +28,14 @@ _CHECKED_COLUMN: dict[Agency, str] = {
 
 
 class PendingPublisherPrefix(NamedTuple):
-    """Row `doi_prefixes` dont l'éditeur reste à déterminer. `publisher_name_*` sont en général NULL, la row créée par `resolve_ra` avec la RA seule. Renseignés, le volet attache l'éditeur sans requête."""
+    """Préfixe dont l'éditeur reste à déterminer. Son nom d'éditeur est en général vide : `resolve_ra` crée la ligne avec l'agence seule. Un nom présent dispense de la requête à l'agence."""
 
     prefix: str
     ra: str
     publisher_name_raw: str | None
     publisher_name_normalized: str | None
     sample_doi: str | None = None
-    """DOI du préfixe porté par un enregistrement, lu juste avant d'interroger Crossref."""
+    """DOI d'un enregistrement source de ce préfixe, lu juste avant d'interroger Crossref."""
 
 
 class DoiPrefixStore:
@@ -45,7 +45,7 @@ class DoiPrefixStore:
         self._conn = conn
 
     def get_prefixes_to_resolve(self) -> list[str]:
-        """Préfixes des DOI connus (vue `known_dois`, sans filtre de périmètre), qui couvrent les DOI que cherche la phase `fetch_missing`."""
+        """Préfixes absents de la table parmi les DOI connus (vue `known_dois`), tous périmètres confondus. Ils couvrent les DOI que cherche la phase `fetch_missing`."""
         result = self._conn.execute(
             text(
                 """
@@ -60,7 +60,7 @@ class DoiPrefixStore:
         return [row.prefix for row in result]
 
     def insert_ra(self, *, prefix: str, ra: str) -> bool:
-        """Insère un préfixe avec sa RA seule. `ra='unknown'` si doi.org ne connaît pas le préfixe. Retourne True si inséré, False si déjà présent (`ON CONFLICT (prefix) DO NOTHING`)."""
+        """Insère un préfixe avec sa seule agence, `unknown` pour un préfixe inconnu de doi.org. Renvoie vrai si le préfixe est absent de la table."""
         result = self._conn.execute(
             text(
                 "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "
@@ -71,7 +71,7 @@ class DoiPrefixStore:
         return result.rowcount > 0
 
     def breakdown_by_registration_agency(self) -> list[tuple[str, int, int]]:
-        """Pour chaque Registration Agency présente parmi tous les DOI connus (`Crossref` / `DataCite` / `unknown`), le couple `(ra, nombre de DOI distincts, nombre de préfixes distincts)`, trié par nombre de DOI décroissant. Un DOI (ou préfixe) non encore résolu compte comme `unknown`. Sert l'observabilité de la phase `resolve_ra`."""
+        """Nombre de DOI et de préfixes de chaque agence parmi les DOI connus, de l'agence qui a le plus de DOI à celle qui en a le moins. Un préfixe absent de la table compte comme `unknown`. Sert le journal de la phase `resolve_ra`."""
         result = self._conn.execute(
             text(
                 """
@@ -122,7 +122,7 @@ class DoiPrefixStore:
         client_name_normalized: str | None,
         datacite_client_symbol: str | None,
     ) -> None:
-        """Renseigne les métadonnées publisher d'une row après fetch `/prefixes` (et corrige `ra` si elle était `unknown`). N'attache pas le `publisher_id` (cf. `update_publisher_id`) ni ne marque la row vérifiée (cf. `mark_checked`)."""
+        """Pose l'agence et les métadonnées d'éditeur que donne l'API `/prefixes`. L'éditeur s'attache par `update_publisher_id`, la réponse de l'agence se retient par `mark_checked`."""
         self._conn.execute(
             text(
                 """
@@ -150,14 +150,19 @@ class DoiPrefixStore:
         )
 
     def find_doi_with_prefix(self, prefix: str) -> str | None:
-        """Un DOI de ce préfixe porté par un enregistrement, qui sert à retrouver le membre Crossref déposant."""
+        """Un DOI actif d'enregistrement source de ce préfixe. Il sert à retrouver le membre Crossref déposant."""
         return self._conn.execute(
-            text("SELECT doi FROM source_records WHERE doi LIKE :motif LIMIT 1"),
+            text(f"""
+                SELECT id_value FROM source_record_identifiers
+                WHERE id_type = '{SourceIdentifierType.DOI.value}' AND removed_by IS NULL
+                  AND id_value LIKE :motif
+                LIMIT 1
+            """),
             {"motif": f"{prefix}/%"},
         ).scalar()
 
     def update_publisher_id(self, prefix: str, publisher_id: int) -> None:
-        """Attache un publisher à un préfixe."""
+        """Attache un éditeur à un préfixe."""
         self._conn.execute(
             text("UPDATE doi_prefixes SET publisher_id = :pid WHERE prefix = :prefix"),
             {"pid": publisher_id, "prefix": prefix},

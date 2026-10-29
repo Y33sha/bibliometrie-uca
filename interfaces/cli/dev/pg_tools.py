@@ -11,7 +11,7 @@ from infrastructure.settings import settings
 def resolve_pg_tool(name: str) -> str:
     """Localise l'exécutable PostgreSQL `name` (`pg_dump`, `psql`…).
 
-    Ordre : variable d'environnement portant le nom en majuscules (`PG_DUMP`, `PSQL` : chemin complet), puis le `PATH`, puis les dossiers d'installation PostgreSQL usuels sous Windows, où les binaires sont posés hors `PATH`.
+    Ordre : variable d'environnement au nom en majuscules (`PG_DUMP`, `PSQL` : chemin complet), puis le `PATH`, puis les dossiers d'installation PostgreSQL usuels sous Windows, où les binaires sont posés hors `PATH`.
     """
     variable = name.upper()
     env = os.environ.get(variable)

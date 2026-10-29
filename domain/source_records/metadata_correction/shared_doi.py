@@ -1,15 +1,6 @@
-"""Correction du DOI d'un groupe d'enregistrements partageant un même DOI.
+"""Correction du DOI que partagent plusieurs enregistrements sources.
 
-Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_records` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
-
-- **convergence (même œuvre)** : une forme secondaire DataCite converge sur le DOI de l'œuvre principale, exposé par un `relatedIdentifiers` → substitution du DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un DOI présent en base comme dataset, forme du DOI indifférente). Un fichier complémentaire figshare, sans relation déclarée, rejoint la collection figshare de même titre. Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
-- **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres. Les membres qui gardent le DOI perdent aussi les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
-
-Un DOI que doi.org ne connaît pas est nullé sur tous les membres du groupe, avant toute autre décision.
-
-La décision est **agnostique de la source** : le caller applicatif regroupe par DOI (brut reconstruit) et persiste la cible de chaque membre. La famille de cas est extensible.
-
-`CONVERGENCE_CASES` liste les cas de convergence, où l'agrégation canonique relègue le membre en fin de priorité, pour que le titre vienne de l'enregistrement canonique. `DATACITE_DIRECT_CONVERGENCE` mappe la `relation_type` d'un `relatedIdentifiers` (vocabulaire DataCite, gardé en chaîne) au cas de correction ; la requête de candidats au clustering le consomme pour former son `CASE` et son filtre.
+Une forme secondaire DataCite (version, variante, pièce d'un jeu de données) qui déclare son œuvre principale, présente en base, donne au DOI partagé une cible : le DOI de cette œuvre (`doi_target`). Un DOI partagé par des œuvres distinctes est retiré des membres qui l'ont à tort (`resolve_cluster_doi_corrections`). Les membres qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 """
 
 import re
@@ -26,26 +17,26 @@ from domain.sources.registry import Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
-class DoiClusterCase(StrEnum):
-    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `corrections.doi.corrected_by`."""
+class DoiTargetRule(StrEnum):
+    """Règle qui donne une cible au DOI d'une forme secondaire DataCite. Inscrite dans `doi_targets.rule`."""
 
-    # Formes secondaires DataCite → convergence sur l'œuvre canonique.
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
     DATACITE_VARIANT_TO_PRIMARY = (
         "DATACITE_VARIANT_TO_PRIMARY"  # copie repository → version publiée (IsVariantFormOf)
     )
     DATACITE_PACKAGE_PIECE = "DATACITE_PACKAGE_PIECE"  # pièce d'un dataset → dataset parent présent (IsPartOf, ou fichier complémentaire figshare)
 
-    # Ouvrage et chapitre partageant un DOI : le DOI appartient à l'ouvrage (`book`), le
-    # `book_chapter` d'un autre titre le porte à tort → le chapitre le perd.
+
+class DoiClusterCase(StrEnum):
+    """Cas de retrait du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `source_record_identifiers.removed_by`."""
+
+    # Ouvrage et chapitre partageant un DOI : le DOI est celui de l'ouvrage, le chapitre d'un autre titre le perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"
 
-    # Plusieurs `book_chapter` partageant un DOI mais de titres réellement différents : le DOI
-    # est celui de l'ouvrage hôte (absent du groupe), recopié sur ses chapitres → tous le perdent.
+    # Chapitres de titres différents partageant un DOI : celui de l'ouvrage, absent du groupe. Tous le perdent.
     CHAPITRES_TITRES_DIFFERENTS = "CHAPITRES_TITRES_DIFFERENTS"
 
-    # Volume d'actes (`proceedings`) et documents de titres différents partageant son DOI : ce
-    # sont des communications du volume → elles perdent le DOI.
+    # Volume d'actes et documents d'autres titres partageant son DOI : ces communications perdent le DOI.
     ACTES_VS_COMMUNICATION = "ACTES_VS_COMMUNICATION"
 
     # Dépôt HAL dont le DOI est celui d'une autre œuvre (`_depots_hal_d_une_autre_oeuvre`) → le dépôt le perd.
@@ -55,20 +46,10 @@ class DoiClusterCase(StrEnum):
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
 
 
-# Cas de convergence (cf. docstring du module) : substitution du DOI du membre par celui de l'œuvre canonique.
-CONVERGENCE_CASES: frozenset[str] = frozenset(
-    {
-        DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-        DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-        DoiClusterCase.DATACITE_PACKAGE_PIECE,
-    }
-)
-
-
-# Convergence directe : le `relatedIdentifiers` pointe le DOI de l'œuvre canonique, pris tel quel.
-DATACITE_DIRECT_CONVERGENCE: dict[str, DoiClusterCase] = {
-    "IsVersionOf": DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-    "IsVariantFormOf": DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
+# Types de relation DataCite qui désignent l'œuvre principale par son DOI. La requête des candidats en tire son `CASE` et son filtre.
+DATACITE_DIRECT_CONVERGENCE: dict[str, DoiTargetRule] = {
+    "IsVersionOf": DoiTargetRule.DATACITE_VERSION_TO_CONCEPT,
+    "IsVariantFormOf": DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY,
 }
 # Pièce d'un package : la requête exige en plus que le parent soit un dataset présent en base.
 DATACITE_PACKAGE_PIECE_RELATION = "IsPartOf"
@@ -81,25 +62,32 @@ FIGSHARE_ADDITIONAL_FILE_TITLE_PATTERN = r"^additional file( [0-9]+)? of "
 
 
 def meme_oeuvre_declaree(
-    case: DoiClusterCase, doc_type: str | None, own_doi: str | None, target_doi: str | None
+    case: DoiTargetRule, doc_type: str | None, own_doi: str | None, target_doi: str | None
 ) -> bool:
     """Vrai si la relation déclarée par un enregistrement source réunit son DOI `own_doi` et `target_doi` en une seule œuvre.
 
     Une pièce de dataset rejoint son parent, et deux DOI d'un même registrant forment une seule œuvre. Entre deux registrants, une copie de repository rejoint la forme publiée, sauf un enregistrement source `preprint`. Une version d'un autre registrant relie deux œuvres, comme un preprint arXiv et l'article publié.
     """
-    if case is DoiClusterCase.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
+    if case is DoiTargetRule.DATACITE_PACKAGE_PIECE or meme_registrant(own_doi, target_doi):
         return True
-    return case is DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
+    return case is DoiTargetRule.DATACITE_VARIANT_TO_PRIMARY and doc_type != DocType.PREPRINT
+
+
+class SecondaryFormDeclaration(NamedTuple):
+    """Enregistrement source qui déclare son DOI forme secondaire de l'œuvre principale `target_doi`, présente en base, sous la règle `rule`. `doc_type` : type après la correction unaire."""
+
+    id: int
+    doc_type: str | None
+    target_doi: str
+    rule: DoiTargetRule
 
 
 class DoiClusterMember(NamedTuple):
-    """Un membre d'un groupe de `source_records` partageant un DOI : son id, son `doc_type` **canonique** (corrigé par la passe unaire) et son `title_normalized` (matérialisé). `canonical_doi` est le DOI de l'œuvre canonique vers laquelle converger, présent si ce membre (typiquement une `source_record` `datacite`) est une **forme secondaire** déclarant la relation ; `same_work_case` porte alors le `DoiClusterCase` correspondant (version/variante/pièce de package)."""
+    """Membre d'un groupe d'enregistrements sources qui partagent un DOI. `doc_type` : type après la correction unaire."""
 
     id: int
     doc_type: str | None
     title_normalized: str | None
-    canonical_doi: str | None = None
-    same_work_case: DoiClusterCase | None = None
     # Valeurs des clés de confirmation (`CONFIRMATION_ID_TYPES`) de ses identifiants, par type.
     confirmation_ids: Mapping[str, tuple[str, ...]] = {}
     # Identifiants propres de l'enregistrement source, par type : le `hal_id` d'un enregistrement source HAL, le NNT d'un enregistrement source theses.fr.
@@ -110,11 +98,18 @@ class DoiClusterMember(NamedTuple):
 
 
 class DoiClusterDecision(NamedTuple):
-    """Cible de correction du DOI d'un membre : `target_doi` (`None` = nullage, sinon le DOI substitué) et le cas qui l'a produite."""
+    """Retrait du DOI d'un membre, et le cas qui le décide."""
 
     id: int
-    target_doi: str | None
     case: DoiClusterCase
+
+
+class DoiTarget(NamedTuple):
+    """Cible du DOI d'une forme secondaire : le DOI de l'œuvre principale, et la règle qui relie les deux DOI."""
+
+    doi: str
+    target_doi: str
+    rule: DoiTargetRule
 
 
 class ConfirmationIdRemoval(NamedTuple):
@@ -196,27 +191,26 @@ def confirmation_id_removals(
     return removals
 
 
-# Marqueurs structurels de titre de chapitre, retirés avant comparaison : un chapitre est
-# fréquemment saisi avec son numéro (« chapitre 14 … ») par une source et sans par une autre.
+# Marqueurs de chapitre, retirés avant comparaison : une source saisit le numéro du chapitre (« chapitre 14 … »), une autre non.
 _CHAPTER_TITLE_MARKERS = re.compile(
     r"\b(chapitre|chapter|chap|ch|section|sec|partie|part|vol|tome|pp|p)\b"
 )
 
 
 def _clean_title(title_normalized: str | None) -> str:
-    """Retire le bruit structurel d'un titre normalisé (chiffres = numéros de chapitre/page, mots-marqueurs) et re-collapse les espaces, pour comparer des titres à leur résidu. Déterministe (égalité stricte, aucune similarité floue)."""
+    """Titre normalisé sans chiffres ni marqueurs de chapitre, pour comparer des titres."""
     cleaned = re.sub(r"\d+", " ", title_normalized or "")
     cleaned = _CHAPTER_TITLE_MARKERS.sub(" ", cleaned)
     return re.sub(r"\s+", " ", cleaned).strip()
 
 
 def _same_title(a: str, b: str) -> bool:
-    """Deux résidus de titre désignent la même œuvre : égaux, ou l'un contenu dans l'autre (troncature de sous-titre)."""
+    """Vrai si deux titres nettoyés désignent la même œuvre : égaux, ou l'un contenu dans l'autre (sous-titre tronqué)."""
     return a == b or a in b or b in a
 
 
 def _group_has_distinct_chapters(titles: list[str | None]) -> bool:
-    """True si le groupe contient deux chapitres **réellement distincts** : après nettoyage, une paire de titres qui ne désignent pas la même œuvre (`_same_title`). Égalité stricte sur le résidu, sans seuil flou."""
+    """Vrai si deux titres de chapitre, nettoyés, désignent des œuvres différentes."""
     cleaned = [c for c in (_clean_title(t) for t in titles) if c]
     return any(not _same_title(a, b) for a, b in combinations(cleaned, 2))
 
@@ -277,44 +271,44 @@ def _depots_hal_d_une_autre_oeuvre(group: list[DoiClusterMember]) -> list[DoiClu
     ]
 
 
-def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
-    """Vrai si la relation déclarée par `member` désigne la même œuvre que le DOI partagé (cf. `meme_oeuvre_declaree`)."""
-    if member.same_work_case is None or member.canonical_doi is None:
-        return False
-    return meme_oeuvre_declaree(
-        member.same_work_case, member.doc_type, shared_doi, member.canonical_doi
+def doi_target(declarations: Iterable[SecondaryFormDeclaration], *, doi: str) -> DoiTarget | None:
+    """Cible de `doi` quand un enregistrement source le déclare forme secondaire d'une autre forme de la même œuvre (cf. `meme_oeuvre_declaree`) : version → concept, variante → version publiée, fichier → dépôt parent."""
+    declaration = next(
+        (
+            d
+            for d in declarations
+            if d.target_doi != doi and meme_oeuvre_declaree(d.rule, d.doc_type, doi, d.target_doi)
+        ),
+        None,
     )
+    return DoiTarget(doi, declaration.target_doi, declaration.rule) if declaration else None
 
 
 def resolve_cluster_doi_corrections(
-    group: list[DoiClusterMember], *, shared_doi: str, unresolved: bool = False
+    group: list[DoiClusterMember],
+    *,
+    shared_doi: str,
+    unresolved: bool = False,
+    has_target: bool = False,
 ) -> list[DoiClusterDecision]:
-    """Pour un groupe de `source_records` partageant `shared_doi`, renvoie les corrections `(source_record_id, target_doi, cas)`. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller qui forme le groupe par DOI.
+    """Membres d'un groupe qui partagent `shared_doi` et le perdent, avec le cas qui le décide.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
-    - **Même œuvre DataCite** (un membre porte un `canonical_doi`, cf. `_meme_oeuvre`) : tous les membres convergent sur l'œuvre principale (`target_doi = canonical_doi`), avec le cas porté par ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
-    - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI (`target_doi = None`, celui de l'ouvrage). Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
-    - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + égalité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
+    - **DOI d'une forme secondaire** (`has_target`, cf. `doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
+    - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI, celui de l'ouvrage. Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
+    - **Chapitres seuls, de titres différents** : tous les `book_chapter` perdent le DOI, celui de l'ouvrage absent.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
-    - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et dont le titre partage moins de 35 % de ses mots avec elle, perd le DOI. S'ajoute aux cas précédents.
-
-    Hors de ces cas, un membre partageant le DOI par accident ne reçoit aucune décision.
-
-    Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
+    - **Dépôt HAL d'une autre œuvre** (`_depots_hal_d_une_autre_oeuvre`) : un dépôt HAL sans nom d'auteur commun avec l'enregistrement source Crossref du DOI, et dont le titre partage peu de mots avec le sien, perd le DOI. S'ajoute aux cas précédents.
+    """
     if unresolved:
-        return [
-            DoiClusterDecision(m.id, None, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for m in group
-        ]
-    canonical = next((m for m in group if _meme_oeuvre(m, shared_doi)), None)
-    if canonical is not None:
-        assert canonical.canonical_doi is not None and canonical.same_work_case is not None
-        case = canonical.same_work_case
-        return [DoiClusterDecision(m.id, canonical.canonical_doi, case) for m in group]
+        return [DoiClusterDecision(m.id, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for m in group]
+    if has_target:
+        return []
 
     decisions = _divergence_decisions(group)
     decided = {d.id for d in decisions}
     return decisions + [
-        DoiClusterDecision(m.id, None, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
+        DoiClusterDecision(m.id, DoiClusterCase.HAL_DOI_D_UNE_AUTRE_OEUVRE)
         for m in _depots_hal_d_une_autre_oeuvre(group)
         if m.id not in decided
     ]
@@ -330,7 +324,7 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
             _clean_title(m.title_normalized) for m in book_family if m.doc_type == DocType.BOOK
         ]
         return [
-            DoiClusterDecision(m.id, None, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
+            DoiClusterDecision(m.id, DoiClusterCase.OUVRAGE_VS_CHAPITRE)
             for m in chapters
             if not any(_same_title(_clean_title(m.title_normalized), t) for t in book_titles if t)
         ]
@@ -340,10 +334,9 @@ def _divergence_decisions(group: list[DoiClusterMember]) -> list[DoiClusterDecis
         and _group_has_distinct_chapters([m.title_normalized for m in chapters])
     ):
         return [
-            DoiClusterDecision(m.id, None, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS)
-            for m in chapters
+            DoiClusterDecision(m.id, DoiClusterCase.CHAPITRES_TITRES_DIFFERENTS) for m in chapters
         ]
     return [
-        DoiClusterDecision(m.id, None, DoiClusterCase.ACTES_VS_COMMUNICATION)
+        DoiClusterDecision(m.id, DoiClusterCase.ACTES_VS_COMMUNICATION)
         for m in _volume_communications(group)
     ]

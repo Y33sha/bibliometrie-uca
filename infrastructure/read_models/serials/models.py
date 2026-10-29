@@ -29,7 +29,7 @@ SerialSort = Literal[
 class SerialFilters:
     """Filtres que la liste des revues et ses facettes honorent toutes deux.
 
-    `search` cherche dans le titre et dans les ISSN — les trois colonnes de support et les ISSN rejetés. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `has_publications` retient les revues qui ont au moins une publication (`True`) ou aucune (`False`).
+    `search` cherche dans le titre, et dans tous les ISSN de la revue, quel que soit leur statut. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `has_publications` retient les revues qui ont au moins une publication (`True`) ou aucune (`False`).
     """
 
     search: str = ""
@@ -51,10 +51,7 @@ class SerialIssnDetail(BaseModel):
 
 
 class SerialListItem(BaseModel):
-    """Ligne de la liste paginée `/api/serials` — un résumé ; le profil complet est `SerialDetailResponse`.
-
-    `publisher_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `serials`.
-    """
+    """Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`). Le nom de l'éditeur vient de `publishers`, le nombre de publications des publications."""
 
     id: int
     title: str
@@ -75,7 +72,7 @@ class SerialListResponse(PaginatedResponse):
 class SerialDetailResponse(SerialListItem):
     """GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
 
-    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload DOAJ est rendu tel quel.
     """
 
     issn_details: list[SerialIssnDetail]
@@ -89,7 +86,7 @@ class SerialDetailResponse(SerialListItem):
 class SerialsFacetsResponse(BaseModel):
     """Facettes de `/api/serials`.
 
-    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. `publications` compte les revues avec et sans publication.
+    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ a pour libellés `Indexée` et `Non indexée`. `publications` compte les revues avec et sans publication.
     """
 
     serial_types: list[FacetOption]
@@ -127,7 +124,7 @@ class LikelyProceedingsResponse(BaseModel):
 
 
 class DoiNamespaceConflict(BaseModel):
-    """Enregistrements de `record_serial` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_serial`.
+    """Enregistrements de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`.
 
     `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part des DOI qui désigne `namespace_serial`, un DOI partagé entre plusieurs revues au prorata de ses enregistrements. `records` compte les enregistrements de `record_serial`, `sources` les répartit par source.
     """

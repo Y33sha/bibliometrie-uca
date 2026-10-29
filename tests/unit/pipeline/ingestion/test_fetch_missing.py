@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `fetch_missing` : canaux HAL séquentiels, puis lot parallèle de la recherche par DOI.
 
-Les dépendances techniques sont injectées (runners par canal et par source, parallélisme). L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est remplacé par une exécution synchrone déterministe.
+Les dépendances techniques sont injectées (exécution par canal et par source, parallélisme). L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est simulé par une exécution synchrone déterministe.
 """
 
 import logging
@@ -16,7 +16,7 @@ def _sync_run_parallel(thunks):
 
 
 def _non_configuree(source: str) -> PhaseMetrics:
-    """Métriques que rend l'accès à une source sans identifiants."""
+    """Métriques que renvoie l'accès à une source sans identifiants."""
     metrics = PhaseMetrics()
     signal_source_unconfigured(
         metrics, source, "pas de credentials", logger=logging.getLogger("test"), phase="test"
@@ -38,8 +38,12 @@ def test_hal_channels_then_parallel_doi_with_skip(contexte):
     ).run(contexte(mode="full"))
 
     channels = {r["key"] for r in metrics.details["table"]["rows"]}
-    assert {"hal-id", "NNT", "openalex"} <= channels  # canaux HAL + DOI configurée
-    assert "scanr" not in channels  # DOI non configurée → sautée
+    assert {
+        "hal-id",
+        "NNT",
+        "openalex",
+    } <= channels  # canaux HAL et source configurée pour la recherche par DOI
+    assert "scanr" not in channels  # source non configurée pour la recherche par DOI : sautée
     assert any(s["code"] == "source_unconfigured" for s in metrics.signals)
     assert metrics.new == 8  # 2 (hal-id) + 1 (NNT) + 5 (openalex)
 
@@ -60,7 +64,7 @@ def test_nnt_channel_only_in_full_mode(contexte):
 
 
 def _run_doi_only(contexte, fetch_doi_one, caplog) -> str:
-    """Joue la seule recherche par DOI (HAL hors du filtre `sources`) et rend le journal."""
+    """Joue la seule recherche par DOI (HAL hors du filtre `sources`) et renvoie le journal."""
     with caplog.at_level(logging.INFO, logger="test"):
         FetchMissingPhase(
             fetch_hal_by_id=lambda _ctx: PhaseMetrics(),
@@ -148,7 +152,7 @@ def test_hal_skipped_when_sources_excludes_it(contexte):
         fetch_theses_by_nnt=lambda _ctx: PhaseMetrics(),
         fetch_doi_one=lambda _ctx, source: PhaseMetrics(new=3),
         run_parallel=_sync_run_parallel,
-    ).run(contexte(mode="full", sources={"openalex"}))  # pas de hal → canaux HAL sautés
+    ).run(contexte(mode="full", sources={"openalex"}))  # HAL hors du filtre : canaux HAL sautés
 
     assert calls == []  # aucun canal HAL
 

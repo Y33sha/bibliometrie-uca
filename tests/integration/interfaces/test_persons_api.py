@@ -1,10 +1,6 @@
-"""Tests de caractérisation pour le router persons.
+"""Tests de caractérisation du router des personnes : chaque branche des routes (validation, 404, cas nominal), et la trace d'audit des écritures.
 
-Stratégie : exercer toutes les branches des endpoints (validation, 404,
-happy path) pour couvrir le router et verrouiller le comportement.
-Identique à test_addresses_api.py : seed minimal via un pool dédié
-(hors pool partagé par l'API), ids uniques par test pour éviter les
-collisions entre cas.
+Les jeux de données sont posés par une connexion distincte de celles de l'API, avec des identifiants uniques par test.
 """
 
 from functools import partial
@@ -34,7 +30,7 @@ _persons_name_form = partial(seed_person_name_form, sources=["persons"])
 def _seed_perimeter_contribution(
     person_id: int, mode: str, *, raw_author_name: str, identifiers=None
 ) -> tuple[int, int]:
-    """Publication du périmètre dont le seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source de nom `raw_author_name` et d'identifiants `identifiers`. Rend (publication, contribution)."""
+    """Publication du périmètre dont la seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source de nom brut `raw_author_name` et d'identifiants `identifiers`. Renvoie (publication, contribution)."""
     publication = seed_publication(uniq("Pub"), in_perimeter=True)
     source_record = seed_source_record(publication_id=publication)
     source_contribution = seed_source_contribution(
@@ -97,7 +93,7 @@ class TestPersonsList:
         assert r.status_code == 200
 
     def test_active_keeps_persons_with_a_publication(self, client):
-        """`active=true` écarte une personne sans contribution ni fiche RH, conservée pour ses décisions."""
+        """`active=true` écarte une personne sans contribution ni fiche RH."""
         name = uniq("Actif")
         with_publication = seed_person(name, "A")
         seed_contribution(seed_publication(), person_id=with_publication)
@@ -110,10 +106,7 @@ class TestPersonsList:
 
 class TestPersonProfileIdentifiers:
     def test_rejected_identifier_never_leaves_the_api(self, client):
-        """Un identifiant rejeté est une attribution écartée : l'endpoint public ne l'annonce pas.
-
-        La règle tient dans la lecture, non dans la page : tout client de l'API en dépend.
-        """
+        """Un identifiant rejeté est absent de la fiche que renvoie l'API, pour tout client."""
         person = seed_person(last="REJECTEDID")
         seed_person_identifier(
             person, id_type="orcid", id_value="0000-0002-0000-0001", status="rejected"
@@ -163,7 +156,7 @@ class TestPersonList:
         assert r.status_code == 200
 
     def test_public_directory_call(self, client):
-        """L'appel de l'annuaire public : personnes retenues, tri sur les contributions d'auteur."""
+        """Appel de l'annuaire public : personnes sans exclusion, par nombre décroissant de contributions."""
         r = client.get("/api/persons", params={"exclusion": "none", "sort": "contributions_desc"})
         assert r.status_code == 200
         assert all(p["exclusion"] is None for p in r.json()["persons"])
@@ -201,7 +194,7 @@ class TestPersonDetail:
         assert r.status_code == 200
 
 
-# ── Identifiants (add / remove / status / reassign) ─────────────
+# ── Identifiants (ajout, retrait, statut, réattribution) ────────
 
 
 class TestAddIdentifier:
@@ -213,7 +206,7 @@ class TestAddIdentifier:
         assert r.status_code == 401
 
     def test_invalid_id_type(self, auth_client):
-        # Valeur hors de l'énum `PersonIdentifierType` : rejetée au bord par Pydantic (422).
+        # Valeur hors de `PersonIdentifierType` : refusée en 422 par la validation de la requête.
         pid = seed_person()
         r = auth_client.post(
             f"/api/persons/{pid}/identifiers",
@@ -342,7 +335,7 @@ class TestUpdateIdentifierStatus:
         assert contribution_person(contribution)[0] == pid
 
 
-# ── Reject / update name / merge ────────────────────────────────
+# ── Rejet, changement de nom, fusion ────────────────────────────
 
 
 class TestSetPersonExclusion:
@@ -385,8 +378,7 @@ class TestUpdatePersonName:
         assert r.json()["ok"] is True
 
     def test_visible_immediately(self, auth_client):
-        # La requête est committée avant l'envoi de la réponse : l'écriture est lisible depuis
-        # une connexion indépendante.
+        # La requête est committée avant l'envoi de la réponse : l'écriture est lisible depuis une connexion indépendante.
         pid = seed_person()
         marker = uniq("READBACK")
         r = auth_client.patch(
@@ -429,7 +421,7 @@ class TestMergePersons:
         assert body["target_id"] == dst
 
 
-# ── Name forms / detach ─────────────────────────────────────────
+# ── Formes de nom, détachement ──────────────────────────────────
 
 
 class TestNameFormContributions:
@@ -629,10 +621,7 @@ def _audit_personne(event_type: str, aggregate_id: int) -> list[dict]:
 
 
 class TestTracabilite:
-    """Le nom d'une personne et ses identifiants sont ce par quoi les contributions sources lui reviennent.
-
-    Les changer déplace des publications d'une personne à une autre, sans que rien dans les données ne dise ensuite qui l'a décidé : le rejet et la réattribution d'un identifiant étaient consignés, l'attribution initiale et le changement de nom non.
-    """
+    """Le changement de nom d'une personne et l'ajout d'un identifiant sont consignés : ils déplacent des contributions sources d'une personne à une autre."""
 
     def test_le_changement_de_nom_est_consigne(self, auth_client):
         pid = seed_person("AVANT", "A")
@@ -665,7 +654,7 @@ class TestTracabilite:
         }
 
     def test_un_ajout_sans_effet_ne_consigne_rien(self, auth_client):
-        """Réattribuer le même identifiant à la même personne ne décide rien : l'appel est idempotent."""
+        """Ajouter à une personne un identifiant qu'elle a déjà est sans effet, et ne consigne rien."""
         pid = seed_person()
         corps = {"id_type": "idhal", "id_value": "audit-idempotent"}
         assert auth_client.post(f"/api/persons/{pid}/identifiers", json=corps).status_code == 200

@@ -1,6 +1,6 @@
-"""Implémentation `RawStore` sur le système de fichiers local.
+"""`RawStore` sur le système de fichiers local.
 
-Layout : `{root}/{source}/{source_id_url_encoded}.json.gz`. Le `source_id` est URL-encodé (`quote(safe="")`) pour neutraliser les caractères non sûrs en système de fichiers (`/` des ids ScanR, `:` des ids WoS). Payload gzippé à l'écriture, décompressé à la lecture — transparent pour l'appelant (`put`/`get` manipulent des bytes JSON bruts). L'écriture passe par un fichier temporaire du même répertoire, renommé une fois complet : une écriture interrompue laisse la version précédente intacte.
+Chaque payload est dans `{root}/{source}/{source_id encodé}.json.gz`. Le `source_id` est encodé pour l'URL (`quote(safe="")`) : les `/` des identifiants ScanR et les `:` des identifiants WoS deviennent sûrs. Le payload est compressé en gzip à l'écriture, décompressé à la lecture. L'écriture passe par un fichier temporaire du même répertoire, renommé une fois complet : une écriture interrompue laisse la version précédente intacte.
 """
 
 from __future__ import annotations

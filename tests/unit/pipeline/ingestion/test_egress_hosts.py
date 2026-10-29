@@ -1,8 +1,8 @@
 """Hôtes que le trafic sortant peut joindre.
 
-La liste d'hôtes déclarée est celle des destinations effectivement joignables. Trois choses la tiennent : un contrat d'architecture interdit au code servant les requêtes HTTP d'atteindre un client réseau, le helper HTTP partagé ne suit une redirection que vers le même hôte (`test_http_retry`), et ce module confronte les URL écrites dans le code à la liste.
+La liste d'hôtes déclarée est celle des destinations joignables. Trois mécanismes la garantissent : un contrat d'architecture interdit au code qui sert les requêtes HTTP d'importer un client réseau ; le helper HTTP partagé suit seulement les redirections vers le même hôte (`test_http_retry`) ; ce module confronte les URL écrites dans le code à la liste.
 
-La confrontation vise `pipeline/ingestion/`, d'où partent les requêtes. Les espaces de noms XML que les normaliseurs y lisent ne sont jamais appelés. Les URL des autres couches désignent des pages à afficher — une fiche HAL, un profil ORCID — et ne sont jamais appelées non plus.
+La confrontation vise `pipeline/ingestion/`, d'où partent les requêtes. Les espaces de noms XML que les normaliseurs y lisent sont des identifiants, jamais appelés. Les URL des autres couches désignent des pages à afficher (une fiche HAL, un profil ORCID), jamais appelées non plus.
 """
 
 import re
@@ -28,9 +28,7 @@ HOTES_DECLARES = frozenset(
         "cluster-production.elasticsearch.dataesr.ovh",
         "www.sudoc.fr",
         "zenodo.org",
-        # Le référentiel des revues open access n'est pas servi par `doaj.org`, qui redirige
-        # vers un lien signé sur son stockage objet. Seule redirection que le code suive, et
-        # vers ce seul hôte (`ALLOWED_DUMP_HOSTS`).
+        # `doaj.org` redirige le téléchargement du dump DOAJ vers un lien signé sur son stockage objet : seule redirection vers un autre hôte que le code suive (`ALLOWED_DUMP_HOSTS`).
         "doaj-live-journal-csv.s3.amazonaws.com",
     }
 )
@@ -72,10 +70,7 @@ class TestListeDeclaree:
 
 class TestAucuneUrlEcarte:
     def test_aucune_url_de_la_couche_sortante_ne_vise_un_hote_non_declare(self):
-        """Une source ajoutée vers un hôte absent de la liste fait échouer l'intégration.
-
-        C'est ce qui rend la liste vérifiable plutôt que constatée à la lecture.
-        """
+        """Une source ajoutée vers un hôte absent de la liste fait échouer le test."""
         inconnus = _hotes_ecrits_dans(_COUCHE_SORTANTE) - HOTES_DECLARES
         assert not inconnus, (
             f"Hôtes écrits dans la couche sortante sans figurer à la liste : {sorted(inconnus)}. "
@@ -83,7 +78,7 @@ class TestAucuneUrlEcarte:
         )
 
     def test_la_liste_ne_porte_pas_d_hote_devenu_inutile(self):
-        """Un hôte retiré du code sort de la liste : elle décrit ce qui est joignable, non ce qui l'a été."""
+        """Un hôte retiré du code sort de la liste : elle décrit seulement ce qui est joignable."""
         ecrits = _hotes_ecrits_dans(_COUCHE_SORTANTE) | set(ALLOWED_DUMP_HOSTS)
         assert HOTES_DECLARES <= ecrits, sorted(HOTES_DECLARES - ecrits)
 

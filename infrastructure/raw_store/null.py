@@ -1,6 +1,6 @@
 """`RawStore` qui ne conserve rien.
 
-L'archivage des réponses brutes sert à rejouer les traitements sans réinterroger les sources. Un déploiement qui n'en a pas l'usage n'a pas de raison d'ouvrir un emplacement en écriture pour lui : ce store accepte les écritures et les oublie, et se comporte pour la lecture comme un store vide.
+L'archivage des réponses brutes sert à rejouer les traitements sans interroger de nouveau les sources. Un déploiement qui s'en passe évite d'ouvrir un emplacement en écriture : ce store accepte les écritures et les oublie, et se lit comme un store vide.
 """
 
 from __future__ import annotations

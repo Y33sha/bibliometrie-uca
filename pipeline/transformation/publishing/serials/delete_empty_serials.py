@@ -26,8 +26,8 @@ _EMPTY_SERIALS = text(f"""
     ORDER BY j.id
 """)
 
-# Un ISSN déjà présent sans revue tient lieu de la ligne de même valeur des revues supprimées ; leurs autres ISSN
-# restent sans revue (`ON DELETE SET NULL`). Les formes de nom partent avec la revue (`ON DELETE CASCADE`).
+# Un ISSN déjà présent sans revue prévaut sur la ligne de même valeur d'une revue supprimée ; les autres ISSN restent sans revue (`ON DELETE SET NULL`).
+# Les formes de nom partent avec la revue (`ON DELETE CASCADE`).
 _DELETE_ISSNS_KNOWN_WITHOUT_SERIAL = text("""
     DELETE FROM serial_issns i
     WHERE i.serial_id = ANY(:ids)
@@ -37,7 +37,7 @@ _DELETE_SERIALS = text("DELETE FROM serials WHERE id = ANY(:ids)")
 
 
 def delete_empty_serials(conn: Connection) -> list[SerialSummary]:
-    """Supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, et les rend."""
+    """Supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, et les renvoie."""
     empty = [
         SerialSummary(r.id, r.title, r.publisher, tuple(r.issns))
         for r in conn.execute(_EMPTY_SERIALS).all()

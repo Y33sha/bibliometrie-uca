@@ -7,9 +7,9 @@ from domain.publications.access import Access, access, access_url
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
+from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
@@ -28,13 +28,13 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns, corrected_by
+from infrastructure.sql_fragments import active_issns
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
-    """Publications apparentées, des deux sens, vues depuis `publication_id`.
+    """Publications apparentées, dans les deux sens, vues depuis la publication.
 
-    Les arêtes sortantes (`from_publication_id = publication_id`) gardent leur type ; les entrantes (`target_publication_id = publication_id`) sont inversées pour se lire depuis la publication courante. La cible porte ses métadonnées si elle est au corpus, sinon seul son DOI est connu. Dédupliqué par (type, cible) — une paire déclarée des deux côtés ne s'affiche qu'une fois.
+    Les relations sortantes gardent leur type ; les entrantes sont inversées pour se lire depuis la publication. Une cible du corpus vient avec ses métadonnées, une cible hors corpus avec son seul DOI. Une paire déclarée des deux côtés s'affiche une fois.
     """
     rows = conn.execute(
         text("""
@@ -64,7 +64,7 @@ def get_publication_relations(conn: Connection, publication_id: int) -> list[Rel
         relation_type = r.rtype
         if r.incoming:
             relation_type = inverse_relation(RelationType(relation_type)).value
-        # Clé de la cible : son `publication_id` si au corpus, sinon son DOI (cible hors corpus, sans ligne `publications`). Le DOI peut être absent d'une cible au corpus, d'où la bascule sur l'id.
+        # Clé de la cible : son `publication_id` si elle est dans le corpus, sinon son DOI. Une cible du corpus peut être sans DOI, d'où la clé par identifiant.
         target_key = f"id:{r.other_id}" if r.other_id is not None else f"doi:{r.other_doi}"
         key = (relation_type, target_key)
         if key in seen:
@@ -85,7 +85,7 @@ def get_publication_relations(conn: Connection, publication_id: int) -> list[Rel
 
 
 def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo]:
-    """Acronyme, nom et type des structures `ids`, par identifiant en texte."""
+    """Acronyme, nom et type des structures données, par identifiant en texte."""
     if not ids:
         return {}
     rows = conn.execute(
@@ -98,7 +98,7 @@ def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo
     return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
 
 
-# Identifiants de bases qui référencent la publication, exposés en sidebar, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, qui sont des localisations.
+# Identifiants de bases qui référencent la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, qui sont des localisations.
 _EXTERNAL_IDENTIFIER_TYPES = (SourceIdentifierType.PMID, SourceIdentifierType.NNT)
 
 # Sources dont l'enregistrement est la page du DOI, déjà affiché.
@@ -121,9 +121,10 @@ def _referenced_by(sources: list[SourceRecordOut], access: Access) -> list[Sourc
 def get_publication_external_identifiers(
     conn: Connection, publication_id: int
 ) -> list[ExternalIdentifierOut]:
-    """PMID et NNT actifs des `source_records` de la publication, sans doublon, dans l'ordre `_EXTERNAL_IDENTIFIER_TYPES` puis par valeur.
+    """PMID et NNT actifs des enregistrements sources de la publication, sans doublon, par type (`_EXTERNAL_IDENTIFIER_TYPES`) puis par valeur.
 
-    Un NNT déjà porté par une source `theses` est omis : le `source_id` de cette source *est* le NNT, et son lien theses.fr couvre déjà l'identifiant (même raison que l'exclusion de `hal_id`, couvert par le lien source HAL)."""
+    Un NNT déjà présent dans une source `theses` est omis : l'identifiant natif de cette source est le NNT, et son lien theses.fr le couvre, comme le lien HAL couvre le `hal_id`.
+    """
     rows = conn.execute(
         text("""
             SELECT DISTINCT i.id_type::text AS id_type, i.id_value
@@ -147,10 +148,7 @@ def get_publication_external_identifiers(
 
 
 def get_publication_subjects(conn: Connection, publication_id: int) -> list[SubjectOut]:
-    """Sujets (concepts) attachés à une publication, dédupliqués par `subject_id`.
-
-    Les sources qui ont annoté chaque sujet sont agrégées dans `sources`. Triés par label, insensible à la casse.
-    """
+    """Sujets d'une publication, sans doublon, avec les sources qui les donnent, triés par libellé sans égard à la casse."""
     rows = conn.execute(
         text("""
             SELECT s.id, s.label, s.language,
@@ -198,19 +196,18 @@ class PublicationDetailQueries:
         ).one_or_none()
         if not publication_row:
             return None
-        # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, retournés à part.
+        # Mots-clés libres (agrégat des sources) : hors référentiel `subjects`, rendus à part.
         keywords = publication_row.keywords or []
 
         sources_rows = self._conn.execute(
             text(f"""
-                SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries,
-                       COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
-                           AS is_secondary
+                SELECT sr.source, sr.source_id, sr.oa_status, {source_record_doi_sql("sr")} AS doi,
+                       sr.hal_collections, sr.countries
                 FROM source_records sr
                 WHERE sr.publication_id = :pid
                 ORDER BY sr.created_at DESC
             """),
-            {"pid": publication_id, "convergence_cases": list(CONVERGENCE_CASES)},
+            {"pid": publication_id},
         ).all()
         sources = [
             SourceRecordOut(
@@ -220,7 +217,6 @@ class PublicationDetailQueries:
                 doi=r.doi,
                 hal_collections=r.hal_collections,
                 countries=r.countries,
-                is_secondary=r.is_secondary,
             )
             for r in sources_rows
         ]

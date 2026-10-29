@@ -83,7 +83,7 @@ _INSERT = text("""
 
 
 def clean(cell: str | None) -> str | None:
-    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et rend None si elle est vide."""
+    """Met la cellule à plat — balises, entités HTML et caractères invisibles retirés — et renvoie None si elle est vide."""
     return sanitize_optional_text(cell)
 
 
@@ -317,7 +317,7 @@ _LINKS = (
 def map_structures(conn: Connection, resolver: StructureResolver) -> list[UnresolvedLabel]:
     """Rattache chaque paiement à son laboratoire et à son payeur, d'après leurs libellés.
 
-    Recalcule tous les rattachements, donc reflète l'état courant des formes de noms. Rend les libellés sans structure, du plus fréquent au plus rare.
+    Recalcule tous les rattachements, donc reflète l'état courant des formes de noms. Renvoie les libellés sans structure, du plus fréquent au plus rare.
     """
     unresolved: list[UnresolvedLabel] = []
     for label_column, context_column, structure_column, types in _LINKS:
@@ -416,7 +416,7 @@ def import_payments(
 
 
 def drop_open_apc_superseded_by_institution(conn: Connection) -> int:
-    """Retire les frais d'open access OpenAPC d'un article que la réponse de son établissement payeur décrit déjà. Rend le nombre de paiements retirés.
+    """Retire les frais d'open access OpenAPC d'un article que la réponse de son établissement payeur décrit déjà. Renvoie le nombre de paiements retirés.
 
     OpenAPC reprend les réponses à l'enquête sous une forme variable (lignes additionnées, première seule, ou toutes), que la clé d'unicité ne dédoublonne pas. La réponse de l'établissement, facturée ligne à ligne et rattachée au laboratoire, l'emporte. Un frais d'open access sans laboratoire vient d'OpenAPC, qui ne nomme pas le laboratoire ; avec laboratoire, il vient d'une réponse d'établissement. La règle vaut quel que soit l'ordre des imports.
     """

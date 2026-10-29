@@ -1,4 +1,4 @@
-"""Phase `metadata_correction` — sous-étape **serial_by_doi** : rattachement de la revue manquante par l'espace de noms du DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
+"""Sous-étape `serial_by_doi` de la phase `metadata_correction` : rattachement de la revue manquante par l'espace de noms des DOI (`attach_serial_by_doi`), d'après la table `serial_doi_namespaces`."""
 
 import logging
 from collections.abc import Mapping, Sequence
@@ -20,9 +20,9 @@ from pipeline.transformation.publications.correction.correction_store import (
 def _compute_update(
     row: SerialCorrectionRow, namespaces: Mapping[str, DoiNamespace]
 ) -> SerialCorrectionUpdate | None:
-    """Mise à jour d'une `source_record`, ou `None` s'il est l'état courant."""
+    """Mise à jour d'un enregistrement source, ou `None` si rien ne change."""
     attached = attach_serial_by_doi(
-        row.serial_id, row.doi, row.raw_doc_type, row.source, row.corrections, namespaces
+        row.serial_id, row.dois, row.raw_doc_type, row.source, row.corrections, namespaces
     )
     if tuple(attached) == (row.serial_id, row.corrections):
         return None
@@ -32,14 +32,14 @@ def _compute_update(
 def compute_updates(
     rows: Sequence[SerialCorrectionRow], namespaces: Sequence[DoiNamespace]
 ) -> list[SerialCorrectionUpdate]:
-    """Rattachements à persister."""
+    """Rattachements à écrire."""
     by_namespace = {ns.namespace: ns for ns in namespaces}
     return [u for row in rows if (u := _compute_update(row, by_namespace)) is not None]
 
 
 @dataclass
 class SerialByDoiStats:
-    """Bilan de la passe : `source_records` examinées, et `source_records` qui reçoivent une revue."""
+    """Bilan de la sous-étape : enregistrements sources examinés, enregistrements sources qui reçoivent une revue."""
 
     examined: int
     attached: int
@@ -48,7 +48,7 @@ class SerialByDoiStats:
 def run(
     conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> SerialByDoiStats:
-    """Rattache leur revue aux `source_records` sans revue dont le DOI tombe dans un espace de noms, et réévalue les rattachements existants."""
+    """Rattache leur revue aux enregistrements sources sans revue dont les DOI relèvent d'un espace de noms, et réévalue les rattachements existants."""
     step(logger, "Revues non renseignées, identifiables par le DOI du document")
     namespaces = store.fetch_serial_doi_namespaces()
     rows = store.fetch_serial_by_doi_candidates()

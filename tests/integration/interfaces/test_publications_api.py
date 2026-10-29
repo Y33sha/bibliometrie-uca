@@ -1,17 +1,19 @@
-"""Tests de caractérisation pour le router publications.
+"""Tests de caractérisation du router des publications.
 
-Stratégie : pas de données seedées (la base est vide), on vérifie que
-chaque combinaison de filtres exerce le SQL sans crash et renvoie une
-réponse structurellement correcte.
-
-Chaque test exerce une branche différente des apply_*_filter et de la
-construction dynamique des WHERE/ORDER BY — si le refactor casse un
-chemin SQL, ces tests le révèlent par un 500 (via raise_server_exceptions).
+Sur une base vide, chaque test exerce une branche des filtres, des tris, des facettes ou des exports, et vérifie la forme de la réponse. Un chemin SQL cassé se révèle par un 500.
 """
 
 import pytest
 
 from domain.publications.licenses import LICENSE_LABELS
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
+from tests.integration.helpers.db import owner_connection
+from tests.integration.helpers.seeds import seed_publication, uniq
+from tests.integration.helpers.sources import insert_source_record
 
 
 def test_licenses_follow_the_domain_enum(client):
@@ -20,6 +22,13 @@ def test_licenses_follow_the_domain_enum(client):
     assert [(o["value"], o["label_fr"]) for o in r.json()] == [
         (lic.value, label) for lic, label in LICENSE_LABELS.items()
     ]
+
+
+def test_sources_are_readable_without_session(client):
+    """La route des sources d'une publication répond sans session : une publication inconnue renvoie 404."""
+    r = client.get("/api/publications/999999/sources")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Publication introuvable"
 
 
 class TestSuspectMerges:
@@ -37,8 +46,7 @@ class TestSuspectMerges:
 
 
 class TestPublicationsList:
-    """Exerce le SQL de GET /api/publications avec toutes les combinaisons
-    de filtres actuellement supportés par le router."""
+    """SQL de GET /api/publications, sous chaque filtre et chaque tri."""
 
     def test_empty_list(self, client):
         r = client.get("/api/publications")
@@ -81,7 +89,7 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_filter_lab_none(self, client):
-        """Publications UCA sans aucun labo."""
+        """Publications sans laboratoire."""
         r = client.get("/api/publications", params={"lab_none": "true"})
         assert r.status_code == 200
 
@@ -127,8 +135,7 @@ class TestPublicationsList:
         assert r.status_code == 200
 
     def test_complex_filter_combination(self, client):
-        """Combine plusieurs filtres pour exercer la construction dynamique
-        du WHERE complet — c'est le scénario le plus sensible pour le refactor."""
+        """Plusieurs filtres combinés exercent la construction complète de la clause WHERE."""
         r = client.get(
             "/api/publications",
             params={
@@ -145,11 +152,7 @@ class TestPublicationsList:
 
 
 class TestClosedVocabularyFilters:
-    """Une valeur hors vocabulaire est refusée, non ignorée.
-
-    Ignorée, elle traversait jusqu'au SQL qui la laissait tomber : la liste rendue n'était
-    pas celle qu'on croyait, et le code restait 200.
-    """
+    """Une valeur hors vocabulaire est refusée en 422. Ignorée, elle laisserait passer une liste non filtrée sous un code 200."""
 
     @pytest.mark.parametrize(
         ("param", "value"),
@@ -177,7 +180,7 @@ class TestClosedVocabularyFilters:
 
 
 class TestPublicationsFacets:
-    """Exerce la construction des facettes."""
+    """Construction des facettes, avec et sans filtres."""
 
     def test_facets_structure(self, client):
         r = client.get("/api/publications/facets")
@@ -193,7 +196,7 @@ class TestPublicationsFacets:
         assert r.status_code == 200
 
     def test_facets_with_filters(self, client):
-        """Les facettes doivent refléter le contexte de filtrage."""
+        """Facettes calculées sous filtres."""
         r = client.get(
             "/api/publications/facets",
             params={"year": "2024", "doc_type": "article"},
@@ -228,7 +231,7 @@ class TestPublicationsFacets:
         assert r.status_code == 200
 
     def test_entity_facet_subject_under_a_subject_selection(self, client):
-        # Facette sujets sous sa propre sélection (sautée) et sous une recherche de libellé.
+        # Facette des sujets sous sa propre sélection, qu'elle ignore, et sous une recherche de libellé.
         r = client.get(
             "/api/publications/facets/entities",
             params={"kind": "subject", "entity_search": "chim", "subject_id": "1,2"},
@@ -246,7 +249,7 @@ class TestPublicationsFacets:
 
 
 class TestPublicationsExports:
-    """Exports CSV/JSON — génèrent des réponses non-JSON."""
+    """Export CSV de la liste des publications."""
 
     def test_csv_export(self, client):
         r = client.get("/api/publications/export.csv")
@@ -261,15 +264,14 @@ class TestPublicationsExports:
         assert r.status_code == 200
 
     def test_csv_export_respects_columns(self, client):
-        """Le CSV reflète les colonnes visibles : seules les colonnes demandées
-        sont émises, + Titre et Accès (toujours présents)."""
+        """Le CSV contient les colonnes demandées, puis Titre et Accès, toujours présents."""
         r = client.get("/api/publications/export.csv", params={"columns": "type,year"})
         assert r.status_code == 200
         header = r.text.splitlines()[0].lstrip("﻿").split(",")
         assert header == ["Type", "Année", "Titre", "Accès"]
 
     def test_csv_export_publisher_is_its_own_column(self, client):
-        """L'éditeur sort quand sa colonne est demandée, indépendamment de la revue."""
+        """La colonne de l'éditeur est distincte de celle de la revue."""
         r = client.get("/api/publications/export.csv", params={"columns": "publisher"})
         assert r.status_code == 200
         header = r.text.splitlines()[0].lstrip("﻿").split(",")
@@ -279,7 +281,7 @@ class TestPublicationsExports:
         assert "Éditeur" not in r.text.splitlines()[0]
 
     def test_csv_export_hal_status_column(self, client):
-        """Le statut HAL d'une page labo s'exporte, comme sa colonne s'affiche."""
+        """Sur une page de laboratoire, la colonne du statut HAL s'exporte."""
         r = client.get(
             "/api/publications/export.csv",
             params={"columns": "hal_status", "lab_id": "1", "hal_status": "ok,notice"},
@@ -298,14 +300,14 @@ class TestPublicationsExports:
         ]
 
     def test_csv_export_is_streamed(self, client):
-        """La réponse part en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant et les copies de sa relecture."""
+        """La réponse part en flux, sans composer le fichier entier en mémoire."""
         with client.stream("GET", "/api/publications/export.csv") as r:
             assert r.status_code == 200
             assert "content-length" not in r.headers  # taille inconnue à l'envoi
             assert next(r.iter_raw())  # le premier bloc part sans attendre le dernier
 
     def test_csv_export_opens_with_a_byte_order_mark(self, client):
-        """Sans elle, un tableur lit l'UTF-8 comme de l'ANSI et les accents ressortent en mojibake."""
+        """Sans BOM, un tableur lit l'UTF-8 comme de l'ANSI et altère les accents."""
         r = client.get("/api/publications/export.csv")
         assert r.text.startswith("\ufeff")
 
@@ -349,3 +351,36 @@ class TestPublicationSources:
     def test_not_found(self, client):
         r = client.get("/api/publications/999999999/sources")
         assert r.status_code == 404
+
+    def test_doi_affiche_par_role_et_autres_doi_parmi_les_identifiants(self, client):
+        """Régression : le DOI affiché d'un enregistrement ScanR était son DOI `secondary` (preprint), et non son DOI `derived`."""
+        publication_id = seed_publication("Article")
+        with owner_connection() as conn:
+            insert_source_record(
+                conn,
+                publication_id,
+                source="scanr",
+                source_id=uniq("doi10.1038/s41598-1"),
+                title="Article",
+                identifiers=[
+                    SourceIdentifier(
+                        SourceIdentifierType.DOI, "10.1038/s41598-1", SourceIdentifierRole.DERIVED
+                    ),
+                    SourceIdentifier(
+                        SourceIdentifierType.DOI,
+                        "10.21203/rs.3.rs-1",
+                        SourceIdentifierRole.SECONDARY,
+                    ),
+                    SourceIdentifier(
+                        SourceIdentifierType.DOI,
+                        "10.9999/faux",
+                        SourceIdentifierRole.SECONDARY,
+                        "UNRESOLVED_DOI_TO_NULL",
+                    ),
+                ],
+            )
+        r = client.get(f"/api/publications/{publication_id}/sources")
+        assert r.status_code == 200
+        [record] = r.json()["source_records"]
+        assert record["doi"] == "10.1038/s41598-1"
+        assert record["identifiers"] == [{"type": "doi", "value": "10.21203/rs.3.rs-1"}]

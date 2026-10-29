@@ -132,7 +132,7 @@ _WRITE_SQL = text("""
       AND (g.person_id, g.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
 """)
 
-# Contributions décidés dont la personne diffère de celle que désigne leur décision : ils la perdent.
+# Contributions décidées dont la personne diffère de celle que désigne leur décision : elles la perdent.
 _RELEASE_SQL = text(f"""
     UPDATE contributions g SET {DETACHED_CONTRIBUTION}
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[])) AS u(id, person_id)
@@ -141,7 +141,7 @@ _RELEASE_SQL = text(f"""
 
 
 def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> PersonIndex:
-    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit dont les contributions attestent plusieurs prénoms pleins (`Namesake.conflicting`)."""
+    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit à qui les contributions donnent plusieurs prénoms pleins (`Namesake.conflicting`)."""
     namesakes: dict[str, list[Namesake]] = defaultdict(list)
     for namesake in fetch_namesakes(conn):
         namesakes[normalize_text(namesake.last_name)].append(
@@ -230,7 +230,7 @@ def decide_contributions(
 
 
 def release_contributions(conn: Connection, decisions: dict[int, ContributionDecision]) -> int:
-    """Retire leur personne aux contributions que leur décision rattache à une autre personne, à une personne à créer ou à aucune. Précède toute écriture : une publication compte une personne au plus, et la personne retirée peut revenir à une autre contribution de la publication. Rend le nombre de contributions concernées."""
+    """Retire leur personne aux contributions que leur décision rattache à une autre personne, à une personne à créer ou à aucune. Précède toute écriture : une publication compte une personne au plus, et la personne retirée peut revenir à une autre contribution de la publication. Renvoie le nombre de contributions concernées."""
     if not decisions:
         return 0
     return conn.execute(
@@ -246,7 +246,7 @@ def release_contributions(conn: Connection, decisions: dict[int, ContributionDec
 
 
 def write_decisions(conn: Connection, decisions: dict[int, ContributionDecision]) -> int:
-    """Écrit la personne et le mode des contributions rattachées, quand ils changent. Rend le nombre de contributions écrites."""
+    """Écrit la personne et le mode des contributions rattachées, quand ils changent. Renvoie le nombre de contributions écrites."""
     matched = [
         (contribution_id, d.person_id, str(d.reason))
         for contribution_id, d in decisions.items()
@@ -291,7 +291,7 @@ def create_persons(
     taken: dict[int, frozenset[int]],
     progress: Progress | None = None,
 ) -> int:
-    """Traite une à une les contributions dont la décision est une création, contre l'index tenu à jour : une contribution que désigne une personne créée plus tôt dans le passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à un autre contribution de la publication n'est pas reprise. Met `decisions` à jour et rend le nombre de personnes créées. `progress` avance d'une contribution traité et retient les personnes créées."""
+    """Traite une à une les contributions dont la décision est une création, contre l'index tenu à jour : une contribution que désigne une personne créée dans le même passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à une autre contribution de la publication reste à celle-ci. Met `decisions` à jour et renvoie le nombre de personnes créées. `progress` avance d'une contribution traitée et retient les personnes créées."""
     repo = PgPersonRepository(conn)
     created = 0
     for publication_id in sorted(candidates):
@@ -359,7 +359,7 @@ def create_persons(
 
 
 def apply_pins(conn: Connection) -> int:
-    """Rattache à la personne épinglée les contributions dont une contribution source est épinglée (`pinned_contributions_sql`). Rend le nombre de contributions rattachées."""
+    """Rattache à la personne épinglée les contributions dont une contribution source est épinglée (`pinned_contributions_sql`). Renvoie le nombre de contributions rattachées."""
     release, attach = pinned_contributions_sql("SELECT id FROM contributions")
     conn.execute(text(release))
     return conn.execute(text(attach)).rowcount
@@ -395,7 +395,7 @@ def _log_identified(
 
 
 def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
-    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide la personne des contributions sans personne et des contributions en file, retire leur personne aux contributions que leur décision ne rattache plus à elle (`release_contributions`), écrit les rattachements, puis crée les personnes des contributions du périmètre au nom inconnu (`create_persons`). Rend les compteurs par issue et par motif."""
+    """Applique les épinglages, complète les prénoms réduits (`complete_reduced_first_names`), décide la personne des contributions sans personne et des contributions en file, retire leur personne aux contributions que leur décision ne rattache plus à elle (`release_contributions`), écrit les rattachements, puis crée les personnes des contributions du périmètre au nom inconnu (`create_persons`). Renvoie les compteurs par issue et par motif."""
     pinned = apply_pins(conn)
     completion = complete_reduced_first_names(conn, repo=PgPersonRepository(conn))
     logger.info(

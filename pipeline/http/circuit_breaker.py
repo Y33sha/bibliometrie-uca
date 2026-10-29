@@ -1,12 +1,8 @@
-"""Circuit-breaker par source (implémentation) : coupe les fetches d'une source à bout de budget API (429) ou en panne (5xx / réseau).
+"""Circuit-breaker par source : coupe les requêtes d'une source à bout de budget (429) ou en panne (5xx, réseau).
 
-Un compteur d'échecs **consécutifs** par source, partagé au sein d'une phase via une `ContextVar` : `+1` sur requête échouée (429 / 5xx / réseau après retries), **remis à 0 au premier succès**. Au seuil, le breaker est `tripped` : les deux helpers HTTP — `http_request_with_retry` et sa variante async — court-circuitent les requêtes suivantes (`SourceUnavailableError`) et la boucle de fetch saute le reste de la source ; les items non traités sont retentés au run suivant (phases de rattrapage idempotentes).
+`source_circuit_breaker` pose dans une `ContextVar` le compteur des échecs consécutifs de la source, que partagent les requêtes de la tâche. Une requête en échec après ses nouvelles tentatives l'incrémente, un succès le remet à zéro. Au seuil, le breaker coupe : les clients HTTP lèvent `SourceUnavailableError` pour les requêtes suivantes, et le run suivant reprend les éléments non traités.
 
-L'accès à la source le pose dans la ContextVar par `source_circuit_breaker`, et signale sa coupure. Le client HTTP le manipule (check / record). Les boucles qui rangent un échec en résultat consultent `source_tripped()` pour s'arrêter. Une boucle qui renonce à la source sur `SourceUnavailableError` la coupe (`trip_source`).
-
-Seuil à 10 échecs consécutifs : encaisse un batch d'échecs concurrents ponctuel avant de couper la source.
-
-Concurrence : `record_*` sont sans `await`, atomiques vis-à-vis des autres coroutines — pas de race quand les requêtes async d'une même phase partagent le compteur. Les appelants du helper sync (moissonneurs page à page, clients de préfixes DOI, enrichissement des revues) fetchent en séquence.
+Le seuil de 10 absorbe une série ponctuelle d'échecs de requêtes concurrentes. `record_success` et `record_failure` sont sans `await`, donc atomiques entre les coroutines qui partagent le compteur.
 """
 
 from __future__ import annotations
@@ -31,10 +27,7 @@ __all__ = [
 
 
 class SourceUnavailableError(Exception):
-    """Une source est indisponible pour le run en cours : budget API épuisé (429) ou panne (5xx / réseau).
-
-    Levée par le helper HTTP quand une requête a épuisé ses retries sur une erreur retryable, ou par le circuit-breaker quand la source cumule trop d'échecs. Les orchestrateurs l'attrapent pour sauter la source sans interrompre le run ; les items non traités repartent au run suivant (phases de rattrapage idempotentes).
-    """
+    """Source indisponible pour le run, levée par le client HTTP après ses nouvelles tentatives, ou par le breaker coupé. L'accès à la source l'attrape pour sauter la source sans interrompre le run."""
 
     def __init__(self, source: str) -> None:
         super().__init__(
@@ -79,19 +72,19 @@ _current_breaker: ContextVar[SourceCircuitBreaker | None] = ContextVar(
 
 
 def get_current_breaker() -> SourceCircuitBreaker | None:
-    """Breaker de la phase courante (None si aucun n'est posé)."""
+    """Breaker de la tâche courante, ou `None`."""
     return _current_breaker.get()
 
 
 def trip_source() -> None:
-    """Coupe la source de la phase courante. Sans breaker posé, ne fait rien."""
+    """Coupe la source de la tâche courante, si un breaker est posé : une boucle y renonce sur `SourceUnavailableError`."""
     breaker = _current_breaker.get()
     if breaker is not None:
         breaker.trip()
 
 
 def source_tripped() -> bool:
-    """`True` si le breaker de la phase courante a coupé."""
+    """Vrai si le breaker de la tâche courante a coupé. Une boucle qui range les échecs en résultats le consulte pour s'arrêter."""
     breaker = _current_breaker.get()
     return breaker is not None and breaker.tripped
 

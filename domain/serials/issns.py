@@ -29,7 +29,7 @@ class IssnStatus(StrEnum):
     """ISSN d'un titre précédent ou suivant."""
     SUPPLEMENT = "supplement"
     UNVERIFIED = "unverified"
-    """Valeur valide mise de côté, de motif inconnu : la vérification Sudoc le donne."""
+    """ISSN valide que donnent les enregistrements sources de la revue, sans notice Sudoc qui le confirme."""
 
 
 ISSN_SUPPORTS = tuple(IssnSupport)

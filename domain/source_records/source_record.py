@@ -1,18 +1,14 @@
-"""Entité `SourceRecord` — l'image d'un document dans une source externe.
-
-Un `SourceRecord` représente un document tel que remonté par une source (HAL, OpenAlex, WoS, theses.fr, ScanR, …), avant agrégation dans la `Publication` du référentiel. Clés : `id` (surrogate), `(source, source_id)` (naturelle) ; un réimport met à jour la même entité.
-
-Immuable (frozen), utilisée en lecture seule : jamais persistée via cet objet — les écritures passent par le SQL. Consommée par `refresh_from_sources`, l'agrégation des métadonnées. La correction des métadonnées lit son propre contrat d'entrée, `MetadataForCorrection`.
-"""
+"""Enregistrement source : un document tel qu'une source le décrit, avant son agrégation en publication. `(source, source_id)` l'identifie : un réimport met à jour le même enregistrement source."""
 
 from dataclasses import dataclass
 
+from domain.source_records.keys import DoiKeys
 from domain.types import JsonValue
 
 
 @dataclass(frozen=True, slots=True)
 class SourceRecord:
-    """Document tel qu'extrait d'une source externe, chargé pour lecture."""
+    """Enregistrement source, en lecture seule."""
 
     id: int | None
     source: str
@@ -20,7 +16,8 @@ class SourceRecord:
     title: str
     publication_year: int | None
     doc_type: str | None
-    doi: str | None
+    # DOI actifs de rôle autre que `related`, cible appliquée.
+    dois: DoiKeys
     serial_id: int | None
     monograph_id: int | None
     container_title: str | None

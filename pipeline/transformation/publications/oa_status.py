@@ -3,8 +3,6 @@
 La phase interroge Unpaywall pour les DOI jamais vérifiés ou périmés, hors DOI DataCite, et écrit chaque verdict. Un DOI absent d'Unpaywall reçoit un verdict nul. Quand Unpaywall est indisponible, le DOI attend le run suivant. Le statut des publications de ces DOI se recalcule ensuite par `publication_oa_status`, à partir de leurs enregistrements sources et du verdict.
 
 Le délai de péremption et le plafond par run bornent la phase : le retard des DOI jamais vérifiés s'écoule d'un run à l'autre. La phase passe par l'accès à Unpaywall, qui exige l'adresse du polite pool.
-
-Implémentation async : `httpx2.AsyncClient` partagé + `asyncio.Semaphore(5)` sous le seuil Unpaywall (~10 req/s recommandé).
 """
 
 from __future__ import annotations
@@ -43,8 +41,8 @@ from pipeline.task_runner import SingleTaskPhase
 type OaStatusFetcher = Callable[[httpx2.AsyncClient, str], Awaitable[LookupOutcome[str]]]
 """Signature : `(client, doi) → statut OA mappé, NOT_FOUND ou UNAVAILABLE`."""
 
-# Constantes opérationnelles.
 BATCH_SIZE = 50
+# Requêtes simultanées, sous le débit que recommande Unpaywall (10 par seconde).
 MAX_CONCURRENT = 5
 
 
@@ -208,7 +206,7 @@ async def _check(
     max_per_run: int | None,
     max_concurrent: int,
 ) -> PhaseMetrics:
-    """Interroge Unpaywall pour les DOI à vérifier, écrit les verdicts, recalcule le statut OA des publications de ces DOI, puis rend les métriques du run."""
+    """Interroge Unpaywall pour les DOI à vérifier, écrit les verdicts, recalcule le statut OA des publications de ces DOI, puis renvoie les métriques du run."""
     metrics = PhaseMetrics()
     dois = store.fetch_dois_to_check(limit=max_per_run, staleness_days=staleness_days)
     total = len(dois)
@@ -337,9 +335,6 @@ def _apply_verdicts(
         status = publication_oa_status(publication.signals, by_doi.get(publication.doi))
         if status != publication.oa_status:
             store.update_oa_status(publication.id, status)
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

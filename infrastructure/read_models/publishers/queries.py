@@ -1,4 +1,4 @@
-"""Query services pour les éditeurs (table `publishers`)."""
+"""Lectures des éditeurs (table `publishers`)."""
 
 from collections.abc import Iterator
 
@@ -28,10 +28,7 @@ def _build_publisher_where(
     skip_countries: bool = False,
     skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
-    """Construit la clause WHERE pour `list_publishers` et `publishers_facets`.
-
-    Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes serials/publications.
-    """
+    """Clause WHERE de `list_publishers` et `publishers_facets`. Les drapeaux `skip_*` écartent le filtre de la dimension d'une facette, comme pour les revues et les publications."""
     binds: dict[str, object] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
@@ -40,7 +37,7 @@ def _build_publisher_where(
             parts.append("p.name_normalized LIKE '%' || :search || '%'")
             binds["search"] = normalized
     if filters.publisher_types and not skip_publisher_types:
-        # publisher_type est un enum Postgres → cast en text pour comparer à un array text[].
+        # `publisher_type` est une enum PostgreSQL, convertie en texte pour la comparer à un `text[]`.
         parts.append("p.publisher_type::text = ANY(:publisher_types)")
         binds["publisher_types"] = filters.publisher_types
     if filters.countries and not skip_countries:
@@ -64,7 +61,7 @@ _SORT_MAP = {
 
 
 def _doi_prefixes_sql() -> str:
-    """Sous-requête jsonb_agg des préfixes DOI d'un éditeur (réutilisée par list et detail)."""
+    """Sous-requête `jsonb_agg` des préfixes DOI d'un éditeur, pour la liste et le profil."""
     return """
         COALESCE(
             (SELECT jsonb_agg(jsonb_build_object(
@@ -240,7 +237,7 @@ class PublisherQueries:
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Sujets des publications de l'éditeur, les plus fréquents d'abord.
 
-        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
+        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui a une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(entity_subjects_sql("p.publisher_id = :id")),

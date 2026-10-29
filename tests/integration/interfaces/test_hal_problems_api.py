@@ -1,4 +1,4 @@
-"""Tests d'intégration pour `interfaces.api.routers.hal_problems`.
+"""Tests d'intégration du router des problèmes HAL (`interfaces.api.routers.hal_problems`).
 
 Couvre :
 - GET /api/hal-problems/duplicate-accounts
@@ -21,8 +21,7 @@ from tests.integration.helpers.seeds import (
 
 def _seed_lab(code: str | None = None, hal_collection: str | None = None) -> int:
     lab_id = seed_structure(code or uniq("LAB"), hal_collection=hal_collection)
-    # Rattache au périmètre persons, désigné en configuration : les lectures HAL
-    # scopent au périmètre, pas au type de structure.
+    # Les lectures HAL se limitent au périmètre des personnes, quel que soit le type de structure.
     seed_config("perimeter_persons", "uca")
     seed_add_to_perimeter(lab_id, code="uca", name="test persons perimeter")
     return lab_id
@@ -33,7 +32,7 @@ class TestDuplicateAccounts:
         r = client.get("/api/hal-problems/duplicate-accounts")
         assert r.status_code == 200
         body = r.json()
-        # Forme commune : total + page + per_page + items.
+        # Forme paginée commune : total, page, per_page, items.
         assert "total" in body
 
     def test_per_page_above_limit_rejected(self, client):
@@ -41,7 +40,7 @@ class TestDuplicateAccounts:
         assert r.status_code == 422
 
     def test_accepts_a_single_result_per_page(self, client):
-        """Aucun plancher au-delà de la page non vide : demander une ligne est une demande légitime."""
+        """Le seul plancher est la page non vide : une ligne par page est acceptée."""
         r = client.get("/api/hal-problems/duplicate-accounts", params={"per_page": 1})
         assert r.status_code == 200
 
@@ -70,19 +69,19 @@ class TestDuplicatePublicationsMeta:
 
 class TestMissingCollections:
     def test_requires_lab_id(self, client):
-        # `lab_id` est Query(...) — obligatoire, 422 si absent.
+        # `lab_id` est obligatoire.
         r = client.get("/api/hal-problems/missing-collections")
         assert r.status_code == 422
 
     def test_422_when_lab_has_no_hal_collection(self, client):
-        """Le laboratoire existe, mais sans collection il n'y a rien à quoi comparer."""
+        """Un laboratoire sans collection HAL n'a rien à comparer : 422."""
         lab = _seed_lab(hal_collection=None)
         r = client.get("/api/hal-problems/missing-collections", params={"lab_id": lab})
         assert r.status_code == 422
         assert "collection" in r.json()["detail"]
 
     def test_404_when_lab_is_unknown(self, client):
-        """L'absence de laboratoire et l'absence de collection ne se disent pas du même statut."""
+        """Un laboratoire inconnu renvoie 404, distinct du 422 d'un laboratoire sans collection."""
         r = client.get("/api/hal-problems/missing-collections", params={"lab_id": 999999})
         assert r.status_code == 404
 

@@ -1,10 +1,6 @@
-"""Contrat de `managed_transaction`, le satisfier de `OpenTransaction`.
+"""Contrat de `managed_transaction`, l'implémentation du port `OpenTransaction`.
 
-Chaque orchestrateur de phase reçoit un `open_tx` et lui délègue sa frontière transactionnelle.
-La propriété critique est **commit-sur-succès** : une régression (commit `a6a81f8`) l'avait un
-jour perdue côté phase personnes — 5 semaines de runs qui matchaient en mémoire puis rollbackaient
-à la fermeture de connexion. On la verrouille ici pour toutes les phases, avec le rollback sur
-erreur et la tolérance aux commits par lots (phases à progression durable).
+Chaque orchestrateur de phase reçoit un `open_tx` et lui délègue sa frontière transactionnelle. Le contrat : commit en sortie de bloc, rollback sur erreur, commits par lots admis dans le bloc, connexion fermée en sortie.
 """
 
 import pytest
@@ -48,14 +44,13 @@ def test_rolls_back_on_error(engine):
 
 
 def test_tolerates_batch_commits_and_trailing_write(engine):
-    # Phases à progression durable : commits par lots au fil de l'eau + une écriture résiduelle
-    # entérinée par le commit de sortie. `Engine.begin` lèverait `InvalidRequestError` ici.
+    # Phases à progression durable : commits par lots dans le bloc, puis une dernière écriture validée par le commit de sortie. `Engine.begin` lèverait `InvalidRequestError` ici.
     with managed_transaction(engine) as conn:
         conn.execute(text("INSERT INTO t VALUES (1)"))
         conn.commit()
         conn.execute(text("INSERT INTO t VALUES (2)"))
         conn.commit()
-        conn.execute(text("INSERT INTO t VALUES (3)"))  # résiduel, non commité par l'orchestrateur
+        conn.execute(text("INSERT INTO t VALUES (3)"))  # validé par le commit de sortie
     assert _ids(engine) == [1, 2, 3]
 
 

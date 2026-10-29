@@ -1,6 +1,6 @@
 """Router des paramètres clé-valeur du pipeline. Sert `/api/config/*`.
 
-La table `config` porte les réglages d'exploitation : années couvertes, choix des périmètres par phase, types de structure affichés. La définition des périmètres eux-mêmes appartient au router `perimeters.py`.
+La table `config` contient les réglages d'exploitation : années couvertes, choix des périmètres par phase, types de structure affichés. La définition des périmètres eux-mêmes appartient au router `perimeters.py`.
 """
 
 from typing import cast
@@ -35,7 +35,7 @@ def list_config(
 ) -> list[ConfigItem]:
     """Paramètres applicatifs (clé, valeur JSON, description), triés par clé.
 
-    Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé qu'on n'y inscrit pas reste réservée.
+    Sans le rôle admin, la lecture se restreint à la liste blanche `PUBLIC_CONFIG_KEYS` ; une clé absente de cette liste reste réservée.
     """
     return queries.list_config(public_only=user is None or not user.is_admin)
 
@@ -54,7 +54,7 @@ def update_config(
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif.
 
-    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. La clé doit préexister — les clés sont déclarées dans les migrations, cet endpoint n'en crée pas —, et une clé inconnue rend 404.
+    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue renvoie 404.
     """
     row = config.update_config_value(key, body.value)
     return ConfigItem(

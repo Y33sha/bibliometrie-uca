@@ -31,7 +31,7 @@ def test_symboles_mathml_avant_la_formule():
 
 
 def test_formule_en_debut_de_ligne_garde_le_texte_moins_indente():
-    # 10.1007/s40879-017-0185-x : la ligne qui suit la formule porte l'indentation du bloc.
+    # 10.1007/s40879-017-0185-x : la ligne qui suit la formule a l'indentation du bloc.
     title = (
         "Powers of Jacobi triple product, Cohen’s numbers and the Ramanujan \n$${\\Delta }$$\n"
         "                \n                    \n                        Δ\n"

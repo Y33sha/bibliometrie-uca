@@ -31,7 +31,7 @@ from tests.integration.helpers.sources import (
 
 
 def _refresh(conn, *steps) -> list[int]:
-    """Exécute les étapes de recalcul dans le périmètre des contributions sources à recalculer, et rend leurs nombres de lignes modifiées."""
+    """Exécute les étapes de recalcul sur les lignes en file et renvoie le nombre de lignes modifiées par chacune."""
     create_dirty_scope(conn)
     try:
         return [refresh_step(conn) for refresh_step in steps]
@@ -211,7 +211,7 @@ class TestRefreshPublicationCountries:
             source_id="oa-1",
             countries=["US", "FR"],
         )
-        # Une contribution source, marquée à l'insertion, met la publication dans la portée du refresh.
+        # Une contribution source, marquée à l'insertion, met la publication dans la portée du recalcul.
         insert_source_contribution(sa_sync_conn, sd1, source="hal")
         insert_source_contribution(sa_sync_conn, sd2, source="openalex")
 
@@ -310,7 +310,8 @@ class TestDirtyDrivenSourceCountries:
         )
 
         _refresh(sa_sync_conn, refresh_source_record_countries)
-        assert _source_record_countries(sa_sync_conn, source_record) is None  # orphelin → NULL
+        # Aucun pays trouvé → NULL.
+        assert _source_record_countries(sa_sync_conn, source_record) is None
 
     def test_dirty_address_drives_source_recompute(self, sa_sync_conn):
         # Une contribution source hors file est recalculée parce que son adresse entre en file.

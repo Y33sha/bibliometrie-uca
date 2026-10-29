@@ -9,25 +9,23 @@ https://developers.openalex.org/
 ## API utilisées
 
 **Works API** (https://api.openalex.org/works) — moissonnage des publications.
-- Nécessite *mailto* ou clé API (création via un compte gratuit)
+- Nécessite une adresse électronique de contact ou une clé API (création via un compte gratuit)
 - Requête par institution (filtre `lineage`) + année de publication
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre `authorships.author.orcid` sur un lot de 50 personnes RH
 - Pagination par cursor, 200 résultats/page, à 8 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 
 **Sources API** (https://api.openalex.org/sources) — enrichissement par `openalex_id` de la revue. `enrich_serials_from_openalex`, dans la phase [`publishing`](../pipeline/05-publishing.md). Met à jour `serials.serial_type`.
 
-**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit `publishers.country` (ISO-2 depuis `country_codes[0]`) là où la base n'en a pas. Couverture limitée — environ 13 % des éditeurs locaux ont un `openalex_id` — les autres voient leur `country` renseigné à la main, comme leur `publisher_type`.
+**Publishers API** (https://api.openalex.org/publishers) — enrichissement par `openalex_id` de l'éditeur, lancé à la demande par `interfaces/cli/maintenance/enrich_publishers.py`, hors pipeline. Écrit le pays des éditeurs qui n'en ont pas. Les éditeurs sans identifiant OpenAlex, la plupart, reçoivent leur pays et leur type à la main.
 
 ## Données récupérées
 
-- **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, OA status, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
+- **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, statut open access, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
 - **Licence** : licence de la localisation principale (`primary_location`)
 - **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne. Les fiches du DOAJ, sans copie du texte, sont écartées.
-- **Auteurs** : nom tel qu'il apparaît dans la contribution source, drapeau corresponding, ORCID si présent. Le nom unifié de l'entité auteur OpenAlex est conservé séparément, utilisé uniquement pour vérifier que l'ORCID attribué par OA correspond bien à notre auteur (cf. Particularités).
+- **Auteurs** : nom tel qu'il apparaît dans la contribution source, auteur correspondant, ORCID si présent.
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
-- **Journaux/éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
-
-> Côté base, l'identifiant OpenAlex est notre appellation pour le champ `id` natif (URL `https://openalex.org/W…` pour les works, `A…` auteurs, `S…` sources/journaux, `I…` institutions) une fois short-prefixé. On le stocke pour les publications, journaux, éditeurs et institutions. L'identifiant de l'entité auteur OpenAlex est dans le payload mais pas conservé.
+- **Revues et éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
 
 ## Exemple de payload
 
@@ -178,7 +176,5 @@ Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverte
 
 ## Particularités
 
-- Les requêtes API paginées tronquent les `authorships` à **100 auteurs max** par publication ; ces works sont marqués `staging.authors_truncated` à l'extraction, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les re-télécharge individuellement pour récupérer la liste complète.
-> Le re-téléchargement met à jour `raw_data` sans toucher à `raw_hash`, qui reste l'empreinte du payload paginé. Tant que le moissonnage rend ce même payload, l'UPSERT laisse `raw_data` en place, et la liste complète des auteurs survit. Un payload modifié écrase `raw_data`, troncature comprise, et la même exécution le retélécharge.
-- Le `raw_author_name` d'un élément de `authorships` est plus fiable que `author.display_name` (ce dernier est un nom unifié par l'algo OA, qui peut être erroné).
-- Deux ORCID coexistent dans le payload, de provenances opposées. On retient `authorship.raw_orcid`, provenant de la source moissonnée par OpenAlex . On **ignore** `author.orcid` (ORCID de l'**entité auteur unifiée** par le clustering OpenAlex, régulièrement fautif). Le `raw_orcid` retenu figure dans les informations du contributeur (`contributor_information.identifiers`, reliée par `source_contributions.contributor_information_id`) et utilisé directement comme signal de résolution côté pipeline persons (source OpenAlex inscrite dans [`ORCID_MATCH_SOURCES`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/persons/matching.py)), sans filtre par nom.
+- Les requêtes paginées tronquent les `authorships` à **100 auteurs** par publication. Ces works sont marqués `staging.authors_truncated` au moissonnage, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les retélécharge un par un pour lire la liste complète.
+- OpenAlex rattache chaque auteur à une entité auteur qu'il construit par algorithme, souvent fautive (`author.display_name`, `author.orcid`). Le pipeline lit le nom (`raw_author_name`) et l'ORCID (`raw_orcid`) que donne la source amont d'OpenAlex. Cet ORCID sert au rattachement des personnes, comme ceux de Crossref, DataCite et HAL (`ORCID_MATCH_SOURCES`).

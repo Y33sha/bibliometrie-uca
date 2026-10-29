@@ -33,7 +33,7 @@ class RecordIdentity:
 
     @classmethod
     def of(cls, source_id: str, *dois: str | None) -> RecordIdentity:
-        """Identité de `source_id`, avec les DOI non vides de `dois`, sans doublon."""
+        """Identifiant natif et DOI non vides du document, sans doublon."""
         return cls(source_id, tuple(dict.fromkeys(d for d in dois if d)))
 
     @property
@@ -45,7 +45,7 @@ class RecordIdentity:
 @dataclass(frozen=True, slots=True)
 class SourceAdapter:
     source: Source
-    # Identité d'un document reçu de la source, ou `None` pour un document sans identifiant.
+    # Identifiant natif et DOI d'un document reçu de la source, ou `None` pour un document sans identifiant.
     identify: Callable[[Mapping[str, JsonValue]], RecordIdentity | None]
     # Nouvelle lecture des documents par identifiant natif (phase `fetch_stale`).
     stale_refetch: Callable[[], StaleRefetch]
@@ -57,7 +57,7 @@ class SourceAdapter:
     person_harvester: HarvesterFactory | None = None
     # Recherche par DOI (phase `fetch_missing`).
     doi_search: Callable[[], DoiSearch] | None = None
-    # Neutralisation du bruit volatil avant l'empreinte. `None` : l'empreinte porte sur le payload fidèle.
+    # Neutralisation du bruit volatil avant l'empreinte. `None` : l'empreinte se calcule sur le payload tel quel.
     strip_volatile: StripVolatile | None = None
     # Vrai quand un document reçu d'une réponse de liste atteint le plafond d'auteurs de la source : sa liste est peut-être tronquée. `None` : la source ne plafonne pas.
     authors_truncated: Callable[[Mapping[str, JsonValue]], bool] | None = None

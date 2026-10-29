@@ -26,7 +26,7 @@ _source_record = partial(insert_source_record, title="T")
 
 
 def _attach(conn, publication_id, lab_id):
-    """Contribution reliant la publication à un labo par la vue `contribution_structures`, semée par la chaîne source minimale."""
+    """Contribution du périmètre, d'une personne créée, qui relie la publication au laboratoire `lab_id`."""
     aid = insert_contribution(
         conn, publication_id, person_id=insert_person(conn), in_perimeter=True, roles=["author"]
     )
@@ -51,8 +51,7 @@ class TestSearch:
         assert match in ids and other not in ids
 
     def test_search_matches_subject_label(self, sa_sync_conn):
-        """Une publi dont le titre ne contient pas le terme mais qui est
-        annotée par un sujet matchant doit remonter dans les résultats."""
+        """Une publication dont le titre ne contient pas le terme figure dans les résultats si un de ses sujets le contient."""
         lab = _lab(sa_sync_conn)
         publication = insert_publication(sa_sync_conn, "Foo bar baz")
         unrelated = insert_publication(sa_sync_conn, "Hello world")
@@ -72,12 +71,11 @@ class TestSearch:
         assert publication in ids and unrelated not in ids
 
     def test_title_match_ranks_before_subject_only_match(self, sa_sync_conn):
-        """Les publis dont le titre matche remontent avant celles qui ne
-        matchent que via un sujet — quitte à casser l'ordre par défaut."""
+        """Les publications dont le titre contient le terme passent avant celles qui le contiennent seulement dans un sujet, quel que soit le tri demandé."""
         lab = _lab(sa_sync_conn)
-        # Titre contient "quantum"
+        # Titre qui contient « quantum ».
         title_match = insert_publication(sa_sync_conn, "Quantum entanglement basics")
-        # Titre ne contient pas "quantum", mais sujet associé oui
+        # Titre sans « quantum », sujet qui le contient.
         subject_match = insert_publication(sa_sync_conn, "Foo bar baz")
         _attach(sa_sync_conn, title_match, lab)
         _attach(sa_sync_conn, subject_match, lab)
@@ -94,7 +92,7 @@ class TestSearch:
         assert ids.index(title_match) < ids.index(subject_match)
 
     def test_search_unaccented_matches_accented_label(self, sa_sync_conn):
-        """Les accents ne doivent pas bloquer le match (ILIKE + unaccent)."""
+        """La recherche ignore les accents."""
         lab = _lab(sa_sync_conn)
         publication = insert_publication(sa_sync_conn, "Foo")
         _attach(sa_sync_conn, publication, lab)
@@ -111,8 +109,7 @@ class TestSearch:
         assert publication in ids
 
     def test_facets_respect_search(self, sa_sync_conn):
-        """Régression : les comptes de facettes suivent la recherche titre, pas
-        seulement les autres filtres (la facette doit refléter le tableau)."""
+        """Régression : les comptes de facettes suivent la recherche sur le titre, comme le tableau."""
         lab = _lab(sa_sync_conn)
         for title in ("quantum gravity", "classical mechanics"):
             pid = insert_publication(sa_sync_conn, title=title)
@@ -135,14 +132,10 @@ class TestSearch:
 
 
 class TestHalStatusMultipleHalEntries:
-    """Régression : une publi avec plusieurs entrées HAL (cas réel ~764 en
-    base) ne doit pas tomber dans le filtre `hors_collection` dès qu'au moins
-    une de ses entrées HAL contient la collection du labo. Le statut renvoyé
-    avec chaque publication suit la même règle que le filtre."""
+    """Une publication à plusieurs dépôts HAL est en collection dès qu'un de ses dépôts contient la collection du laboratoire. Le statut rendu avec chaque publication suit la même règle que le filtre."""
 
     def test_publication_in_collection_via_one_hal_entry_is_not_hors_collection(self, sa_sync_conn):
-        """Publi avec 2 dépôts HAL : l'un dans la collection du labo, l'autre
-        non. Doit être exclue du filtre `hors_collection`."""
+        """Deux dépôts HAL, dont un dans la collection du laboratoire : la publication est absente du filtre `hors_collection`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
         publication = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, publication, lab)
@@ -166,7 +159,7 @@ class TestHalStatusMultipleHalEntries:
         assert publication not in [p.id for p in res.publications]
 
     def test_listed_status_follows_the_filter_rule(self, sa_sync_conn):
-        """Le statut renvoyé avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
+        """Le statut rendu avec la publication est celui du filtre : en collection par l'un de ses dépôts, en open access, elle vaut `ok`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
         publication = insert_publication(sa_sync_conn, "Two HAL deposits")
         _attach(sa_sync_conn, publication, lab)
@@ -202,8 +195,7 @@ class TestHalStatusMultipleHalEntries:
         assert all(p.hal_status is None for p in res.publications)
 
     def test_publication_only_outside_collection_is_hors_collection(self, sa_sync_conn):
-        """Cas symétrique : si aucune entrée HAL n'est dans la collection,
-        la publi tombe bien dans `hors_collection`."""
+        """Aucun dépôt HAL dans la collection : la publication figure dans le filtre `hors_collection`."""
         lab = _lab(sa_sync_conn, hal_collection="CMH")
         publication = insert_publication(sa_sync_conn, "Outside only")
         _attach(sa_sync_conn, publication, lab)
@@ -220,8 +212,7 @@ class TestHalStatusMultipleHalEntries:
         assert publication in [p.id for p in res.publications]
 
     def test_ok_without_declared_collection_matches_nothing(self, sa_sync_conn):
-        """Labo dont la collection HAL est absente : le filtre `ok` (en collection + accès
-        ouvert) rend zéro publication."""
+        """Laboratoire sans collection HAL : le filtre `ok` (en collection et en open access) renvoie zéro publication."""
         lab = insert_structure(sa_sync_conn, "LABNC")
         publication = insert_publication(sa_sync_conn, "Open in HAL")
         _attach(sa_sync_conn, publication, lab)
@@ -241,7 +232,7 @@ class TestHalStatusMultipleHalEntries:
 
 
 class TestThesesExport:
-    """Export CSV des thèses : la boucle de rendu lit chaque colonne du SELECT, donc un test avec données garde le contrat SQL du CSV et son projeté d'accord."""
+    """Export CSV des thèses. La boucle de rendu lit chaque colonne de la requête : seul un test avec données vérifie l'accord entre la requête et le CSV."""
 
     def test_renders_a_thesis_with_each_source_url(self, sa_sync_conn):
         lab = _lab(sa_sync_conn)
@@ -404,7 +395,7 @@ class TestPublicationsSort:
         assert self._sorted(sa_sync_conn, "labs_desc") == [p1, p2, p3]
 
     def test_labs_sort_reads_the_labs_of_the_person(self, sa_sync_conn):
-        """Sur la vue d'une personne, la colonne n'affiche que ses laboratoires : le tri lit les mêmes."""
+        """Sur la vue d'une personne, la colonne affiche seulement ses laboratoires : le tri lit les mêmes."""
         alpha, beta, zeta = (insert_structure(sa_sync_conn, c) for c in ("Alpha", "Beta", "Zeta"))
         person = insert_person(sa_sync_conn, "Focus")
         q1 = self._publication(sa_sync_conn, "Q1", labs=(zeta,), person=person)
@@ -474,7 +465,7 @@ class TestHalStatusNeedsASingleLab:
 
 
 class TestExcludedPersonLab:
-    """La contribution source d'une personne exclue ne rattache pas sa publication au laboratoire de cette contribution source."""
+    """La contribution d'une personne exclue ne rattache pas sa publication au laboratoire de cette contribution."""
 
     def test_lab_of_excluded_person_drops_the_publication(self, sa_sync_conn):
         lab_excluded, lab_kept = (
@@ -504,7 +495,7 @@ class TestExcludedPersonLab:
 
 
 class TestPersonView:
-    """Page personne : les contributions sont les contributions rattachées à une personne."""
+    """Vue d'une personne : la liste lit la contribution de la personne. L'auteur d'une thèse est une contribution rattachée à une personne."""
 
     def _seed(self, conn):
         person, coauthor = (
@@ -594,11 +585,11 @@ class TestPersonView:
 
 
 class TestExportsRunTheirQueryBeforeStreaming:
-    """Les exports rendent des blocs, mais interrogent la base à l'appel.
+    """Les exports renvoient des blocs, mais interrogent la base à l'appel.
 
-    Non-régression sur une subtilité qui casserait en production sans faire échouer un test naïf : FastAPI referme la connexion de la requête *avant* d'envoyer le corps de la réponse. Si ces méthodes devenaient des générateurs, la requête ne partirait qu'à la première itération, c'est-à-dire une fois la connexion fermée. Le contenu doit donc rester lisible après la fermeture.
+    FastAPI referme la connexion de la requête avant d'envoyer le corps de la réponse. Un générateur lancerait la requête à la première itération, sur une connexion fermée. Le contenu doit donc rester lisible après la fermeture.
 
-    Chaque test ouvre sa propre connexion sur le même engine, et la ferme : celle du fixture porte la transaction des autres tests.
+    Chaque test ouvre et ferme sa propre connexion sur le même engine : celle du fixture contient la transaction des autres tests.
     """
 
     def test_theses_export_survives_a_closed_connection(self, sa_sync_conn):

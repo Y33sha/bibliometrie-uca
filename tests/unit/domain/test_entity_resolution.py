@@ -1,6 +1,6 @@
-"""Tests unitaires de `domain.entity_resolution.connected_components`.
+"""Composantes connexes des enregistrements sources reliés par des clés partagées (`domain.entity_resolution.connected_components`).
 
-Garde le contrat du clustering ER : fermeture transitive sur clés partagées, isolation par type de clé, singletons sans clé, et déterminisme (composantes triées, racine au `min`).
+Les composantes sont transitives et triées ; deux clés de types différents restent distinctes ; un enregistrement source sans clé forme sa propre composante.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ class TestConnectedComponents:
         assert connected_components([]) == []
 
     def test_singletons_without_tokens(self):
-        """Des enregistrement source sans clé ne s'apparentent à rien : une composante chacune."""
+        """Chaque enregistrement source sans clé forme sa propre composante."""
         assert connected_components([(3, _tok()), (1, _tok()), (2, _tok())]) == [[1], [2], [3]]
 
     def test_shared_doi_groups(self):
@@ -25,7 +25,7 @@ class TestConnectedComponents:
         assert result == [[1, 2]]
 
     def test_transitive_closure_across_keys(self):
-        """1↔2 par DOI, 2↔3 par HAL : 1-2-3 forment une seule composante (transitivité)."""
+        """1 et 2 partagent un DOI, 2 et 3 un identifiant HAL : 1, 2 et 3 forment une seule composante."""
         result = connected_components(
             [
                 (1, _tok(("doi", "10.1/x"))),
@@ -36,7 +36,7 @@ class TestConnectedComponents:
         assert result == [[1, 2, 3]]
 
     def test_distinct_token_types_do_not_bridge(self):
-        """Un DOI `x` et un NNT `x` ne relient pas (tokens namespacés par type)."""
+        """Un DOI `x` et un NNT `x` sont deux clés distinctes."""
         result = connected_components([(1, _tok(("doi", "x"))), (2, _tok(("nnt", "x")))])
         assert result == [[1], [2]]
 
@@ -52,7 +52,7 @@ class TestConnectedComponents:
         assert result == [[1, 2], [10, 11]]
 
     def test_deterministic_order_independent(self):
-        """L'ordre d'entrée n'influe pas sur le résultat (confluent)."""
+        """Le résultat est indépendant de l'ordre d'entrée."""
         members = [
             (5, _tok(("hal_id", "h"))),
             (2, _tok(("doi", "d"), ("hal_id", "h"))),
@@ -75,7 +75,7 @@ class TestConnectedComponents:
         assert result == [[1, 2, 3]]
 
     def test_multivalued_hal_ids_bridge_two_records(self):
-        """Un enregistrement source qui a deux HAL ids ponte deux enregistrements sources qui n'en partagent qu'un chacune."""
+        """Un enregistrement source à deux identifiants HAL relie deux enregistrements sources qui en partagent chacun un seul."""
         result = connected_components(
             [
                 (1, _tok(("hal_id", "hal-1"))),

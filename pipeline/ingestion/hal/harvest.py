@@ -1,8 +1,6 @@
 """Moissonnage HAL : tâche `harvest.hal`.
 
-Interroge l'**union** des collections du périmètre en une seule requête Solr (`fq=collCode_s:(C1 OR … OR Cn)`), paginée en `cursorMark`. Solr dédoublonne l'union côté serveur : chaque document est récupéré une fois, quel que soit le nombre de collections du périmètre auxquelles il appartient.
-
-Le routage new/updated/unchanged vient de l'écriture dans `staging`, pilotée par `raw_hash` : un `raw_hash=null` en base force le réimport (nouveau téléchargement → empreinte recalculée → contenu réécrit + `processed=FALSE`).
+Interroge l'union des collections du périmètre en une seule requête Solr (`fq=collCode_s:(C1 OR … OR Cn)`), paginée par `cursorMark`. Solr dédoublonne l'union : chaque document arrive une fois, quel que soit le nombre de collections du périmètre auxquelles il appartient.
 """
 
 from __future__ import annotations
@@ -68,7 +66,7 @@ def harvest_union(
 ) -> PhaseMetrics:
     """Moissonne l'union des collections pour un périmètre temporel, page après page jusqu'à stabilisation du marqueur.
 
-    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Retourne `PhaseMetrics(new, updated, unchanged, total)`.
+    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Renvoie les compteurs d'écriture.
     """
     query = build_query(years=years, since=since)
     fq = build_collections_fq(list(config.all_collections))
@@ -85,8 +83,7 @@ def harvest_union(
 
         progress.advance(len(docs))
 
-        # Fin de pagination : Solr renvoie le marqueur reçu une fois l'union épuisée. Une page vide
-        # borne aussi la boucle, en cas d'incohérence du serveur.
+        # Fin de pagination : Solr renvoie le marqueur reçu une fois l'union épuisée. Une page vide arrête aussi la boucle, en cas d'incohérence du serveur.
         next_cursor = as_str(data.get("nextCursorMark")) or cursor
         if next_cursor == cursor or not docs:
             break
@@ -111,7 +108,7 @@ class HalHarvester(SourceHarvester[HalHarvestConfig, HalClient]):
     def harvest_all(self, window: HarvestWindow, config: HalHarvestConfig) -> PhaseMetrics:
         """Moissonne l'union des collections, périmètre temporel par périmètre.
 
-        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document n'a qu'une année de publication.
+        En mode incrémental, un seul périmètre : les dépôts modifiés depuis la date, dans la plage d'années du mode complet. Sinon une passe par année, qui permet une reprise ciblée par `--year` : un document a une seule année de publication.
         """
         client = self._client
         fq = build_collections_fq(list(config.all_collections))

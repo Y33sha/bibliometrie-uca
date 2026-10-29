@@ -1,4 +1,4 @@
-"""Source DataCite : moissonnage, paramètres de requête, empreinte des nœuds."""
+"""Source DataCite : moissonnage, paramètres de requête, empreinte des ressources JSON:API."""
 
 from __future__ import annotations
 
@@ -64,7 +64,7 @@ def _strip_volatile(raw_data: Mapping[str, JsonValue]) -> Mapping[str, JsonValue
 
 
 def _identify(record: Mapping[str, JsonValue]) -> RecordIdentity | None:
-    """Le DOI d'un nœud DataCite est son identifiant."""
+    """Le DOI d'une ressource DataCite est son identifiant."""
     from pipeline.ingestion.datacite.fields import record_doi
 
     doi = record_doi(record)

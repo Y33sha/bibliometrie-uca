@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL sync pour les contributions (contributions) et les source_contributions."""
+"""Repository PostgreSQL des contributions et de leurs contributions sources."""
 
 from datetime import datetime
 from typing import cast
@@ -24,7 +24,7 @@ from infrastructure.sql_fragments import (
 def detach_rejected_contributions(
     conn: Connection, person_id: int, publication_id: int | None = None
 ) -> int:
-    """Retire la personne à ses contributions des publications où elle est rejetée, et retire les épinglages de leurs contributions sources à elle. Avec `publication_id`, sur cette publication seulement. Rend le nombre de contributions détachées.
+    """Retire la personne à ses contributions des publications où elle est rejetée, et retire les épinglages de leurs contributions sources à elle. Avec `publication_id`, sur cette publication seulement. Renvoie le nombre de contributions détachées.
 
     Partagé par le rejet d'une paire et par la fusion de personnes, qui peut réunir sur une même personne une contribution et un rejet.
     """
@@ -73,7 +73,7 @@ class PgContributionRepository(ContributionRepository):
             {"aid": source_contribution_id},
         ).scalar_one_or_none()
 
-    # ── Contributions : contributions ─────────────
+    # ── Contributions ─────────────
 
     def mark_contributions_for_name_form(self, person_id: int, name_form: str) -> int:
         return enqueue(
@@ -169,7 +169,7 @@ class PgContributionRepository(ContributionRepository):
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
         return detach_rejected_contributions(self._conn, person_id, publication_id)
 
-    # ── confirmed_source_contributions (épinglage admin, must-link au grain de la contribution source) ──
+    # ── Épinglages de contributions sources (confirmed_source_contributions) ──
 
     def pin_contributions(self, source_contribution_ids: list[int], person_id: int) -> None:
         if not source_contribution_ids:
@@ -189,7 +189,7 @@ class PgContributionRepository(ContributionRepository):
         ):
             self._conn.execute(text(sql), {"ids": source_contribution_ids})
 
-    # ── Propagation périmètre UCA depuis les adresses ──────────────
+    # ── Périmètre, depuis les adresses ──────────────
 
     def find_source_contributions_by_addresses(
         self,

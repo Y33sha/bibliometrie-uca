@@ -22,10 +22,7 @@ HAL_FIELDS = [
     "subTitle_s",
     "authFullNameFormIDPersonIDIDHal_fs",
     "authQuality_s",
-    # label_xml (TEI) : seul champ qui attache ORCID/IdRef à chaque auteur
-    # par position. Les listes `authORCIDIdExt_s` / `authIdRefIdExt_s`
-    # sont compactées (valeurs non-null seulement, pas d'alignement) et
-    # ne sont donc pas demandées.
+    # `label_xml` (TEI) : seul champ qui rattache l'ORCID et l'IdRef à chaque auteur par sa position. `authORCIDIdExt_s` et `authIdRefIdExt_s` omettent les valeurs nulles et perdent l'alignement : ils restent hors de la liste.
     "label_xml",
     "producedDateY_i",
     "publicationDate_s",
@@ -56,8 +53,7 @@ HAL_FIELDS = [
     "pubmedId_s",
     "abstract_s",
     "keyword_s",
-    # Domaines CCSD : `<code>_FacetSep_<libellé racine>/…/<libellé feuille>`, qui
-    # porte le libellé de chaque niveau. `domain_s` n'expose que les codes.
+    # Domaines CCSD : `<code>_FacetSep_<libellé racine>/…/<libellé feuille>`, avec le libellé de chaque niveau. `domain_s` donne seulement les codes.
     "fr_domainAllCodeLabel_fs",
     "volume_s",
     "issue_s",
@@ -144,7 +140,7 @@ class HalStructuresClient:
         ]
 
     def by_ids(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:
-        """Structures d'identifiants `ids`. Un alias est absent de la réponse."""
+        """Structures de ces identifiants. Un alias est absent de la réponse."""
         return self._docs("docid", ids)
 
     def by_aliases(self, ids: Collection[int]) -> Sequence[Mapping[str, JsonValue]]:

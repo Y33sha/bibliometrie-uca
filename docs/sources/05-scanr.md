@@ -10,21 +10,21 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 
 **Elasticsearch DataESR** (`https://cluster-production.elasticsearch.dataesr.ovh/scanr-publications/_search`) — moissonnage des publications du périmètre français de la recherche.
 
-- Login et mot de passe nécessaires : accordés gratuitement sur demande par mail: https://scanr.enseignementsup-recherche.gouv.fr/about/contact
+- Identifiant et mot de passe nécessaires, accordés gratuitement sur demande : https://scanr.enseignementsup-recherche.gouv.fr/about/contact
 - Requête : année + affiliation par identifiant SIREN
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : clause réunissant l'IdRef (`authors.person`, sous la forme `idref<IdRef>`) et l'ORCID (`authors.denormalized.orcid`) d'un lot de personnes RH
-- Pagination par `search_after` sur `id.keyword`, taille `SCANR_PER_PAGE`, à 5 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
+- Pagination par `search_after` sur `id.keyword`, 1 000 résultats par page, à 5 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 
 ## Données récupérées
 
-- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut OA, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
+- **Publications** : identifiant ScanR, titre (multilingue), année, type, statut open access, résumé (multilingue), mots-clés (multilingue), concepts `domains` (concepts wikidata et mots-clés, ajoutés aux mots-clés ; vedettes sudoc, retenues comme sujets), citations (somme des comptages annuels), URLs (landing, PDF, DOI), identifiants externes (DOI, hal_id, NNT, PMID), licence (`oaEvidence.license`)
 - **Localisations** (`source_record_locations`) : la copie ouverte (`oaEvidence`), avec son PDF, sa version et son accès, puis la page du document (`landingPage`) quand elle désigne une autre adresse.
-- **Journal/éditeur** : titre, ISSN, eISSN, éditeur. Pour une thèse ou une habilitation, le titre de la source est l'université de soutenance : il ne donne ni publication en série ni titre de conteneur.
-- **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, on ne conserve que les feuilles), ORCID et IdRef si présents. Une affiliation avec `structId` est une fiche du référentiel HAL : elle donne une structure HAL à la contribution source. Une affiliation sans `structId` est un texte d'affiliation : elle donne une adresse.
+- **Revue et éditeur** : titre, ISSN, eISSN, éditeur. Pour une thèse ou une habilitation, le titre de la source est l'université de soutenance : il ne donne ni publication en série ni titre de conteneur.
+- **Auteurs** : nom complet, rôle, affiliations rattachées à chaque auteur (arbre tutelle → laboratoire, seules les feuilles sont retenues), ORCID et IdRef si présents. Une affiliation avec `structId` est une fiche du référentiel HAL : elle donne une structure HAL à la contribution source. Une affiliation sans `structId` est un texte d'affiliation : elle donne une adresse.
 
 ## Exemple de payload
 
-Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `topics` réduit à 1 entrée complète + 2 abrégées (la hiérarchie OpenAlex est verbeuse), `domains` réduit à 2 entrées + ellipsis. Champs ScanR non consommés par le pipeline (`ix`, `structures`, `institutions`, `co_structures`, `predict_teds`, `bso_local_affiliations`, `autocompleted*`, etc.) retirés.
+Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `domains` réduit à 2 entrées. Champs que le pipeline ne lit pas retirés.
 
 ```json
 {
@@ -49,18 +49,6 @@ Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `topi
     "publisher": "American Medical Association",
     "journalIssns": ["0098-7484", "1538-3598"]
   },
-  "topics": [
-    {
-      "id": "https://openalex.org/T11207",
-      "field": { "id": "https://openalex.org/fields/27", "display_name": "Medicine" },
-      "score": 1,
-      "domain": { "id": "https://openalex.org/domains/4", "display_name": "Health Sciences" },
-      "subfield": { "id": "https://openalex.org/subfields/2734", "display_name": "Pathology and Forensic Medicine" },
-      "display_name": "Alcohol Consumption and Health Effects"
-    },
-    { "display_name": "Liver Disease Diagnosis and Treatment", "score": 1, "...": "(hiérarchie omise)" },
-    { "display_name": "Liver Disease and Transplantation", "score": 0.999, "...": "(hiérarchie omise)" }
-  ],
   "domains": [
     {
       "code": "Q147778", "type": "wikidata", "count": 18,
@@ -122,7 +110,7 @@ Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `topi
 
 ### Identifiants ScanR
 
-L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publication dans cette source, sans séparateur. Sondage sur 10 000 documents UCA :
+L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publication dans cette source, sans séparateur. Sondage sur 10 000 documents :
 
 | Préfixe | Part | Exemple |
 |---|---|---|
@@ -131,6 +119,6 @@ L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publi
 | `nnt`  | 4 %  | `nnt2023clil0004` |
 | `pmid` | 0.2 %| `pmid36609465` |
 
-### Statut OA dérivé plutôt que pris brut
+### Statut open access
 
-`isOa` n'est qu'un booléen oui/non. Pour obtenir un `oa_status` nuancé (green / gold / hybrid / bronze / closed / diamond), on dérive depuis le couple `(isOa, oaEvidence)` via `derive_scanr_oa_status` : `oaEvidence` contient la voie d'accès OA (repository, publisher, license, etc.) qui permet de classer le statut.
+`isOa` est un booléen. Le statut open access (green, gold, hybrid, bronze, diamond, closed) se déduit de `isOa` et de la copie ouverte que décrit `oaEvidence` (`derive_scanr_oa_status`).

@@ -1,7 +1,4 @@
-"""Intégration : passe de réconciliation des composantes (merge-only).
-
-Valide le SQL (voisinage 1-hop, relevé de la file, suppression des marquages) sur vraie base, et le bout-en-bout `reconcile()` (fusion + suppression des marquages traités), dans la transaction rollbackée.
-"""
+"""Réconciliation des enregistrements sources : voisinage direct des enregistrements sources marqués, relevé de la file, et passe complète `reconcile()` (rattachement, création, fusion et scission de publications, suppression des marquages traités)."""
 
 import logging
 from functools import partial
@@ -16,8 +13,13 @@ from domain.source_records.identifiers import (
     SourceIdentifierType,
 )
 from domain.source_records.keys import project_confirmation_keys
+from infrastructure.db.doi_targets import fetch_doi_targets
 from infrastructure.db.queues import Queue
-from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
+from infrastructure.db.source_record_identifiers import (
+    identifiers_json_sql,
+    parse_identifiers,
+    source_record_doi_sql,
+)
 from pipeline.transformation.publications.reconciliation import (
     fetch_reconciliation_universe,
     mark_for_reconciliation,
@@ -83,7 +85,7 @@ def _source_record_state(conn, source_record_id) -> tuple:
 
 
 def _manual_merge(conn, source_record_ids) -> int:
-    """Enregistre une fusion manuelle des enregistrements sources `source_record_ids`, par leur clé naturelle. Rend son identifiant."""
+    """Enregistre une fusion manuelle des enregistrements sources `source_record_ids`, par leur clé naturelle. Renvoie son identifiant."""
     manual_merge_id = conn.execute(
         text("INSERT INTO manual_merges DEFAULT VALUES RETURNING id")
     ).scalar_one()
@@ -97,18 +99,25 @@ def _manual_merge(conn, source_record_ids) -> int:
     return manual_merge_id
 
 
+def _add_doi_target(conn, doi, target_doi) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO doi_targets (doi, target_doi, rule)"
+            " VALUES (:doi, :target, 'DATACITE_VERSION_TO_CONCEPT')"
+        ),
+        {"doi": doi, "target": target_doi},
+    )
+
+
 def _universe(conn) -> set[int]:
-    """Relève la file, puis rend les identifiants du voisinage 1-hop."""
+    """Relève la file, puis renvoie les identifiants du voisinage direct des enregistrements sources marqués."""
     snapshot_queued_source_records(conn)
     return {r.id for r in fetch_reconciliation_universe(conn)}
 
 
 class TestUniverse:
     def test_fetches_dirty_and_one_hop_neighbor(self, sa_sync_conn):
-        """Le voisinage = enregistrement source dirty + enregistrement source non-dirty partageant une clé ; ignore les non-liées.
-
-        DOI présent sur les enregistrements sources, pas sur les publications (`UNIQUE(lower(doi))` interdit deux publications
-        au même DOI) ; le voisinage par DOI joint sur `source_records.doi`."""
+        """Le voisinage contient l'enregistrement source marqué et l'enregistrement source non marqué qui partage son DOI, sans l'enregistrement source sans clé commune. Seuls les enregistrements sources ont le DOI : deux publications ne peuvent avoir le même DOI."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -118,6 +127,19 @@ class TestUniverse:
         _source_record(conn, unrelated_publication, source_id="c", doi="10.9/z", marked=False)
 
         assert _universe(conn) == {dirty, neighbor}
+
+    def test_neighbor_by_doi_target(self, sa_sync_conn):
+        """Le DOI d'une version a pour cible celui du concept : les enregistrements sources des deux DOI sont voisins."""
+        conn = sa_sync_conn
+        _add_doi_target(conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
+        dirty = _source_record(conn, source_id="hal", doi="10.5281/zenodo.101")
+        concept = _source_record(conn, source_id="c", doi="10.5281/zenodo.100", marked=False)
+        version = _source_record(conn, source_id="v", doi="10.5281/zenodo.101", marked=False)
+
+        assert _universe(conn) == {dirty, concept, version}
+        clear(conn, Queue.SOURCE_RECORD_KEYS)
+        mark(conn, Queue.SOURCE_RECORD_KEYS, [concept])
+        assert _universe(conn) == {dirty, concept, version}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
         conn = sa_sync_conn
@@ -191,7 +213,7 @@ class TestUniverse:
         assert _universe(conn) == {dirty}
 
     def test_neighbor_by_metadata_block(self, sa_sync_conn):
-        """Voisinage par token bloc métadonnée : deux enregistrements sources de même doc_type + titre (long) + année, sans clé d'identifiant partagée (ici des thèses)."""
+        """Voisinage par bloc de métadonnées : deux thèses de même type, même titre long et même année, sans identifiant commun."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -230,8 +252,7 @@ class TestUniverse:
         assert _universe(conn) == {dirty, neighbor}
 
     def test_dirty_orphan_included(self, sa_sync_conn):
-        """Un enregistrement source orpheline dirty EST un seed : l'assignation est unifiée dans la réconciliation
-        (elle se fait matcher / créer / skipper par le même primitif)."""
+        """Un enregistrement source orphelin marqué entre dans la passe : la réconciliation le rattache, crée sa publication ou l'écarte."""
         conn = sa_sync_conn
         orphan = _source_record(conn, source_id="orphan", doi="10.1/x")
         assert snapshot_queued_source_records(conn) == [orphan]
@@ -239,9 +260,7 @@ class TestUniverse:
 
 class TestEndToEnd:
     def test_two_publications_sharing_doi_merged(self, sa_sync_conn):
-        """Deux publications dont les enregistrements sources partagent un DOI → fusion. Les publications n'ont pas (encore) le DOI en
-        colonne (`UNIQUE(lower(doi))` interdit deux publications au même DOI) : aucune ne l'a, donc
-        l'ancre tombe sur le `min(source_record_id)`."""
+        """Deux publications dont les enregistrements sources partagent un DOI sont fusionnées. Aucune des deux n'a le DOI : l'ancre est la publication du plus petit enregistrement source."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -250,7 +269,6 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        # Aucune publication n'a le DOI en colonne → ancre = publication du plus petit source_record_id.
         anchor, absorbed = (
             (publication_a, publication_b)
             if source_record_a < source_record_b
@@ -284,6 +302,58 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_other)[0] == publication_b
         assert _publication_exists(conn, publication_b)
         assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) is None
+
+    def test_scanr_record_joins_the_article_of_its_derived_doi(self, sa_sync_conn):
+        """L'identifiant ScanR désigne l'article ; le premier DOI de ses `externalIds` est celui du preprint.
+
+        Régression : l'enregistrement source ScanR rejoignait la publication du preprint par le DOI de la colonne."""
+        conn = sa_sync_conn
+        article = _seed_publication(conn, doi="10.1/article")
+        preprint = _seed_publication(conn, doi="10.1101/preprint")
+        _source_record(conn, article, source="crossref", source_id="a", doi="10.1/article")
+        _source_record(conn, preprint, source="crossref", source_id="p", doi="10.1101/preprint")
+        scanr = _source_record(
+            conn,
+            preprint,
+            source="scanr",
+            source_id="doi10.1/article",
+            doi="10.1101/preprint",
+            identifiers=[
+                *_ids(SourceIdentifierType.DOI, _DERIVED, "10.1/article"),
+                *_ids(SourceIdentifierType.DOI, _SECONDARY, "10.1101/preprint"),
+            ],
+        )
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, scanr)[0] == article
+
+    def test_deposit_with_a_version_doi_joins_the_concept_publication(self, sa_sync_conn):
+        """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté de la réconciliation avec la version.
+
+        Le DOI de la version a pour cible le concept : le dépôt HAL rejoint la publication du concept, qui garde le DOI du concept. L'enregistrement DataCite de la version, écarté, reste orphelin."""
+        conn = sa_sync_conn
+        _add_doi_target(conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
+        publication = _seed_publication(conn, doi="10.5281/zenodo.100")
+        concept = _source_record(
+            conn, publication, source="datacite", source_id="c", doi="10.5281/zenodo.100"
+        )
+        version = _source_record(
+            conn, source="datacite", source_id="v", doi="10.5281/zenodo.101", is_matchable=False
+        )
+        hal = _source_record(conn, source="hal", source_id="hal-1", doi="10.5281/zenodo.101")
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, concept)[0] == publication
+        assert _source_record_state(conn, hal)[0] == publication
+        assert _source_record_state(conn, version)[0] is None
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": publication}
+            ).scalar_one()
+            == "10.5281/zenodo.100"
+        )
 
     def test_publication_of_excluded_records_only_is_deleted(self, sa_sync_conn):
         """Régression : une publication faite de copies GRESIS (DOI 10.60692) est supprimée, ses enregistrements sources restent orphelins."""
@@ -387,8 +457,7 @@ class TestEndToEnd:
         assert "nouveaux ou mis à jour" not in caplog.text
 
     def test_publication_with_two_dois_splits(self, sa_sync_conn):
-        """Une publication qui a doi=X héberge un enregistrement source doi=Y (reliées par hal_id) → X garde la publication,
-        Y part sur une nouvelle publication."""
+        """Une publication de DOI X contient un enregistrement source de DOI Y, relié par un hal-id : l'enregistrement source de DOI X garde la publication, celui de DOI Y passe dans une publication créée."""
         conn = sa_sync_conn
         publication = _seed_publication(conn, doi="10.1/x")
         source_record_x = _source_record(
@@ -408,7 +477,6 @@ class TestEndToEnd:
 
         reconcile(conn, logger)
 
-        # X garde la publication d'origine ; Y est parti sur un autre publication (créé).
         assert _source_record_state(conn, source_record_x) == (publication, False)
         y_publication, y_dirty = _source_record_state(conn, source_record_y)
         assert y_publication != publication
@@ -417,7 +485,7 @@ class TestEndToEnd:
         assert _publication_exists(conn, y_publication)
 
     def test_two_theses_sharing_title_year_merged(self, sa_sync_conn):
-        """Deux thèses cross-source, même titre (long) + année, sans DOI/NNT/hal partagé → fusion par token bloc métadonnée."""
+        """Deux thèses de sources différentes, de même titre long et même année, sans DOI, NNT ni hal-id commun, sont fusionnées par bloc de métadonnées."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -449,7 +517,7 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_b) == (anchor, False)
 
     def test_distinct_dois_not_merged(self, sa_sync_conn):
-        """Deux publications à DOI distincts partageant un hal_id : pas de fusion (cannot-link DOI)."""
+        """Deux publications de DOI distincts qui partagent un hal-id restent séparées : deux DOI distincts interdisent la fusion."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn, doi="10.1/x")
         publication_b = _seed_publication(conn, doi="10.2/y")
@@ -465,7 +533,7 @@ class TestEndToEnd:
 
         assert _publication_exists(conn, publication_a)
         assert _publication_exists(conn, publication_b)
-        # Drapeaux nettoyés malgré l'absence de fusion (les enregistrements sources ont été réconciliées).
+        # Sans fusion, les enregistrements sources réconciliés quittent la file.
         assert _source_record_state(conn, source_record_a)[1] is False
         assert _source_record_state(conn, source_record_b)[1] is False
 
@@ -608,7 +676,7 @@ class TestMetadataBlock:
     LONG = "une communication scientifique au titre assez long"
 
     def test_two_conference_papers_merged(self, sa_sync_conn):
-        """Deux conference_paper cross-source, même titre (long) + année, sans DOI → fusion par token bloc."""
+        """Deux communications de sources différentes, de même titre long et même année, sans DOI, sont fusionnées par bloc de métadonnées."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -640,7 +708,7 @@ class TestMetadataBlock:
         assert _source_record_state(conn, source_record_b) == (anchor, False)
 
     def test_short_title_not_merged(self, sa_sync_conn):
-        """Titre court (≤ seuil) → pas de token bloc, pas de fusion (garde de longueur)."""
+        """Un titre court, sous le seuil de longueur, est exclu du bloc de métadonnées : pas de fusion."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -667,7 +735,7 @@ class TestMetadataBlock:
         assert _source_record_state(conn, source_record_b)[1] is False
 
     def test_different_doc_type_not_merged(self, sa_sync_conn):
-        """Même titre long + année mais doc_type différents → pas de fusion (doc_type dans la clé)."""
+        """Même titre long et même année, mais types différents : pas de fusion, le type fait partie du bloc."""
         conn = sa_sync_conn
         publication_a = _seed_publication(conn)
         publication_b = _seed_publication(conn)
@@ -691,7 +759,7 @@ class TestMetadataBlock:
 
 
 class TestMarkForReconciliation:
-    """Primitive de re-matérialisation : marquage total ou ciblé (CLI maintenance + flag rebuild)."""
+    """Marquage pour la réconciliation, total ou ciblé, utilisé par le script de maintenance et l'option `rebuild`."""
 
     def test_mark_all(self, sa_sync_conn):
         conn = sa_sync_conn
@@ -713,25 +781,33 @@ class TestMarkForReconciliation:
         conn = sa_sync_conn
         source_record = _source_record(conn, source_id="d", doc_type="poster", marked=False)
         assert mark_for_reconciliation(conn, "doc_type = 'poster'", dry_run=True) >= 1
-        assert _source_record_state(conn, source_record)[1] is False  # dry-run n'écrit pas
+        assert _source_record_state(conn, source_record)[1] is False  # rien d'écrit en simulation
 
 
 class TestUniverseMatchesPythonTokens:
-    """Différentiel anti-divergence : le voisinage SQL (branches d'univers) relie exactement les
-    enregistrement source que les tokens Python (`project_confirmation_keys`) relient. Les deux encodages du même
-    critère d'égalité doivent s'accorder — surtout la garde de longueur `metadata_block`.
+    """Le voisinage SQL relie exactement les enregistrements sources que relient les tokens Python (`project_confirmation_keys`), garde de longueur du bloc de métadonnées comprise.
 
-    Pour chaque enregistrement source, on le marque seul dirty et on compare son voisinage 1-hop SQL à l'ensemble
-    des enregistrements sources dont les tokens Python intersectent les siens.
+    Chaque enregistrement source est marqué seul ; son voisinage SQL est comparé aux enregistrements sources dont les tokens Python ont une intersection avec les siens.
     """
 
     def test_sql_universe_matches_python_token_linkage(self, sa_sync_conn_owner):
         conn = sa_sync_conn_owner
         long_a, long_b = "a" * 40, "b" * 40
-        len30 = "c" * 30  # juste SOUS le seuil strict > 30 → pas de token metadata_block
+        len30 = "c" * 30  # au seuil : pas de bloc de métadonnées, qui exige plus de 30 caractères
+        _add_doi_target(conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
         ids = [
             _source_record(conn, source_id="doi1", doi="10.1/x", marked=False),
             _source_record(conn, source_id="doi2", doi="10.1/x", marked=False),
+            # Le DOI d'une version a pour cible celui du concept.
+            _source_record(conn, source_id="version", doi="10.5281/zenodo.101", marked=False),
+            _source_record(conn, source_id="concept", doi="10.5281/zenodo.100", marked=False),
+            # DOI secondaires : la copie d'archive relie `work` à l'article.
+            _source_record(
+                conn,
+                source_id="work",
+                marked=False,
+                identifiers=_ids(SourceIdentifierType.DOI, _SECONDARY, "10.1/x", "10.9/copie"),
+            ),
             # hal-00000002 est la clé de hal2, pas celle de hal1 : les deux restent séparés.
             _source_record(
                 conn,
@@ -745,9 +821,7 @@ class TestUniverseMatchesPythonTokens:
                 marked=False,
                 identifiers=_hal(_SECONDARY, "hal-00000002", "hal-00000003"),
             ),
-            # Préfixe de collection institutionnelle : le VO HALId doit l'accepter comme token
-            # (sinon le SQL les rapproche mais le clustering Python non → divergence + non-fusion).
-            # Le numéro fait 8 chiffres (docid CCSD), exigence du VO.
+            # Hal-id à préfixe de collection institutionnelle : le value object `HALId` l'accepte comme token, comme le SQL. Le numéro a 8 chiffres, comme l'exige `HALId`.
             _source_record(
                 conn,
                 source_id="emse1",
@@ -804,19 +878,21 @@ class TestUniverseMatchesPythonTokens:
             r.id: r
             for r in conn.execute(
                 text(
-                    f"SELECT id, doi, {identifiers_json_sql('id')} AS identifiers, doc_type,"
+                    f"SELECT id, {identifiers_json_sql('id')} AS identifiers, doc_type,"
                     " title_normalized, publication_year FROM source_records WHERE id = ANY(:ids)"
                 ).bindparams(bindparam("ids")),
                 {"ids": ids},
             )
         }
+        identifiers = {i: parse_identifiers(r.identifiers) for i, r in rows.items()}
+        doi_targets = fetch_doi_targets(conn, (x for ids_ in identifiers.values() for x in ids_))
         toks = {
             i: project_confirmation_keys(
-                r.doi,
-                parse_identifiers(r.identifiers),
+                identifiers[i],
                 r.doc_type,
                 r.title_normalized,
                 r.publication_year,
+                doi_targets,
             ).tokens()
             for i, r in rows.items()
         }
@@ -834,19 +910,16 @@ class TestUniverseMatchesPythonTokens:
 
 
 class TestExternalDoiCarrier:
-    """Régression : une publication orpheline (sans enregistrement source) qui a un DOI — état typique après un
-    TRUNCATE + réimport des sources — ne doit pas faire planter la réconciliation. Les enregistrements sources fraîches
-    qui ont ce DOI s'y rattachent au lieu de créer une publication neuve (qui violerait l'unicité du DOI)."""
+    """Régression : une publication sans enregistrement source, avec un DOI, faisait échouer la réconciliation. Les enregistrements sources de ce DOI s'y rattachent ; une publication créée aurait le même DOI."""
 
     def test_orphan_publication_with_doi_is_reused_not_duplicated(self, sa_sync_conn):
         conn = sa_sync_conn
         orphan_publication = _seed_publication(
             conn, doi="10.70675/abc"
-        )  # a le DOI, aucun enregistrement source
+        )  # DOI, sans enregistrement source
         sp1 = _source_record(conn, source_id="t1", title_normalized="t", doi="10.70675/abc")
         sp2 = _source_record(conn, source_id="t2", doi="10.70675/abc")
-        # in_perimeter → sans le correctif, ce groupe d'orphelins serait une CRÉATION et
-        # planterait sur publications_doi_lower_key ; avec, il s'ancre sur la publication existante.
+        # Avec une contribution source du périmètre, ces orphelins créeraient une publication au DOI déjà pris (`publications_doi_lower_key`).
         insert_source_contribution(
             conn, sp1, source="openalex", author_position=None, in_perimeter=True
         )
@@ -866,31 +939,25 @@ def _distinct_dois(conn, publication_id) -> set[str]:
     return set(
         conn.execute(
             text(
-                "SELECT DISTINCT doi FROM source_records "
-                "WHERE publication_id = :id AND doi IS NOT NULL"
+                f"SELECT {source_record_doi_sql('sr')} FROM source_records sr"
+                " WHERE sr.publication_id = :id"
             ),
             {"id": publication_id},
         ).scalars()
-    )
+    ) - {None}
 
 
 class TestStaleMembership:
-    """Régression : une source_record rattachée par une clé de confirmation qui disparaît
-    ensuite doit être détachée, pas laissée sur une publication que plus rien ne lui associe.
+    """Régression : un enregistrement source restait sur une publication après la disparition de la clé qui l'y rattachait.
 
-    Cas typique : une préversion arXiv rejoint la publication tant que l'enregistrement OpenAlex
-    porte le DOI de la préversion, puis la source bascule sur le DOI de la version publiée. Le
-    voisinage 1-hop se calcule sur les clés d'après : la préversion n'y figure dans aucun bras, et
-    seul le marquage des source_records co-rattachées la ramène dans la
-    passe. Sans elle, la publication porte deux DOI distincts.
+    Exemple : une préversion arXiv rejoint la publication tant que l'enregistrement OpenAlex a le DOI de la préversion, puis OpenAlex donne le DOI de la version publiée. Le voisinage se calcule sur les clés à jour, sans la préversion. Seul le marquage des autres enregistrements sources de la publication la fait entrer dans la passe ; sans lui, la publication garde deux DOI distincts.
     """
 
     PREPRINT_DOI = "10.48550/arxiv.2409.20505"
     PUBLISHED_DOI = "10.1016/j.tcs.2026.116186"
 
     def _seed_drifted_pair(self, conn) -> tuple[int, int, int]:
-        """Une publication au DOI de préversion, ses deux enregistrements sources, et plus aucune clé partagée entre
-        elles : DOI distincts, aucun identifiant commun, titres absents (pas de token bloc)."""
+        """Une publication au DOI de la préversion, et ses deux enregistrements sources sans clé commune : DOI distincts, aucun identifiant commun, titres absents."""
         publication = _seed_publication(conn, doi=self.PREPRINT_DOI)
         preprint = _source_record(
             conn,
@@ -904,8 +971,7 @@ class TestStaleMembership:
         return publication, preprint, published
 
     def test_siblings_of_a_dirty_source_record_are_marked(self, sa_sync_conn):
-        """La propagation marque les co-rattachées, et elles seules : ni les enregistrements sources d'une autre
-        publication, ni les orphelines."""
+        """Seuls les autres enregistrements sources de la publication sont marqués, à l'exclusion de ceux d'une autre publication et des orphelins."""
         conn = sa_sync_conn
         _, preprint, _ = self._seed_drifted_pair(conn)
         other = _source_record(conn, _seed_publication(conn), source_id="other", marked=False)
@@ -925,7 +991,7 @@ class TestStaleMembership:
         preprint_publication, preprint_dirty = _source_record_state(conn, preprint)
         published_publication, published_dirty = _source_record_state(conn, published)
         assert preprint_publication != published_publication
-        # Ancre = porteur du DOI : la publication reste à la préversion, dont elle porte le DOI.
+        # L'ancre est l'enregistrement source du DOI de la publication : la publication reste à la préversion.
         assert preprint_publication == publication
         assert (preprint_dirty, published_dirty) == (False, False)
         assert _distinct_dois(conn, preprint_publication) == {self.PREPRINT_DOI}

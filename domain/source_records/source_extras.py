@@ -19,7 +19,7 @@ class SourceExtra(StrEnum):
     RELATION = "relation"
     """Relations déclarées, par type de relation (Crossref)."""
     CONFERENCE = "conference"
-    """Nom et acronyme du congrès dont l'enregistrement est issu (Crossref)."""
+    """Nom et acronyme du congrès dont l'enregistrement source est issu (Crossref)."""
     GROUP_TITLE = "group_title"
     """Forme de présentation d'un `posted-content` (Crossref : `oral`, `pico`, `display`)."""
     REFERENCES_COUNT = "references_count"
@@ -55,9 +55,9 @@ class SourceExtra(StrEnum):
 
 
 CROSSREF_PREPRINT_OF = "is-preprint-of"
-"""Type de relation Crossref d'un enregistrement qui est le preprint d'une autre œuvre."""
+"""Type de relation Crossref d'un enregistrement source qui est le preprint d'une autre œuvre."""
 
 
 def declares_conference(source_extras: Mapping[str, JsonValue] | None) -> bool:
-    """L'enregistrement nomme le congrès dont il est issu."""
+    """Vrai si l'enregistrement source nomme le congrès dont il est issu."""
     return SourceExtra.CONFERENCE in (source_extras or {})

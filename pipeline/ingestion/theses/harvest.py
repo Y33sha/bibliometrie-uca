@@ -43,7 +43,7 @@ def build_query(ppns: list[str]) -> str:
 def list_theses(
     client: ThesesClient, ppns: list[str], progress: Progress, *, years: list[int]
 ) -> tuple[int, list[str]]:
-    """`(thèses parcourues, identifiants retenus)` des établissements, page après page.
+    """Nombre de thèses parcourues et identifiants retenus des établissements, page après page.
 
     Retient les thèses soutenues l'une des années `years` (NNT commençant par l'année), et toutes les thèses en cours. `progress` compte les thèses parcourues, et retient celles que le filtre garde.
     """
@@ -81,7 +81,7 @@ def staged_theses_ids(conn: Connection) -> set[str]:
 
 
 def stage_details(conn: Connection, log: logging.Logger, theses_ids: list[str]) -> PhaseMetrics:
-    """Lit le détail des thèses `theses_ids` et l'écrit dans `staging`. Une thèse que la recherche liste et dont le détail est introuvable reste hors de `staging`."""
+    """Lit le détail des thèses données et l'écrit dans `staging`. Une thèse que la recherche liste et dont le détail est introuvable reste hors de `staging`."""
     return asyncio.run(
         look_up(
             conn,

@@ -1,6 +1,6 @@
-"""Adapter OpenAlex Sources → enrichissement des revues (`serials`).
+"""Client OpenAlex des sources : type de source des revues.
 
-Interroge l'endpoint OpenAlex Sources par lots d'IDs (filtre à pipe `|`, jusqu'à 50 par requête) pour en tirer le type de source. Le HTTP passe par le helper partagé `http_request_with_retry` : retry, backoff et alimentation du circuit-breaker de source (429 / 5xx / réseau) sont gérés là. L'orchestrateur `application` ne reçoit qu'un callable de fetch et ne consulte que l'état du breaker.
+Interroge `/sources` par lots d'identifiants (filtre à `|`, 50 au plus par requête). Les requêtes passent par `http_request_with_retry` : nouvelles tentatives, backoff et circuit-breaker de la source. La sous-étape qui l'emploie reçoit seulement la fonction de requête, et consulte l'état du circuit-breaker.
 """
 
 from __future__ import annotations
@@ -25,9 +25,9 @@ def fetch_sources_batch(
     *,
     openalex_sources_api: str,
 ) -> dict[str, str | None]:
-    """Interroge OpenAlex Sources pour un lot d'IDs.
+    """Type brut de chaque source d'un lot, par identifiant court.
 
-    Retourne `short_id → raw_type`. Retourne `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les retries ; l'appelant consulte l'état du circuit-breaker pour décider d'arrêter.
+    Un lot refusé (4xx), ou qui reste sans réponse après les nouvelles tentatives, renvoie `{}` ; l'appelant consulte le circuit-breaker pour s'arrêter.
     """
     full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     params: dict[str, str] = {

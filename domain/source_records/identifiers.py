@@ -69,6 +69,21 @@ def active(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
     return [i for i in identifiers if i.removed_by is None]
 
 
+def own_dois(identifiers: Iterable[SourceIdentifier]) -> set[str]:
+    """DOI propres d'un enregistrement source parmi `identifiers` : ses DOI `primary` ou `derived`, à défaut ses DOI `secondary`."""
+    dois = [
+        i
+        for i in identifiers
+        if i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
+    ]
+    strong = {
+        i.value
+        for i in dois
+        if i.role in (SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED)
+    }
+    return strong or {i.value for i in dois}
+
+
 def with_removals(
     identifiers: Iterable[SourceIdentifier],
     owned_rules: Set[str],

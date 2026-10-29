@@ -1,4 +1,4 @@
-"""Tests des règles pures de matching de contributions à des personnes."""
+"""Règles de matching des contributions à des personnes."""
 
 from domain.persons.contributor_name import ContributorName
 from domain.persons.matching import (
@@ -92,29 +92,26 @@ class TestDecideNameFormOutcome:
         assert decision == NameFormDecision(action="create")
 
     def test_no_match_without_allow_create_skips(self):
-        """Cas typique : rôle non-auteur d'une thèse, person inconnue."""
+        """Forme de nom inconnue, création interdite (membre du jury d'une thèse, par exemple) : aucun rattachement."""
         decision = decide_name_form_outcome(None, allow_create=False)
         assert decision.action == "skip"
         assert decision.reason == "creation_not_allowed"
 
     def test_multiple_person_ids_overrides_allow_create(self):
-        """Ambiguïté de nom → skip même si la création est autorisée
-        (on ne crée pas une personne quand des homonymes existent)."""
+        """Plusieurs personnes ont la forme de nom, création interdite : l'ambiguïté motive le refus."""
         decision = decide_name_form_outcome([42, 17], allow_create=False)
         assert decision.action == "skip"
         assert decision.reason == "ambiguous_name_form"
 
     def test_rejected_candidate_eliminated_disambiguates(self):
-        """2 candidats dont 1 rejeté pour la publi → l'élimination ne laisse
-        qu'une candidate → match univoque (désambiguïsation par élimination)."""
+        """Deux candidates, dont une rejetée pour la publication : la contribution est rattachée à l'autre."""
         decision = decide_name_form_outcome(
             [42, 17], allow_create=True, rejected_person_ids=frozenset({17})
         )
         assert decision == NameFormDecision(action="match", person_id=42)
 
     def test_single_rejected_candidate_skips(self):
-        """Unique candidate rejetée pour la publi → orpheline, pas de match,
-        pas de création (on ne crée pas une personne pour une paire rejetée)."""
+        """Seule candidate rejetée pour la publication : ni rattachement, ni création."""
         decision = decide_name_form_outcome(
             [42], allow_create=True, rejected_person_ids=frozenset({42})
         )
@@ -138,7 +135,7 @@ class TestDecideNameFormOutcome:
         assert decision == NameFormDecision(action="skip", reason="ambiguous_name_form")
 
     def test_unknown_form_compatible_person_rejected_skips(self):
-        """La seule personne compatible est rejetée pour la publication : orpheline, pas de création."""
+        """La seule personne compatible est rejetée pour la publication : ni rattachement, ni création."""
         decision = decide_name_form_outcome(
             None, allow_create=True, rejected_person_ids=frozenset({42}), compatible_person_ids=[42]
         )
@@ -154,7 +151,7 @@ class TestCompatibleNamesakes:
         assert compatible_namesakes("Abdellah", [Namesake(1, "Tnourji", "A.")]) == [1]
 
     def test_reduced_name_finds_the_compound_first_name(self):
-        """« A. » prolonge « Abdul-Majeed », dont les formes à initiales ne donnent que « a m »."""
+        """« A. » prolonge « Abdul-Majeed », dont les formes à initiales donnent seulement « a m »."""
         assert compatible_namesakes("A.", [Namesake(1, "Al-Izeri", "Abdul-Majeed")]) == [1]
 
     def test_reduced_name_finds_every_compatible_person(self):
@@ -257,7 +254,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection is None
 
     def test_incompatible_name_rejected(self):
-        """Sans verdict, nom incompatible → match refusé (test de tokens), rejet journalisé."""
+        """Sans verdict sur la forme de nom, un nom incompatible fait refuser le rattachement, et le rejet est rendu."""
         idref_map = {"252404955": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
             "252404955", idref_map, _contribution("Paul Martin"), ("paul martin",), {}
@@ -266,8 +263,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection == (42, "jean dupont")
 
     def test_confirmed_name_form_matches_without_token_test(self):
-        """Forme confirmée pour la personne → match même si les tokens divergeraient
-        (changement de nom : « Van Lander » confirmée pour « Maneval »)."""
+        """Une forme de nom confirmée pour la personne la rattache, même à tokens incompatibles (changement de nom : « Van Lander » confirmée pour « Maneval »)."""
         idref_map = {"x": IdentifiedPerson(42, "maneval", "axelle")}
         status = {("van lander axelle", 42): "confirmed"}
         result = decide_match_by_identifier(
@@ -277,7 +273,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection is None
 
     def test_rejected_name_form_refused_even_if_compatible(self):
-        """Forme rejetée pour la personne → refus même si les tokens seraient compatibles."""
+        """Une forme de nom rejetée pour la personne fait refuser le rattachement, même à tokens compatibles."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         status = {("jean dupont", 42): "rejected"}
         result = decide_match_by_identifier(
@@ -293,7 +289,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection is None
 
     def test_falsy_value_returns_empty(self):
-        """Pas de tentative de lookup si la valeur est vide/None."""
+        """Une valeur vide ou `None` laisse la contribution sans rattachement."""
         m = {"foo": IdentifiedPerson(1, "a", "b")}
         assert decide_match_by_identifier(None, m, _contribution("X"), ("x",), {}).person_id is None
         assert decide_match_by_identifier("", m, _contribution("X"), ("x",), {}).person_id is None
@@ -305,8 +301,7 @@ class TestDecideMatchByIdentifier:
         )
 
     def test_surname_only_source_contribution_not_rejected(self):
-        """Contribution source trop pauvre (nom seul) : compatible (sous-ensemble de tokens),
-        donc pas de refus — on s'abstient plutôt que de rejeter."""
+        """Contribution source réduite au nom de famille : ses tokens sont un sous-ensemble du nom de la personne, donc compatibles."""
         idref_map = {"x": IdentifiedPerson(42, "dupont", "jean")}
         result = decide_match_by_identifier(
             "x", idref_map, _contribution("Dupont"), ("dupont",), {}
@@ -315,7 +310,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection is None
 
     def test_works_for_orcid_too(self):
-        """La fonction est générique : même contrat pour IdRef et ORCID."""
+        """Même règle pour un ORCID que pour un IdRef."""
         orcid_map = {"0000-0001-2345-6789": IdentifiedPerson(7, "curie", "marie")}
         result = decide_match_by_identifier(
             "0000-0001-2345-6789", orcid_map, _contribution("Marie Curie"), ("marie curie",), {}
@@ -323,8 +318,7 @@ class TestDecideMatchByIdentifier:
         assert result.person_id == 7
 
     def test_graphie_variant_corroborates(self):
-        """Variante de graphie du propriétaire (faute de frappe) : corrobore et se
-        rattache, au lieu d'être rejetée puis dédoublée au canal nominal."""
+        """Une graphie proche de celle de la personne (faute de frappe) confirme le rattachement."""
         idref_map = {"x": IdentifiedPerson(42, "khalil", "toufik")}
         result = decide_match_by_identifier(
             "x", idref_map, _contribution("Toufic Khalil"), ("toufic khalil",), {}
@@ -333,8 +327,7 @@ class TestDecideMatchByIdentifier:
         assert result.rejection is None
 
     def test_surname_homonym_still_rejected(self):
-        """Même patronyme, prénom franchement autre : reste rejeté (pas de fausse
-        corroboration par graphie)."""
+        """Même nom de famille, prénom franchement autre : le rattachement est refusé."""
         idref_map = {"x": IdentifiedPerson(42, "chanal", "helene")}
         result = decide_match_by_identifier(
             "x", idref_map, _contribution("Herve Chanal"), ("herve chanal",), {}

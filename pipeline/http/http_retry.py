@@ -1,16 +1,11 @@
-"""Requêtes HTTP avec retry, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
+"""Requêtes HTTP avec nouvelles tentatives, backoff exponentiel et circuit-breaker, en versions synchrone et asynchrone.
 
-`http_request_with_retry` émet une requête httpx2 synchrone (moissonneurs page à page, clients de préfixes DOI) ; `http_request_with_retry_async` s'appuie sur un `httpx2.AsyncClient` partagé entre coroutines (recherche par DOI de la phase `fetch_missing`, enrichissements concurrents), et `http_get_text_with_retry_async` rend le corps de la réponse en texte (notices XML du Sudoc). `lookup_json_async` classe la requête d'un élément en issue : trouvé, absent, source indisponible.
+- 429, 5xx, erreur réseau, corps vide (si `retry_on_empty_body`) ou corps illisible : pause de `initial_backoff * 2^attempt`, puis nouvelle tentative, jusqu'à `max_retries` tentatives. L'épuisement compte un échec au circuit-breaker et lève `SourceUnavailableError`.
+- Autre 4xx (404…) : `httpx2.HTTPStatusError` immédiate, réponse définitive de la source.
 
-Le classement d'une tentative (`_classify`) et l'épuisement (`_exhausted`) sont communs. Chaque enveloppe porte seulement l'I/O de son client et l'attente (`time.sleep` / `asyncio.sleep`).
+Une redirection est suivie seulement pour une requête GET, vers le même hôte, et une fois : Crossref redirige ainsi un DOI alias vers son DOI principal. Toute autre redirection est une erreur : l'hôte joint reste celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
 
-Politique de retry :
-  - 429 (Too Many Requests), 5xx, erreur réseau, corps vide (si `retry_on_empty_body`) ou corps illisible : pause `initial_backoff * 2^attempt` puis retry, jusqu'à `max_retries` tentatives. L'épuisement compte un échec au circuit-breaker et lève `SourceUnavailableError`.
-  - autres 4xx (404…) : `httpx2.HTTPStatusError` immédiate, sans retry ni comptage (réponse définitive de la source).
-
-Une redirection n'est suivie que vers le même hôte, pour une requête GET, et une seule fois : Crossref redirige ainsi un DOI alias vers son DOI principal. Toute autre redirection — autre hôte, autre méthode, second saut — est traitée comme une erreur. L'hôte joint reste celui qu'`api_params` désigne, et les en-têtes d'authentification ne quittent pas leur destinataire.
-
-Circuit-breaker : chaque requête s'exécute sous le `SourceCircuitBreaker` que l'accès à la source pose dans la ContextVar. Il court-circuite les requêtes quand la source cumule trop d'échecs consécutifs, et se remet à zéro au succès. Chaque tentative attend son tour au rythme de la source (`breaker.pace`). Une requête émise hors de l'accès à une source lève `RuntimeError`.
+Chaque tentative attend son tour au rythme de la source, et compte au circuit-breaker que pose l'accès à la source (`access_source`). Hors de cet accès, une requête lève `RuntimeError`.
 """
 
 from __future__ import annotations
@@ -110,7 +105,7 @@ def _log_retry(reason: str, label: str, wait: float, attempt: int, max_retries: 
 def _exhausted(
     breaker: SourceCircuitBreaker, label: str, reason: str, max_retries: int
 ) -> SourceUnavailableError:
-    """Compte l'échec au breaker et rend l'erreur à lever."""
+    """Compte l'échec au breaker et renvoie l'erreur à lever."""
     breaker.record_failure()
     logger.error("Échec après %s tentatives %s : %s", max_retries, label, reason)
     return SourceUnavailableError(breaker.source)
@@ -130,7 +125,7 @@ def http_request_with_retry(
     retry_on_empty_body: bool = False,
     label: str = "",
 ) -> JsonValue:
-    """Requête HTTP synchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
+    """Requête HTTP synchrone, selon la politique du module.
 
     `max_retries=3` avec le backoff par défaut donne des pauses de 1 et 2 s. `label` : chaîne courte (ex. "year 2024, rec 100") insérée dans les logs. Le corps est rendu tel que la source l'a écrit : la plupart répondent par un objet, `doi.org/ra` par un tableau — l'appelant en tire la forme qu'il attend (`as_mapping`, `as_sequence`).
     """
@@ -184,9 +179,9 @@ async def http_request_with_retry_async(
     retry_on_empty_body: bool = False,
     label: str = "",
 ) -> JsonValue:
-    """Requête HTTP asynchrone avec retry, backoff et circuit-breaker (politique cf. docstring du module).
+    """Requête HTTP asynchrone, selon la politique du module.
 
-    Le `httpx2.AsyncClient` est partagé entre les coroutines d'un même run (connexions poolées). `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs. Le corps est rendu tel que la source l'a écrit, comme pour la variante synchrone.
+    Les coroutines d'un même run partagent le `httpx2.AsyncClient` et ses connexions. `label` : chaîne courte (ex. "DOI 10.xxx") pour distinguer les requêtes concurrentes dans les logs. Le corps est rendu tel que la source l'a écrit, comme pour la variante synchrone.
     """
     return await _request_with_retry_async(
         client,
@@ -262,7 +257,7 @@ async def http_get_text_with_retry_async(
     initial_backoff: float = 1.0,
     label: str = "",
 ) -> str:
-    """Requête GET asynchrone qui rend le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry_async`. Un corps vide est retenté."""
+    """Requête GET asynchrone qui renvoie le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry_async`. Un corps vide est retenté."""
     return await _request_with_retry_async(
         client,
         "GET",

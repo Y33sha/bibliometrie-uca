@@ -21,6 +21,7 @@ swap:
   "dans le but de": "pour"
   "procéder à (la|une) vérification": "vérifier"
   "un certain nombre de": "plusieurs"
+  "(DOI|identifiants?) (actifs? )?non liés?": "<type> de rôle autre que `related` (valeurs de l'enum des rôles)"
   "curation": "édition manuelle, correction à la main, décision humaine"
   "cur(at)?ée?s?": "saisi à la main, corrigé à la main"
   "canoniques?": "référentiel"

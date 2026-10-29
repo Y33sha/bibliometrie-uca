@@ -1,7 +1,4 @@
-"""Règles métier sur les métadonnées de publication — domain services purs sans état d'instance.
-
-Catch-all pour les règles qui touchent aux métadonnées d'une publication (oa_status, titre canonique, …) et n'ont pas de meilleure cible. À mesure qu'un type d'opération gagne en volume, il peut sortir dans son propre module.
-"""
+"""Règles sur les métadonnées d'une publication : statut open access, titre, métadonnées minimales."""
 
 import re
 from collections.abc import Iterable
@@ -12,7 +9,7 @@ from domain.normalize import normalize_text
 
 
 class OaStatus(StrEnum):
-    """Statut d'accès ouvert d'une publication — les membres portent les libellés de l'enum PostgreSQL `oa_type`."""
+    """Statut open access d'une publication. Reflet du type PostgreSQL `oa_type`."""
 
     DIAMOND = "diamond"
     GOLD = "gold"
@@ -24,11 +21,7 @@ class OaStatus(StrEnum):
     UNKNOWN = "unknown"
 
 
-# ── Agrégation multi-sources du statut OA ───────────────────────────
-
-# Classement des statuts OA : plus la valeur est grande, plus le
-# statut est « ouvert ». Utilisé par `best_oa_status` pour choisir le
-# statut le plus ouvert entre plusieurs sources.
+# Rang des statuts open access, du moins ouvert au plus ouvert.
 OA_RANK: dict[str, int] = {
     OaStatus.DIAMOND: 8,
     OaStatus.GOLD: 7,
@@ -40,23 +33,13 @@ OA_RANK: dict[str, int] = {
     OaStatus.UNKNOWN: 1,
 }
 
-# Vocabulaire de l'enum SQL `oa_status`. Chaque statut porte un rang dans `OA_RANK` :
-# les clés du classement énumèrent l'ensemble des statuts. Valide le filtre `oa_status`
-# des lectures ; une valeur hors vocabulaire est refusée.
+# Statuts open access, qui valident le filtre `oa_status` des lectures.
 OA_STATUSES: frozenset[str] = frozenset(OA_RANK)
 
-# Valeur canonique de `publications.oa_status` quand aucune source n'a
-# de signal exploitable. Convention : `source_records.oa_status`
-# accepte NULL (= la source ne s'est pas prononcée), mais au niveau
-# canonique on matérialise l'absence de signal par 'unknown' (vraie
-# valeur de l'enum, classée en queue d'`OA_RANK`). À utiliser comme
-# fallback après `best_oa_status(...)` ou pour défaut sur
-# `source_records.oa_status` orphelin.
+# Statut d'une publication sans signal des sources. Le statut d'un enregistrement source sans signal est `NULL`.
 OA_STATUS_UNKNOWN_DEFAULT = OaStatus.UNKNOWN
 
-# Ventilation des statuts en trois niveaux d'accès : `oa_status` est la forme fine,
-# l'accès la forme grossière. Chaque statut appartient à un niveau et à un seul, et les
-# trois niveaux couvrent `OA_RANK` — ce qu'un test du domaine vérifie.
+# Niveaux d'accès, plus grossiers que les statuts. Chaque statut appartient à un seul niveau.
 ACCESS_LEVELS: dict[str, frozenset[str]] = {
     "open": frozenset(
         {OaStatus.DIAMOND, OaStatus.GOLD, OaStatus.HYBRID, OaStatus.BRONZE, OaStatus.GREEN}
@@ -67,19 +50,15 @@ ACCESS_LEVELS: dict[str, frozenset[str]] = {
 
 OA_OPEN_STATUSES: frozenset[str] = ACCESS_LEVELS["open"]
 
-# Statuts « non-ouverts » : aucun signal d'open access exploitable. Une archive
-# ouverte attestant un dépôt, ou un embargo connu, priment sur eux (`publication_oa_status`).
+# Statuts sans signal d'open access.
 OA_CLOSED_STATUSES: frozenset[str] = ACCESS_LEVELS["closed"]
 
-# Sources qui sont des archives ouvertes : quand l'une déclare `green`, elle atteste un FICHIER
-# déposé et lisible (pas une estimation à distance). Ce dépôt est un fait — un `closed` d'Unpaywall,
-# qui ne voit pas ce fichier sous le DOI, ne peut pas le refermer (`publication_oa_status`). HAL ;
-# le `green` HAL vient d'un dépôt effectif ou d'un lien arXiv/PMC (cf. `derive_hal_oa_status`).
+# Sources qui sont des archives ouvertes.
 OPEN_ARCHIVE_SOURCES: frozenset[str] = frozenset({"hal"})
 
 
 class _OaSignalSource(Protocol):
-    """Forme minimale lue par `has_open_archive_deposit` : la provenance et le statut OA d'une `source_record`. Membres en lecture seule (propriétés) pour accepter aussi bien un dataclass mutable qu'un `frozen` (comme `SourceRecord`)."""
+    """Enregistrement source réduit à sa source et à son statut open access."""
 
     @property
     def source(self) -> str: ...
@@ -88,17 +67,12 @@ class _OaSignalSource(Protocol):
 
 
 def has_open_archive_deposit(sources: Iterable[_OaSignalSource]) -> bool:
-    """Vrai si une archive ouverte (`OPEN_ARCHIVE_SOURCES`) atteste un dépôt avec fichier (`green`).
-
-    Un tel dépôt est un fait : il prime sur un `closed`/`unknown` d'Unpaywall (lequel ne voit pas le fichier sous le DOI). Le `hybrid` ne compte pas — c'est un lien éditeur relayé par l'archive, sans fichier déposé."""
+    """Vrai si une archive ouverte déclare un dépôt avec fichier (`green`). Le `green` de HAL vient d'un dépôt ou d'un lien arXiv ou PubMed Central (`derive_hal_oa_status`)."""
     return any(s.source in OPEN_ARCHIVE_SOURCES and s.oa_status == OaStatus.GREEN for s in sources)
 
 
 def best_oa_status(statuses: Iterable[str | None]) -> str | None:
-    """Retourne le statut OA le plus ouvert parmi `statuses`.
-
-    Ordre décroissant : diamond > gold > hybrid > bronze > green > closed > unknown. Les valeurs None, vides ou inconnues sont ignorées. Retourne None si aucune valeur exploitable n'est fournie.
-    """
+    """Statut le plus ouvert selon `OA_RANK`, ou `None`. Les valeurs vides ou inconnues sont ignorées."""
     best: str | None = None
     best_rank = 0
     for s in statuses:
@@ -113,7 +87,7 @@ def best_oa_status(statuses: Iterable[str | None]) -> str | None:
 def publication_oa_status(sources: Iterable[_OaSignalSource], unpaywall: str | None) -> str:
     """Statut OA d'une publication, à partir de ses sources et du verdict d'Unpaywall sur son DOI (`None` : DOI non vérifié ou absent d'Unpaywall).
 
-    Sans verdict, le statut le plus ouvert des sources. Le verdict l'emporte, sauf dans trois cas où le statut des sources tient : diamond face à gold, qu'Unpaywall ne distingue pas ; embargoed face à closed ou unknown ; un dépôt en archive ouverte face à closed ou unknown.
+    Sans verdict, le statut le plus ouvert des sources. Le verdict l'emporte, sauf dans trois cas où le statut des sources tient : diamond face à gold, qu'Unpaywall ne distingue pas ; embargoed face à closed ou unknown ; un dépôt en archive ouverte face à closed ou unknown, Unpaywall ne voyant pas ce fichier sous le DOI.
     """
     sources = list(sources)
     from_sources = best_oa_status(s.oa_status for s in sources) or OA_STATUS_UNKNOWN_DEFAULT
@@ -127,14 +101,6 @@ def publication_oa_status(sources: Iterable[_OaSignalSource], unpaywall: str | N
         return from_sources
     return unpaywall
 
-
-# ── Canonicalisation des titres double-encodés HTML ─────────────────
-#
-# OpenAlex et ScanR remontent parfois des titres avec un encodage HTML
-# appliqué deux fois — par exemple "<i>Candida</i>" arrive en base sous
-# la forme "&amp;lt;i&amp;gt;Candida&amp;lt;/i&amp;gt;". On corrige au
-# moment d'écrire dans `publications.title` pour que la couche canonique
-# reste propre, indépendamment de la qualité du flux source.
 
 _HTML_ENTITY_NAMED = {"amp": "&", "lt": "<", "gt": ">", "quot": '"', "apos": "'"}
 _HTML_ENTITY_RE = re.compile(r"&(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);")
@@ -155,26 +121,23 @@ def _decode_html_entities_once(s: str) -> str:
 
 
 def has_minimal_publication_metadata(title: str | None, publication_year: int | None) -> bool:
-    """Indique si une publication candidate a les métadonnées minimales nécessaires à sa création.
-
-    Invariant posé à l'insertion : titre non vide ET année renseignée. Une publication sans ces deux champs n'a pas de valeur métier (pas de référence biblio consultable, pas d'année pour les statistiques) et est filtrée par les normalizers en amont de `find_or_create`.
-
-    Une `publication_year` à 0 est considérée comme absente (cas pathologique : `bool(0) is False`).
-    """
+    """Vrai si une publication candidate a un titre et une année, condition de sa création. Une année à 0 compte comme absente."""
     return bool(title) and bool(publication_year)
+
+
+TITLE_NORMALIZED_MAX_LENGTH = 2000
+
+
+def is_overlong_title(title: str | None) -> bool:
+    """Vrai si le titre normalisé dépasse `TITLE_NORMALIZED_MAX_LENGTH` caractères. Un titre aussi long réunit d'autres textes : programme de congrès, résumé, remerciements."""
+    return bool(title) and len(normalize_text(title)) > TITLE_NORMALIZED_MAX_LENGTH
 
 
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
 def clean_publication_title(title: str | None) -> str | None:
-    """Nettoie un titre pour la persistance et l'affichage.
-
-    - Décode les entités HTML jusqu'à stabilisation : `&lt;sub&gt;` → `<sub>`, `&amp;` → `&`, `&#233;` → `é`. La boucle (bornée) absorbe les flux double-échappés (`&amp;lt;`, OpenAlex / ScanR). Décoder est sûr : un `&` de contenu ("Smith & Jones") est ré-échappé au point d'affichage et réduit à un espace par `normalize_text` — rien ne consomme le titre stocké sans l'une ou l'autre de ces étapes.
-    - Collapse le whitespace parasite (newlines / tabs / espaces multiples → un seul espace, trim) : fréquent quand le markup source (MathML/HTML) est indenté dans le titre.
-
-    Conserve les balises HTML (rendues à l'affichage). Idempotent.
-    """
+    """Titre pour l'enregistrement et l'affichage : entités HTML décodées jusqu'à stabilité (`&amp;lt;` d'OpenAlex et de ScanR), espacement réduit à un espace simple. Les balises HTML restent. L'affichage ré-échappe un `&` décodé (« Smith & Jones »)."""
     if not title:
         return title
     for _ in range(4):
@@ -186,5 +149,5 @@ def clean_publication_title(title: str | None) -> str | None:
 
 
 def normalized_title(title: str | None) -> str:
-    """Forme normalisée d'un titre pour le blocking / la dédup / le matching : nettoyage HTML (`clean_publication_title`) puis `normalize_text`. Déterministe et idempotent — c'est la valeur matérialisée dans `source_records.title_normalized`, identique à ce que le matcher calcule à la volée."""
+    """Forme de comparaison d'un titre, valeur de `source_records.title_normalized`."""
     return normalize_text(clean_publication_title(title) or "")

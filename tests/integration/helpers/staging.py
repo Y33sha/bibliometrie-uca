@@ -8,12 +8,6 @@ from sqlalchemy import Connection, text
 from pipeline.ingestion.common.normalize import normalizer_builders
 from pipeline.ingestion.common.staging import StagingStore
 
-# Colonnes remises à jour quand la ligne (source, source_id) existe déjà.
-_UPSERTS = {
-    "processed": "processed = FALSE",
-    "raw_data": "processed = FALSE, raw_data = EXCLUDED.raw_data",
-}
-
 
 def insert_staging(
     conn: Connection,
@@ -26,11 +20,11 @@ def insert_staging(
     raw_hash: str | None = None,
     seen_days_ago: int | None = None,
     disappeared: bool = False,
-    upsert: str | None = None,
+    replace: bool = False,
 ) -> int:
     """Insère une ligne de staging et renvoie son `id`.
 
-    `raw_data` vaut `{}` par défaut. `seen_days_ago` recule `last_seen_at` d'autant de jours avant l'instant de la transaction ; `disappeared` date la disparition de cet instant. Une colonne laissée à `None` prend la valeur par défaut du schéma. Sur une ligne (source, source_id) existante, `upsert="processed"` la remet à traiter et `upsert="raw_data"` remplace aussi son contenu.
+    `raw_data` vaut `{}` par défaut. `seen_days_ago` recule `last_seen_at` d'autant de jours avant l'instant de la transaction ; `disappeared` date la disparition de cet instant. Une colonne laissée à `None` prend la valeur par défaut du schéma. Sur une ligne (source, source_id) existante, `replace` remplace son contenu et la remet à traiter.
     """
     values = {
         "source": source,
@@ -57,7 +51,9 @@ def insert_staging(
     columns += [column for column in expressions if column not in values]
     placeholders = [expressions.get(column, f":{column}") for column in columns]
     conflict = (
-        f" ON CONFLICT (source, source_id) DO UPDATE SET {_UPSERTS[upsert]}" if upsert else ""
+        " ON CONFLICT (source, source_id) DO UPDATE SET processed = FALSE, raw_data = EXCLUDED.raw_data"
+        if replace
+        else ""
     )
     return conn.execute(
         text(
@@ -88,7 +84,7 @@ def insert_failed_lookup(
 
 
 def normalize_pending(conn: Connection, source: str) -> int:
-    """Normalise les lignes de staging à traiter de `source`, avec le normaliseur de la phase, dans la transaction du test. Rend le nombre d'enregistrements sources normalisés."""
+    """Normalise les lignes de staging à traiter de `source`, avec le normaliseur de la phase, dans la transaction du test. Renvoie le nombre d'enregistrements sources normalisés."""
     normalizer = normalizer_builders(archive=False)[source](conn, logging.getLogger("test"))
     rows = StagingStore(conn).fetch_pending_staging(source, limit=10_000)
     return sum(1 for row in rows if normalizer.process_work(row))

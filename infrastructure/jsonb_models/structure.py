@@ -6,13 +6,11 @@ from infrastructure.jsonb_models._base import JsonbModel
 
 
 class StructureApiIds(JsonbModel):
-    """Modèle de la colonne JSONB `structures.api_ids`.
+    """Identifiants d'une structure auprès des API externes (`structures.api_ids`), par source.
 
-    Identifiants API externes d'une structure, **indexés par source**. Chaque source peut avoir 0, 1 ou plusieurs IDs (une structure fusionnée dans OpenAlex garde parfois deux entrées distinctes). Les valeurs sont des **listes de strings**, même quand il n'y a qu'un seul ID.
+    Chaque source donne une liste d'identifiants, même pour un seul : une structure fusionnée dans OpenAlex garde parfois deux entrées. Ils alimentent les filtres d'affiliation du moissonnage (`get_extraction_api_ids`).
 
-    Alimente les filtres d'affiliation à l'extraction (via `infrastructure/read_models/perimeters.py`, `get_extraction_api_ids`).
-
-    Clés strictes (whitelist `domain.sources.STRUCTURE_API_SOURCES`) : `extra="forbid"` rejette toute clé inconnue. Un test de synchronisation vérifie que les champs du modèle correspondent à la whitelist.
+    Les clés sont celles de `domain.sources.STRUCTURE_API_SOURCES` : `extra="forbid"` rejette une clé inconnue, et un test vérifie l'accord des champs avec cette liste.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -26,7 +24,7 @@ class StructureApiIds(JsonbModel):
     @field_validator("openalex", "wos", "scanr", "theses", "datacite", mode="before")
     @classmethod
     def _ensure_list(cls, v: str | list[str] | None) -> list[str] | None:
-        """Tolère un string unique en entrée en le wrappant en liste. Le résultat est toujours `list[str]` (ou None)."""
+        """Accepte une chaîne seule, mise en liste."""
         if v is None:
             return None
         if isinstance(v, str):
@@ -34,5 +32,5 @@ class StructureApiIds(JsonbModel):
         return v
 
     def to_dict(self) -> dict[str, list[str]]:
-        """Sérialise pour écriture en base (JSONB, `structures.api_ids`). Omet les clés None et les listes vides."""
+        """Sérialise pour l'écriture en base, sans les clés nulles ni les listes vides."""
         return {k: v for k, v in self.model_dump(exclude_none=True).items() if v}

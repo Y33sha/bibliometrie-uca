@@ -1,4 +1,4 @@
-"""Service des publications en série — écritures sur l'agrégat Serial.
+"""Service des publications en série : écritures sur l'agrégat Serial.
 
 Le `serial_type` d'une revue alimente des règles de correction du `doc_type` de ses publications. Après une édition ou une fusion, le pipeline rejoue ces corrections (`SerialRecompute`).
 """
@@ -45,7 +45,7 @@ class SerialService:
         self._conn = conn
 
     def update_serial(self, serial_id: int, update: SerialUpdate) -> int:
-        """Charge la revue, applique les champs explicitement fournis (`Serial.edit`), persiste. Si le `serial_type` ou le `oa_model` change effectivement, rejoue les corrections des publications de la revue : leur `doc_type` suit le type de la revue, leur statut diamant son modèle OA. Retourne le nombre de publications dont le `doc_type` change.
+        """Charge la revue, applique les champs fournis (`Serial.edit`) et l'écrit. Si son type ou son modèle open access change, rejoue les corrections de ses publications : leur type suit celui de la revue, leur statut diamant son modèle open access. Renvoie le nombre de publications dont le type change.
 
         Un `null` sur un champ obligatoire (titre, type, caractère académique) vaut champ non fourni. L'événement d'audit contient seulement les champs soumis.
 
@@ -71,7 +71,7 @@ class SerialService:
         return self.requalify_publications_for_serial(serial_id)
 
     def preview_type_change_impact(self, serial_id: int, serial_type: SerialType) -> int:
-        """Compte les publications de la revue dont le `doc_type` changerait si son `serial_type` passait à `serial_type`.
+        """Compte les publications de la revue dont le type changerait avec le type de revue donné.
 
         Applique réellement l'édition (`update_serial`) dans un `SAVEPOINT` annulé : l'aperçu emprunte le chemin exact de l'édition, et aucune écriture ne survit, ni aucun événement d'audit. Lève `NotFoundError` sur une revue inconnue, comme l'édition simulée.
         """
@@ -94,7 +94,7 @@ class SerialService:
     def requalify_publications_for_serial(self, serial_id: int) -> int:
         """Requalifie, par le pipeline, le `doc_type` des publications d'une revue après un changement de son `serial_type`.
 
-        Précondition : l'appelant a déjà écrit le `serial_type`, dans la même transaction. Retourne le nombre de publications dont le `doc_type` change, et émet l'audit `serial.type_requalified` si ce nombre est positif.
+        L'appelant a écrit le nouveau type dans la même transaction. Renvoie le nombre de publications dont le `doc_type` change, et émet l'audit `serial.type_requalified` si ce nombre est positif.
         """
         changed = self._recompute.requalify_publications(serial_id)
         if changed > 0:

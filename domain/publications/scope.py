@@ -3,35 +3,24 @@
 from collections.abc import Sequence, Set
 from typing import NamedTuple
 
-from domain.publications.identifiers import DOI
 from domain.publications.metadata import normalized_title
-from domain.source_records.identifiers import SourceIdentifier, active
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+    active,
+    own_dois,
+)
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 OUT_OF_SCOPE_DOC_TYPES = frozenset({"peer_review", "memoir", "physical_object"})
-"""Types de document non admissibles : jamais matérialisés en publication.
+"""Types de document exclus des publications. Une œuvre de l'un de ces types reste sans publication. Ses enregistrements sources et ses contributions sources restent en base, sans contribution ni personne.
 
-Une œuvre dont le `doc_type` canonique résolu appartient à cet ensemble n'a pas de ligne
-`publications` : le module du cycle de vie la supprime après l'arbitrage du type
-(`pipeline/transformation/publications/lifecycle.py`). Ses `source_records` et
-`source_contributions` subsistent, détachées : sans publication, elles ne génèrent ni
-contribution canonique ni personne.
-
-Justifications :
-
-- `peer_review` : reviews de papers, pas une contribution scientifique en soi (les
-  comptes de publications seraient pollués).
-- `memoir` : essentiellement DUMAS (Master), étudiants pas membres permanents — les
-  inclure polluerait `persons` de comptes éphémères.
-- `physical_object` : échantillon ou instrument identifié par un DOI DataCite (IGSN des
-  échantillothèques), pas un texte publié.
-
-Deux points d'application : un enregistrement de l'un de ces types ne fonde pas de publication
-à la réconciliation (`domain/publications/reconciliation.py`), et le module du cycle de vie
-supprime la publication dont le type résolu est de cet ensemble. Retirer un type de cet
-ensemble suffit à le réintégrer à la matérialisation.
+- `peer_review` : rapport d'évaluation d'un article.
+- `memoir` : mémoire d'étudiant, surtout de DUMAS ; ses auteurs sont de passage.
+- `physical_object` : échantillon ou instrument identifié par un DOI DataCite (IGSN).
 """
 
 EXCLUDED_DOI_PREFIXES = frozenset({"10.60692"})
@@ -70,28 +59,30 @@ PARATEXT_TITLES = frozenset(
 class MatchabilityFacts(NamedTuple):
     """Faits d'un enregistrement source que lit `is_matchable`.
 
-    `raw_doi` est le DOI d'avant correction. `doi` et `urls` sont les valeurs corrigées, privées des dépôts HAL introuvables. `identifiers` sont les identifiants de l'enregistrement source, avec leur statut.
+    `urls` : URL de copie, privées des dépôts HAL introuvables. `identifiers` : identifiants de l'enregistrement source, avec leur statut. `primary_doi_has_target` : son DOI `primary` est celui d'une forme secondaire, qui a une cible dans `doi_targets`.
     """
 
     source: str
     source_id: str
-    raw_doi: str | None
-    doi: str | None
     title_normalized: str | None
     urls: Sequence[str]
     identifiers: Sequence[SourceIdentifier]
+    primary_doi_has_target: bool = False
 
 
 def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
-    """L'enregistrement source entre dans la réconciliation. Il en est écarté dans quatre cas :
+    """Vrai si l'enregistrement source entre dans la réconciliation. Il en est écarté si :
 
-    - son DOI d'avant correction a un préfixe de `EXCLUDED_DOI_PREFIXES` ;
+    - tous ses DOI propres (`own_dois`), quel que soit leur statut, ont un préfixe de `EXCLUDED_DOI_PREFIXES` ;
+    - il vient de DataCite et son DOI `primary` a une cible : l'enregistrement source est une forme secondaire d'une œuvre présente en base ;
     - son titre normalisé est dans `PARATEXT_TITLES` ;
     - il vient de ScanR et il est issu d'un dépôt HAL de `missing_hal_ids` ;
-    - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a ni DOI, ni lien, ni clé de confirmation active.
+    - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a aucun DOI actif de rôle autre que `related`, aucune URL de copie et aucune clé de confirmation active.
     """
-    raw_doi = DOI.try_parse(facts.raw_doi)
-    if raw_doi is not None and raw_doi.prefix.value in EXCLUDED_DOI_PREFIXES:
+    own = own_dois(facts.identifiers)
+    if own and all(doi.split("/", 1)[0] in EXCLUDED_DOI_PREFIXES for doi in own):
+        return False
+    if facts.source == Source.DATACITE and facts.primary_doi_has_target:
         return False
     if facts.title_normalized in PARATEXT_TITLES:
         return False
@@ -100,9 +91,11 @@ def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     ):
         return False
     if facts.source in AGGREGATOR_SOURCES:
-        return bool(
-            facts.doi
-            or facts.urls
-            or any(i.id_type in CONFIRMATION_ID_TYPES for i in active(facts.identifiers))
+        return bool(facts.urls) or any(
+            i.id_type in CONFIRMATION_ID_TYPES
+            or (
+                i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
+            )
+            for i in active(facts.identifiers)
         )
     return True

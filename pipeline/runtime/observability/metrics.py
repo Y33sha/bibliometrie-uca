@@ -1,7 +1,4 @@
-"""Métriques retournées par les phases du pipeline.
-
-Chaque `run(...)` de phase retourne un `PhaseMetrics` ; l'orchestrateur (`run_pipeline`) en mesure la durée et agrège les compteurs par phase. La consommation (rapport, dashboard) se fait côté observabilité, à partir du payload de `to_payload`.
-"""
+"""Compteurs que renvoie chaque phase du pipeline. L'orchestrateur en mesure la durée et les enregistre (`to_payload`)."""
 
 from __future__ import annotations
 
@@ -65,32 +62,14 @@ EXTRA_LABELS: dict[str, str | tuple[str, str]] = {
     "unmatched": "non rapproché",
     "unresolved": "non résolu",
 }
-"""Compteurs sur-mesure, au singulier. Un couple porte les formes que le `s` final ne donne pas."""
+"""Libellés des compteurs propres à une phase, au singulier. Un couple donne les formes que le `s` final ne donne pas."""
 
 
 @dataclass
 class PhaseMetrics:
-    """Compteurs d'une exécution de phase pipeline.
+    """Compteurs d'une exécution de phase.
 
-    `new`, `updated`, `unchanged`, `errors` couvrent les cas standards.
-    `updated` = contenu réécrit (hash changé) ; `unchanged` = re-vu à contenu
-    identique (seul `last_seen_at` bumpé). `extras` accueille les compteurs
-    spécifiques à une phase quand ils ne rentrent pas dans le cadre générique :
-    `already_complete` pour `fetch_truncated`, `tagged` pour `extract_hal`,
-    `not_found` pour les fetchers HAL, etc.
-
-    `total` (items traités) est **dérivé** : `max(seen, new+updated+unchanged)`.
-    Il vaut le dénominateur explicite `seen` (items interrogés/vus, alimenté par
-    `add(seen=…)`) dès qu'il dépasse les catégorisés, sinon la somme catégorisée.
-    Garanti `≥ new+updated+unchanged` par construction — impossible de le
-    désynchroniser comme le faisait un compteur saisi à la main (un moissonneur qui
-    catégorise sans incrémenter le total fausserait l'affichage).
-
-    `details` porte les indicateurs sur-mesure d'observabilité (conventions
-    `summary`, `table`, lues par l'interface) et `signals` le motif d'un statut
-    dégradé (source coupée après une série de requêtes en échec…), qui fait passer le point de
-    la phase en ambre et s'affiche au drill-down : tous deux remontés à
-    l'orchestrateur pour la capture par phase, sans rôle dans les compteurs.
+    `updated` : contenu réécrit ; `unchanged` : revu à contenu identique. `extras` : compteurs propres à la phase (`EXTRA_LABELS`). `details` : indicateurs que l'interface affiche (`summary`, `table`). `signals` : motifs d'un statut dégradé, comme une source coupée.
     """
 
     new: int = 0
@@ -107,11 +86,11 @@ class PhaseMetrics:
     Hors comparaison : deux relevés portant les mêmes compteurs sont égaux, quels que soient les mots qui les présentent.
     """
     duration_s: float | None = field(default=None, compare=False)
-    """Durée d'une tâche en secondes, mesurée par l'exécuteur. Hors fusion : une phase en remplit sa table d'observabilité."""
+    """Durée d'une tâche en secondes, mesurée par l'exécuteur ; `merge` l'ignore."""
 
     @property
     def total(self) -> int:
-        """Items traités : dénominateur explicite `seen`, ou somme catégorisée si plus grande."""
+        """Éléments traités : `seen`, ou la somme de `new`, `updated` et `unchanged` si elle est plus grande."""
         return max(self.seen, self.new + self.updated + self.unchanged)
 
     def add(
@@ -134,10 +113,7 @@ class PhaseMetrics:
             self.extras[k] = self.extras.get(k, 0) + v
 
     def merge(self, other: PhaseMetrics) -> None:
-        """Agrège les compteurs d'un autre `PhaseMetrics` en place.
-
-        Utilisé par les phases qui chaînent plusieurs sous-helpers (ex: la phase `harvest` accumule les métriques de ses moissonneurs).
-        """
+        """Ajoute en place les compteurs, détails et signaux de `other`."""
         self.new += other.new
         self.updated += other.updated
         self.unchanged += other.unchanged
@@ -149,8 +125,7 @@ class PhaseMetrics:
         self.signals.extend(other.signals)
 
     def to_payload(self, duration_s: float) -> PhaseMetricsPayload:
-        """Sérialise les compteurs et la durée d'exécution vers le payload de transport
-        (`domain.pipeline_runs`), persisté par l'observabilité."""
+        """Forme JSON des compteurs, durée comprise (`domain.pipeline_runs.PhaseMetricsPayload`)."""
         return {
             "new": self.new,
             "updated": self.updated,
@@ -162,9 +137,8 @@ class PhaseMetrics:
         }
 
     def as_summary(self) -> str:
-        """Une-ligne lisible pour les logs ('10 nouveaux, 5 mis à jour')."""
-        # Les clés d'`extras` nomment les compteurs pour l'observabilité, que l'interface
-        # d'administration et les runs déjà enregistrés lisent : la traduction reste à l'affichage.
+        """Ligne de journal des compteurs (« 10 nouveaux, 5 mis à jour »)."""
+        # Les clés d'`extras` sont celles des runs enregistrés, que lit l'interface : la traduction se fait à l'affichage.
         parts: list[str] = []
         if self.new:
             parts.append(f"{self.new} {inflect(self.new, 'nouveau', 'nouveaux')}")

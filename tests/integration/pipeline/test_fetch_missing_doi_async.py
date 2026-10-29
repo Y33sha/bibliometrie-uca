@@ -1,8 +1,7 @@
 """Recherche par DOI de la phase `fetch_missing` (`pipeline.ingestion.common.doi_search.fetch_missing_doi`).
 
-Deux angles :
-1. **Boucle** : via une fausse recherche, vérifie le pool de workers, l'inscription des DOI absents, la vérification doi.org et les métriques.
-2. **Recherches par source** : via la fixture `http_mock`, vérifie que `fetch_async` parle à l'API correctement (enregistrement source trouvé, absence, erreurs réseau et HTTP).
+1. La boucle, avec une recherche simulée : pool de workers, inscription des DOI absents, vérification par doi.org, métriques.
+2. La recherche de chaque source (`fetch_async`), avec la fixture `http_mock` : enregistrement source trouvé, DOI absent, erreurs réseau et HTTP.
 """
 
 from __future__ import annotations
@@ -29,8 +28,6 @@ from pipeline.ingestion.scanr.fetch_missing import ScanrDoiSearch
 from pipeline.ingestion.wos.fetch_missing import WosDoiSearch
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# ── helpers ──────────────────────────────────────────────────────
-
 
 def _sans_config[S](cls: type[S], **attributs: object) -> S:
     """Recherche `cls` construite sans lire la configuration, avec les attributs donnés."""
@@ -41,7 +38,7 @@ def _sans_config[S](cls: type[S], **attributs: object) -> S:
 
 
 class _FakeAdapter:
-    """Recherche de test : rend un enregistrement source par DOI, sauf les DOI de `absents` ; `inserted_records` retient les écritures."""
+    """Recherche de test : renvoie un enregistrement source par DOI, sauf les DOI de `absents` ; `inserted_records` retient les écritures."""
 
     source_key = "openalex"
     batch_size = 1
@@ -61,7 +58,7 @@ class _FakeAdapter:
     async def fetch_async(self, client, dois):  # noqa: ARG002
         self._in_flight += 1
         self.record_in_flight.append(self._in_flight)
-        # Petit await pour permettre au scheduler asyncio d'interleaver
+        # Laisse les autres lots démarrer.
         await asyncio.sleep(0.01)
         self._in_flight -= 1
         if dois[0] in self._absents:
@@ -92,9 +89,6 @@ async def _run(adapter, dois: list[str], *, recorded: list | None = None, **kw) 
         return await fetch_missing_doi(
             MagicMock(), adapter, logging.getLogger("test"), retry_after_days=30, **kw
         )
-
-
-# ── orchestrateur : parallélisme + sémaphore + stats ─────────────
 
 
 class TestRunAsyncOrchestrator:
@@ -149,13 +143,13 @@ class TestRunAsyncOrchestrator:
 
     @pytest.mark.asyncio
     async def test_worker_pool_caps_concurrent_fetches(self):
-        """`max_concurrent=3` workers doivent plafonner à 3 le nb de fetches en vol."""
+        """Avec `max_concurrent=3`, au plus trois recherches sont en cours à la fois."""
         in_flight: list[int] = []
         adapter = _FakeAdapter(record_in_flight=in_flight)
         adapter.max_concurrent = 3
         await _run(adapter, [f"10.1/{i}" for i in range(10)])
         assert max(in_flight) <= 3
-        # Avec 10 DOIs et 3 workers, on doit avoir vu les 3 workers saturés au moins une fois
+        # Avec dix DOI, les trois workers sont occupés en même temps au moins une fois.
         assert max(in_flight) == 3
 
     @pytest.mark.asyncio
@@ -170,7 +164,7 @@ class TestRunAsyncOrchestrator:
 
     @pytest.mark.asyncio
     async def test_fetch_error_continues_other_dois(self):
-        """Une exception dans fetch_async sur un lot ne doit pas arrêter les autres."""
+        """Une exception de `fetch_async` sur un lot laisse les autres lots se poursuivre."""
 
         class _FlakyAdapter(_FakeAdapter):
             async def fetch_async(self, client, dois):
@@ -181,9 +175,6 @@ class TestRunAsyncOrchestrator:
         result = await _run(_FlakyAdapter(), ["10.1/ok1", "10.1/bad", "10.1/ok2"])
         assert result.total == 3
         assert (result.new, result.errors) == (2, 1)
-
-
-# ── recherche OpenAlex : fetch_async via http_mock ─────────────────
 
 
 class TestOpenalexFetchAsync:
@@ -211,7 +202,7 @@ class TestOpenalexFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_no_result_is_not_found(self, http_mock):
-        """Réponse valide sans résultat → DOI confirmé absent."""
+        """Réponse valide sans résultat : DOI confirmé absent."""
         http_mock.get("https://api.openalex.org/works").mock(
             return_value=httpx2.Response(200, json={"results": []})
         )
@@ -221,7 +212,7 @@ class TestOpenalexFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_network_error_concludes_nothing(self, http_mock):
-        """Erreur réseau persistante → ni enregistrement source ni absence : le DOI attend le run suivant."""
+        """Erreur réseau persistante : ni enregistrement source ni absence ; le DOI attend le run suivant."""
         http_mock.get("https://api.openalex.org/works").mock(
             side_effect=httpx2.ConnectError("refused")
         )
@@ -231,14 +222,11 @@ class TestOpenalexFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_http_error_concludes_nothing(self, http_mock):
-        """Erreur HTTP (401/4xx/5xx), y compris 404 de l'endpoint de recherche → ni enregistrement source ni absence."""
+        """Erreur HTTP (4xx, 5xx), y compris 404 de l'endpoint de recherche : ni enregistrement source ni absence."""
         http_mock.get("https://api.openalex.org/works").mock(return_value=httpx2.Response(404))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
         assert result == UNAVAILABLE
-
-
-# ── recherche HAL : fetch_async via http_mock ──────────────────────
 
 
 class TestHalFetchAsync:
@@ -260,16 +248,13 @@ class TestHalFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_no_result_is_not_found(self, http_mock):
-        """Réponse Solr valide sans doc → DOI confirmé absent."""
+        """Réponse Solr valide sans document : DOI confirmé absent."""
         http_mock.get("https://api.archives-ouvertes.fr/search/").mock(
             return_value=httpx2.Response(200, json={"response": {"docs": []}})
         )
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/missing"])
         assert result == LookupBatch(absent=["10.1/missing"])
-
-
-# ── recherche Crossref : fetch_async via http_mock ─────────────────
 
 
 class TestCrossrefFetchAsync:
@@ -309,9 +294,6 @@ class TestCrossrefFetchAsync:
         assert result == LookupBatch(records=[{"DOI": "10.1/PRINCIPAL"}], absent=["10.1/alias"])
 
 
-# ── recherche ScanR : fetch_async via http_mock ────────────────────
-
-
 def _scanr_hit(scanr_id: str, doi: str) -> dict:
     return {"_source": {"id": scanr_id, "externalIds": [{"type": "doi", "id": doi}]}}
 
@@ -335,7 +317,7 @@ class TestScanrFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_batch_marks_unmatched_dois(self, http_mock):
-        """Lot de 2 DOI, un seul hit : le DOI sans correspondance est confirmé absent (diff requêtés / trouvés)."""
+        """Lot de deux DOI, un seul résultat : le DOI sans résultat est confirmé absent."""
         http_mock.post(API_BASE_URLS["scanr"]).mock(
             return_value=httpx2.Response(
                 200, json={"hits": {"hits": [_scanr_hit("scanr-1", "10.1/a")]}}
@@ -348,14 +330,11 @@ class TestScanrFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_auth_failure_concludes_nothing(self, http_mock):
-        """Erreur HTTP (401/403/500...) → ni enregistrement source ni absence, sans propager l'exception."""
+        """Erreur HTTP (401, 403, 500…) : ni enregistrement source ni absence, sans exception."""
         http_mock.post(API_BASE_URLS["scanr"]).mock(return_value=httpx2.Response(401))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
         assert result == UNAVAILABLE
-
-
-# ── recherche DataCite : fetch_async (batch query) via http_mock ───
 
 
 class TestDoiOrgExistence:
@@ -388,7 +367,7 @@ class TestDataciteFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_batch_returns_records(self, http_mock):
-        """Lot de 2 DOI, 2 nœuds `data` : remappés par DOI exact (lowercase)."""
+        """Lot de deux DOI, deux éléments `data` en majuscules : chaque DOI est trouvé, sans distinction de casse."""
         http_mock.get("https://api.datacite.org/dois").mock(
             return_value=httpx2.Response(
                 200,
@@ -407,7 +386,7 @@ class TestDataciteFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_batch_marks_unmatched_dois(self, http_mock):
-        """Lot de 2 DOI, un seul nœud : le DOI absent de la réponse est confirmé absent (diff requêtés / trouvés)."""
+        """Lot de deux DOI, un seul élément `data` : le DOI absent de la réponse est confirmé absent."""
         http_mock.get("https://api.datacite.org/dois").mock(
             return_value=httpx2.Response(
                 200, json={"data": [{"id": "10.1/a", "attributes": {"doi": "10.1/a"}}]}
@@ -420,16 +399,13 @@ class TestDataciteFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_network_error_concludes_nothing(self, http_mock):
-        """Erreur réseau persistante = lot incomplet : aucun DOI n'est déclaré absent."""
+        """Erreur réseau persistante : aucun DOI déclaré absent."""
         http_mock.get("https://api.datacite.org/dois").mock(
             side_effect=httpx2.ConnectError("refused")
         )
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
         assert result == UNAVAILABLE
-
-
-# ── recherche WoS : fetch_async via http_mock ──────────────────────
 
 
 class TestWosFetchAsync:
@@ -443,7 +419,7 @@ class TestWosFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_single_page(self, http_mock):
-        """Lot de DOIs qui tient sur une seule page."""
+        """Lot de DOI dont les résultats tiennent sur une seule page."""
         http_mock.get("https://api.clarivate.com/api/wos").mock(
             return_value=httpx2.Response(
                 200,
@@ -457,14 +433,13 @@ class TestWosFetchAsync:
         )
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a", "10.1/b"])
-        # Les 2 records reviennent ; les mocks n'ont pas de DOI extractible,
-        # donc les 2 DOI interrogés sont aussi déclarés absents (lot complet).
+        # Les deux enregistrements sont renvoyés. Ils n'ont pas de DOI lisible, donc les deux DOI demandés sont aussi déclarés absents.
         assert [r["UID"] for r in result.records] == ["WOS:001", "WOS:002"]
         assert set(result.absent) == {"10.1/a", "10.1/b"}
 
     @pytest.mark.asyncio
     async def test_fetch_async_400_marks_batch_not_found(self, http_mock):
-        """WoS 400 = lot sans correspondance : zéro match, tout le lot est confirmé absent."""
+        """Une réponse 400 de WoS signifie un lot sans résultat : tout le lot est confirmé absent."""
         http_mock.get("https://api.clarivate.com/api/wos").mock(return_value=httpx2.Response(400))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
@@ -472,7 +447,7 @@ class TestWosFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_http_error_concludes_nothing(self, http_mock):
-        """Erreur HTTP non-400 (401/403/5xx) = lot non fiable : aucun DOI déclaré absent, sans exception propagée."""
+        """Erreur HTTP autre que 400 (401, 403, 5xx) : aucun DOI déclaré absent, sans exception."""
         http_mock.get("https://api.clarivate.com/api/wos").mock(return_value=httpx2.Response(401))
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(client, ["10.1/a"])
@@ -480,7 +455,7 @@ class TestWosFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_network_error_concludes_nothing(self, http_mock):
-        """Erreur réseau persistante = lot incomplet : aucun DOI déclaré absent."""
+        """Erreur réseau persistante : aucun DOI déclaré absent."""
         http_mock.get("https://api.clarivate.com/api/wos").mock(
             side_effect=httpx2.ConnectError("refused")
         )
@@ -490,7 +465,7 @@ class TestWosFetchAsync:
 
     @pytest.mark.asyncio
     async def test_fetch_async_filters_preprint_dois(self, http_mock):
-        """DOIs Zenodo/arXiv/SSRN sont filtrés avant appel → pas d'appel HTTP si le lot entier ne contient que des preprints."""
+        """Les DOI de preprints (Zenodo, arXiv, SSRN) sont écartés avant l'appel : un lot fait seulement de preprints ne fait aucun appel HTTP."""
         route = http_mock.get("https://api.clarivate.com/api/wos")
         async with httpx2.AsyncClient() as client:
             result = await self._adapter().fetch_async(

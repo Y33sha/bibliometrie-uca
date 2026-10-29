@@ -1,9 +1,6 @@
-"""Compteurs `publication_count` (publications in-perimeter) sur `serials` + `publishers`.
+"""Nombre de publications du périmètre de chaque revue et de chaque éditeur (`publication_count`).
 
-`serials.publication_count` = nombre de publications in-perimeter de la revue.
-`publishers.publication_count` = nombre de publications in-perimeter de l'éditeur (`publications.publisher_id`).
-
-Les deux recalculs en masse tournent dans la phase `finalize`, après `in_perimeter`. Les variantes ciblées servent aux fusions de revues et d'éditeurs. Tous sont idempotents (`IS DISTINCT FROM`).
+Les recalculs de toutes les revues et de tous les éditeurs se font dans la phase `finalize`, après celui du périmètre. Les recalculs ciblés servent aux fusions de revues et d'éditeurs. Tous sont idempotents.
 """
 
 from sqlalchemy import Connection, text
@@ -40,7 +37,7 @@ def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> 
 def refresh_serial_publication_counts(conn: Connection) -> int:
     """Recalcule le `publication_count` de chaque revue.
 
-    Rend le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
+    Renvoie le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
     """
     return conn.execute(
         text("""
@@ -61,7 +58,7 @@ def refresh_serial_publication_counts(conn: Connection) -> int:
 
 
 def refresh_publisher_publication_counts(conn: Connection) -> int:
-    """Recalcule le `publication_count` de chaque éditeur. Rend le nombre de lignes changées."""
+    """Recalcule le `publication_count` de chaque éditeur. Renvoie le nombre de lignes changées."""
     return conn.execute(
         text("""
             WITH counts AS (

@@ -104,7 +104,7 @@ def ensure_admin_user() -> None:
         user_repository(conn).ensure_user(settings.admin_user, [Role.ADMIN])
 
 
-# ----- Factories DB -----
+# ----- Connexions -----
 
 
 # Méthodes HTTP sans effet de bord. Starlette sert `HEAD` par la route `GET` correspondante.
@@ -139,7 +139,7 @@ def connection_factory(request: Request) -> Callable[[], Connection]:
 def db_conn(request: Request) -> Iterator[Connection]:
     """Connexion de la requête, servie aux routes par `DbConn`. Toutes les dépendances de la requête la partagent.
 
-    Une requête d'écriture qui aboutit est committée avec ses événements d'audit (`record_pending_events`) ; une exception l'annule. Le commit précède l'envoi de la réponse (`scope="function"`) : une requête ou une tâche de fond lancée ensuite lit l'état committé. Les services ne committent pas.
+    Une requête d'écriture qui aboutit est commitée avec ses événements d'audit (`record_pending_events`) ; une exception l'annule. Le commit précède l'envoi de la réponse (`scope="function"`) : une requête ou une tâche de fond lancée ensuite lit l'état commité. Les services ne commitent pas.
     """
     with _open_connection(request) as conn:
         try:
@@ -331,7 +331,7 @@ def structure_service(conn: DbConn) -> StructureService:
 def _run_detached(label: str, work: Callable[[Connection], None]) -> None:
     """Exécute `work` dans sa propre transaction, hors du cycle de requête, et journalise son exception éventuelle.
 
-    Partager la connexion de la requête laisserait une transaction ouverte (idle in transaction). `work` voit les écritures de la requête, committées avant l'envoi de la réponse.
+    Partager la connexion de la requête laisserait une transaction ouverte (idle in transaction). `work` voit les écritures de la requête, commitées avant l'envoi de la réponse.
     """
     try:
         with get_sync_engine().begin() as conn:
@@ -349,7 +349,7 @@ def bg_propagate_countries(address_ids: list[int]) -> None:
 
 
 def bg_propagate_in_perimeter(address_ids: list[int]) -> None:
-    """Tâche de fond : propage `in_perimeter` après une review d'affiliation. Le recalcul peut toucher des dizaines de milliers de contributions sources."""
+    """Tâche de fond : propage `in_perimeter` après une décision sur le lien d'une adresse à une structure. Le recalcul peut toucher des dizaines de milliers de contributions sources."""
     _run_detached(
         "propagation d'in_perimeter",
         lambda conn: address_service(conn).propagate_in_perimeter_for_addresses(address_ids),

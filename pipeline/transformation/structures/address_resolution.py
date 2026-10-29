@@ -1,6 +1,6 @@
-"""Résolution des adresses : rattachement aux structures et détection du périmètre. Tâche `affiliations.resolve_addresses`.
+"""Tâche `affiliations.resolve_addresses` : rattachement des adresses aux structures, par leurs formes de nom (`name_recognition`).
 
-Reconnaît les structures par leurs formes de nom (`name_recognition`) et enregistre dans `address_structures` la forme à l'origine de chaque détection (`matched_form_id`).
+`address_structures` garde la forme à l'origine de chaque détection.
 """
 
 import logging
@@ -18,7 +18,7 @@ from pipeline.transformation.structures.detections import (
 )
 from pipeline.transformation.structures.name_recognition import StructureNameMatcher
 
-# Taille des tranches (pagination keyset) : borne la mémoire et les allers-retours SQL par batch.
+# Adresses par tranche : la taille borne la mémoire et le nombre d'allers-retours SQL.
 CHUNK_SIZE = 10000
 
 
@@ -27,7 +27,7 @@ def count_addresses(conn: Connection) -> int:
 
 
 def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> list[tuple[int, str]]:
-    """Tranche des adresses d'identifiant supérieur à `after_id`, triées par identifiant (pagination keyset)."""
+    """Tranche des adresses qui suivent `after_id`, par identifiant croissant."""
     rows = conn.execute(
         text(
             "SELECT a.id, a.normalized_text FROM addresses a "
@@ -38,21 +38,18 @@ def fetch_addresses_chunk(conn: Connection, *, after_id: int, limit: int) -> lis
     return [(r.id, r.normalized_text) for r in rows]
 
 
-# ─── Run ─────────────────────────────────────────────────────────
-
-
 class ResolutionStats(NamedTuple):
     """Bilan d'une passe de résolution d'adresses."""
 
     processed: int  # adresses traitées
-    in_perimeter: int  # adresses portant ≥1 structure du périmètre
-    affiliations: int  # liens adresse↔structure détectés
+    in_perimeter: int  # adresses rattachées à au moins une structure du périmètre
+    affiliations: int  # liens détectés entre adresse et structure
 
 
 def run_resolution(
     conn: Connection, perimeter_ids: set[int], logger: logging.Logger
 ) -> ResolutionStats:
-    """Recalcul complet idempotent des affiliations : toutes les adresses, par tranches, un commit par tranche."""
+    """Rattache toutes les adresses aux structures, d'après les formes de nom en base."""
     matcher = StructureNameMatcher.load(conn)
     return process_addresses(conn, matcher, perimeter_ids, logger)
 
@@ -65,10 +62,7 @@ def process_addresses(
     *,
     chunk_size: int = CHUNK_SIZE,
 ) -> ResolutionStats:
-    """Résout toutes les adresses par tranches (keyset) : matching mémoire + écritures en bloc.
-
-    Chaque tranche est lue et matchée en mémoire, puis ses liens adresse→structure sont synchronisés (`sync_detections`). `chunk_size` borne la mémoire et les allers-retours SQL.
-    """
+    """Rattache toutes les adresses aux structures, tranche par tranche : reconnaissance en mémoire, synchronisation des liens de la tranche (`sync_detections`), puis commit."""
 
     processed = 0
     in_perimeter_count = 0

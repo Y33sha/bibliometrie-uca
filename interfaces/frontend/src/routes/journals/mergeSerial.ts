@@ -2,7 +2,7 @@ import { errorMessage, serials as serialsApi } from '#lib/api/index.js';
 import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
 
 /**
- * Fusionne la revue `sourceId` dans `target` et rend `true` si la fusion a eu lieu.
+ * Fusionne la revue `sourceId` dans `target` et renvoie `true` si la fusion a eu lieu.
  *
  * Les publications absorbées prennent le `serial_type` de la cible : quand ce changement requalifie des publications, leur nombre est annoncé et la fusion attend une confirmation.
  */

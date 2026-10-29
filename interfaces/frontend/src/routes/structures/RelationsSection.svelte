@@ -87,7 +87,7 @@
     display: grid;
     grid-template-columns: 180px 1fr;
     gap: 12px 20px;
-    align-items: center;
+    align-items: baseline;
     font-size: var(--fs-md);
   }
   .relation-label {

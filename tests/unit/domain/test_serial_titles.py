@@ -91,7 +91,7 @@ def test_missing_title():
     assert not nested_titles("", "Nature")
 
 
-# Cas réels : revues portées par les enregistrements d'une même publication.
+# Cas réels : revues données par les enregistrements sources d'une même publication.
 @pytest.mark.parametrize(
     ("full", "short"),
     [

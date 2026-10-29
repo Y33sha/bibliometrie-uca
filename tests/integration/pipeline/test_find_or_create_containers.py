@@ -1,4 +1,4 @@
-"""Tests d'intégration de `find_or_create_containers` : entrée de `serials` et monographie d'un document."""
+"""Entrée de `serials` et monographie d'un document (`find_or_create_containers`)."""
 
 import pytest
 from sqlalchemy import text

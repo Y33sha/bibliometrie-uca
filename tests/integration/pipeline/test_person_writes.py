@@ -1,4 +1,4 @@
-"""Tests d'intégration des écritures de la phase `persons` (`pipeline/transformation/persons/person_writes.py`)."""
+"""Écritures de la phase `persons` (`pipeline/transformation/persons/person_writes.py`)."""
 
 from functools import partial
 
@@ -40,8 +40,7 @@ class TestAddIdentifiersFromContributions:
         assert id_types == ["idhal", "idref", "orcid"]
 
     def test_skips_malformed_and_keeps_valid(self, sa_sync_conn, repo):
-        """Un identifiant source mal formé est ignoré (log, pas d'exception) ; la
-        promotion continue pour les identifiants valides du même lot."""
+        """Un identifiant mal formé est journalisé et ignoré, sans exception ; les identifiants valides du même lot sont ajoutés à la personne."""
         person_id = _person(sa_sync_conn)
         contributions = [
             {"source": "hal", "orcid": "pas-un-orcid", "idhal": "jdupont"},

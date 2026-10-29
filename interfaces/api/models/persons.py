@@ -53,12 +53,7 @@ class UpdateNameFormStatus(BaseModel):
 
 
 class AddIdentifierResponse(BaseModel):
-    """Réponse de `POST /api/persons/{id}/identifiers`, polymorphe selon l'issue :
-
-    - doublon exact : `added=False` + `reason`
-    - ajout : `added=True` + `id_type` + `id_value`
-    - réattribution depuis une autre personne : en plus, `reassigned=True`
-    """
+    """Réponse de `POST /api/persons/{id}/identifiers`, selon l'issue : doublon exact (`added` faux, avec `reason`), ajout (`added` vrai, avec `id_type` et `id_value`), ou réattribution depuis une autre personne (`reassigned` vrai en plus)."""
 
     added: bool
     reason: str | None = None
@@ -84,7 +79,7 @@ class NameFormStatusResponse(BaseModel):
 
 
 class DetachContributionsResponse(BaseModel):
-    """Décompte d'un détachement de contributions : contributions détachées de la personne, formes de nom nettoyées."""
+    """Décompte d'un détachement de contributions : contributions détachées de la personne, formes de nom supprimées."""
 
     detached: int
     cleaned_forms: int

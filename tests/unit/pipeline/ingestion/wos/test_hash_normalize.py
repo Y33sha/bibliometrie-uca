@@ -1,4 +1,4 @@
-"""Empreinte de changement d'une ligne d'export WoS : indifférente à la date d'export et aux compteurs d'usage, sensible à l'enregistrement source."""
+"""Empreinte de changement d'une ligne d'export WoS : indifférente à la date d'export et aux compteurs d'usage, sensible au contenu de l'enregistrement source."""
 
 from pipeline.ingestion.common.change_detection import change_detection_hash
 

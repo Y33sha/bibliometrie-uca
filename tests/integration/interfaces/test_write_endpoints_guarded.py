@@ -1,8 +1,8 @@
-"""Garde d'authentification des écritures, vérifiée sur l'ensemble de la surface d'API.
+"""Garde d'authentification des écritures, vérifiée sur toutes les routes de l'API.
 
-Le middleware d'`interfaces.api.app` filtre sur la méthode HTTP : une requête d'écriture sans session valide reçoit un refus avant tout traitement, et seul le préfixe `/api/auth/` y échappe. Ces tests confrontent la règle au contrat d'API entier plutôt qu'à des points d'entrée choisis : une écriture ajoutée plus tard est couverte sans qu'on y pense, et une écriture ajoutée sous le préfixe exempté fait échouer l'intégration.
+Le middleware d'`interfaces.api.app` filtre sur la méthode HTTP : une écriture sans session valide est refusée avant tout traitement. Seul le préfixe `/api/auth/` est exempté. Les tests énumèrent les écritures du contrat publié (OpenAPI) : toute écriture du contrat est couverte, et une écriture sous le préfixe exempté fait échouer les tests.
 
-L'énumération part du contrat publié (OpenAPI), qui décrit la surface telle qu'elle est servie. Un point d'entrée soustrait au contrat lui échapperait ; il échapperait du même coup aux types du frontend, qui en dérivent, et le contrôle de fraîcheur de ces types le signalerait.
+Une route absente du contrat échapperait à cette énumération, mais aussi aux types du frontend qui en dérivent ; le contrôle de fraîcheur de ces types la signalerait.
 """
 
 import re
@@ -19,9 +19,9 @@ EXEMPTED_WRITES = {
     ("POST", "/api/auth/login"),
     ("POST", "/api/auth/logout"),
 }
-"""Écritures que le middleware laisse passer sans session, et les seules.
+"""Seules écritures que le middleware laisse passer sans session : ouvrir et fermer une session.
 
-Ouvrir une session et la fermer sont les deux gestes qu'on ne peut pas exiger d'une session ouverte. Toute autre écriture sous ce préfixe échapperait à la garde : l'y inscrire est une décision, que ce test rend explicite.
+Toute autre écriture sous le préfixe exempté échapperait à la garde : l'y ajouter suppose de la déclarer ici.
 """
 
 _PATH_PARAM = re.compile(r"\{[^}]+\}")
@@ -41,12 +41,12 @@ def _write_endpoints() -> list[tuple[str, str]]:
 
 
 def _concrete(path: str) -> str:
-    """Chemin où chaque paramètre est remplacé par `1` : les identifiants du projet sont des entiers, et la garde tombe de toute façon avant la validation."""
+    """Chemin dont chaque paramètre vaut `1` : les identifiants du projet sont des entiers, et la garde refuse avant la validation."""
     return _PATH_PARAM.sub("1", path)
 
 
 def test_le_contrat_porte_des_ecritures():
-    """Filet du filet : une énumération vide passerait sans rien vérifier."""
+    """Une énumération vide ferait passer les tests sans rien vérifier."""
     assert len(_write_endpoints()) > 30
 
 
@@ -67,15 +67,15 @@ def test_une_ecriture_sans_session_est_refusee(client, methode, chemin):
     [("POST", "/api/inexistant"), ("DELETE", "/api/inexistant/1")],
 )
 def test_une_ecriture_sur_un_chemin_inexistant_est_refusee_de_meme(client, methode, chemin):
-    """La garde précède le routage : le refus ne dit pas si le chemin visé existe.
+    """La garde précède le routage : le refus est le même, que le chemin existe ou non.
 
-    Un 404 sur un chemin servi et un 401 sur les autres laisseraient un appelant anonyme dresser la carte des écritures.
+    Un appelant anonyme ne peut donc pas dresser la liste des écritures.
     """
     assert client.request(methode, chemin).status_code == 401
 
 
 def test_les_seules_ecritures_exemptees_sont_celles_de_la_session():
-    """Le préfixe `/api/auth/` échappe à la garde : ce qu'il abrite est énuméré."""
+    """Les écritures sous le préfixe exempté `/api/auth/` sont exactement celles de `EXEMPTED_WRITES`."""
     sous_le_prefixe = {
         (methode, chemin)
         for methode, chemin in _write_endpoints()

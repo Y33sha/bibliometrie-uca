@@ -1,6 +1,6 @@
-"""Périmètres : clôture des tutelles matérialisée dans `perimeter_structures`, lecture des structures d'un périmètre, condition d'exécution des phases qui dépendent du périmètre d'extraction.
+"""Périmètres : structures de chaque périmètre, matérialisées dans `perimeter_structures`, et erreur du périmètre d'extraction vide.
 
-`refresh_perimeter_structures` est rejouée en tête de pipeline, avant toute phase, et par l'administration après l'édition d'un périmètre, d'une structure ou d'une tutelle (`PerimeterStructures`)."""
+La table se recalcule en tête de pipeline, avant toute phase, et après chaque édition d'un périmètre, d'une structure ou d'une tutelle par l'administration (`PerimeterStructures`)."""
 
 from sqlalchemy import Connection, text
 
@@ -18,10 +18,7 @@ class EmptyExtractionPerimeterError(RuntimeError):
 
 
 def refresh_perimeter_structures(conn: Connection) -> None:
-    """Recompute la table matérialisée `perimeter_structures` : pour chaque périmètre, la clôture récursive (`est_tutelle_de`) de ses racines `perimeters.root_structure_ids`, filtrée aux structures existantes. Idempotent (DELETE + réinsertion complète). Commit laissé au caller.
-
-    Seule implémentation de la clôture d'un périmètre — `get_perimeter_structure_ids` lit cette table. À rejouer à chaque édition de `perimeters.root_structure_ids` ou `structure_parents`.
-    """
+    """Recalcule `perimeter_structures` : pour chaque périmètre, ses structures racines et les structures dont elles sont tutelles, directement ou non. Seules comptent les structures existantes. L'appelant commite."""
     conn.execute(text("DELETE FROM perimeter_structures"))
     conn.execute(
         text("""
@@ -43,7 +40,7 @@ def refresh_perimeter_structures(conn: Connection) -> None:
 
 
 class PerimeterStructures:
-    """Clôture des tutelles des périmètres : rematérialisation et lecture (port injecté par l'API)."""
+    """Structures des périmètres, pour l'API : recalcul et lecture."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn

@@ -1,16 +1,10 @@
-"""Phase `relations` — population de `publication_relations` depuis les relations déclarées.
+"""Phase `relations` : reconstruction complète de `publication_relations` à chaque run, en une transaction.
 
-Tourne après `publications` : les `source_records` sont rattachées à leur publication canonique, et les DOI cibles sont résolus en `publication_id` quand ils sont au corpus.
+La phase suit `publications` : les enregistrements sources sont rattachés à leur publication, et un DOI cible se résout en publication quand elle est en base. Trois signaux donnent les relations :
 
-Trois signaux peuplent la table :
-
-- **Signal #1 — relations déclarées par les sources** : DataCite `source_extras.related_identifiers` et Crossref `source_extras.relation`, converties vers le vocabulaire canonique par `domain.publications.relations`.
-- **Signal #2 — clés de confirmation partagées** : deux publications distinctes qui partagent une clé (hal_id, arXiv, PMID, NNT) sont apparentées ; le type se déduit de leur couple de `doc_type` (`infer_shared_key_relation`).
-- **Signal #3 — rapprochement par titre** : une publication dépendante sans relation déclarée ni clé partagée est reliée à l'œuvre dont elle dépend par le titre — un erratum à l'article qu'il corrige (`is_correction_of`, titre parent en suffixe après « Erratum: »…), un preprint à sa version publiée (`is_preprint_of`, titre identique). Sous garde d'ambiguïté (un seul parent substantiel au même titre). La sélection et sa garde sont en SQL.
-
-Les relations de même œuvre (versions, formes variantes, pièces de package) relèvent de la déduplication, à la phase `metadata_correction`. Quand `IsVersionOf` ou `IsVariantFormOf` relient deux œuvres (cf. `meme_oeuvre_declaree`), le signal #1 les type par leur couple de `doc_type`, comme un preprint arXiv et l'article publié.
-
-Reconstruction complète à chaque run (table dérivée) : la table est purgée puis réécrite depuis les trois signaux réunis, en une transaction — idempotent et sans dérive.
+- **Signal #1, relations déclarées** par DataCite (`related_identifiers`) et Crossref (`relation`), traduites par `domain.publications.relations`. Une relation de même œuvre (`IsVersionOf`, `IsVariantFormOf`) qui relie deux œuvres (`meme_oeuvre_declaree`) se type par les types de document des deux publications, comme un preprint arXiv et l'article publié.
+- **Signal #2, clés de confirmation partagées** (hal_id, arXiv, PMID, NNT) par deux publications distinctes : leurs types de document donnent la relation (`infer_shared_key_relation`).
+- **Signal #3, titre** : un erratum rejoint l'article qu'il corrige (titre de l'article à la suite de « Erratum: »), un preprint sa version publiée (même titre), à condition qu'un seul candidat ait ce titre.
 """
 
 from __future__ import annotations
@@ -32,7 +26,7 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
-from domain.source_records.identifiers import SourceIdentifierType
+from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -40,10 +34,11 @@ from domain.source_records.keys import (
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from domain.types import JsonValue
+from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
-from infrastructure.sql_fragments import has_source_extra, in_clause, raw_column
+from infrastructure.sql_fragments import has_source_extra, in_clause
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -57,9 +52,9 @@ from pipeline.task_runner import TaskStep, run_tasks
 
 
 class DeclaredRelationSource(NamedTuple):
-    """Une `source_record` rattachée qui déclare des relations dans son `source_extras` (DataCite `related_identifiers` ou Crossref `relation`).
+    """Enregistrement source rattaché qui déclare des relations dans son `source_extras` (DataCite `related_identifiers` ou Crossref `relation`).
 
-    Son DOI d'origine et son `source_record_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
+    Son DOI `primary` et son `source_record_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
     """
 
     publication_id: int
@@ -101,7 +96,7 @@ class SharedKeyPair(NamedTuple):
 
 
 class TitleMatch(NamedTuple):
-    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). `child` porte la relation dirigée vers `parent` (`is_correction_of`, `is_preprint_of`)."""
+    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). La relation dirigée part de `child` vers `parent` (`is_correction_of`, `is_preprint_of`)."""
 
     child_id: int
     parent_id: int
@@ -111,7 +106,7 @@ class TitleMatch(NamedTuple):
 class RelationsRebuild(NamedTuple):
     """Ce qu'une reconstruction de `publication_relations` laisse : les arêtes écrites, celles qu'elle ajoute (par type, décroissant) et le nombre de celles qui disparaissent.
 
-    Une arête ajoutée est présente après la reconstruction et absente avant ; une arête disparue, l'inverse. Les deux se comptent contre l'état de la table au début de la phase, pas contre le nombre d'arêtes soumises : la table est reconstruite entière à chaque run, et l'essentiel de ce qu'elle reçoit s'y trouvait déjà."""
+    Une arête ajoutée est présente après la reconstruction et absente avant ; une arête disparue, l'inverse."""
 
     written: int
     added_by_type: list[tuple[str, int]]
@@ -208,13 +203,15 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
 
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
-    """Les `source_records` rattachées dont le `source_extras` déclare des relations."""
-    # Le DOI d'origine, et non le DOI corrigé : c'est lui que l'enregistrement source déclare, et c'est son
-    # préfixe qui dit si une relation de même œuvre franchit un registrant.
+    """Enregistrements sources rattachés dont le `source_extras` déclare des relations."""
+    # Le DOI `primary`, quel que soit son statut, est celui de l'enregistrement source déclarant : son préfixe dit si une relation de même œuvre franchit un registrant.
     rows = conn.execute(
         text(f"""
             SELECT sr.publication_id, sr.source::text AS source, sr.source_extras,
-                   lower({raw_column("doi")}) AS doi,
+                   (SELECT min(i.id_value) FROM source_record_identifiers i
+                    WHERE i.source_record_id = sr.id
+                      AND i.id_type = '{SourceIdentifierType.DOI.value}'
+                      AND i.role = '{SourceIdentifierRole.PRIMARY.value}') AS doi,
                    p.doc_type::text AS doc_type, sr.doc_type AS source_record_doc_type
             FROM source_records sr
             JOIN publications p ON p.id = sr.publication_id
@@ -236,14 +233,15 @@ def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSo
 
 
 def fetch_publications_by_doi(conn: Connection, dois: list[str]) -> dict[str, DoiPublication]:
-    """Publications du corpus que désignent ces DOI, indexées par DOI en minuscules."""
+    """Publications du corpus que désignent ces DOI, indexées par DOI en minuscules. Le DOI d'une forme secondaire désigne la publication de sa cible (`doi_targets`)."""
     if not dois:
         return {}
     rows = conn.execute(
-        text(
-            "SELECT lower(doi) AS doi, id, doc_type::text AS doc_type "
-            "FROM publications WHERE lower(doi) = ANY(:dois)"
-        ),
+        text(f"""
+            SELECT d.doi, p.id, p.doc_type::text AS doc_type
+            FROM unnest(CAST(:dois AS text[])) AS d (doi)
+            JOIN publications p ON lower(p.doi) = {doi_or_target_sql("d.doi")}
+        """),  # noqa: S608 — fragment rendu depuis un alias de la requête
         {"dois": dois},
     ).all()
     return {r.doi: DoiPublication(r.id, r.doc_type) for r in rows}
@@ -260,7 +258,7 @@ def fetch_shared_key_pairs(conn: Connection) -> list[SharedKeyPair]:
 def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
     """Les erratums rapprochés par titre de l'œuvre qu'ils corrigent (signal #3).
 
-    Pour chaque erratum, candidats = publications non-erratum, titre assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un suffixe de celui de l'erratum (le titre parent est reproduit verbatim après un préfixe « Erratum: »). Garde d'ambiguïté : on ne rapproche que si **exactement un** candidat « substantiel » (hors `preprint` et `dataset`, simples formes de la même œuvre) porte ce titre."""
+    Pour chaque erratum, candidats = publications non-erratum, titre assez long, publiées dans la fenêtre `[année − 2 … année]`, dont le `title_normalized` est un suffixe de celui de l'erratum (le titre de l'article suit « Erratum: »). Le rapprochement exige un seul candidat de ce titre, hors `preprint` et `dataset`, autres formes de la même œuvre."""
     rows = conn.execute(_ERRATUM_TITLE_MATCHES_SQL).all()
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
@@ -268,7 +266,7 @@ def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
 def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
     """Les preprints rapprochés par titre de leur version publiée (signal #3).
 
-    Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée portent le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
+    Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée ont le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
     rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
@@ -279,9 +277,8 @@ _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, 
 
 
 def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
-    """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
-    # La table temporaire vit le temps de l'appel : créée avant la purge, elle sert le diff puis
-    # disparaît. Un échec en cours de route annule sa création avec le reste de la transaction.
+    """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête avec sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
+    # La table temporaire, créée avant la purge, sert la comparaison puis est supprimée. Un échec annule sa création avec le reste de la transaction.
     conn.execute(
         text(
             f"CREATE TEMP TABLE relations_before AS "
@@ -338,12 +335,13 @@ def _insert_edges(conn: Connection, edges: list[RelationEdge]) -> int:
         }
         for e in edges
     ]
-    stmt = text("""
+    stmt = text(f"""
         INSERT INTO publication_relations
             (from_publication_id, relation_type, target_doi, target_publication_id, source)
         SELECT e.f, e.t::relation_type, e.d, COALESCE(e.p, p.id), e.s
         FROM jsonb_to_recordset(:payload) AS e(f int, t text, d text, p int, s text)
-        LEFT JOIN publications p ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = e.d
+        LEFT JOIN publications p
+          ON e.p IS NULL AND e.d IS NOT NULL AND lower(p.doi) = {doi_or_target_sql("e.d")}
         WHERE COALESCE(e.p, p.id) IS NULL OR COALESCE(e.p, p.id) <> e.f
         ON CONFLICT ON CONSTRAINT publication_relations_uq DO NOTHING
     """).bindparams(bindparam("payload", type_=Jsonb))
@@ -416,7 +414,7 @@ def _build_distinct_work_edges(
                 continue
             relation, subject = inferred
             if subject == "b":
-                # Une cible typée est au corpus : c'est elle qui porte la relation dirigée.
+                # Une cible typée est au corpus : la relation dirigée part d'elle.
                 assert target is not None
                 edges.append(
                     RelationEdge(
@@ -548,10 +546,7 @@ class RelationsPhase:
 
 
 def _log_changes(rebuild: RelationsRebuild, logger: logging.Logger) -> None:
-    """Écrit ce que la reconstruction a changé : les relations ajoutées par nature du lien, puis celles qui ont disparu.
-
-    La table étant reconstruite entière à chaque run, le nombre d'arêtes écrites ne dit rien : presque toutes s'y trouvaient déjà. Seul l'écart avec l'état précédent porte une information.
-    """
+    """Écrit ce que la reconstruction a changé : les relations ajoutées par nature du lien, puis celles qui ont disparu."""
     added = _count_by_pair_label(rebuild.added_by_type)
     total = sum(added.values())
     step(logger, "Relations entre publications")
@@ -580,9 +575,6 @@ def _count_by_pair_label(added_by_type: list[tuple[str, int]]) -> dict[str, int]
         label = RELATION_PAIR_LABELS.get(RelationType(relation_type), relation_type)
         by_label[label] = by_label.get(label, 0) + count
     return dict(sorted(by_label.items(), key=lambda item: item[1], reverse=True))
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

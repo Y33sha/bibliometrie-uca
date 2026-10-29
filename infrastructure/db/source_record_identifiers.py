@@ -5,7 +5,8 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
-from infrastructure.sql_fragments import case_priority, raw_column
+from domain.sources.registry import AGGREGATOR_SOURCES
+from infrastructure.sql_fragments import case_priority
 
 
 def first_of_its_type_sql(identifier: str) -> str:
@@ -22,11 +23,33 @@ def first_of_its_type_sql(identifier: str) -> str:
     )
 
 
-def related_doi_sql(identifier: str, source_record: str) -> str:
-    """Condition SQL : l'identifiant aliasé `identifier` est un DOI actif autre que le DOI d'avant correction de l'enregistrement source aliasé `source_record`."""
+def source_record_doi_sql(source_record: str) -> str:
+    """Expression SQL : DOI affiché de l'enregistrement source aliasé `source_record`, le premier de ses DOI actifs de rôle autre que `related`, par rôle puis par valeur (`first_of_its_type_sql`). NULL sans DOI."""
     return (
-        f"{identifier}.id_type = '{SourceIdentifierType.DOI}' AND {identifier}.removed_by IS NULL"
-        f" AND {identifier}.id_value IS DISTINCT FROM {raw_column('doi', source_record)}"
+        "(SELECT d.id_value FROM source_record_identifiers d"  # noqa: S608
+        f" WHERE d.source_record_id = {source_record}.id"
+        f" AND d.id_type = '{SourceIdentifierType.DOI}'"
+        f" AND d.role <> '{SourceIdentifierRole.RELATED}' AND {first_of_its_type_sql('d')})"
+    )
+
+
+def serial_doi_sql(identifier: str, source_record: str) -> str:
+    """Condition SQL : l'identifiant aliasé `identifier` est un DOI actif que l'enregistrement source aliasé `source_record` donne avec sa revue.
+
+    Ce sont ses DOI `primary` ou `derived`. A défaut, ce sont ses DOI `secondary`, sauf chez un agrégateur : chez OpenAlex, un DOI `secondary` est souvent celui d'une copie de repository.
+    """
+    aggregators = ", ".join(f"'{s.value}'" for s in sorted(AGGREGATOR_SOURCES))
+    strong = f"'{SourceIdentifierRole.PRIMARY}', '{SourceIdentifierRole.DERIVED}'"
+    # noqa S608 : `identifier` et `source_record` sont des alias de la requête hôte, jamais une entrée.
+    return (
+        f"{identifier}.id_type = '{SourceIdentifierType.DOI}' AND {identifier}.removed_by IS NULL"  # noqa: S608
+        f" AND ({identifier}.role IN ({strong})"
+        f" OR ({identifier}.role = '{SourceIdentifierRole.SECONDARY}'"
+        f" AND {source_record}.source::text NOT IN ({aggregators})"
+        " AND NOT EXISTS (SELECT 1 FROM source_record_identifiers x"
+        f" WHERE x.source_record_id = {identifier}.source_record_id"
+        f" AND x.id_type = '{SourceIdentifierType.DOI}' AND x.removed_by IS NULL"
+        f" AND x.role IN ({strong}))))"
     )
 
 

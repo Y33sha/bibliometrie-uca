@@ -1,6 +1,6 @@
 """Sous-étape de la phase `publishing` — calcule les espaces de noms DOI des revues.
 
-Les couples (DOI, revue) des enregistrements de toutes les sources désignent les espaces de noms (`domain/serials/doi_namespaces.py`). La table `serial_doi_namespaces` est recalculée en entier à chaque passage.
+Les couples (DOI, revue) des enregistrements sources de toutes les sources désignent les espaces de noms (`domain/serials/doi_namespaces.py`). La table `serial_doi_namespaces` est recalculée en entier à chaque passage.
 """
 
 import logging
@@ -11,6 +11,7 @@ from sqlalchemy import Connection, text
 
 from domain.serials.doi_namespaces import DoiNamespace, designated_by_namespace, learn_namespaces
 from domain.serials.serial import SerialType
+from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.db.tables import serial_doi_namespaces
 from infrastructure.sql_fragments import corrected
 from pipeline.runtime.observability.log_format import quantity
@@ -30,15 +31,16 @@ class DoiSerialRow(NamedTuple):
 
 # Une revue posée par son espace de noms laisse sa trace dans `corrections.serial_id`.
 _DOI_SERIAL_PAIRS = text(f"""
-    SELECT s.doi, s.serial_id, j.serial_type
+    SELECT d.id_value AS doi, s.serial_id, j.serial_type
     FROM source_records s
     JOIN serials j ON j.id = s.serial_id
-    WHERE s.doi IS NOT NULL AND NOT {corrected("serial_id", "s")}
+    JOIN source_record_identifiers d ON d.source_record_id = s.id AND {serial_doi_sql("d", "s")}
+    WHERE NOT {corrected("serial_id", "s")}
 """)
 
 
 def find_doi_serial_pairs(conn: Connection) -> list[DoiSerialRow]:
-    """Le couple (DOI, revue) de chaque enregistrement. Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
+    """Les couples (DOI, revue) des enregistrements sources, un par DOI que l'enregistrement source donne avec sa revue (`serial_doi_sql`). Une revue posée par son espace de noms est exclue : elle ne témoigne pas pour lui."""
     return [
         DoiSerialRow(r.doi, r.serial_id, SerialType(r.serial_type))
         for r in conn.execute(_DOI_SERIAL_PAIRS)

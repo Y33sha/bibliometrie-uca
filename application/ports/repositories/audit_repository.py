@@ -1,6 +1,6 @@
-"""Port AuditRepository — contrat d'écriture dans `audit_log`.
+"""Port AuditRepository : écriture dans `audit_log`.
 
-Le port n'expose qu'une insertion brute. Le filtrage par `user_id` (no-op hors contexte HTTP) relève de `application/audit_log.py`.
+Le port insère seulement. Le choix de consigner, selon la requête, relève de `application/audit_log.py`.
 """
 
 from typing import Protocol
@@ -9,7 +9,7 @@ from domain.types import JsonValue
 
 
 class AuditRepository(Protocol):
-    """Contrat d'écriture sync dans audit_log."""
+    """Écriture dans `audit_log`."""
 
     def record_event(
         self,

@@ -1,6 +1,6 @@
 """Router des éditeurs : listes, recherche, édition, fusion. Sert `/api/publishers/*`.
 
-Les chemins littéraux — `/types`, `/facets`, `/export.csv` — précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux (`/types`, `/facets`, `/export.csv`) précèdent `/{publisher_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, Query
@@ -40,7 +40,7 @@ router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 def list_publisher_types() -> list[EnumOption]:
     """Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
 
-    La source de vérité côté Python est `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page admin des éditeurs et la colonne « Type » des pages publiques.
+    Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
     """
     return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
@@ -53,7 +53,7 @@ def publisher_filters(
 ) -> PublisherFilters:
     """Filtres communs à la liste des éditeurs et à ses facettes.
 
-    `publisher_type` accepte plusieurs valeurs séparées par des virgules, prises dans l'énumération du domaine ; une valeur inconnue rend 422. `country` suit la même convention multi-valeurs, sur les codes du référentiel. `search` est ignoré en deçà de deux caractères.
+    `publisher_type` accepte plusieurs valeurs séparées par des virgules, prises dans l'énumération du domaine ; une valeur inconnue renvoie 422. `country` suit la même convention multi-valeurs, sur les codes du référentiel. `search` agit à partir de deux caractères.
     """
     return PublisherFilters(
         search=search,
@@ -103,7 +103,7 @@ def list_publishers(
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 
@@ -116,7 +116,7 @@ def get_publisher(
 ) -> Publisher:
     """Profil complet d'un éditeur, pour sa page publique.
 
-    Porte ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
+    Contient ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
     """
     return detail.found(queries.get_publisher_detail(publisher_id))
 
@@ -142,7 +142,7 @@ def update_publisher(
 ) -> OkResponse:
     """Met à jour un éditeur, champ par champ.
 
-    Seuls les champs présents dans le corps de la requête sont écrits (`exclude_unset=True`). Renvoie 404 sur un éditeur inconnu.
+    Seuls les champs présents dans le corps de la requête sont écrits. Renvoie 404 sur un éditeur inconnu.
     """
     publishers.update_publisher(publisher_id, body)
     return OkResponse()
@@ -162,9 +162,9 @@ def merge(
 
     Les revues et les publications de la source passent à la cible, puis la source est supprimée. Deux revues au titre partagé entre les deux éditeurs sont fondues en une, et leurs publications requalifiées contre le `serial_type` de la cible (`merge_serials`).
 
-    Deux éditeurs qui portent des membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
+    Deux éditeurs aux membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
 
-    Cette fusion de revues peut buter : ISSN divergents pour un même titre, ou doublon interne de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'admin les traite côté revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+    La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'administration les traite dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
     publishers.merge_publishers(publisher_id, body.source_id)
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

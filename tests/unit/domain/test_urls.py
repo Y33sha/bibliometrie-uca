@@ -40,7 +40,7 @@ class TestIsHost:
         assert not is_host("https://exemple.fr/doi.org/10.1234/x", "doi.org")
 
     def test_domain_as_a_suffix_of_the_host(self):
-        """`fauxdoi.org` porte `doi.org` en fin d'hôte sans en être un sous-domaine."""
+        """`fauxdoi.org` finit par `doi.org` sans en être un sous-domaine."""
         assert not is_host("https://fauxdoi.org/10.1234/x", "doi.org")
 
     def test_no_host(self):

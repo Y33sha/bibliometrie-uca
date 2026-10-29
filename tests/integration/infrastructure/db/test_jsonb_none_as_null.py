@@ -1,7 +1,6 @@
 """Le type JSONB du projet écrit `None` en NULL SQL, jamais en JSON `null`.
 
-Les deux se relisent en `None` côté Python, mais SQL les distingue : une colonne qui mélange les
-deux formes échappe aux contraintes et aux index qui raisonnent sur NULL.
+Les deux se relisent en `None` côté Python, mais SQL les distingue : une colonne qui mélange les deux formes échappe aux contraintes et aux index qui raisonnent sur NULL.
 """
 
 from sqlalchemy import bindparam, text
@@ -38,9 +37,7 @@ def test_colonne_de_table_none_donne_null_sql(sa_sync_conn):
 def test_identite_sans_identifiant_ne_se_dedouble_pas(sa_sync_conn):
     """Une contribution source sans identifiant rejoint les informations du contributeur NULL de même nom, au lieu d'en créer d'autres.
 
-    C'est ce que porte l'unique `NULLS NOT DISTINCT` de la table, et ce qu'un JSON `null` mettait
-    en défaut : il n'est pas NULL, l'unique le laissait passer, et le `key_hash` de la ligne en
-    double différait de celui que le rapprochement recherche.
+    La contrainte d'unicité `NULLS NOT DISTINCT` de la table l'assure. Un JSON `null` la met en défaut : il diffère de NULL, donc la contrainte le laisse passer, et le `key_hash` de la ligne en double diffère de celui que la recherche par `key_hash` calcule.
     """
     sa_sync_conn.execute(
         text(

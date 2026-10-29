@@ -14,7 +14,6 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import PublicationFilterBar from '#lib/components/PublicationFilterBar.svelte';
 	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
-	import { isAdmin } from '#lib/session.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import ActiveFilterBar from '#lib/components/ActiveFilterBar.svelte';
 	import {
@@ -70,10 +69,8 @@
 		onExcludeContribution?: (contributionId: number, publicationId: number) => void | boolean | Promise<void | boolean>;
 	} = $props();
 
-	// Volet d'une publication, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
-	const drawer = useDrawerParam('publication', isAdmin);
-	// Une seule cellule d'actions en tête de ligne : volet, puis exclusion de la contribution.
-	const hasRowActions = $derived(isAdmin() || showAdminExclude);
+	// Volet d'une publication : ouvert tant que `?publication=<id>` figure dans l'URL. Une icône en tête de ligne ouvre le volet ; le titre mène toujours à la fiche.
+	const drawer = useDrawerParam('publication');
 
 	// Le laboratoire a la colonne et le filtre « Statut HAL ». La personne a la colonne et le filtre « Auteur correspondant », le filtre du périmètre, et marque les APC des publications dont elle n'est pas l'auteur correspondant.
 	// svelte-ignore state_referenced_locally
@@ -270,7 +267,7 @@
 <table class="data-table publication-table">
 	<thead>
 		<tr>
-			{#if hasRowActions}<th class="row-actions"></th>{/if}
+			<th class="row-actions"></th>
 			{#if col('type')}<th style="width:80px">{columnLabels.type}</th>{/if}
 			{#if col('year')}<th style="width:40px" class="sortable" class:active={yearSort !== null} onclick={() => toggleSort('year')}>
 				{columnLabels.year} <SortChevron direction={yearSort} />
@@ -307,20 +304,17 @@
 	</thead>
 	<tbody>
 		{#if listing.items.length === 0}
-			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + (hasRowActions ? 1 : 0)} emptyText="Aucune publication trouvée" />
+			<TableStatusRow loading={listing.loading} error={listing.error} colspan={cv.visibleColumns.length + 1} emptyText="Aucune publication trouvée" />
 		{:else}
 			{#each listing.items as p (p.id)}
 				<tr class:active-row={p.id === drawer.id}>
-					{#if hasRowActions}
-						<td class="row-actions">
-							{#if isAdmin()}
-								<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
-							{/if}
-							{#if showAdminExclude && p.contribution_id != null}
-								<IconButton icon="reject" label="Exclure ce lien auteur–publication" onclick={() => onExcludeClick(p)} />
-							{/if}
-						</td>
-					{/if}
+					<!-- Cellule d'actions : volet, puis exclusion de la contribution. -->
+					<td class="row-actions">
+						<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(p.id)} />
+						{#if showAdminExclude && p.contribution_id != null}
+							<IconButton icon="reject" label="Exclure ce lien auteur–publication" onclick={() => onExcludeClick(p)} />
+						{/if}
+					</td>
 					{#if col('type')}<td>
 						{#if p.doc_type}<DocTypePill docType={p.doc_type} />{/if}
 					</td>{/if}

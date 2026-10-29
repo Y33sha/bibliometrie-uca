@@ -1,6 +1,6 @@
-"""Le lookup `key_hash` (Python) doit rester aligné sur la colonne générée `contributor_information.key_hash`.
+"""Colonnes générées de `contributor_information` : `key_hash` concorde avec l'expression que calcule `key_hash_sql`, `author_name_normalized` réunit prénom et nom.
 
-Un désalignement ferait échouer silencieusement la résolution des informations du contributeur par `key_hash`.
+Un écart sur `key_hash` ferait échouer sans erreur la recherche des informations du contributeur par `key_hash`.
 """
 
 from sqlalchemy import text
@@ -34,7 +34,7 @@ def test_key_hash_sql_matches_generated_column(sa_sync_conn):
 
 
 def test_forme_prenom_nom_calculee(sa_sync_conn):
-    """`author_name_normalized` : prénom et nom, parties vides omises."""
+    """`author_name_normalized` réunit prénom et nom, sans les parties vides."""
     sa_sync_conn.execute(
         text(
             "INSERT INTO contributor_information (last_name_normalized, first_name_normalized) "

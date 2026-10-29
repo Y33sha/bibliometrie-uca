@@ -431,7 +431,7 @@
   });
 </script>
 
-<Drawer width="600px" {onclose} {onescape}>
+<Drawer width="67vw" {onclose} {onescape}>
   {#snippet head()}
     {#if detail}
       {@const s = detail.structure}

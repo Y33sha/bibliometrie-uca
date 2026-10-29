@@ -1,4 +1,4 @@
-"""Lecture des personnes (router persons).
+"""Lectures des personnes, pour les routes `/api/persons`.
 
 Le package est organisé par thème, une classe par module :
 - `list` : liste, recherche, personne en administration, formes de nom

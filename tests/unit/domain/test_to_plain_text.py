@@ -1,6 +1,6 @@
 """Mise à plat d'une valeur reçue d'une source : `domain.normalize.to_plain_text`.
 
-Les champs qui n'ont pas vocation à porter du balisage — adresse d'affiliation, libellé de sujet, nom d'auteur, titre de revue, nom d'éditeur — le reçoivent pourtant des sources. Ces cas sont relevés dans les données réelles.
+Les sources mettent du balisage dans des champs en texte brut : adresse d'affiliation, libellé de sujet, nom d'auteur, titre de revue, nom d'éditeur. Les cas viennent des données réelles.
 """
 
 import pytest
@@ -19,27 +19,23 @@ class TestBalises:
         assert to_plain_text('<a href="https://ror.org/01ggx4157">CERN</a>') == "CERN"
 
     def test_preserve_les_indices_de_miller(self):
-        # `<111>` est du contenu (cristallographie), pas une balise : le premier caractère
-        # doit être une lettre pour qu'un fragment soit tenu pour du balisage.
+        # `<111>` est du contenu (cristallographie) : un fragment est du balisage seulement s'il commence par une lettre.
         assert to_plain_text("Surface <111> orientation") == "Surface <111> orientation"
 
     def test_preserve_les_inegalites(self):
-        # Le corps d'une balise exclut `<` : l'encadrement s'arrête au signe suivant, et la
-        # mesure survit à la mise à plat.
+        # Le corps d'une balise exclut `<` : la balise candidate s'arrête au signe suivant, et la mesure reste intacte.
         assert to_plain_text("mesuré pour 2.96<yCMS<3.53 et 0.5<pT<10 GeV/c") == (
             "mesuré pour 2.96<yCMS<3.53 et 0.5<pT<10 GeV/c"
         )
 
     def test_retire_les_balises_imbriquees(self):
-        # Le retrait d'une balise peut en reconstituer une autre : `<ab<aa>a>` laisse `<ab a>`,
-        # qui est encore du balisage. Le retrait se répète jusqu'à ce qu'il n'en reste aucun.
+        # Le retrait d'une balise peut en reconstituer une autre : `<ab<aa>a>` laisse `<ab a>`, encore du balisage. Le retrait se répète jusqu'au dernier fragment.
         assert to_plain_text("<ab<aa>a>") == ""
         assert to_plain_text("&lt;ab&lt;aa&gt;a&gt;") == ""
         assert to_plain_text("ca<c<b>>-=") == "ca -="
 
     def test_la_mise_a_plat_est_idempotente(self):
-        # Une valeur déjà mise à plat ne bouge plus : le résultat ne porte aucun fragment
-        # qu'un second passage retirerait.
+        # Une valeur déjà mise à plat reste identique au second passage.
         for brut in ("<ab<aa>a>", '</b!"<b=>>', "<i><b>Nature</b></i>", "<!--<a>x</a>--> y"):
             une_passe = to_plain_text(brut)
             assert to_plain_text(une_passe) == une_passe
@@ -61,8 +57,7 @@ class TestEntites:
         assert to_plain_text("a &amp; b") == "a & b"
 
     def test_decode_les_entites_reechappees(self):
-        # Relevé en base : des contributions sources arrivent doublement échappées (`&amp;amp;`), qu'une
-        # passe unique laisserait à moitié décodées.
+        # Relevé en base : des contributions sources arrivent doublement échappées (`&amp;amp;`) ; le décodage se répète.
         assert to_plain_text("OVPF, OVSG &amp;amp; OVSM Teams") == "OVPF, OVSG & OVSM Teams"
         assert to_plain_text("a &amp;amp;amp; b") == "a & b"
 
@@ -73,7 +68,7 @@ class TestEntites:
 
 class TestCommentaires:
     def test_retire_les_commentaires_entiers(self):
-        # Relevé sur des adresses OpenAlex : le numéro d'appel de note voyage en commentaire.
+        # Relevé sur des adresses OpenAlex : le numéro d'appel de note est dans un commentaire.
         assert to_plain_text("<!--<label>3</label>--> Clinique Maussins, Paris") == (
             "Clinique Maussins, Paris"
         )

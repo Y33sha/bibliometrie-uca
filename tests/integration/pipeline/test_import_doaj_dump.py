@@ -1,4 +1,4 @@
-"""Tests d'intégration de l'import du dump DOAJ (`run_import_doaj_dump`)."""
+"""Import du dump DOAJ (`run_import_doaj_dump`)."""
 
 import logging
 
@@ -29,7 +29,7 @@ def _row(issn="", eissn="", **extra):
 
 
 def _run(conn, rows, *, dry_run=False):
-    # commit=False : le fixture sa_sync_conn est une transaction rollbackée.
+    # Sans validation : la fixture `sa_sync_conn` est une transaction annulée en fin de test.
     return run_import_doaj_dump(
         conn,
         logging.getLogger("test"),
@@ -74,13 +74,13 @@ class TestImportDoajDump:
         assert stats.no_issn_rows == 1
 
     def test_reset_clears_serials_absent_from_dump(self, sa_sync_conn):
-        # Un journal marqué is_in_doaj mais absent du dump repasse à FALSE.
+        # Une revue marquée `is_in_doaj` et absente du dump perd sa marque.
         jid = _create_serial(sa_sync_conn, issn="0036-8075")
         _create_serial(sa_sync_conn, issn="0028-0836")
         sa_sync_conn.execute(
             text("UPDATE serials SET is_in_doaj = TRUE WHERE id = :id"), {"id": jid}
         )
-        _run(sa_sync_conn, [_row(issn="0028-0836")])  # dump sans notre premier ISSN
+        _run(sa_sync_conn, [_row(issn="0028-0836")])  # dump sans l'ISSN de la première revue
         assert _is_in_doaj(sa_sync_conn, jid) is False
 
     def test_dump_without_recognized_serial_changes_nothing(self, sa_sync_conn):
@@ -94,7 +94,7 @@ class TestImportDoajDump:
         assert _is_in_doaj(sa_sync_conn, jid) is True
 
     def test_orphan_rows_counted_not_matched(self, sa_sync_conn):
-        stats = _run(sa_sync_conn, [_row(issn="2049-3630")])  # ISSN inconnu en local
+        stats = _run(sa_sync_conn, [_row(issn="2049-3630")])  # ISSN absent de la base
         assert stats.orphan_rows == 1
         assert stats.matched == 0
 
@@ -102,7 +102,7 @@ class TestImportDoajDump:
         jid = _create_serial(sa_sync_conn, issn="0028-0836")
         stats = _run(sa_sync_conn, [_row(issn="0028-0836")], dry_run=True)
         assert stats.matched == 1  # compté
-        assert _is_in_doaj(sa_sync_conn, jid) is False  # mais rien écrit
+        assert _is_in_doaj(sa_sync_conn, jid) is False  # sans écriture
 
 
 class TestTypeDoajSerialsAsJournals:

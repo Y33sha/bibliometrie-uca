@@ -29,7 +29,7 @@ StructureSort = Literal[
 class StructureFilters:
     """Filtres de la liste des structures, de ses facettes et de son export.
 
-    `perimeter_ids` retient les structures de ces périmètres, clôture comprise. `perimeter_none` retient les structures hors de tout périmètre. Les deux se combinent en OU.
+    `perimeter_ids` retient les structures de ces périmètres, sous-structures comprises. `perimeter_none` retient les structures hors de tout périmètre. Les deux se combinent en OU.
     """
 
     search: str = ""
@@ -50,7 +50,7 @@ class StructureListItem(BaseModel):
     ror_id: str | None
     hal_collection: str | None
     perimeter_ids: list[int]
-    """Périmètres auxquels la structure appartient (clôture transitive). Vide = hors périmètre."""
+    """Périmètres qui contiennent la structure, directement ou par une tutelle ; vide hors de tout périmètre."""
     tutelles: list[RelatedStructureOut] | None
     """Structures qui exercent une tutelle sur celle-ci."""
 
@@ -71,7 +71,7 @@ class StructuresFacetsResponse(BaseModel):
 
 
 class StructureOut(BaseModel):
-    """Structure complète — renvoyée par GET/POST/PUT sur `/api/structures`."""
+    """Structure complète, rendue par GET, POST et PUT sur `/api/structures`."""
 
     id: int
     code: str
@@ -100,7 +100,7 @@ class StructureOut(BaseModel):
 
 
 class RelatedStructureOut(BaseModel):
-    """Structure voisine (parent/enfant) dans le détail d'une structure."""
+    """Structure voisine (tutelle ou sous-structure) dans le détail d'une structure."""
 
     id: int
     code: str

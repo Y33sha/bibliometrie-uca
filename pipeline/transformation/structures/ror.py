@@ -43,7 +43,7 @@ class RorStore:
         *,
         version: str,
     ) -> None:
-        """Vide les deux tables, y écrit les organisations et les couples `(parent, enfant)`, et inscrit `version` dans `ror_dump_imports`. Marque les dépendants des organisations dont le pays change (`_mark_country_changes`)."""
+        """Remplace les organisations et leurs relations par celles du dump, inscrit sa version, et marque pour la phase `countries` les dépendants des organisations dont le pays change."""
         previous = dict(
             self._conn.execute(
                 select(ror_organizations.c.ror_id, ror_organizations.c.country_code)
@@ -90,7 +90,7 @@ class RorStore:
         )
 
     def _mark_country_changes(self, ror_ids: list[str]) -> None:
-        """Pour les organisations `ror_ids` : marque pour le recalcul des pays les contributions sources qui les citent sans adresse."""
+        """Marque pour le recalcul des pays les contributions sources qui citent ces organisations sans adresse."""
         if not ror_ids:
             return
         self._conn.execute(
@@ -128,7 +128,7 @@ def import_ror_dump(
     version: str,
     store: RorStore,
 ) -> RorImportStats:
-    """Remplit le référentiel ROR avec les organisations du dump `version` et leurs relations parent/enfant, en une transaction."""
+    """Remplit le référentiel ROR avec les organisations d'une version du dump et leurs relations parent/enfant, puis commite."""
     orgs = list(organizations)
     relations = ror_relations(orgs)
     store.replace_all(orgs, relations, version=version)
@@ -143,7 +143,7 @@ def run_refresh_ror(
     store: RorStore,
     logger: logging.Logger,
 ) -> PhaseMetrics:
-    """Importe la dernière version du dump ROR si elle n'est pas déjà importée."""
+    """Importe la dernière version du dump ROR, si elle reste à importer."""
     metrics = PhaseMetrics()
     step(logger, "Référentiel ROR")
     last = store.last_imported_version()

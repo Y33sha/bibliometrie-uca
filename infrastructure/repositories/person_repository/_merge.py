@@ -67,7 +67,7 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> None:
-    """La contribution de l'absorbée dans une publication où la conservée en a déjà un perd sa personne ; les autres passent à la conservée."""
+    """La contribution de l'absorbée dans une publication où la conservée en a déjà une perd sa personne ; les autres passent à la conservée."""
     conn.execute(
         text(f"""
             UPDATE contributions s SET {DETACHED_CONTRIBUTION}
@@ -131,7 +131,7 @@ MERGE_STEPS: dict[str, MergeStep] = {
 
 
 def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
-    """Applique chaque étape de `MERGE_STEPS`, supprime la personne absorbée et enregistre sa redirection, dans la transaction du caller.
+    """Applique chaque étape de `MERGE_STEPS`, supprime la personne absorbée et enregistre sa redirection, dans la transaction de l'appelant.
 
     Après les transferts, la personne conservée peut réunir la contribution de l'une et le rejet de l'autre pour la même publication : le rejet l'emporte, comme au rejet d'une paire.
     """

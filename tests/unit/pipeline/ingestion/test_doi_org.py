@@ -1,6 +1,6 @@
 """Tests du client `doi.org/ra` (`fetch_registration_agencies`).
 
-Mockent `httpx2.request` (utilisé par `http_request_with_retry`) pour ne pas dépendre du réseau. Les requêtes s'exécutent sous le circuit-breaker de la fixture `breaker`.
+Les tests simulent `httpx2.request`, qu'appelle `http_request_with_retry`. Les requêtes s'exécutent sous le circuit-breaker de la fixture `breaker`.
 """
 
 from __future__ import annotations

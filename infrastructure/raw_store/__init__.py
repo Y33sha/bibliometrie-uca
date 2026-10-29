@@ -1,4 +1,4 @@
-"""Store de payloads bruts hors BDD (cf. `base.RawStore`)."""
+"""Archive des payloads bruts des sources, hors base (`base.RawStore`)."""
 
 from infrastructure.raw_store.base import RawStore, UnreadablePayloadError
 from infrastructure.raw_store.factory import get_raw_store

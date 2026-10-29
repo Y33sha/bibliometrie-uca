@@ -37,7 +37,7 @@ class HalStructureStore:
         self._conn = conn
 
     def ids_to_fetch(self, *, refresh_stale: bool) -> set[int]:
-        """Structures citées et absentes du référentiel, avec ses structures anciennes quand `refresh_stale` est vrai."""
+        """Structures citées et absentes du référentiel. Avec `refresh_stale`, s'y ajoutent les structures chargées il y a plus de `STALE_AFTER_DAYS` jours."""
         ids = set(
             self._conn.execute(
                 text("""
@@ -64,7 +64,7 @@ class HalStructureStore:
         return ids
 
     def known_ids(self, ids: Iterable[int]) -> set[int]:
-        """Identifiants de `ids` déjà présents dans le référentiel, comme structure ou comme alias."""
+        """Identifiants déjà présents dans le référentiel, comme structure ou comme alias."""
         return set(
             self._conn.execute(
                 text("""
@@ -206,7 +206,7 @@ def fetch_hal_structures(
     save_batch: SaveBatch,
     progress: Progress | None = None,
 ) -> HalStructuresLoad:
-    """Lit `ids` dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture. `progress` compte les identifiants lus ; son total croît avec les parents à lire."""
+    """Lit les structures dans `ref/structure` par lots, résout les alias, puis lit les parents absents du référentiel, jusqu'à la racine. Chaque lot passe à `save_batch` dès sa lecture. `progress` compte les identifiants lus ; son total croît avec les parents à lire."""
     load = HalStructuresLoad()
     pending = set(ids)
     requested: set[int] = set()
@@ -247,7 +247,7 @@ def run_refresh_hal_structures(
     logger: logging.Logger,
     refresh_stale: bool,
 ) -> PhaseMetrics:
-    """Charge les structures HAL citées et absentes du référentiel, relit les anciennes quand `refresh_stale` est vrai, puis reconstruit les relations. Chaque lot est validé dès son écriture."""
+    """Charge les structures à lire, puis reconstruit les relations, y compris quand HAL devient inaccessible."""
     metrics = PhaseMetrics()
     step(logger, "Référentiel des structures HAL")
     ids = store.ids_to_fetch(refresh_stale=refresh_stale)

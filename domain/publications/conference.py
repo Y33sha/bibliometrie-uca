@@ -1,7 +1,4 @@
-"""Communication (`conference`) ou texte publié dans des actes (`conference_paper`).
-
-Une `conference_paper` est un texte publié dans des actes. Une `conference` est une communication sans texte publié, résumés compris. La décision se prend sur l'ensemble des enregistrements d'une publication : un enregistrement suffit à attester la publication, un autre peut la désigner comme résumé.
-"""
+"""Arbitrage entre communication sans texte publié, résumés compris (`conference`), et texte publié dans des actes (`conference_paper`), sur l'ensemble des enregistrements sources d'une publication."""
 
 import re
 
@@ -34,7 +31,7 @@ def _hal_titles(source: SourceRecord) -> list[str]:
 
 
 def names_abstracts(source: SourceRecord) -> bool:
-    """L'enregistrement source HAL range la communication dans un recueil de résumés."""
+    """Vrai si l'enregistrement source HAL range la communication dans un recueil de résumés."""
     return source.source == "hal" and any(
         _ABSTRACTS.search(normalize_text(t)) for t in _hal_titles(source)
     )
@@ -56,8 +53,8 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
 
 
 def attests_publication(source: SourceRecord) -> bool:
-    """L'enregistrement source atteste un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
-    if source.doi or source.serial_id or source.monograph_id:
+    """Vrai si l'enregistrement source décrit un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
+    if source.dois.all or source.serial_id or source.monograph_id:
         return True
     if declares_conference(source.source_extras):
         return True
@@ -65,9 +62,9 @@ def attests_publication(source: SourceRecord) -> bool:
 
 
 def arbitrate_conference(doc_type: str, sources: list[SourceRecord]) -> str:
-    """Type d'une publication qui relève d'un congrès, au vu de tous ses enregistrements.
+    """Type d'une publication qui relève d'un congrès.
 
-    Un enregistrement qui désigne une communication (`conference`, recueil de résumés HAL) l'emporte sur `article`, `conference_paper` et `preprint`. Une `conference_paper` qu'aucun enregistrement n'atteste devient une `conference`. Les autres types restent inchangés.
+    Un enregistrement source qui désigne une communication (`conference`, recueil de résumés HAL) l'emporte sur `article`, `conference_paper` et `preprint`. Une `conference_paper` sans enregistrement source qui décrive un texte publié devient une `conference`.
     """
     if doc_type in _SUPPLANTED_BY_CONFERENCE and any(
         s.doc_type == DocType.CONFERENCE or names_abstracts(s) for s in sources

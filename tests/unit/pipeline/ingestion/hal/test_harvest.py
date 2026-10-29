@@ -1,6 +1,6 @@
 """Moissonnage HAL (`pipeline.ingestion.hal.harvest`).
 
-Requêtes Solr et champs des enregistrements sources : fonctions pures. Pilotage par `HalHarvester` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur disjoncteur. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est remplacée, la connexion est un mock.
+Requêtes Solr et champs des enregistrements sources : fonctions pures. Pilotage par `HalHarvester` : découpage en périmètres temporels, comptage préalable de chaque périmètre, mode incrémental, refus d'une configuration sans collection, arrêt sur circuit-breaker. Pas de réseau ni de base : un faux client sert une page vide, la lecture de la configuration est simulée, la connexion est un mock.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from tests.helpers.harvesters import arguments_du_run
 
 _LOGGER = logging.getLogger("test")
 
-# Page Solr close : aucun document, marqueur inchangé — la pagination s'arrête au premier tour.
+# Page Solr finale : aucun document, marqueur inchangé. La pagination s'arrête au premier tour.
 _PAGE_VIDE = {"response": {"numFound": 0, "docs": []}, "nextCursorMark": "*"}
 
 
@@ -66,7 +66,7 @@ class TestFields:
 
 @pytest.fixture
 def configuration(monkeypatch):
-    """Remplace la lecture des collections et des années en base."""
+    """Simule la lecture des collections et des années en base."""
 
     def _poser(collections: dict[str, str], annees: list[int]) -> None:
         monkeypatch.setattr(harvest, "get_hal_collections", lambda conn: collections)
@@ -118,7 +118,7 @@ def test_mode_incremental_fait_une_seule_passe_sur_la_date(configuration):
 
 
 def test_mode_incremental_garde_les_annees_du_mode_complet(configuration):
-    # Un enregistrement source ancienne modifiée depuis la date reste hors de la plage d'années.
+    # Un enregistrement source ancien, modifié depuis la date, reste hors de la plage d'années.
     configuration({"C": "Coll"}, [2020, 2021, 2022])
     client = _client()
     HalHarvester(MagicMock(), _LOGGER, client).run(arguments_du_run(since="2026-01-01"))

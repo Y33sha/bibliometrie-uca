@@ -1,12 +1,8 @@
-"""Traduction du type de document de chaque source dans le vocabulaire du référentiel, l'enum PostgreSQL `doc_type`.
-
-Chaque source (HAL, OpenAlex, WoS, ScanR, theses.fr, DataCite, Crossref) a sa propre nomenclature, et sa propre table.
-"""
+"""Traduction du type de document de chaque source dans le vocabulaire du référentiel, l'enum PostgreSQL `doc_type`."""
 
 from domain.publications.doc_types import DOC_TYPES_SET
 
-# Mapping par source. Clés en minuscules pour le lookup.
-# Les valeurs sont des valeurs valides de l'enum doc_type.
+# Table de chaque source, clés en minuscules.
 _SOURCE_MAPS: dict[str, dict[str, str]] = {
     "hal": {
         # Combinaisons type_sous-type (prioritaires)

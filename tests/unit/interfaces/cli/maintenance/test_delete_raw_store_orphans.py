@@ -1,8 +1,6 @@
-"""Élagage des payloads archivés devenus orphelins.
+"""Suppression des payloads archivés sans ligne correspondante dans `staging`.
 
-L'archive des réponses des sources ne fait que croître : la normalisation y dépose, jamais n'en retire. Au fil des ré-imports et des purges, des payloads y subsistent sans ligne correspondante en attente de traitement. Le script confronte les clés de l'archive à ce que la base référence, et supprime le reste.
-
-L'opération est destructrice, d'où le mode simulation, qui compte sans rien retirer. Sa réversibilité tient à ce que la base reste la source de vérité : un payload supprimé est ré-archivé au passage suivant s'il revient.
+Le script confronte les clés de l'archive aux identifiants de `staging`, source par source, et supprime les clés absentes. Le mode simulation compte sans rien supprimer.
 """
 
 import sys
@@ -16,7 +14,7 @@ from interfaces.cli.maintenance.delete_raw_store_orphans import main
 
 
 class _FakeStore:
-    """Archive dont on connaît les clés par source, et qui retient les suppressions."""
+    """Archive aux clés données par source, qui enregistre les suppressions."""
 
     def __init__(
         self, cles: dict[str, list[str]], deja_disparues: frozenset[str] = frozenset()
@@ -35,7 +33,7 @@ class _FakeStore:
 
 @pytest.fixture
 def lancer(tmp_path, monkeypatch):
-    """Monte une arborescence d'archive et lance le script dessus."""
+    """Crée les répertoires de l'archive et lance le script dessus."""
 
     @contextmanager
     def _contexte():
@@ -75,7 +73,7 @@ def test_simulation_ne_supprime_rien(lancer):
 
 
 def test_une_seule_source_visee(lancer):
-    """Les autres sources de l'archive ne sont pas parcourues."""
+    """Avec `--source`, seule la source désignée est parcourue."""
     code, store = lancer(
         {"hal": ["hal-1"], "openalex": ["W1"]}, {"hal": set(), "openalex": set()}, "--source", "hal"
     )
@@ -99,7 +97,7 @@ def test_archive_introuvable(lancer, tmp_path):
 
 
 def test_payload_deja_disparu_du_disque(lancer, caplog):
-    """Un fichier retiré entre le relevé et la suppression n'est pas compté comme supprimé."""
+    """Un fichier disparu entre le parcours des clés et la suppression compte comme détecté, pas comme supprimé."""
     import logging
 
     with caplog.at_level(logging.INFO):

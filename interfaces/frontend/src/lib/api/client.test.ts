@@ -2,7 +2,7 @@
  *
  * Les lectures s'annulent par clé : une requête portant une clé déjà en vol interrompt la
  * précédente, et la requête interrompue reste en suspens plutôt que de rendre la main. Les
- * écritures traduisent un statut d'échec en `ApiError` et rendent `null` sur une réponse sans
+ * écritures traduisent un statut d'échec en `ApiError` et renvoient `null` sur une réponse sans
  * corps.
  */
 
@@ -45,7 +45,7 @@ function toursDeBoucle(): Promise<void> {
 	return new Promise((resoudre) => setTimeout(resoudre, 0));
 }
 
-/** Rend `'en suspens'` quand la promesse ne se règle pas dans le délai imparti. */
+/** Renvoie `'en suspens'` quand la promesse ne se règle pas dans le délai imparti. */
 function reglementOuSuspens<T>(promesse: Promise<T>): Promise<T | 'en suspens'> {
 	return Promise.race([
 		promesse,
@@ -59,12 +59,12 @@ describe('ApiError', () => {
 		expect(erreur.detailMessage).toBe('Identifiant inconnu');
 	});
 
-	it('rend null quand le detail n’est pas une chaîne', () => {
+	it('renvoie null quand le detail n’est pas une chaîne', () => {
 		const erreur = new ApiError(422, { detail: [{ msg: 'champ manquant' }] });
 		expect(erreur.detailMessage).toBeNull();
 	});
 
-	it('rend null quand la réponse ne porte pas de corps exploitable', () => {
+	it('renvoie null quand la réponse ne porte pas de corps exploitable', () => {
 		expect(new ApiError(500, null).detailMessage).toBeNull();
 	});
 
@@ -88,7 +88,7 @@ describe('errorMessage', () => {
 });
 
 describe('lecture', () => {
-	it('rend le corps JSON d’une réponse aboutie', async () => {
+	it('renvoie le corps JSON d’une réponse aboutie', async () => {
 		const promesse = api<{ total: number }>('/api/publications');
 		await toursDeBoucle();
 		enVol[0].resoudre(reponseJson({ total: 3 }));
@@ -220,21 +220,21 @@ describe('écriture', () => {
 		expect(enVol[1].init?.method).toBe('PATCH');
 	});
 
-	it('rend null sur une réponse sans contenu', async () => {
+	it('renvoie null sur une réponse sans contenu', async () => {
 		const promesse = del('/api/persons/1');
 		await toursDeBoucle();
 		enVol[0].resoudre(new Response(null, { status: 204 }));
 		expect(await promesse).toBeNull();
 	});
 
-	it('rend null sur une réponse aboutie au corps vide', async () => {
+	it('renvoie null sur une réponse aboutie au corps vide', async () => {
 		const promesse = post('/api/persons', {});
 		await toursDeBoucle();
 		enVol[0].resoudre(new Response('', { status: 200 }));
 		expect(await promesse).toBeNull();
 	});
 
-	it('rend le corps JSON d’une écriture aboutie', async () => {
+	it('renvoie le corps JSON d’une écriture aboutie', async () => {
 		const promesse = post<{ id: number }>('/api/persons', { name: 'Curie' });
 		await toursDeBoucle();
 		enVol[0].resoudre(reponseJson({ id: 7 }, 201));
@@ -271,7 +271,7 @@ describe('apiDetail', () => {
 		expect(replace).toHaveBeenCalledWith('/journals/12?tab=dashboard');
 	});
 
-	it('rend le corps JSON sans redirection', async () => {
+	it('renvoie le corps JSON sans redirection', async () => {
 		const promesse = apiDetail<{ id: number }>('/api/serials/7');
 		await toursDeBoucle();
 		enVol[0].resoudre(reponseJson({ id: 7 }));

@@ -1,9 +1,6 @@
-"""Adapter Unpaywall : récupère le statut OA d'un DOI.
+"""Client Unpaywall : statut open access d'un DOI.
 
-API: https://api.unpaywall.org/v2/{doi}?email=...
-Rate limit: 100 000 req/jour, ~10 req/s recommandé.
-
-Implémentation async sur `httpx2.AsyncClient` + retry/backoff via `lookup_json_async`. Le client httpx2 est passé en paramètre pour être partagé sur toute la boucle d'enrichissement.
+L'API (`https://api.unpaywall.org/v2/{doi}?email=…`) accepte 100 000 requêtes par jour, et recommande une dizaine par seconde. Les requêtes passent par `lookup_json_async`, avec nouvelles tentatives et backoff, sur un client que toute la boucle d'enrichissement partage.
 """
 
 from __future__ import annotations
@@ -15,7 +12,7 @@ from domain.types import as_mapping
 from pipeline.http.http_retry import lookup_json_async
 from pipeline.http.lookup import NOT_FOUND, LookupOutcome, NotFound, Unavailable
 
-# Mapping Unpaywall oa_status → notre enum oa_type
+# Statut Unpaywall → `oa_type`.
 OA_MAP = {
     "gold": "gold",
     "hybrid": "hybrid",
@@ -32,11 +29,11 @@ async def fetch_oa_status(
     base_url: str,
     email: str,
 ) -> LookupOutcome[str]:
-    """Statut OA d'un DOI selon Unpaywall, ramené au vocabulaire `oa_type`.
+    """Statut open access d'un DOI selon Unpaywall, ramené au vocabulaire `oa_type`.
 
     `NOT_FOUND` couvre un DOI inexploitable, un DOI absent d'Unpaywall et un statut hors vocabulaire.
     """
-    # Re-nettoyage avant l'appel HTTP par DOI (idempotent) : la colonne source peut porter un DOI non normalisé. Un DOI inexploitable → pas d'appel.
+    # La colonne d'origine peut contenir un DOI non normalisé : `clean_doi` repasse avant l'appel. Un DOI inexploitable évite l'appel.
     cleaned = clean_doi(doi)
     if not cleaned:
         return NOT_FOUND

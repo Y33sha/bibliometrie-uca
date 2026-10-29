@@ -1,4 +1,4 @@
-"""Empreinte de changement d'un nœud DataCite : indifférente à la route de lecture et aux compteurs, sensible à l'enregistrement source."""
+"""Empreinte de changement d'une ressource DataCite : indifférente à la route de lecture et aux compteurs de consultation, sensible au contenu de l'enregistrement source."""
 
 import copy
 
@@ -24,7 +24,7 @@ _LISTED = {
 
 
 def _single() -> dict:
-    """Le même DOI tel que le rend la route unitaire (`/dois/{doi}`), un mois plus tard."""
+    """Le même DOI tel que le renvoie la route unitaire (`/dois/{doi}`), un mois plus tard."""
     node = copy.deepcopy(_LISTED)
     node["attributes"].update(
         {

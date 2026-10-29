@@ -1,6 +1,6 @@
 """Modèles de réponse : lectures sur les exécutions de phase du pipeline (/api/pipeline/runs/*).
 
-La liste agrège les exécutions par `run_id` (statut global = le pire des statuts de phase). Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec son écart de durée au médian historique, recalculé à la lecture.
+La liste regroupe les exécutions par `run_id` ; le statut d'un run est le pire de ses phases. Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec son écart de durée au médian historique, recalculé à la lecture.
 """
 
 from __future__ import annotations

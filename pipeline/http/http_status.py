@@ -1,9 +1,4 @@
-"""Levée d'une erreur de statut sur une requête vers une source.
-
-Plusieurs API de sources attendent leur identifiant en paramètre de requête : la clé OpenAlex, l'adresse annoncée à Unpaywall. Le message porte le seul statut, si bien qu'un appelant peut journaliser l'erreur telle quelle.
-
-Les adapters qui l'attrapent lisent le statut sur la réponse ; le contexte de la requête — source et lot — vient du `label` que chaque appelant passe au helper HTTP.
-"""
+"""Erreur de statut d'une réponse de source. Son message donne seulement le statut, sans l'URL, et se journalise tel quel : plusieurs API attendent un identifiant en paramètre de requête (clé OpenAlex, adresse annoncée à Unpaywall)."""
 
 from __future__ import annotations
 
@@ -11,10 +6,7 @@ import httpx2
 
 
 def raise_for_status(response: httpx2.Response) -> None:
-    """Lève `httpx2.HTTPStatusError` si le statut n'est pas un succès.
-
-    Le type levé est celui d'httpx2, que les adapters de sources attrapent nommément et dont ils lisent `response.status_code`. Le message porte le statut et sa phrase-raison.
-    """
+    """Lève `httpx2.HTTPStatusError` pour une réponse en échec, avec le statut et sa phrase-raison pour message."""
     if response.is_success:
         return
     raise httpx2.HTTPStatusError(

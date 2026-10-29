@@ -1,8 +1,8 @@
 """Service du frontend buildé : reprises sur fichier absent, et frontière de l'API.
 
-Trois comportements distinguent ce service d'un service de fichiers statiques ordinaire : le chemin nu introuvable est retenté avec l'extension `.html` (format prérendu), une route inconnue retombe sur `index.html` (routage côté client), et un chemin d'API inconnu reçoit un 404 plutôt que la page d'accueil — servir celle-ci sous un code 200 ferait passer une panne d'API pour un succès.
+Trois comportements distinguent ce service d'un service de fichiers statiques ordinaire. Un chemin introuvable est retenté avec l'extension `.html` (pages prérendues). Une route inconnue retombe sur `index.html` (routage côté client). Un chemin d'API inconnu reçoit un 404 : la page d'accueil, servie sous un code 200, ferait passer une panne d'API pour un succès.
 
-Une erreur qui n'est pas un fichier absent remonte telle quelle : les reprises ne valent que pour le 404.
+Une erreur autre qu'un fichier absent remonte telle quelle : les reprises valent seulement pour le 404.
 """
 
 from collections.abc import Set as AbstractSet
@@ -19,9 +19,9 @@ _SCOPE = {"type": "http", "method": "GET"}
 
 
 def _service_de_fichiers(*, disponibles: AbstractSet[str] = frozenset(), erreur: int | None = None):
-    """Remplace le service de fichiers sous-jacent : seuls `disponibles` existent.
+    """Simule le service de fichiers sous-jacent : seuls les chemins `disponibles` existent.
 
-    `erreur` fait échouer tout accès sur ce code, pour éprouver ce qui n'est pas un fichier absent.
+    `erreur` fait échouer tout accès avec ce code, pour tester une erreur autre qu'un fichier absent.
     """
     servis: list[str] = []
 
@@ -59,7 +59,7 @@ async def test_route_inconnue_retombe_sur_la_page_d_accueil():
 
 @pytest.mark.parametrize("chemin", ["api/inconnu", "prefixe/api/inconnu"])
 async def test_chemin_d_api_inconnu_rend_404(chemin):
-    """Le segment est reconnu où qu'il se trouve : un préfixe de déploiement le décale d'un cran."""
+    """Le segment `api` est reconnu à toute position : un préfixe de déploiement le place en deuxième position."""
     correctif, _ = _service_de_fichiers(disponibles={"index.html"})
     with correctif, pytest.raises(HTTPException) as refus:
         await SPAStaticFiles(directory=".", check_dir=False).get_response(chemin, _SCOPE)

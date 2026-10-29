@@ -40,7 +40,7 @@ def _probe_app() -> FastAPI:
 
 
 def _call_then_disconnect(app: FastAPI, method: str, path: str) -> tuple[int, float]:
-    """Envoie la requête, se déconnecte après 0,5 s. Retourne le statut de la réponse et la durée de l'appel."""
+    """Envoie la requête, se déconnecte après 0,5 s. Renvoie le statut de la réponse et la durée de l'appel."""
     scope = {
         "type": "http",
         "asgi": {"version": "3.0"},
@@ -96,7 +96,7 @@ def test_ecriture_abandonnee_menee_a_son_terme(probe):
 
 
 def test_connexion_rendue_au_pool_hors_d_atteinte(sa_engine_app):
-    """Une annulation après le retour de la connexion dans le pool épargne la requête qui la reprend."""
+    """Une annulation émise après le retour de la connexion au pool épargne la requête suivante sur cette connexion."""
     engine = create_engine(
         sa_engine_app.url.render_as_string(hide_password=False), pool_size=1, max_overflow=0
     )

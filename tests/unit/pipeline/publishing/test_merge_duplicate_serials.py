@@ -101,7 +101,7 @@ def test_first_serial_of_an_issnl_group_absorbs_the_others():
 
 
 def test_shared_issn_merges_a_nested_title():
-    """Cas réel : « BMJ » et « BMJ-BRITISH MEDICAL JOURNAL » portent le même ISSN en ligne."""
+    """Cas réel : « BMJ » et « BMJ-BRITISH MEDICAL JOURNAL » ont le même ISSN en ligne."""
     group = SerialIssnGroup(
         "1756-1833",
         (SerialTitleRow(26, "BMJ"), SerialTitleRow(33093, "BMJ-BRITISH MEDICAL JOURNAL")),
@@ -112,7 +112,7 @@ def test_shared_issn_merges_a_nested_title():
 
 
 def test_shared_issn_spares_another_title():
-    """Cas réel : « Les Essentiels d'Hermès » porte l'ISSN en ligne d'« Hermès, La Revue »."""
+    """Cas réel : « Les Essentiels d'Hermès » a l'ISSN en ligne d'« Hermès, La Revue »."""
     group = SerialIssnGroup(
         "1963-1006",
         (
@@ -161,7 +161,7 @@ def test_same_title_pair_is_merged_after_the_issn_rules():
 
 
 def test_succeeding_title_absorbs_the_preceding_one():
-    """Cas réel : BMC Family Practice porte parmi ses ISSN rejetés l'ISSN de son titre suivant, BMC Primary Care."""
+    """Cas réel : BMC Family Practice a parmi ses ISSN rejetés l'ISSN de son titre suivant, BMC Primary Care."""
     repo = _Repo(rejected_issn_groups=[SerialMergeGroup("2731-4553", (1194, 33723))])
     metrics, merges = _run(repo)
     assert merges == [(1194, 33723)]

@@ -15,7 +15,10 @@ def issns_from_columns(
     statuses: Mapping[str, IssnStatus] | None = None,
     supports: Mapping[str, IssnSupport] | None = None,
 ) -> list[SerialIssn]:
-    """ISSN d'une revue décrite par ses champs `issn` (papier), `eissn` (en ligne), `issnl` (drapeau ISSN-L) et ses valeurs mises de côté : `malformed` si invalides, `unverified` sinon, sauf statut fourni par `statuses`."""
+    """ISSN d'une revue décrite par ses champs `issn` (papier), `eissn` (en ligne), `issnl` (ISSN-L, actif) et ses valeurs mises de côté.
+
+    Une valeur mise de côté a le statut `malformed` si elle est invalide, `unverified` sinon, sauf statut donné par `statuses` ; son support est celui que donne `supports`.
+    """
     statuses = statuses or {}
     supports = supports or {}
     rows: dict[str, SerialIssn] = {}

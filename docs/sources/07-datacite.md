@@ -11,7 +11,7 @@ Documentation API :
 DataCite est l'agence d'enregistrement des DOI des données de la recherche : jeux de données, logiciels, *preprints*, thèses, et plus largement tout ce que déposent les entrepôts institutionnels et disciplinaires (Zenodo, figshare, recherche-data-gouv, theses.fr, NAKALA…). Chaque préfixe DOI est rattaché à un *provider* (l'organisation déposante) et à un *client* (l'entrepôt précis).
 
 Le pipeline interroge DataCite de trois façons :
-- [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ « DataCite » de l'admin des structures) ;
+- [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ DataCite des identifiants de structure) ;
 - [`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources ;
 - [moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : les DOI dont un créateur a l'ORCID d'une personne RH (`creators.nameIdentifiers.nameIdentifier`).
 
@@ -23,12 +23,10 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 - `https://api.datacite.org/dois?query=…` : recherche paginée par curseur (moissonnages, `fetch_missing_doi`) ;
 - `https://api.datacite.org/dois/{doi}` : interrogation unitaire (`fetch_stale`).
 
-Les deux routes rendent un même DOI sous deux formes. Le hash de détection de changement ignore ces différences et les compteurs de consultation.
-
-- *polite pool* obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
+- Adresse électronique de contact dans le `User-Agent` (`POLITE_POOL_EMAIL`)
 - Pas de quota contractuel. Le pipeline s'en tient à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 3 requêtes simultanées (`max_concurrent=3`)
 
-**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identification du *provider* et du *client* (l'entrepôt) rattachés à un préfixe DOI. Consommée par la sous-étape `resolve_datacite_publishers` de la phase [`publishing`](../pipeline/05-publishing.md), qui complète la table `doi_prefixes` (préfixe → entrepôt + provider) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra).
+**Prefixes API** (`https://api.datacite.org/prefixes/{prefix}`) — identifie l'organisation déposante (*provider*) et l'entrepôt (*client*) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_datacite_publishers`), une fois connue l'agence d'enregistrement du préfixe ([`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra)).
 
 ## Données récupérées
 
@@ -37,7 +35,7 @@ Les deux routes rendent un même DOI sous deux formes. Le hash de détection de 
 
 ## Exemple de payload
 
-*Preprint* `10.17181/b5jnp-h2c36` (déposé sur l'entrepôt du CERN, un auteur UCA). Champs non consommés retirés : `url`, `contentUrl`, `formats`, `sizes`, `identifiers`/`alternateIdentifiers`, `geoLocations`, `dates`/`created`/`registered`/`updated`, `schemaVersion`/`metadataVersion`/`source`/`state`/`xml` et les compteurs de vues/téléchargements (métadonnées DataCite internes). Résumé tronqué.
+*Preprint* `10.17181/b5jnp-h2c36` (déposé sur l'entrepôt du CERN). Réduit aux champs que le pipeline lit ; résumé tronqué.
 
 ```json
 {
@@ -93,29 +91,24 @@ Les deux routes rendent un même DOI sous deux formes. Le hash de détection de 
 
 DataCite déclare ses relations dans `relatedIdentifiers[].relationType`, sous des valeurs comme `IsSupplementTo` ou `IsPartOf`. La phase [relations](../pipeline/11-enrichissements.md#relations-entre-publications-relations) les traduit vers son vocabulaire, et écarte celles qui désignent la même œuvre, une citation ou une évaluation.
 
-### `doc_type` à deux niveaux
+### Type de document
 
-DataCite déclare le type dans deux champs : `resourceTypeGeneral` (vocabulaire contrôlé : `JournalArticle`, `Preprint`, `ConferencePaper`, `Dataset`, `Software`, `Text`…) et `resourceType` (texte libre déposé par l'entrepôt). Un seul jeton est retenu et stocké dans `source_records.doc_type` : le `resourceTypeGeneral` quand il est spécifique, sinon le `resourceType` libre (les valeurs génériques `Text` et `Other` y renvoient souvent un type plus précis comme « Journal article » ou « Working Paper »). La conversion vers le vocabulaire du référentiel se fait dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_records/doc_types.py).
+DataCite déclare le type dans deux champs : `resourceTypeGeneral`, au vocabulaire contrôlé (`JournalArticle`, `Preprint`, `Dataset`, `Text`…), et `resourceType`, en texte libre. Le type retenu est `resourceTypeGeneral` quand il est spécifique, sinon `resourceType` : les valeurs génériques `Text` et `Other` cachent souvent un type précis (« Journal article », « Working Paper »). La conversion vers le vocabulaire du référentiel se fait dans le mapping `datacite` de [`doc_types`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/source_records/doc_types.py).
 
 ### Revue hôte
 
-DataCite déduit `container` des éléments liés de l'enregistrement source ou de sa description `SeriesInformation`, un texte libre. Le conteneur désigne une revue, une collection ou un recueil d'actes à deux conditions (`container_names_a_journal`) :
-
-- Le type est celui d'un article, d'une communication, d'un recueil d'actes, d'un livre, d'un chapitre ou d'un data paper. Un article se déclare par la valeur contrôlée `JournalArticle` depuis la version 4.4 du schéma (2021). Avant, il se déclarait `Text`, avec « Journal article » ou « Article » en texte libre, forme que des éditeurs gardent encore.
-- Le conteneur ne vient pas d'une citation en texte libre. Les copies d'articles déposées par les entrepôts (GSI, DESY, RWTH) citent l'article publié dans leur `SeriesInformation` (« Physics letters / B 777, 151 - 162 (2018). doi:… »). DataCite la découpe mal : le volume reste dans le titre, l'année et le DOI passent dans les pages.
-
-Les deux champs de type viennent du déposant du DOI : logiciel de l'entrepôt, plateforme de l'éditeur, ou auteur sur Zenodo. Ils disent la nature du document, pas s'il s'agit de la version publiée : des entrepôts déclarent `JournalArticle`, des éditeurs `Text`. Un préprint, un rapport, un logiciel ou un jeu de données n'a pas de revue. Le titre d'un conteneur écarté reste dans `container_title`.
+DataCite déduit `container` des éléments liés ou de la description `SeriesInformation`, en texte libre. Le conteneur est retenu comme revue, collection ou recueil d'actes pour un type publié dans une revue ou un livre (article, communication, chapitre…), et quand il ne vient pas d'une citation en texte libre, que DataCite découpe mal (`container_names_a_journal`). Le titre d'un conteneur écarté reste dans `container_title`.
 
 ### Affiliations textuelles
 
-Les affiliations des `creators` sont des chaînes de texte (parfois accompagnées d'un identifiant ROR). Elles sont routées vers `addresses` / `source_contribution_addresses` comme HAL/OpenAlex/ScanR/Crossref : la phase [`affiliations`](../pipeline/04-affiliations.md) y détecte `in_perimeter`, ce qui fait entrer les contributions DataCite dans le rattachement à une personne.
+Les affiliations des créateurs sont du texte, parfois avec un ROR. Elles deviennent des adresses, que la phase [`affiliations`](../pipeline/04-affiliations.md) examine.
 
 ### DOI liés et concept/version
 
 Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour faire converger versions et concept vers une seule publication.
 
-Les `relatedIdentifiers` contiennent aussi d'autres liens entre documents (un supplément et son article, un chapitre et son ouvrage, des citations). Le sous-ensemble « même œuvre ou œuvre étroitement liée » alimente le pool de DOI à rapatrier (identifiants liés de l'enregistrement source) ; la liste complète et typée est conservée dans `source_records.source_extras` pour un usage ultérieur (relations entre publications).
+Les DOI apparentés (versions, formes, parties, suppléments) deviennent des identifiants liés, que la phase `fetch_missing` cherche.
 
-### `oa_status` non dérivé
+### Statut open access
 
-DataCite n'expose pas un statut OA fiable. `oa_status` reste NULL côté DataCite — les autres sources arbitrent via `refresh_from_sources`.
+DataCite ne donne pas de statut open access : celui de la publication vient des autres sources.

@@ -1,5 +1,4 @@
-"""Tests des value objects et helpers de domain/publications/identifiers.py
-(DOI, HALId, NNT, clean_doi, normalize_nnt, extract_hal_id_from_url)."""
+"""Identifiants des publications (`domain.publications.identifiers`) : DOI, identifiant HAL, NNT, PMID, PMCID, arXiv, ISSN, ISBN, préfixe DOI."""
 
 from dataclasses import FrozenInstanceError
 
@@ -27,39 +26,43 @@ from domain.publications.identifiers import (
     normalize_pmid,
 )
 
-# ── DOI ────────────────────────────────────────────────────────────
-
 
 class TestDOIConstruction:
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
             ("10.1234/test", "10.1234/test"),  # DOI nu
-            ("https://doi.org/10.1234/test", "10.1234/test"),  # strip https
-            ("http://doi.org/10.1234/test", "10.1234/test"),  # strip http
-            ("https://dx.doi.org/10.1234/test", "10.1234/test"),  # strip dx.doi.org
-            ("http://dx.doi.org/10.1234/test", "10.1234/test"),  # strip http dx.doi.org
+            ("https://doi.org/10.1234/test", "10.1234/test"),  # schéma https retiré
+            ("http://doi.org/10.1234/test", "10.1234/test"),  # schéma http retiré
+            ("https://dx.doi.org/10.1234/test", "10.1234/test"),  # hôte dx.doi.org retiré
+            ("http://dx.doi.org/10.1234/test", "10.1234/test"),  # http et dx.doi.org retirés
             ("http://www.doi.org/10.1016/j.bja.2018.02.007", "10.1016/j.bja.2018.02.007"),
             ("doi:10.1234/test", "10.1234/test"),  # préfixe de schéma doi:
-            ("DOI:10.1234/TEST", "10.1234/test"),  # schéma doi: + lowercase
+            ("DOI:10.1234/TEST", "10.1234/test"),  # schéma doi: et minuscules
             (
                 "doi:10.6084/m9.figshare.31023197.v1",
                 "10.6084/m9.figshare.31023197",
-            ),  # schéma + suffixe vN
-            ("  10.1234/test  ", "10.1234/test"),  # strip whitespace
+            ),  # schéma et suffixe .vN
+            ("  10.1234/test  ", "10.1234/test"),  # espaces retirés
             ("10.6084/m9.figshare.31023197.v1", "10.6084/m9.figshare.31023197"),  # suffixe .vN
             ("10.36227/techrxiv.19754971.v2", "10.36227/techrxiv.19754971"),  # suffixe .v2
             ("10.1234/test/pdf", "10.1234/test"),  # suffixe /pdf
-            ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF + strip url
+            ("https://doi.org/10.1234/test/PDF", "10.1234/test"),  # /PDF et URL retirés
             ("10.3389/fnut.2026.1714437/full", "10.3389/fnut.2026.1714437"),  # suffixe /full
             ("10.3389/feart.2020.00279/abstract", "10.3389/feart.2020.00279"),  # suffixe /abstract
             (
                 "10.1234/test/pdf.v1",
                 "10.1234/test",
-            ),  # .vN ré-expose /pdf : résolu par le point fixe
-            ("10.24072/pcjournal.308/", "10.24072/pcjournal.308"),  # slash final parasite
-            ("https://doi.org/10.1234/test/", "10.1234/test"),  # slash final + strip url
-            ("10.36227/techrxiv.19754971.v2/", "10.36227/techrxiv.19754971"),  # slash + suffixe vN
+            ),  # le retrait de .vN fait apparaître /pdf, retiré à son tour
+            ("10.24072/pcjournal.308/", "10.24072/pcjournal.308"),  # barre oblique finale parasite
+            (
+                "https://doi.org/10.1234/test/",
+                "10.1234/test",
+            ),  # barre oblique finale et URL retirées
+            (
+                "10.36227/techrxiv.19754971.v2/",
+                "10.36227/techrxiv.19754971",
+            ),  # barre oblique et suffixe .vN
             ("10.18145/ivia)", "10.18145/ivia"),  # parenthèse finale non appariée
             ("10.1234/test.", "10.1234/test"),  # point final parasite
             ("10.1234/test).", "10.1234/test"),  # ponctuations finales cumulées
@@ -71,8 +74,7 @@ class TestDOIConstruction:
             ("10.1234/a)b", "10.1234/a)b"),  # parenthèse non appariée hors de la fin conservée
             ("10.1234/a(b", "10.1234/a(b"),
             ("10.1234/abc(", "10.1234/abc"),  # seule la parenthèse finale est retirée
-            # Lowercase : CrossRef traite le DOI en case-insensitive ; lowercase
-            # évite les faux doublons cross-sources.
+            # Minuscules : la casse d'un DOI est indifférente.
             ("10.1038/Nature", "10.1038/nature"),
             ("10.1038/NATURE", "10.1038/nature"),
             ("https://doi.org/10.1038/NATURE", "10.1038/nature"),
@@ -81,13 +83,13 @@ class TestDOIConstruction:
             ("10.1140/epjc%252fs10052-021-09192-8", "10.1140/epjc/s10052-021-09192-8"),  # double
             # Tiret typographique Unicode → `-` ASCII.
             ("10.1002/1878‐0261.12651", "10.1002/1878-0261.12651"),
-            # Markup / fragment HTML scrapé en fin.
+            # Fragment de balisage HTML en fin.
             ("10.1002/casp.2572>)", "10.1002/casp.2572"),
             ("10.1016/j.chemgeo.2023.121326>.", "10.1016/j.chemgeo.2023.121326"),
             ("10.1016/j.caeai.2022.100093.(", "10.1016/j.caeai.2022.100093"),  # parenthèse ouvrante
-            # Query string parasite.
+            # Paramètres de requête parasites.
             ("10.1108/raf-05-2017-0101?utm_campaign=repec", "10.1108/raf-05-2017-0101"),
-            # Liste de DOI au point-virgule : garder le premier.
+            # Liste de DOI séparés par des points-virgules : le premier est gardé.
             ("10.1017/qpb.2025.10030; 10.1017/qpb.2025.10030.pr1", "10.1017/qpb.2025.10030"),
         ],
     )
@@ -98,16 +100,16 @@ class TestDOIConstruction:
         assert str(DOI("10.1234/test")) == "10.1234/test"
 
     def test_does_not_strip_v_not_followed_by_digit(self):
-        """Un .v suivi de non-chiffre ne doit pas être strippé."""
+        """Un `.v` suivi d'autre chose qu'un chiffre est conservé."""
         assert DOI("10.1234/journal.v12.issue3").value == "10.1234/journal.v12.issue3"
 
     @pytest.mark.parametrize(
         "raw",
         [
-            "10.1234/test/pdf.v1",  # une étape de fin ré-expose du travail de début
-            "doi:10.1234/TEST.v2",  # schéma + version + casse
+            "10.1234/test/pdf.v1",  # une étape de fin fait apparaître un motif d'une étape de début
+            "doi:10.1234/TEST.v2",  # schéma, version et casse
             "10.1140/epjc%252fs10052-021-09192-8",  # double encodage pourcent
-            "10.1002/casp.2572>)",  # ponctuation + parenthèse non appariée
+            "10.1002/casp.2572>)",  # ponctuation et parenthèse non appariée
         ],
     )
     def test_idempotent(self, raw):
@@ -119,7 +121,7 @@ class TestDOIConstruction:
         "raw",
         [
             "",  # vide
-            "   ",  # whitespace seul
+            "   ",  # espaces seuls
             "https://doi.org/",  # préfixe URL sans DOI
         ],
     )
@@ -163,7 +165,7 @@ class TestDOIImmutable:
             d.value = "other"
 
     def test_is_hashable(self):
-        """Deux DOI égaux doivent avoir le même hash (utilisable dans un set)."""
+        """Deux DOI égaux ont le même hash : un ensemble les confond."""
         a = DOI("10.1234/test")
         b = DOI("https://doi.org/10.1234/test")
         assert a == b
@@ -171,11 +173,8 @@ class TestDOIImmutable:
         assert {a, b} == {a}
 
     def test_equality_by_normalized_value(self):
-        """Deux DOI avec le même canon sont égaux même si écrits différemment."""
+        """Deux graphies du même DOI normalisé sont égales."""
         assert DOI("10.1234/test") == DOI("  10.1234/test.v2  ")
-
-
-# ── HALId ──────────────────────────────────────────────────────────
 
 
 class TestHALIdConstruction:
@@ -196,14 +195,13 @@ class TestHALIdConstruction:
             ("sic_01848892", "sic_01848892"),  # portail ArchiveSIC : séparateur `_`
             ("https://archivesic.ccsd.cnrs.fr/sic_01848892v1", "sic_01848892"),
             ("pmh:oai:HAL:sic_01848892v1", "sic_01848892"),
-            ("hal-04123456v2", "hal-04123456"),  # strip suffixe version
-            ("HAL-04123456", "hal-04123456"),  # lowercase
-            ("https://hal.science/hal-04123456", "hal-04123456"),  # strip URL
+            ("hal-04123456v2", "hal-04123456"),  # suffixe de version retiré
+            ("HAL-04123456", "hal-04123456"),  # minuscules
+            ("https://hal.science/hal-04123456", "hal-04123456"),  # URL retirée
             ("https://hal.science/hal-04123456v2", "hal-04123456"),  # URL + version
             ("https://tel.archives-ouvertes.fr/tel-02345678", "tel-02345678"),  # URL autre portail
             ("https://hal.inrae.fr/hal-04123456", "hal-04123456"),  # portail institutionnel
-            # Identifiant OAI-PMH HAL exposé par OpenAlex dans location.id (source structurée,
-            # présente même quand la landing page est une page éditeur).
+            # Identifiant OAI-PMH de HAL donné par OpenAlex dans `location.id`, même quand la landing page est une page d'éditeur.
             ("pmh:oai:HAL:cea-01736955v1", "cea-01736955"),
         ],
     )
@@ -220,8 +218,7 @@ class TestHALIdConstruction:
             "https://doi.org/10.3204/pubdb-2020-00553",  # hôte non-HAL
             "https://doi.org/10.1234/zenodo-12345678",  # hôte non-HAL, fragment au format d'un docid
             "https://resolver.sub.uni-goettingen.de/purl?gro-2/84100",  # PURL étranger
-            # Identifiants OAI-PMH de dépôts institutionnels : l'autorité n'est pas HAL, le regex
-            # de docid attraperait sinon un fragment d'UUID (b454-3339841149, f-2861829395).
+            # Identifiants OAI-PMH de dépôts institutionnels, hors HAL : le fragment d'UUID (b454-3339841149, f-2861829395) a la forme d'un docid.
             "pmh:oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee",
             "pmh:oai:pure.atira.dk:openaire_cris_publications/c9b1b138-2601-400d-855f-2861829395c5",
         ],
@@ -239,7 +236,7 @@ class TestIsHalHost:
             "hal.inrae.fr",
             "tel.archives-ouvertes.fr",
             "dumas.ccsd.cnrs.fr",
-            "hal-univ-exemple.fr",  # portail white-label au label `hal-…`
+            "hal-univ-exemple.fr",  # portail en marque blanche, nommé `hal-…`
             "HAL.Science",
         ],
     )
@@ -262,15 +259,12 @@ class TestHALIdTryParse:
         assert HALId.try_parse("https://hal.science/hal-04123456v1").value == "hal-04123456"
 
 
-# ── NNT ────────────────────────────────────────────────────────────
-
-
 class TestNNT:
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
-            ("2021clfa0030", "2021CLFA0030"),  # uppercase
-            ("  2021CLFA0030  ", "2021CLFA0030"),  # strip whitespace
+            ("2021clfa0030", "2021CLFA0030"),  # majuscules
+            ("  2021CLFA0030  ", "2021CLFA0030"),  # espaces retirés
         ],
     )
     def test_normalizes(self, raw, expected):
@@ -280,10 +274,9 @@ class TestNNT:
         "raw",
         [
             "",  # vide
-            "   ",  # whitespace seul
+            "   ",  # espaces seuls
             "2021-CLFA-0030",  # non alphanumérique
-            # Identifiants OAI-PMH exposés par OpenAlex dans primary_location.id :
-            # ce ne sont pas des NNT, le garde doit les rejeter (sinon lien theses.fr mort).
+            # Identifiants OAI-PMH donnés par OpenAlex dans `primary_location.id`, rejetés comme NNT.
             "oai:HAL:hal-04677016v1",
             "doi:10.5281/zenodo.17854170",
             "ark:/13030/qt2sv083h3",
@@ -298,9 +291,6 @@ class TestNNT:
 
     def test_try_parse_invalid(self):
         assert NNT.try_parse("") is None
-
-
-# ── Helpers de normalisation PMID / PMCID / arXiv ──────────────────
 
 
 class TestNormalizeIdHelpers:
@@ -335,9 +325,6 @@ class TestNormalizeIdHelpers:
         assert normalize_arxiv_id(raw) == expected
 
 
-# ── extract_doi_from_url ───────────────────────────────────────────
-
-
 class TestExtractDoiFromUrl:
     @pytest.mark.parametrize(
         ("raw", "expected"),
@@ -345,7 +332,7 @@ class TestExtractDoiFromUrl:
             ("https://doi.org/10.1234/x", "10.1234/x"),  # URL doi.org
             ("http://dx.doi.org/10.1234/x", "10.1234/x"),  # URL dx.doi.org
             ("doi:10.1234/x", "10.1234/x"),  # forme OAI-PMH location.id
-            ("doi:10.1234/X.v2", "10.1234/x"),  # nettoyé (lowercase + version)
+            ("doi:10.1234/X.v2", "10.1234/x"),  # normalisé (minuscules, version retirée)
             ("https://hal.science/hal-04123456", None),  # autre identifiant
             ("https://arxiv.org/abs/2401.00123", None),
             ("https://exemple.fr/?ref=doi.org/10.1234/x", None),  # doi.org hors de l'hôte
@@ -355,9 +342,6 @@ class TestExtractDoiFromUrl:
     )
     def test_extracts(self, raw, expected):
         assert extract_doi_from_url(raw) == expected
-
-
-# ── Value objects PMID / PMCID / ArxivId ───────────────────────────
 
 
 class TestPublicationMedArxivVOs:
@@ -378,9 +362,6 @@ class TestPublicationMedArxivVOs:
         assert ArxivId.try_parse(None) is None
         with pytest.raises(ValidationError):
             ArxivId("garbage")
-
-
-# ── ISSN / ISBN ────────────────────────────────────────────────────
 
 
 class TestISSN:
@@ -477,7 +458,7 @@ class TestISBN:
 
 
 class TestFindIsbns:
-    """Zones de enregistrement source telles que HAL, DataCite et WoS les donnent."""
+    """Champs ISBN tels que HAL, DataCite et WoS les donnent."""
 
     @pytest.mark.parametrize(
         ("raw", "expected"),
@@ -485,7 +466,7 @@ class TestFindIsbns:
             ("978-3-030-34162-6 ; 978-3-030-34163-3", ["9783030341626", "9783030341633"]),
             ("978-2-7380-1445-0 / EAN: 9782738014450", ["9782738014450"]),  # l'EAN répète l'ISBN
             ("978-3-319-77273-8_16", ["9783319772738"]),  # suffixe de chapitre
-            ("10.1007/978-3-030-58080-3_309", ["9783030580803"]),  # ISBN porté par un DOI
+            ("10.1007/978-3-030-58080-3_309", ["9783030580803"]),  # ISBN contenu dans un DOI
             ("2055-0472", []),  # un ISSN est plus court
             ("9786-2-916153-40-7", []),  # tiret mal placé, clé fausse
             ("978753589865", []),  # douze chiffres
@@ -499,15 +480,12 @@ class TestFindIsbns:
         assert find_isbns(None) == []
 
 
-# ── DoiPrefix ──────────────────────────────────────────────────────
-
-
 class TestDoiPrefix:
     @pytest.mark.parametrize(
         ("raw", "expected"),
         [
             ("10.1016", "10.1016"),  # préfixe nu
-            ("  10.1016  ", "10.1016"),  # whitespace
+            ("  10.1016  ", "10.1016"),  # espaces
             ("10.1016/j.foo.2020.01", "10.1016"),  # DOI complet → préfixe
             ("10.1016>", "10.1016"),  # ponctuation parasite en queue
             ("10.5194/acp-21-1", "10.5194"),  # préfixe Copernicus

@@ -1,4 +1,4 @@
-"""Tests de la persistance et du hash de détection de l'extraction."""
+"""Empreinte et hash de détection des changements de l'extraction, sélection des DOI à chercher et des documents à relire."""
 
 from functools import partial
 
@@ -6,6 +6,11 @@ import pytest
 from sqlalchemy import text
 
 from domain.publications.identifiers import clean_doi
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.ingestion.common.change_detection import change_detection_hash
 from pipeline.ingestion.common.doi_search import get_missing_dois
 from pipeline.ingestion.common.fingerprint import fingerprint
@@ -23,8 +28,6 @@ _publication = partial(
 
 # Enregistrement source de titre « T ».
 _source_record = partial(insert_source_record, title="T")
-
-# ── fingerprint ─────────────────────────────────────────────────
 
 
 class TestComputeHash:
@@ -44,7 +47,7 @@ class TestComputeHash:
         assert fingerprint(a) != fingerprint(b)
 
     def test_unicode(self):
-        """Les caractères accentués sont gérés correctement."""
+        """Un texte accentué donne une empreinte de 32 caractères."""
         data = {"title": "Étude des phénomènes"}
         h = fingerprint(data)
         assert isinstance(h, str) and len(h) == 32
@@ -58,12 +61,8 @@ class TestComputeHash:
         assert fingerprint({}) == fingerprint({})
 
 
-# ── change_detection_hash / normalisation HAL ────────────────────
-
-
 def _tei(*, when, not_before="2025-01-01"):
-    """Fragment TEI HAL minimal : horodatage de génération (`@when`, volatil) et
-    date d'embargo (`@notBefore`, bibliographique)."""
+    """Fragment TEI HAL minimal : horodatage de génération (`@when`, variable d'un moissonnage à l'autre) et date d'embargo (`@notBefore`, donnée bibliographique)."""
     return (
         '<TEI xmlns="http://www.tei-c.org/ns/1.0"><teiHeader><fileDesc>'
         f'<publicationStmt><date when="{when}"/></publicationStmt></fileDesc></teiHeader>'
@@ -74,29 +73,26 @@ def _tei(*, when, not_before="2025-01-01"):
 
 class TestChangeDetectionHash:
     def test_hal_generation_timestamp_ignored(self):
-        """Deux moissonnages HAL ne différant que par l'horodatage de génération du
-        TEI produisent le même hash : ni UPSERT ni re-normalisation parasites."""
+        """Deux moissonnages HAL qui diffèrent seulement par l'horodatage de génération du TEI donnent le même hash : le document n'est ni réécrit ni renormalisé."""
         a = {"halId_s": "hal-1", "label_xml": _tei(when="2026-05-28T15:21:36+02:00")}
         b = {"halId_s": "hal-1", "label_xml": _tei(when="2026-06-16T20:30:49+02:00")}
         assert change_detection_hash("hal", a) == change_detection_hash("hal", b)
 
     def test_hal_real_content_change_detected(self):
-        """Un champ métier qui change reste détecté malgré la neutralisation."""
+        """Un changement de titre change le hash."""
         base = _tei(when="2026-05-28T15:21:36+02:00")
         a = {"label_xml": base, "title_s": ["Étude A"]}
         b = {"label_xml": base, "title_s": ["Étude B"]}
         assert change_detection_hash("hal", a) != change_detection_hash("hal", b)
 
     def test_hal_embargo_change_detected(self):
-        """Une date d'embargo (`@notBefore`) qui change reste détectée : seul `@when`
-        est neutralisé."""
+        """Un changement de date d'embargo (`@notBefore`) change le hash : seul `@when` est ignoré."""
         a = {"label_xml": _tei(when="2026-01-01T00:00:00+02:00", not_before="2025-01-01")}
         b = {"label_xml": _tei(when="2026-01-01T00:00:00+02:00", not_before="2026-06-01")}
         assert change_detection_hash("hal", a) != change_detection_hash("hal", b)
 
     def test_non_hal_source_hashes_faithful_payload(self):
-        """Sans normaliseur, l'empreinte est celle du payload fidèle — la
-        neutralisation est propre à la source, pas au champ."""
+        """Hors HAL, le hash est l'empreinte du payload entier, `label_xml` compris."""
         payload = {"id": "W1", "label_xml": _tei(when="2026-01-01T00:00:00+02:00")}
         assert change_detection_hash("openalex", payload) == fingerprint(payload)
 
@@ -111,9 +107,6 @@ class TestStripVolatileForHash:
     def test_returns_input_when_no_label_xml(self):
         payload = {"halId_s": "hal-1"}
         assert strip_volatile_for_hash(payload) is payload
-
-
-# ── clean_doi ────────────────────────────────────────────────────
 
 
 class TestCleanDoi:
@@ -146,9 +139,7 @@ class TestCleanDoi:
 
 
 def _add_inperim_source_record(conn, source, sid, *, doi=None, identifiers=None):
-    """Publication `in_perimeter` + source_record `source` rattaché.
-
-    Le pool de la recherche par DOI ne part que des `source_records` in-périmètre, donc un DOI candidat doit être porté par un tel record (et non par un simple `staging.doi`, retiré du pool)."""
+    """Publication du périmètre et son enregistrement source `source`, de DOI `doi` et d'identifiants secondaires `identifiers`. La recherche par DOI part seulement des enregistrements sources du périmètre."""
     publication_id = _publication(conn, "T", in_perimeter=True)
     _source_record(
         conn,
@@ -173,7 +164,7 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_exclut_un_doi_secondaire_de_la_cible(self, sa_sync_conn):
-        """La cible rend le même document pour son DOI principal comme pour ses DOI secondaires."""
+        """La cible renvoie le même document pour son DOI principal comme pour ses DOI secondaires."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/preprint")
         _add_inperim_source_record(
             sa_sync_conn,
@@ -186,7 +177,7 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_excludes_out_of_perimeter_source_records(self, sa_sync_conn):
-        """Un DOI porté par une publication hors-périmètre ne remonte pas dans le pool."""
+        """Le DOI d'une publication hors périmètre est exclu des DOI à chercher."""
         publication_id = _publication(sa_sync_conn, "T", in_perimeter=False)
         _source_record(
             sa_sync_conn, publication_id, source="openalex", source_id="W1", doi="10.1234/out"
@@ -194,36 +185,66 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_crossref_target_filters_non_crossref_prefixes(self, sa_sync_conn):
-        """target='crossref' : seuls les DOI dont le préfixe est résolu vers Crossref ; un préfixe pas encore résolu attend `resolve_ra`."""
+        """Pour Crossref, seuls les DOI de préfixe attribué à Crossref sont retenus. Un DOI de préfixe sans agence connue attend la phase `resolve_ra`."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         insert_doi_prefix(sa_sync_conn, "10.1038", ra="Crossref")
-        # Trois DOIs non-crossref in-périmètre : DataCite, Crossref, préfixe inconnu.
+        # Trois DOI d'enregistrements sources HAL du périmètre : préfixe DataCite, préfixe Crossref, préfixe inconnu.
         _add_inperim_source_record(sa_sync_conn, "hal", "h1", doi="10.5281/zenodo.1")
         _add_inperim_source_record(sa_sync_conn, "hal", "h2", doi="10.1038/nature.1")
-        _add_inperim_source_record(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe absent
+        _add_inperim_source_record(sa_sync_conn, "hal", "h3", doi="10.99999/x.1")  # préfixe inconnu
 
         result = get_missing_dois(sa_sync_conn, "crossref", retry_after_days=30)
 
-        # DataCite éliminé, Crossref gardé, préfixe non résolu en attente.
+        # Seul le DOI de préfixe Crossref est retenu.
         assert "10.5281/zenodo.1" not in result
         assert "10.1038/nature.1" in result
         assert "10.99999/x.1" not in result
 
     def test_includes_related_dois_from_source_records(self, sa_sync_conn):
-        """Les autres DOI d'un source_record in-périmètre (source != cible) entrent dans le pool, comme le DOI primaire."""
+        """Tous les DOI actifs d'un enregistrement source du périmètre, d'une autre source que la cible, sont retenus."""
         _add_inperim_source_record(
             sa_sync_conn,
             "openalex",
             "W1",
-            doi="10.1234/primary",
-            identifiers={"doi": ["10.9999/preprint"]},
+            identifiers={"doi": ["10.1234/primary", "10.9999/preprint"]},
         )
         result = get_missing_dois(sa_sync_conn, "hal", retry_after_days=30)
         assert "10.1234/primary" in result
         assert "10.9999/preprint" in result
 
+    def test_reads_the_dois_of_the_identifier_table(self, sa_sync_conn):
+        """Régression : la colonne `doi` d'un work OpenAlex gardait un DOI mal formé, absent de ses identifiants."""
+        _add_inperim_source_record(
+            sa_sync_conn,
+            "openalex",
+            "W1",
+            doi="10.3389/feart.2020.00279/abstract",
+            identifiers={"doi": ["10.3389/feart.2020.00279"]},
+        )
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == [
+            "10.3389/feart.2020.00279"
+        ]
+
+    def test_excludes_a_doi_removed_by_the_correction(self, sa_sync_conn):
+        publication_id = _publication(sa_sync_conn, "T", in_perimeter=True)
+        _source_record(
+            sa_sync_conn,
+            publication_id,
+            source="openalex",
+            source_id="W1",
+            identifiers=[
+                SourceIdentifier(
+                    SourceIdentifierType.DOI,
+                    "10.1234/faux",
+                    SourceIdentifierRole.SECONDARY,
+                    "UNRESOLVED_DOI_TO_NULL",
+                )
+            ],
+        )
+        assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
+
     def test_includes_arxiv_derived_datacite_doi(self, sa_sync_conn):
-        """Un arxiv_id d'un source_record in-périmètre (source != cible) entre dans le pool sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
+        """L'identifiant arXiv d'un enregistrement source du périmètre, d'une autre source que la cible, est retenu sous la forme du DOI DataCite `10.48550/arxiv.<id>`, en minuscules."""
         _add_inperim_source_record(
             sa_sync_conn, "openalex", "W1", identifiers={"arxiv_id": "2605.02321"}
         )
@@ -231,7 +252,7 @@ class TestGetMissingDois:
         assert "10.48550/arxiv.2605.02321" in result
 
     def test_arxiv_derived_doi_excluded_for_same_source(self, sa_sync_conn):
-        """L'arxiv_id d'un record de la cible elle-même ne génère pas de candidat (même logique `source != cible` que les autres branches du pool)."""
+        """L'identifiant arXiv d'un enregistrement source de la cible elle-même est exclu."""
         _add_inperim_source_record(
             sa_sync_conn, "hal", "H1", identifiers={"arxiv_id": "2605.02321"}
         )
@@ -239,7 +260,7 @@ class TestGetMissingDois:
         assert "10.48550/arxiv.2605.02321" not in result
 
     def test_includes_relation_targets(self, sa_sync_conn):
-        """Les cibles des relations depuis une publication in-périmètre (`publication_relations.target_doi`) entrent dans le pool."""
+        """Le DOI cible d'une relation depuis une publication du périmètre est retenu."""
         _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=True)
         insert_publication_relation(
             sa_sync_conn,
@@ -252,7 +273,7 @@ class TestGetMissingDois:
         assert "10.9999/related" in result
 
     def test_relation_targets_excluded_when_parent_out_of_perimeter(self, sa_sync_conn):
-        """Une relation depuis une publication hors-périmètre n'entre pas dans le pool."""
+        """Le DOI cible d'une relation depuis une publication hors périmètre est exclu."""
         _publication(sa_sync_conn, "Parent", row_id=1, in_perimeter=False)
         insert_publication_relation(
             sa_sync_conn,
@@ -264,7 +285,7 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
 
     def test_hal_target_no_prefix_filter(self, sa_sync_conn):
-        """target='hal' : aucun filtre par RA, tous les DOIs candidats remontent."""
+        """Pour HAL, les DOI sont retenus quelle que soit leur agence d'enregistrement."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.5281/zenodo.1")
 
@@ -273,7 +294,7 @@ class TestGetMissingDois:
         assert result == ["10.5281/zenodo.1"]
 
     def test_excludes_dois_in_backoff(self, sa_sync_conn):
-        """Un DOI cherché en vain depuis moins que le délai sort du pool."""
+        """Un DOI cherché en vain depuis moins longtemps que le délai est exclu."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_source_record(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         insert_failed_lookup(
@@ -283,7 +304,7 @@ class TestGetMissingDois:
         assert result == ["10.1234/b"]
 
     def test_retries_dois_with_expired_backoff(self, sa_sync_conn):
-        """Délai échu → le DOI repasse dans le pool."""
+        """Un DOI cherché en vain depuis plus longtemps que le délai est retenu."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         insert_failed_lookup(
             sa_sync_conn, id_type="doi", id_value="10.1234/a", not_found_days_ago=60
@@ -292,7 +313,7 @@ class TestGetMissingDois:
         assert result == ["10.1234/a"]
 
     def test_exclut_les_doi_inconnus_de_doi_org(self, sa_sync_conn):
-        """Un DOI que doi.org ne connaît pas sort du pool de toutes les cibles, quelle que soit la date de l'échec."""
+        """Un DOI inconnu de doi.org est exclu pour toutes les cibles, quelle que soit la date de l'échec."""
         _add_inperim_source_record(sa_sync_conn, "openalex", "W1", doi="10.1234/a")
         _add_inperim_source_record(sa_sync_conn, "openalex", "W2", doi="10.1234/b")
         insert_failed_lookup(
@@ -310,7 +331,7 @@ class TestGetMissingDois:
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=7) == ["10.1234/a"]
 
     def test_backoff_is_per_target_source(self, sa_sync_conn):
-        """L'échec d'un DOI sur `hal` n'affecte pas le pool de `openalex`."""
+        """L'échec d'un DOI dans HAL laisse ce DOI parmi les DOI à chercher dans OpenAlex."""
         _add_inperim_source_record(sa_sync_conn, "scanr", "S1", doi="10.1234/a")
         insert_failed_lookup(sa_sync_conn, id_type="doi", id_value="10.1234/a")
         assert get_missing_dois(sa_sync_conn, "hal", retry_after_days=30) == []
@@ -342,8 +363,7 @@ class TestGetMissingDois:
 
 class TestGetStaleSourceIds:
     def test_returns_old_rows_with_and_without_doi(self, sa_sync_conn):
-        # Le refetch par id natif ne dépend pas du DOI : la row sans DOI est
-        # sélectionnée au même titre que celle qui en a un.
+        # La relecture par identifiant de la source est indépendante du DOI.
         insert_staging(sa_sync_conn, "openalex", source_id="W1", doi="10.1/old", seen_days_ago=100)
         insert_staging(sa_sync_conn, "openalex", source_id="W2", seen_days_ago=100)
         insert_staging(
@@ -369,8 +389,7 @@ class TestGetStaleSourceIds:
         assert get_stale_source_ids(sa_sync_conn, "openalex", after_days=90) == ["W1"]
 
     def test_year_filter_scopes_to_window_and_keeps_null(self, sa_sync_conn):
-        # W1 hors fenêtre (exclue), W2 dans la fenêtre (gardée), W3 sans
-        # source_records → publication_year NULL, conservée (LEFT JOIN conservateur).
+        # W1 est hors de la fenêtre, W2 dedans. W3, sans enregistrement source, n'a pas d'année : il est gardé.
         for sid in ("W1", "W2", "W3"):
             insert_staging(sa_sync_conn, "openalex", source_id=sid, seen_days_ago=100)
         _source_record(sa_sync_conn, source="openalex", source_id="W1", publication_year=2020)
@@ -424,15 +443,12 @@ class TestDisappearedMarking:
 
 
 class TestGetPrefixesToResolve:
-    """Régression : resolve tire ses préfixes de la vue `candidate_dois`, le même
-    pool que la recherche par DOI — donc aussi les cibles de relations et les arXiv-dérivés,
-    pas seulement staging + related_dois. L'ancienne requête ratait ces préfixes,
-    laissant leur RA jamais résolue et la recherche par DOI en best-effort sur les deux RA."""
+    """Régression : les préfixes des DOI cibles de relations et des DOI dérivés d'arXiv restaient sans agence d'enregistrement. Les préfixes à résoudre viennent de la vue `candidate_dois`, comme les DOI de la recherche par DOI."""
 
     def test_pool_covers_relation_and_arxiv_prefixes(self, sa_sync_conn):
         from pipeline.transformation.publishing.doi_prefixes import DoiPrefixStore
 
-        # Préfixe vu UNIQUEMENT via publication_relations.target_doi (parent in-périmètre).
+        # Préfixe présent seulement dans le DOI cible d'une relation, depuis une publication du périmètre.
         _publication(sa_sync_conn, "P", row_id=1, in_perimeter=True)
         insert_publication_relation(
             sa_sync_conn,
@@ -441,7 +457,7 @@ class TestGetPrefixesToResolve:
             source="crossref",
             target_doi="10.77777/rel",
         )
-        # Préfixe vu UNIQUEMENT via un arxiv_id (DOI DataCite dérivé), enregistrement source in-périmètre.
+        # Préfixe présent seulement dans le DOI DataCite dérivé de l'identifiant arXiv d'un enregistrement source du périmètre.
         _source_record(
             sa_sync_conn,
             1,
@@ -452,4 +468,4 @@ class TestGetPrefixesToResolve:
 
         prefixes = DoiPrefixStore(sa_sync_conn).get_prefixes_to_resolve()
         assert "10.77777" in prefixes  # cible de relation
-        assert "10.48550" in prefixes  # arxiv-dérivé
+        assert "10.48550" in prefixes  # DOI dérivé d'arXiv

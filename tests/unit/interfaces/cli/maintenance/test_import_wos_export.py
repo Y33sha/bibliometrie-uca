@@ -1,4 +1,4 @@
-"""Tests de la lecture des exports tabulés de `interfaces.cli.maintenance.import_wos_export`."""
+"""Lecture des exports tabulés du Web of Science par `import_wos_export`."""
 
 from interfaces.cli.maintenance.import_wos_export import export_files, read_export
 

@@ -1,6 +1,6 @@
 """Exécution des tâches d'une phase, dans l'ordre du graphe (`pipeline.graph`).
 
-Une phase fournit, pour chacune de ses tâches, un `TaskStep` : la fonction qui l'exécute, et pour une tâche qui tient une ligne du journal, sa section et son libellé. L'exécuteur ouvre la section quand elle change, exécute la tâche par l'accès à sa source si elle en déclare une (`network`) et mesure sa durée, écrit sa ligne de bilan, puis lance sa maintenance (`maintenance`). Une tâche sans libellé écrit elle-même ses lignes. Une section dont toutes les tâches se taisent faute de rien traiter (`silent_when_empty`) se ferme sur « Rien à faire ».
+Une phase fournit un `TaskStep` par tâche. L'exécuteur ouvre la section de la tâche, l'exécute, par l'accès à sa source si elle sort sur le réseau, écrit sa ligne de bilan, puis lance sa maintenance.
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class TaskStep:
     progress_bar: bool = False
     # Échecs consécutifs avant que le circuit-breaker de la source coupe. `None` : seuil par défaut.
     threshold: int | None = None
-    # Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée rend des métriques vides et n'écrit rien.
+    # Condition d'exécution, évaluée avant l'accès à la source. Une tâche écartée renvoie des métriques vides et n'écrit rien.
     when: Callable[[PhaseContext], bool] | None = None
     # La tâche n'écrit rien quand elle n'a rien traité : `total` nul, sans signal.
     silent_when_empty: bool = False
@@ -47,7 +47,7 @@ def run_tasks(
     *,
     parallel: RunParallel = run_parallel,
 ) -> dict[str, PhaseMetrics]:
-    """Exécute les tâches de `phase` dans l'ordre du graphe et rend leurs métriques, par nom de tâche.
+    """Exécute les tâches de `phase` dans l'ordre du graphe et renvoie leurs métriques, par nom de tâche.
 
     Les tâches consécutives d'un même groupe parallèle s'exécutent ensemble par `parallel` ; leurs lignes de bilan suivent, dans l'ordre du graphe. Lève `ValueError` si `steps` ne couvre pas exactement les tâches de la phase.
     """
@@ -134,7 +134,7 @@ def _write_lines(
 
 
 def _maintain(task: Task, ctx: PhaseContext) -> list[tuple[str, str]]:
-    """Lance la maintenance de la tâche et rend une ligne de journal par opération. `VACUUM FULL` dans un mode qui le demande."""
+    """Lance la maintenance de la tâche et renvoie une ligne de journal par opération. `VACUUM FULL` dans un mode qui le demande."""
     lines = []
     for operation in task.maintenance:
         if operation.startswith("VACUUM ") and ctx.options.policy.vacuum_full:
@@ -169,7 +169,7 @@ def _execute(task: Task, step: TaskStep, phase: str, ctx: PhaseContext) -> Phase
 
 
 def _outcome(metrics: PhaseMetrics) -> str:
-    """Bilan d'une tâche : sa ligne de bilan, ce qui l'a empêché de travailler, ou ses compteurs."""
+    """Bilan d'une tâche : sa ligne de bilan, ce qui l'a empêchée de travailler, ou ses compteurs."""
     if metrics.report is not None:
         return metrics.report
     if any(s["code"] == "source_unconfigured" for s in metrics.signals):

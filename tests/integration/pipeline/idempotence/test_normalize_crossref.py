@@ -1,16 +1,8 @@
-"""Idempotence : normalisation CrossRef.
+"""Idempotence de la normalisation Crossref.
 
-CrossRef est ingérée DOI-driven (cf. `fetch_missing_doi`) puis
-normalisée vers `source_records` + `source_contributions`. Les
-affiliations textuelles alimentent `addresses` /
-`source_contribution_addresses`, ce qui permet à la phase `affiliations`
-de poser `in_perimeter` sur les SA crossref.
+Crossref est moissonné par DOI (`fetch_missing_doi`), puis normalisé en enregistrements sources et contributions sources. Les affiliations textuelles deviennent des adresses (`addresses`, `source_contribution_addresses`), d'où la phase `affiliations` tire les indices de périmètre des contributions sources Crossref.
 
-Vérifie :
-- Le double passage `process_work` ne crée pas de doublons (y compris
-  sur les liens adresses).
-- Les branches d'erreur (DOI absent, titre absent, raw_data vide)
-  marquent `processed=TRUE` et n'insèrent rien.
+Le module vérifie qu'une seconde normalisation laisse les comptes inchangés, liens aux adresses compris, et qu'un document sans contenu, sans DOI, ou sans titre ni année est marqué traité sans insertion.
 """
 
 from __future__ import annotations
@@ -25,8 +17,7 @@ _crossref_staging = partial(insert_staging, source="crossref", processed=False)
 
 CROSSREF_STAGING_DOCS = [
     {
-        # Cas nominal : article avec DOI, titre, année, auteurs ORCID,
-        # affiliations textuelles.
+        # Cas nominal : article avec DOI, titre, année, auteurs avec ORCID et affiliations textuelles.
         "source_id": "10.9999/cr-test-001",
         "doi": "10.9999/cr-test-001",
         "raw_data": {
@@ -61,7 +52,7 @@ CROSSREF_STAGING_DOCS = [
         },
     },
     {
-        # Cas minimal : DOI + titre + année, sans auteurs ni journal.
+        # Cas minimal : DOI, titre et année, sans auteurs ni revue.
         "source_id": "10.9999/cr-test-002",
         "doi": "10.9999/cr-test-002",
         "raw_data": {
@@ -82,7 +73,7 @@ def _insert_crossref_staging(conn, docs):
             doi=doc["doi"],
             raw_data=doc["raw_data"],
             processed=False,
-            upsert="raw_data",
+            replace=True,
         )
 
 
@@ -125,13 +116,12 @@ class TestNormalizeCrossrefIdempotence:
         counts_1 = _count_crossref(sa_sync_conn)
         assert processed_1 == 2
         assert counts_1["sp"] == 2
-        # 2 auteurs sur le 1er record, 0 sur le 2nd → 2 source_contributions.
+        # Deux auteurs dans le premier document, aucun dans le second.
         assert counts_1["sa"] == 2
-        # 2 affiliations distinctes (UCA, CNRS) liées via address linker.
+        # Deux affiliations distinctes (UCA, CNRS), liées par leurs adresses.
         assert counts_1["sca"] == 2
 
-        # Réinjecter le raw_data (le normaliseur peut le purger via VACUUM
-        # post-pipeline ; ici on re-stage explicitement pour relancer).
+        # La normalisation vide `raw_data` : le test réinsère le contenu pour relancer.
         _insert_crossref_staging(sa_sync_conn, CROSSREF_STAGING_DOCS)
         _run_normalize_crossref(sa_sync_conn)
         create_all_publications(sa_sync_conn)
@@ -169,11 +159,11 @@ class TestNormalizeCrossrefIdempotence:
         assert rows[0].identifiers is not None
         assert rows[0].identifiers.get("orcid") == "0000-0002-1825-0097"
 
-        # Deuxième auteur : pas d'ORCID.
+        # Deuxième auteur : sans ORCID.
         assert (rows[1].raw_last_name, rows[1].raw_first_name) == ("Pasteur", "Bob")
         assert rows[1].identifiers is None
 
-        # Les affiliations sont routées vers addresses + source_contribution_addresses.
+        # Les affiliations deviennent des adresses liées aux contributions sources.
         addr_rows = sa_sync_conn.execute(
             text("""
                 SELECT a.raw_text
@@ -189,15 +179,14 @@ class TestNormalizeCrossrefIdempotence:
 
 class TestNormalizeCrossrefSkipBranches:
     def test_skips_when_raw_data_empty(self, sa_sync_conn):
-        # raw_data vide → process_work retourne None et marque processed.
+        # `raw_data` vide : rien d'inséré, ligne marquée traitée.
         from sqlalchemy import text
 
         _crossref_staging(sa_sync_conn, source_id="10.9999/cr-empty", doi="10.9999/cr-empty")
 
         processed = _run_normalize_crossref(sa_sync_conn)
         assert processed == 0
-        # Le record est tout de même marqué processed pour ne pas être
-        # ré-essayé en boucle.
+        # Marquée traitée, la ligne est laissée de côté au passage suivant.
         row = sa_sync_conn.execute(
             text(
                 "SELECT processed FROM staging WHERE source = 'crossref' "
@@ -207,7 +196,7 @@ class TestNormalizeCrossrefSkipBranches:
         assert row.processed is True
 
     def test_skips_when_no_doi(self, sa_sync_conn):
-        # raw_data sans DOI → skip avec WARNING + processed=TRUE.
+        # `raw_data` sans DOI : rien d'inséré, ligne marquée traitée.
         from sqlalchemy import text
 
         _crossref_staging(sa_sync_conn, source_id="no-doi-001", raw_data={"title": ["Untitled"]})
@@ -223,7 +212,7 @@ class TestNormalizeCrossrefSkipBranches:
         assert row.processed is True
 
     def test_skips_when_no_title_or_year(self, sa_sync_conn):
-        # raw_data avec DOI mais sans titre/année → skip.
+        # `raw_data` avec DOI, sans titre ni année : rien d'inséré.
         from sqlalchemy import text
 
         _crossref_staging(

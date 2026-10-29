@@ -18,7 +18,7 @@ from pipeline.ingestion.datacite.prefixes import (
 def _datacite_payload(
     prefix: str, client_symbol: str, client_name: str, provider_id: str, provider_name: str
 ) -> dict:
-    """Réponse JSON:API minimaliste, calquée sur api.datacite.org/prefixes/{p}?include=clients,providers."""
+    """Réponse JSON:API minimale, sur le modèle de api.datacite.org/prefixes/{p}?include=clients,providers."""
     return {
         "data": {
             "id": prefix,
@@ -65,7 +65,7 @@ def test_parse_datacite_prefix_payload_missing_relationships_returns_none():
 
 
 def test_parse_datacite_prefix_payload_missing_included_entry_returns_none():
-    """Si `relationships` référence un client mais qu'il manque dans `included`, on rate."""
+    """Un client référencé dans `relationships` et absent de `included` donne None."""
     payload = {
         "data": {
             "relationships": {

@@ -7,11 +7,9 @@ from typing import NamedTuple
 
 from domain.normalize import normalize_text
 
-# Année d'une édition de congrès (« NuFACT 2022 ») : de 1800 à 2099. Précédée d'un chiffre, d'un trait ou d'une
-# barre oblique, elle fait partie d'un nombre plus long ou d'une plage (« 11812 », « 101-1812 », « 2019/2020 »).
-# Suivie d'une lettre, d'un chiffre, d'un trait ou d'une parenthèse ouvrante, elle fait partie d'un code ou date
-# le fascicule d'une revue (« VTC2025-Spring », « 2018(7) »). Une lettre peut la précéder : « Goldschmidt2023 »,
-# « PoS(ICRC2021) ».
+# Année d'une édition de congrès (« NuFACT 2022 ») : de 1800 à 2099. Une lettre peut la précéder : « Goldschmidt2023 », « PoS(ICRC2021) ».
+# Précédée d'un chiffre, d'un trait ou d'une barre oblique, elle fait partie d'un nombre ou d'une plage (« 11812 », « 2019/2020 »).
+# Suivie d'une lettre, d'un chiffre, d'un trait ou d'une parenthèse ouvrante, elle fait partie d'un code ou date un fascicule (« VTC2025-Spring », « 2018(7) »).
 _EVENT_YEAR = re.compile(r"(?<![\d\-–/])(?:1[89]\d\d|20\d\d)(?![\w\-–/(])")
 _YEAR_RANGE = re.compile(r"(\d{4})\s*[-–]\s*(\d{4})")
 _JOURNAL_WORD = re.compile(r"\bjournal\b", re.IGNORECASE)
@@ -25,9 +23,11 @@ _LEGAL_PROCEEDINGS = re.compile(
 
 
 def names_proceedings(title: str) -> bool:
-    """Indique si le titre annonce des actes : « Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence ».
+    """Vrai si le titre annonce des actes : « Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence ».
 
     Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre ne compte pas, pas plus qu'une procédure judiciaire : « Third Parties in Criminal Proceedings ».
+
+    Seul le mot anglais compte : en sciences humaines, les chapitres d'« Actes du colloque » restent des chapitres.
     """
     return (
         bool(_PROCEEDINGS.search(title))
@@ -37,12 +37,12 @@ def names_proceedings(title: str) -> bool:
 
 
 def names_ebook_platform(title: str) -> bool:
-    """Indique si le titre est celui qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur : « ENS Éditions eBooks ». Une plateforme d'ebooks n'est le conteneur d'aucun document."""
+    """Vrai si le titre est celui qu'OpenAlex donne à la plateforme d'ebooks d'un éditeur : « ENS Éditions eBooks ». Une plateforme d'ebooks n'est le conteneur d'aucun document."""
     return bool(_EBOOK_PLATFORM.search(title))
 
 
 def names_a_dated_event(title: str) -> bool:
-    """Indique si le titre nomme une édition datée : « NuFACT 2022 », « 2024 IEEE SENSORS », « Goldschmidt2023 abstracts ».
+    """Vrai si le titre nomme une édition datée : « NuFACT 2022 », « 2024 IEEE SENSORS », « Goldschmidt2023 abstracts ».
 
     Ne comptent pas : une période (« Poetry, 1960–2015 »), une année seule entre parenthèses (« 22 Seiten (2023). »), un titre qui contient le mot « journal » (« Journal of high energy physics 2018(7) »).
     """
@@ -56,15 +56,14 @@ def names_a_dated_event(title: str) -> bool:
 
 
 def nested_titles(a: str | None, b: str | None) -> bool:
-    """Les mots d'un titre sont tous dans l'autre : « BMJ » et « BMJ British Medical Journal », pas « Physical review C » et « Physical review D »."""
+    """Vrai si les mots d'un titre sont tous dans l'autre : « BMJ » et « BMJ British Medical Journal », pas « Physical review C » et « Physical review D »."""
     if not a or not b:
         return False
     words_a, words_b = set(normalize_text(a).split()), set(normalize_text(b).split())
     return bool(words_a and words_b) and (words_a <= words_b or words_b <= words_a)
 
 
-# Mots qu'une abréviation de titre laisse tomber. Une lettre isolée compte : elle distingue les sections
-# d'une revue (« Physical Review A », « Physical Review D »).
+# Mots qu'une abréviation de titre laisse tomber. Une lettre isolée compte : elle distingue les sections d'une revue (« Physical Review A », « Physical Review D »).
 _STOP_WORDS = frozenset(
     {"an", "and", "at", "de", "des", "du", "en", "et", "for", "in", "la", "le", "les", "of", "on", "the", "to"}
 )  # fmt: skip
@@ -73,11 +72,9 @@ _ELISION = re.compile(r"\b[dlDL]['’]")
 _WORD = re.compile(r"[^\W_]+")
 # Un acronyme compte au plus autant de lettres, dont deux capitales : « JINST », « UBB », « HiHEP ».
 _ACRONYM_MAX = 5
-# Titres parallèles d'une même revue : « JCSM/Journal of Clinical Sleep Medicine », « Arthritis Care & Research
-# = Arthritis Care and Research ».
+# Titres parallèles d'une même revue : « JCSM/Journal of Clinical Sleep Medicine », « Arthritis Care & Research = Arthritis Care and Research ».
 _PARALLEL_TITLES = re.compile(r"[/=]")
-# Début d'un sous-titre ou d'un complément : « Notos - Espaces de la création », « Medicine (Baltimore) »,
-# « Costellazioni : Rivista di lingue e letterature ».
+# Début d'un sous-titre ou d'un complément : « Notos - Espaces de la création », « Medicine (Baltimore) », « Costellazioni : Rivista di lingue e letterature ».
 _SUBTITLE = re.compile(r"\s[-–—]\s|[:(\[]")
 
 
@@ -89,7 +86,7 @@ class _Word(NamedTuple):
 
 
 def compatible_titles(a: str, b: str) -> bool:
-    """Les deux titres désignent la même revue : l'un abrège l'autre, ou ils diffèrent seulement par la casse, l'accentuation, la ponctuation et les mots vides.
+    """Vrai si les deux titres désignent la même revue : l'un abrège l'autre, ou ils diffèrent seulement par la casse, l'accentuation, la ponctuation et les mots vides.
 
     Un mot abrégé est le début du mot complet (« Phys » pour « Physical ») ou sa contraction : même initiale, lettres dans l'ordre (« Rept » pour « Reports »). Un acronyme se découpe en débuts de mots successifs (« JINST » pour « Journal of Instrumentation »). Tous les mots du titre long sont abrégés, dans l'ordre : « Microscopy » n'abrège pas « Microscopy Today ». Chaque titre parallèle, séparé par `/` ou `=`, et chaque titre privé de son sous-titre sont essayés à leur tour.
     """
@@ -118,7 +115,7 @@ def _words(title: str) -> tuple[_Word, ...]:
 
 
 def _abbreviates(short: Sequence[_Word], full: Sequence[_Word]) -> bool:
-    """Les mots du titre court abrègent, dans l'ordre, tous ceux du titre long, et un mot au moins y est raccourci."""
+    """Vrai si les mots du titre court abrègent, dans l'ordre, tous ceux du titre long, et un mot au moins y est raccourci."""
     targets = [w.text for w in full]
 
     @cache

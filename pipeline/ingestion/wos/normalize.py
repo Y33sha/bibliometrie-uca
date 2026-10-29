@@ -1,4 +1,4 @@
-"""Normalisation des données WoS : staging → tables normalisées."""
+"""Normalisation des enregistrements sources WoS, lus dans la forme de l'API ou d'une ligne d'export tabulé."""
 
 import logging
 from collections.abc import Mapping, Sequence
@@ -42,10 +42,6 @@ from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
 
-# =============================================================
-# UTILITAIRES
-# =============================================================
-
 
 def _text_of(value: JsonValue) -> str | None:
     """Numérotation que l'API donne en nombre ou en chaîne, en texte ; `None` si vide."""
@@ -53,7 +49,7 @@ def _text_of(value: JsonValue) -> str | None:
 
 
 def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
-    """Suite de valeurs portée par `obj` : l'API rend un objet seul là où elle annonce une liste."""
+    """Valeurs d'un champ : l'API renvoie un objet seul là où elle annonce une liste."""
     if obj is None:
         return []
     if isinstance(obj, (str, Mapping)):
@@ -64,7 +60,7 @@ def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
 
 
 def _get_api_title(static: Mapping[str, JsonValue], title_type: str) -> str | None:
-    """Extrait un titre depuis la structure API."""
+    """Titre d'un type donné, dans la forme de l'API."""
     titles = at_path(static, "summary", "titles")
     title_list = _safe_list(titles.get("title"))
     for entry in title_list:
@@ -77,11 +73,11 @@ def _get_api_title(static: Mapping[str, JsonValue], title_type: str) -> str | No
 def _parse_api_authors(
     static: Mapping[str, JsonValue], dynamic: Mapping[str, JsonValue]
 ) -> list[dict[str, JsonValue]]:
-    """Extrait les auteurs depuis le format API."""
+    """Auteurs, dans la forme de l'API."""
     names_data = at_path(static, "summary", "names")
     name_list = _safe_list(names_data.get("name"))
 
-    # Adresses pour le matching
+    # Adresses, par numéro
     addresses_data = at_path(static, "fullrecord_metadata", "addresses")
     addr_list = _safe_list(addresses_data.get("address_name"))
     addr_map: dict[str, str] = {}  # addr_no -> full_address
@@ -91,7 +87,7 @@ def _parse_api_authors(
         addr_no = spec.get("addr_no")
         if addr_no is not None:
             addr_map[str(addr_no)] = as_str(spec.get("full_address")) or ""
-            # Organizations structurées
+            # Organisations de l'adresse
             org_list = _safe_list(at_path(spec, "organizations").get("organization"))
             orgs: list[dict[str, JsonValue]] = []
             for entry in org_list:
@@ -118,12 +114,12 @@ def _parse_api_authors(
         daisng_id = str(daisng) if daisng else None
         researcher_id = as_str(name_obj.get("r_id"))
 
-        # L'ORCID WoS (`PreferredORCID`) n'est pas moissonné : attribué par le matching algorithmique interne de Web of Science, il est trop peu fiable pour figurer dans les informations du contributeur (où sa source serait perdue et où il deviendrait un faux signal de matching).
-        # Les ORCID fiables viennent des sources à dépôt auteur (`ORCID_MATCH_SOURCES`).
+        # L'ORCID WoS (`PreferredORCID`) reste hors de la moisson : le matching interne de Web of Science l'attribue, trop peu fiable pour les informations du contributeur, où il perdrait sa source.
+        # Les ORCID fiables viennent des sources où l'auteur les dépose (`ORCID_MATCH_SOURCES`).
 
         is_corresponding = as_str(name_obj.get("reprint")) == "Y"
 
-        # Affiliations via addr_no
+        # Affiliations, par numéro d'adresse
         addr_nos = name_obj.get("addr_no")
         raw_affiliation = None
         # Chaque adresse de l'auteur, avec les ROR de ses organisations.
@@ -165,7 +161,7 @@ def _parse_api_authors(
 
 
 def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
-    """Extrait le DOI depuis la structure API."""
+    """DOI, dans la forme de l'API."""
     try:
         identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
@@ -177,7 +173,7 @@ def _get_api_doi(dynamic: Mapping[str, JsonValue]) -> str | None:
 
 
 def _get_api_issn(dynamic: Mapping[str, JsonValue], issn_type: str = "issn") -> str | None:
-    """Extrait l'ISSN ou eISSN depuis la structure API."""
+    """ISSN ou eISSN, dans la forme de l'API."""
     try:
         identifiers = at_path(dynamic, "cluster_related", "identifiers").get("identifier", [])
         for ident in _safe_list(identifiers):
@@ -200,7 +196,7 @@ def _get_api_isbns(dynamic: Mapping[str, JsonValue], isbn_type: str) -> list[str
 
 
 def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:  # noqa: C901
-    """Extrait un record structuré depuis le format API."""
+    """Record structuré d'un payload de l'API."""
     static = at_path(raw, "static_data")
     dynamic = at_path(raw, "dynamic_data")
     summary = at_path(static, "summary")
@@ -246,7 +242,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
     if lang_list:
         language = as_str(as_mapping(lang_list[0]).get("content")) or as_str(lang_list[0])
 
-    # Numérotation, éditeur et revue tels que WoS les nomme, en parallèle des publishers/serials créés via find_or_create_*.
+    # Numérotation, éditeur et revue tels que WoS les nomme.
     page = at_path(publication_info, "page")
     issn_val = _get_api_issn(dynamic, "issn")
     eissn_val = _get_api_issn(dynamic, "eissn")
@@ -274,7 +270,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
             abstract = str(p)
 
     # Keywords
-    # Web of Science rend un mot-clé unique en chaîne, plusieurs en liste.
+    # Web of Science renvoie un mot-clé unique en chaîne, plusieurs en liste.
     kw_raw = at_path(frm, "keywords").get("keyword", [])
     single_word = as_str(kw_raw)
     keywords = ([single_word] if single_word else as_strs(kw_raw)) or None
@@ -362,7 +358,7 @@ def _export_authors(raw: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]]:
 def extract_from_export(
     raw: Mapping[str, JsonValue], staging_doi: str | None
 ) -> dict[str, JsonValue]:
-    """Extrait un record structuré d'une ligne d'export tabulé de l'interface WoS, sous la même forme qu'`extract_from_api`. Le statut open access reste inconnu."""
+    """Record structuré d'une ligne d'export tabulé de l'interface WoS, sous la même forme qu'`extract_from_api`. Le statut open access reste inconnu."""
 
     def field(tag: str) -> str | None:
         return as_str(raw.get(tag))
@@ -408,19 +404,14 @@ def extract_from_export(
 
 
 def extract_record(raw: Mapping[str, JsonValue], staging_doi: str | None) -> dict[str, JsonValue]:
-    """Extrait un record structuré d'un payload WoS : JSON de l'API, ou ligne d'export tabulé de l'interface (balise `UT`)."""
+    """Record structuré d'un payload WoS : JSON de l'API, ou ligne d'export tabulé de l'interface (balise `UT`)."""
     if "UT" in raw:
         return extract_from_export(raw, staging_doi)
     return extract_from_api(raw, staging_doi)
 
 
-# =============================================================
-# PUBLISHERS & SERIALS
-# =============================================================
-
-
 def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
-    """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document ne reçoit pas de monographie."""
+    """Ce que WoS dit du conteneur d'un document. Le titre de la source est la revue d'un article, le livre ou le volume d'actes d'un chapitre ou d'une communication. Sous un ISSN, le titre de la source est aussi celui de la collection : le document reste sans monographie."""
     title = as_str(rec.get("journal_title"))
     issn, eissn = as_str(rec.get("issn")), as_str(rec.get("eissn"))
     return ContainerDescription(
@@ -435,11 +426,6 @@ def get_container_facts(rec: Mapping[str, JsonValue]) -> ContainerDescription:
         eisbns=tuple(as_strs(rec.get("eisbns"))),
         year=as_int(rec.get("publication_year")),
     )
-
-
-# =============================================================
-# SOURCE DOCUMENTS (WOS)
-# =============================================================
 
 
 def wos_identifiers(rec: Mapping[str, JsonValue]) -> tuple[SourceIdentifier, ...]:
@@ -461,12 +447,11 @@ def wos_identifiers(rec: Mapping[str, JsonValue]) -> tuple[SourceIdentifier, ...
 def wos_source_record(
     rec: Mapping[str, JsonValue], staging_id: int, containers: Containers
 ) -> SourceRecordUpsert:
-    """Enregistrement source WoS d'un record, identifié par son UT. Le titre de la source sert de `container_title` à défaut d'entrée de `serials`. Cette source ne porte pas de numéro national de thèse : elle ne moissonne pas les thèses."""
+    """Enregistrement source WoS d'un record, identifié par son UT. Le titre de la source sert de titre libre du conteneur à défaut de revue. Les records WoS sont sans NNT."""
     return SourceRecordUpsert(
         source="wos",
         source_id=as_str(rec.get("ut")) or "",
         staging_id=staging_id,
-        doi=as_str(rec.get("doi")),
         identifiers=wos_identifiers(rec),
         title=as_str(rec.get("title")) or "",
         publication_year=as_int(rec.get("publication_year")),
@@ -485,11 +470,8 @@ def wos_source_record(
     )
 
 
-# =============================================================
-# WOS CONTRIBUTIONS — identifiants sur source_contributions
-# =============================================================
-# Le `daisng_id` (entité algorithmique WoS non fiable) n'est pas conservé.
-# Le `researcher_id` (ResearcherID Clarivate) — identifiant cross-source — figure dans les informations du contributeur (contributor_information.identifiers).
+# Le `daisng_id`, entité calculée par WoS et peu fiable, reste hors de la base.
+# Le `researcher_id` (ResearcherID de Clarivate), identifiant commun à plusieurs sources, va dans les informations du contributeur.
 
 
 def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
@@ -504,16 +486,16 @@ def _author_name(author: Mapping[str, JsonValue]) -> ContributorName | None:
 def build_wos_author_records(
     rec: Mapping[str, JsonValue], logger: logging.Logger
 ) -> list[AuthorRecord]:
-    """Parse les contributions d'un record WoS en `AuthorRecord` (sans I/O).
+    """Contributions sources d'un record WoS.
 
-    Un record dont l'extraction a écarté tous les auteurs (`authors_found` non nul, `authors` vide) est journalisé en avertissement. Chaque auteur reçoit ses `identifiers` (researcher_id ; l'ORCID WoS n'est pas moissonné, cf. extraction), ses adresses brutes, chacune avec les ROR de ses organisations. Les `author_position` du payload WoS peuvent se répéter ; elles sont dédoublonnées ici (première occurrence gagne), la clé `(source_record_id, author_position)` interdisant les doublons en base.
+    Un record dont l'extraction a écarté tous les auteurs est journalisé en avertissement. Chaque auteur reçoit son ResearcherID et ses adresses, chacune avec les ROR de ses organisations. Les positions du payload WoS peuvent se répéter ; la base interdit deux contributions sources de même position : la première occurrence l'emporte.
     """
     authors_kept = [as_mapping(a) for a in as_sequence(rec.get("authors"))]
     if not authors_kept:
         if found := as_int(rec.get("authors_found")):
             logger.warning(
                 "WoS record %s : %d auteurs présents mais aucun exploitable "
-                "(filtre is_wos_author_exploitable) — contributions ignorés",
+                "(filtre is_wos_author_usable), contributions ignorées",
                 as_str(rec.get("ut")) or "?",
                 found,
             )
@@ -550,7 +532,7 @@ def build_wos_author_records(
                 ],
             )
         )
-    # `author_position` lue du payload WoS : dédup (première occurrence gagne).
+    # Positions lues du payload : la première occurrence l'emporte.
     by_position: dict[int | None, AuthorRecord] = {}
     for r in records:
         by_position.setdefault(r.position, r)
@@ -571,7 +553,7 @@ class WosNormalizer(SourceNormalizer):
         return as_str(rec.get("title")), as_int(rec.get("publication_year"))
 
     def parse(self, row: StagingRow) -> Document:
-        """Le record, lu dans la forme de l'API ou de l'export, identifié par son UT à défaut d'en porter un."""
+        """Le record, lu dans la forme de l'API ou de l'export, identifié par l'identifiant de sa ligne de `staging` s'il est sans UT."""
         rec = extract_record(row.raw_data, row.doi)
         if not rec["ut"]:
             rec["ut"] = row.source_id

@@ -120,7 +120,7 @@ class TestPurge:
         assert purge_publications(conn, limit=2) == 0
 
     def test_sujets_supprimes_en_cascade(self, sa_sync_conn):
-        """`publication_subjects` reste limitée aux publications du périmètre sans filtre propre."""
+        """La purge d'une publication supprime ses liens aux sujets : `publication_subjects` contient seulement des publications du périmètre."""
         conn = sa_sync_conn
         pid = insert_publication(conn)
         insert_publication_subject(conn, pid, subject_id=insert_subject(conn, "vaches laitieres"))

@@ -1,6 +1,6 @@
 """Agrégation des métriques de la phase `publishing`.
 
-La phase enchaîne ses sous-étapes (résolution des préfixes → éditeurs, enrichissement des revues via OpenAlex, vérification des ISSN dans le Sudoc, import DOAJ). Leurs compteurs et signaux doivent remonter à la phase : sinon le log de fin et l'observabilité rapportent « no-op » alors que du travail a été effectué.
+La phase enchaîne ses sous-étapes : éditeurs des préfixes DOI (Crossref, DataCite), enrichissement des revues par OpenAlex, vérification des ISSN dans le Sudoc, import DOAJ. Leurs compteurs et signaux remontent à la phase.
 """
 
 from unittest.mock import patch
@@ -33,7 +33,7 @@ def test_phase_aggregates_substep_counters():
             )
         )
 
-    # Les compteurs des sous-étapes sont remontés : le résumé n'est pas « no-op ».
+    # Les compteurs des sous-étapes remontent dans le résumé de la phase.
     assert metrics.new == 1
     assert metrics.updated == 5
     assert metrics.extras.get("publisher_matched") == 2

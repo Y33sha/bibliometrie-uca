@@ -1,6 +1,6 @@
 """Client Sudoc : correspondance ISSN → PPN (service `issn2ppn`) et notices MARCXML des publications en série.
 
-Le HTTP passe par les helpers asynchrones de `http_retry`, sur un `httpx2.AsyncClient` partagé : retry, backoff et alimentation du circuit-breaker de source. Le XML est lu avec `defusedxml`, qui refuse les déclarations d'entités. L'interprétation des zones de la notice appartient à `domain.sources.sudoc`.
+Les requêtes passent par `http_retry`, sur un client asynchrone partagé : nouvelles tentatives, backoff et circuit-breaker de la source. Le XML est lu avec `defusedxml`, qui refuse les déclarations d'entités. L'interprétation des zones de la notice appartient à `domain.sources.sudoc`.
 """
 
 from __future__ import annotations

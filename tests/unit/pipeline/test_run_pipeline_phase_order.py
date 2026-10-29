@@ -14,11 +14,8 @@ def _fake_tx():
     yield MagicMock()
 
 
-def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
-    """Adresses, revues et éditeurs se comptent des mêmes publications et contributions sources.
-
-    La phase `contributions` les stabilise : leurs décomptes s'y recalculent ensemble.
-    """
+def test_les_decomptes_de_publications_se_recalculent_dans_finalize():
+    """Les décomptes de publications des adresses, des revues et des éditeurs se recalculent ensemble dans la phase `finalize`."""
     with (
         patch.object(finalize_phase, "purge_publications", return_value=0),
         patch.object(finalize_phase, "count_contributions_in_perimeter"),
@@ -53,6 +50,6 @@ def test_les_decomptes_de_publications_se_recalculent_dans_contributions():
 
 
 def test_resolve_ra_runs_after_normalize_before_publishing():
-    """La RA des DOI normalisés dans le run est résolue avant que `publishing` rattache les préfixes à leur éditeur."""
+    """L'agence d'enregistrement des DOI normalisés dans le run est résolue avant que `publishing` rattache les préfixes à leur éditeur."""
     names = [n for n, _ in run_pipeline.PHASES]
     assert names.index("normalize") < names.index("resolve_ra") < names.index("publishing")

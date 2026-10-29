@@ -23,7 +23,7 @@ def insert_ror_tree(conn: Connection) -> None:
 def insert_author(
     conn: Connection, publication: int, source_id: str, ror: str, person: int | None = None
 ) -> int:
-    """Un auteur de `publication`, dont la contribution source cite `ror`, rattaché ou non à `person`. Rend l'`id` de la contribution source."""
+    """Un auteur de `publication`, dont la contribution source cite `ror`, rattaché ou non à `person`. Renvoie l'`id` de la contribution source."""
     record = insert_source_record(conn, publication, source="openalex", source_id=source_id)
     source_contribution = insert_source_contribution(conn, record)
     contribution = align_source_contributions(conn, publication, [(source_contribution, record)])

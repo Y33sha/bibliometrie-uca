@@ -4,7 +4,7 @@ from enum import StrEnum
 
 
 class StagingEntryMode(StrEnum):
-    """Voie par laquelle une ligne de `staging` est entrée, valeur de `staging.entry_mode`. Posée à la création, jamais réécrite."""
+    """Voie par laquelle une ligne de `staging` est entrée, valeur de `staging.entry_mode`. Posée à la création de la ligne, et fixe ensuite."""
 
     # Moissonnage d'une source sur les affiliations du périmètre.
     BULK = "bulk"

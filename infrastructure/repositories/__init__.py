@@ -1,12 +1,6 @@
-"""Factories pour accéder aux implémentations concrètes des repositories.
+"""Fabriques des implémentations PostgreSQL des repositories.
 
-La couche application importe ces fonctions plutôt que les classes concrètes Pg* : elle ne dépend que de ce module (point de câblage d'infrastructure) et des Protocols dans application/ports/repositories/, jamais des classes d'implémentation.
-
-Usage :
-    from infrastructure.repositories import person_repository
-
-    def set_exclusion(conn, person_id, exclusion):
-        person_repository(conn).set_exclusion(person_id, exclusion)
+La couche application importe ces fonctions, jamais les classes `Pg*` : elle dépend de ce module et des protocoles de `application/ports/repositories/`.
 """
 
 from sqlalchemy import Connection

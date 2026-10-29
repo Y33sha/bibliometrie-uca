@@ -25,7 +25,7 @@ _ORCID = "0000-0002-1825-0097"
 
 
 def _contribution(conn, publication, members):
-    """Contribution des contributions sources `(source, nom, identifiants, du périmètre)` de la publication, aux attributs recomposés comme par la phase `author_grouping`."""
+    """Contribution qui aligne les contributions sources `(source, nom, identifiants, du périmètre)` de la publication, aux attributs recomposés comme par la phase `author_grouping`."""
     pairs = []
     for index, (source, name, identifiers, in_perimeter) in enumerate(members):
         source_record = insert_source_record(
@@ -160,7 +160,7 @@ def _attach(conn, contribution, person, mode):
 
 
 def _pin_members(conn, contribution, person):
-    """Épingle à `person` tous les contributions sources de la contribution."""
+    """Épingle à `person` toutes les contributions sources de la contribution."""
     conn.execute(
         text("""
             INSERT INTO confirmed_source_contributions (source_contribution_id, person_id)
@@ -436,7 +436,7 @@ def test_le_journal_compte_les_identifications_par_mode_et_les_creations(sa_sync
 
 
 def test_un_role_sans_creation_ne_compte_pas_parmi_les_non_identifiees(sa_sync_conn, caplog):
-    """Une contribution source du jury au nom inconnu reste sans personne sans être compté ; un auteur au nom inconnu fonde une personne."""
+    """Une contribution source du jury au nom inconnu reste sans personne, hors du décompte ; un auteur au nom inconnu fonde une personne."""
     conn = sa_sync_conn
     publication = insert_publication(conn)
     source_record = insert_source_record(conn, publication, source="theses", source_id="these-1")
@@ -457,6 +457,7 @@ def test_un_role_sans_creation_ne_compte_pas_parmi_les_non_identifiees(sa_sync_c
 
     assert "  ├─ 1 contribution du périmètre non identifiée" in caplog.messages
     assert "  ├─ 0 indécidable" in caplog.messages
+    assert "  └─ 1 personne créée" in caplog.messages
 
 
 class TestResolutionQueue:

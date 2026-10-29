@@ -141,6 +141,7 @@ def insert_monograph(
     proceedings: bool | None = None,
     publisher_id: int | None = None,
     serial_id: int | None = None,
+    isbn: str | None = None,
 ) -> int:
     """Insère une monographie et renvoie son `id`. Le titre normalisé vaut par défaut le titre en minuscules."""
     return insert_row(
@@ -152,6 +153,7 @@ def insert_monograph(
             "proceedings": proceedings,
             "publisher_id": publisher_id,
             "serial_id": serial_id,
+            "isbn": isbn,
         },
     )
 

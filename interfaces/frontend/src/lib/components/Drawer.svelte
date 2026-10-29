@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Volet droit des référentiels de l'administration : il se ferme par Échap, par le fond et par son bouton.
+  // Volet droit : il se ferme par Échap, par le fond et par son bouton.
   import type { Snippet } from "svelte";
 
   let {
@@ -94,9 +94,12 @@
   .drawer-close:hover {
     color: var(--text);
   }
+  /* Les marges intérieures sont des variables : un contenu figé aux bords du volet les compense. */
   .drawer-body {
+    --drawer-padding-y: 16px;
+    --drawer-padding-x: 18px;
     flex: 1;
     overflow-y: auto;
-    padding: 16px 18px;
+    padding: var(--drawer-padding-y) var(--drawer-padding-x);
   }
 </style>

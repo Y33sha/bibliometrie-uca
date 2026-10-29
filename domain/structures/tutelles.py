@@ -1,9 +1,4 @@
-"""Règles métier sur les tutelles entre structures (`structure_parents`).
-
-Fonctions libres (domain services) validant le graphe `structure_parents` : la règle cycle / auto-référence porte sur l'arête `parent → child`, hors de l'agrégat `Structure`.
-
-Pattern caller : le service applicatif prefetche les ancêtres du `parent_id` candidat via le repo (`WITH RECURSIVE`) et passe le set ici. Le domaine reste pur (zéro I/O).
-"""
+"""Tutelles entre structures (`structure_parents`) : refus des cycles."""
 
 from domain.errors import ValidationError
 
@@ -14,15 +9,7 @@ def check_can_create_tutelle(
     child_id: int,
     ancestors_of_parent: frozenset[int],
 ) -> None:
-    """Vérifie qu'une tutelle `parent_id → child_id` est créable.
-
-    Refus :
-
-    - **auto-référence** : `parent_id == child_id` (cas dégénéré).
-    - **cycle** : `child_id` est déjà un ancêtre de `parent_id` ; ajouter cette tutelle refermerait la boucle.
-
-    Le set `ancestors_of_parent` n'inclut pas `parent_id` lui-même : c'est l'ensemble strict des structures atteignables depuis `parent_id` en remontant les arêtes `child → parent` du graphe.
-    """
+    """Lève `ValidationError` si la tutelle `parent_id → child_id` relie une structure à elle-même ou ferme un cycle. `ancestors_of_parent` : ancêtres stricts de `parent_id`."""
     if parent_id == child_id:
         raise ValidationError(
             f"Auto-référence interdite dans structure_parents : parent_id == child_id ({parent_id})"

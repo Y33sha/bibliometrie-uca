@@ -1,11 +1,6 @@
-"""Tests de caractérisation pour le router `admin/contributions`.
+"""Tests de caractérisation du router des contributions : exclusion d'une contribution, lecture et rattachement des contributions orphelines.
 
-Couvre :
-- PATCH /api/contributions/{id}/exclude
-- GET / POST /api/contributions/orphans/*
-
-Stratégie : seed minimal via un pool dédié (hors pool API), ids uniques par
-test pour éviter les collisions.
+Les jeux de données sont posés par une connexion distincte de celles de l'API, avec des identifiants uniques par test.
 """
 
 import uuid
@@ -31,9 +26,7 @@ def _uniq_name(prefix: str) -> str:
 
 
 def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[int, int]:
-    """Contribution orpheline : contribution d'auteur du périmètre sans personne, d'une contribution source de nom brut `raw_author_name`, dans une publication.
-
-    Renvoie (contribution, publication) pour pouvoir rejeter la paire."""
+    """Contribution orpheline (contribution d'auteur du périmètre, sans personne) d'une contribution source de nom brut `raw_author_name`. Renvoie (contribution, publication)."""
     publication_id = seed_publication(title=uniq("Pub"))
     source_record_id = seed_source_record(publication_id=publication_id)
     source_contribution_id = seed_source_contribution(
@@ -45,7 +38,7 @@ def _seed_orphan_with_publication(raw_author_name: str = "Reject Me") -> tuple[i
 
 
 def _seed_orphan() -> int:
-    """Contribution d'une contribution orpheline, dans sa publication."""
+    """Identifiant d'une contribution orpheline."""
     return _seed_orphan_with_publication()[0]
 
 
@@ -53,7 +46,7 @@ def _seed_orphan() -> int:
 
 
 def _contribution_id(publication_id: int, person_id: int | None) -> int:
-    """L'`id` de la contribution de la personne `person_id` dans la publication, ou de la contribution sans personne si `person_id` vaut `None`."""
+    """Identifiant de la contribution de la personne dans la publication, ou de la contribution sans personne si `person_id` vaut `None`."""
     with owner_pool() as cur:
         cur.execute(
             "SELECT id FROM contributions"
@@ -84,13 +77,13 @@ class TestExcludeContribution:
         assert publication_perimeter_evidence(publication) == []
 
     def test_contribution_without_person_is_not_found(self, auth_client):
-        """L'id d'une contribution sans personne ne désigne pas une contribution."""
+        """L'exclusion vise une contribution rattachée : une contribution sans personne renvoie 404."""
         contribution, _ = _seed_orphan_with_publication()
         r = auth_client.patch(f"/api/contributions/{contribution}/exclude")
         assert r.status_code == 404
 
 
-# ── Orphan contributions ──────────────────────────────────────────
+# ── Contributions orphelines ──────────────────────────────────────
 
 
 class TestOrphanContributions:
@@ -116,7 +109,7 @@ class TestOrphanContributions:
         assert r.status_code == 422
 
     def test_returns_last_name_first_name_from_comma_form(self, client):
-        """Format "Last, First" : parsé en last_name="Last", first_name="First"."""
+        """Nom « Nom, Prénom » : nom de famille avant la virgule, prénom après."""
         marker = _uniq_name("Marker")
         _seed_orphan_with_publication(f"{marker}, Jane")
 
@@ -131,7 +124,7 @@ class TestOrphanContributions:
         assert item["sources"] == ["hal"]
 
     def test_returns_last_name_first_name_from_space_form(self, client):
-        """Format "First Last" : parsé en last_name=dernier mot, first_name=reste."""
+        """Nom « Prénom Nom » : le dernier mot est le nom de famille, le reste le prénom."""
         marker = _uniq_name("Marker")
         _seed_orphan_with_publication(f"Jane Marie {marker}")
 
@@ -183,8 +176,7 @@ class TestAssignOrphanContribution:
         assert r.json()["person_id"] == pid
 
     def test_assign_visible_immediately(self, auth_client):
-        # La requête est committée avant l'envoi de la réponse : le rattachement est lisible
-        # depuis une connexion indépendante.
+        # La requête est committée avant l'envoi de la réponse : le rattachement est lisible depuis une connexion indépendante.
         pid = seed_person()
         contribution = _seed_orphan()
         r = auth_client.post(

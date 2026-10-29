@@ -1,6 +1,6 @@
-"""Phase `metadata_correction` — sous-étape unaire : chaque `source_record` corrigée par `correct_source_record`, la mise à jour persistée quand elle change quelque chose.
+"""Sous-étape unaire de la phase `metadata_correction` : chaque enregistrement source corrigé par `correct_source_record`, et la mise à jour écrite quand elle change quelque chose.
 
-Les journaux sont typés à ce stade : la phase tourne après `publishing`. La correction repart des valeurs d'avant correction, si bien qu'un changement de `serial_type` qui (dé)clenche une règle est rattrapé au run suivant.
+Les revues sont typées à ce stade : la phase suit `publishing`. La correction repart des valeurs d'avant correction : un changement de type de revue qui déclenche ou retire une règle s'applique au run suivant.
 """
 
 import logging
@@ -31,7 +31,7 @@ def compute_updates(
     hal_rows: Mapping[str, UnaryCorrectionRow],
     missing_hal_ids: Set[str],
 ) -> list[CorrectionUpdate]:
-    """Mises à jour à persister pour `rows`. `hal_rows` : enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR de `rows`. `missing_hal_ids` : dépôts HAL introuvables dans HAL."""
+    """Mises à jour à écrire. `hal_rows` donne les enregistrements sources HAL par identifiant, où se trouvent les dépôts d'origine des enregistrements sources ScanR. `missing_hal_ids` : dépôts introuvables dans HAL."""
     updates: list[CorrectionUpdate] = []
     for row in rows:
         origin = (
@@ -47,7 +47,7 @@ def compute_updates(
 
 
 def hal_origin_ids(rows: list[UnaryCorrectionRow]) -> list[str]:
-    """Identifiants des dépôts HAL dont sont issus les enregistrements sources ScanR de `rows`."""
+    """Identifiants des dépôts HAL dont sont issus les enregistrements sources ScanR."""
     return sorted(
         {
             hal_id
@@ -63,7 +63,7 @@ def compute_update(
     origin_doc_type: str | None = None,
     missing_hal_ids: Set[str] = frozenset(),
 ) -> CorrectionUpdate | None:
-    """Mise à jour de la correction unaire d'une `source_record` (`correct_source_record`), ou `None` si rien ne change. `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu."""
+    """Mise à jour de la correction unaire d'un enregistrement source (`correct_source_record`), ou `None` si rien ne change. `origin_doc_type` : type corrigé du dépôt HAL dont l'enregistrement source ScanR est issu."""
     corrected = correct_source_record(
         row.facts,
         row.identifiers,
@@ -76,7 +76,7 @@ def compute_update(
 
 @dataclass
 class UnaryCorrectionStats:
-    """Bilan de la passe unaire : `source_records` examinées, `source_records` corrigées par au moins une règle, et nombre de déclenchements par règle."""
+    """Bilan de la passe unaire : enregistrements sources examinés, enregistrements sources corrigés par au moins une règle, déclenchements par règle."""
 
     examined: int
     corrected: int
@@ -84,7 +84,7 @@ class UnaryCorrectionStats:
 
 
 def tally_corrections(updates: list[CorrectionUpdate]) -> tuple[int, dict[str, int]]:
-    """`(source_records corrigées, déclenchements par règle)` à partir des `corrected_by` des champs unaires et des règles qui retirent des identifiants. Une règle qui corrige plusieurs champs d'une `source_record` compte une fois."""
+    """Nombre d'enregistrements sources corrigés et déclenchements par règle, d'après les champs unaires corrigés et les règles qui retirent des identifiants. Une règle qui corrige plusieurs champs d'un enregistrement source compte une fois."""
     rule_counts: dict[str, int] = {}
     corrected = 0
     for update in updates:
@@ -110,7 +110,7 @@ def run(
     store: SourceRecordCorrectionStore,
     logger: logging.Logger,
 ) -> UnaryCorrectionStats:
-    """Passe unaire : corrige et persiste les métadonnées corrigées sur toutes les `source_records`."""
+    """Corrige tous les enregistrements sources et écrit les mises à jour."""
     step(logger, "Corrections de métadonnées par document")
     t0 = time.perf_counter()
     rows = store.fetch_for_unary_correction()

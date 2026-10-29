@@ -9,9 +9,7 @@ from sqlalchemy import Connection, Row, text
 
 logger = logging.getLogger(__name__)
 
-# Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui
-# commence par l'un d'eux est évaluée à l'ouverture du fichier — avec le contenu qu'une
-# source externe y a déposé, titres et noms de revues venant de HAL et OpenAlex.
+# Caractères par lesquels un tableur reconnaît le début d'une formule. Une cellule qui commence par l'un d'eux est évaluée à l'ouverture du fichier, avec le contenu qu'une source externe y a déposé : titres et noms de revues venus de HAL et d'OpenAlex.
 _FORMULA_STARTERS = ("=", "+", "-", "@", "\t", "\r")
 
 
@@ -28,17 +26,16 @@ def neutralize_formula(value: object) -> object:
 
 
 class _EchoStream:
-    """Flux de sortie qui rend le texte qu'on lui écrit.
+    """Flux de sortie qui renvoie le texte écrit.
 
-    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
+    `csv.writer` renvoie ce que son flux a renvoyé à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
     """
 
     def write(self, value: str) -> str:
         return value
 
 
-# Marque d'ordre des octets, en tête du premier bloc : sans elle, un tableur lit l'UTF-8 comme
-# de l'ANSI et les accents ressortent en mojibake.
+# Marque d'ordre des octets, en tête du premier bloc : sans elle, un tableur lit l'UTF-8 comme de l'ANSI, et les accents ressortent en mojibake.
 BOM = "﻿"
 
 
@@ -67,8 +64,7 @@ class CsvWriter:
         )
 
 
-# Taille visée d'un bloc rendu au client. Une ligne par bloc ferait des dizaines de milliers
-# d'envois pour un export ; un bloc trop gros ramènerait le tampon qu'on cherche à supprimer.
+# Taille visée d'un bloc rendu au client. Une ligne par bloc ferait des dizaines de milliers d'envois pour un export ; un bloc trop gros ramènerait le tampon que les blocs évitent.
 EXPORT_CHUNK_SIZE = 64 * 1024
 
 
@@ -87,16 +83,14 @@ def chunked(lines: Iterator[str], size: int = EXPORT_CHUNK_SIZE) -> Iterator[str
         yield "".join(pending)
 
 
-# Plafond de lignes d'un export. Assez haut pour qu'un export légitime ne l'approche jamais —
-# à ce compte, requête et fichier tiennent confortablement en mémoire — et assez bas pour
-# qu'une demande sans filtre, que n'importe qui peut répéter, ne puisse pas la saturer.
+# Plafond de lignes d'un export : assez haut pour qu'un export légitime en reste loin, la requête et le fichier tenant en mémoire ; assez bas pour qu'une demande sans filtre, que n'importe qui peut répéter, laisse la mémoire disponible.
 MAX_EXPORT_ROWS = 500_000
 
 
 def cap_export_rows(
     rows: Sequence[Row[tuple[object, ...]]], cap: int
 ) -> tuple[Sequence[Row[tuple[object, ...]]], bool]:
-    """Rend les lignes ramenées au plafond, et si la coupe a eu lieu.
+    """Renvoie les lignes ramenées au plafond, et si la coupe a eu lieu.
 
     Les requêtes demandent `cap + 1` lignes : la ligne excédentaire signale le dépassement, sans `COUNT` séparé. La coupe suit le tri appliqué en base.
     """

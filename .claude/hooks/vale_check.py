@@ -19,7 +19,7 @@ if ".claude" in pathlib.Path(path).parts:
 def lignes_modifiees(chemin: str) -> set[int] | None:
     """Numéros de ligne que le fichier a gagnés ou changés depuis `HEAD`.
 
-    Rend `None` quand tout le fichier est à considérer : fichier hors du suivi git, ou dépôt
+    Renvoie `None` quand tout le fichier est à considérer : fichier hors du suivi git, ou dépôt
     inaccessible.
     """
     suivi = subprocess.run(
@@ -43,7 +43,7 @@ def lignes_modifiees(chemin: str) -> set[int] | None:
 rapport = subprocess.run(["vale", "--output=JSON", path], capture_output=True, text=True)
 try:
     alertes = [a for fichier in json.loads(rapport.stdout).values() for a in fichier]
-except (json.JSONDecodeError, AttributeError):
+except json.JSONDecodeError, AttributeError:
     sys.exit(0)
 
 modifiees = lignes_modifiees(path)

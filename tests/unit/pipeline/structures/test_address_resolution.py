@@ -17,8 +17,6 @@ from pipeline.transformation.structures.name_recognition import (
     StructureNameMatcher,
 )
 
-# ── Helpers pour construire des formes de test ───────────────────
-
 
 def _form(
     structure_id,
@@ -30,10 +28,7 @@ def _form(
     is_excluding=False,
     structure_type=StructureType.LABO,
 ):
-    """Construit un MatchableNameForm pour les tests.
-
-    Reproduit l'invariant garanti en base : une forme courte a toujours `is_word_boundary`.
-    """
+    """MatchableNameForm de test. Comme en base, une forme courte a toujours `is_word_boundary`."""
     normalized = form_normalized or form_text.lower()
     return MatchableNameForm(
         id=form_id or structure_id * 100,
@@ -44,9 +39,6 @@ def _form(
         requires_context_of=requires_context_of,
         structure_type=structure_type,
     )
-
-
-# ── Orchestrateurs (run_resolution / process_addresses) ──────────
 
 
 @pytest.fixture
@@ -98,7 +90,7 @@ def name_forms(monkeypatch: pytest.MonkeyPatch) -> list[MatchableNameForm]:
 
 class TestRunResolution:
     def test_processes_all_addresses(self, logger, name_forms, syncs, addresses):
-        """Charge les formes, matche toutes les adresses, écrit les détections."""
+        """La résolution charge les formes, cherche les structures dans toutes les adresses et écrit les détections."""
         name_forms.append(_form(1, "limos", form_id=10))
         addresses.extend([(101, "lab limos clermont")])
         conn = _FakeConn()
@@ -108,7 +100,7 @@ class TestRunResolution:
         assert syncs == [([(101, 1, 10)], [101])]
 
     def test_no_addresses_skips_writes(self, logger, name_forms, syncs, addresses):
-        """Si `fetch_addresses_chunk` retourne [], aucun upsert."""
+        """Sans adresse, aucune écriture."""
         name_forms.append(_form(1, "limos", form_id=10))
         addresses.extend([])
         conn = _FakeConn()
@@ -120,7 +112,7 @@ class TestRunResolution:
 
 class TestProcessAddresses:
     def test_in_perimeter_counted(self, logger, syncs, addresses):
-        """Une adresse qui matche une structure du périmètre incrémente in_perimeter."""
+        """Une adresse où une structure du périmètre est reconnue compte dans in_perimeter."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         addresses.extend([(101, "lab limos clermont")])
         conn = _FakeConn()
@@ -134,7 +126,7 @@ class TestProcessAddresses:
         assert conn.commits == 1
 
     def test_out_of_perimeter_not_counted(self, logger, syncs, addresses):
-        """Match hors périmètre : affiliations créées mais in_perimeter reste à 0."""
+        """Structure reconnue hors du périmètre : l'affiliation est créée, in_perimeter reste à 0."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         addresses.extend([(101, "lab limos clermont")])
         conn = _FakeConn()
@@ -145,7 +137,7 @@ class TestProcessAddresses:
         assert affil_count == 1
 
     def test_no_match_still_syncs(self, logger, syncs, addresses):
-        """Adresse sans match : la synchronisation de sa tranche retire ses liens non détectés."""
+        """Adresse sans structure reconnue : la synchronisation de sa tranche retire ses liens non détectés."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         addresses.extend([(101, "univ paris saclay")])
         conn = _FakeConn()
@@ -157,13 +149,13 @@ class TestProcessAddresses:
         assert syncs == [([], [101])]
 
     def test_chunked_one_commit_per_chunk(self, logger, syncs, addresses):
-        """Une tranche = un commit ; `chunk_size` borne la tranche (pagination keyset)."""
+        """Un commit par tranche ; `chunk_size` borne la tranche (pagination keyset)."""
         matcher = StructureNameMatcher([_form(1, "limos", form_id=10)])
         addresses.extend([(i, "lab limos clermont") for i in range(1, 4)])
         conn = _FakeConn()
 
         process_addresses(conn, matcher, {1}, logger, chunk_size=2)
 
-        # 3 adresses, chunk_size=2 → tranches [1, 2] et [3] → 2 commits.
+        # Trois adresses par tranches de deux : tranches [1, 2] et [3], deux commits.
         assert conn.commits == 2
         assert [scope for _, scope in syncs] == [[1, 2], [3]]

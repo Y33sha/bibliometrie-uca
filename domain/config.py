@@ -21,7 +21,7 @@ class ConfigKey(StrEnum):
     UNPAYWALL_MAX_PER_RUN = "unpaywall_max_per_run"
     """Nombre de DOI vérifiés auprès d'Unpaywall par run."""
     FETCH_MISSING_MAX_PER_SOURCE = "fetch_missing_max_per_source"
-    """Nombre de DOI interrogés par source cible à l'import par DOI."""
+    """Nombre de DOI interrogés par source cible à la recherche par DOI (phase `fetch_missing`)."""
     SUDOC_MAX_PER_RUN = "sudoc_max_per_run"
     """Nombre de revues vérifiées dans le Sudoc par run."""
     FETCH_STALE_AFTER_DAYS = "fetch_stale_after_days"
@@ -78,14 +78,14 @@ YEAR_KEYS = _keys_of(ConfigKind.YEAR)
 
 
 def cap_value(key: ConfigKey, stored: int | None) -> int | None:
-    """Plafond à appliquer pour `key` d'après la valeur stockée ; `None` pour illimité."""
+    """Plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro ou une valeur négative retire la borne."""
     value = SETTINGS[key].default if stored is None else stored
     assert value is not None
     return value if value > 0 else None
 
 
 def delay_value(key: ConfigKey, stored: int | None) -> int:
-    """Délai à appliquer pour `key` d'après la valeur stockée, en jours."""
+    """Délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente ou inférieure à un jour donne le défaut."""
     default = SETTINGS[key].default
     assert default is not None
     return stored if stored is not None and stored >= 1 else default

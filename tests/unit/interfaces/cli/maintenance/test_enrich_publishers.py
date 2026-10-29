@@ -1,6 +1,6 @@
 """Enrichissement du pays des éditeurs depuis OpenAlex.
 
-Le script se referme sur sa connexion quoi qu'il arrive, et l'épuisement du quota quotidien de la source est un report à la prochaine exécution, pas une erreur. La boucle par lots s'arrête dès que le circuit-breaker de source est déclenché.
+Le script ferme sa connexion dans tous les cas. Un quota quotidien épuisé reporte le reste à l'exécution suivante, sans échec. La boucle par lots s'arrête dès que le circuit-breaker de la source se déclenche.
 """
 
 import logging
@@ -22,7 +22,7 @@ from pipeline.ingestion.openalex import api
 
 @pytest.fixture
 def lancer(monkeypatch):
-    """Neutralise la source et la base, et retient les arguments remis à la boucle."""
+    """Neutralise la source et la base, et enregistre les arguments transmis à la boucle."""
 
     def _lancer(*arguments, issue=None):
         conn = SimpleNamespace(close=lambda: fermetures.append(True))
@@ -64,7 +64,7 @@ def test_options_transmises(lancer):
 
 
 def test_quota_de_la_source_epuise(lancer, caplog):
-    """Le quota du jour épuisé n'est pas un échec : le reste est reporté, la connexion refermée."""
+    """Un quota du jour épuisé termine le script sans échec : le reste est reporté, la connexion fermée."""
     with caplog.at_level(logging.WARNING):
         resultat = lancer(issue=SourceUnavailableError("openalex"))
 
@@ -83,7 +83,7 @@ class TestArretSurCoupeCircuit:
         return conn
 
     def test_s_arrete_quand_le_coupe_circuit_se_declenche(self, monkeypatch):
-        """La boucle s'arrête au tour où le breaker est déclenché, sans parcourir tout le stock."""
+        """La boucle s'arrête au lot où le circuit-breaker se déclenche, sans parcourir tout le stock."""
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):
@@ -94,7 +94,7 @@ class TestArretSurCoupeCircuit:
 
         conn = self._run(monkeypatch, fetch_batch, n_batches=20)
         assert calls["n"] == 3
-        conn.commit.assert_called()  # le déjà-fait est committé avant de couper
+        conn.commit.assert_called()  # les lots traités sont commités avant l'arrêt
 
     def test_parcourt_tous_les_lots_quand_la_source_tient(self, monkeypatch):
         calls = {"n": 0}
@@ -139,7 +139,7 @@ class TestFetchPublishersBatch:
         assert out == {"P1": "fr"}
 
     def test_dictionnaire_vide_sur_echec(self, monkeypatch):
-        """L'échec est déjà compté au circuit-breaker par le helper HTTP : le lot rendu est vide."""
+        """La fonction de requête HTTP compte déjà l'échec au circuit-breaker : le lot rendu est vide."""
 
         def boom(*_a, **_k):
             raise SourceUnavailableError("openalex")

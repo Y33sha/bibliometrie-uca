@@ -1,6 +1,6 @@
 """Une valeur hors vocabulaire est refusée à l'entrée, et le refus nomme le paramètre fautif.
 
-La couverture appartient à `tests/unit/interfaces/test_query_vocabularies.py`, qui confronte le code à la liste des filtres laissés libres : tout filtre qui ne prend pas ses valeurs dans un vocabulaire fermé y figure, motivé. Ces appels vérifient ce que le vocabulaire produit sur la surface HTTP.
+La couverture des filtres est testée par `tests/unit/interfaces/test_query_vocabularies.py` : tout filtre sans vocabulaire fermé figure, avec son motif, dans la liste des filtres libres. Ces appels vérifient le refus sur la surface HTTP.
 """
 
 import pytest
@@ -14,7 +14,7 @@ class TestValeurIntruse:
         assert "valeur-inexistante" in r.json()["detail"]
 
     def test_une_intruse_glissee_parmi_des_valeurs_valides_est_refusee(self, client):
-        """Le refus porte sur la liste entière : une valeur juste ne couvre pas une valeur fausse."""
+        """Une valeur fausse parmi des valeurs justes fait refuser la liste entière."""
         r = client.get("/api/publications", params={"is_corresponding": "yes,peut-etre"})
         assert r.status_code == 422
 
@@ -52,7 +52,7 @@ class TestValeursAdmises:
 
 
 class TestFiltreApc:
-    """Le filtre APC prend `yes` / `no`, avec ou sans sélection de laboratoires."""
+    """Le filtre APC prend `yes` ou `no`, avec ou sans sélection de laboratoires."""
 
     @pytest.mark.parametrize("chemin", ["/api/publications", "/api/stats/pivot"])
     def test_admis_avec_un_laboratoire(self, client, chemin):

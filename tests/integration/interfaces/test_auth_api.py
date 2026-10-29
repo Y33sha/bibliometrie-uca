@@ -1,6 +1,6 @@
 """Tests d'intégration du parcours de connexion.
 
-La fixture `auth_client` forge son jeton directement, sans passer par `/api/auth/login` : le parcours complet — connexion, cookie posé, écriture autorisée, déconnexion — ne s'exerce donc que par ces tests.
+La fixture `auth_client` forge son jeton sans passer par `/api/auth/login`. Seuls ces tests exercent le parcours complet : connexion, cookie, écriture autorisée, déconnexion.
 """
 
 import bcrypt
@@ -43,11 +43,9 @@ def _remove_user(login: str) -> None:
 
 class TestLogin:
     def test_pose_un_cookie_de_session_durci(self, client, monkeypatch):
-        """Le cookie qui porte la session est inaccessible au script, borné au site, réservé au canal chiffré et daté.
+        """Le cookie de session est inaccessible au script, limité au site, réservé à HTTPS et daté.
 
-        Ces quatre attributs sont ce qui sépare un jeton de session d'une valeur qu'un script injecté lirait, qu'une requête partie d'un autre site rejouerait, ou qu'un accès en clair révélerait. Ce test les relit sur la réponse plutôt que dans le code qui les pose.
-
-        L'empreinte est posée ici, à faible coût : ce test porte sur les attributs du cookie, non sur la vérification du mot de passe.
+        Le test lit ces attributs sur la réponse. L'empreinte du mot de passe est calculée au coût minimal de bcrypt.
         """
         from interfaces.api import session as session_module
 
@@ -68,7 +66,6 @@ class TestLogin:
         assert f"max-age={SESSION_MAX_AGE}" in pose
 
     def test_la_session_dure_sept_jours(self):
-        """Durée de vie d'une session, en secondes."""
         assert SESSION_MAX_AGE == 7 * 24 * 3600
 
     def test_rejects_unknown_user(self, client):
@@ -93,7 +90,7 @@ class TestLogin:
         payload = {"username": "inconnu", "password": "x"}
         for _ in range(_LOGIN_MAX_ATTEMPTS):
             assert client.post("/api/auth/login", json=payload).status_code == 401
-        # Au-delà du plafond, le limiteur coupe avant même la vérification des identifiants.
+        # Au-delà du plafond, le limiteur refuse avant la vérification des identifiants.
         assert client.post("/api/auth/login", json=payload).status_code == 429
 
 
@@ -113,7 +110,7 @@ class TestCheck:
         }
 
     def test_reports_forged_cookie_as_anonymous(self, client):
-        client.cookies.set("session", "admin|0.contribution source-inventee")
+        client.cookies.set("session", "admin|0.signature-inventee")
         try:
             r = client.get("/api/auth/check")
             assert r.json()["authenticated"] is False
@@ -177,15 +174,15 @@ class TestLogout:
         assert r.json() == {"ok": True}
 
     def test_is_open_to_anonymous(self, client):
-        """La déconnexion ne garde rien : le middleware exempte `/api/auth/`."""
+        """La déconnexion est ouverte sans session : le middleware exempte `/api/auth/`."""
         r = client.post("/api/auth/logout")
         assert r.status_code == 200
 
 
 class TestDureeDeReponse:
-    """La vérification du mot de passe a lieu même quand le nom d'utilisateur ne correspond pas.
+    """Le mot de passe est vérifié même pour un nom d'utilisateur inconnu.
 
-    Elle coûte quelques centaines de millisecondes, là où comparer deux noms en coûte une fraction de microseconde : un refus immédiat désignerait un nom inconnu, et permettrait de trouver le nom du compte sans dépenser les tentatives que le plafond accorde.
+    La vérification coûte quelques centaines de millisecondes. Un refus immédiat révélerait donc qu'un nom est inconnu, et permettrait de trouver le nom du compte sans consommer les tentatives du plafond.
     """
 
     def test_le_mot_de_passe_est_verifie_sur_un_nom_inconnu(self, client, monkeypatch):
@@ -198,7 +195,7 @@ class TestDureeDeReponse:
         assert appels == ["x"]
 
     def test_le_nom_est_compare_en_temps_constant(self):
-        """La comparaison passe par `hmac.compare_digest`, dont la durée ne dépend pas du nombre de caractères justes."""
+        """La comparaison passe par `hmac.compare_digest`, dont la durée est indépendante du nombre de caractères justes."""
         import inspect
 
         from interfaces.api.session import check_username

@@ -1,6 +1,6 @@
-"""Facettes dynamiques pour /api/publications/facets.
+"""Facettes de `/api/publications/facets`.
 
-Chaque facette exclut son propre filtre mais applique tous les autres. Les facettes sont indépendantes et s'exécutent en parallèle, chacune sur sa propre connexion (cf. `PublicationFacetQueries.publications_facets`).
+Chaque facette exclut son propre filtre et applique tous les autres. Les facettes sont indépendantes, et s'exécutent en parallèle, chacune sur sa connexion (`PublicationFacetQueries.publications_facets`).
 """
 
 from collections.abc import Callable
@@ -45,10 +45,7 @@ from infrastructure.read_models.publications.models import (
 
 
 class _PublicationFacetsBuilder:
-    """Construit les facettes dynamiques pour /api/publications/facets : une méthode privée `_facet_*` par facette, orchestrées par `PublicationFacetQueries.publications_facets`.
-
-    Chaque facette exclut son propre filtre mais applique tous les autres.
-    """
+    """Facettes de `/api/publications/facets` : une méthode `_facet_*` par facette."""
 
     def __init__(
         self, conn: Connection, filters: PublicationFilters, context: FilterContext
@@ -78,7 +75,7 @@ class _PublicationFacetsBuilder:
 
     def _facet_labs(self) -> tuple[list[FacetOption], int]:
         where_sql, binds = self._clauses_skipping("lab")
-        # `publication_structures` (matview publi↔structure dédoublonnée) → COUNT(*) par structure, sans jointure contributions ni DISTINCT/tri (cf. migration d8b3f5a2c9e6). `where_sql` ne porte que sur `p` (publications).
+        # `publication_structures` (vue matérialisée, liens sans doublon entre publication et structure) : COUNT(*) par structure, sans jointure aux contributions ni DISTINCT. `where_sql` concerne seulement `p`.
         labs_rows = self.conn.execute(
             text(f"""
                 SELECT s.id::text AS value, COALESCE(s.acronym, s.name) AS label,
@@ -207,7 +204,7 @@ class _PublicationFacetsBuilder:
         ]
 
     def _facet_source_counts(self) -> dict[str, YesNoCount]:
-        """Counts {yes, no} par source, ignorant en bloc tous les filtres source."""
+        """Décomptes oui et non de chaque source, sans aucun filtre de source."""
         where_sql, binds = self._clauses_skipping("source")
         row = self.conn.execute(
             text(f"""
@@ -296,7 +293,7 @@ class _PublicationFacetsBuilder:
         return [FacetOption(value=r.code, label=r.name, count=r.n) for r in rows]
 
     def _facet_hal_status(self) -> list[FacetOption]:
-        """HAL status : seulement si un seul labo est sélectionné."""
+        """Statut HAL, quand un seul laboratoire est sélectionné."""
         if len(self.filters.lab_ids) != 1:
             return []
         where_sql, binds = self._clauses_skipping("hal_status")
@@ -351,9 +348,9 @@ class PublicationFacetQueries:
     _open_connection: Callable[[], Connection]
 
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
-        """Facettes dynamiques : chaque facette exclut son propre filtre mais applique tous les autres.
+        """Facettes de la liste : chacune exclut son propre filtre et applique tous les autres.
 
-        Les ~11 facettes sont **indépendantes** et chacune est un agrégat sur l'ensemble filtré (~0,5 s). On les exécute en **parallèle**, chacune dans un thread avec sa propre connexion ouverte par `_open_connection` (psycopg libère le GIL pendant la requête). Le contexte de filtrage est lu une fois et partagé.
+        Les facettes, une dizaine, sont indépendantes ; chacune agrège l'ensemble filtré en une demi-seconde environ. Elles s'exécutent en parallèle, chacune dans un thread avec sa connexion (`_open_connection`) : psycopg libère le GIL pendant la requête. Le contexte de filtrage se lit une fois.
         """
         context = filter_context(self._conn, filters)
 
@@ -411,7 +408,7 @@ class PublicationFacetQueries:
         search: str,
         filters: PublicationFilters,
     ) -> EntityFacetResponse:
-        """Facette éditeur, revue, auteur ou sujet contextuelle de la liste : N premières entités sous les filtres actifs, en sautant le filtre de la dimension demandée (les autres, dont l'autre entité, restent appliqués → corrélation). Recherche serveur par nom."""
+        """Facette d'entité de la liste (éditeur, revue, auteur, sujet) : les premières entités sous les filtres actifs, hors filtre de la dimension demandée. Les autres filtres, dont celui de l'autre entité, s'appliquent. La recherche par nom se fait côté serveur."""
         context = filter_context(self._conn, filters)
         where_sql, binds = publication_filter_where(filters, context, kind)
         return EntityFacetResponse(

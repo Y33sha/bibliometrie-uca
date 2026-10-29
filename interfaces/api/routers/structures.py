@@ -1,6 +1,6 @@
 """Router du référentiel des entités organisationnelles et de leurs liens. Sert `/api/structures/*`.
 
-Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_parents` en exprime le rattachement hiérarchique, qui décide de la clôture d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` — celles des personnes, homonymes mais sans rapport, vivent sous `/api/persons`.
+Une structure est un laboratoire, une composante, une université, un centre hospitalier, une école ou un site. La table `structure_parents` décrit leurs tutelles, qui décident des structures d'un périmètre. Les formes de nom, qui servent à reconnaître les structures dans les adresses, s'éditent sous `/name-forms` ; celles des personnes, sans rapport, vivent sous `/api/persons`.
 
 Les chemins littéraux se déclarent avant `/{structure_id}` : un segment fixe placé après serait capté par le paramètre.
 """
@@ -131,7 +131,7 @@ def create_structure(
     data: StructureCreate,
     structures: StructureService = Depends(structure_service),
 ) -> StructureOut:
-    """Crée une structure. Lève 409 si le `code` ou le `ror_id` est déjà utilisé."""
+    """Crée une structure. Renvoie 409 si le `code` ou le `ror_id` est déjà utilisé."""
     return StructureOut.from_structure(structures.create_structure(data))
 
 
@@ -143,9 +143,9 @@ def create_tutelle(
     data: TutelleCreate,
     structures: StructureService = Depends(structure_service),
 ) -> StructureTutelleCreateResponse:
-    """Crée une tutelle parent-enfant entre deux structures.
+    """Crée une tutelle entre deux structures.
 
-    Idempotent : une tutelle identique — même parent, même enfant — laisse la table inchangée et rend `{"status": "already_exists"}`. Lève 422 si elle viole l'invariant de graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Lève 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+    Une tutelle existante (même parent, même enfant) laisse la table inchangée et renvoie `{"status": "already_exists"}`. Renvoie 422 si la tutelle viole le graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Renvoie 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
     row = structures.create_tutelle(parent_id=data.parent_id, child_id=data.child_id)
     if row is None:
@@ -158,14 +158,13 @@ def delete_tutelle(
     tutelle_id: int,
     structures: StructureService = Depends(structure_service),
 ) -> DeletedResponse:
-    """Supprime une tutelle. 404 si l'id n'existe pas."""
+    """Supprime une tutelle. Renvoie 404 si elle n'existe pas."""
     structures.delete_tutelle(tutelle_id)
     return DeletedResponse()
 
 
 # ── Formes de nom ────────────────────────────────────────────────
-# Une forme de nom est une écriture sous laquelle une structure se reconnaît dans le texte brut
-# d'une adresse. La phase `affiliations` les charge toutes et les apparie ; ces routes les éditent.
+# Une forme de nom est une écriture sous laquelle une structure se reconnaît dans le texte brut d'une adresse. La phase `affiliations` les charge toutes et les apparie ; ces routes les éditent.
 
 
 @router.post("/name-forms", response_model=NameFormOut)
@@ -173,9 +172,9 @@ def create_name_form(
     data: NameFormCreate,
     structures: StructureService = Depends(structure_service),
 ) -> NameFormOut:
-    """Crée une forme de nom pour une structure, utilisée par le matching d'adresses.
+    """Crée une forme de nom pour une structure, qui sert à la reconnaître dans les adresses.
 
-    `form_text` est normalisé (accents, casse, ponctuation) par le service avant insertion. `is_word_boundary` : le match exige une frontière de mot dans l'adresse brute. `is_excluding` : forme dont la présence retire la structure des résultats. `requires_context_of` : liste d'ids de structures qui doivent elles-mêmes matcher l'adresse pour que cette forme active. Lève 409 si `structure_id` désigne une structure inexistante.
+    Le service normalise `form_text` (accents, casse, ponctuation) avant l'insertion. `is_word_boundary` : la forme doit former un mot entier dans l'adresse. `is_excluding` : la présence de la forme retire la structure du résultat. `requires_context_of` : structures dont l'une doit aussi être reconnue dans l'adresse pour que la forme vaille. Renvoie 409 si `structure_id` désigne une structure inexistante.
     """
     return NameFormOut.model_validate(structures.create_name_form(data))
 
@@ -185,7 +184,7 @@ def get_name_form(
     form_id: int,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> NameFormOut:
-    """Récupère une forme de nom par son id. 404 si inconnue."""
+    """Forme de nom, par son identifiant. Renvoie 404 si elle est inconnue."""
     row = queries.get_name_form(form_id)
     if not row:
         raise HTTPException(status_code=404, detail="Forme de nom introuvable")
@@ -198,7 +197,7 @@ def update_name_form(
     data: NameFormUpdate,
     structures: StructureService = Depends(structure_service),
 ) -> NameFormOut:
-    """Met à jour une forme de nom (sélective des champs fournis). 404 si inconnue."""
+    """Met à jour les champs fournis d'une forme de nom. Renvoie 404 si elle est inconnue."""
     return NameFormOut.model_validate(structures.update_name_form(form_id, data))
 
 
@@ -207,7 +206,7 @@ def delete_name_form(
     form_id: int,
     structures: StructureService = Depends(structure_service),
 ) -> DeletedResponse:
-    """Supprime une forme de nom. 404 si inconnue."""
+    """Supprime une forme de nom. Renvoie 404 si elle est inconnue."""
     structures.delete_name_form(form_id)
     return DeletedResponse()
 
@@ -220,10 +219,7 @@ def get_structure(
     structure_id: int,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureDetailResponse:
-    """Détail complet d'une structure : identifiants + parents + enfants + formes de nom.
-
-    Retourne `{structure, parents, children, forms}`. Les parents sont les structures qui ont cette structure comme `child_id` dans `structure_parents` ; les enfants inversement. 404 si la structure n'existe pas.
-    """
+    """Détail complet d'une structure : `{structure, parents, children, forms}`, soit la structure, ses tutelles, ses sous-structures et ses formes de nom. Renvoie 404 si la structure n'existe pas."""
     detail = queries.get_structure_detail(structure_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Structure introuvable")
@@ -277,7 +273,7 @@ def get_structure_deletion_impact(
     structure_id: int,
     queries: StructuresQueries = Depends(structures_queries),
 ) -> StructureDeletionImpact:
-    """Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. 404 si la structure n'existe pas."""
+    """Ce que la suppression de la structure emporte, pour la confirmation : formes de nom, tutelles, liens adresse-structure confirmés ou rejetés, périmètres dont elle est une racine. Renvoie 404 si la structure n'existe pas."""
     impact = queries.get_deletion_impact(structure_id)
     if impact is None:
         raise HTTPException(status_code=404, detail="Structure introuvable")
@@ -302,6 +298,6 @@ def delete_structure(
     structure_id: int,
     structures: StructureService = Depends(structure_service),
 ) -> DeletedResponse:
-    """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). 404 si inconnue."""
+    """Supprime une structure, avec ses formes de nom, ses tutelles et ses liens adresse-structure (`deletion-impact` les compte). Renvoie 404 si elle est inconnue."""
     structures.delete_structure(structure_id)
     return DeletedResponse()

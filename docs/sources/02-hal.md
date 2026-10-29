@@ -11,7 +11,7 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 ## API utilisée
 
 **Search API** (https://api.archives-ouvertes.fr/search) — moissonnage des publications.
-- Pas de credentials nécessaires.
+- Sans identifiants d'accès.
 - Requête par [collection HAL](../glossaire.md#collection-hal) + année de publication
 - [Moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : filtre réunissant les ORCID (`authORCIDIdExt_s`), idHAL (`authIdHal_s`) et IdRef (`authIdRefIdExt_s`) d'un lot de personnes RH
 - Champs Solr récupérés : voir [pipeline/ingestion/hal/fields.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/hal/fields.py) (`HAL_FIELDS`)
@@ -19,9 +19,9 @@ Documentation API : https://api.archives-ouvertes.fr/docs
 
 ## Données récupérées
 
-- **Publications** : titre, DOI, année, type de document, langue, journal (titre, ISSN, eISSN, éditeur), ISBN (zone `idno` du TEI `label_xml`, seul endroit où HAL le donne), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
+- **Publications** : titre, DOI, année, type de document, langue, revue (titre, ISSN, eISSN, éditeur), ISBN (lu dans le TEI), OA, licence du fichier déposé (`licence_s`), URI, résumé, mots-clés, domaines HAL, biblio (volume/numéro/pages)
 - **Localisation** (`source_record_locations`) : la page du dépôt (`uri_s`) et le fichier déposé (`fileMain_s`), avec sa licence. La copie est ouverte quand un fichier est déposé ; un dépôt sans fichier, qui renvoie seulement vers un autre emplacement, est fermé.
-- **Auteurs** : nom complet, hal_person_id, idHAL, ORCID et IdRef si présents
+- **Auteurs** : nom complet, compte HAL, idHAL, ORCID et IdRef si présents
 - **Affiliations** : structures HAL directes de chaque auteur et leur ROR, lus dans le TEI. HAL donne des structures de son référentiel, sans texte d'affiliation : les contributions sources HAL sont sans adresse.
 
 ## Exemple de payload
@@ -65,7 +65,7 @@ Document `hal-04836977` (3 auteurs, podcast Métaclassique). `abstract_s`, `subT
 }
 ```
 
-Extrait du `label_xml` (TEI, ~22k chars), 1er `<author>` :
+Extrait du `label_xml` (TEI), premier auteur :
 
 ```xml
 <author role="aut">
@@ -88,22 +88,8 @@ Extrait du `label_xml` (TEI, ~22k chars), 1er `<author>` :
 
 ## Particularités
 
-### Champs auteurs alignés vs compactés
+### Identifiants et structures des auteurs
 
-Les seuls champs auteurs Solr requêtés (`authQuality_s` et le composite `authFullNameFormIDPersonIDIDHal_fs`) sont alignés par position : longueur = nombre d'auteurs, l'index correspond à la position d'auteur.
+Le TEI `label_xml` est le seul champ qui attache à chaque auteur, par position, ses identifiants (ORCID, IdRef, idHAL), son nom et son prénom, et ses structures avec leur ROR. Les listes Solr d'identifiants par auteur (`authORCIDIdExt_s`, `authIdRefIdExt_s`…) gardent seulement les valeurs présentes : leur index ne correspond pas à la position de l'auteur.
 
-HAL expose aussi des listes d'identifiants Solr par auteur (`authIdHal_s`, `authIdHal_i`, `authORCIDIdExt_s`, `authIdRefIdExt_s`) mais elles sont **compactées** (valeurs non-null seulement) : l'index ne correspond plus à la position d'auteur, donc elles sont inutilisables pour reconstituer l'alignement. Ces champs ne sont pas requêtés. Les ORCID et IdRef sont récupérés via le TEI `label_xml` (cf. infra) — seul endroit qui les attache à chaque auteur par position.
-
-### Composite Solr des identifiants
-
-`authFullNameFormIDPersonIDIDHal_fs` : champ par position qui combine 4 identifiants : `Nom_FacetSep_formId-personId_FacetSep_idhal`. C'est le champ central côté auteurs HAL — le nom est dérivé de son 1er segment, et c'est aussi la seule source de `hal_person_id`.
-
-Quand l'idHAL manque, le 3e segment reste vide (cas d'Hélène Tysman : `Hélène Tysman_FacetSep_3340220-0_FacetSep_` — `personId=0` est aussi la valeur sentinelle HAL pour « pas de person »).
-
-Une absence complète de ce champ dans le payload est traitée comme une erreur : le doc reste `processed=FALSE` dans `staging` et un log d'erreur signale le hal_id concerné.
-
-### TEI `label_xml`
-
-Seul champ où ORCID, IdRef et idHAL sont attachés à chaque auteur via les `<idno type="ORCID|IDREF|idhal">` à l'intérieur de chaque `<author>`. Voir l'extrait XML ci-dessus.
-
-Chaque `<author>` désigne aussi ses structures directes par `<affiliation ref="#struct-<identifiant>"/>`. Le `listOrg` du TEI donne le ROR de chaque structure. Les structures vont dans `source_contribution_hal_structures`, leurs ROR dans `source_contribution_rors`.
+Le champ Solr `authFullNameFormIDPersonIDIDHal_fs`, aligné par position, donne le nom complet et le compte HAL (`hal_person_id`) de chaque auteur. Un dépôt sans ce champ est refusé.

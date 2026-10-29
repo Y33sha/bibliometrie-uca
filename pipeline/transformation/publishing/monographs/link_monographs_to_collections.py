@@ -22,7 +22,7 @@ LABEL = "Rattachement aux collections"
 
 
 class MonographSerialCandidates(NamedTuple):
-    """Une monographie, son éditeur, sa nature, son `serial_id`, et les entrées de `serials` de ses enregistrements, à ISSN et sans ISSN."""
+    """Une monographie et les entrées de `serials` de ses enregistrements, avec ou sans ISSN actif."""
 
     monograph_id: int
     title: str
@@ -57,7 +57,7 @@ _SET_SERIAL = text("UPDATE monographs SET serial_id = :serial_id WHERE id = :id"
 
 
 def find_monograph_serial_candidates(conn: Connection) -> list[MonographSerialCandidates]:
-    """Chaque monographie portée par au moins un enregistrement, avec les entrées de `serials` de ses enregistrements."""
+    """Chaque monographie qui a au moins un enregistrement source, avec les entrées de `serials` de ses enregistrements."""
     return [
         MonographSerialCandidates(
             r.id,

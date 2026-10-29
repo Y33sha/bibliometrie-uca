@@ -1,6 +1,6 @@
 """Moissonnage Web of Science : tâche `harvest.wos`.
 
-Interroge l'API WoS Expanded sur les affiliations du périmètre (`OG=`), année par année. La pagination refait la recherche avec `firstRecord` à chaque page : celle par `queryId` rend des pages vides.
+Interroge l'API WoS Expanded sur les affiliations du périmètre (`OG=`), année par année. La pagination refait la recherche avec `firstRecord` à chaque page : celle par `queryId` renvoie des pages vides.
 """
 
 from __future__ import annotations

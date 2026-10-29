@@ -1,10 +1,10 @@
-"""Graphe de dépendances du pipeline : les tâches, ce qu'elles lisent et écrivent, dans l'ordre d'exécution actuel. Chaque tâche appartient à une phase, et l'ordre des phases est celui de leurs tâches.
+"""Graphe de dépendances du pipeline : les tâches, ce qu'elles lisent et écrivent, dans l'ordre d'exécution. Chaque tâche appartient à une phase, et l'ordre des phases est celui de leurs tâches.
 
 Une donnée se désigne par sa table (`"serials"`) ou par une colonne (`"serials.serial_type"`) ; `"serials.id"` désigne l'existence des lignes, que créent et suppriment les écrivains. Une table et l'une de ses colonnes se recouvrent.
 
 Une tâche dépend des tâches placées avant elle qui écrivent ce qu'elle lit. Une lecture déclarée `previous_run` lit aussi ce qu'une tâche placée après elle, ou elle-même, a écrit au run précédent. Les tests vérifient que l'ordre d'exécution ne fait lire à aucune tâche une donnée écrite après elle, sauf lecture du run précédent déclarée.
 
-La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche de la contribution.
+La maintenance d'une tâche (`VACUUM`, `ANALYZE`) suit ses écritures et ne crée aucune dépendance. Des tâches consécutives du même `parallel_group` s'exécutent en parallèle : leurs écritures communes ne dépendent pas de leur ordre, et aucune ne dépend d'une autre tâche du groupe.
 """
 
 from collections.abc import Iterable, Sequence
@@ -34,7 +34,7 @@ class Task:
     network: str | None = None
     # Maintenance physique des tables, dans l'ordre : `VACUUM staging`, `ANALYZE source_contributions`.
     maintenance: tuple[str, ...] = ()
-    # Contribution de tâches consécutives exécutées en parallèle.
+    # Groupe de tâches consécutives exécutées en parallèle.
     parallel_group: str | None = None
 
 
@@ -97,7 +97,7 @@ def _task(
 
 
 def overlaps(a: str, b: str) -> bool:
-    """Deux données se recouvrent : même table, et même colonne si les deux en désignent une."""
+    """Vrai si deux données se recouvrent : même table, et même colonne si les deux en désignent une."""
     table_a, _, column_a = a.partition(".")
     table_b, _, column_b = b.partition(".")
     return table_a == table_b and (not column_a or not column_b or column_a == column_b)
@@ -108,7 +108,7 @@ def _overlaps_any(item: str, items: Iterable[str]) -> bool:
 
 
 def _affected_by(read: str, write: str) -> bool:
-    """L'écriture `write` change ce que lit `read`. Créer ou supprimer des lignes (`id`) change toutes les lectures de la table."""
+    """Vrai si l'écriture `write` change ce que lit `read`. Créer ou supprimer des lignes (`id`) change toutes les lectures de la table."""
     return overlaps(read, write) or (
         write.partition(".")[2] == "id" and read.partition(".")[0] == write.partition(".")[0]
     )
@@ -119,7 +119,7 @@ def _writes_read(reader: Task, writer: Task) -> list[str]:
 
 
 def dependencies(tasks: Sequence[Task]) -> dict[str, set[str]]:
-    """Pour chaque tâche, les tâches placées avant elle, hors de sa contribution parallèle, qui écrivent ce qu'elle lit."""
+    """Pour chaque tâche, les tâches placées avant elle, hors de son groupe parallèle, qui écrivent ce qu'elle lit."""
     return {
         reader.name: {
             writer.name
@@ -231,8 +231,7 @@ TASKS: tuple[Task, ...] = (
             "fetch_missing",
             # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
             reads=(
-                "source_records.doi",
-                "source_records.corrections",
+                "source_record_identifiers",
                 "source_records.publication_year",
                 "publication_relations",
                 *(("doi_prefixes.ra",) if PROFILES[source].registration_agency else ()),
@@ -464,8 +463,6 @@ TASKS: tuple[Task, ...] = (
         "resolve_ra",
         reads=(
             "doi_prefixes.id",
-            "source_records.doi",
-            "source_records.corrections",
             "source_record_identifiers",
             "publication_relations",
         ),
@@ -482,7 +479,7 @@ TASKS: tuple[Task, ...] = (
             "doi_prefixes.publisher_id",
             "doi_prefixes.publisher_name_normalized",
             "doi_prefixes.crossref_checked_at",
-            "source_records.doi",
+            "source_record_identifiers",
             "publishers.id",
             "publisher_name_forms",
         ),
@@ -498,7 +495,7 @@ TASKS: tuple[Task, ...] = (
         ),
         # L'agence et l'éditeur qu'a posés `resolve_datacite_publishers` sortent un préfixe de la sélection.
         previous_run=(
-            "source_records.doi",
+            "source_record_identifiers",
             "publishers",
             "publisher_name_forms",
             "doi_prefixes",
@@ -607,7 +604,6 @@ TASKS: tuple[Task, ...] = (
             "serials.manual_fields",
             "source_records.serial_id",
             "source_records.publication_year",
-            "source_records.doi",
             "source_records.publication_id",
             "source_record_identifiers",
             # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
@@ -635,8 +631,7 @@ TASKS: tuple[Task, ...] = (
             "serial_issns",
             "source_records.publication_id",
             "source_records.serial_id",
-            "source_records.doi",
-            "source_record_identifiers.removed_by",
+            "source_record_identifiers",
             "unpaywall",
         ),
     ),
@@ -657,7 +652,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=(
             "serials",
             "serial_issns",
-            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            # Type brut de la source (`raw_doc_type`) : la correction ne le change pas.
             "source_records.corrections",
             "source_records.doc_type",
             "source_records.serial_id",
@@ -680,7 +675,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=(
             "serials",
             "serial_issns",
-            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            # Type brut de la source (`raw_doc_type`) : la correction ne le change pas.
             "source_records.corrections",
             "source_records.doc_type",
             "source_records.serial_id",
@@ -690,13 +685,14 @@ TASKS: tuple[Task, ...] = (
         "publishing.learn_serial_doi_namespaces",
         "publishing",
         reads=(
-            "source_records.doi",
+            "source_record_identifiers",
             "source_records.serial_id",
             "source_records.corrections",
             "serials.serial_type",
         ),
         writes=("serial_doi_namespaces",),
-        previous_run=("source_records", "serials"),
+        # Statuts posés par la correction de `metadata_correction`.
+        previous_run=("source_records", "serials", "source_record_identifiers.removed_by"),
     ),
     _task(
         "publishing.enrich_serials_from_doaj",
@@ -756,7 +752,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=(
             "monographs",
             "serials",
-            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            # Type brut de la source (`raw_doc_type`) : la correction ne le change pas.
             "source_records.corrections",
             "source_records.doc_type",
         ),
@@ -766,7 +762,7 @@ TASKS: tuple[Task, ...] = (
         "metadata_correction",
         reads=(
             "serial_doi_namespaces",
-            "source_records.doi",
+            "source_record_identifiers",
             "source_records.serial_id",
             "source_records.corrections",
             "source_records.doc_type",
@@ -776,7 +772,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.corrections",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records",),
+        previous_run=("source_records", "source_record_identifiers.removed_by"),
     ),
     _task(
         "metadata_correction.unary",
@@ -837,7 +833,30 @@ TASKS: tuple[Task, ...] = (
         ),
     ),
     _task(
-        "metadata_correction.cluster",
+        "metadata_correction.doi_targets",
+        "metadata_correction",
+        reads=tuple(
+            f"source_records.{column}"
+            for column in (
+                "id",
+                "source",
+                "doc_type",
+                "doi",
+                "title_normalized",
+                "publication_year",
+                "corrections",
+                "source_extras",
+            )
+        )
+        # DOI présents en base.
+        + ("source_record_identifiers",)
+        # DOI que doi.org ne connaît pas.
+        + ("failed_lookups",),
+        writes=("doi_targets", "source_record_keys_queue"),
+        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
+    ),
+    _task(
+        "metadata_correction.remove_identifiers",
         "metadata_correction",
         reads=tuple(
             f"source_records.{column}"
@@ -848,12 +867,10 @@ TASKS: tuple[Task, ...] = (
                 "doi",
                 "title_normalized",
                 "corrections",
-                "source_extras",
                 "source_id",
-                "publication_id",
             )
         )
-        + ("source_record_identifiers",)
+        + ("source_record_identifiers", "doi_targets")
         # DOI que doi.org ne connaît pas.
         + ("failed_lookups",)
         # Noms des auteurs d'un dépôt HAL et de l'enregistrement source Crossref de son DOI.
@@ -864,11 +881,8 @@ TASKS: tuple[Task, ...] = (
             "contributor_information",
         ),
         writes=(
-            "source_records.doi",
-            "source_records.corrections",
             "source_record_identifiers.removed_by",
             "source_record_keys_queue",
-            "publication_contributions_queue",
         ),
         previous_run=("source_records", "source_record_identifiers.removed_by"),
     ),
@@ -890,6 +904,7 @@ TASKS: tuple[Task, ...] = (
                 )
             ),
             "source_record_identifiers",
+            "doi_targets",
             # Dépôts HAL introuvables dans HAL.
             "failed_lookups",
         ),
@@ -902,6 +917,7 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "source_records",
             "source_record_identifiers",
+            "doi_targets",
             "source_record_keys_queue",
             "source_contributions.in_perimeter",
             "manual_merge_source_records",
@@ -1021,7 +1037,7 @@ TASKS: tuple[Task, ...] = (
             "source_contributions.neutralized_identifiers",
             # Publications dont une contribution source change de neutralisation : leurs contributions sont à recalculer.
             "publication_contributions_queue",
-            # Contributions rattachés par un identifiant neutralisé ou transféré, à redécider.
+            # Contributions rattachées par un identifiant neutralisé ou transféré, à redécider.
             "contribution_resolution_queue",
             "person_identifiers",
         ),
@@ -1084,7 +1100,7 @@ TASKS: tuple[Task, ...] = (
             "person_name_forms",
         ),
         writes=("person_name_forms",),
-        # Contributions vidés et personnes supprimées par `purge`.
+        # Contributions vidées et personnes supprimées par `purge`.
         previous_run=("persons", "person_name_forms", "contributions.person_id"),
     ),
     _task(
@@ -1343,10 +1359,8 @@ TASKS: tuple[Task, ...] = (
 )
 
 
-# ── Phases ────────────────────────────────────────────────────
-
 _RUN_PHASE = "run"
-"""Contribution des tâches que l'orchestrateur exécute avant toute phase."""
+"""Groupe des tâches que l'orchestrateur exécute avant toute phase."""
 
 PHASE_ORDER: tuple[str, ...] = tuple(
     dict.fromkeys(task.phase for task in TASKS if task.phase != _RUN_PHASE)
@@ -1396,4 +1410,4 @@ if not HARVESTING_PHASES <= set(PHASE_ORDER):
     raise ValueError("HARVESTING_PHASES nomme une phase absente du graphe")
 
 if set(PHASE_LABELS) != set(PHASE_ORDER):
-    raise ValueError("PHASE_LIBELLES et le graphe ne nomment pas les mêmes phases")
+    raise ValueError("PHASE_LABELS et le graphe ne nomment pas les mêmes phases")

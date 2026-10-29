@@ -1,8 +1,6 @@
-"""Tests de caractérisation des lectures de structure servant la page publique des laboratoires.
+"""Tests de caractérisation des lectures de structure de la page publique des laboratoires.
 
-Les quatre lectures s'exercent sur une base vide : ce qu'on
-vérifie ici, c'est que chaque chemin est servi et que le SQL passe, non le
-contenu des agrégats.
+Les quatre lectures s'exercent sur une base vide : les tests vérifient que chaque route répond et que son SQL s'exécute, sans contrôler le contenu des agrégats.
 """
 
 

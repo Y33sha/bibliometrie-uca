@@ -1,4 +1,4 @@
-"""Limiteur de débit à fenêtre fixe (anti-bruteforce du login)."""
+"""Limiteur de débit à fenêtre fixe : compteurs, clé du client et signalement d'un en-tête de proxy ignoré."""
 
 import logging
 
@@ -13,9 +13,9 @@ from interfaces.api.rate_limit import (
 
 
 def _request(client_host: str | None, port: int = 51234, **headers: str) -> Request:
-    """Requête minimale portant une adresse de connexion, un port et des en-têtes.
+    """Requête minimale avec une adresse de connexion, un port et des en-têtes.
 
-    Le port vaut 0 quand le serveur ASGI a réécrit l'adresse depuis `X-Forwarded-For` : il perd l'information à cette occasion, et c'est à cela qu'on reconnaît un en-tête pris en compte.
+    Le port vaut 0 quand le serveur ASGI a réécrit l'adresse depuis `X-Forwarded-For`. Un port nul signale donc un en-tête pris en compte.
     """
     return Request(
         {
@@ -27,7 +27,7 @@ def _request(client_host: str | None, port: int = 51234, **headers: str) -> Requ
 
 
 class _Clock:
-    """Horloge pilotée pour des fenêtres déterministes."""
+    """Horloge pilotée par le test, pour des fenêtres déterministes."""
 
     def __init__(self) -> None:
         self.t = 0.0
@@ -76,9 +76,9 @@ class TestFixedWindowRateLimiter:
 
 
 class TestMemoryBound:
-    """Non-régression : le plafond de compteurs suivis ne bornait rien tant qu'aucune fenêtre n'était écoulée.
+    """Le nombre de compteurs suivis reste sous le plafond, même sans fenêtre écoulée.
 
-    La purge ne retirait que les fenêtres écoulées, et le compteur du nouvel arrivant était enregistré dans tous les cas : sous un flot d'adresses distinctes tombant dans une même fenêtre, la table grossissait sans limite — ce que le code annonçait impossible.
+    Sous un flot d'adresses distinctes dans une même fenêtre, la purge des fenêtres écoulées reste sans effet : le compteur de la fenêtre la plus ancienne est alors retiré.
     """
 
     def test_a_flood_of_fresh_counters_stays_under_the_cap(self):
@@ -88,7 +88,7 @@ class TestMemoryBound:
         assert len(limiter._hits) == 4
 
     def test_the_oldest_window_is_the_one_dropped(self):
-        """Celle qui allait expirer la première : son oubli coûte le moins."""
+        """Le compteur retiré est celui de la fenêtre la plus ancienne, qui expire la première."""
         clock = _Clock()
         limiter = FixedWindowRateLimiter(5, 60, max_keys=3, clock=clock)
         for nom in ("a", "b", "c"):
@@ -123,7 +123,7 @@ class TestMemoryBound:
         assert list(limiter._hits) == ["b", "c", "a"]
 
     def test_an_evicted_client_gets_its_attempts_back(self):
-        """Contrepartie assumée du plafond : sous flot, un client suivi peut perdre son compteur avant la fin de sa fenêtre."""
+        """Contrepartie du plafond : sous un flot d'adresses, un client suivi peut perdre son compteur avant la fin de sa fenêtre."""
         limiter = FixedWindowRateLimiter(1, 60, max_keys=2, clock=_Clock())
         assert limiter.allow("victime") is True
         assert limiter.allow("victime") is False
@@ -153,9 +153,9 @@ class TestClientKey:
 
 
 class TestProxyHeaderIgnoredWarning:
-    """Un en-tête de proxy écarté par le serveur ASGI se signale au journal.
+    """Un en-tête de proxy ignoré par le serveur ASGI est signalé au journal.
 
-    Le plafond de tentatives compte alors tous les clients dans un même seau, ce qui laisse un tiers interdire la connexion d'administration à tout le monde. Le signalement nomme le pair, valeur à porter dans `FORWARDED_ALLOW_IPS`.
+    Le plafond de tentatives compte alors tous les clients ensemble : un tiers peut bloquer la connexion d'administration pour tout le monde. Le signalement nomme le pair, valeur à ajouter à `FORWARDED_ALLOW_IPS`.
     """
 
     def setup_method(self):
@@ -174,7 +174,7 @@ class TestProxyHeaderIgnoredWarning:
         assert len(caplog.records) == 1
 
     def test_se_repete_passe_l_intervalle(self, caplog, monkeypatch):
-        """Le réglage se corrige à l'exploitation, et le signalement reste disponible le jour où on le cherche."""
+        """Passé l'intervalle, le signalement se répète : il reste visible dans le journal tant que le réglage est faux."""
         monkeypatch.setattr(rate_limit, "_WARN_INTERVAL_SECONDS", 0.0)
         with caplog.at_level(logging.WARNING):
             for _ in range(3):
@@ -188,7 +188,7 @@ class TestProxyHeaderIgnoredWarning:
         assert {r.peer for r in caplog.records} == {"172.17.0.1", "172.18.0.1"}
 
     def test_la_table_des_pairs_signales_reste_bornee(self, caplog):
-        """Sous un flot d'adresses distinctes, la plus anciennement signalée cède sa place."""
+        """Sous un flot d'adresses distinctes, la table des pairs signalés reste sous son plafond."""
         with caplog.at_level(logging.WARNING):
             for i in range(rate_limit._MAX_WARNED_PEERS + 10):
                 _client_key(_request(f"10.0.{i // 256}.{i % 256}", x_forwarded_for="203.0.113.9"))

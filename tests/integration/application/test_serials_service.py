@@ -90,14 +90,11 @@ def publisher_service(sa_sync_conn):
 
 
 def _fetch_one(conn, sql_text: str, **params):
-    """Exécute un text() SELECT sync et retourne result.first() (Row ou None)."""
+    """Exécute une requête SELECT et renvoie sa première ligne, ou `None`."""
     return conn.execute(text(sql_text), params).first()
 
 
-# ── Helpers ──────────────────────────────────────────────────────
-
-
-# ── find_by_id (hydratation aggregates) ────────────────────────────
+# ── find_by_id ─────────────────────────────────────────────────────
 
 
 class TestPublisherFindById:
@@ -209,7 +206,7 @@ class TestUpdateSerial:
     def test_type_saisi_a_la_main_hors_de_portee_du_pipeline(
         self, sa_sync_conn, gateway, serial_service
     ):
-        """Un type saisi devient un champ saisi à la main : le typage des recueils d'actes ne le voit plus, et les écritures du pipeline s'abstiennent."""
+        """Un type saisi devient un champ saisi à la main : le typage des recueils d'actes l'ignore, et les écritures du pipeline le laissent en place."""
         j = _serial(sa_sync_conn, title="2024 IEEE SENSORS")
         serial_service.update_serial(j, update=SerialUpdate(serial_type=SerialType.JOURNAL))
 
@@ -351,7 +348,7 @@ class TestMergePublishers:
         assert row.publisher_id == target
 
     def test_transfers_monographs(self, sa_sync_conn, publisher_service):
-        """La monographie garde un éditeur, qui la retrouve par son titre."""
+        """Les monographies de l'éditeur absorbé passent à l'éditeur conservé."""
         target = insert_publisher(sa_sync_conn, "Presses universitaires de Rennes")
         source = insert_publisher(sa_sync_conn, "PUR")
         monograph = insert_monograph(sa_sync_conn, "Livre", publisher_id=source)
@@ -364,7 +361,7 @@ class TestMergePublishers:
         assert row.publisher_id == target
 
     def test_transfers_doi_prefixes(self, sa_sync_conn, publisher_service):
-        """Régression : le préfixe DOI de l'éditeur absorbé perdait son éditeur, sans être résolu de nouveau."""
+        """Régression : le préfixe DOI de l'éditeur absorbé passe à l'éditeur conservé."""
         target = insert_publisher(sa_sync_conn, "Elsevier BV")
         source = insert_publisher(sa_sync_conn, "Elsevier [1977-....]")
         insert_doi_prefix(
@@ -379,7 +376,7 @@ class TestMergePublishers:
         assert row.publisher_id == target
 
     def test_merges_same_title_serials(self, sa_sync_conn, publisher_service):
-        """Si cible et source ont un journal de même titre, ils sont fusionnés."""
+        """Deux revues de même titre, une chez chaque éditeur, sont fusionnées."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         jt = _serial(sa_sync_conn, publisher_id=target, issn="0028-0836")
@@ -396,8 +393,7 @@ class TestMergePublishers:
     def test_merges_same_title_serials_with_only_source_openalex_id(
         self, sa_sync_conn, publisher_service
     ):
-        """Cible sans openalex_id, source avec : la fusion doit déplacer
-        l'openalex_id du source vers la cible sans violer UNIQUE(openalex_id)."""
+        """Seule la revue absorbée a un `openalex_id` : la revue conservée le reçoit, sans violer l'unicité de `openalex_id`."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         jt = _serial(sa_sync_conn, publisher_id=target)
@@ -431,8 +427,7 @@ class TestMergePublishers:
     def test_blocks_when_target_has_internal_duplicate_titles(
         self, sa_sync_conn, publisher_service
     ):
-        """Si la cible a 2 journaux au même titre et la source en a 1, la fusion
-        N→1 casserait. On flagge ces paires comme blockers."""
+        """L'éditeur conservé a deux revues de même titre, l'éditeur absorbé une : la fusion est bloquée, et chaque paire est signalée comme doublon interne."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         _serial(sa_sync_conn, publisher_id=target, issn="0028-0836")
@@ -448,7 +443,7 @@ class TestMergePublishers:
             assert "doublon interne" in b["reason"]
 
     def test_collects_all_blockers_in_one_pass(self, sa_sync_conn, publisher_service):
-        """Plusieurs paires de revues bloquantes → toutes remontées d'un coup."""
+        """Toutes les paires de revues bloquantes sont signalées en une fois."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source")
         _serial(sa_sync_conn, title="Rev1", publisher_id=target, issn="1111-1111")
@@ -462,7 +457,7 @@ class TestMergePublishers:
         assert len(exc_info.value.blocking_serials) == 2
 
     def test_transfers_openalex_id_when_target_has_none(self, sa_sync_conn, publisher_service):
-        """Target sans openalex_id, source avec : la cible reçoit celui de la source."""
+        """Seul l'éditeur absorbé a un `openalex_id` : l'éditeur conservé le reçoit."""
         target = insert_publisher(sa_sync_conn, "Target")
         source = insert_publisher(sa_sync_conn, "Source", openalex_id="P999")
         publisher_service.merge_publishers(target, source)
@@ -472,7 +467,7 @@ class TestMergePublishers:
         assert row.openalex_id == "P999"
 
     def test_keeps_target_openalex_id_when_both_set(self, sa_sync_conn, publisher_service):
-        """Si les deux ont un openalex_id, celui de la cible est conservé."""
+        """Quand les deux éditeurs ont un `openalex_id`, celui de l'éditeur conservé reste."""
         target = insert_publisher(sa_sync_conn, "Target", openalex_id="P_TARGET")
         source = insert_publisher(sa_sync_conn, "Source", openalex_id="P_SOURCE")
         publisher_service.merge_publishers(target, source)
@@ -505,8 +500,7 @@ class TestMergeSerials:
         target = _serial(sa_sync_conn, title="Target")
         source = _serial(sa_sync_conn, title="Source")
         publication_id = insert_publication(sa_sync_conn, serial_id=source)
-        # ≥1 source_record : sinon `refresh_from_sources` (déclenché par la
-        # requalification post-merge) supprimerait la publication comme orpheline.
+        # La requalification qui suit la fusion appelle `refresh_from_sources`, qui supprime une publication sans enregistrement source.
         _openalex_source_record(
             sa_sync_conn, publication_id, source_id="W-transfer", serial_id=source
         )
@@ -592,7 +586,7 @@ class TestMergeSerials:
         assert row.sudoc_checked_at is None
 
     def test_source_issns_join_the_target(self, sa_sync_conn, serial_service):
-        """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint la cible, qui garde son propre ISSN."""
+        """Titre précédent absorbé par le titre suivant : l'ISSN du titre précédent rejoint les ISSN écartés de la cible, qui garde son propre ISSN."""
         target = _serial(sa_sync_conn, title="BMC Primary Care", eissn="2731-4553")
         source = _serial(
             sa_sync_conn,
@@ -625,7 +619,7 @@ class TestMergeSerials:
         assert row.is_in_doaj is True
 
     def test_does_not_overwrite_existing_fields(self, sa_sync_conn, serial_service):
-        """COALESCE : les champs renseignés dans la cible sont préservés."""
+        """Les champs renseignés de la cible gardent leur valeur."""
         target = _serial(sa_sync_conn, title="Target", issn="0028-0836")
         source = _serial(sa_sync_conn, title="Source", issn="1234-5678")
 
@@ -637,11 +631,7 @@ class TestMergeSerials:
     def test_requalifies_absorbed_publications_against_target_type(
         self, sa_sync_conn, serial_service
     ):
-        """Fusionner une revue dans un média retype ses publications en `media`.
-
-        Régression : avant ce hook, le merge repointait `serial_id` mais laissait
-        les `doc_type` des publications absorbées inchangés.
-        """
+        """Fusionner une revue dans un média passe ses publications au type `media`."""
         media = _serial(sa_sync_conn, title="Le Monde")
         revue = _serial(sa_sync_conn, title="Revue X")
         sa_sync_conn.execute(
@@ -673,12 +663,12 @@ class TestMergeSerials:
         assert row.doc_type == "media"
 
 
-# ── requalify_publications_for_serial (persistance enregistrement source + auto-cicatrisation) ──
+# ── requalify_publications_for_serial ──
 
 
 class TestRequalifyPublicationsForSerial:
     def _seed(self, conn):
-        """Journal 'journal' + une publication 'article' attestée par un enregistrement source 'article'."""
+        """Revue de type `journal` et publication de type `article`, présente dans un enregistrement source de type `article`."""
         serial = _serial(conn, title="Revue X")
         conn.execute(
             text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"), {"id": serial}
@@ -696,7 +686,7 @@ class TestRequalifyPublicationsForSerial:
         self, sa_sync_conn, serial_service
     ):
         serial, publication, source_record = self._seed(sa_sync_conn)
-        # Le caller a déjà basculé le type (comme update_serial).
+        # L'appelant change le type avant la requalification, comme `update_serial`.
         sa_sync_conn.execute(
             text("UPDATE serials SET serial_type = 'media' WHERE id = :id"), {"id": serial}
         )
@@ -709,7 +699,7 @@ class TestRequalifyPublicationsForSerial:
             "SELECT doc_type, corrections FROM source_records WHERE id = :id",
             id=source_record,
         )
-        # La colonne enregistrement source est persistée (ce que lira le matcher), avec le brut réversible.
+        # Le type corrigé est écrit dans l'enregistrement source, avec la valeur brute pour annuler la correction.
         assert source_record_row.doc_type == "media"
         assert source_record_row.corrections == {
             "doc_type": {"raw": "article", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
@@ -726,7 +716,7 @@ class TestRequalifyPublicationsForSerial:
         )
         serial_service.requalify_publications_for_serial(serial)
 
-        # Le type revient à 'journal' : la correction doit être défaite, le brut restauré.
+        # Le type revient à 'journal' : la correction est annulée et la valeur brute restaurée.
         sa_sync_conn.execute(
             text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"), {"id": serial}
         )

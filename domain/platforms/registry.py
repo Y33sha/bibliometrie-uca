@@ -1,11 +1,4 @@
-"""Liste fermée des plateformes connues : archives ouvertes, serveurs de preprints et plateformes d'éditeurs. Une plateforme connue porte le nom de la liste.
-
-Une plateforme d'éditeurs enregistre sous son propre préfixe DOI les articles des revues qu'elle diffuse : le titulaire du préfixe et le nom que Crossref donne à ces DOI sont alors la plateforme, pas l'éditeur.
-
-Une copie se rattache à une plateforme connue par son URL (`known_platform_of_copy`) : l'hôte, puis le préfixe d'une URL doi.org, puis la source OpenAlex de la copie. Les URL de l'hôte osf.io désignent plusieurs serveurs de preprints sans les distinguer : seule la source OpenAlex les départage.
-
-Le préfixe 10.1101 est commun à bioRxiv, à medRxiv et aux revues de Cold Spring Harbor (*Genome Research*) : il ne désigne pas seul un serveur de preprints.
-"""
+"""Liste fermée des plateformes connues : archives ouvertes, serveurs de preprints et plateformes d'éditeurs. Une plateforme reconnue prend le nom de la liste."""
 
 from dataclasses import dataclass
 from urllib.parse import urlsplit
@@ -55,7 +48,7 @@ def _repository(
 HAL = _repository(
     "HAL", ("S4306402512", "S4406922276", "S4406922393", "S4406922470", "S4377196329")
 )
-"""L'archive ouverte HAL, que HAL décrit lui-même. OpenAlex range aussi des copies de HAL sous des sources de portails. Ses hôtes sont les portails HAL (`is_hal_host`)."""
+"""L'archive ouverte HAL. OpenAlex range aussi des copies de HAL sous des sources de portails. Ses hôtes sont les portails HAL (`is_hal_host`)."""
 
 PUBMED_CENTRAL = _repository(
     "PubMed Central",
@@ -77,6 +70,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _repository("Figshare", ("S4377196282",), ("figshare.com",)),
     _repository("CERN Document Server", ("S4306402195",), ("cds.cern.ch",)),
     ARXIV,
+    # Le préfixe 10.1101 couvre aussi les revues de Cold Spring Harbor (*Genome Research*).
     _preprint_server("bioRxiv", {"10.1101", "10.64898"}, ("S4306402567",), ("biorxiv.org",)),
     _preprint_server("medRxiv", {"10.1101", "10.64898"}, ("S3005729997",), ("medrxiv.org",)),
     _preprint_server("SSRN", {"10.2139"}, ("S4210172589",), ("ssrn.com",)),
@@ -86,6 +80,7 @@ KNOWN_PLATFORMS: tuple[KnownPlatform, ...] = (
     _preprint_server("Preprints.org", {"10.20944"}, ("S6309402219",), ("preprints.org",)),
     _preprint_server("ChemRxiv", {"10.26434"}, ("S4393918830",), ("chemrxiv.org",)),
     _preprint_server("Authorea", {"10.22541"}, ("S4363604296",), ("authorea.com",)),
+    # Les URL d'osf.io désignent plusieurs serveurs de preprints sans les distinguer : seule la source OpenAlex les départage.
     _preprint_server("OSF Preprints", {"10.31219"}, ("S4306401127",)),
     _preprint_server("PsyArXiv", {"10.31234"}, ("S4306401687",)),
     _preprint_server("SocArXiv", {"10.31235"}, ("S4306401238",)),
@@ -176,7 +171,7 @@ def known_platform_of_copy(url: str, openalex_id: str | None) -> KnownPlatform |
 
 
 def is_publisher_platform_prefix(prefix: str) -> bool:
-    """Vrai quand `prefix` est le préfixe DOI d'une plateforme d'éditeurs."""
+    """Vrai si `prefix` est le préfixe DOI d'une plateforme d'éditeurs. Une telle plateforme enregistre sous son préfixe les articles des revues qu'elle diffuse : le titulaire du préfixe est la plateforme."""
     return prefix in _PUBLISHER_PLATFORM_PREFIXES
 
 

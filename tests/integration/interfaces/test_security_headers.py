@@ -9,7 +9,7 @@ class TestSecurityHeaders:
         assert r.headers["referrer-policy"] == "strict-origin-when-cross-origin"
 
     def test_les_capteurs_du_navigateur_sont_refuses(self, client):
-        """Aucune page n'en demande : les refuser ferme la porte à du code qui s'exécuterait dans la page."""
+        """Aucune page n'utilise ces capacités : les refuser en prive un code injecté dans la page."""
         politique = client.get("/api/auth/check").headers["permissions-policy"]
         for capacite in ("geolocation", "camera", "microphone", "payment", "usb"):
             assert f"{capacite}=()" in politique
@@ -20,14 +20,14 @@ class TestSecurityHeaders:
         assert r.headers["cross-origin-opener-policy"] == "same-origin"
 
     def test_les_ressources_ne_se_chargent_pas_depuis_un_autre_site(self, client):
-        """Une requête sans CORS venue d'une origine tierce n'obtient rien : le pendant, pour les ressources, de l'isolement du contexte de navigation."""
+        """Une requête sans CORS venue d'une autre origine n'obtient pas la ressource."""
         r = client.get("/api/auth/check")
         assert r.headers["cross-origin-resource-policy"] == "same-origin"
 
     def test_les_en_tetes_couvrent_aussi_l_interface(self, client):
-        """Le middleware les pose sur toute réponse, pages du frontend comprises.
+        """Le middleware pose les en-têtes sur toute réponse, pages du frontend comprises.
 
-        L'attendu est lu dans le middleware lui-même : un en-tête qu'on y ajoute est couvert sans qu'on y pense, et un en-tête qu'on en retire cesse d'être exigé ici.
+        L'attendu est lu dans le middleware : le test suit tout en-tête qu'on y ajoute ou qu'on en retire.
         """
         from interfaces.api.app import _SECURITY_HEADERS
 
@@ -37,9 +37,9 @@ class TestSecurityHeaders:
 
 
 class TestPolitiqueDeSecuriteDeContenu:
-    """Politique de sécurité de contenu posée en en-tête, en regard de celle que les pages du frontend portent en balise.
+    """Politique de sécurité de contenu en en-tête, à côté de celle que les pages du frontend déclarent en balise.
 
-    Une balise `<meta>` ne peut pas exprimer `frame-ancestors` : la directive n'a d'effet qu'en en-tête. Les réponses de l'API, qui ne rendent que du JSON, portent en plus une politique qui n'autorise aucune ressource.
+    La directive `frame-ancestors` agit seulement en en-tête. Les réponses de l'API, en JSON, ont en plus une politique qui n'autorise aucune ressource.
     """
 
     def test_toute_reponse_refuse_l_insertion_dans_un_cadre(self, client):
@@ -53,7 +53,7 @@ class TestPolitiqueDeSecuriteDeContenu:
             assert directive in politique
 
     def test_la_politique_de_l_interface_ne_restreint_que_le_cadre(self, client):
-        """Les pages portent leur propre politique en balise, qui autorise nommément les scripts de l'application : celle de l'en-tête ne doit pas la contredire."""
+        """Les pages déclarent en balise leur propre politique, qui autorise les scripts de l'application : l'en-tête se limite à `frame-ancestors`."""
         politique = client.get("/").headers["content-security-policy"]
         assert politique == "frame-ancestors 'none'"
 
@@ -64,9 +64,9 @@ class TestPolitiqueDeSecuriteDeContenu:
 
 
 class TestMiseEnCache:
-    """Aucun cache du chemin ne garde une réponse de l'API.
+    """Aucun cache intermédiaire ne garde une réponse de l'API.
 
-    Une même adresse ne rend pas toujours le même corps : la configuration se restreint à une liste blanche de clés sans session et s'ouvre avec. Un cache partagé qui rangerait la variante servie à une session ouverte la rendrait ensuite à un appelant anonyme.
+    Une même adresse renvoie des corps différents selon la session : sans session, la configuration se limite à une liste blanche de clés. Un cache partagé rendrait à un appelant anonyme la variante servie à une session.
     """
 
     def test_une_lecture_d_api_interdit_la_mise_en_cache(self, client):
@@ -84,17 +84,17 @@ class TestMiseEnCache:
         assert r.headers.get("cache-control") == "no-store"
 
     def test_l_interface_garde_son_cache(self, client):
-        """Les fichiers du frontend portent leur empreinte dans leur nom : les mettre en cache est ce qui rend une page rapide au second chargement."""
+        """Les fichiers du frontend contiennent leur empreinte dans leur nom : leur mise en cache accélère le second chargement."""
         r = client.get("/")
         assert r.headers.get("cache-control") != "no-store"
 
 
 class TestOrdreDeLaPile:
-    """Le middleware CORS enveloppe ceux qui composent des réponses, et voit donc les refus qu'ils émettent. Seule l'inscription du préfixe de déploiement, qui ne répond jamais, l'enveloppe à son tour.
+    """Le middleware CORS enveloppe ceux qui composent des réponses, et voit donc leurs refus. Seul le middleware du préfixe de déploiement, qui ne répond jamais, l'enveloppe à son tour.
 
-    Un refus dépourvu d'en-têtes CORS arrive au navigateur d'une origine autorisée comme une erreur CORS opaque : le code et le message de refus sont perdus, et la page ne peut rien en dire. Or les middlewares d'authentification, de plafond et de pagination composent leurs refus eux-mêmes, sans laisser passer la requête — d'où l'ordre.
+    Un refus sans en-têtes CORS arrive au navigateur d'une origine autorisée comme une erreur CORS opaque : le code et le message sont perdus. Or les middlewares d'authentification, de plafond et de pagination composent leurs refus eux-mêmes.
 
-    L'ordre est vérifié sur la pile plutôt que sur une réponse : les origines autorisées se figent à la construction du middleware, si bien qu'un appel n'en montre les en-têtes que sur un déploiement qui en énumère, et la production n'en énumère aucune.
+    L'ordre est vérifié sur la pile : les origines autorisées sont fixées à la construction du middleware, et la production n'en déclare aucune, donc une réponse ne montre pas les en-têtes CORS.
     """
 
     def test_cors_enveloppe_les_autres_middlewares(self):

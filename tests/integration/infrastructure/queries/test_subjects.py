@@ -96,7 +96,7 @@ class TestLinkAndClear:
         assert n == 1
 
     def test_bulk_dedupes_within_a_batch(self, sa_sync_conn):
-        """Deux annotations d'une même source visant le même sujet ne donnent qu'un lien."""
+        """Deux annotations d'une même source pour le même sujet donnent un seul lien."""
         publication = insert_publication(sa_sync_conn)
         sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
         sent = SubjectStore(sa_sync_conn).link_publication_subjects_bulk(
@@ -109,14 +109,14 @@ class TestLinkAndClear:
         assert sent == 1
 
     def test_bulk_counts_only_new_links(self, sa_sync_conn):
-        """Le retour compte les liens réellement insérés, pas ceux déjà présents."""
+        """La valeur rendue compte les liens insérés, pas ceux déjà présents."""
         publication = insert_publication(sa_sync_conn)
         sid = SubjectStore(sa_sync_conn).upsert_subject(label="x")
         sid2 = SubjectStore(sa_sync_conn).upsert_subject(label="y")
         SubjectStore(sa_sync_conn).link_publication_subjects_bulk(
             source="hal", rows=[PublicationSubjectLink(publication, sid)]
         )
-        # Ré-insertion du lien existant + un nouveau : seul le nouveau est compté.
+        # Le lien existant et un lien absent : seul le second compte.
         n = SubjectStore(sa_sync_conn).link_publication_subjects_bulk(
             source="hal",
             rows=[
@@ -127,7 +127,7 @@ class TestLinkAndClear:
         assert n == 1
 
     def test_clear_preserves_rejected_links(self, sa_sync_conn):
-        """Le nettoyage avant réingestion épargne les liens que la curation a rejetés."""
+        """Le nettoyage avant réingestion épargne les liens rejetés à la main."""
         publication = insert_publication(sa_sync_conn)
         kept = SubjectStore(sa_sync_conn).upsert_subject(label="rejete")
         dropped = SubjectStore(sa_sync_conn).upsert_subject(label="ordinaire")

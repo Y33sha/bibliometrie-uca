@@ -1,8 +1,6 @@
 """Tests d'intégration de `refresh_perimeter_structures`.
 
-Vérifie que la table matérialisée `perimeter_structures` reproduit la clôture
-récursive des racines `perimeters.root_structure_ids`, et que le refresh est
-idempotent.
+La table matérialisée `perimeter_structures` reproduit la clôture récursive des racines `perimeters.root_structure_ids`, et le refresh est idempotent.
 """
 
 from sqlalchemy import text

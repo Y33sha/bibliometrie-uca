@@ -60,7 +60,7 @@ class TestComputePersonNameForms:
         }
 
     def test_annee_de_naissance_retiree(self) -> None:
-        """Une fiche créée d'après une forme d'autorité porte l'année de naissance."""
+        """Le prénom d'une personne créée d'après une forme d'autorité contient l'année de naissance ; ses formes de nom l'omettent."""
         assert compute_person_name_forms("Chométy", "Philippe 1973-") == {
             "philippe chomety",
             "p chomety",

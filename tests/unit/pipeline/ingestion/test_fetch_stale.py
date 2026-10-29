@@ -1,6 +1,6 @@
-"""Nouvelle lecture des documents anciens (`pipeline.ingestion.common.stale_refetch.refresh`).
+"""Relecture des documents anciens (`pipeline.ingestion.common.stale_refetch.refresh`).
 
-Les trois issues d'une lecture par identifiant natif sont routées correctement :
+Chaque issue d'une lecture par identifiant natif a son traitement :
 - document trouvé (empreinte changée / inchangée) → écriture dans `staging` (updated / unchanged) ;
 - absence confirmée (`NOT_FOUND`) → `disappeared_at` ;
 - source indisponible (`UNAVAILABLE`) → rien, compté en `errors`, ni écrit ni marqué disparu.
@@ -35,7 +35,7 @@ class _Lecture(StaleRefetch):
 
 @dataclass
 class _Base:
-    """Base simulée : la sélection rend les identifiants de la lecture, les écritures sont retenues."""
+    """Base simulée : la sélection renvoie les identifiants de la lecture, les écritures sont retenues."""
 
     ecrits: list[str] = field(default_factory=list)
     disparus: list[str] = field(default_factory=list)
@@ -43,7 +43,7 @@ class _Base:
 
 @pytest.fixture
 def lancer(monkeypatch):
-    """Lance `refresh` sur une lecture simulée ; rend les métriques et la base simulée."""
+    """Lance `refresh` sur une lecture simulée ; renvoie les métriques et la base simulée."""
 
     def _lancer(outcomes: dict):
         base = _Base()
@@ -89,7 +89,7 @@ def test_routes_each_outcome(lancer):
 
 
 def test_transient_failure_is_noop(lancer):
-    # Un échec transitoire ne marque jamais le document disparu : l'absence n'est pas prouvée.
+    # Un échec transitoire laisse l'absence non établie : le document reste présent.
     metrics, base = lancer({"X": UNAVAILABLE})
     assert (base.ecrits, base.disparus, metrics.errors) == ([], [], 1)
 
@@ -101,7 +101,7 @@ def test_empty_is_noop(lancer):
 
 
 def test_progress_counter_counts_documents_found_at_the_source(monkeypatch, lancer):
-    """Le compteur de la barre porte les documents retrouvés à la source ; une disparition ou une erreur fait seulement avancer la barre."""
+    """Le compteur de la barre compte les documents retrouvés à la source ; une disparition ou une erreur fait seulement avancer la barre."""
 
     class _Spy:
         avances = 0

@@ -1,8 +1,8 @@
-"""Adapter PostgreSQL pour l'édition, l'enrichissement pays et la fusion de l'agrégat Publisher.
+"""Repository PostgreSQL de l'agrégat Publisher : édition, pays et fusion.
 
-Séparé de `serial_repository.py` (principe ISP). Le trouve-ou-crée, alimenté par le pipeline, vit dans `pipeline/transformation/publishing/publishers/publishers.py`. Même contrat que les autres PgXxxRepository : exceptions du domaine, l'orchestration métier restant dans `application/services/`.
+Le trouve-ou-crée du pipeline vit dans `pipeline/transformation/publishing/find_or_create.py`. Les erreurs sont celles du domaine ; l'orchestration est dans `application/services/`.
 
-La fusion d'éditeurs applique la règle de fusion de chaque donnée d'un éditeur (`publisher_merge`) ; la détection préalable des revues homonymes est dans `SerialRepository.find_shared_title_serial_pairs`, le service de fusion d'éditeurs orchestrant les deux.
+La fusion applique la règle de chaque donnée d'un éditeur (`publisher_merge`). Le service de fusion trouve d'abord les revues homonymes (`SerialRepository.find_shared_title_serial_pairs`).
 """
 
 from typing import NamedTuple
@@ -29,7 +29,7 @@ class _PublisherRow(NamedTuple):
 
 
 def _publisher_from_row(row: _PublisherRow) -> Publisher:
-    """Mapping d'une row `publishers` SQL vers l'aggregate `Publisher`."""
+    """Éditeur de domaine d'une ligne de `publishers`."""
     return Publisher(
         id=row.id,
         name=row.name,
@@ -45,7 +45,7 @@ class PgPublisherRepository(PublisherRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── Chargement ─────────────────────────────────────────────────
 
     def find_by_id(self, publisher_id: int) -> Publisher | None:
         row = self._conn.execute(
@@ -63,10 +63,10 @@ class PgPublisherRepository(PublisherRepository):
 
     # ── Enrichissement pays (maintenance) ──────────────────────────
 
-    # ── Persistance de l'agrégat ───────────────────────────────────
+    # ── Écriture ───────────────────────────────────────────────────
 
     def save(self, publisher: Publisher) -> None:
-        """Persiste un éditeur chargé : UPDATE de ses champs éditables par l'API. `name_normalized` est re-dérivé du nom ; `openalex_id` (géré par le pipeline) n'est pas touché. Lève `NotFoundError` si l'id est absent."""
+        """Écrit les champs modifiables par l'API d'un éditeur chargé. Le nom normalisé se recalcule ; `openalex_id`, que tient le pipeline, reste. Lève `NotFoundError` si l'id est absent."""
         result = self._conn.execute(
             update(publishers)
             .where(publishers.c.id == publisher.id)

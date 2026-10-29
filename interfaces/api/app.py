@@ -1,6 +1,6 @@
 """Application FastAPI : assemblage de la surface HTTP.
 
-Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares, les routers et le service du frontend buildé.
+Câble le cycle de vie de l'engine SQLAlchemy, la traduction des erreurs métier en codes HTTP, les middlewares, les routers et le service du frontend compilé.
 
 Lancement en développement : `bash start.sh`.
 """
@@ -90,7 +90,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         set_sync_engine(None)
 
 
-# Préfixe de déploiement (`/bibliometrie` en production), vide pour un service à la racine. Cf. `route_path`.
+# Préfixe de déploiement (`/bibliometrie` en production), vide pour un service à la racine (`route_path`).
 ROOT_PATH = os.environ.get("ROOT_PATH", "")
 
 # Docs interactives activées par `expose_api_docs`, en développement seulement : elles décrivent toute l'API, admin comprise.
@@ -207,7 +207,7 @@ async def operational_error_handler(request: Request, exc: OperationalError) -> 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Renvoie du JSON 500 au lieu de HTML pour les erreurs non gérées."""
+    """Renvoie en JSON, plutôt qu'en HTML, le 500 d'une erreur non gérée."""
     logger.error("Erreur non gérée sur %s %s", request.method, request.url.path, exc_info=exc)
     return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"})
 
@@ -233,7 +233,7 @@ async def read_only_guard_middleware(
 
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next: RequestResponseEndpoint) -> Response:
-    """Protège les endpoints d'écriture, hors `/api/auth/` : 401 sans session valide, 403 sans le rôle admin.
+    """Protège les routes d'écriture, hors `/api/auth/` : 401 sans session valide, 403 sans le rôle admin.
 
     Journalise chaque action admin réussie dans un record `admin_action` (utilisateur, méthode, chemin, statut). Le chemin est celui du routage, sans le préfixe de déploiement.
     """
@@ -338,12 +338,12 @@ async def timing_middleware(request: Request, call_next: RequestResponseEndpoint
 
 # En-têtes de sécurité posés sur toute réponse. HSTS relève du reverse-proxy TLS.
 _SECURITY_HEADERS = {
-    "X-Content-Type-Options": "nosniff",  # interdit le MIME-sniffing
-    "X-Frame-Options": "DENY",  # anti-clickjacking
+    "X-Content-Type-Options": "nosniff",  # Interdit au navigateur de deviner le type MIME.
+    "X-Frame-Options": "DENY",  # Contre le clickjacking.
     "Referrer-Policy": "strict-origin-when-cross-origin",
     # Retire l'accès aux capteurs et périphériques du navigateur, dont aucune page ne se sert.
     "Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
-    # Une page ouverte depuis l'application (fiche HAL, profil ORCID…) n'a pas de référence vers l'application (`window.opener`).
+    # Une page ouverte depuis l'application (fiche HAL, profil ORCID…) reste sans référence vers l'application (`window.opener`).
     "Cross-Origin-Opener-Policy": "same-origin",
     # Refuse aux autres origines le chargement des ressources de l'application hors CORS (image, script, cadre).
     "Cross-Origin-Resource-Policy": "same-origin",
@@ -361,7 +361,7 @@ _API_CSP = f"default-src 'none'; base-uri 'none'; form-action 'none'; {_FRAME_AN
 _NO_STORE = "no-store"
 """Interdit à tout cache de conserver une réponse de l'API.
 
-Une même URL d'API rend un corps différent selon la session (la configuration, par exemple) : un cache partagé servirait à un appelant anonyme la réponse destinée à une session admin.
+Une même URL d'API renvoie un corps différent selon la session (la configuration, par exemple) : un cache partagé servirait à un appelant anonyme la réponse destinée à une session admin.
 """
 
 
@@ -402,7 +402,7 @@ app.add_middleware(
 app.add_middleware(RootPath, root_path=ROOT_PATH)
 
 
-# ----- Include routers -----
+# ----- Routers -----
 
 app.include_router(auth.router)
 app.include_router(stats.router)
@@ -425,9 +425,9 @@ app.include_router(subjects.router)
 app.include_router(sources.router)
 
 
-# ----- Frontend SPA (prod) -----
+# ----- Frontend (production) -----
 #
-# En production, FastAPI sert le frontend buildé (`interfaces/frontend/build`). Monté en dernier, pour que les routes `/api/*` passent d'abord. En développement, vite sert le frontend et le build est absent.
+# En production, FastAPI sert le frontend compilé (`interfaces/frontend/build`). Monté en dernier, pour que les routes `/api/*` passent d'abord. En développement, vite sert le frontend et le build est absent.
 #
 # Hors couverture : la branche prise dépend de la présence du build.
 if BUILD_DIR.is_dir():  # pragma: no cover

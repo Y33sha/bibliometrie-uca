@@ -1,4 +1,4 @@
-"""Tests d'intégration du « trouver ou créer » des éditeurs et des revues (`pipeline/transformation/publishing/find_or_create.py`)."""
+"""Recherche ou création des éditeurs et des revues (`pipeline/transformation/publishing/find_or_create.py`)."""
 
 from functools import partial
 from types import SimpleNamespace
@@ -34,7 +34,7 @@ def publisher_store(sa_sync_conn):
 
 
 def _fetch_one(conn, sql_text: str, **params):
-    """Exécute un SELECT et retourne sa première ligne, ou `None`."""
+    """Exécute un SELECT et renvoie sa première ligne, ou `None`."""
     return conn.execute(text(sql_text), params).first()
 
 
@@ -42,9 +42,6 @@ def _find_or_create(title, *, issn=None, eissn=None, issnl=None, **kwargs):
     """`find_or_create_serial` avec un ISSN papier, un ISSN en ligne et un ISSN-L."""
     issns = source_issns(print_issn=issn, electronic_issn=eissn, linking=issnl)
     return find_or_create_serial(title, issns=issns, **kwargs)
-
-
-# ── find_or_create_publisher ───────────────────────────────────────
 
 
 class TestFindOrCreatePublisher:
@@ -70,7 +67,7 @@ class TestFindOrCreatePublisher:
     def test_un_nom_encode_rejoint_le_meme_editeur_que_le_nom_en_clair(
         self, sa_sync_conn, publisher_store
     ):
-        """Régression : même cause et même correction que pour les revues (cf. `TestFindOrCreateSerial`)."""
+        """Régression : un nom avec entités HTML (`&amp;`) créait un deuxième éditeur."""
         premier = find_or_create_publisher("Taylor & Francis", repo=publisher_store)
         second = find_or_create_publisher("TAYLOR &amp; FRANCIS", repo=publisher_store)
         assert second == premier
@@ -101,9 +98,6 @@ class TestFindOrCreatePublisher:
         assert row.openalex_id == "P123"
 
 
-# ── find_or_create_serial ─────────────────────────────────────────
-
-
 class TestFindOrCreateSerial:
     def test_returns_none_on_empty_title(self, sa_sync_conn, gateway):
         assert _find_or_create(None, repo=gateway) is None
@@ -119,13 +113,7 @@ class TestFindOrCreateSerial:
     def test_un_titre_encode_rejoint_le_meme_serial_que_le_titre_en_clair(
         self, sa_sync_conn, gateway
     ):
-        """Régression : le titre affiché et la clé de rapprochement dérivent de la même valeur.
-
-        Les sources livrent le même titre tantôt en clair, tantôt avec des entités HTML. Tant
-        que la clé se calculait sur le titre reçu et le titre affiché sur sa mise à plat, les
-        deux formes avaient des clés distinctes (`... amp ...`) et la revue naissait en deux
-        exemplaires — quatre cas relevés en base.
-        """
+        """Régression : un titre avec entités HTML (`&amp;`) créait une deuxième revue. Le titre affiché et la clé de matching dérivent du même titre décodé."""
         premier = _find_or_create("Wood & Fire Safety", repo=gateway)
         second = _find_or_create("Wood &amp; Fire Safety", repo=gateway)
         assert second == premier

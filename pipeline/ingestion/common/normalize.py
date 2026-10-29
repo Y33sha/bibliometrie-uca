@@ -1,13 +1,15 @@
-"""Phase `normalize` : normalisation du staging vers `source_records`, `source_contributions` et `addresses`. Tâches `normalize.<source>`.
+"""Phase `normalize` : normalisation de `staging` vers les enregistrements sources, les contributions sources et les adresses.
 
-Les `source_records` sortent sans `publication_id` : la phase `publications` les assigne. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
+Les enregistrements sources sortent sans publication : la phase `publications` les y rattache. Pour HAL, les ORCID et IdRef sont lus dans le TEI.
 
 La phase enchaîne ses tâches (`pipeline.graph`) :
 
 1. la normalisation de chaque source retenue, dans l'ordre de `SOURCE_PRIORITY` ;
-2. la suppression des `source_records` dont le staging porte `disappeared_at` ;
-3. le nettoyage des informations du contributeur orphelines (la normalisation réassigne des contributions sources et la suppression précédente en retire, laissant des lignes de `contributor_information` qu'aucune contribution source ne référence) ;
-4. le nettoyage des adresses orphelines, pour la même raison. Sa maintenance, lancée par l'exécuteur, est le `VACUUM` du staging (`raw_data` vidé après normalisation) : `VACUUM FULL` en mode full, simple sinon.
+2. la suppression des enregistrements sources des documents disparus de leur source ;
+3. la suppression des informations du contributeur qu'aucune contribution source ne référence : la normalisation réassigne des contributions sources, et la suppression précédente en retire ;
+4. la suppression des adresses orphelines, pour la même raison.
+
+L'exécuteur lance ensuite le `VACUUM` de `staging`, vidé de ses payloads : `VACUUM FULL` en mode full, simple dans les autres modes.
 """
 
 from __future__ import annotations
@@ -50,7 +52,7 @@ from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
-"""Normalise une source (connexion + normaliseur câblé) et rend son bilan."""
+"""Normalise une source et renvoie son bilan."""
 
 
 def _selected(source: str) -> Callable[[PhaseContext], bool]:
@@ -60,7 +62,7 @@ def _selected(source: str) -> Callable[[PhaseContext], bool]:
 
 @dataclass(frozen=True)
 class NormalizePhase:
-    """Le run normalise les sources de ses options, toutes quand il n'en restreint aucune, dans l'ordre de `SOURCE_PRIORITY`."""
+    """Normalisation des sources du run, toutes quand il n'en restreint aucune, dans l'ordre de `SOURCE_PRIORITY`."""
 
     normalize_one: NormalizeOne
     prune_disappeared: Callable[[PhaseContext], int]
@@ -68,7 +70,7 @@ class NormalizePhase:
     cleanup_orphan_addresses: Callable[[PhaseContext], int]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Normalise les sources retenues, retire les enregistrements sources disparus, nettoie les informations du contributeur et les adresses orphelines ; l'exécuteur lance ensuite le `VACUUM` du staging."""
+        """Exécute les tâches de la phase et assemble les métriques."""
         sources = [source.value for source in SOURCE_PRIORITY]
         steps = {
             f"normalize.{source}": TaskStep(
@@ -149,9 +151,6 @@ class NormalizePhase:
         if deleted:
             metrics.report = f"{quantity(deleted, 'adresse supprimée', 'adresses supprimées')}"
         return metrics
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 type NormalizerFactory = Callable[[Connection, logging.Logger], SourceNormalizer]

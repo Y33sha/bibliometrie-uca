@@ -1,9 +1,8 @@
-"""Tests de caractérisation pour le router feedback.
+"""Tests de caractérisation du router de retour sur la détection des adresses.
 
 Couvre :
-- /api/feedback/stats : cas vide + cas avec données (branches des COUNT FILTER)
-- /api/feedback/false-negatives : cas vide + cas avec données + filtre search
-- /api/feedback/false-positives : idem
+- /api/feedback/stats : structure vide, et une adresse par catégorie ;
+- /api/feedback/false-negatives et /api/feedback/false-positives : liste vide, résultats, recherche, pagination.
 """
 
 from tests.integration.helpers.seeds import (
@@ -34,23 +33,23 @@ class TestFeedbackStats:
         sid = seed_structure()
         fid = seed_structure_name_form(sid)
 
-        # concordant_valid : confirmed + detected
+        # Concordance positive : détectée et confirmée.
         a1 = seed_address(uniq("a1"))
         seed_address_structure(a1, structure_id=sid, matched_form_id=fid, is_confirmed=True)
 
-        # concordant_rejected : rejected + not detected
+        # Concordance négative : non détectée et rejetée.
         a2 = seed_address(uniq("a2"))
         seed_address_structure(a2, structure_id=sid, is_confirmed=False)
 
-        # false_negative : confirmed mais non détectée
+        # Faux négatif : confirmée sans être détectée.
         a3 = seed_address(uniq("a3"))
         seed_address_structure(a3, structure_id=sid, is_confirmed=True)
 
-        # false_positive : détectée mais rejetée
+        # Faux positif : détectée et rejetée.
         a4 = seed_address(uniq("a4"))
         seed_address_structure(a4, structure_id=sid, matched_form_id=fid, is_confirmed=False)
 
-        # pending : détectée mais pas encore review
+        # En attente : détectée, sans décision.
         a5 = seed_address(uniq("a5"))
         seed_address_structure(a5, structure_id=sid, matched_form_id=fid)
 
@@ -58,7 +57,7 @@ class TestFeedbackStats:
         assert r.status_code == 200
         body = r.json()
         assert body["total_reviewed"] == 4
-        # 2 concordants sur 4 reviewed = 50%
+        # Deux concordances sur quatre décisions : 50 %.
         assert body["detection_rate"] == 50.0
         assert body["false_negatives"] == 1
         assert body["false_positives"] == 1
@@ -96,7 +95,7 @@ class TestFeedbackFalseNegatives:
         sid = seed_structure()
         target = seed_address("Marqueur Unique Search Target")
         seed_address_structure(target, structure_id=sid, is_confirmed=True)
-        # Bruit non matché
+        # Adresse hors de la recherche.
         other = seed_address("Paris")
         seed_address_structure(other, structure_id=sid, is_confirmed=True)
 

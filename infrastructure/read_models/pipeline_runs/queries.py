@@ -1,6 +1,6 @@
-"""Query service pour les exécutions de phase (table `pipeline_phase_executions`).
+"""Lectures des exécutions de phase (`pipeline_phase_executions`).
 
-L'écart de durée est recalculé à la lecture : le médian historique d'une phase se calcule sur ses exécutions réussies hors run courant, et le rapport de la durée courante à ce médian est exposé tel quel (aucun seuil ; l'œil juge une phase anormalement lente).
+L'écart de durée se recalcule à la lecture : le médian d'une phase se calcule sur ses exécutions réussies hors run courant, et le rapport de la durée courante à ce médian est rendu tel quel, sans seuil.
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ class PipelineRunsQueries:
         self._conn = conn
 
     def list_runs(self, *, limit: int = 50, offset: int = 0) -> list[RunSummary]:
-        """Fenêtre de runs, plus récent en premier (`offset` runs sautés pour le chargement incrémental). Statut global = le pire des statuts de phase ; mode et sources pris sur la première phase du run."""
+        """Fenêtre de runs, plus récent en premier (`offset` runs sautés pour le chargement incrémental). Le statut d'un run est le pire de ses phases ; mode et sources viennent de sa première phase."""
         rows = self._conn.execute(
             text(
                 """

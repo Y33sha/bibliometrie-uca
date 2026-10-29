@@ -1,6 +1,6 @@
 """Tests d'intégration pour `infrastructure.read_models.contributions.queries`.
 
-Une contribution orpheline est une contribution du périmètre, sous un rôle d'auteur, sans personne. Les tests alignent les contributions sources hors contribution et recomposent les attributs des contributions comme le pipeline (`_contribution`)."""
+Une contribution orpheline est une contribution du périmètre, sous un rôle d'auteur, sans personne."""
 
 from sqlalchemy import text
 
@@ -23,7 +23,7 @@ from tests.integration.helpers.structures import (
 
 
 def _contribution(conn) -> None:
-    """Contribution les contributions sources sans contribution et recompose les attributs des contributions."""
+    """Aligne les contributions sources sans contribution et recompose les attributs des contributions, comme le pipeline."""
     align_unaligned(conn)
     recompose_contribution_attributes(conn)
 
@@ -92,7 +92,7 @@ class TestOrphanContributionsCount:
 
 
 def _list(conn, **filters):
-    """File des orphelines, après avoir groupé les contributions sources sans contribution."""
+    """File des contributions orphelines, après alignement des contributions sources sans contribution."""
     _contribution(conn)
     return ContributionsQueries(conn).list_orphan_contributions(
         filters=OrphanFilters(**filters), page=1, per_page=50
@@ -100,7 +100,7 @@ def _list(conn, **filters):
 
 
 def _hal_and_openalex_contribution(conn, hal_name: str, openalex_name: str) -> int:
-    """Contribution orpheline à deux contributions sources, HAL (source prioritaire, nom affiché) et OpenAlex. Retourne son id."""
+    """Contribution orpheline à deux contributions sources, HAL (source prioritaire, nom affiché) et OpenAlex. Renvoie son identifiant."""
     publication = insert_publication(conn)
     hal = insert_source_contribution(
         conn, insert_source_record(conn, publication), raw_author_name=hal_name, in_perimeter=True
@@ -209,7 +209,7 @@ class TestListOrphanContributions:
         ]
 
     def _labs_setup(self, conn):
-        """Contribution source « Zzorph Avec » au labo LAB et à une équipe ; « Zzorph Autre » au labo AUTRE ; « Zzorph Sans » sans structure."""
+        """Contributions sources « Zzorph Avec » au laboratoire LAB et à une équipe, « Zzorph Autre » au laboratoire AUTRE, « Zzorph Sans » sans structure."""
         lab, other_lab, team = (
             insert_structure(conn, code, acronym=acronym, structure_type=stype)
             for code, acronym, stype in (
@@ -271,7 +271,7 @@ class TestListOrphanContributions:
         assert facets.no_lab_count == 1
 
     def test_lists_labs_detected_in_the_source_contribution(self, sa_sync_conn):
-        """Seuls les laboratoires des contributions sources de la contribution apparaissent, pas ceux des autres contributions sources de la publication ni les autres types de structure."""
+        """Seuls les laboratoires des contributions sources de la contribution apparaissent : ni ceux des autres contributions sources de la publication, ni les autres types de structure."""
         ids = self._labs_setup(sa_sync_conn)
 
         (row,) = _list(sa_sync_conn, search="Zzorph Avec").contributions

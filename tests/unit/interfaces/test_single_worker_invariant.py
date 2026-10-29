@@ -1,8 +1,8 @@
-"""Le serveur qui sert l'API tient en un seul processus.
+"""Le serveur qui sert l'API tourne en un seul processus.
 
-Les trois limiteurs de débit — tentatives de connexion, lectures, exports — comptent en mémoire du processus (`interfaces/api/rate_limit.py`), et le nombre d'exports menés de front se réserve sur un sémaphore du même processus. Chaque processus supplémentaire porte donc ses propres compteurs : sous `n` processus, les plafonds valent `n` fois ce qu'ils annoncent, et dix tentatives de connexion par tranche de cinq minutes en deviennent dix fois plus.
+Les trois limiteurs de débit (tentatives de connexion, lectures, exports) comptent dans la mémoire du processus (`interfaces/api/rate_limit.py`). Le nombre d'exports simultanés se réserve sur un sémaphore du même processus. Chaque processus supplémentaire a donc ses propres compteurs : sous `n` processus, chaque plafond vaut `n` fois sa valeur annoncée.
 
-Ce module confronte les descriptions de lancement du dépôt à cet invariant. Ajouter des processus au serveur demande d'abord de sortir l'état des limiteurs du processus.
+Ce module vérifie cet invariant sur les descriptions de lancement du dépôt. Pour ajouter des processus au serveur, l'état des limiteurs doit d'abord sortir du processus.
 """
 
 import re
@@ -19,7 +19,7 @@ _LANCEMENTS = [
     "docker-compose.yml",
     "start.sh",
 ]
-"""Descriptions qui lancent le serveur, ou lui composent son environnement."""
+"""Descriptions qui lancent le serveur, ou composent son environnement."""
 
 _PLUSIEURS_PROCESSUS = re.compile(
     r"""
@@ -47,7 +47,7 @@ def test_aucun_lancement_ne_demande_plusieurs_processus(chemin):
 
 
 def _descriptions_de_deploiement() -> set[Path]:
-    """Descriptions de construction, de composition et de lancement que porte le dépôt."""
+    """Descriptions de construction, de composition et de lancement du dépôt."""
     fichiers = {
         chemin
         for motif in ("Dockerfile", "docker-compose*.yml", "*.sh", "interfaces/*/Dockerfile")

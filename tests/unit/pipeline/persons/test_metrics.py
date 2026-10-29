@@ -1,4 +1,4 @@
-"""Métriques de la phase personnes, assemblées depuis les compteurs de ses tâches."""
+"""Métriques de la phase `persons`, assemblées depuis les compteurs de ses tâches."""
 
 from pipeline.transformation.persons.metrics import build_metrics
 

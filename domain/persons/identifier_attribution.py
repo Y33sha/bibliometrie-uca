@@ -1,10 +1,6 @@
-"""Aggregate root `IdentifierAttribution` — relation Personne ↔ identifiant externe avec statut.
+"""Attribution d'un identifiant externe à une personne, et ses changements de statut.
 
-Aggregate à part (pas un VO, pas une entité fille de `Person`) : le `status` (`pending` / `confirmed` / `rejected`) porte sur la *relation* identifier ↔ person, et la réattribution charge et mute le seul identifier (load + save), pas les deux personnes. Clé naturelle : `(id_type, id_value)` ; clé surrogate : `id`.
-
-`Person.identifiers: tuple[IdentifierAttribution, ...]` est une projection en lecture hydratée par le repository à la demande, pas la source de vérité des mutations.
-
-La logique métier touchant aux attributions d'identifiants (transitions de statut, réattribution) vit ici.
+Le statut (`pending`, `confirmed`, `rejected`) qualifie l'attribution. Elle forme donc un agrégat distinct de `Person`, et une réattribution modifie seulement l'attribution. `Person.identifiers` en donne une copie en lecture.
 """
 
 from dataclasses import dataclass
@@ -26,10 +22,7 @@ class AttributionOutcome(StrEnum):
 
 @dataclass(slots=True)
 class IdentifierAttribution:
-    """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, hal_person_id) à une personne, avec statut.
-
-    `id_type` ∈ `PERSON_IDENTIFIER_TYPES`. `id_value` est la valeur canonique stockée en base, normalisée par le value object de son type (`normalized_identifier_value`).
-    """
+    """Attribution d'un identifiant externe (ORCID, idHAL, IdRef, compte HAL) à une personne. Une valeur d'identifiant appartient à une seule personne. `id_value` est sous forme canonique."""
 
     id: int | None
     person_id: int
@@ -39,12 +32,7 @@ class IdentifierAttribution:
     source: IdentifierOrigin | None = None
 
     def reattribute_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
-        """Déplace l'attribution vers une autre personne.
-
-        Autorisée uniquement depuis le statut `REJECTED` : un identifiant rejeté pour une personne A peut être réattribué à une personne B avec statut `PENDING`. Lève `IdentifierAttributionConflictError` sinon.
-
-        `source` trace l'origine de la réattribution (`IdentifierOrigin`).
-        """
+        """Déplace une attribution `rejected` vers une autre personne, en `pending`. `source` : origine de la réattribution. Lève `IdentifierAttributionConflictError` pour un autre statut."""
         if self.status is not AttributionStatus.REJECTED:
             raise IdentifierAttributionConflictError(
                 f"Impossible de réattribuer l'identifiant {self.id_type}={self.id_value!r} "
@@ -56,11 +44,9 @@ class IdentifierAttribution:
         self.source = source
 
     def transfer_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
-        """Transfère une attribution `pending` vers une autre personne.
+        """Déplace une attribution `pending` vers une autre personne, en `pending`. Lève `IdentifierAttributionConflictError` pour un autre statut.
 
-        Réservé à l'arbitrage automatique des conflits d'attribution : une valeur `pending` est déplacée vers la personne que désigne la majorité des groupes qui la portent. Le statut reste `pending` (attribution non vérifiée, simplement mieux placée).
-
-        Interdit sur `confirmed` (attribution verrouillée par l'admin — jamais déplacée automatiquement) et sur `rejected` (qui relève de `reattribute_to`). Lève `IdentifierAttributionConflictError` sinon.
+        Sert à l'arbitrage automatique des conflits : la valeur revient à la personne que désigne la majorité des contributions qui la contiennent.
         """
         if self.status is not AttributionStatus.PENDING:
             raise IdentifierAttributionConflictError(
@@ -83,10 +69,7 @@ class AttributionResult(NamedTuple):
 def attribution_outcome(
     existing: IdentifierAttribution | None, person_id: int
 ) -> AttributionOutcome:
-    """Issue de l'attribution à `person_id` d'un identifiant dont `existing` est l'attribution en base.
-
-    Une autre personne qui détient l'identifiant en `pending` ou `confirmed` le garde (`HELD_ELSEWHERE`). Pour le lui reprendre, son statut doit d'abord passer à `rejected`.
-    """
+    """Issue de l'attribution d'un identifiant à `person_id`, d'après son attribution en base (`existing`). Un identifiant détenu par une autre personne se reprend seulement après passage de son attribution à `rejected`."""
     if existing is None:
         return AttributionOutcome.ADDED
     if existing.person_id == person_id:

@@ -1,6 +1,6 @@
-"""Identités de connexion : chaque usage exige la sienne, et refuse de se replier sur une autre.
+"""Identités de connexion à la base (rôles PostgreSQL) : chaque usage exige la sienne, sans repli sur une autre.
 
-Les migrations se connectent sous le propriétaire du schéma, l'API sous son rôle restreint, le pipeline et les scripts en ligne de commande sous le leur. Chaque exigence tient au point d'usage, de sorte qu'un processus porte les seuls identifiants qu'il exerce.
+Les migrations se connectent sous le propriétaire du schéma, l'API sous son rôle restreint, le pipeline et les scripts en ligne de commande sous le rôle du pipeline. Un processus détient donc seulement les identifiants de son usage.
 """
 
 import pytest
@@ -12,7 +12,7 @@ from infrastructure.db.engine import db_url
 
 @pytest.fixture
 def db_settings(monkeypatch):
-    """Pose les trois identités, que chaque test dégrade sur un point."""
+    """Renseigne les trois identités ; chaque test en retire une partie."""
 
     def _apply(**overrides):
         defaults = {
@@ -24,8 +24,7 @@ def db_settings(monkeypatch):
             "db_pipeline_password": "pipeline-pw",
         }
         for name, value in {**defaults, **overrides}.items():
-            # Les mots de passe sont typés `SecretStr` : les poser en clair les rendrait
-            # inutilisables par le constructeur d'URL, qui lit par `.get_secret_value()`.
+            # Le constructeur d'URL lit les mots de passe par `.get_secret_value()` : ils sont typés `SecretStr`.
             posee = SecretStr(value) if name.endswith("_password") else value
             monkeypatch.setattr(engine_mod.settings, name, posee)
 
@@ -52,7 +51,7 @@ class TestIdentiteRetenue:
         assert url.password == "pipeline-pw"
 
     def test_le_pipeline_est_l_identite_par_defaut(self, db_settings):
-        """Le pipeline et les scripts sont les appelants les plus nombreux ; l'API et les migrations demandent la leur."""
+        """Sans identité demandée, la connexion se fait sous le rôle du pipeline ; l'API et les migrations demandent la leur."""
         db_settings()
         assert db_url().username == "bibliometrie_pipeline"
 
@@ -67,7 +66,7 @@ class TestRefusDUneIdentiteAbsente:
         ],
     )
     def test_une_identite_absente_est_refusee(self, db_settings, identite, reglage, variable):
-        """Se replier sur une autre ferait tourner un processus avec des droits qu'il n'exerce pas, sans que rien ne le signale."""
+        """Une identité sans nom d'utilisateur lève une erreur qui nomme la variable d'environnement manquante."""
         db_settings(**{reglage: ""})
         with pytest.raises(RuntimeError, match=variable):
             db_url(identite)
@@ -78,11 +77,11 @@ class TestRefusDUneIdentiteAbsente:
             db_url("app")
 
     def test_l_api_n_a_besoin_ni_du_proprietaire_ni_du_pipeline(self, db_settings):
-        """Le partage tient à cela : le conteneur qui sert l'API se passe des deux autres mots de passe."""
+        """Le conteneur qui sert l'API se passe des identifiants du propriétaire et du pipeline."""
         db_settings(db_owner_user="", db_owner_password="", db_pipeline_user="")
         assert db_url("app").username == "bibliometrie_app"
 
     def test_le_pipeline_n_a_pas_besoin_du_proprietaire(self, db_settings):
-        """Symétrique, et c'est l'objet du rôle : le conteneur qui exécute le pipeline ne porte plus le mot de passe capable de modifier la structure."""
+        """Le conteneur qui exécute le pipeline se passe du mot de passe qui permet de modifier le schéma."""
         db_settings(db_owner_user="", db_owner_password="")
         assert db_url("pipeline").username == "bibliometrie_pipeline"

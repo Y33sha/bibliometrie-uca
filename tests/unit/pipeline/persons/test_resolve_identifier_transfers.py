@@ -14,7 +14,7 @@ _OWNER, _OTHER, _THIRD = 1, 2, 3
 
 
 def _resolve(monkeypatch, votes: dict[int, int], status: str = "pending"):
-    """Arbitre un conflit : ORCID attribué à `_OWNER` avec le statut `status`, voix des groupes `votes`. Rend les compteurs, le dépôt simulé et les accès SQL simulés."""
+    """Arbitre un conflit : ORCID attribué à `_OWNER` avec le statut `status`, voix des groupes `votes`. Renvoie les compteurs, le dépôt simulé et les accès SQL simulés."""
     queries = MagicMock()
     queries.mark_identifier_contributions.return_value = 0
     monkeypatch.setattr(
@@ -58,7 +58,7 @@ def test_sans_voix_rien_ne_transfere(monkeypatch):
 
 
 def test_un_titulaire_confirme_n_est_jamais_transfere(monkeypatch):
-    """Un conflit confirmé par l'admin est tranché : il ne compte pas parmi les conflits à arbitrer."""
+    """Un identifiant confirmé par un administrateur reste à son titulaire : le conflit compte, sans arbitrage."""
     result, repo, queries = _resolve(monkeypatch, {_OWNER: 0, _OTHER: 5}, status="confirmed")
     assert result == {"conflicts": 1, "pending": 0, "transferred": 0}
     repo.find_identifier.assert_not_called()

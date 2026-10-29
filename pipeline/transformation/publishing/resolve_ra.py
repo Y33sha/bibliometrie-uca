@@ -112,9 +112,6 @@ def _resolve(
     return metrics
 
 
-# ── Câblage ───────────────────────────────────────────────────
-
-
 def build() -> Phase:
 
     # doi.org/ra est une API publique : l'adresse du polite pool y est facultative.

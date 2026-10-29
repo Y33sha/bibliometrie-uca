@@ -1,4 +1,4 @@
-"""Oneshot `apply_known_platforms` : type des plateformes et réconciliation des publications à préfixe de plateforme d'éditeurs."""
+"""Oneshot `apply_known_platforms` : type des plateformes, et mise en file des enregistrements sources dont le DOI a un préfixe de plateforme."""
 
 from sqlalchemy import text
 

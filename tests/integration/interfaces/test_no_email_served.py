@@ -1,6 +1,6 @@
-"""Les adresses électroniques du référentiel des personnels ne sortent par aucune lecture.
+"""Les adresses électroniques du référentiel des personnels sont absentes de toute réponse de l'API.
 
-`hr_records.email` est renseigné pour départager les homonymes au rattachement des contributions sources. Cet usage est interne au traitement : aucune réponse de l'API n'a à contenir cette valeur. Le contrat d'API et les couches qui le servent sont confrontés à cette règle, plutôt que de la laisser tenir à l'attention de qui ajoute un champ.
+`hr_records.email` sert seulement à départager les homonymes au rattachement des contributions sources. Les tests confrontent à cette règle le contrat d'API et les couches qui le servent.
 """
 
 import re
@@ -9,17 +9,17 @@ from infrastructure import PROJECT_ROOT
 from interfaces.api.app import app
 
 EMAIL_LIKE = re.compile(r"\b(e?[-_]?mails?|courriels?)\b", re.IGNORECASE)
-"""Ce qui nomme une adresse électronique, aux frontières de mot près : « maillon » n'en est pas une."""
+"""Motif qui nomme une adresse électronique, aux frontières de mot : « maillon » est exclu."""
 
 SERVING_LAYERS = (
     "infrastructure/read_models",
     "interfaces/api",
 )
-"""Couches qui composent une réponse de lecture : les modèles de réponse et le SQL qui les remplit, la surface HTTP."""
+"""Couches qui composent une réponse de lecture : modèles de réponse, SQL qui les remplit, surface HTTP."""
 
 
 def test_aucun_champ_du_contrat_d_api_ne_porte_une_adresse():
-    """Le schéma OpenAPI décrit tout ce que l'API rend : aucune propriété n'y nomme une adresse électronique."""
+    """Le schéma OpenAPI décrit tout ce que l'API renvoie : aucune propriété n'y nomme une adresse électronique."""
     schemas = app.openapi()["components"]["schemas"]
     fautifs = [
         f"{nom}.{propriete}"
@@ -33,7 +33,7 @@ def test_aucun_champ_du_contrat_d_api_ne_porte_une_adresse():
 
 
 def test_aucune_couche_de_lecture_ne_nomme_la_colonne():
-    """La colonne n'est lue nulle part sur le chemin d'une réponse — ni en SQL, ni dans un DTO, ni dans un router."""
+    """Aucun fichier des couches de lecture (SQL, DTO, router) ne mentionne une adresse électronique."""
     fautifs = [
         f"{chemin.relative_to(PROJECT_ROOT)}:{numero}"
         for couche in SERVING_LAYERS

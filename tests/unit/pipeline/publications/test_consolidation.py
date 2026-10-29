@@ -1,6 +1,6 @@
 """Tests unitaires du recalcul d'une publication (`pipeline/transformation/publications/consolidation.py`).
 
-Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `serial_id` de la publication peuvent venir de `source_records` différentes. Une correction qui dépend de la revue, appliquée à chaque source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
+Correction du `doc_type` rejouée sur la publication (`_apply_canonical_doc_type_correction`). Le `doc_type` et le `serial_id` de la publication viennent parfois d'enregistrements sources différents. Une correction qui dépend de la revue, appliquée à chaque enregistrement source, ignore la revue retenue pour la publication. Le rejeu l'applique à cette revue.
 """
 
 from domain.publications.identifiers import DOI
@@ -23,8 +23,7 @@ def _publication(**overrides: object) -> Publication:
 
 
 def test_serial_type_media_decoupling_is_repaired():
-    # doc_type arbitré = preprint (d'un enregistrement source sans journal), serial_id arbitré = un journal média
-    # (d'une autre enregistrement source) : la re-correction applique SERIAL_TYPE_MEDIA_TO_MEDIA au journal résolu.
+    # doc_type retenu : preprint, d'un enregistrement source sans revue ; serial_id retenu : une revue de type média, d'un autre enregistrement source. Le rejeu applique SERIAL_TYPE_MEDIA_TO_MEDIA à cette revue.
     publication = _publication(doc_type="preprint", serial_id=7)
     _apply_canonical_doc_type_correction(publication, serial_type="media")
     assert publication.doc_type == "media"
@@ -41,7 +40,7 @@ def test_no_serial_type_no_change():
 
 
 def test_serial_type_without_rule_leaves_doc_type():
-    # serial_type='journal' : aucune règle journal-dépendante → pas de correction.
+    # Aucune règle ne dépend d'une revue de type journal : aucune correction.
     publication = _publication(doc_type="preprint", serial_id=7)
     _apply_canonical_doc_type_correction(publication, serial_type="journal")
     assert publication.doc_type == "preprint"
@@ -49,7 +48,7 @@ def test_serial_type_without_rule_leaves_doc_type():
 
 
 def test_full_cascade_replayed_thesis_with_publisher_doi():
-    # La re-correction rejoue toute la cascade : thèse + serial_id + DOI éditeur → article.
+    # Le rejeu reprend toutes les règles : une thèse avec revue et DOI d'éditeur devient un article.
     publication = _publication(doc_type="thesis", serial_id=7, doi=DOI("10.1016/j.ex.2020.01.001"))
     _apply_canonical_doc_type_correction(publication, serial_type="journal")
     assert publication.doc_type == "article"

@@ -1,6 +1,6 @@
 """Orchestrateur de la phase `affiliations` : enchaînement des trois sous-étapes.
 
-La phase rafraîchit le périmètre, résout les adresses, puis pose `in_perimeter`. Deux propriétés tiennent son contrat : chaque sous-étape ouvre sa propre transaction, et le périmètre est lu une fois après le rafraîchissement puis passé aux deux sous-étapes suivantes — le relire donnerait deux résultats sur un périmètre qui vient de changer.
+La phase rafraîchit le périmètre, résout les adresses, puis pose `in_perimeter`. Chaque sous-étape ouvre sa propre transaction. Le périmètre est lu une fois, après le rafraîchissement, et passé aux deux sous-étapes suivantes.
 """
 
 from unittest.mock import patch

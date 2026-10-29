@@ -1,11 +1,10 @@
 """Tests unitaires de `pipeline.ingestion.wos.normalize`.
 
 Couvre :
-- Helpers purs (`_safe_list`, `_get_api_title`, `_parse_api_authors`, `_get_api_doi`, `_get_api_issn`).
-- `extract_from_api` : extraction depuis la structure WoS Expanded API (static_data/dynamic_data imbriqués) avec ses nombreuses branches (dict vs list, doctypes, biblio, abstract, keywords, topics, citations).
-- `get_container_facts`, `wos_source_record` : propagation des champs.
-- `build_wos_author_records` : filtre `is_wos_author_usable`, construction des `AuthorRecord` (researcher_id, adresses ; l'ORCID WoS n'est pas moissonné), warning si tout rejeté.
-- `WosNormalizer` : UT lu depuis la ligne de staging, éditeur, entrée `source_records` construite avec les conteneurs.
+- les fonctions de lecture d'une réponse de l'API WoS Expanded (`static_data` et `dynamic_data` imbriqués, valeur en dict ou en liste) et d'une ligne d'export tabulé ;
+- `get_container_facts` et `wos_source_record` ;
+- `build_wos_author_records` : auteurs exploitables, identifiants et adresses, avertissement quand aucun auteur n'est exploitable ;
+- `WosNormalizer` : UT lu dans la ligne de staging, éditeur, enregistrement source construit avec les conteneurs.
 
 La séquence d'écriture commune à toutes les sources est testée avec la classe de base.
 """
@@ -35,9 +34,7 @@ from pipeline.ingestion.wos.normalize import (
     wos_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import (
-    staging_row,
-)
+from tests.helpers.normalize_doubles import identifier_values, staging_row
 
 # ── _safe_list ───────────────────────────────────────────────────
 
@@ -50,7 +47,7 @@ class TestSafeList:
         assert _safe_list([1, 2, 3]) == [1, 2, 3]
 
     def test_dict_wrapped_in_list(self):
-        """WoS API renvoie parfois un dict scalar au lieu d'une liste à 1 élément."""
+        """L'API WoS renvoie parfois un dict seul à la place d'une liste d'un élément."""
         d = {"key": "value"}
         assert _safe_list(d) == [d]
 
@@ -149,7 +146,7 @@ class TestGetApiIssn:
         assert _get_api_issn(dynamic, "issn") is None
 
     def test_empty_string_returns_none(self):
-        """Strip + or-none : un ISSN vide ne doit pas être renvoyé."""
+        """Un ISSN fait d'espaces donne None."""
         dynamic = {
             "cluster_related": {"identifiers": {"identifier": [{"type": "issn", "value": "  "}]}}
         }
@@ -236,7 +233,7 @@ class TestParseApiAuthors:
 
         assert len(authors) == 1
         a = authors[0]
-        assert a["position"] == 0  # seq_no=1 → position=0
+        assert a["position"] == 0  # seq_no 1 donne la position 0
         assert a["full_name"] == "Jane Doe"
         assert a["daisng_id"] == "DAIS-1"
 
@@ -245,7 +242,7 @@ class TestParseApiAuthors:
             "summary": {
                 "names": {
                     "name": [
-                        {"seq_no": 1, "full_name": "No Role"},  # pas de role
+                        {"seq_no": 1, "full_name": "No Role"},  # sans rôle
                         _make_author_name(seq_no=2, full_name="With Role"),
                     ]
                 }
@@ -278,7 +275,7 @@ class TestParseApiAuthors:
         assert authors[0]["full_name"] == "Doe, J."
 
     def test_orcid_not_harvested_from_data_item_ids(self):
-        """L'ORCID WoS (`PreferredORCID`) n'est pas moissonné (source trop peu fiable)."""
+        """L'ORCID WoS (`PreferredORCID`), attribué par le matching interne de Web of Science, reste hors de la moisson."""
         static = {
             "summary": {"names": {"name": [_make_author_name(orcid="0000-0001-2345-6789")]}},
             "fullrecord_metadata": {"addresses": {}},
@@ -504,7 +501,7 @@ class TestExtractFromApi:
 
     def test_fallback_to_staging_doi_when_api_missing(self):
         raw = _make_api_record()
-        # Retirer le DOI de l'API.
+        # Réponse de l'API sans DOI.
         raw["dynamic_data"]["cluster_related"]["identifiers"]["identifier"] = [
             {"type": "issn", "value": "0000-1111"}
         ]
@@ -540,7 +537,7 @@ class TestExtractFromApi:
         assert rec["doc_type"] == "other"
 
     def test_publisher_full_name_fallback(self):
-        """Quand `unified_name` est absent, on utilise `full_name`."""
+        """Sans `unified_name`, l'éditeur prend `full_name`."""
         raw = _make_api_record(publisher_name=None)
         raw["static_data"]["summary"]["publishers"] = {
             "publisher": {"names": {"name": {"full_name": "Fallback Press"}}}
@@ -602,7 +599,7 @@ class TestExtractFromApi:
         assert rec["biblio"] is None
 
     def test_biblio_publisher_and_journal_extracted(self):
-        """publisher + journal bruts ajoutés à biblio en parallèle des find_or_create_*."""
+        """Le nom de l'éditeur et la revue, tels que WoS les donne, figurent dans `biblio`."""
         raw = _make_api_record(
             vol=None,
             issue=None,
@@ -624,7 +621,7 @@ class TestExtractFromApi:
         }
 
     def test_page_as_string_ignored(self):
-        """L'API peut renvoyer `page` comme str (cas dégénéré) — pas de first_page/last_page produit."""
+        """Une `page` en chaîne est ignorée : ni première ni dernière page."""
         raw = _make_api_record(
             vol="1", issue=None, publisher_name=None, journal_title=None, issn=None, eissn=None
         )
@@ -685,7 +682,7 @@ class TestExtractFromApi:
         assert rec["topics"] is None
 
     def test_cited_by_count_invalid_value(self):
-        """Si `local_count` n'est pas castable en int → None."""
+        """Un `local_count` non numérique donne None."""
         raw = _make_api_record()
         raw["dynamic_data"]["citation_related"]["tc_list"]["silo_tc"] = [
             {"coll_id": "WOK", "local_count": "notanumber"}
@@ -842,7 +839,7 @@ class TestWosSourceRecord:
         )
 
         assert row_arg.source_id == "WOS:1"
-        assert row_arg.doi == "10.1/x"
+        assert identifier_values(row_arg)["doi"] == ["10.1/x"]
         assert row_arg.title == "T"
         assert row_arg.publication_year == 2024
         assert row_arg.raw_doc_type == "article"
@@ -861,7 +858,7 @@ class TestWosSourceRecord:
 
         assert row_arg.serial_id is None
         assert row_arg.oa_status is None
-        assert row_arg.doi is None
+        assert "doi" not in identifier_values(row_arg)
 
     def test_container_title_absent_with_serial_id(self):
         rec = {
@@ -882,7 +879,7 @@ class TestWosSourceRecord:
         assert row_arg.container_title is None
 
     def test_container_title_falls_back_when_no_serial_id(self):
-        """Sans `serial_id` (titre non matché), `journal_title` devient le `container_title`."""
+        """Sans revue identifiée, `journal_title` devient le `container_title`."""
         rec = {
             "ut": "WOS:1",
             "title": "T",
@@ -899,7 +896,7 @@ class TestWosSourceRecord:
         assert row_arg.container_title == "Container Title"
 
 
-# ── build_wos_author_records (parsing pur) ───────────────────────
+# ── build_wos_author_records ───────────────────────
 
 
 class TestBuildWosAuthorRecords:
@@ -907,7 +904,7 @@ class TestBuildWosAuthorRecords:
         assert build_wos_author_records({"ut": "WOS:1", "authors": []}, logger) == []
 
     def test_all_authors_filtered_logs_warning(self, logger, caplog):
-        """Auteurs présents à l'extraction mais aucun exploitable → warning."""
+        """Des auteurs présents dans la réponse, aucun exploitable : avertissement au journal."""
         rec = {"ut": "WOS:42", "authors": [], "authors_found": 1}
         with caplog.at_level(logging.WARNING, logger=logger.name):
             records = build_wos_author_records(rec, logger)
@@ -964,7 +961,7 @@ class TestBuildWosAuthorRecords:
         assert rec0.name == ContributorName(raw="Jane Doe")
         assert rec0.is_corresponding is True
         assert rec0.roles == ["author"]
-        # `researcher_id` porté ; l'ORCID WoS en entrée est ignoré (non moissonné).
+        # `researcher_id` est retenu ; l'ORCID WoS en entrée est ignoré.
         assert rec0.identifiers == {"researcher_id": "R-1"}
         assert [a.text for a in rec0.addresses] == ["addr-X"]
 

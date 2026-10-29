@@ -1,70 +1,50 @@
-"""Le type d'une donnée JSON, et sa lecture.
+"""Type d'une donnée JSON, et accesseurs typés.
 
-`JsonValue` décrit ce qu'une source externe ou une colonne JSONB peut porter. Les branches conteneur sont `Sequence` et `Mapping` (covariants) : un caller peut passer un `dict[str, str]` ou un `list[int]` là où on attend du JSON. Les consommateurs ne mutent pas le payload.
-
-Les accesseurs qui suivent ramènent une valeur JSON à la forme que le code attend, ou à rien. Une donnée reçue de l'extérieur n'a en effet pas la forme annoncée par contrat mais celle qu'elle a : un champ documenté comme texte arrive parfois en liste, en nombre, ou absent. Y accéder sans vérifier marche jusqu'au payload qui déroge, et lève alors au milieu d'un moissonnage. Ces fonctions rendent le contrôle explicite et uniforme, là où chaque lecture le refaisait à sa façon — ou l'omettait.
-
-Le repli est la valeur vide plutôt qu'une erreur : un enregistrement source mal formé sur un champ ne doit pas interrompre la lecture des autres. C'est au niveau de l'enregistrement source que l'appelant décide si ce qui manque le rend inexploitable.
-
-Alias récursif en syntaxe PEP 695 (`type X = ...`, évaluation paresseuse).
+Une source renvoie parfois un champ sous une autre forme que celle documentée : une liste, un nombre ou rien au lieu d'un texte. Chaque accesseur renvoie la valeur au type attendu, ou une valeur vide (`None`, objet vide, liste vide). Un champ mal formé laisse donc lisible le reste de l'enregistrement source.
 """
 
 from collections.abc import Mapping, Sequence
 
+# Conteneurs en `Sequence` et `Mapping`, covariants : un `dict[str, str]` ou une `list[int]` s'y passent. Les consommateurs ne modifient pas la valeur.
 type JsonValue = str | int | float | bool | None | Sequence[JsonValue] | Mapping[str, JsonValue]
 
 
 def as_str(value: JsonValue) -> str | None:
-    """Chaîne portée par `value`, ou `None` si elle n'en porte pas.
-
-    Aucune conversion : un nombre reçu là où un texte est attendu signale une donnée d'une autre nature, non un texte à fabriquer.
-    """
+    """`value` si c'est une chaîne, sinon `None`, même pour un nombre."""
     return value if isinstance(value, str) else None
 
 
 def as_text(value: JsonValue) -> str | None:
-    """Chaîne de `value` sans les espaces qui l'entourent, ou `None` si `value` n'est pas une chaîne ou se réduit à des espaces."""
+    """Comme `as_str`, sans les espaces qui entourent la chaîne ; `None` pour une chaîne vide ou blanche."""
     return (as_str(value) or "").strip() or None
 
 
 def as_int(value: JsonValue) -> int | None:
-    """Entier porté par `value`, ou `None` si elle n'en porte pas.
-
-    Un booléen est écarté : Python le tient pour un entier, mais `true` reçu là où un compte est attendu ne vaut pas 1.
-    """
+    """`value` si c'est un entier, sinon `None`, même pour un booléen."""
     if isinstance(value, bool):
         return None
     return value if isinstance(value, int) else None
 
 
 def as_float(value: JsonValue) -> float | None:
-    """Nombre porté par `value`, ou `None` si elle n'en porte pas. Un entier est converti en flottant, un booléen écarté."""
+    """`value` en flottant si c'est un nombre, sinon `None`, même pour un booléen."""
     if isinstance(value, bool):
         return None
     return float(value) if isinstance(value, int | float) else None
 
 
 def as_bool(value: JsonValue) -> bool | None:
-    """Booléen porté par `value`, ou `None` si elle n'en porte pas.
-
-    Aucune conversion : `0`, `"false"` ou une chaîne vide reçus là où un booléen est attendu signalent une donnée d'une autre nature.
-    """
+    """`value` si c'est un booléen, sinon `None`, même pour `0` ou `"false"`."""
     return value if isinstance(value, bool) else None
 
 
 def as_mapping(value: JsonValue) -> Mapping[str, JsonValue]:
-    """Objet porté par `value`, ou un objet vide.
-
-    Le repli permet d'enchaîner la lecture d'un champ imbriqué sans vérifier chaque niveau : un objet vide rend `None` sur n'importe quelle clé.
-    """
+    """`value` si c'est un objet, sinon un objet vide. Les lectures imbriquées s'enchaînent donc sans vérification."""
     return value if isinstance(value, Mapping) else {}
 
 
 def at_path(root: JsonValue, *keys: str) -> Mapping[str, JsonValue]:
-    """Objet atteint en descendant `keys` depuis `root`, ou un objet vide.
-
-    Certaines sources nichent leurs champs sous plusieurs niveaux d'objets, dont chacun peut manquer. Descendre par cette fonction évite de le vérifier niveau par niveau.
-    """
+    """Objet atteint en descendant `keys` depuis `root`, ou un objet vide si un niveau manque."""
     courant = as_mapping(root)
     for cle in keys:
         courant = as_mapping(courant.get(cle))
@@ -72,18 +52,12 @@ def at_path(root: JsonValue, *keys: str) -> Mapping[str, JsonValue]:
 
 
 def as_sequence(value: JsonValue) -> Sequence[JsonValue]:
-    """Liste portée par `value`, ou une liste vide.
-
-    Une chaîne en est écartée : Python la tient pour une suite de caractères, ce qu'un champ JSON n'entend jamais dire.
-    """
+    """`value` si c'est une liste, sinon une liste vide, même pour une chaîne."""
     if isinstance(value, (str, Mapping)):
         return []
     return value if isinstance(value, Sequence) else []
 
 
 def as_strs(value: JsonValue) -> list[str]:
-    """Chaînes non vides portées par la liste `value`.
-
-    Sert les champs qui énumèrent du texte — mots-clés, codes de collection, pays. Un élément d'une autre nature est écarté comme le serait la valeur seule.
-    """
+    """Chaînes non vides de la liste `value` ; les autres éléments sont écartés."""
     return [texte for element in as_sequence(value) if (texte := as_str(element))]

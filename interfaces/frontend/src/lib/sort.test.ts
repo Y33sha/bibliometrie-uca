@@ -13,7 +13,7 @@ describe('nextSort', () => {
 	});
 
 	// Régression : le clic sur un en-tête envoyait la colonne sans sens (`sort=serials`), que l'API refuse.
-	it('rend toujours une clé suffixée du sens', () => {
+	it('renvoie toujours une clé suffixée du sens', () => {
 		expect(nextSort('serials', 'serials', 'desc')).toBe('serials_desc');
 	});
 
@@ -28,7 +28,7 @@ describe('sortDirection', () => {
 		expect(sortDirection('year_asc', 'year')).toBe('asc');
 	});
 
-	it('rend null pour une autre colonne', () => {
+	it('renvoie null pour une autre colonne', () => {
 		expect(sortDirection('year_desc', 'title')).toBeNull();
 	});
 });

@@ -1,7 +1,4 @@
-"""Règles de la fusion manuelle de publications.
-
-Deux publications à DOI distincts ne fusionnent pas. Avant la fusion, chaque contribution source a la personne et le mode de rattachement de sa contribution. Après le réalignement, une contribution reçoit la personne de ses contributions sources, avec le mode le plus prioritaire (`MATCH_REASON_PRIORITY`). Une contribution dont les contributions sources désignent deux personnes est en conflit : elle reste sans personne. Une personne désignée par plusieurs contributions revient à la mieux appuyée (`settle_publication`).
-"""
+"""Règles de la fusion manuelle de publications."""
 
 from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
@@ -44,7 +41,9 @@ class MergedAttributions:
 def merge_attributions(
     previous: Mapping[int, Attribution], contributions: Mapping[int, Collection[int]]
 ) -> MergedAttributions:
-    """Attributions des contributions réalignées.
+    """Attributions des contributions réalignées après la fusion.
+
+    Une contribution reçoit la personne de ses contributions sources, avec le mode de rattachement le plus prioritaire (`MATCH_REASON_PRIORITY`). Une contribution dont les contributions sources désignent deux personnes est en conflit, et reste sans personne. Une personne désignée par plusieurs contributions revient à la mieux appuyée (`settle_publication`).
 
     `previous` : attribution avant la fusion de chaque contribution source dont la contribution a une personne. `contributions` : contributions sources de chaque contribution réalignée.
     """

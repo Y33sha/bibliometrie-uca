@@ -192,6 +192,70 @@ APRÈS :
     - **Licence** : licence de la localisation principale (`primary_location`)
 
 
+## Micro-détail que l'interface ou le code montre
+
+La documentation sert à l'onboarding. Ce qu'un nouveau venu apprend en explorant l'interface ou en lisant une docstring ne s'y écrit pas : le supprimer, sans le déplacer ailleurs.
+
+AVANT :
+    **Administration**, en session d'administration. La barre de navigation passe en clair et propose le menu Administration :
+
+APRÈS :
+    **Administration**, en session d'administration :
+
+AVANT :
+    Les captures d'écran se refont avec `python -m interfaces.cli.dev.screenshots`, l'application en cours d'exécution.
+
+APRÈS :
+    (rien)
+
+## Définition qui mêle l'essentiel et l'accidentel
+
+Une définition dit ce qu'est l'entité. La façon dont elle est alimentée (saisie à la main, import, calcul) est un détail d'implémentation : elle va ailleurs, ou nulle part.
+
+AVANT :
+    | structure | `structures` | Établissement, laboratoire, site ou service, saisi à la main |
+
+APRÈS :
+    | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
+
+## Étapes numérotées
+
+Le titre d'une étape la nomme ; un numéro n'apporte rien quand l'ordre se lit déjà dans la suite des paragraphes.
+
+AVANT :
+    **Étape 1 — `fetch_missing.hal_by_id` et `fetch_missing.scanr_by_hal_id` : documents manquants, par hal-id.**
+
+APRÈS :
+    **`fetch_missing.hal_by_id` et `fetch_missing.scanr_by_hal_id` : documents manquants, par hal-id.**
+
+## Personnification du code
+
+Une phase, un module ou une étape ne « cherche » ni n'« essaie ». Quand l'action est celle du processus, « on » suffit.
+
+AVANT :
+    On essaie donc de retrouver dans chaque source les documents trouvés seulement dans les autres.
+
+APRÈS :
+    On cherche donc dans chaque source les documents trouvés seulement dans les autres.
+
+## Mot qui fait poser une question au lecteur
+
+Relire hors du contexte du projet. Un mot qui fait poser une question (meilleure selon quel critère ? lequel parmi d'autres ?) se remplace par un mot plus simple qui ne la pose pas.
+
+AVANT :
+    Le bouton « Accéder » mène à la meilleure copie ouverte, à défaut au DOI.
+
+APRÈS :
+    Le bouton « Accéder » mène au texte intégral, à défaut au DOI.
+
+Une sélection sans critère fait aussi poser la question « pourquoi ceux-là ? ». Citer quelques éléments d'une liste parce qu'ils ont un lien vers le glossaire n'est pas un critère : supprimer.
+
+AVANT :
+    Les filtres couvrent notamment le paiement d'[APC](../../glossaire.md#apc), la [voie *open access*](../../glossaire.md#voies-open-access) et les [organisations partenaires](../../glossaire.md#organisation-partenaire).
+
+APRÈS :
+    (rien)
+
 ## Décision énoncée sans sa raison
 
 Une décision négative nue en dit trop ou trop peu : le lecteur se demande pourquoi. Donner la raison en une proposition, ou supprimer la phrase.

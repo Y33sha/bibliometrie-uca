@@ -1,4 +1,4 @@
-"""Adapter PostgreSQL sync pour les 3 tables du concept Structure."""
+"""Repository PostgreSQL de l'agrégat Structure : structures, tutelles et formes de nom."""
 
 from typing import NamedTuple, cast
 
@@ -64,7 +64,7 @@ class _StructureRow(NamedTuple):
 
 
 def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameForm:
-    """Mapping d'une row `structure_name_forms` SQL vers le VO."""
+    """Forme de nom de domaine d'une ligne de `structure_name_forms`."""
     return StructureNameForm(
         form_text=row.form_text,
         is_word_boundary=row.is_word_boundary,
@@ -74,9 +74,9 @@ def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameFo
 
 
 def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm, ...]) -> Structure:
-    """Mapping d'une row `structures` SQL vers l'aggregate `Structure`.
+    """Structure de domaine d'une ligne de `structures`, avec ses formes de nom, chargées à part par `find_by_id`.
 
-    Reçoit la liste hydratée des `name_forms` (chargée à part par `find_by_id`). Les VOs `ror_id` et `hal_collection` sont parsés en strict (`RorId(...)` / `HalCollection(...)`) : une valeur en base au format non canonique lève `ValidationError` à l'hydratation, signalant une corruption à investiguer sur une base censée normalisée.
+    Le ROR et la collection HAL se lisent en strict : une valeur mal normalisée en base lève `ValidationError`, et signale une corruption.
     """
     return Structure(
         id=row.id,
@@ -93,13 +93,9 @@ def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm,
 
 
 def _normalize_api_ids(raw: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
-    """Valide et normalise `api_ids` via le modèle JSONB StructureApiIds.
+    """Forme normalisée de `api_ids` (`StructureApiIds`), ou `None` pour une entrée vide. Lève `ValidationError` si le schéma est violé.
 
-    - Entrée : dict brut (côté API admin) ou None.
-    - Sortie : dict canonique prêt JSONB, ou None si l'entrée est vide/None.
-    - Lève `domain.errors.ValidationError` si le schéma est violé.
-
-    La validation vit côté repo (frontière infra→DB) : tout chemin d'écriture passe par ici, y compris les scripts CLI qui court-circuitent la couche application.
+    La validation se fait dans le repository : toute écriture y passe, y compris celle des scripts qui contournent la couche application.
     """
     if not raw:
         return None
@@ -115,7 +111,7 @@ class PgStructureRepository(StructureRepository):
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Chargement de l'aggregate ──────────────────────────────────
+    # ── Chargement ─────────────────────────────────────────────────
 
     def find_by_id(self, structure_id: int) -> Structure | None:
         row = self._conn.execute(
@@ -150,7 +146,7 @@ class PgStructureRepository(StructureRepository):
     # ── structures ─────────────────────────────────────────────────
 
     def add(self, structure: Structure) -> int:
-        """Insère une structure neuve et retourne son id. Canonise `api_ids` (validation du schéma JSONB), posé sous sa forme canonique sur l'entité."""
+        """Insère une structure et renvoie son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
         structure.api_ids = _normalize_api_ids(structure.api_ids)
         return scalar_int(
             self._conn.execute(
@@ -172,7 +168,7 @@ class PgStructureRepository(StructureRepository):
         )
 
     def save(self, structure: Structure) -> None:
-        """Persiste une structure chargée : UPDATE de ses champs éditables (`code` immuable exclu). Canonise `api_ids`. Lève `NotFoundError` si l'id est absent."""
+        """Écrit les champs modifiables d'une structure chargée ; le code reste. `api_ids` est validé. Lève `NotFoundError` si l'id est absent."""
         structure.api_ids = _normalize_api_ids(structure.api_ids)
         result = self._conn.execute(
             update(structures)
@@ -227,7 +223,7 @@ class PgStructureRepository(StructureRepository):
     # ── structure_parents ─────────────────────────────────────────
 
     def get_ancestor_ids(self, structure_id: int) -> frozenset[int]:
-        # Remontée récursive `child → parent` à travers `structure_parents`. `structure_id` lui-même est exclu du résultat.
+        # Remontée récursive `child → parent` à travers `structure_parents`. Le résultat est sans `structure_id` lui-même.
         stmt = text(
             """
             WITH RECURSIVE ancestors(id) AS (

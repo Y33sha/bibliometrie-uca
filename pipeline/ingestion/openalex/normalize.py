@@ -1,4 +1,4 @@
-"""Normalisation des données OpenAlex : staging → tables structurées."""
+"""Normalisation des enregistrements sources OpenAlex."""
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
@@ -63,10 +63,6 @@ from pipeline.ingestion.openalex.payload import (
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
-
-# =============================================================
-# UTILITAIRES
-# =============================================================
 
 
 def extract_locations_data(
@@ -169,10 +165,7 @@ def _repository(source: Mapping[str, JsonValue]) -> PlatformFacts | None:
 
 
 def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str | None:
-    """Reconstruit le texte de l'abstract depuis l'inverted index OpenAlex.
-
-    Le format est {mot: [positions]} → on reconstitue le texte en ordre.
-    """
+    """Résumé reconstitué depuis l'index inversé d'OpenAlex (`{mot: [positions]}`)."""
     if not inverted_index:
         return None
     positions: dict[int, str] = {}
@@ -186,7 +179,7 @@ def reconstruct_abstract(inverted_index: Mapping[str, JsonValue] | None) -> str 
 
 
 def extract_topics(work: Mapping[str, JsonValue]) -> list[dict[str, JsonValue]] | None:
-    """Extrait les topics OpenAlex sous forme de liste simplifiée."""
+    """Topics OpenAlex, en liste simplifiée."""
     topics: list[dict[str, JsonValue]] = []
     for entry in as_sequence(work.get("topics")):
         t = as_mapping(entry)
@@ -212,11 +205,6 @@ def extract_impact(work: Mapping[str, JsonValue]) -> Impact:
         top_10_percent=as_bool(percentile.get("is_in_top_10_percent")),
         top_1_percent=as_bool(percentile.get("is_in_top_1_percent")),
     )
-
-
-# =============================================================
-# PUBLISHERS & SERIALS
-# =============================================================
 
 
 def get_publisher(work: Mapping[str, JsonValue]) -> PublisherFacts | None:
@@ -262,11 +250,6 @@ def get_container_facts(work: Mapping[str, JsonValue]) -> ContainerDescription:
     )
 
 
-# =============================================================
-# SOURCE DOCUMENTS (OPENALEX)
-# =============================================================
-
-
 def get_title(work: Mapping[str, JsonValue]) -> str | None:
     """Titre du work, ou à défaut son `display_name`."""
     return as_str(work.get("title")) or as_str(work.get("display_name"))
@@ -296,8 +279,7 @@ def openalex_source_record(  # noqa: C901
 
     is_retracted = bool(work.get("is_retracted"))
 
-    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme, en parallèle des publishers/serials créés via find_or_create_*.
-    # Mêmes critères que la création : l'éditeur et la revue sont ignorés pour une primary location qui héberge le work sans le publier (HAL, theses.fr, Zenodo, etc.), la revue pour une plateforme d'ebooks.
+    # Numérotation, éditeur et revue tels qu'OpenAlex les nomme. Comme à la création, l'éditeur et la revue sont écartés pour une localisation principale qui héberge le work sans le publier (HAL, theses.fr, Zenodo…), la revue pour une plateforme d'ebooks.
     raw_biblio = as_mapping(work.get("biblio"))
     primary_source = as_mapping(as_mapping(work.get("primary_location")).get("source"))
     publisher_source = primary_source if names_publisher(primary) else {}
@@ -334,7 +316,6 @@ def openalex_source_record(  # noqa: C901
         source="openalex",
         source_id=openalex_id,
         staging_id=staging_id,
-        doi=doi,
         identifiers=openalex_identifiers(location_identifiers, doi, primary),
         title=get_title(work) or "",
         publication_year=get_publication_year(work),
@@ -363,28 +344,20 @@ def openalex_source_record(  # noqa: C901
     )
 
 
-# =============================================================
-# OPENALEX AUTHORS — identifiants sur source_contributions
-# =============================================================
-# Les entités auteurs OpenAlex sont algorithmiques et non fiables, on garde uniquement l'ORCID quand présent, dans les informations du contributeur (contributor_information.identifiers).
+# Les entités auteurs d'OpenAlex sont calculées et peu fiables : seul l'ORCID déposé est gardé, dans les informations du contributeur.
 
 
 def _extract_openalex_orcid(authorship: Mapping[str, JsonValue]) -> str | None:
-    """Extrait l'ORCID déposé par l'auteur sur l'authorship (`raw_orcid`).
+    """ORCID que l'auteur a déposé sur son `authorship` (`raw_orcid`).
 
-    OpenAlex porte deux ORCID par authorship, de provenances opposées :
+    OpenAlex donne deux ORCID par `authorship` :
 
-    - `raw_orcid` (niveau authorship) : recopié tel quel de la métadonnée brute du work telle qu'ingérée par OpenAlex depuis sa source amont (Crossref pour l'essentiel des articles à éditeur). C'est l'ORCID déposé par l'auteur à la soumission — fiable au même titre qu'un ORCID Crossref.
-    - `author.orcid` (niveau entité auteur OpenAlex) : ORCID de l'entité désambiguïsée par le clustering nom × affiliation d'OpenAlex, régulièrement fautif.
+    - `raw_orcid` recopie la métadonnée du work que donne la source amont d'OpenAlex, Crossref pour la plupart des articles d'éditeur. C'est l'ORCID déposé à la soumission, aussi fiable qu'un ORCID Crossref.
+    - `author.orcid` est l'ORCID de l'entité auteur qu'OpenAlex désambiguïse par nom et affiliation, souvent fautive.
 
-    On retient `raw_orcid` et on ignore `author.orcid`.
+    Seul `raw_orcid` est retenu.
     """
     return as_str(authorship.get("raw_orcid"))
-
-
-# =============================================================
-# OPENALEX AUTHORSHIPS
-# =============================================================
 
 
 def _countries(institutions: Iterable[Mapping[str, JsonValue]]) -> list[str] | None:
@@ -406,14 +379,14 @@ def _rors(institutions: Iterable[Mapping[str, JsonValue]]) -> frozenset[RorId]:
 
 
 def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorRecord]:
-    """Parse les authorships d'un work OpenAlex en `AuthorRecord` (sans I/O).
+    """Contributions sources des `authorships` d'un work OpenAlex.
 
     - nom brut : `raw_author_name`, le nom tel qu'imprimé, `author.display_name` étant celui de l'auteur désambiguïsé ;
     - ORCID déposé (`raw_orcid`) sur `identifiers` ;
     - adresses : les `raw_affiliation_strings` ;
     - pays d'une adresse : `country_code` des institutions que `affiliations` relie à son texte ;
     - ROR des institutions : sur l'adresse dont le texte les désigne, sur la contribution source pour les autres ;
-    - `roles=['author']` explicite (OpenAlex ne distingue pas les rôles).
+    - rôle toujours `author` : OpenAlex ne distingue pas les rôles.
     """
     authorships = [as_mapping(a) for a in as_sequence(work.get("authorships"))]
     ids_by_position = [
@@ -424,7 +397,7 @@ def build_openalex_author_records(work: Mapping[str, JsonValue]) -> list[AuthorR
     for position, authorship in enumerate(authorships):
         name = ContributorName.from_raw(as_str(authorship.get("raw_author_name")))
         if name is None:
-            # Sans nom, l'authorship est inexploitable pour le matching personnes.
+            # Sans nom, l'`authorship` est inexploitable pour la résolution des personnes.
             continue
 
         institutions = {

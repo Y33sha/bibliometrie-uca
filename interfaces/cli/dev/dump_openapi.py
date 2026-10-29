@@ -1,7 +1,7 @@
 # STATUS: recurring (dev)
-"""Dump le schéma OpenAPI de l'API FastAPI vers un fichier JSON.
+"""Écrit le schéma OpenAPI de l'API FastAPI dans un fichier JSON.
 
-Utilisé pour alimenter `openapi-typescript` (génération des types côté frontend) sans exiger un backend en cours d'exécution. Lancé par le script npm `types:gen` (cf. `interfaces/frontend/package.json`).
+Le fichier alimente `openapi-typescript`, qui génère les types du frontend, sans API lancée. Le script npm `types:gen` (`interfaces/frontend/package.json`) l'appelle.
 
 Usage :
     python -m interfaces.cli.dev.dump_openapi [output_path]

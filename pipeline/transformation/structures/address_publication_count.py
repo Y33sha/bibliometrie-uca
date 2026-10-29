@@ -1,13 +1,10 @@
-"""Recalcul du cache `addresses.publication_count`, en fin de phase `contributions`."""
+"""Nombre de publications de chaque adresse (`addresses.publication_count`), recalculé en fin de phase `finalize`."""
 
 from sqlalchemy import Connection, text
 
 
 def recompute_address_publication_count(conn: Connection) -> int:
-    """Recalcule `addresses.publication_count` sur **toutes** les adresses, depuis les publications du référentiel liées par `source_contribution_addresses`. Retourne le nombre de lignes modifiées.
-
-    Idempotent, et de portée globale : une adresse qui a perdu tous ses liens repasse à 0.
-    """
+    """Recalcule le nombre de publications de chaque adresse, d'après les enregistrements sources de ses contributions sources. Une adresse sans publication repasse à 0. Renvoie le nombre d'adresses modifiées."""
     return conn.execute(
         text("""
             UPDATE addresses a

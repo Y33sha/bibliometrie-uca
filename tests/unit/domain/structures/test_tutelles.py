@@ -1,4 +1,4 @@
-"""Tests des règles métier sur `structure_parents`."""
+"""Création d'une tutelle entre deux structures : auto-référence et cycles refusés."""
 
 import pytest
 
@@ -30,7 +30,7 @@ class TestCheckCanCreateTutelle:
             )
 
     def test_rejects_direct_cycle(self):
-        # Child est le parent direct de parent → cycle de longueur 2.
+        # L'enfant est le parent direct du parent : cycle de longueur 2.
         with pytest.raises(ValidationError, match="Cycle"):
             check_can_create_tutelle(
                 parent_id=10,
@@ -39,7 +39,7 @@ class TestCheckCanCreateTutelle:
             )
 
     def test_rejects_indirect_cycle(self):
-        # Child est un ancêtre lointain de parent → cycle long.
+        # L'enfant est un ancêtre lointain du parent : cycle long.
         with pytest.raises(ValidationError, match="Cycle"):
             check_can_create_tutelle(
                 parent_id=10,

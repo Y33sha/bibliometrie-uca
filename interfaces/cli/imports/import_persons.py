@@ -1,14 +1,11 @@
 # STATUS: recurring (imports)
-"""
-Import des personnes depuis un fichier RH (CSV ou TSV).
+"""Import des personnes depuis un fichier RH (CSV ou TSV).
 
-Usage:
-    python -m interfaces.cli.imports.import_persons fichier_rh.csv
+Usage :
     python -m interfaces.cli.imports.import_persons fichier_rh.csv
     python -m interfaces.cli.imports.import_persons fichier_rh.tsv --dry-run
 
-Colonnes attendues (noms flexibles, détection automatique) :
-    nom, prenom, email, department-name, role-title, start-date, end-date
+Colonnes attendues, aux noms reconnus automatiquement : nom, prenom, email, department-name, role-title, start-date, end-date.
 """
 
 import argparse
@@ -97,7 +94,7 @@ def import_rh_person(
 
 
 def parse_date(val: object) -> str | None:
-    """Parse une date depuis différents formats possibles."""
+    """Date lue dans l'un des formats reconnus."""
     if not val or str(val).strip() == "":
         return None
     val = str(val).strip()
@@ -107,8 +104,7 @@ def parse_date(val: object) -> str | None:
             return datetime.strptime(val, fmt).date().isoformat()  # noqa: DTZ007
         except ValueError:
             continue
-    # Sérialisation numérique Excel : nombre de jours depuis la base 1899-12-30
-    # (décalée d'un jour pour compenser le faux bissextile 1900 d'Excel).
+    # Date sérialisée par Excel : nombre de jours depuis le 1899-12-30, base décalée d'un jour pour compenser le faux 29 février 1900 d'Excel.
     try:
         n = int(float(val))
         if 30000 < n < 60000:
@@ -120,7 +116,7 @@ def parse_date(val: object) -> str | None:
     return None
 
 
-# Mapping flexible des noms de colonnes
+# Noms reconnus de chaque colonne attendue.
 COLUMN_ALIASES = {
     "last_name": ["nom", "last_name", "lastname", "name", "family_name"],
     "first_name": ["prenom", "prénom", "first_name", "firstname", "given_name"],
@@ -161,7 +157,7 @@ COLUMN_ALIASES = {
 
 
 def resolve_columns(headers: list[str]) -> dict[str, int]:
-    """Mappe les colonnes attendues aux indices réels du fichier."""
+    """Indice de chaque colonne attendue dans le fichier."""
     normalized = [h.lower().strip().replace(" ", "_") for h in headers]
     mapping = {}
     for field, aliases in COLUMN_ALIASES.items():
@@ -178,26 +174,23 @@ def resolve_columns(headers: list[str]) -> dict[str, int]:
 
 
 def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
-    """Lit un fichier CSV ou TSV et retourne une liste de dicts."""
+    """Lignes d'un fichier CSV ou TSV, en dictionnaires."""
     with open(filepath, encoding="utf-8-sig") as f:
         sample = f.read(4096)
         f.seek(0)
-        # Détecter le séparateur
+        # Détection du séparateur
         sniffer = csv.Sniffer()
         try:
             dialect = sniffer.sniff(sample, delimiters=",;\t|")
         except csv.Error:
-            dialect = csv.excel_tab  # fallback TSV
+            dialect = csv.excel_tab  # À défaut, tabulation
 
         reader = csv.reader(f, dialect)
         headers = next(reader)
         col_map = resolve_columns(headers)
 
         if "last_name" not in col_map or "first_name" not in col_map:
-            # Le séparateur détecté peut être le mauvais : on retente en tabulations, et on ne
-            # retient ce second essai que s'il reconnaît davantage de colonnes. Sans cette
-            # comparaison, un fichier bien lu mais amputé d'une colonne attendue serait relu en
-            # une colonne unique, et le manque signalé porterait sur la mauvaise.
+            # Le séparateur détecté peut être faux : un second essai en tabulations est retenu s'il reconnaît davantage de colonnes. Sans cette comparaison, un fichier bien lu mais privé d'une colonne attendue serait relu en une colonne unique, et le manque signalé désignerait la mauvaise.
             f.seek(0)
             reader_tab = csv.reader(f, delimiter="\t")
             headers_tab = next(reader_tab)
@@ -239,7 +232,7 @@ def import_persons(
     dry_run: bool = False,
     export_date: str | None = None,
 ) -> int:
-    """Insère les personnes en base. Retourne le nombre d'insertions."""
+    """Insère les personnes en base, et renvoie le nombre d'insertions."""
     inserted = 0
     skipped = 0
     duplicates = 0

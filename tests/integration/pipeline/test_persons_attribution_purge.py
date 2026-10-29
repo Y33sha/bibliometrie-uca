@@ -1,4 +1,4 @@
-"""Purge des attributions d'identifiant automatiques qu'aucun contribution source des contributions de leur personne ne contient."""
+"""Purge des attributions d'identifiant automatiques qu'aucune contribution source des contributions de leur personne ne contient."""
 
 from functools import partial
 

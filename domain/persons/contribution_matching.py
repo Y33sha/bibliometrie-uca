@@ -92,10 +92,7 @@ MATCH_REASON_PRIORITY: tuple[ContributionMatchReason, ...] = (
 
 @dataclass(frozen=True)
 class AlignedSourceContribution:
-    """Contribution source alignée dans une contribution, telle que la décision la lit.
-
-    `identifiers` : identifiants non neutralisés par la contribution source. `pinned_person_id` : personne à laquelle l'administration l'a épinglée.
-    """
+    """Contribution source alignée dans une contribution. `identifiers` : identifiants non neutralisés. `pinned_person_id` : personne à laquelle l'administration l'a épinglée."""
 
     source: str
     name: ContributorName
@@ -121,14 +118,12 @@ class AlignedSourceContribution:
 
 @dataclass(frozen=True)
 class PersonIndex:
-    """Personnes connues, telles que la décision les consulte.
+    """Personnes connues, indexées pour la décision.
 
     - `identifiers` : par type d'identifiant, la personne de chaque valeur (attributions non rejetées).
     - `name_forms` : personnes de chaque forme de nom active.
     - `name_form_status` : verdict d'un couple (forme de nom, personne), qui corrobore ou refuse un identifiant.
     - `namesakes` : personnes par nom de famille normalisé, pour le rattachement par initiales compatibles.
-
-    `register` y ajoute une personne créée pendant la décision.
     """
 
     identifiers: Mapping[str, MutableMapping[str, IdentifiedPerson]]
@@ -139,7 +134,7 @@ class PersonIndex:
     def register(
         self, person_id: int, last_name: str, first_name: str, identifiers: Mapping[str, str]
     ) -> None:
-        """Ajoute la personne `person_id` : homonyme de son nom de famille, formes de son nom, identifiants encore libres. Une forme déjà portée par une autre personne devient ambiguë."""
+        """Ajoute une personne créée pendant la décision : son nom de famille, ses formes de nom, ses identifiants encore libres. Une forme de nom déjà associée à une autre personne devient ambiguë."""
         last_key = normalize_text(last_name)
         self.namesakes[last_key] = [
             *self.namesakes.get(last_key, ()),
@@ -345,7 +340,7 @@ _NAME_SOURCE_RANK = {source.value: rank for rank, source in enumerate(NAME_SOURC
 
 
 def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, str]:
-    """(nom de famille, prénom) de la personne que fonde une contribution : ceux d'une contribution source d'une source qui sépare nom et prénom, de préférence au prénom complet, puis selon la préséance des sources (`NAME_SOURCE_PRIORITY`)."""
+    """Nom de famille et prénom d'une personne créée depuis une contribution. Ils viennent de préférence d'une source qui sépare nom et prénom, puis d'un prénom complet, puis de la source la mieux placée dans `NAME_SOURCE_PRIORITY`."""
 
     def rank(member: AlignedSourceContribution) -> tuple[bool, bool, int, tuple[str, str]]:
         last_name, first_name = member.name.split()
@@ -363,7 +358,7 @@ def founding_name(members: Sequence[AlignedSourceContribution]) -> tuple[str, st
 def identifiers_to_attribute(
     members: Sequence[AlignedSourceContribution], decision: ContributionDecision
 ) -> list[dict[str, str]]:
-    """Identifiants fiables des contributions sources d'une contribution rattachée, à attribuer à sa personne. Les valeurs dont la corroboration a été refusée (`decision.refused`) en sont écartées."""
+    """Identifiants fiables des contributions sources d'une contribution rattachée, à attribuer à sa personne. Les valeurs refusées faute de nom compatible sont écartées."""
     refused = {(id_type, value) for id_type, value, _ in decision.refused}
     return [
         {

@@ -1,6 +1,6 @@
 """Normaliseur DataCite : parsing des auteurs, données bibliographiques, conteneurs et enregistrement source.
 
-Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators`. Un nœud sans DOI est refusé. L'enregistrement source est construit sans entrée-sortie.
+Le format DataCite loge ses métadonnées sous `attributes` et nomme ses auteurs `creators`. Un enregistrement sans DOI est refusé. L'enregistrement source est construit sans entrée-sortie.
 """
 
 from unittest.mock import MagicMock
@@ -102,7 +102,7 @@ class TestAuthorRecords:
         assert build_datacite_author_records(attrs)[0].identifiers is None
 
     def test_shared_orcid_kept_on_each_record(self):
-        """La lecture rend l'ORCID de chaque creator tel que la source le donne ; le writer neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie l'ORCID de chaque creator tel que la source le donne ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
         attrs = {
             "creators": [
                 {
@@ -149,7 +149,7 @@ class TestAuthorRecords:
         assert build_datacite_author_records(attrs)[0].name == ContributorName(raw="Cher")
 
     def test_family_name_sans_given_name_reste_chaine_brute(self):
-        # `familyName` seul porte souvent le nom complet.
+        # `familyName` seul contient souvent le nom complet.
         attrs = {"creators": [{"familyName": "Mathieu Durand"}]}
         assert build_datacite_author_records(attrs)[0].name == ContributorName(raw="Mathieu Durand")
 
@@ -224,7 +224,7 @@ class TestChampsIgnores:
         assert biblio["issue"] == "3"
 
     def test_identifiant_d_un_autre_registre_ignore(self):
-        """Un creator peut porter plusieurs identifiants : seul celui d'ORCID est retenu."""
+        """Un creator a parfois plusieurs identifiants : seul celui d'ORCID est retenu."""
         attrs = {
             "creators": [
                 {
@@ -244,7 +244,7 @@ class TestChampsIgnores:
         }
 
     def test_identifiant_orcid_illisible_ignore(self):
-        """Le registre est le bon, la valeur non : on continue de chercher."""
+        """Un identifiant ORCID illisible est écarté, et la lecture passe à l'identifiant suivant."""
         attrs = {
             "creators": [
                 {
@@ -282,7 +282,7 @@ class TestChampsIgnores:
 
 class TestAuthorBlock:
     def test_creators_deviennent_les_contributions_sources(self):
-        """Le bloc auteurs du normaliseur porte les `creators`, que `author_records` lit."""
+        """Le bloc auteurs du normaliseur contient les `creators`, que lit `author_records`."""
         normalizer = _normalizer()
         attrs = {
             "creators": [
@@ -306,7 +306,7 @@ class TestPublisher:
 
 class TestContainers:
     def test_sans_titre_de_contenant_aucun_conteneur(self):
-        """La majorité des dépôts DataCite sont des jeux de données, sans revue qui les porte."""
+        """Un dépôt sans titre de contenant, le plus souvent un jeu de données, n'a aucun conteneur."""
         facts = _normalizer().container_facts({})
         assert (facts.journal_title, facts.collection_title, facts.book_title) == (None, None, None)
 
@@ -393,10 +393,10 @@ class TestSourceRecord:
         assert document.source == "datacite"
         assert document.source_id == "10.5281/zenodo.1"
         assert document.staging_id == 42
-        assert document.doi == "10.5281/zenodo.1"
+        assert identifier_values(document)["doi"] == ["10.5281/zenodo.1"]
         assert document.title == "Un jeu de données"
         assert document.publication_year == 2024
-        assert document.oa_status is None  # DataCite ne renseigne pas l'accès ouvert
+        assert document.oa_status is None  # DataCite ne renseigne pas le statut open access
 
     def test_dois_apparentes_rassembles(self):
         attributs = _attributs(
@@ -411,7 +411,7 @@ class TestSourceRecord:
 
         document = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, None))
 
-        assert identifier_values(document) == {"doi": ["10.5281/zenodo.0"]}
+        assert identifier_values(document) == {"doi": ["10.5281/zenodo.0", "10.5281/zenodo.1"]}
 
     def test_titre_du_conteneur_garde_sans_revue_resolue(self):
         attributs = _attributs(container={"title": "Une collection"})
@@ -436,7 +436,7 @@ class TestDoi:
 
         document = normalizer.source_record(row, normalizer.parse(row), Containers(None, None))
 
-        assert document.doi == "10.5281/zenodo.9"
+        assert identifier_values(document)["doi"] == ["10.5281/zenodo.9"]
 
     def test_document_refuse_sans_doi(self):
         raw = {"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}

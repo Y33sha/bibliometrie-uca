@@ -15,7 +15,7 @@ from tests.integration.helpers.sources import (
 
 
 def _source_contribution_for_publication(conn, publication_id, source_id):
-    """source_contribution rattachée à la publication `publication_id`."""
+    """Contribution source d'un enregistrement source de la publication `publication_id`."""
     source_record_id = insert_source_record(
         conn, publication_id, source_id=source_id, publication_year=2024
     )
@@ -23,7 +23,7 @@ def _source_contribution_for_publication(conn, publication_id, source_id):
 
 
 def _link_address(conn, source_contribution_id, raw_text):
-    """Rattache une adresse (créée à la volée, dédupliquée par md5) à une contribution source via `source_contribution_addresses`."""
+    """Rattache à la contribution source l'adresse de texte `raw_text`, créée au besoin."""
     addr_id = insert_address(conn, raw_text, reuse=True)
     insert_source_contribution_address(conn, source_contribution_id, address_id=addr_id)
     return addr_id
@@ -31,10 +31,10 @@ def _link_address(conn, source_contribution_id, raw_text):
 
 class TestRecomputePublicationCount:
     def test_counts_distinct_publications(self, sa_sync_conn):
-        """publication_count = nb de publications distinctes, pas de contributions sources."""
+        """`publication_count` compte les publications distinctes de l'adresse, pas ses contributions sources."""
         p1 = insert_publication(sa_sync_conn, "P1")
         p2 = insert_publication(sa_sync_conn, "P2")
-        # 3 contributions sources sur la même adresse : 2 sur p1 (1 distinct), 1 sur p2.
+        # 3 contributions sources sur la même adresse : 2 sur p1, 1 sur p2.
         for sid, publication in (("h1", p1), ("h2", p1), ("h3", p2)):
             _link_address(
                 sa_sync_conn,
@@ -54,7 +54,7 @@ class TestRecomputePublicationCount:
         )
 
     def test_resets_orphan_to_zero(self, sa_sync_conn):
-        """Une adresse sans lien mais au publication_count figé (cache périmé) repasse à 0."""
+        """Une adresse sans lien, au `publication_count` périmé, repasse à 0."""
         addr = insert_address(sa_sync_conn, "Stale", publication_count=42)
 
         recompute_address_publication_count(sa_sync_conn)
@@ -67,7 +67,7 @@ class TestRecomputePublicationCount:
         )
 
     def test_ignores_source_record_without_publication_id(self, sa_sync_conn):
-        """Un document non rattaché (publication_id NULL) ne compte pas."""
+        """Un enregistrement source sans publication ne compte pas."""
         _link_address(
             sa_sync_conn,
             _source_contribution_for_publication(sa_sync_conn, None, "orphan"),

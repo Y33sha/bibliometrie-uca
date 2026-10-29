@@ -1,6 +1,6 @@
 """Tests d'intégration : `last_daily_extract_date`, borne « depuis » du mode quotidien.
 
-`last_daily_extract_date` prend le maximum sur toute la table, et `pipeline_phase_executions` porte des lignes committées par d'autres tests de la session. Les cas se placent donc en 2099, après toute ligne réelle.
+`last_daily_extract_date` prend le maximum sur toute la table, et `pipeline_phase_executions` contient des lignes committées par d'autres tests de la session. Les cas se placent donc en 2099, après toute ligne réelle.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ class TestLastDailyHarvestDate:
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 15)
 
     def test_extraction_par_annees_ignoree(self, sa_sync_conn):
-        """Cas réel : une extraction HAL bornée à 2020 ne ramène pas les dépôts récents."""
+        """Une extraction hors mode quotidien est ignorée : bornée par années, elle ne ramène pas les dépôts récents."""
         _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
         _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(20), mode="full")
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
@@ -37,7 +37,7 @@ class TestLastDailyHarvestDate:
         assert last_daily_extract_date(sa_sync_conn) == datetime.date(2099, 6, 10)
 
     def test_extraction_avec_signal_ignoree(self, sa_sync_conn):
-        """HAL indisponible ou run interrompu : les enregistrements sources non récupérées restent dans la fenêtre suivante."""
+        """Une extraction en avertissement ou en erreur est ignorée (HAL indisponible, run interrompu) : les enregistrements sources non récupérés restent dans la fenêtre suivante."""
         _phase(sa_sync_conn, 1, phase="harvest", started_at=_at(10))
         _phase(sa_sync_conn, 2, phase="harvest", started_at=_at(20), status="warning")
         _phase(sa_sync_conn, 3, phase="harvest", started_at=_at(25), status="error")

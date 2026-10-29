@@ -32,7 +32,7 @@ class PivotSchemaResponse(BaseModel):
 
 
 class PivotResponse(BaseModel):
-    """Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés = `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
+    """Résultat d'une agrégation. Chaque ligne contient la valeur de chaque groupement (clés de `groups`) et la mesure sous la clé `value` (numérique, `null` si dénominateur nul)."""
 
     measure: str
     groups: list[str]
@@ -49,7 +49,8 @@ class CountryCollaboration(BaseModel):
 class CollaborationsResponse(BaseModel):
     """Collaborations internationales ventilées par pays étranger (source `publications.countries`).
 
-    `international_count` = publications avec au moins un pays étranger ; `total_count` = corpus filtré. Leur rapport donne la part de publications en collaboration internationale."""
+    `international_count` compte les publications avec au moins un pays étranger, `total_count` le corpus filtré ; leur rapport donne la part de publications en collaboration internationale.
+    """
 
     rows: list[CountryCollaboration]
     international_count: int

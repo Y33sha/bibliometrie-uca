@@ -1,4 +1,4 @@
-"""Lecture des agrégats des tableaux de bord (router stats).
+"""Lectures des agrégats des tableaux de bord, pour les routes `/api/stats`.
 
 Le package est organisé par thème d'agrégat, une classe par module :
 - `pivot` : agrégation générique et schéma de son registre
@@ -18,7 +18,7 @@ from infrastructure.read_models.stats.pivot import StatsPivotQueries
 class StatsQueries(StatsPivotQueries, StatsCollaborationQueries):
     """Agrégats des tableaux de bord.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour demander des statistiques.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre elle-même : ses appelants se passent de le connaître.
     """
 
     def __init__(self, conn: Connection) -> None:

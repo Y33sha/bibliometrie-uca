@@ -1,8 +1,4 @@
-"""Vérifie que tous les scripts d'extraction et de processing s'importent sans erreur.
-
-Détecte les NameError, ImportError et SyntaxError au niveau module
-(variables non définies, imports cassés, etc.).
-"""
+"""Les modules du pipeline et des services s'importent sans erreur (`NameError`, `ImportError`, `SyntaxError` au niveau du module)."""
 
 import importlib
 
@@ -51,5 +47,5 @@ MODULES = [
 
 @pytest.mark.parametrize("module", MODULES)
 def test_import(module):
-    """Chaque module doit s'importer sans erreur."""
+    """Le module s'importe sans erreur."""
     importlib.import_module(module)

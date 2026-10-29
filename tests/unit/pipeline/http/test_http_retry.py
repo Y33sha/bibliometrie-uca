@@ -23,11 +23,11 @@ _API_KEY = "cle-secrete-de-test"
 
 pytestmark = pytest.mark.usefixtures("breaker")
 
-# ── variante synchrone (httpx2) ────────────────────────────────
+# Variante synchrone
 
 
 def _resp(status: int) -> MagicMock:
-    """Réponse simulée. `is_success` et `reason_phrase` sont ce que lit `raise_for_status`, qui compose lui-même le message d'erreur."""
+    """Réponse simulée, avec les attributs que lit `raise_for_status` pour composer le message d'erreur."""
     r = MagicMock()
     r.status_code = status
     r.is_success = 200 <= status < 300
@@ -49,8 +49,7 @@ def test_4xx_fails_fast_without_retry():
         with pytest.raises(httpx2.HTTPStatusError) as excinfo:
             http_retry.http_request_with_retry("GET", "http://x", label="t", max_retries=3)
     assert req.call_count == 1  # aucun retry sur 4xx
-    # Non-régression : l'erreur que les appelants journalisent ne porte pas la requête,
-    # dont les paramètres transportent la clé d'API.
+    # Non-régression : l'erreur journalisée par les appelants omet la requête, dont les paramètres contiennent la clé d'API.
     assert _API_KEY not in str(excinfo.value)
 
 
@@ -108,7 +107,7 @@ def test_success_returns_json():
         assert http_retry.http_request_with_retry("GET", "http://x", label="t") == {}
 
 
-# ── variante asynchrone (httpx2) ──────────────────────────────────
+# Variante asynchrone
 
 
 class TestAsyncText:
@@ -274,9 +273,9 @@ class TestAsync:
 
 
 class TestRedirections:
-    """Le helper ne suit une redirection que vers le même hôte, pour une requête GET, et une seule fois : l'hôte joint reste celui que la requête désigne.
+    """Le helper suit seulement une redirection vers le même hôte, pour une requête GET, et une seule fois.
 
-    Les en-têtes d'authentification propres à un fournisseur, que le client HTTP ne retire pas comme il retire `Authorization`, ne quittent donc pas leur destinataire.
+    Les en-têtes d'authentification propres à un fournisseur, que le client HTTP garde lors d'une redirection, restent donc chez leur destinataire.
     """
 
     @pytest.mark.asyncio

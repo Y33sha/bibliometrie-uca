@@ -1,4 +1,4 @@
-"""Tests de `domain.source_records.impact`."""
+"""Indicateurs d'impact d'un enregistrement source (`domain.source_records.impact`)."""
 
 from domain.source_records.impact import Impact
 

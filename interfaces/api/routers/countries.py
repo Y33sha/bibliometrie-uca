@@ -1,6 +1,6 @@
 """Router du référentiel des pays. Sert `/api/countries`.
 
-Le référentiel alimente les listes de choix partout où un pays s'attribue ou se filtre. L'attribution elle-même porte sur des adresses et vit dans le router `addresses.py`.
+Le référentiel alimente les listes de choix partout où un pays s'attribue ou se filtre. L'attribution, qui concerne des adresses, vit dans le router `addresses.py`.
 """
 
 from fastapi import APIRouter, Depends

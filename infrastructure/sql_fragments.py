@@ -1,6 +1,6 @@
 """Fragments SQL partagés entre plusieurs adaptateurs de l'API ou du pipeline.
 
-Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority` — valeurs d'enums ou ordres de priorité, jamais d'entrée utilisateur : interpolation directe sûre), des expressions rendues depuis les alias de la requête hôte (identifiants d'une contribution source), et des expressions SQL figées.
+Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority`), valeurs d'enums ou ordres de priorité, sans entrée utilisateur, donc sûrs à interpoler ; des expressions rendues depuis les alias de la requête hôte ; des expressions SQL figées.
 """
 
 from application.ports.repositories.address_repository import AddressCountryFilter
@@ -78,7 +78,7 @@ def diamond_journal_sql(serial: str = "j") -> str:
 
 
 def has_author_role(source_contribution: str = "sc") -> str:
-    """Condition vraie quand la contribution source ou la contribution aliasé `source_contribution` tient le rôle d'auteur."""
+    """Condition vraie quand la contribution source ou la contribution aliasée `source_contribution` tient le rôle d'auteur."""
     return f"{source_contribution}.roles && ARRAY['{ContributionRole.AUTHOR.value}']::text[]"
 
 
@@ -200,7 +200,7 @@ NO_PERIMETER_EVIDENCE = "'{}'::perimeter_evidence[]"
 def source_contribution_perimeter_evidence(source_contribution_ids: str | None = None) -> str:
     """Requête des indices de l'entrée dans le périmètre de chaque contribution source qui en a : colonnes `id` et `evidence`, tableau trié.
 
-    `:perimeter_ids` : structures du périmètre, atteintes par la matview `source_contribution_structures`. `source_contribution_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les contributions sources.
+    `:perimeter_ids` : structures du périmètre, atteintes par la vue matérialisée `source_contribution_structures`. `source_contribution_ids` : nom d'un paramètre lié, tableau d'ids, qui restreint les contributions sources.
     """
     by_structure = "scs.structure_id = ANY(:perimeter_ids)"
     by_contributor_information = ""
@@ -234,14 +234,6 @@ def corrected_by(field: str, source_record: str = "sr") -> str:
 def stashed_raw(field: str, source_record: str = "sr") -> str:
     """Valeur que la source donne pour le champ `field` de l'enregistrement source aliasé `source_record`, quand une correction l'a changée. NULL quand le champ est intact."""
     return f"{source_record}.corrections -> '{field}' ->> '{RAW}'"
-
-
-def raw_column(field: str, source_record: str = "sr") -> str:
-    """Valeur que la source donne pour la colonne texte `field` de l'enregistrement source aliasé `source_record` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
-    return (
-        f"CASE WHEN {source_record}.corrections -> '{field}' ? '{RAW}'"
-        f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
-    )
 
 
 def source_extra(key: SourceExtra, alias: str = "sr") -> str:

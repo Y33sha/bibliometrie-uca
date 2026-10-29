@@ -14,7 +14,6 @@
 	import { useFacets } from '#lib/composables/useFacets.svelte.js';
 	import { useUrlFilters } from '#lib/composables/useUrlFilters.svelte.js';
 	import { paramsToQuery } from '#lib/utils.js';
-	import { isAdmin } from '#lib/session.svelte.js';
 	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
 
@@ -40,8 +39,8 @@
 	// svelte-ignore state_referenced_locally
 	const columns = useThesisColumns(!hasFixedLab);
 
-	// Volet d'une thèse, en session admin : ouvert tant que `?publication=<id>` figure dans l'URL.
-	const drawer = useDrawerParam('publication', isAdmin);
+	// Volet d'une thèse : ouvert tant que `?publication=<id>` figure dans l'URL.
+	const drawer = useDrawerParam('publication');
 
 	let search = $state('');
 	let currentSort: PublicationSort = $state('soutenance_desc');
@@ -211,7 +210,7 @@
 	{/snippet}
 </ListToolbar>
 
-<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} {columns} onopen={isAdmin() ? drawer.open : undefined} activeId={drawer.id} />
+<ThesesTable items={listing.items} loading={listing.loading} error={listing.error} sort={currentSort} onToggleSort={toggleSort} {columns} onopen={drawer.open} activeId={drawer.id} />
 <Pagination
 	page={listing.page}
 	pages={listing.pages}

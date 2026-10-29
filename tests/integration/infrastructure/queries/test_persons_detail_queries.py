@@ -59,8 +59,7 @@ def _theses(conn, person_id):
 
 class TestPersonTheses:
     def test_author_name_matches_author_person_id(self, sa_sync_conn):
-        """Deux doctorants sur la thèse : le nom d'auteur affiché correspond à `author_person_id`
-        (une seule ligne pour les deux, plutôt que deux `LIMIT 1` qui pouvaient diverger)."""
+        """Deux doctorants sur la thèse : le nom d'auteur affiché est celui de la personne `author_person_id`."""
         jury = insert_person(sa_sync_conn, "Jury", first_name="Jean")
         alice = insert_person(sa_sync_conn, "Doctorant", first_name="Alice")
         bruno = insert_person(sa_sync_conn, "Doctorant", first_name="Bruno")

@@ -4,9 +4,9 @@ import { setQueryParam } from '#lib/url.js';
 /**
  * Volet d'une entité, ouvert tant que `?<param>=<id>` figure dans l'URL.
  *
- * `enabled` faux garde le volet fermé, par exemple hors session admin.
+ * `enabled` faux garde le volet fermé, par exemple hors session admin. Sans `enabled`, le volet s'ouvre dans toute session.
  */
-export function useDrawerParam(param: string, enabled: () => boolean) {
+export function useDrawerParam(param: string, enabled: () => boolean = () => true) {
 	return {
 		get id(): number | null {
 			return enabled() ? Number(page.url.searchParams.get(param)) || null : null;

@@ -13,7 +13,7 @@ class TestPlaceNameDetector:
         assert det.detect("university of warsaw faculty of physics") == {"pl"}
 
     def test_word_boundary_no_partial_match(self):
-        # La forme ne matche pas collée dans un mot plus long.
+        # Une forme collée dans un mot plus long reste non reconnue.
         det = PlaceNameDetector({"keio university": "jp"})
         assert det.detect("akeio university") == set()  # 'keio' collé après 'a'
         assert det.detect("keio universityx") == set()  # 'university' suivi de 'x'

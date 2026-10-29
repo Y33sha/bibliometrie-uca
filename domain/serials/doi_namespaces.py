@@ -53,7 +53,7 @@ def namespace_candidates(doi: str) -> list[str]:
 
 
 class DoiNamespace(NamedTuple):
-    """Un espace de noms retenu : la revue qu'il désigne, les DOI qui l'attestent et la part d'entre eux qui porte cette revue."""
+    """Espace de noms retenu : la revue qu'il désigne, le nombre de DOI qu'il couvre, et la part de leurs voix qui va à cette revue."""
 
     namespace: str
     serial_id: int
@@ -73,7 +73,7 @@ def learn_namespaces(
     min_dois: int = 5,
     min_share: float = 0.9,
 ) -> dict[str, DoiNamespace]:
-    """Espaces de noms que désignent les couples `(DOI, revue)` des enregistrements, un couple par enregistrement.
+    """Espaces de noms que désignent les couples `(DOI, revue)` des enregistrements sources, un couple par enregistrement source.
 
     Chaque DOI donne une voix, répartie entre ses revues au prorata de ses enregistrements. Un espace est retenu s'il couvre au moins `min_dois` DOI distincts et qu'une revue hors de `platforms` y recueille au moins `min_share` des voix. Les DOI des revues de `platforms` comptent dans le total. Un espace est écarté quand un espace plus court, retenu, désigne déjà la même revue.
     """
