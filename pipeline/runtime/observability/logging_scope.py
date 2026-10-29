@@ -1,9 +1,4 @@
-"""Préfixage contextuel des logs d'une phase source-dépendante.
-
-Un `scoped_logger` enveloppe un logger pour préfixer chaque ligne d'un `[source · scope]` (ou `[source]`). Situe toute ligne intermédiaire dans un run multi-sources : on sait d'un coup quelle source — et le cas échéant quel périmètre (année, plage `depuis …`, PPN d'établissement) — produit la ligne, sans le répéter à la main. Indispensable quand plusieurs sources défilent (batchs de normalisation) ou tournent en parallèle (fetch DOI) et que les logs s'entrelacent.
-
-Partagé par les phases d'extraction et de normalisation (`harvest/`, `normalize/`).
-"""
+"""Préfixe `[source · périmètre]` des lignes de journal d'une phase qui traite plusieurs sources : il situe chaque ligne quand les sources s'entrelacent. Le périmètre est une année, une plage d'années ou un établissement."""
 
 from __future__ import annotations
 
@@ -29,12 +24,12 @@ class _ScopedLogger(logging.LoggerAdapter[logging.Logger]):
 def scoped_logger(logger: logging.Logger, source: str, scope: str | None = None) -> _ScopedLogger:
     """Adaptateur préfixant les logs d'un `[source · scope]`, ou `[source]` sans scope.
 
-    La source paraît sous le nom qu'on lui connaît — `theses.fr` plutôt que `theses`.
+    La source paraît sous son libellé (`theses.fr`).
     """
     name = source_label(source)
     prefix = f"[{name} · {scope}]" if scope else f"[{name}]"
     return _ScopedLogger(logger, prefix)
 
 
-# Les fonctions d'extraction, de la phase fetch_missing et de normalisation acceptent indifféremment un logger nu ou un logger scopé — c'est l'orchestrateur qui décide du scope.
+# Logger nu, ou préfixé par `scoped_logger` au choix de l'appelant.
 type ScopedOrPlainLogger = logging.Logger | logging.LoggerAdapter[logging.Logger]
