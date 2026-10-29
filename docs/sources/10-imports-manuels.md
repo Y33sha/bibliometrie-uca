@@ -11,7 +11,7 @@ Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://gith
 
 Le département RH est affiché pour information. Les liens entre personnes et structures viennent des [contributions](../glossaire.md#contribution).
 
-Les personnes naissent des contributions des publications ([création de personnes](../pipeline/09-persons.md)), fiche RH ou non. La fiche RH enrichit la personne, et une personne qui en a une est toujours conservée par une fusion.
+L'import crée la personne et sa fiche RH. La fiche enrichit la personne, et une personne qui en a une est toujours conservée par une fusion.
 
 ## Données APC
 
