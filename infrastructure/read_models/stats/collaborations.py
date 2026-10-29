@@ -1,11 +1,12 @@
 """Agrégat des collaborations internationales par pays.
 
-Compte, pour chaque pays étranger, le nombre de publications du périmètre qui lui sont co-affiliées, en dépliant la colonne `publications.countries` (ensemble des pays présents dans les affiliations d'une publication). Le pays de l'établissement et l'absence de pays sont écartés (`NON_INTERNATIONAL_COUNTRY_CODES`).
+Compte, pour chaque pays étranger, le nombre de publications du périmètre qui lui sont co-affiliées, en dépliant la colonne `publications.countries` (ensemble des pays présents dans les affiliations d'une publication). Le pays de l'établissement et l'absence de pays sont écartés (`non_international_country_codes`).
 """
 
 from sqlalchemy import Connection, text
 
-from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
+from domain.countries import non_international_country_codes
+from infrastructure.read_models.perimeters.queries import get_institution_country
 from infrastructure.read_models.publications.filtering import (
     filter_context,
     publication_filter_where,
@@ -16,8 +17,6 @@ from infrastructure.read_models.stats.models import (
     CountryCollaboration,
 )
 
-_NON_INTERNATIONAL = sorted(NON_INTERNATIONAL_COUNTRY_CODES)
-
 
 class StatsCollaborationQueries:
     _conn: Connection
@@ -25,7 +24,9 @@ class StatsCollaborationQueries:
     def collaborations(self, *, filters: PublicationFilters) -> CollaborationsResponse:
         """Collaborations internationales sous les filtres : nombre de publications co-affiliées à chaque pays étranger, du plus fréquent au moins fréquent, nombre de publications en collaboration internationale (au moins un pays étranger) et total du corpus filtré, pour exprimer une part."""
         where, binds = publication_filter_where(filters, filter_context(self._conn, filters))
-        binds["non_international"] = _NON_INTERNATIONAL
+        binds["non_international"] = non_international_country_codes(
+            get_institution_country(self._conn)
+        )
         self._conn.execute(text("SET LOCAL jit = off"))
 
         per_country = (

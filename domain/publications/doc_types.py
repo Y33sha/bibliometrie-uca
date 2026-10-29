@@ -1,6 +1,8 @@
-"""Types de document des publications, et leurs familles."""
+"""Types de document des publications, leurs libellés et leurs familles."""
 
+from dataclasses import dataclass
 from enum import StrEnum
+from typing import NamedTuple
 
 
 class DocType(StrEnum):
@@ -9,10 +11,12 @@ class DocType(StrEnum):
     ARTICLE = "article"
     CONFERENCE_PAPER = "conference_paper"
     CONFERENCE = "conference"
+    RECORDED_TALK = "recorded_talk"
     BOOK = "book"
     BOOK_CHAPTER = "book_chapter"
     THESIS = "thesis"
     ONGOING_THESIS = "ongoing_thesis"
+    PRACTICE_THESIS = "practice_thesis"
     PREPRINT = "preprint"
     REVIEW = "review"
     EDITORIAL = "editorial"
@@ -53,31 +57,100 @@ ARTICLE_SUBTYPES: frozenset[str] = frozenset(
     }
 )
 
-# Familles de types de document, dans l'ordre d'affichage. Chaque type appartient à une famille.
-DOC_TYPE_FAMILIES: dict[str, tuple[DocType, ...]] = {
-    "publications": (
-        DocType.ARTICLE,
-        DocType.CONFERENCE_PAPER,
-        DocType.BOOK,
-        DocType.BOOK_CHAPTER,
-        DocType.REVIEW,
-        DocType.DATA_PAPER,
+
+class DocTypeLabel(NamedTuple):
+    """Libellés français d'un type de document."""
+
+    singular: str
+    plural: str
+
+
+DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
+    DocType.ARTICLE: DocTypeLabel("Article", "Articles"),
+    DocType.CONFERENCE_PAPER: DocTypeLabel("Conference paper", "Conference papers"),
+    DocType.CONFERENCE: DocTypeLabel("Communication", "Communications"),
+    DocType.RECORDED_TALK: DocTypeLabel("Conférence filmée", "Conférences filmées"),
+    DocType.BOOK: DocTypeLabel("Ouvrage", "Ouvrages"),
+    DocType.BOOK_CHAPTER: DocTypeLabel("Chapitre", "Chapitres"),
+    DocType.THESIS: DocTypeLabel("Thèse", "Thèses"),
+    DocType.ONGOING_THESIS: DocTypeLabel("Thèse en cours", "Thèses en cours"),
+    DocType.PRACTICE_THESIS: DocTypeLabel("Thèse d'exercice", "Thèses d'exercice"),
+    DocType.PREPRINT: DocTypeLabel("Preprint", "Preprints"),
+    DocType.REVIEW: DocTypeLabel("Article de synthèse", "Articles de synthèse"),
+    DocType.EDITORIAL: DocTypeLabel("Éditorial", "Éditoriaux"),
+    DocType.REPORT: DocTypeLabel("Rapport", "Rapports"),
+    DocType.PEER_REVIEW: DocTypeLabel("Peer review", "Peer reviews"),
+    DocType.OTHER: DocTypeLabel("Autre", "Autres"),
+    DocType.DATASET: DocTypeLabel("Données", "Données"),
+    DocType.SOFTWARE: DocTypeLabel("Logiciel", "Logiciels"),
+    DocType.PATENT: DocTypeLabel("Brevet", "Brevets"),
+    DocType.HDR: DocTypeLabel("HDR", "HDR"),
+    DocType.MEMOIR: DocTypeLabel("Mémoire", "Mémoires"),
+    DocType.POSTER: DocTypeLabel("Poster", "Posters"),
+    DocType.LETTER: DocTypeLabel("Lettre à l'éditeur", "Lettres à l'éditeur"),
+    DocType.ERRATUM: DocTypeLabel("Erratum", "Errata"),
+    DocType.RETRACTION: DocTypeLabel("Rétractation", "Rétractations"),
+    DocType.BOOK_REVIEW: DocTypeLabel("Recension", "Recensions"),
+    DocType.DATA_PAPER: DocTypeLabel("Data paper", "Data papers"),
+    DocType.PROCEEDINGS: DocTypeLabel("Proceedings", "Proceedings"),
+    DocType.MEDIA: DocTypeLabel("Intervention média", "Interventions média"),
+    DocType.PHYSICAL_OBJECT: DocTypeLabel("Objet physique", "Objets physiques"),
+}
+
+
+@dataclass(frozen=True)
+class DocTypeFamily:
+    """Famille de types de document, qui groupe et filtre les listes."""
+
+    label: str
+    types: tuple[DocType, ...]
+
+
+# Familles dans l'ordre d'affichage, leurs types aussi. Chaque type appartient à une seule famille.
+DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
+    "publications": DocTypeFamily(
+        "Publications",
+        (
+            DocType.ARTICLE,
+            DocType.REVIEW,
+            DocType.CONFERENCE_PAPER,
+            DocType.BOOK,
+            DocType.BOOK_CHAPTER,
+        ),
     ),
-    "preprints": (DocType.PREPRINT,),
-    "theses": (DocType.THESIS, DocType.ONGOING_THESIS, DocType.HDR, DocType.MEMOIR),
-    "data": (DocType.DATASET, DocType.SOFTWARE, DocType.PATENT),
-    "misc": (
-        DocType.OTHER,
-        DocType.MEDIA,
-        DocType.POSTER,
-        DocType.REPORT,
-        DocType.ERRATUM,
-        DocType.RETRACTION,
-        DocType.PEER_REVIEW,
-        DocType.EDITORIAL,
-        DocType.LETTER,
-        DocType.BOOK_REVIEW,
-        DocType.PROCEEDINGS,
-        DocType.PHYSICAL_OBJECT,
+    "conferences": DocTypeFamily(
+        "Conférences", (DocType.CONFERENCE, DocType.RECORDED_TALK, DocType.POSTER)
+    ),
+    "preprints": DocTypeFamily("Prépublications", (DocType.PREPRINT,)),
+    # Les thèses d'exercice et les mémoires sont exclus des listes, les thèses en cours y sont invisibles.
+    "theses": DocTypeFamily(
+        "Thèses",
+        (
+            DocType.THESIS,
+            DocType.ONGOING_THESIS,
+            DocType.HDR,
+            DocType.PRACTICE_THESIS,
+            DocType.MEMOIR,
+        ),
+    ),
+    "data": DocTypeFamily(
+        "Données & logiciels",
+        (DocType.DATASET, DocType.DATA_PAPER, DocType.SOFTWARE, DocType.PATENT),
+    ),
+    "misc": DocTypeFamily(
+        "Annexes & divers",
+        (
+            DocType.OTHER,
+            DocType.MEDIA,
+            DocType.REPORT,
+            DocType.ERRATUM,
+            DocType.RETRACTION,
+            DocType.PEER_REVIEW,
+            DocType.EDITORIAL,
+            DocType.LETTER,
+            DocType.BOOK_REVIEW,
+            DocType.PROCEEDINGS,
+            DocType.PHYSICAL_OBJECT,
+        ),
     ),
 }

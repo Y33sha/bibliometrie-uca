@@ -35,6 +35,8 @@
   ];
   type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
   type Perimeter = components["schemas"]["PerimeterOut"];
+  type PerimeterCountry = components["schemas"]["PerimeterCountryOut"];
+  type Country = components["schemas"]["CountryOut"];
 
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);
@@ -206,6 +208,32 @@
     hueDraft = null;
   }
 
+  // Pays de l'établissement : les pays ROR des structures du périmètre des personnes en tête, puis le reste du référentiel.
+  const INSTITUTION_COUNTRY_KEY = "institution_country";
+  const institutionCountryItem = $derived(configByKey(INSTITUTION_COUNTRY_KEY));
+  let perimeterCountries: PerimeterCountry[] = $state([]);
+  let countries: Country[] = $state([]);
+  const otherCountries = $derived.by(() => {
+    const listed = new Set(perimeterCountries.map((c) => c.code));
+    return countries.filter((c) => !listed.has(c.code));
+  });
+
+  async function loadCountries() {
+    [perimeterCountries, countries] = await Promise.all([
+      api<PerimeterCountry[]>("/api/perimeters/countries"),
+      api<Country[]>("/api/countries"),
+    ]);
+  }
+
+  async function saveInstitutionCountry(code: string) {
+    try {
+      await configApi.setValue(INSTITUTION_COUNTRY_KEY, code);
+      await load();
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), "error");
+    }
+  }
+
   async function toggleLabType(type: string) {
     const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
     await configApi.setValue("laboratories_display_types", next);
@@ -269,7 +297,10 @@
     saving = false;
   }
 
-  onMount(load);
+  onMount(() => {
+    load();
+    loadCountries();
+  });
 </script>
 
 <PageHeader title="Configuration" />
@@ -349,10 +380,10 @@
   </div>
 
   <!-- ═══ PÉRIMÈTRES ═══ -->
-  <h2 class="section-title">Périmètres</h2>
-
-  <h3 class="subsection-title">Définition des périmètres</h3>
-  <p class="info-box">Chaque périmètre est défini par une liste de structures racines. Les sous-structures en tutelle sont incluses récursivement.</p>
+  <div class="section-head">
+    <h2 class="section-title">Périmètre d'établissement</h2>
+    <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
+  </div>
   <TableScroll>
     <table class="data-table perimeters-table">
       <thead>
@@ -386,9 +417,36 @@
       </tbody>
     </table>
   </TableScroll>
-  <div class="perim-new">
-    <button class="btn btn-sm btn-primary" onclick={openPerimCreate}>+ Nouveau périmètre</button>
-  </div>
+  {#if institutionCountryItem}
+    <div class="config-grid">
+      <div class="config-row">
+        <span class="config-label">
+          <Tooltip text="Une publication co-affiliée à un autre pays est une collaboration internationale.">
+            <span class="role-phase">Pays de l'établissement</span>
+          </Tooltip>
+        </span>
+        <select
+          class="select"
+          aria-label="Pays de l'établissement"
+          value={institutionCountryItem.value}
+          onchange={(e) => saveInstitutionCountry((e.target as HTMLSelectElement).value)}
+        >
+          {#if perimeterCountries.length > 0}
+            <optgroup label="Pays des structures du périmètre">
+              {#each perimeterCountries as c (c.code)}
+                <option value={c.code}>{c.name ?? c.code.toUpperCase()}</option>
+              {/each}
+            </optgroup>
+          {/if}
+          <optgroup label="Autres pays">
+            {#each otherCountries as c (c.code)}
+              <option value={c.code}>{c.name}</option>
+            {/each}
+          </optgroup>
+        </select>
+      </div>
+    </div>
+  {/if}
 
   <h3 class="subsection-title">Rôle des périmètres</h3>
   <div class="config-grid">
@@ -514,8 +572,16 @@
   .section-title {
     margin: 24px 0 8px;
   }
-  .perim-new {
-    margin-top: 8px;
+  /* Titre de section et bouton d'ajout sur une ligne, le bouton au bord droit. */
+  .section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 24px 0 8px;
+  }
+  .section-head .section-title {
+    margin: 0;
   }
   .info-box {
     margin: 4px 0 12px;

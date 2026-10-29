@@ -1,7 +1,7 @@
 # Pipeline
-* [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Extraction
 * [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? Inspire-HEP
+* [ ] INPI pour les brevets
 * [ ] payloads bruts: ne plus faire transiter par la base?
 * [ ] ScanR est-il utile comme source? mesurer la fiabilité des idref/orcid qu'il apporte
 ## Suite du traitement
@@ -13,23 +13,24 @@
 * [ ] gérer les adresses résultant d'une erreur de parsing (ex. publi 106296); quand un work openalex a les mêmes affiliations pour toutes les contributions => suspect (contrôler par les autres sources)
 * [ ] conserver l'historique des structures
 * [ ] financements (projets ANR, projets européens)
-# Code
-* [ ] 'fr' écrit en dur
 # UI
 ## Admin
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
 * [ ] fusionner structures
+* [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Publique
+* [ ] icônes des licences
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis
+* [ ] mettre en place des slugs pour les URL? (personnes, labos, éditeurs, revues)
 * [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories?
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] mesures d'impact à intégrer dans les stats, les dashboards, et les facettes
+* [ ] stats en compte fractionnaire vs compte entier
+* [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
+### Visualisation
+* [ ] taux de collaboration
 * [ ] évolution des collaborations dans le temps (graphes de collaboration par labo, avec visualisation animée par année)
 * [ ] visualisation des collab avec carte (monde, Europe, France) qui les localise au niveau de leur ville
-* [ ] stats en compte fractionnaire vs compte entier
-* [ ] mettre en place des slugs pour les URL? (personnes, labos, éditeurs, revues)
-* [ ] définir des groupes de pays (UE, continents) pour la facette "pays des co-auteurs"
-* [ ] icônes des licences
 
 # Cas particuliers, bizarreries à élucider
 * publi 165064: lien éditeur présenté comme "full text" alors que non

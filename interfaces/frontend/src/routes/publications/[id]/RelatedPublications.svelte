@@ -1,7 +1,8 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
   import SectionLabel from "./SectionLabel.svelte";
-  import { docTypeLabel, relationTypeLabel } from "#lib/labels.js";
+  import { docTypeLabel } from "#lib/docTypes.svelte.js";
+  import { relationTypeLabel } from "#lib/labels.js";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";
   import type { RelatedPublication } from "./types";
 

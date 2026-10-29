@@ -12,7 +12,7 @@
 	import { toast } from '#lib/dialogs.svelte.js';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';
-	import { docTypeLabel } from '#lib/labels.js';
+	import { docTypeLabel } from '#lib/docTypes.svelte.js';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
 	import { structureLabel } from '#lib/structureLabels.js';
 	import { groupStructuresByType, structureGroupLabel } from '#lib/structureTypes.js';

@@ -8,7 +8,8 @@ import type { Action } from 'svelte/action';
 export const stickyHeight: Action<HTMLElement, { variable: string; hidden?: number }> = (node, params) => {
 	const root = document.documentElement;
 	let { variable, hidden = 0 } = params;
-	const publish = () => root.style.setProperty(variable, `${Math.max(0, node.offsetHeight - hidden)}px`);
+	// Hauteur fractionnaire : une hauteur arrondie à l'entier laisse un liseré entre la barre et l'en-tête.
+	const publish = () => root.style.setProperty(variable, `${Math.max(0, node.getBoundingClientRect().height - hidden)}px`);
 	const observer = new ResizeObserver(publish);
 	observer.observe(node);
 	publish();

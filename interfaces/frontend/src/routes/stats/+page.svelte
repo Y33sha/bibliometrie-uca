@@ -13,7 +13,7 @@
 	import { defaultYears } from '#lib/defaultYears.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
 	import { paramsToQuery } from '#lib/utils.js';
-	import { publicationsDocTypes } from '#lib/labels.js';
+	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { toast } from '#lib/dialogs.svelte.js';
 	import {
 		appendFilterParams,
@@ -36,7 +36,7 @@
 	import type { components } from '#lib/api/schema.js';
 	// --- State ---
 	// Filtres de la liste des publications, hors contexte. La famille « Publications » est présélectionnée (cf. onMount).
-	const FILTERS = publicationFilters({ kind: 'all' }, publicationsDocTypes);
+	const FILTERS = publicationFilters({ kind: 'all' }, publicationsDocTypes());
 	let values = $state(initialValues(FILTERS));
 
 	let chartCanvas: HTMLCanvasElement | undefined = $state();
@@ -423,7 +423,7 @@
 
 		// Défaut du type de document : la famille « Publications ». Appliqué uniquement quand l'URL ne porte pas de filtre de types ; le jeton `all` (sélection vide explicite) le laisse vide.
 		if (!u.has('doc_type')) {
-			values.checkbox.docTypes = [...publicationsDocTypes];
+			values.checkbox.docTypes = publicationsDocTypes();
 		}
 
 		await facets.load();

@@ -152,6 +152,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/doc-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Doc Types
+         * @description Familles des types de document et leurs types, avec leurs libellés français, dans l'ordre d'affichage.
+         */
+        get: operations["list_doc_types_api_publications_doc_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications/facets": {
         parameters: {
             query?: never;
@@ -1990,6 +2010,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/perimeters/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Perimeter Countries
+         * @description Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent. Sert à choisir le pays de l'établissement.
+         */
+        get: operations["list_perimeter_countries_api_perimeters_countries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/perimeters/{perimeter_id}": {
         parameters: {
             query?: never;
@@ -3329,6 +3369,30 @@ export interface components {
             has_rh: boolean;
         };
         /**
+         * DocTypeFamilyOut
+         * @description Famille de types de document, ses types dans l'ordre d'affichage.
+         */
+        DocTypeFamilyOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Types */
+            types: components["schemas"]["DocTypeOut"][];
+        };
+        /**
+         * DocTypeOut
+         * @description Type de document et ses libellés français.
+         */
+        DocTypeOut: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Plural Label */
+            plural_label: string;
+        };
+        /**
          * DoiNamespaceConflict
          * @description Enregistrements de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`.
          *
@@ -4190,6 +4254,16 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+        };
+        /**
+         * PerimeterCountryOut
+         * @description Pays d'organisations ROR des structures du périmètre des personnes.
+         */
+        PerimeterCountryOut: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string | null;
         };
         /** PerimeterCreate */
         PerimeterCreate: {
@@ -5314,7 +5388,7 @@ export interface components {
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée. `raw_doc_type` est le type dans le vocabulaire de la source. Pour un type corrigé, `doc_type_uncorrected` est le type d'avant correction et `doc_type_corrected_by` la règle de correction.
          */
         SourceRecordMetadataOut: {
             /** Id */
@@ -5333,6 +5407,12 @@ export interface components {
             title_normalized: string | null;
             /** Doc Type */
             doc_type: string | null;
+            /** Raw Doc Type */
+            raw_doc_type: string | null;
+            /** Doc Type Uncorrected */
+            doc_type_uncorrected: string | null;
+            /** Doc Type Corrected By */
+            doc_type_corrected_by: string | null;
             /** Publication Year */
             publication_year: number | null;
             /** Language */
@@ -6099,6 +6179,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnumOption"][];
+                };
+            };
+        };
+    };
+    list_doc_types_api_publications_doc_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocTypeFamilyOut"][];
                 };
             };
         };
@@ -9112,6 +9212,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_perimeter_countries_api_perimeters_countries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerimeterCountryOut"][];
                 };
             };
         };

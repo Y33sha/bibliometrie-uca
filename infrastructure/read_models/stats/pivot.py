@@ -73,14 +73,14 @@ class Measure:
 
 def doc_type_grouped_sql(column: str = "p.doc_type") -> str:
     """Expression `CASE` qui projette une colonne `doc_type` sur la clé de groupement du pivot : les types de la famille « publications » (article, communication, chapitre…) gardent leur grain fin, les autres familles se regroupent sous leur clé de famille. Le détail sert là où il informe le plus : la répartition des publications au sens strict varie fortement d'un laboratoire à l'autre. L'expression couvre toute l'enum ; un type non listé tombe dans `misc`."""
-    expanded = DOC_TYPE_FAMILIES["publications"]
+    expanded = DOC_TYPE_FAMILIES["publications"].types
     whens = [
         f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in expanded)}) THEN {column}::text"
     ]
     whens += [
-        f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in types)}) THEN {family!r}"
-        for family, types in DOC_TYPE_FAMILIES.items()
-        if family != "publications"
+        f"WHEN {column}::text IN ({', '.join(f'{t.value!r}' for t in family.types)}) THEN {key!r}"
+        for key, family in DOC_TYPE_FAMILIES.items()
+        if key != "publications"
     ]
     return f"CASE {' '.join(whens)} ELSE 'misc' END"
 

@@ -10,11 +10,14 @@ from interfaces.cli.dev.seed_from_ror import (
 )
 
 
-def _record(ror_id: str, types: list[str], names: list[tuple[str, list[str]]], children=()):
+def _record(
+    ror_id: str, types: list[str], names: list[tuple[str, list[str]]], children=(), country=None
+):
     return {
         "id": f"https://ror.org/{ror_id}",
         "types": types,
         "names": [{"value": value, "types": kinds} for value, kinds in names],
+        "locations": [{"geonames_details": {"country_code": country}}] if country else [],
         "relationships": [
             {"id": f"https://ror.org/{child}", "type": "child", "label": child}
             for child in children
@@ -29,6 +32,7 @@ ROOT = parse_organization(
         ["education", "funder"],
         [("UL", ["acronym"]), ("Université de Lorraine", ["ror_display", "label"])],
         children=["02vnf0c38", "05kxdq627"],
+        country="BE",
     )
 )
 LAB = parse_organization(
@@ -131,8 +135,16 @@ def test_seed_links_children_to_root_and_skips_untyped():
         ("perimeter_persons", "lorraine"),
         ("site_title", ""),
         ("brand_hue", 196),
+        ("institution_country", "be"),
     ]
     assert seed.skipped == [GARDENS]
+
+
+def test_institution_country_defaults_without_ror_location():
+    seed = build_institution_seed(LAB, [], [], "loria")
+
+    config = dict(row[:2] for row in _section(seed, "config").rows)
+    assert config["institution_country"] == "fr"
 
 
 def test_seed_carries_hal_collections_by_ror():

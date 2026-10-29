@@ -113,10 +113,13 @@
                 {:else if cell.title}
                   <PublicationTitle titre={cell.text} />
                 {:else}
+                  {#if cell.corrected}
+                    <del class="uncorrected" title={cell.corrected.rule ? `Corrigé par la règle ${cell.corrected.rule}` : "Corrigé"}>{cell.corrected.from}</del>
+                  {/if}
                   {cell.text}
                 {/if}
                 {#if cell.note}
-                  <div class="note" title="Nom donné par la source">{cell.note}</div>
+                  <div class="note" title="Valeur donnée par la source">{cell.note}</div>
                 {/if}
               </td>
             {/each}
@@ -285,6 +288,10 @@
     color: var(--muted);
     font-size: var(--fs-sm);
     margin-top: 2px;
+  }
+  .uncorrected {
+    color: var(--muted);
+    margin-right: 4px;
   }
   .failure {
     color: var(--muted);

@@ -24,10 +24,7 @@ class PlaceNameKind(StrEnum):
 # d'une adresse non arbitrée. Les décomptes géographiques l'écartent.
 NO_COUNTRY_CODE = "xx"
 
-# Pays de l'établissement.
-DOMESTIC_COUNTRY_CODE = "fr"
 
-# Codes écartés des décomptes de collaborations internationales.
-NON_INTERNATIONAL_COUNTRY_CODES: frozenset[str] = frozenset(
-    {DOMESTIC_COUNTRY_CODE, NO_COUNTRY_CODE}
-)
+def non_international_country_codes(institution_country: str) -> list[str]:
+    """Codes écartés des décomptes de collaborations internationales : pays de l'établissement et absence de pays."""
+    return sorted({institution_country, NO_COUNTRY_CODE})

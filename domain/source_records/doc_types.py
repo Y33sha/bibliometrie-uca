@@ -9,6 +9,12 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "art_artrev": "review",
         "art_bookreview": "book_review",
         "art_datapaper": "data_paper",
+        # Mémoire suivi du code de diplôme DUMAS (`dumas_degreeType`) : thèses d'exercice de médecine, de pharmacie, de médecine vétérinaire, en chirurgie dentaire, commune médecine-pharmacie.
+        "mem_12": "practice_thesis",
+        "mem_13": "practice_thesis",
+        "mem_30": "practice_thesis",
+        "mem_47": "practice_thesis",
+        "mem_63": "practice_thesis",
         "undefined_preprint": "preprint",
         "undefined_workingpaper": "preprint",
         "creport_resreport": "report",
@@ -22,6 +28,7 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "art": "article",
         "comm": "conference_paper",
         "poster": "poster",
+        "presconf": "conference",
         "ouv": "book",
         "ouv_crit": "book",
         "ouv_dictionary": "book",
@@ -41,8 +48,8 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "lecture": "other",
         "img": "other",
         "img_photography": "other",
-        "video": "other",
-        "son": "other",
+        "video": "recorded_talk",
+        "son": "media",
         "map": "other",
         "software": "software",
         "patent": "patent",
@@ -152,11 +159,11 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
         "software": "software",
         "computationalnotebook": "software",
         "peerreview": "peer_review",
-        "audiovisual": "media",
+        "audiovisual": "recorded_talk",
         "image": "other",
         "collection": "other",
         "physicalobject": "physical_object",
-        "sound": "other",
+        "sound": "media",
         "model": "other",
         "workflow": "other",
         "standard": "other",
@@ -213,8 +220,16 @@ _SOURCE_MAPS: dict[str, dict[str, str]] = {
 }
 
 
+def _translate(part: str, source_map: dict[str, str]) -> str | None:
+    """Traduction d'un type brut : sa valeur dans la table, sinon le type lui-même s'il est du référentiel. Un type suivi d'un sous-type absent de la table (`MEM_14`) prend la traduction du type."""
+    if translated := source_map.get(part) or (part if part in DOC_TYPES_SET else None):
+        return translated
+    base, _, subtype = part.partition("_")
+    return source_map.get(base) if subtype else None
+
+
 def map_doc_type(raw: str, source: str) -> str | None:
-    """Type du référentiel pour le type `raw` donné par `source` : sa valeur dans la table de la source, sinon `raw` lui-même s'il est un type du référentiel. `None` pour une valeur absente des deux ; `other` pour une valeur vide.
+    """Type du référentiel pour le type `raw` donné par `source` (`_translate`). `None` pour une valeur inconnue ; `other` pour une valeur vide.
 
     Un type composite (WoS « Article; Proceedings Paper ») prend la traduction de sa première partie traduite autrement qu'en `other`.
     """
@@ -222,11 +237,7 @@ def map_doc_type(raw: str, source: str) -> str | None:
     if not parts:
         return "other"
     source_map = _SOURCE_MAPS.get(source, {})
-    known = [
-        translated
-        for part in parts
-        if (translated := source_map.get(part) or (part if part in DOC_TYPES_SET else None))
-    ]
+    known = [translated for part in parts if (translated := _translate(part, source_map))]
     if not known:
         return None
     return next((t for t in known if t != "other"), "other")

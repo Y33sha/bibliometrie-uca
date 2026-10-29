@@ -114,6 +114,11 @@ class TestDumasRule:
         assert corrected is not None
         assert corrected.value == "memoir"
 
+    def test_dumas_url_spares_practice_thesis(self):
+        # Le diplôme du dépôt HAL fait de la thèse d'exercice un type à part.
+        view = _view(doc_type="practice_thesis", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
+        assert effective_metadata(view).doc_type is None
+
     def test_no_dumas_url_no_correction(self):
         view = _view(doc_type="thesis", urls=("https://example.com/x",))
         assert effective_metadata(view).doc_type is None
@@ -304,6 +309,23 @@ class TestTitleSupplementaryContentRule:
 
     def test_supplementary_dataset_plural_corrects_to_dataset(self):
         view = _view(doc_type="other", title="Supplementary datasets for a major X")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_supporting_movies_on_recorded_talk_corrects_to_dataset(self):
+        # DataCite `Audiovisual` : vidéos jointes à un article.
+        view = _view(
+            doc_type="recorded_talk",
+            title="Supporting Movies from: Seismo-acoustic observations of crashing ocean waves",
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
+
+    def test_supplementary_videos_corrects_to_dataset(self):
+        view = _view(
+            doc_type="recorded_talk",
+            title="Supplementary videos for 'Driven shear flow in biological magneto-active fluids'",
+        )
         corrected = effective_metadata(view).doc_type
         assert corrected is not None and corrected.value == "dataset"
 
@@ -631,6 +653,11 @@ class TestTitleMediaPrefixRule:
     def test_article_with_interview_title_corrects(self):
         # OpenAlex classe parfois les interviews écrites en `article`.
         view = _view(doc_type="article", title="Interview of Teis Hansen, Full Professor")
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "media"
+
+    def test_interview_prefix_on_recorded_talk_corrects_to_media(self):
+        view = _view(doc_type="recorded_talk", title="Interview Jean Pierre CHANET INRAE")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None and corrected.value == "media"
 

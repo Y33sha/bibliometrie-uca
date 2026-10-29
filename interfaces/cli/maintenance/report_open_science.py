@@ -15,7 +15,7 @@ from pathlib import Path
 
 from sqlalchemy import Connection, Row, text
 
-from domain.countries import NON_INTERNATIONAL_COUNTRY_CODES
+from domain.countries import non_international_country_codes
 from domain.dates import today
 from domain.platforms.platform import PlatformType
 from domain.platforms.registry import known_platform_of_copy, preprint_servers_of_prefix
@@ -24,6 +24,7 @@ from domain.publications.licenses import License, license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.registry import source_label
 from infrastructure.db.engine import get_sync_engine
+from infrastructure.read_models.perimeters.queries import get_institution_country
 from infrastructure.read_models.structures.queries import (
     AUTHOR_SOURCE_CONTRIBUTION,
     AUTHORED_PUBLICATION,
@@ -49,6 +50,7 @@ DOC_TYPE_LABELS = {
     DocType.REVIEW: "Revue de littérature (review)",
     DocType.CONFERENCE_PAPER: "Texte publié dans des actes",
     DocType.CONFERENCE: "Communication sans texte publié",
+    DocType.RECORDED_TALK: "Conférence filmée",
     DocType.POSTER: "Poster",
     DocType.EDITORIAL: "Éditorial",
     DocType.LETTER: "Lettre",
@@ -97,8 +99,8 @@ HAL_FULL_TEXT = f"""
     )
 """
 
-# Publication `p` cosignée hors de France. Le paramètre `:domestic` liste les codes pays non internationaux.
-INTERNATIONAL = "EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> ALL(:domestic))"
+# Publication `p` cosignée hors du pays de l'établissement. Le paramètre `:non_international` liste les codes pays non internationaux.
+INTERNATIONAL = "EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> ALL(:non_international))"
 
 # Revue `j` diamant : marquée diamant, ou dans le DOAJ sans APC ni autres frais.
 DIAMOND_JOURNAL = f"COALESCE({diamond_journal_sql('j')}, false)"
@@ -128,7 +130,11 @@ class OpenScienceReport:
 
     def __init__(self, conn: Connection, structure_id: int, year: int) -> None:
         self._conn = conn
-        self._binds: dict[str, object] = {"structure_id": structure_id, "year": year}
+        self._binds: dict[str, object] = {
+            "structure_id": structure_id,
+            "year": year,
+            "non_international": non_international_country_codes(get_institution_country(conn)),
+        }
         self.year = year
 
     def _rows(self, sql: str, **binds: object) -> Sequence[SqlRow]:
@@ -362,16 +368,14 @@ class OpenScienceReport:
         )
 
     def collaborations(self) -> str:
-        binds = {"domestic": sorted(NON_INTERNATIONAL_COUNTRY_CODES)}
         countries = self._rows(
             f"""
             SELECT COALESCE(rc.name, upper(c)) AS country, COUNT(*) AS n
             FROM ({LAB_PUBLICATIONS}) p, unnest(p.countries) AS c
             LEFT JOIN ref.countries rc ON rc.code = c
-            WHERE p.publication_year = :year AND c <> ALL(:domestic)
+            WHERE p.publication_year = :year AND c <> ALL(:non_international)
             GROUP BY 1 ORDER BY 2 DESC, 1
-            """,
-            **binds,
+            """
         )
         r = self._one(
             f"""
@@ -389,12 +393,11 @@ class OpenScienceReport:
             """,
             types=_values(OA_RATE_TYPES),
             open=_values(OPEN_STATUSES),
-            **binds,
         )
         top = ", ".join(f"{c.country} ({c.n})" for c in countries[:TOP_COUNTRIES])
         return (
             "## Collaborations internationales\n\n"
-            f"{r.international} publications sur {r.total} ont au moins un coauteur affilié hors de France, avec {len(countries)} pays au total. "
+            f"{r.international} publications sur {r.total} ont au moins un coauteur affilié à l'étranger, avec {len(countries)} pays au total. "
             f"Pays les plus fréquents : {top}.\n\n"
             f"Taux d'ouverture des copublications internationales : {r.intl_open} sur {r.intl_oa_base} ({_pct(r.intl_open, r.intl_oa_base)}). "
             f"Autres publications : {r.other_open} sur {r.other_oa_base} ({_pct(r.other_open, r.other_oa_base)})."
@@ -555,15 +558,13 @@ class OpenScienceReport:
                        WHERE a.publication_id = p.id AND a.is_corresponding AND {AUTHOR_SOURCE_CONTRIBUTION}
                    )) AS corresponding
             FROM ({LAB_PUBLICATIONS}) p WHERE p.publication_year = :year
-            """,
-            domestic=sorted(NON_INTERNATIONAL_COUNTRY_CODES),
+            """
         )
         n_countries = self._one(
             f"""
             SELECT COUNT(DISTINCT c) AS n FROM ({LAB_PUBLICATIONS}) p, unnest(p.countries) AS c
-            WHERE p.publication_year = :year AND c <> ALL(:domestic)
-            """,
-            domestic=sorted(NON_INTERNATIONAL_COUNTRY_CODES),
+            WHERE p.publication_year = :year AND c <> ALL(:non_international)
+            """
         ).n
         opened = oa.hal + oa.elsewhere if oa else 0
         oa_total = oa.total if oa else 0

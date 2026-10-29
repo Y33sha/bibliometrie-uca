@@ -11,11 +11,13 @@
   import { loadInstitution, siteTitle } from "#lib/institution.svelte.js";
   import { isAdmin, loadSession, loginUrl, session } from "#lib/session.svelte.js";
   import { loadSources } from "#lib/sources.svelte.js";
+  import { docTypesLoaded, loadDocTypes } from "#lib/docTypes.svelte.js";
 
   let { children }: { children: Snippet } = $props();
 
   loadInstitution();
   loadSources();
+  loadDocTypes();
   loadSession();
 
   const isAdminSection = $derived(isActive("/admin"));
@@ -155,8 +157,8 @@
 </header>
 
 <main id="contenu" class="container" tabindex="-1">
-  <!-- Une page se monte une fois la session lue, pour un identifiant et un rôle : ses fonctions d'administration et ses filtres par défaut dépendent du rôle. Naviguer vers un autre identifiant de la même route, ou changer de rôle, la remonte avec ses chargements au montage. -->
-  {#if session.loaded}
+  <!-- Une page se monte une fois la session et les types de document lus, pour un identifiant et un rôle : ses fonctions d'administration et ses filtres par défaut dépendent du rôle et des familles de types. Naviguer vers un autre identifiant de la même route, ou changer de rôle, la remonte avec ses chargements au montage. -->
+  {#if session.loaded && docTypesLoaded()}
     {#key `${page.params.id}|${isAdmin()}`}
       {@render children()}
     {/key}

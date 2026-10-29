@@ -15,11 +15,11 @@ from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 
-OUT_OF_SCOPE_DOC_TYPES = frozenset({"peer_review", "memoir", "physical_object"})
+OUT_OF_SCOPE_DOC_TYPES = frozenset({"peer_review", "practice_thesis", "memoir", "physical_object"})
 """Types de document exclus des publications. Une œuvre de l'un de ces types reste sans publication. Ses enregistrements sources et ses contributions sources restent en base, sans contribution ni personne.
 
 - `peer_review` : rapport d'évaluation d'un article.
-- `memoir` : mémoire d'étudiant, surtout de DUMAS ; ses auteurs sont de passage.
+- `practice_thesis`, `memoir` : thèse d'exercice et mémoire d'étudiant, surtout de DUMAS ; leurs auteurs sont de passage.
 - `physical_object` : échantillon ou instrument identifié par un DOI DataCite (IGSN).
 """
 

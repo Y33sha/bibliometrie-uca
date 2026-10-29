@@ -5,6 +5,7 @@ Sur une base vide, chaque test exerce une branche des filtres, des tris, des fac
 
 import pytest
 
+from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.licenses import LICENSE_LABELS
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -22,6 +23,16 @@ def test_licenses_follow_the_domain_enum(client):
     assert [(o["value"], o["label_fr"]) for o in r.json()] == [
         (lic.value, label) for lic, label in LICENSE_LABELS.items()
     ]
+
+
+def test_doc_types_follow_the_domain_families(client):
+    r = client.get("/api/publications/doc-types")
+    assert r.status_code == 200
+    assert [(f["key"], [t["value"] for t in f["types"]]) for f in r.json()] == [
+        (key, list(family.types)) for key, family in DOC_TYPE_FAMILIES.items()
+    ]
+    article = r.json()[0]["types"][0]
+    assert article == {"value": "article", "label": "Article", "plural_label": "Articles"}
 
 
 def test_sources_are_readable_without_session(client):

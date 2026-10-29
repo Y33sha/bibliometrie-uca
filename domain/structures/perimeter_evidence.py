@@ -12,7 +12,7 @@ class PerimeterEvidence(StrEnum):
     HR_RECORD = "hr_record"
     # Une structure HAL directe de la contribution source, ou un de ses parents HAL, correspond à une structure du périmètre.
     HAL_STRUCTURE = "hal_structure"
-    # Un ROR de la contribution source est celui d'une structure du périmètre.
+    # Un ROR sans adresse de la contribution source est celui d'une structure du périmètre.
     ROR = "ror"
     # Indice d'une publication : la thèse est soutenue dans un établissement du périmètre (PPN de l'établissement de soutenance parmi les `api_ids.theses`).
     THESIS_INSTITUTION = "thesis_institution"

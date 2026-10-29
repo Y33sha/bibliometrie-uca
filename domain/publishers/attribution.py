@@ -17,9 +17,11 @@ UNPUBLISHED_DOC_TYPES: frozenset[str] = frozenset(
         DocType.THESIS,
         DocType.ONGOING_THESIS,
         DocType.HDR,
+        DocType.PRACTICE_THESIS,
         DocType.MEMOIR,
         DocType.POSTER,
         DocType.CONFERENCE,
+        DocType.RECORDED_TALK,
         DocType.PATENT,
     }
 )

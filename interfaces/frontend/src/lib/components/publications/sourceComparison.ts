@@ -1,5 +1,6 @@
 import type { components } from '#lib/api/schema.js';
-import { CONTRIBUTION_ROLE_ORDER, docTypeLabel, oaStatusLabel } from '#lib/labels.js';
+import { docTypeLabel } from '#lib/docTypes.svelte.js';
+import { CONTRIBUTION_ROLE_ORDER, oaStatusLabel } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];
@@ -8,12 +9,13 @@ export type SourceContribution = components['schemas']['SourceContributionOut'];
 /** Cible du lien d'une case : un DOI, ou une entrée du référentiel. Le gabarit compose l'adresse et en écrit l'hôte. */
 export type CellLink = { kind: 'doi'; doi: string } | { kind: 'serials' | 'publishers'; id: number };
 
-/** Case du tableau : texte affiché (`null` pour une valeur absente), lien éventuel, et en note le nom donné par la source quand il diffère du référentiel. `title` signale un titre de publication, rendu par `PublicationTitle`. */
+/** Case du tableau : texte affiché (`null` pour une valeur absente), lien éventuel, et en note la valeur donnée par la source quand elle diffère du référentiel. `title` signale un titre de publication, rendu par `PublicationTitle`. `corrected` : valeur d'avant correction, affichée barrée, et règle de correction. */
 export interface ComparisonCell {
 	text: string | null;
 	link?: CellLink;
 	note?: string;
 	title?: boolean;
+	corrected?: { from: string; rule: string | null };
 }
 
 /** Ligne du tableau : un champ, une case par enregistrement. `divergent` signale au moins deux valeurs différentes. */
@@ -122,7 +124,14 @@ function fields(records: SourceRecord[]): Field[] {
 		{
 			key: 'doc_type',
 			label: 'Type',
-			cell: (r) => ({ text: r.doc_type ? docTypeLabel(r.doc_type) : null }),
+			// Type corrigé, précédé du type d'avant correction, avec en note le type dans le vocabulaire de la source.
+			cell: (r) => ({
+				text: r.doc_type ? docTypeLabel(r.doc_type) : null,
+				note: r.raw_doc_type ?? undefined,
+				corrected: r.doc_type_uncorrected
+					? { from: docTypeLabel(r.doc_type_uncorrected), rule: r.doc_type_corrected_by }
+					: undefined,
+			}),
 			compared: (r) => r.doc_type,
 		},
 		{

@@ -1,4 +1,4 @@
-"""Traduction des types de document des sources, et libellés français de chaque type dans le frontend."""
+"""Traduction des types de document des sources."""
 
 import re
 from pathlib import Path
@@ -10,7 +10,6 @@ from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCHEMA_PATH = PROJECT_ROOT / "infrastructure" / "db" / "schema.sql"
-LABELS_PATH = PROJECT_ROOT / "interfaces" / "frontend" / "src" / "lib" / "labels.ts"
 
 
 def _read_pg_doc_type_enum() -> set[str]:
@@ -23,37 +22,10 @@ def _read_pg_doc_type_enum() -> set[str]:
     return {m.group(1) for m in re.finditer(r"'([^']+)'", match.group(1))}
 
 
-def _read_ts_label_map(var_name: str) -> dict[str, str]:
-    """Libellés de la table `<var_name>`, lus dans le source de `labels.ts`."""
-    ts = LABELS_PATH.read_text(encoding="utf-8")
-    block = re.search(
-        rf"export const {var_name}: Record<string, string> = \{{(.*?)\}};",
-        ts,
-        re.DOTALL,
-    )
-    assert block, f"Map {var_name} introuvable dans labels.ts"
-    return {m.group(1): m.group(3) for m in re.finditer(r"(\w+):\s*(['\"])(.*?)\2", block.group(1))}
-
-
 class TestDocTypeEnum:
     def test_doc_types_couvre_exactement_l_enum_pg(self):
         """`DOC_TYPES` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
         assert DOC_TYPES_SET == _read_pg_doc_type_enum()
-
-
-class TestDocTypeLabelsFrontend:
-    def test_singulier_couvre_exactement_les_doc_types(self):
-        """Chaque type de document a un libellé singulier dans le frontend."""
-        assert set(_read_ts_label_map("docTypeSingular").keys()) == DOC_TYPES_SET
-
-    def test_pluriel_couvre_exactement_les_doc_types(self):
-        """Chaque type de document a un libellé pluriel dans le frontend."""
-        assert set(_read_ts_label_map("docTypePlural").keys()) == DOC_TYPES_SET
-
-    def test_libelles_non_vides(self):
-        for var_name in ("docTypeSingular", "docTypePlural"):
-            for value, label in _read_ts_label_map(var_name).items():
-                assert label, f"Libellé vide pour {value} dans {var_name}"
 
 
 class TestMapDocType:
@@ -75,6 +47,26 @@ class TestMapDocType:
 
     def test_datacite_presentation_vers_conference(self):
         assert map_doc_type("Presentation", source="datacite") == "conference"
+
+    def test_videos_vers_recorded_talk(self):
+        assert map_doc_type("VIDEO", source="hal") == "recorded_talk"
+        assert map_doc_type("Audiovisual", source="datacite") == "recorded_talk"
+
+    def test_enregistrements_audio_vers_media(self):
+        assert map_doc_type("SON", source="hal") == "media"
+        assert map_doc_type("Sound", source="datacite") == "media"
+
+    def test_hal_these_d_exercice_par_le_diplome_dumas(self):
+        assert map_doc_type("MEM_12", source="hal") == "practice_thesis"
+        assert map_doc_type("MEM_30", source="hal") == "practice_thesis"
+
+    def test_hal_sous_type_absent_de_la_table_prend_le_type(self):
+        """Un mémoire de sage-femme (`MEM_14`) reste un mémoire."""
+        assert map_doc_type("MEM_14", source="hal") == "memoir"
+        assert map_doc_type("ART_unknown", source="hal") == "article"
+
+    def test_hal_presconf_vers_conference(self):
+        assert map_doc_type("PRESCONF", source="hal") == "conference"
 
     def test_hal_protocole_de_recherche_vers_report(self):
         assert map_doc_type("REPORT_RESPROT", source="hal") == "report"

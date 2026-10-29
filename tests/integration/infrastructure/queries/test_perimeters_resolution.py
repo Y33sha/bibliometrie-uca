@@ -3,14 +3,17 @@
 from sqlalchemy import text
 
 from infrastructure.read_models.perimeters.queries import (
+    PerimetersQueries,
     get_extraction_api_ids,
     get_extraction_structure_ids,
     get_hal_collections,
+    get_institution_country,
     get_persons_perimeter_name,
     get_persons_perimeter_root_ids,
     get_persons_structure_ids,
 )
 from tests.integration.helpers.config import set_config
+from tests.integration.helpers.rors import insert_ror_tree
 from tests.integration.helpers.structures import insert_perimeter, insert_structure
 
 
@@ -58,6 +61,37 @@ def test_configured_persons_perimeter_prevails(sa_sync_conn):
 
     assert get_persons_structure_ids(conn) == {persons_root}
     assert get_persons_perimeter_name(conn) == "Personnes"
+
+
+def test_institution_country_defaults_when_absent(sa_sync_conn):
+    conn = sa_sync_conn
+    conn.execute(text("DELETE FROM config WHERE key = 'institution_country'"))
+
+    assert get_institution_country(conn) == "fr"
+
+
+def test_persons_perimeter_countries_by_frequency(sa_sync_conn):
+    conn = sa_sync_conn
+    _clear_perimeter_config(conn)
+    insert_ror_tree(conn)
+    structures = []
+    for code, ror in (
+        ("res_fr_1", "0univ0001"),
+        ("res_fr_2", "0lab00001"),
+        ("res_de", "0ger00001"),
+        ("res_sans_ror", None),
+    ):
+        structure = insert_structure(conn, code)
+        conn.execute(
+            text("UPDATE structures SET ror_id = :r WHERE id = :s"), {"r": ror, "s": structure}
+        )
+        structures.append(structure)
+    insert_perimeter(conn, "res_pays", root_structure_ids=structures, materialize=True)
+    set_config(conn, "perimeter_persons", "res_pays")
+
+    countries = PerimetersQueries(conn).persons_perimeter_countries()
+
+    assert [c.code for c in countries] == ["fr", "de"]
 
 
 class TestGetHalCollections:

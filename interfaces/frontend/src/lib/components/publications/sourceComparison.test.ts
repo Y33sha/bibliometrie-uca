@@ -22,6 +22,9 @@ function record(overrides: Partial<SourceRecord>): SourceRecord {
 		title: 'Titre',
 		title_normalized: 'titre',
 		doc_type: 'article',
+		raw_doc_type: null,
+		doc_type_uncorrected: null,
+		doc_type_corrected_by: null,
 		publication_year: 2024,
 		language: 'en',
 		language_name: 'Anglais',
@@ -130,6 +133,24 @@ describe('comparisonRows', () => {
 			record({ id: 2, serial_id: 8, journal_title: 'Nature' }),
 		]);
 		expect(row(rows, 'serial').divergent).toBe(true);
+	});
+
+	it("affiche le type corrigé, le type d'avant correction et en note le type de la source", () => {
+		const rows = comparisonRows([
+			record({
+				doc_type: 'media',
+				raw_doc_type: 'journal-article',
+				doc_type_uncorrected: 'article',
+				doc_type_corrected_by: 'SERIAL_TYPE_MEDIA_TO_MEDIA',
+			}),
+		]);
+		expect(row(rows, 'doc_type').cells).toEqual([
+			{
+				text: 'media',
+				note: 'journal-article',
+				corrected: { from: 'article', rule: 'SERIAL_TYPE_MEDIA_TO_MEDIA' },
+			},
+		]);
 	});
 
 	it('affiche le nom de la langue, avec en note la valeur que donnait la source', () => {

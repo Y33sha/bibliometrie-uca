@@ -36,12 +36,13 @@ from domain.config import (
     BRAND_HUE_KEY,
     CAP_KEYS,
     DELAY_KEYS,
+    INSTITUTION_COUNTRY_KEY,
     MAX_YEAR,
     MIN_YEAR,
     SITE_TITLE_KEY,
     YEAR_KEYS,
 )
-from domain.countries import PlaceNameKind
+from domain.countries import NO_COUNTRY_CODE, PlaceNameKind
 from domain.country_detection import CountryDetectionMethod
 from domain.merge import MergedEntity
 from domain.persons.contribution_matching import ContributionMatchReason
@@ -168,6 +169,12 @@ config = Table(
         "AND (value)::numeric BETWEEN 0 AND 359 "
         "AND (value)::numeric = trunc((value)::numeric))",
         name="config_brand_hue_is_angle",
+    ),
+    CheckConstraint(
+        f"key <> '{INSTITUTION_COUNTRY_KEY}' OR (jsonb_typeof(value) = 'string' "
+        "AND value #>> '{}' ~ '^[a-z]{2}$' "
+        f"AND value #>> '{{}}' <> '{NO_COUNTRY_CODE}')",
+        name="config_institution_country_is_code",
     ),
     schema="ops",
 )
