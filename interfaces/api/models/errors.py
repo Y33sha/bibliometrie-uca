@@ -1,6 +1,6 @@
 """Corps des réponses d'erreur à charge structurée, partagés par les handlers d'`app.py` et les routes qui les déclarent.
 
-Les erreurs à corps trivial (`{detail}`) n'ont pas de modèle : leur forme est universelle. Ces deux-ci portent une liste que le frontend affiche, d'où un contrat publié dans l'OpenAPI. Elles reprennent la forme des `TypedDict` de `domain/errors.py`, côté HTTP.
+Une erreur au seul `{detail}` se passe de modèle. Ces deux-ci contiennent une liste que le frontend affiche : leur contrat est publié dans l'OpenAPI. Elles reprennent, côté HTTP, la forme des `TypedDict` de `domain/errors.py`.
 """
 
 from pydantic import BaseModel
@@ -24,7 +24,7 @@ class PublisherMergeBlockedResponse(BaseModel):
 
 
 class RejectedPairItem(BaseModel):
-    """Paire (publication, personne) déjà rejetée, qui bloque une réassignation."""
+    """Paire (publication, personne) déjà rejetée, qui bloque une réattribution."""
 
     publication_id: int
     person_id: int

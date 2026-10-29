@@ -9,12 +9,12 @@ from domain.serials.serial import SerialType
 
 
 class SerialTypeChange(BaseModel):
-    """Valeur de `serial_type` dont la modale admin demande l'impact avant de confirmer l'édition."""
+    """Type de revue dont la fenêtre d'édition de l'administration demande l'effet avant de confirmer."""
 
     serial_type: SerialType
 
 
 class SerialTypeChangeImpact(BaseModel):
-    """Compte des publications dont le `doc_type` canonique changerait si le `serial_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition."""
+    """Nombre de publications dont le type changerait avec le type de revue prévu, rendu avant la confirmation de l'édition."""
 
     count: int

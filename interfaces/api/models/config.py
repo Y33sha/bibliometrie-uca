@@ -6,9 +6,7 @@ from pydantic import BaseModel
 
 
 class ConfigValueUpdate(BaseModel):
-    """Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire."""
+    """Corps de PUT /api/config/{key} : une valeur JSON quelconque."""
 
-    # `Any` plutôt que `JsonValue` (récursif PEP 695) : le schéma JSON
-    # généré contient une self-référence que `openapi-typescript` n'arrive
-    # pas à instancier côté TS (cf. `infrastructure/read_models/config/models.py`).
+    # `Any` plutôt que `JsonValue` : openapi-typescript traduit le schéma autoréférent de `JsonValue` en un type que TypeScript refuse (`infrastructure/read_models/config/models.py`).
     value: Any

@@ -2840,11 +2840,7 @@ export interface components {
         };
         /**
          * AddIdentifierResponse
-         * @description Réponse de `POST /api/persons/{id}/identifiers`, polymorphe selon l'issue :
-         *
-         *     - doublon exact : `added=False` + `reason`
-         *     - ajout : `added=True` + `id_type` + `id_value`
-         *     - réattribution depuis une autre personne : en plus, `reassigned=True`
+         * @description Réponse de `POST /api/persons/{id}/identifiers`, selon l'issue : doublon exact (`added` faux, avec `reason`), ajout (`added` vrai, avec `id_type` et `id_value`), ou réattribution depuis une autre personne (`reassigned` vrai en plus).
          */
         AddIdentifierResponse: {
             /** Added */
@@ -3054,7 +3050,7 @@ export interface components {
         };
         /**
          * AssignOrphanContribution
-         * @description Attribution unitaire d'une contribution orpheline, désignée par son contribution. Seule à savoir créer la personne au passage.
+         * @description Attribution d'une contribution orpheline, désignée par son identifiant. Seule à pouvoir créer la personne au passage.
          */
         AssignOrphanContribution: {
             /** Contribution Id */
@@ -3080,7 +3076,7 @@ export interface components {
         AttributionStatus: "pending" | "confirmed" | "rejected" | "authenticated";
         /**
          * AuthCheckResponse
-         * @description État de la session : `authenticated` dit si la requête porte une session valide, `login` et `roles` désignent son utilisateur.
+         * @description État de la session : `authenticated` dit si la requête a une session valide, `login` et `roles` désignent son utilisateur.
          */
         AuthCheckResponse: {
             /** Authenticated */
@@ -3095,7 +3091,7 @@ export interface components {
         };
         /**
          * BatchAssignOrphanContributions
-         * @description Attribution en lot de contributions orphelines, désignées par leurs contributions, à une personne existante.
+         * @description Attribution en lot de contributions orphelines, désignées par leurs identifiants, à une personne existante.
          */
         BatchAssignOrphanContributions: {
             /** Contribution Ids */
@@ -3196,7 +3192,7 @@ export interface components {
         };
         /**
          * ConfigValueUpdate
-         * @description Corps de PUT /api/config/{key} : value JSON-sérialisable arbitraire.
+         * @description Corps de PUT /api/config/{key} : une valeur JSON quelconque.
          */
         ConfigValueUpdate: {
             /** Value */
@@ -3312,7 +3308,7 @@ export interface components {
         };
         /**
          * DetachContributionsResponse
-         * @description Décompte d'un détachement de contributions : contributions détachées de la personne, formes de nom nettoyées.
+         * @description Décompte d'un détachement de contributions : contributions détachées de la personne, formes de nom supprimées.
          */
         DetachContributionsResponse: {
             /** Detached */
@@ -3419,9 +3415,7 @@ export interface components {
         };
         /**
          * EnumOption
-         * @description Une valeur d'enum exposée à l'interface : `{value, label_fr}`.
-         *
-         *     Sert aux endpoints qui alimentent les listes déroulantes (publisher_type, serial_type, …). La source de vérité côté Python est l'ordre de la constante associée (ex. `domain.publishers.PUBLISHER_TYPES`).
+         * @description Une valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de la constante du domaine (`domain.publishers.PUBLISHER_TYPES`, par exemple).
          */
         EnumOption: {
             /** Value */
@@ -4064,7 +4058,7 @@ export interface components {
         OaModel: "subscription" | "full_oa" | "diamond" | "repository";
         /**
          * OkResponse
-         * @description Réponse minimale d'acquittement (pas de données).
+         * @description Acquittement sans données.
          */
         OkResponse: {
             /**
@@ -4930,7 +4924,7 @@ export interface components {
         };
         /**
          * RejectedPairItem
-         * @description Paire (publication, personne) déjà rejetée, qui bloque une réassignation.
+         * @description Paire (publication, personne) déjà rejetée, qui bloque une réattribution.
          */
         RejectedPairItem: {
             /** Publication Id */
@@ -5183,14 +5177,14 @@ export interface components {
         SerialType: "journal" | "data_journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";
         /**
          * SerialTypeChange
-         * @description Valeur de `serial_type` dont la modale admin demande l'impact avant de confirmer l'édition.
+         * @description Type de revue dont la fenêtre d'édition de l'administration demande l'effet avant de confirmer.
          */
         SerialTypeChange: {
             serial_type: components["schemas"]["SerialType"];
         };
         /**
          * SerialTypeChangeImpact
-         * @description Compte des publications dont le `doc_type` canonique changerait si le `serial_type` passait à la valeur prévue. Renvoyé par le preview de la modale admin avant confirmation de l'édition.
+         * @description Nombre de publications dont le type changerait avec le type de revue prévu, rendu avant la confirmation de l'édition.
          */
         SerialTypeChangeImpact: {
             /** Count */
@@ -5603,7 +5597,7 @@ export interface components {
         };
         /**
          * StructureTutelleCreateResponse
-         * @description Réponse de POST /api/structures/tutelles, polymorphe : soit la tutelle créée, soit `{status: "already_exists"}`.
+         * @description Réponse de POST /api/structures/tutelles : la tutelle créée, ou `{status: "already_exists"}`.
          */
         StructureTutelleCreateResponse: {
             /** Id */
@@ -5828,7 +5822,7 @@ export interface components {
         };
         /**
          * TotalCountResponse
-         * @description Compteur générique : `{total: int}` (utilisé par les endpoints `/count`).
+         * @description Compteur générique : `{total: int}` (routes `/count`).
          */
         TotalCountResponse: {
             /** Total */

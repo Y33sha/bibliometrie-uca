@@ -17,7 +17,7 @@ class TutelleCreate(BaseModel):
 
 
 class StructureTutelleCreateResponse(BaseModel):
-    """Réponse de POST /api/structures/tutelles, polymorphe : soit la tutelle créée, soit `{status: "already_exists"}`."""
+    """Réponse de POST /api/structures/tutelles : la tutelle créée, ou `{status: "already_exists"}`."""
 
     id: int | None = None
     parent_id: int | None = None

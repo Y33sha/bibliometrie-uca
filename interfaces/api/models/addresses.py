@@ -9,7 +9,7 @@ from infrastructure.read_models.addresses.models import (
 
 # ----- Corps des requêtes -----
 
-# `is_confirmed` : True = confirmé, False = rejeté, None = retour à l'état non tranché.
+# `is_confirmed` : vrai pour confirmé, faux pour rejeté, `None` pour revenir en attente.
 
 
 class ReviewAction(BaseModel):

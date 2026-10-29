@@ -31,7 +31,7 @@ from interfaces.api.params import SearchTerm
 class PublicationFilterParams:
     """Filtres communs à la liste des publications et aux statistiques.
 
-    Les valeurs multiples se séparent par des virgules. `lab_id` accepte la sentinelle `none`, qui retient les publications qu'aucun laboratoire ne signe, et se combine aux identifiants.
+    Les valeurs multiples se séparent par des virgules. `lab_id` accepte la sentinelle `none`, qui retient les publications sans laboratoire, et se combine aux identifiants.
     """
 
     search: SearchTerm = ""
