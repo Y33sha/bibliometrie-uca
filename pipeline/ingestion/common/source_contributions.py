@@ -1,8 +1,6 @@
-"""Writer batch partagé pour les `source_contributions` (toutes sources).
+"""Écriture des contributions sources, commune à toutes les sources.
 
-Ce qui diffère entre sources est uniquement le *parsing* du payload (HAL : TEI + composites Solr ; OpenAlex : tableau authorships ; etc.). Les étapes d'*écriture* sont communes — les tables `source_records` / `source_contributions` / `addresses` / `source_contribution_addresses` sont partagées. Chaque normaliseur isole le bloc auteurs de son payload et fournit la construction des `AuthorRecord` depuis ce bloc (`sync_source_contributions`).
-
-Coût : un nombre constant d'allers-retours Python↔PG par document.
+Seule l'analyse du payload diffère d'une source à l'autre : chaque normaliseur isole le bloc auteurs de son payload et en construit les `AuthorRecord` (`sync_source_contributions`). L'écriture d'un document fait un nombre constant d'allers-retours avec la base.
 """
 
 from __future__ import annotations
@@ -42,11 +40,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class AddressRecord:
-    """Une affiliation textuelle d'un auteur, avec pays optionnels.
+    """Une affiliation textuelle d'un auteur.
 
-    `text` : texte de l'affiliation, assaini à la construction (`sanitize_raw_text`). Une affiliation réduite à du bruit invisible a un texte vide, et ne s'écrit pas.
-    `countries` : codes pays que la source donne pour cette affiliation. Ils deviennent des candidats du moyen de la source (`SOURCE_COUNTRY_METHODS`).
-    `ror_ids` : ROR que la source attribue à cette affiliation.
+    Le texte est assaini à la construction (`sanitize_raw_text`) : une affiliation réduite à du bruit invisible a un texte vide, et ne s'écrit pas. Les codes pays que la source donne deviennent des candidats du moyen de la source (`SOURCE_COUNTRY_METHODS`). Les ROR sont ceux que la source attribue à l'affiliation.
     """
 
     text: str
@@ -59,9 +55,9 @@ class AddressRecord:
 
 @dataclass(slots=True)
 class AuthorRecord:
-    """DTO auteur partagé : sortie du parsing source, entrée du writer.
+    """Auteur d'un document, tel que le normaliseur de la source le lit.
 
-    `position` : rang d'auteur, `None` pour une contribution source sans rôle d'auteur (directeur, jury de thèse). `roles` à `None` stocke `NULL` (les sources qui veulent le défaut `{author}` le posent explicitement). `ror_ids` : ROR que la source attribue à la contribution source sans texte d'affiliation ; ceux d'une affiliation à texte sont sur son `AddressRecord`. `hal_structure_ids` : structures HAL directes de la contribution source (`structId`). `collective` : la source déclare la contribution source collective. Le writer marque aussi collective une contribution source dont le nom désigne un collectif (`is_collective_name`).
+    Une contribution source sans rôle d'auteur (direction, jury de thèse) a une position nulle. Des rôles nuls restent `NULL` en base : une source qui veut le rôle `author` le pose. Les ROR sont ceux que la source attribue à la contribution source sans texte d'affiliation ; ceux d'une affiliation à texte sont sur son `AddressRecord`. Les structures HAL sont les structures directes de la contribution source (`structId`). Une contribution source est collective si la source le déclare, ou si son nom désigne un collectif (`is_collective_name`).
     """
 
     position: int | None
@@ -111,11 +107,11 @@ def write_source_contributions(
     source_record_id: int,
     records: list[AuthorRecord],
 ) -> None:
-    """Synchronise les contributions sources d'un enregistrement source avec `records` (`plan_source_contribution_sync`).
+    """Synchronise les contributions sources d'un enregistrement source avec les auteurs lus (`plan_source_contribution_sync`).
 
     Une contribution source rapprochée garde son identifiant, donc sa personne et sa confirmation. Elle est réécrite, adresses et ROR compris, seulement si son empreinte change. Les contributions sources sans correspondant sont insérées ou supprimées. Une insertion, une suppression, ou un changement de position ou de rôles marque la publication de l'enregistrement source pour le groupement des auteurs. L'enregistrement source reçoit son nombre de contributions sources d'auteur individuelles et de noms complets distincts parmi elles (`is_individual_author`).
 
-    Une contribution source entrante est identifiée par son rang dans `records`. Les `position` non nulles de `records` sont uniques ; chaque parser le garantit (WoS, qui lit la position du payload, dédoublonne dans son parser).
+    Une contribution source entrante est identifiée par son rang dans la liste des auteurs. Les positions non nulles de cette liste sont uniques ; chaque normaliseur le garantit.
     """
     neutralizations = shared_identifier_neutralizations([rec.identifiers for rec in records])
     items: list[SourceContributionItem] = []
@@ -220,7 +216,7 @@ def write_source_contributions(
     )
     ror_items: dict[tuple[int, str, int | None], ContributionRorItem] = {}
     for key, source_contribution_id in sorted(source_contribution_id_by_key.items()):
-        # Un ROR d'une adresse de la contribution source reste absent de la contribution source seule.
+        # Un ROR attaché à une adresse de la contribution source s'écrit seulement avec cette adresse.
         on_addresses = frozenset().union(*(a.ror_ids for a in records[key].addresses))
         rors_by_address: list[tuple[frozenset[RorId], int | None]] = [
             (records[key].ror_ids - on_addresses, None),
@@ -307,9 +303,9 @@ def write_addresses(
     source: str,
     source_contribution_addresses: list[tuple[int | None, list[AddressRecord]]],
 ) -> dict[str, int]:
-    """Écrit les `addresses` d'un document, leurs pays candidats et leurs liens `source_contribution_addresses`, et rend l'identifiant de chaque adresse par son texte.
+    """Écrit les adresses d'un document, leurs pays candidats et leurs liens aux contributions sources, et rend l'identifiant de chaque adresse par son texte.
 
-    `source_contribution_addresses` : les couples `(source_contribution_id, adresses)` du document. Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les formes sont upsertées puis leurs ids récupérés en une passe. Les pays que la source donne deviennent des candidats du moyen de `source`. Les liens sont insérés en une requête. Un `source_contribution_id` None est ignoré.
+    Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les pays que la source donne deviennent des candidats du moyen de la source. Une adresse sans contribution source s'écrit sans lien.
     """
     norm_by_text: dict[str, str] = {}
     addr_countries: dict[str, set[str]] = {}

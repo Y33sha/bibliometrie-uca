@@ -1,8 +1,8 @@
-"""Écriture et suppression des `source_records`. L'écriture est commune aux normaliseurs de toutes les sources.
+"""Écriture et suppression des enregistrements sources, communes aux normaliseurs de toutes les sources.
 
-Un enregistrement source est la vue normalisée d'un import : le dernier import fait autorité. L'UPSERT réécrit donc toutes les colonnes de l'enregistrement depuis la ligne fournie, sans conserver de valeur antérieure. Seule la clé `(source, source_id)` traverse les imports, ce qui maintient l'`id` de la ligne stable pour les tables qui la référencent — d'où l'UPSERT plutôt qu'un DELETE suivi d'un INSERT.
+Un enregistrement source est la vue normalisée du dernier import, qui fait autorité : l'écriture réécrit toutes les colonnes que l'import renseigne. La clé `(source, source_id)` garde l'`id` de la ligne d'un import à l'autre, pour les tables qui la référencent.
 
-L'écriture concerne seulement les colonnes de la ligne : celles qu'aucun import ne renseigne traversent l'UPSERT intactes. C'est le cas de `publication_id`, que la phase `publications` pose et recalcule pour les lignes de la file `source_record_keys_queue`, où chaque écriture met la ligne. C'est aussi le cas du cache `countries`, alimenté par la phase du même nom, et de `created_at`.
+Les colonnes qu'aucun import ne renseigne restent en l'état : le rattachement à la publication, que la phase `publications` recalcule pour chaque enregistrement source écrit, les pays, que calcule la phase `countries`, et la date de création.
 """
 
 import json
@@ -32,9 +32,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class SourceRecordUpsert:
-    """Un enregistrement `source_records` tel qu'une source le fournit, prêt à être écrit.
+    """Un enregistrement source tel qu'une source le fournit, prêt à être écrit.
 
-    Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr ne fournit pas de résumé, HAL et theses.fr pas d'indicateur de citation, `hal_collections` et `embargo_until` n'existent que pour HAL, `is_retracted` que pour OpenAlex.
+    Le jeu de colonnes est commun à toutes les sources ; celles qu'une source ne renseigne pas restent à `None`. Cette absence reflète ce que la source expose : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` et `embargo_until` existent seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
     Quatre colonnes de `source_records` n'y figurent pas. `title_normalized` se dérive de `title` au moment de l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id` est le rattachement à la publication, que la phase `publications` pose et que l'import ne connaît pas.
     """
@@ -71,7 +71,7 @@ class SourceRecordUpsert:
     keywords: list[str] | None = None
     topics: JsonValue = None
 
-    # Accès ouvert
+    # Open access
     oa_status: str | None = None
     license: License | None = None
     urls: list[str] | None = None
@@ -91,19 +91,14 @@ class SourceRecordUpsert:
 
 _FIELDS = tuple(f for f in fields(SourceRecordUpsert) if f.name != "identifiers")
 
-# Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes
-# calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` est inséré et
-# réécrit sans autre geste, en phase avec le contrat.
+# Les colonnes écrites se dérivent des champs de la ligne, plus les colonnes calculées à l'écriture : un champ ajouté à `SourceRecordUpsert` s'écrit sans autre geste.
 _ROW_FIELDS = tuple(f.name for f in _FIELDS)
 _COLUMNS = (*_ROW_FIELDS, "title_normalized", "doc_type", "language")
 
-# Tout est réécrit sauf la clé de conflit, qui est justement ce qui identifie la ligne. `corrections` se vide : les
-# valeurs d'origine qu'il garde viennent de l'import précédent, et la phase `metadata_correction` refait ses
-# corrections sur les valeurs fraîches.
+# Tout est réécrit, sauf la clé de conflit. `corrections` se vide : ses valeurs d'origine viennent de l'import précédent, et la phase `metadata_correction` refait ses corrections sur les valeurs fraîches.
 _UPDATED_COLUMNS = tuple(c for c in _COLUMNS if c not in ("source", "source_id"))
 
-# Colonnes JSONB : les champs annotés `JsonValue` (les `list[str]` sont des `text[]`,
-# hors JSONB). Un champ JSONB ajouté au contrat est typé sans autre geste.
+# Colonnes JSONB : les champs annotés `JsonValue` ; les `list[str]` sont des `text[]`. Un champ JSONB ajouté au contrat est typé sans autre geste.
 _JSONB_COLUMNS = tuple(f.name for f in _FIELDS if f.type is JsonValue)
 
 # Colonnes à type énuméré PostgreSQL : le paramètre est converti vers ce type.
@@ -149,7 +144,7 @@ _INSERT_IDENTIFIERS = text("""
 def replace_identifiers(
     conn: Connection, identifiers_by_source_record: Mapping[int, Iterable[SourceIdentifier]]
 ) -> None:
-    """Remplace les identifiants de chaque enregistrement source de `identifiers_by_source_record`, en une suppression et une insertion. Chaque identifiant écrit est actif."""
+    """Remplace les identifiants des enregistrements sources donnés, en une suppression et une insertion. Chaque identifiant écrit est actif."""
     conn.execute(_DELETE_IDENTIFIERS, {"source_record_ids": list(identifiers_by_source_record)})
     rows = [
         {
@@ -166,7 +161,7 @@ def replace_identifiers(
 
 
 class SourceRecordStore:
-    """Écriture des `source_records` et de leurs identifiants. Les formes de `language_forms` se chargent à la première écriture."""
+    """Écriture des enregistrements sources et de leurs identifiants. Les formes de langue se chargent à la première écriture."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
@@ -198,7 +193,7 @@ class SourceRecordStore:
 
 
 def _doc_type(row: SourceRecordUpsert) -> str | None:
-    """Type du référentiel de `row.raw_doc_type` (`map_doc_type`). Un type inconnu de la table de sa source donne `other` et est journalisé."""
+    """Type du référentiel qui correspond au type de la source (`map_doc_type`). Un type absent de la table de sa source donne `other` et est journalisé."""
     if row.raw_doc_type is None:
         return None
     doc_type = map_doc_type(row.raw_doc_type, row.source)
@@ -237,9 +232,9 @@ def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, .
 
 
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:
-    """Supprime les `source_records` dont la ligne de `staging` (alias `s`) satisfait `staging_filter`.
+    """Supprime les enregistrements sources dont la ligne de `staging` (alias `s`) satisfait le filtre, et rend leur nombre.
 
-    Les `source_records` rattachées à la même publication sont d'abord marquées pour la réconciliation : la phase `publications` réconcilie alors la publication et recalcule ses métadonnées sans la source retirée. La publication est marquée pour le groupement des auteurs. Une publication vidée de toutes ses sources est supprimée en fin de phase `publications`. Les `source_contributions` suivent par cascade. Rend le nombre de `source_records` supprimées.
+    Les autres enregistrements sources de leur publication sont d'abord marqués pour la réconciliation : la phase `publications` recalcule la publication sans les enregistrements supprimés. La publication est marquée pour le groupement des auteurs. Une publication vidée de tous ses enregistrements sources est supprimée en fin de phase `publications`. Les contributions sources suivent par cascade.
     """
     enqueue(
         conn,
@@ -276,22 +271,19 @@ def _delete_source_records(conn: Connection, staging_filter: str, params: dict[s
 
 
 def delete_source_record_of_staging(conn: Connection, staging_id: int) -> None:
-    """Supprime la `source_record` de la ligne de `staging` `staging_id` (cf. `_delete_source_records`)."""
+    """Supprime l'enregistrement source d'une ligne de `staging` (`_delete_source_records`)."""
     _delete_source_records(conn, "s.id = :staging_id", {"staging_id": staging_id})
 
 
 def delete_disappeared_source_records(conn: Connection) -> int:
-    """Supprime les `source_records` dont le staging porte `disappeared_at` (cf. `_delete_source_records`). La ligne de `staging` reste, avec sa marque.
-
-    Balayage ensembliste, idempotent.
-    """
+    """Supprime les enregistrements sources des documents disparus de leur source (`_delete_source_records`). La ligne de `staging` reste, marquée disparue."""
     return _delete_source_records(conn, "s.disappeared_at IS NOT NULL", {})
 
 
 def delete_source_records_before(conn: Connection, start_year: int) -> tuple[int, int]:
-    """Supprime les enregistrements sources parus avant `start_year` (cf. `_delete_source_records`), puis leur ligne de `staging`. Une thèse en cours reste : elle n'a pas d'année de soutenance.
+    """Supprime les enregistrements sources parus avant `start_year` (`_delete_source_records`), puis leur ligne de `staging`. Une thèse en cours reste : elle est sans année de soutenance.
 
-    Rend le nombre de `source_records` et de lignes de `staging` supprimées.
+    Rend le nombre d'enregistrements sources et de lignes de `staging` supprimés.
     """
     staging_ids = list(
         conn.execute(

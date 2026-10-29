@@ -53,7 +53,7 @@ class PublisherFacts(NamedTuple):
 
 
 class NormalizeStats(NamedTuple):
-    """Bilan d'une normalisation de source : works normalisés, ignorés (rien à écrire / non pertinents), en erreur."""
+    """Bilan d'une normalisation de source : enregistrements normalisés, lignes vides sautées, enregistrements en erreur ou refusés."""
 
     processed: int
     skipped: int
@@ -61,24 +61,14 @@ class NormalizeStats(NamedTuple):
 
 
 class SourceNormalizer(ABC):
-    """Normalisation d'une source : la source analyse une ligne de `staging`, le patron écrit.
+    """Normalisation d'une source : la sous-classe analyse une ligne de `staging`, le patron écrit.
 
-    Points d'override :
-    - `SOURCE` : identifiant source (obligatoire, ex: "hal", "openalex")
-    - `DEFAULT_BATCH_SIZE` : taille de commit (défaut 500)
-    - `FETCH_SUB_BATCH` : taille des sous-lots de fetch staging (défaut 50)
-    - `minimal_metadata(row)` : abstrait, titre et année de l'enregistrement source
-    - `parse(row)` : document lu dans la ligne, ou `None` pour un enregistrement refusé (défaut : le payload)
-    - `publisher(doc)`, `container_facts(doc)`, `locations(doc)` : éditeur, conteneurs et localisations du document (défaut : aucun)
-    - `source_record(row, doc, containers)` : abstrait, enregistrement source à écrire
-    - `author_block(doc)`, `author_records(block)` : abstraits, bloc auteurs et contributions sources qu'il donne
-    - `preload_caches()` : pré-chargement optionnel
-    - `cleanup()` : libération des caches après commit final
+    Une sous-classe définit `SOURCE`, `minimal_metadata`, `source_record`, `author_block` et `author_records`. `parse`, `publisher`, `container_facts`, `locations`, `preload_caches` et `cleanup` ont un comportement par défaut.
     """
 
     SOURCE: ClassVar[str] = ""
     DEFAULT_BATCH_SIZE: ClassVar[int] = 500
-    # Taille des sous-lots de fetch staging : charger tous les staging d'un coup fait exploser la RAM côté Python (JSONB désérialisés, overhead ~3-5× la taille brute).
+    # Lignes de `staging` chargées par sous-lot : en mémoire, un payload JSONB désérialisé occupe 3 à 5 fois sa taille brute.
     FETCH_SUB_BATCH: ClassVar[int] = 50
 
     def __init__(
@@ -100,8 +90,6 @@ class SourceNormalizer(ABC):
         self._publisher_store = publisher_store
         self._contribution_store = contribution_store
         self._location_store = location_store
-
-    # ── Analyse d'une ligne, propre à la source ─────────────────
 
     @abstractmethod
     def minimal_metadata(self, row: StagingRow) -> tuple[str | None, int | None]:
@@ -131,16 +119,14 @@ class SourceNormalizer(ABC):
 
     @abstractmethod
     def author_block(self, doc: Document) -> AuthorBlock:
-        """Partie du document qui porte ses auteurs : son empreinte décide de la synchronisation des contributions sources."""
+        """Partie du document qui contient ses auteurs : son empreinte décide de la synchronisation des contributions sources."""
 
     @abstractmethod
     def author_records(self, block: AuthorBlock) -> list[AuthorRecord]:
         """Contributions sources que donne le bloc auteurs."""
 
-    # ── Écritures ───────────────────────────────────────────────
-
     def normalize_record(self, row: StagingRow) -> bool:
-        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Rend True, ou False pour un enregistrement refusé, sans rien écrire.
+        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Rend vrai, ou faux pour un enregistrement refusé, sans rien écrire.
 
         Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations et ses contributions sources.
         """
@@ -179,9 +165,9 @@ class SourceNormalizer(ABC):
         return True
 
     def process_work(self, row: StagingRow) -> bool | None:
-        """Traite une ligne staging. Retourne True (ok), None (skip), False (enregistrement refusé).
+        """Traite une ligne de `staging`. Rend vrai pour un enregistrement normalisé, `None` pour une ligne vide, sautée, et faux pour un enregistrement refusé.
 
-        Un enregistrement source vide est sauté. Un enregistrement source sans titre ou sans année, avec un titre trop long (`is_overlong_title`), ou refusé par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
+        Un enregistrement sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
             self._staging.mark_done(row.id)
@@ -197,18 +183,16 @@ class SourceNormalizer(ABC):
         return result
 
     def _reject(self, row: StagingRow) -> bool:
-        """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Rend False, compté comme enregistrement incomplet."""
+        """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Rend faux, compté comme enregistrement incomplet."""
         self._staging.discard_source_record(row.id)
         self._staging.mark_done(row.id)
         return False
 
     def preload_caches(self) -> None:  # noqa: B027 (hook optionnel)
-        """Pré-chargement optionnel, avant la boucle sur les enregistrements sources."""
+        """Charge les caches de la source, avant la boucle sur les lignes."""
 
     def cleanup(self) -> None:  # noqa: B027 (hook optionnel)
-        """Libération des caches in-memory."""
-
-    # ── Template method ────────────────────────────────────────
+        """Libère les caches en mémoire, après le dernier commit."""
 
     def _count_pending(self) -> int:
         return self._staging.count_pending_staging(self.SOURCE)
@@ -221,14 +205,14 @@ class SourceNormalizer(ABC):
             yield from self._staging.fetch_staging_by_ids(batch_ids)
 
     def _process_one(self, row: StagingRow) -> bool | None:
-        """Enveloppe process_work dans un SAVEPOINT : un work en erreur est annulé sans abandonner le batch en cours."""
+        """Traite une ligne dans un SAVEPOINT : une ligne en erreur est annulée, et le lot en cours continue."""
         with savepoint(self.conn, on_rollback_failure=self.conn.rollback):
             return self.process_work(row)
 
     def _summarize_incomplete(self, identifiers: list[str]) -> None:
         """Récapitule sous la barre de la source les documents qu'elle a laissés de côté.
 
-        Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source, et la liste des sources reste d'un seul tenant. Le logger nu porte ces lignes, celui de la source les préfixerait de son nom et romprait l'alignement.
+        Le trait vertical se prolonge d'une ligne à l'autre : le récapitulatif appartient à la branche de sa source. Ces lignes passent par le journal nu ; le préfixe de la source romprait l'alignement.
         """
         if not identifiers:
             return
@@ -241,7 +225,7 @@ class SourceNormalizer(ABC):
             self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
 
     def run(self) -> NormalizeStats:
-        """Entry point : pilote la boucle de normalisation."""
+        """Normalise les lignes à traiter, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et rend le bilan."""
         self.conn.rollback()
 
         # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.
@@ -257,8 +241,7 @@ class SourceNormalizer(ABC):
             processed = 0
             skipped = 0
             errors = 0
-            # Documents que `process_work` laisse de côté faute de métadonnées exploitables :
-            # récapitulés sous la barre plutôt qu'écrits un par un au fil de la boucle.
+            # Documents que `process_work` laisse de côté faute de métadonnées exploitables : récapitulés sous la barre en fin de boucle.
             incomplete: list[str] = []
 
             with track_progress(total, source_branch(self.SOURCE), slog) as progress:
@@ -290,9 +273,9 @@ class SourceNormalizer(ABC):
             return NormalizeStats(processed, skipped, errors)
 
         except KeyboardInterrupt:
-            # Ctrl+C frappe souvent en plein `conn.execute()` : la transaction est alors avortée et `commit()` lèverait `PendingRollbackError`.
-            # On rollback (le batch en cours, incomplet, est jeté ; les batches committés tous les `batch_size` sont durables) puis on re-raise pour laisser `run_pipeline.main()` faire l'arrêt propre (rapport partiel + exit 130).
-            # Sans le `raise`, la phase « réussirait » et le pipeline enchaînerait sur la source suivante.
+            # Ctrl+C interrompt souvent un `conn.execute()` : la transaction est alors avortée, et `commit()` lèverait `PendingRollbackError`.
+            # Le rollback jette le lot en cours ; les lots déjà commités restent.
+            # L'exception remonte à `run_pipeline.main()`, qui écrit le rapport partiel et sort en 130. Sans elle, le pipeline enchaînerait sur la source suivante.
             rollback_unless_invalidated(self.conn)
             slog.warning("Interruption — batches déjà committés conservés.")
             raise

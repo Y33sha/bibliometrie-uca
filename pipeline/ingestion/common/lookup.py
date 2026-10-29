@@ -82,9 +82,9 @@ class LookupChannel:
 async def look_up(
     conn: Connection, log: logging.Logger, channel: LookupChannel, keys: Sequence[str]
 ) -> PhaseMetrics:
-    """Cherche `keys` dans la source de `channel`, écrit les documents trouvés et range les absents.
+    """Cherche les identifiants dans la source du canal, écrit les documents trouvés et range les absents.
 
-    `total` = identifiants cherchés ; `new`, `updated`, `unchanged` = documents écrits ; `errors` = identifiants des lots que la source n'a pas servis ; `extras[channel.absent_metric]` = identifiants absents. Le compteur de la barre porte les documents trouvés.
+    Les compteurs rendus : identifiants cherchés (`total`), documents écrits (`new`, `updated`, `unchanged`), identifiants des lots que la source n'a pas servis (`errors`), identifiants absents (compteur du canal). La barre compte les documents trouvés.
     """
     metrics = PhaseMetrics(seen=len(keys))
     if not keys:

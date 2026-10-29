@@ -38,7 +38,7 @@ class StaleRefetch(ABC):
     ) -> FetchOutcome: ...
 
 
-# Filtre année (`{year_clause}`) : `publication_year` vient de `source_records` (LEFT JOIN ; NULL si absent, conservé).
+# Filtre sur l'année (`{year_clause}`) : `publication_year` vient de `source_records`. Un document sans enregistrement source reste sélectionné.
 _STALE_ROWS_SQL_TEMPLATE = """
     SELECT s.source_id
     FROM staging s
@@ -63,16 +63,16 @@ _SET_DISAPPEARED_SQL = text(
 def get_stale_source_ids(
     conn: Connection, source: str, years: list[int] | None = None, *, after_days: int
 ) -> list[str]:
-    """Identifiants natifs des documents de `source` dont `last_seen_at` date de plus de `after_days` jours, hors documents disparus.
+    """Identifiants natifs des documents de la source que le moissonnage n'a pas revus depuis `after_days` jours, hors documents disparus.
 
-    `years` borne la sélection à la fenêtre d'années du run, jointe depuis `source_records.publication_year` : un run sur une période glissante relit seulement les documents de ses propres années, et les thèses en cours. `None` = aucune borne.
+    `years` borne la sélection aux documents de ces années, et aux thèses en cours.
     """
     if source not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {source}. Valides : {', '.join(VALID_SOURCES)}")
     params: dict[str, object] = {"source": source, "days": after_days}
     year_clause = ""
     if years is not None:
-        # Une thèse en cours n'a pas d'année de soutenance : elle est relue quelle que soit la fenêtre.
+        # Une thèse en cours est sans année de soutenance : elle est relue quelle que soit la fenêtre.
         year_clause = (
             "AND (sr.publication_year IS NULL OR sr.publication_year = ANY(:years)"
             f" OR sr.doc_type = '{DocType.ONGOING_THESIS}')"
@@ -83,7 +83,7 @@ def get_stale_source_ids(
 
 
 def set_disappeared(conn: Connection, source: str, source_id: str) -> None:
-    """Pose `disappeared_at` sur le document `(source, source_id)` confirmé absent. Ne commite pas."""
+    """Marque disparu un document que la source dit absent. L'appelant commite."""
     conn.execute(_SET_DISAPPEARED_SQL, {"source": source, "source_id": source_id})
 
 
@@ -95,11 +95,9 @@ async def refresh(
     after_days: int,
     years: list[int] | None = None,
 ) -> PhaseMetrics:
-    """Relit par identifiant natif les documents de la source de `refetch` non revus depuis `after_days` jours.
+    """Relit par identifiant natif les documents de la source que le moissonnage n'a pas revus depuis `after_days` jours. Un document que la source dit absent est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
 
-    `years` borne la sélection à la fenêtre d'années du run (via `source_records.publication_year`) ; `None` = tous les documents anciens de la source. Un document confirmé absent est marqué `disappeared_at`.
-
-    Compteurs de `look_up` : `updated` = `raw_data` réécrit (empreinte changée) ; `unchanged` = document identique (seul `last_seen_at` mis à jour) ; `errors` = source indisponible ; `extras["disappeared"]` = absences confirmées.
+    Rend les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
     """
     source = refetch.source_key
     return await look_up(
