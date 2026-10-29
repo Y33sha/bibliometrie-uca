@@ -12,19 +12,19 @@ theses.fr est le portail [ABES](../glossaire.md#abes) qui agrège les thèses fr
 
 **API de recherche** (`https://theses.fr/api/v1/theses/recherche/`) — liste des thèses des établissements du périmètre.
 
-- Pas d'authentification
+- Sans identifiants d'accès
 - Requête : `q=etabSoutenancePpn:(<PPN>)`, pagination par `debut` / `nombre`
 - 500 résultats par page (max accepté par l'API), à 3 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
 - L'API ne filtre pas par année : le moissonnage retient les thèses soutenues dans la fenêtre d'années du run, et toutes les thèses en cours
 
-**API de détail** (`https://theses.fr/api/v1/theses/these/<identifiant>`) — une thèse par son identifiant. Elle répond 400 pour un identifiant inconnu.
+**API de détail** (`https://theses.fr/api/v1/theses/these/<identifiant>`) — une thèse par son identifiant.
 
 - Le moissonnage lit le détail des thèses absentes de `staging`. `fetch_stale` relit le détail des autres, `fetch_missing` cherche les thèses par NNT.
 - `staging` contient le détail de chaque thèse.
 
 ## Données récupérées
 
-- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (= laboratoires), sujets auteur (multilingues), sujets Rameau (vocabulaire contrôlé BNF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
+- **Thèse** : identifiant ([NNT](../glossaire.md#nnt) pour les soutenues, id `sXXXXXX` pour les en cours), titres et résumés multilingues, langues, DOI éventuel (DOI ABES `10.70675/...` pour les thèses récentes), discipline, dates (soutenance, première inscription), école doctorale, partenaires de recherche (laboratoires), sujets auteur (multilingues), sujets RAMEAU (vocabulaire contrôlé de la BnF), statut (`soutenue` / `enCours`), cas de diffusion et accessibilité
 - **Personnes** : auteur(s), directeur(s), rapporteur(s), membres et président du jury — chacun avec nom, prénom et PPN IdRef si présent.
 
 ## Exemple de payload
@@ -100,25 +100,19 @@ Le détail d'une thèse en cours a la même structure, avec `status: "enCours"`,
 
 ## Particularités
 
-### Soutenue vs en cours : un seul flux, deux états
+### Thèses soutenues et en cours
 
-Le même endpoint renvoie les deux. La présence de `dateSoutenance` est le seul signal fiable pour distinguer :
-- présent → `doc_type = "thesis"` (soutenue)
-- absent → `doc_type = "ongoing_thesis"` (en cours)
+Une thèse avec `dateSoutenance` est soutenue (`thesis`), sans elle en cours (`ongoing_thesis`). Une thèse en cours n'a ni NNT ni DOI : son identifiant theses.fr (`sXXXXXX`) sert de clé. L'année est celle de la soutenance, à défaut celle de la première inscription.
 
-Les thèses en cours n'ont ni NNT ni DOI ; leur identifiant theses.fr (`sXXXXXX`) sert seul de clé. L'année est dérivée par cascade `dateSoutenance > datePremiereInscriptionDoctorat`.
+### Rôles
 
-### 5 rôles dans une thèse, tous matérialisés comme contributions
-
-`auteurs`, `directeurs`, `rapporteurs`, `membresJury`, `presidentJury` sont tous transformés en `source_contributions`, chacun avec ses `roles` (`author`, `thesis_director`, `rapporteur`, `jury_member`, `jury_president`). Seuls les auteurs ont un `author_position` ; les autres rôles ont `author_position = NULL`.
-
-Une personne qui apparaît dans plusieurs champs est dédupliquée et a plusieurs rôles. Clé de déduplication : PPN si présent, sinon `(nom, prenom)`.
+Les cinq champs de personnes (`auteurs`, `directeurs`, `rapporteurs`, `membresJury`, `presidentJury`) donnent des contributions sources, avec leurs rôles (`author`, `thesis_director`, `rapporteur`, `jury_member`, `jury_president`). Seuls les auteurs ont une position d'auteur. Une personne présente dans plusieurs champs a plusieurs rôles ; elle est reconnue par son PPN, à défaut par son nom et son prénom.
 
 ### Identifiants : PPN IdRef pour les personnes, NNT pour les thèses
 
-Le PPN [IdRef](../glossaire.md#idref), lorsque présent, figure dans les informations du contributeur (`contributor_information.identifiers->>'idref'`, reliée par `source_contributions.contributor_information_id`) — c'est l'identifiant ABES, partagé avec d'autres sources. Sert de clé de résolution forte dans la phase [persons](../pipeline/09-persons.md) du pipeline.
+Le PPN [IdRef](../glossaire.md#idref) d'une personne, identifiant de l'ABES partagé avec d'autres sources, sert de clé forte à la [résolution des personnes](../pipeline/09-persons.md).
 
-Le NNT (ex. `2017CLFAC001`) sert d'identifiant cross-source pour la thèse : identifiant primaire de l'enregistrement source dans `source_record_identifiers`, il permet le rattachement à des `source_records` HAL/OpenAlex/ScanR qui exposent aussi le NNT.
+Le NNT (ex. `2017CLFAC001`) est l'identifiant primaire de l'enregistrement source. HAL, OpenAlex et ScanR le donnent aussi, ce qui rapproche leurs enregistrements sources.
 
 ### Affiliations partagées au document
 
