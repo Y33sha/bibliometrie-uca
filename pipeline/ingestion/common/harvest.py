@@ -13,7 +13,6 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import TYPE_CHECKING
 
 from domain.dates import date_to_french, today
 from domain.sources.registry import HARVESTED_SOURCES, Source, source_label
@@ -31,10 +30,6 @@ from pipeline.runtime.observability.signals import (
 from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 from pipeline.transformation.structures.perimeter import EmptyExtractionPerimeterError
-
-if TYPE_CHECKING:
-    pass
-
 
 HarvestOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
 GetLastDailyHarvestDate = Callable[[], date | None]

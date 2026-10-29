@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from domain.sources.registry import PERSON_SEARCHED_SOURCES, Source, source_label
 from pipeline.ingestion.adapters import ADAPTERS
@@ -19,10 +18,6 @@ from pipeline.runtime.observability.log_format import LAST_BRANCH
 from pipeline.runtime.observability.metrics import PhaseMetrics
 from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
-
-if TYPE_CHECKING:
-    pass
-
 
 SearchOne = Callable[[PhaseContext, str, HarvestWindow], PhaseMetrics]
 

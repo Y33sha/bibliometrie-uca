@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import httpx2
 
-from pipeline.http.lookup import NotFound, Unavailable
 from pipeline.ingestion.common.stale_refetch import FetchOutcome, StaleRefetch
 from pipeline.ingestion.crossref.api import fetch_work
 
@@ -18,7 +17,4 @@ class CrossrefStaleRefetch(StaleRefetch):
     max_concurrent = 3
 
     async def fetch_by_native_id(self, client: httpx2.AsyncClient, source_id: str) -> FetchOutcome:
-        message = await fetch_work(client, source_id)
-        if isinstance(message, NotFound | Unavailable):
-            return message
-        return message
+        return await fetch_work(client, source_id)
