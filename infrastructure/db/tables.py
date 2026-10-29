@@ -1215,7 +1215,6 @@ source_records = Table(
     Column("id", Integer, primary_key=True),
     Column("source", source_type_enum, nullable=False),
     Column("source_id", Text, nullable=False),
-    Column("doi", Text),
     Column("title", Text, nullable=False),
     Column("title_normalized", Text),
     Column("publication_year", SmallInteger),

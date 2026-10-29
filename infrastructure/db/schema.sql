@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict mGZlLMNrcsPPLIUpzVkH6WsJU8jzki2oF7GcR5xOAS1Ydk6JLuteK7XZe4Y8bdZ
+\restrict hbcMQh2XX1e8CajAfjrnr3yT3vgWlZHF0oDkDDemjGM6hvas3sFwLuYnYvv6veK
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -1225,7 +1225,6 @@ CREATE TABLE sources.source_records (
     id integer NOT NULL,
     source public.source_type NOT NULL,
     source_id text NOT NULL,
-    doi text,
     title text NOT NULL,
     publication_year smallint,
     doc_type public.doc_type,
@@ -4762,13 +4761,6 @@ CREATE INDEX idx_source_records_countries ON sources.source_records USING gin (c
 
 
 --
--- Name: idx_source_records_doi; Type: INDEX; Schema: sources; Owner: -
---
-
-CREATE INDEX idx_source_records_doi ON sources.source_records USING btree (doi) WHERE (doi IS NOT NULL);
-
-
---
 -- Name: idx_source_records_hal_collections; Type: INDEX; Schema: sources; Owner: -
 --
 
@@ -5625,5 +5617,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict mGZlLMNrcsPPLIUpzVkH6WsJU8jzki2oF7GcR5xOAS1Ydk6JLuteK7XZe4Y8bdZ
+\unrestrict hbcMQh2XX1e8CajAfjrnr3yT3vgWlZHF0oDkDDemjGM6hvas3sFwLuYnYvv6veK
 

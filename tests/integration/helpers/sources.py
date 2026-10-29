@@ -101,7 +101,6 @@ def insert_source_record(
             "title": title,
             "title_normalized": title_normalized,
             "publication_id": publication_id,
-            "doi": doi,
             "publication_year": publication_year,
             "doc_type": doc_type,
             "raw_doc_type": doc_type if raw_doc_type is None else raw_doc_type,

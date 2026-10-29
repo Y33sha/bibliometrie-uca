@@ -137,7 +137,7 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Revues « Research Square » fusionnées et typées `preprint_server` : avec les DOI `derived` de ScanR, l'espace `10.21203/rs.` était attribué à l'une d'elles, typée `unknown`.
 - [x] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [x] Écritures de la colonne retirées : normalisation, `remove_identifiers` (colonne et `corrections.doi`), déclarations de `pipeline/graph.py`.
-- [ ] Suppression de la colonne.
+- [x] Suppression de la colonne et de l'entrée `doi` de `corrections` (b6d1f9a3c8e2).
 
 ### Phase 7 — DOI bioRxiv et medRxiv
 

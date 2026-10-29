@@ -502,8 +502,13 @@ class TestDoiNamespaces:
             serial_id=serial_id,
         )
         sa_sync_conn.execute(
-            text("UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE doi = :doi"),
-            {"raw": '{"serial_id": {"raw": null, "corrected_by": "X"}}', "doi": "10.9001/abc.2"},
+            text(
+                "UPDATE source_records SET corrections = CAST(:raw AS jsonb) WHERE source_id = :sid"
+            ),
+            {
+                "raw": '{"serial_id": {"raw": null, "corrected_by": "X"}}',
+                "sid": f"sp-{serial_id}-10.9001/abc.2",
+            },
         )
         pairs = [p for p in find_doi_serial_pairs(sa_sync_conn) if p.serial_id == serial_id]
         assert [(p.doi, p.serial_type) for p in pairs] == [("10.9001/abc.1", SerialType.UNKNOWN)]
