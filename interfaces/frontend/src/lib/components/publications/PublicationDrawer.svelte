@@ -257,10 +257,9 @@
   .comparison {
     --row-bg: var(--card);
   }
+  /* La couleur de la ligne est peinte sous la partie transparente des cellules sans libellé. */
   tr.divergent {
     --row-bg: var(--warning-light);
-  }
-  tr.divergent td {
     background: var(--row-bg);
   }
   tr.divergent .field {
