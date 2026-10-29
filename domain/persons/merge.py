@@ -7,12 +7,7 @@ from domain.persons.person import PersonExclusion
 
 
 def merge_roles(target_id: int, source_id: int, *, with_rh: Collection[int]) -> tuple[int, int]:
-    """Rôles (conservée, absorbée) d'une fusion demandée `target ← source`.
-
-    Une personne qui a une fiche RH est toujours conservée : si seule la source en a une, les rôles s'inversent. `with_rh` contient les ids des personnes qui ont une fiche RH.
-
-    Lève `ConflictError` si les deux personnes ont chacune une fiche RH.
-    """
+    """Personnes conservée et absorbée d'une fusion demandée de `source` dans `target`. Une personne qui a une fiche RH est conservée. `with_rh` : personnes qui ont une fiche RH. Lève `ConflictError` si les deux en ont une."""
     if target_id in with_rh and source_id in with_rh:
         raise ConflictError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
