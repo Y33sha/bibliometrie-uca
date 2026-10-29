@@ -354,6 +354,18 @@ class TestProcessWorkMinimalMetadata:
         staging.discard_source_record.assert_called_once_with(3)
         staging.mark_done.assert_called_once_with(3)
 
+    def test_enregistrement_source_au_titre_trop_long_ecarte(self):
+        """Régression : OpenAlex donne pour titre de W7223893444 le programme d'un congrès, d'environ 5 000 caractères."""
+        staging = MagicMock()
+        norm = _MinimalNorm(staging)
+        title = "Outcomes of minimally invasive spine surgery. " * 100
+        row = StagingRow(
+            id=4, source_id="W7223893444", doi=None, raw_data={"title": title, "year": 2026}
+        )
+        assert norm.process_work(row) is False
+        staging.discard_source_record.assert_called_once_with(4)
+        assert norm.normalized == []
+
     def test_enregistrement_source_complet_normalise(self):
         staging = MagicMock()
         norm = _MinimalNorm(staging)

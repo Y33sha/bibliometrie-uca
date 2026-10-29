@@ -13,7 +13,7 @@ from typing import ClassVar, NamedTuple
 
 from sqlalchemy import Connection
 
-from domain.publications.metadata import has_minimal_publication_metadata
+from domain.publications.metadata import has_minimal_publication_metadata, is_overlong_title
 from domain.serials.containers import ContainerDescription
 from domain.types import JsonValue
 from infrastructure.db.savepoint import rollback_unless_invalidated, savepoint
@@ -181,13 +181,15 @@ class SourceNormalizer(ABC):
     def process_work(self, row: StagingRow) -> bool | None:
         """Traite une ligne staging. Retourne True (ok), None (skip), False (enregistrement refusé).
 
-        Un enregistrement source vide est sauté. Un enregistrement source sans titre ou sans année, ou refusée par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
+        Un enregistrement source vide est sauté. Un enregistrement source sans titre ou sans année, avec un titre trop long (`is_overlong_title`), ou refusé par la source (`normalize_record` rend False), ne fonde aucune publication (`_reject`).
         """
         if not row.raw_data:
             self._staging.mark_done(row.id)
             return None
         title, publication_year = self.minimal_metadata(row)
-        if not has_minimal_publication_metadata(title, publication_year):
+        if not has_minimal_publication_metadata(title, publication_year) or is_overlong_title(
+            title
+        ):
             return self._reject(row)
         result = self.normalize_record(row)
         if result is False:
@@ -231,7 +233,7 @@ class SourceNormalizer(ABC):
         if not identifiers:
             return
         self.logger.info(
-            "%s%s aux métadonnées incomplètes",
+            "%s%s aux métadonnées incomplètes ou non conformes",
             BRANCH_CONTINUATION,
             quantity(len(identifiers), "document"),
         )

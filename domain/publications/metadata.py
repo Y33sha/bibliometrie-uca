@@ -125,6 +125,14 @@ def has_minimal_publication_metadata(title: str | None, publication_year: int | 
     return bool(title) and bool(publication_year)
 
 
+TITLE_NORMALIZED_MAX_LENGTH = 2000
+
+
+def is_overlong_title(title: str | None) -> bool:
+    """Vrai si le titre normalisé dépasse `TITLE_NORMALIZED_MAX_LENGTH` caractères. Un titre aussi long réunit d'autres textes : programme de congrès, résumé, remerciements."""
+    return bool(title) and len(normalize_text(title)) > TITLE_NORMALIZED_MAX_LENGTH
+
+
 _WHITESPACE_RE = re.compile(r"\s+")
 
 

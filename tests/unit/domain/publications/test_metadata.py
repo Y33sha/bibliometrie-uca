@@ -1,14 +1,16 @@
-"""Tests des règles métier sur les métadonnées de publication (best_oa_status, publication_oa_status, clean_publication_title, has_minimal_publication_metadata)."""
+"""Tests des règles métier sur les métadonnées de publication (best_oa_status, publication_oa_status, clean_publication_title, has_minimal_publication_metadata, is_overlong_title)."""
 
 from types import SimpleNamespace
 
 from domain.publications.metadata import (
     ACCESS_LEVELS,
     OA_RANK,
+    TITLE_NORMALIZED_MAX_LENGTH,
     best_oa_status,
     clean_publication_title,
     has_minimal_publication_metadata,
     has_open_archive_deposit,
+    is_overlong_title,
     normalized_title,
     publication_oa_status,
 )
@@ -90,6 +92,21 @@ class TestHasMinimalPublicationMetadata:
 
     def test_both_missing(self):
         assert has_minimal_publication_metadata(None, None) is False
+
+
+class TestIsOverlongTitle:
+    def test_seuil_inclus(self):
+        assert is_overlong_title("a" * TITLE_NORMALIZED_MAX_LENGTH) is False
+        assert is_overlong_title("a" * (TITLE_NORMALIZED_MAX_LENGTH + 1)) is True
+
+    def test_longueur_du_titre_normalise(self):
+        """Balises et ponctuation retirées, le titre tient sous le seuil."""
+        title = "<b>" + "a" * TITLE_NORMALIZED_MAX_LENGTH + "</b>" + "!" * 50
+        assert is_overlong_title(title) is False
+
+    def test_titre_absent(self):
+        assert is_overlong_title(None) is False
+        assert is_overlong_title("") is False
 
 
 # ── Règles d'agrégation multi-sources ──────────────────────────────
