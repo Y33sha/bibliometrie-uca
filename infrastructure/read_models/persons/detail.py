@@ -1,4 +1,4 @@
-"""Détail d'une personne (sync) : profil, thèses encadrées, adresses, sujets, dashboard Open Access."""
+"""Détail d'une personne : profil, thèses encadrées, adresses, sujets, tableau de bord open access."""
 
 from sqlalchemy import Connection, text
 
@@ -43,7 +43,7 @@ class PersonDetailQueries:
     _conn: Connection
 
     def person_profile(self, person_id: int) -> PersonProfileResponse | None:
-        """Profil public : infos + identifiants."""
+        """Profil public : informations et identifiants."""
         person_row = self._conn.execute(
             text("""
                 SELECT p.id, p.last_name, p.first_name,

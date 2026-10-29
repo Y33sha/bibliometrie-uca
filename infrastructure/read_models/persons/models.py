@@ -15,8 +15,7 @@ from infrastructure.read_models._common import (
     YesNoCount,
 )
 
-# Vocabulaire de tri : le champ, puis le sens. Les deux dénombrements sont triables, comme
-# la fonction et le département.
+# Vocabulaire de tri : le champ, puis le sens. Les deux dénombrements sont triables, comme la fonction et le département.
 PersonSort = Literal[
     "name_asc",
     "name_desc",
@@ -37,7 +36,7 @@ class PersonFilters:
 
     `departments` et `roles` sont multi-valués : une option cochée s'ajoute aux autres. Les `has_*` filtrent sur la présence ou l'absence, et `None` ne filtre pas. `exclusions` retient les personnes dont le motif d'exclusion figure dans la liste, `None` désignant les personnes retenues ; vide, il laisse tout passer.
 
-    `lab_id` n'est pas un filtre mais un scope : il restreint aux personnes du laboratoire et y restreint aussi leurs dénombrements.
+    `lab_id` restreint la liste aux personnes du laboratoire, et leurs dénombrements à ce laboratoire.
     """
 
     search: str = ""
@@ -57,7 +56,7 @@ class PersonFilters:
 
 
 # ---------------------------------------------------------------------------
-# DTOs Identifiants + formes de noms (réutilisés dans plusieurs réponses)
+# Identifiants et formes de nom, communs à plusieurs réponses
 # ---------------------------------------------------------------------------
 
 
@@ -72,10 +71,7 @@ class PersonIdentifierOut(BaseModel):
 
 
 class NameFormSummaryOut(BaseModel):
-    """Forme de nom observée pour une personne, avec son état d'arbitrage.
-
-    Servie par personne, non dans la liste : seule la fiche d'une personne l'affiche.
-    """
+    """Forme de nom observée pour une personne, avec son état d'arbitrage. Seule la fiche d'une personne l'affiche."""
 
     name_form: str
     sources: list[str]
@@ -87,12 +83,12 @@ class NameFormSummaryOut(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Liste / recherche
+# Liste et recherche
 # ---------------------------------------------------------------------------
 
 
 class PersonSearchResult(BaseModel):
-    """Résultat d'autocomplete `/api/persons/search`."""
+    """Résultat d'autocomplétion de `/api/persons/search`."""
 
     id: int
     last_name: str
@@ -104,7 +100,7 @@ class PersonSearchResult(BaseModel):
 class PersonOut(BaseModel):
     """Ligne de `/api/persons`.
 
-    Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire sous scope `lab_id`.
+    Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire avec `lab_id`.
     """
 
     id: int
@@ -128,7 +124,7 @@ class PersonListResponse(PaginatedResponse):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Facettes / référentiels
+# Facettes
 # ---------------------------------------------------------------------------
 
 
@@ -146,7 +142,7 @@ class PersonsFacetsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Détail d'une personne
+# Détail d'une personne
 # ---------------------------------------------------------------------------
 
 
@@ -207,7 +203,7 @@ class PersonAddressesResponse(PaginatedResponse):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Admin : name forms (utilisés par `name_form_contributions`)
+# Administration : formes de nom (`name_form_contributions`)
 # ---------------------------------------------------------------------------
 
 
@@ -234,7 +230,7 @@ class NameFormContributionsResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# DTOs Triage : formes de nom ambiguës
+# Triage : formes de nom ambiguës
 # ---------------------------------------------------------------------------
 
 
@@ -248,8 +244,7 @@ class AmbiguousFormPersonOut(BaseModel):
     # Forme dérivée du nom de la personne : confirmée d'office, statut non modifiable.
     canonical: bool
     has_rh: bool
-    # Nom de la personne compatible (par tokens) avec la forme : homonyme/doublon si
-    # vrai, erreur d'attribution probable si faux.
+    # Nom de la personne compatible avec la forme (mêmes mots) : homonyme ou doublon si vrai, erreur d'attribution probable si faux.
     compatible: bool
 
 
@@ -263,7 +258,7 @@ class AmbiguousNameFormsResponse(PaginatedResponse):
 
 
 class CurationPersonOut(BaseModel):
-    """Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer."""
+    """Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le panneau latéral."""
 
     person_id: int
     first_name: str
@@ -322,7 +317,7 @@ class DistinctPersonOut(BaseModel):
 
 
 class SharingPersonOut(BaseModel):
-    """Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption)."""
+    """Personne qui partage au moins une forme de nom avec une autre, candidate à l'absorption."""
 
     person_id: int
     first_name: str

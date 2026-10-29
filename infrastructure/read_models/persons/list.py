@@ -1,4 +1,4 @@
-"""Liste des personnes + autocomplete + lecture d'une personne (sync)."""
+"""Liste des personnes, autocomplétion et lecture d'une personne."""
 
 from collections.abc import Iterator
 
@@ -32,7 +32,7 @@ from infrastructure.read_models.persons.models import (
 from infrastructure.read_models.sql_fragments import other_name_form_holders
 from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES, has_author_role
 
-# Sous scope `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, cohérent avec une liste restreinte au labo. Le bind `:flt_person_lab_id` vient de `person_in_lab_clause` (filters.py).
+# Avec `lab_id`, chaque dénombrement se limite aux contributions de la personne rattachées à ce laboratoire, comme la liste. Le paramètre `:flt_person_lab_id` vient de `person_in_lab_clause`.
 _LAB_SCOPED_CONTRIBUTIONS = (
     " AND EXISTS (SELECT 1 FROM contribution_structures aus "
     "WHERE aus.contribution_id = a.id AND aus.structure_id = :flt_person_lab_id)"
@@ -106,7 +106,7 @@ class PersonListQueries:
     _conn: Connection
 
     def search_persons(self, *, search: str, limit: int) -> list[PersonSearchResult]:
-        """Recherche rapide (autocomplete) parmi les personnes non exclues, par la règle de l'annuaire (`person_search_clause`)."""
+        """Autocomplétion : personnes non exclues dont le nom répond à la recherche, par la règle de l'annuaire (`person_search_clause`)."""
         search_clause = person_search_clause(search)
         if search_clause is None:
             return []

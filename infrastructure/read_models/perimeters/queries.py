@@ -1,8 +1,8 @@
-"""Lecture du périmètre : clôture de structures (matview `perimeter_structures`) et projection de la page admin.
+"""Lecture des périmètres : structures de chaque périmètre (table `perimeter_structures`) et projection de la page d'administration.
 
-Le périmètre associe des phases à des ensembles de structures, lu depuis `config` (`perimeter_extraction` : structures interrogées à l'extraction et reconnues dans les affiliations ; `perimeter_persons` : périmètre de création des personnes, à défaut le périmètre d'extraction). Une clé absente vaut périmètre vide. La clôture récursive des tutelles est matérialisée dans `perimeter_structures` par `refresh_perimeter_structures` (côté pipeline) ; ces fonctions ne font que la restituer.
+`config` désigne deux périmètres : `perimeter_extraction`, structures interrogées au moissonnage et reconnues dans les affiliations ; `perimeter_persons`, périmètre de création des personnes, à défaut celui d'extraction. Une clé absente vaut périmètre vide. `refresh_perimeter_structures` (pipeline) calcule les structures de chaque périmètre ; ce module les lit.
 
-Les fonctions libres sont partagées par l'extraction, le pipeline et les adapters : tout lecteur du périmètre passe par cette couche de lecture.
+Le moissonnage, le pipeline et les adaptateurs lisent tous le périmètre par ces fonctions.
 """
 
 from sqlalchemy import Connection, text
@@ -24,10 +24,7 @@ from infrastructure.read_models.perimeters.models import (
 
 
 def get_perimeter_structure_ids(conn: Connection, perimeter_code: str) -> set[int]:
-    """Ensemble des `structure_id` du périmètre `perimeter_code` — racines et descendants — lu depuis la table matérialisée `perimeter_structures`.
-
-    La clôture est calculée par `refresh_perimeter_structures` (en tête de pipeline, à chaque édition admin, et au début d'`affiliations`) ; cette lecture ne fait que la restituer.
-    """
+    """Structures d'un périmètre, racines et descendantes, lues dans `perimeter_structures`."""
     result = conn.execute(
         text("""
             SELECT ps.structure_id
@@ -66,7 +63,7 @@ def get_extraction_structure_ids(conn: Connection) -> set[int]:
 
 
 def get_hal_collections(conn: Connection) -> dict[str, str]:
-    """Collections HAL {code_hal: label} des structures du périmètre d'extraction qui ont une collection HAL."""
+    """Collections HAL des structures du périmètre d'extraction qui en ont une : libellé par code."""
     structure_ids = get_extraction_structure_ids(conn)
     if not structure_ids:
         return {}
@@ -103,21 +100,18 @@ def get_extraction_api_ids(conn: Connection, source: str) -> list[str]:
 
 
 def get_persons_structure_ids(conn: Connection) -> set[int]:
-    """Périmètre pour la création des personnes (`in_perimeter`), vide s'il n'est pas configuré."""
+    """Structures du périmètre des personnes, vide s'il n'est pas configuré."""
     code = persons_perimeter_code(conn)
     return get_perimeter_structure_ids(conn, code) if code else set()
 
 
 def get_persons_structure_ids_list(conn: Connection) -> list[int]:
-    """Variante liste de `get_persons_structure_ids` (un `set` n'est pas un paramètre lié valide pour `ANY(:ids)`)."""
+    """Mêmes structures que `get_persons_structure_ids`, en liste : `ANY(:ids)` refuse un `set`."""
     return list(get_persons_structure_ids(conn))
 
 
 def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
-    """Racines du périmètre "persons" (sans descente dans les tutelles).
-
-    À distinguer de `get_persons_structure_ids(...)` qui retourne la clôture transitive (racines + tous les labos descendants). Utilisé quand un code appelant veut filtrer explicitement les racines du périmètre (ex. exclure l'UCA des tutelles affichées pour un labo).
-    """
+    """Racines du périmètre des personnes, sans leurs sous-structures (que rend `get_persons_structure_ids`). Sert à filtrer les racines, par exemple pour retirer l'établissement des tutelles affichées pour un laboratoire."""
     code = persons_perimeter_code(conn)
     if not code:
         return []
@@ -141,7 +135,7 @@ def get_persons_perimeter_name(conn: Connection) -> str:
     return name or code
 
 
-# ── Adapter Pg* pour le port read_models ──────────────────────────
+# ── Lectures pour l'API ───────────────────────────────────────────
 
 
 class PerimetersQueries:
@@ -166,7 +160,7 @@ class PerimetersQueries:
         )
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
-        """Liste tous les périmètres avec leurs structures racines et le décompte de leur ensemble effectif, lu dans `perimeter_structures`."""
+        """Tous les périmètres, avec leurs structures racines et leur nombre de structures, lu dans `perimeter_structures`."""
         perim_rows = self._conn.execute(
             text("SELECT id, code, name, root_structure_ids FROM perimeters ORDER BY id")
         ).all()

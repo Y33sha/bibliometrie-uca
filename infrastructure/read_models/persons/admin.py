@@ -38,7 +38,7 @@ from infrastructure.sql_fragments import (
 
 # ── File de triage : formes de nom ambiguës ──────────────────────
 
-# Formes de ≥2 personnes au sens de `name_form_holder`, dont au moins une à confirmer (`pending_name_form`).
+# Formes d'au moins deux personnes au sens de `name_form_holder`, dont au moins une à confirmer (`pending_name_form`).
 _AMBIGUOUS_FORMS_SQL = f"""
     SELECT pnf.name_form
     FROM person_name_forms pnf
@@ -49,7 +49,7 @@ _AMBIGUOUS_FORMS_SQL = f"""
 """
 
 
-# ── Conflits d'identifiant (file de triage du hub) ───────────────
+# ── Conflits d'identifiant (file de triage) ──────────────────────
 
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
@@ -97,7 +97,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
 
 
 def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPersonOut]:
-    """Vue allégée par personne (nom, RH, nb publications, labos) pour la file de triage."""
+    """Fiche allégée de chaque personne (nom, fiche RH, nombre de publications, laboratoires), pour les files de triage."""
     if not ids:
         return {}
     rows = conn.execute(
@@ -135,10 +135,10 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
     }
 
 
-# ── Doublons par nom (file de triage du hub) ─────────────────────
+# ── Doublons par nom (file de triage) ────────────────────────────
 
-# Paires candidates : 4 requêtes larges (recall), resserrées par `names_compatible` (tokens).
-# Écarte les personnes exclues, les paires distinctes et les paires de deux fiches RH.
+# Paires candidates : quatre requêtes larges, resserrées par `names_compatible` (comparaison des mots du nom).
+# Les personnes exclues, les paires distinctes et les paires de deux fiches RH sont écartées.
 _DUP_WHERE = """
     WHERE p1.exclusion IS NULL AND p2.exclusion IS NULL
     AND NOT EXISTS (
@@ -224,7 +224,7 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain des contributions. Réseaux disjoints → homonyme, communs → doublon. Sujets écartés (trop larges : même domaine ≠ même personne).
+# Recouvrements de réseau entre deux personnes : chaque dimension rend (person_id, valeur) au grain des contributions. Des réseaux disjoints signalent un homonyme, des réseaux communs un doublon. Les sujets sont écartés : un même domaine ne fait pas une même personne.
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
@@ -260,7 +260,7 @@ def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[i
 
 
 def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
-    """Paires de personnes aux noms compatibles (union des requêtes larges, resserrée par tokens). Étape la moins chère : sert le badge sans charger les recouvrements de réseau."""
+    """Paires de personnes aux noms compatibles. Étape la moins coûteuse : elle sert le badge sans calculer les recouvrements de réseau."""
     seen: set[tuple[int, int]] = set()
     candidates: list[tuple[int, int]] = []
     for sql in PERSON_DUP_QUERIES:
@@ -367,7 +367,7 @@ class PersonAdminQueries:
     def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse:
         """Formes de nom ambiguës paginées, avec les personnes qui les ont au sens de `name_form_holder`.
 
-        Chaque personne a son statut (pending/confirmed) pour cette forme et un drapeau `compatible` (nom de la personne compatible avec la forme, par tokens) — discriminant homonyme/doublon (compatible) vs erreur (incompatible). Une forme dérivée du nom de la personne a le drapeau `canonical` et le statut `confirmed`.
+        Chaque personne a son statut pour la forme, et le drapeau `compatible` : son nom est compatible avec la forme. Compatible, la personne est un homonyme ou un doublon ; incompatible, une erreur d'attribution. Une forme dérivée du nom de la personne a le drapeau `canonical` et le statut `confirmed`.
         """
         total = self.ambiguous_name_forms_count()
         offset = (page - 1) * per_page
@@ -421,7 +421,7 @@ class PersonAdminQueries:
         return int(row.total)
 
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
-        """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. Le tri doublon / erreur d'attribution est laissé à l'œil."""
+        """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. L'administration distingue doublon et erreur d'attribution."""
         # Les paires sont peu nombreuses : une seule exécution de la requête donne le total et la page.
         all_rows = self._conn.execute(
             text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b")
@@ -449,7 +449,7 @@ class PersonAdminQueries:
         return len(_name_duplicate_candidates(self._conn))
 
     def name_duplicates(self, *, page: int, per_page: int) -> NameDuplicatesResponse:
-        """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. Fusion / marquage distinct laissés à l'œil."""
+        """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. L'administration décide de la fusion ou de la distinction."""
         pairs = _name_duplicate_pairs(self._conn)
         total = len(pairs)
         offset = (page - 1) * per_page
@@ -501,7 +501,7 @@ class PersonAdminQueries:
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
         """Autres personnes qui ont au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.
 
-        Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le drawer."""
+        Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le panneau latéral."""
         rows = self._conn.execute(
             text(f"""
                 SELECT p2.id AS person_id, p2.first_name, p2.last_name,

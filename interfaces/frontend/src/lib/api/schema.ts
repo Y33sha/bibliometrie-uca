@@ -3278,7 +3278,7 @@ export interface components {
         };
         /**
          * CurationPersonOut
-         * @description Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le drawer.
+         * @description Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom) ; le détail complet est dans le panneau latéral.
          */
         CurationPersonOut: {
             /** Person Id */
@@ -4027,9 +4027,7 @@ export interface components {
         };
         /**
          * NameFormSummaryOut
-         * @description Forme de nom observée pour une personne, avec son état d'arbitrage.
-         *
-         *     Servie par personne, non dans la liste : seule la fiche d'une personne l'affiche.
+         * @description Forme de nom observée pour une personne, avec son état d'arbitrage. Seule la fiche d'une personne l'affiche.
          */
         NameFormSummaryOut: {
             /** Name Form */
@@ -4216,7 +4214,7 @@ export interface components {
         };
         /**
          * PerimeterOut
-         * @description Un périmètre : ses structures racines (`root_structure_ids` bruts, `structures` résolues) et `structure_count`, la taille de la clôture transitive de ces racines (avec leurs sous-structures) — donc distinct du nombre de racines. `is_persons` désigne le périmètre des personnes, celui de la liste publique des structures.
+         * @description Un périmètre : ses structures racines, en identifiants et résolues, et `structure_count`, le nombre de structures des racines et de leurs sous-structures. `is_persons` désigne le périmètre des personnes, celui de la liste publique des structures.
          */
         PerimeterOut: {
             /** Id */
@@ -4332,7 +4330,7 @@ export interface components {
          * PersonOut
          * @description Ligne de `/api/persons`.
          *
-         *     Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire sous scope `lab_id`.
+         *     Les trois dénombrements comptent la même chose sous des conditions de plus en plus étroites, et se restreignent tous au laboratoire avec `lab_id`.
          */
         PersonOut: {
             /** Id */
@@ -4389,7 +4387,7 @@ export interface components {
         };
         /**
          * PersonSearchResult
-         * @description Résultat d'autocomplete `/api/persons/search`.
+         * @description Résultat d'autocomplétion de `/api/persons/search`.
          */
         PersonSearchResult: {
             /** Id */
@@ -5244,7 +5242,7 @@ export interface components {
         };
         /**
          * SharingPersonOut
-         * @description Personne partageant ≥1 forme de nom avec une autre (candidate à l'absorption).
+         * @description Personne qui partage au moins une forme de nom avec une autre, candidate à l'absorption.
          */
         SharingPersonOut: {
             /** Person Id */
