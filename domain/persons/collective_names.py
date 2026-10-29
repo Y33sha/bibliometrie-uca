@@ -1,7 +1,4 @@
-"""Reconnaissance d'un nom de contribution source collective : collaboration, consortium, groupe d'étude, réseau, investigateurs, rédaction, ou organisme déposé à la place d'un auteur (université, laboratoire, institut…).
-
-Sert aux sources qui ne distinguent pas un collectif d'une personne. La règle porte sur le nom normalisé (`normalize_text`) : un mot ou une locution de collectif suffit.
-"""
+"""Reconnaissance d'un collectif déposé à la place d'un auteur : collaboration, consortium, groupe d'étude, organisme… Sert aux sources qui ne distinguent pas un collectif d'une personne."""
 
 from domain.normalize import normalize_text
 
@@ -68,7 +65,7 @@ COLLECTIVE_NAMES: frozenset[str] = frozenset({"et al"})
 
 
 def is_collective_name(name: str | None) -> bool:
-    """Vrai quand `name` désigne un collectif : il contient un mot de `COLLECTIVE_WORDS` ou une locution de `COLLECTIVE_PHRASES`, ou il est un nom de `COLLECTIVE_NAMES`."""
+    """Vrai si le nom contient un mot ou une locution de collectif, ou se réduit à « et al ». La comparaison ignore casse, accents et ponctuation."""
     normalized = normalize_text(name or "")
     if not normalized:
         return False
