@@ -13,12 +13,6 @@ from functools import cached_property, lru_cache
 from typing import NamedTuple
 
 from domain.persons.name_matching import first_name_initials, full_first_name_extends, is_initials
-from domain.source_records.metadata_correction.shared_doi import DoiClusterCase
-
-REPEATED_LIST_CASES: frozenset[str] = frozenset(
-    {DoiClusterCase.DATACITE_VERSION_TO_CONCEPT, DoiClusterCase.DATACITE_PACKAGE_PIECE}
-)
-"""Cas de convergence écartés de l'alignement : versions d'un concept, pièces d'un jeu de données. Leur liste d'auteurs se répète d'un enregistrement source à l'autre. Un enregistrement source de l'un de ces cas est écarté quand la publication a un enregistrement source hors de ces cas."""
 
 
 class GroupingMethod(StrEnum):

@@ -101,7 +101,7 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 ### Phase 6 — Retrait de la colonne `doi`
 
 - [x] Versions, variantes et pièces de dataset écartées quand leur DOI cible est en base.
-- [ ] Code mort des formes secondaires rattachées à une publication : priorité de la consolidation, groupement des contributions sources, copies et sources secondaires de l'API.
+- [x] Code mort des formes secondaires rattachées à une publication : priorité de la consolidation, groupement des contributions sources, copies et sources secondaires de l'API.
 - [ ] DOI d'une version, d'une variante ou d'une pièce de dataset retiré des enregistrements sources qui le citent.
 - [ ] DOI d'un enregistrement source à plusieurs DOI actifs.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.

@@ -13,8 +13,6 @@ Règles d'agrégation par type de champ :
 - **`doc_type`** : premier non-null, un sous-type d'article d'une source moins prioritaire l'emportant sur `article` (cf. `arbitrate_doc_type_with_article_subtype`), puis arbitrage entre communication et texte d'actes (`arbitrate_conference`).
 - **`publisher_id`** : posé par `assign_publisher`, une fois le type de document corrigé (`domain.publishers.attribution`).
 
-Priorité d'ordre : les enregistrements canoniques passent avant les formes secondaires convergées (`secondary_ids` — pièce, version ou variante dont le DOI a été substitué par celui de l'œuvre canonique), afin que les scalaires descriptifs (titre en tête) viennent de l'enregistrement qui porte nativement le DOI, pas d'une pièce. La priorité de source départage à l'intérieur de chaque groupe.
-
 `title_normalized` est recalculé à partir du `title` agrégé, pas pris d'une source (les sources ne fournissent pas ce champ).
 """
 
@@ -40,15 +38,12 @@ def refresh_from_sources(
     sources: list[SourceRecord],
     *,
     source_priority: tuple[str, ...],
-    secondary_ids: frozenset[int] = frozenset(),
     monograph_serials: Mapping[int, int | None] | None = None,
     unpaywall: Mapping[str, str] | None = None,
 ) -> None:
     """Recalcule l'état de `publication` (DOI, oa_status, méta, etc.) par agrégation de ses `sources`. Mute `publication` en place ; persistance via `repo.save(publication)` côté caller.
 
     Règles d'agrégation : premier non-null par `source_priority` pour les scalaires nullable, statut OA tiré des sources et du verdict d'Unpaywall (`publication_oa_status`), union dédupliquée des listes, fusion shallow par clé des JSONB, `topics` indexés par source.
-
-    `secondary_ids` liste les `source_records` qui décrivent une **forme secondaire** de l'œuvre : une pièce, une version ou une variante dont la correction de convergence a remplacé le DOI par celui de l'œuvre. Elles passent en fin de priorité : les scalaires descriptifs (titre en tête) viennent de l'enregistrement dont c'est le DOI d'origine. Les listes restent unionnées toutes sources confondues : une pièce peut contenir un mot-clé légitime.
 
     `monograph_serials` donne l'entrée de `serials` de chaque monographie des sources, sa collection : une publication dont aucune source ne porte de `serial_id` prend celle de sa monographie.
 
@@ -61,7 +56,7 @@ def refresh_from_sources(
             "refresh_from_sources requiert au moins une source ; le cas orphelin est à traiter côté caller (suppression de la publication)"
         )
 
-    sorted_sources = prioritized(sources, source_priority, secondary_ids)
+    sorted_sources = prioritized(sources, source_priority)
 
     new_title = as_str(first_non_null(sorted_sources, "title"))
     publication.title = new_title if new_title is not None else publication.title
@@ -104,7 +99,6 @@ def assign_publisher(
     sources: list[SourceRecord],
     *,
     source_priority: tuple[str, ...],
-    secondary_ids: frozenset[int] = frozenset(),
     prefix_publishers: Mapping[str, int] | None = None,
 ) -> None:
     """Pose l'éditeur de `publication` d'après son type de document, son DOI et ses `sources`.
@@ -115,7 +109,7 @@ def assign_publisher(
     publication.publisher_id = publication_publisher(
         publication.doc_type,
         (prefix_publishers or {}).get(prefix) if prefix else None,
-        (s.publisher_id for s in prioritized(sources, source_priority, secondary_ids)),
+        (s.publisher_id for s in prioritized(sources, source_priority)),
         platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
 
@@ -124,11 +118,11 @@ def assign_publisher(
 
 
 def prioritized(
-    sources: list[SourceRecord], source_priority: tuple[str, ...], secondary_ids: frozenset[int]
+    sources: list[SourceRecord], source_priority: tuple[str, ...]
 ) -> list[SourceRecord]:
-    """`sources` dans l'ordre de l'agrégation : formes canoniques avant formes secondaires, puis ordre de `source_priority`."""
+    """`sources` dans l'ordre de `source_priority`."""
     rank = {s: i for i, s in enumerate(source_priority)}
-    return sorted(sources, key=lambda s: (s.id in secondary_ids, rank.get(s.source, 99)))
+    return sorted(sources, key=lambda s: rank.get(s.source, 99))
 
 
 def _textes(valeurs: list[JsonValue] | None) -> tuple[str, ...]:

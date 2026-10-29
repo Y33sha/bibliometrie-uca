@@ -5411,8 +5411,6 @@ export interface components {
             hal_collections: string[] | null;
             /** Countries */
             countries: string[] | null;
-            /** Is Secondary */
-            is_secondary: boolean;
             /**
              * Record Url
              * @description Lien vers l'enregistrement sur le portail de sa source.

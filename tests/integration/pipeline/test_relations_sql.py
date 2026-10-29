@@ -226,7 +226,7 @@ class TestRelationTargetDeletionCascades:
 
 
 def _source_record_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
-    """Enregistrement source DataCite dont l'étape de correction a substitué le DOI."""
+    """Enregistrement source DataCite dont le DOI d'origine est gardé dans `corrections`."""
     insert_source_record(
         conn,
         publication_id,
@@ -244,14 +244,14 @@ class TestRelationsDeMemeOeuvre:
     def test_l_enregistrement_source_expose_son_doi_d_origine_et_le_type_de_sa_publication(
         self, sa_sync_conn
     ):
-        """Le préfixe se juge sur le DOI que l'enregistrement source déclare, pas sur le DOI substitué."""
+        """Le préfixe se juge sur le DOI que l'enregistrement source déclare, même retiré par une correction."""
         publication = _publication(
             sa_sync_conn, doc_type="preprint", title_normalized="preprint", doi="10.48550/arxiv.1"
         )
         _source_record_datacite(
             sa_sync_conn,
             publication,
-            doi="10.1007/article",
+            doi=None,
             doi_d_origine="10.48550/arxiv.1",
             cible="10.1007/article",
         )

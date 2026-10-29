@@ -19,13 +19,11 @@ from domain.source_records.metadata_correction.rules import (
     MetadataForCorrection,
     effective_metadata,
 )
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models.publications.copies import publication_copies
-from infrastructure.sql_fragments import corrected_by
 from pipeline.transformation.publications.store import PublicationStore
 
 
@@ -88,7 +86,6 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
 
 
 def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
-    # Le `doi` projeté est la colonne nue ; la substitution Zenodo (concept plutôt que version) est déjà persistée par `metadata_correction`.
     """Les `SourceRecord` attachées à une publication canonique, matière de l'agrégation."""
     result = conn.execute(
         text("""
@@ -106,19 +103,6 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
         {"id": publication_id},
     )
     return [_source_record_from_row(row) for row in rows_as(_SourceRecordRow, result)]
-
-
-def converged_secondary_ids(conn: Connection, publication_id: int) -> frozenset[int]:
-    """Ids des `source_records` de `publication_id` dont le DOI a été substitué par une correction de convergence (forme secondaire : version, variante, pièce d'un dataset). L'agrégation les dépriorise pour que les scalaires descriptifs viennent de l'enregistrement canonique."""
-    result = conn.execute(
-        text(f"""
-            SELECT id FROM source_records
-            WHERE publication_id = :id
-              AND {corrected_by("doi", "source_records")} = ANY(:cases)
-        """),
-        {"id": publication_id, "cases": list(CONVERGENCE_CASES)},
-    )
-    return frozenset(row.id for row in result)
 
 
 def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict[int, int | None]:
@@ -209,7 +193,6 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
     if not sources:
         return RefreshVerdict.NO_SOURCE
 
-    secondary_ids = converged_secondary_ids(conn, publication_id)
     # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
     dois = sorted({doi.value for s in sources if (doi := DOI.try_parse(s.doi)) is not None})
@@ -217,7 +200,6 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         publication,
         sources,
         source_priority=SOURCE_PRIORITY,
-        secondary_ids=secondary_ids,
         monograph_serials=monograph_serial_ids(conn, monograph_ids) if monograph_ids else {},
         unpaywall=unpaywall_verdicts(conn, dois) if dois else {},
     )
@@ -236,7 +218,6 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
         publication,
         sources,
         source_priority=SOURCE_PRIORITY,
-        secondary_ids=secondary_ids,
         prefix_publishers=crossref_prefix_publishers(conn, prefixes) if prefixes else {},
     )
 

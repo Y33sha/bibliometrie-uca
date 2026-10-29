@@ -7,7 +7,6 @@ from domain.publications.access import Access, access, access_url
 from domain.publications.doc_types import DocType
 from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
 from infrastructure.read_models.publications.copies import publication_copies
@@ -28,7 +27,7 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns, corrected_by
+from infrastructure.sql_fragments import active_issns
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
@@ -202,15 +201,13 @@ class PublicationDetailQueries:
         keywords = publication_row.keywords or []
 
         sources_rows = self._conn.execute(
-            text(f"""
-                SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries,
-                       COALESCE({corrected_by("doi", "sr")} = ANY(:convergence_cases), false)
-                           AS is_secondary
+            text("""
+                SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries
                 FROM source_records sr
                 WHERE sr.publication_id = :pid
                 ORDER BY sr.created_at DESC
             """),
-            {"pid": publication_id, "convergence_cases": list(CONVERGENCE_CASES)},
+            {"pid": publication_id},
         ).all()
         sources = [
             SourceRecordOut(
@@ -220,7 +217,6 @@ class PublicationDetailQueries:
                 doi=r.doi,
                 hal_collections=r.hal_collections,
                 countries=r.countries,
-                is_secondary=r.is_secondary,
             )
             for r in sources_rows
         ]

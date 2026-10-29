@@ -110,31 +110,6 @@ class TestGetPublicationDetail:
             True,
         )
 
-    def test_sources_flagged_secondary_only_for_convergence(self, sa_sync_conn):
-        # `is_secondary` marque les formes convergées (pièce, version, variante), pas les
-        # enregistrements non corrigés ni les divergences (ouvrage/chapitre, DOI nullé).
-        publication = insert_publication(sa_sync_conn, doi="10.9001/set")
-        insert_source_record(sa_sync_conn, publication, source="datacite", source_id="dc-parent")
-        for source_id, corrected_by in (
-            ("oa-piece", "DATACITE_PACKAGE_PIECE"),
-            ("oa-chapter", "OUVRAGE_VS_CHAPITRE"),
-        ):
-            insert_source_record(
-                sa_sync_conn,
-                publication,
-                source="openalex",
-                source_id=source_id,
-                corrections={"doi": {"raw": "10.9005/orig", "corrected_by": corrected_by}},
-            )
-        detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
-        assert detail is not None
-        secondary_by_id = {s.source_id: s.is_secondary for s in detail.sources}
-        assert secondary_by_id == {
-            "dc-parent": False,
-            "oa-piece": True,
-            "oa-chapter": False,
-        }
-
     def test_thesis_meta_populated_for_thesis(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn, title="Thèse", doc_type="thesis")
         sa_sync_conn.execute(

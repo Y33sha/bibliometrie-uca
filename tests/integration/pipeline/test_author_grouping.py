@@ -246,37 +246,6 @@ def test_a_longueur_egale_scanr_ne_sert_pas_de_reference(conn):
     assert set(crossref) <= set(references)
 
 
-def _corrected_doi(conn, source_contribution, rule):
-    """Marque le DOI de l'enregistrement source de `source_contribution` comme corrigé par `rule`."""
-    conn.execute(
-        text("""
-            UPDATE source_records sr
-            SET corrections = jsonb_build_object('doi', jsonb_build_object('corrected_by', CAST(:rule AS text)))
-            FROM source_contributions sc WHERE sc.id = :sc AND sr.id = sc.source_record_id
-        """),
-        {"sc": source_contribution, "rule": rule},
-    )
-
-
-@pytest.mark.parametrize(
-    ("rule", "grouped"),
-    [
-        ("DATACITE_VERSION_TO_CONCEPT", False),
-        ("DATACITE_PACKAGE_PIECE", False),
-        ("DATACITE_VARIANT_TO_PRIMARY", True),
-    ],
-)
-def test_seules_les_versions_et_les_pieces_sont_ecartees_de_l_alignement(conn, rule, grouped):
-    publication = insert_publication(conn)
-    hal = _source_record(conn, publication, "hal", "hal-1", [("martin", "anne")])
-    oa = _source_record(conn, publication, "openalex", "W1", [("martin", "a")])
-    _corrected_doi(conn, oa[0], rule)
-
-    _run(conn)
-
-    assert ({hal[0], oa[0]} in _contributions(conn, publication).values()) is grouped
-
-
 def test_scanr_issu_d_un_depot_hal_present_s_aligne(conn):
     publication = insert_publication(conn)
     hal = _source_record(conn, publication, "hal", "hal-01234567", [("martin", "anne")])

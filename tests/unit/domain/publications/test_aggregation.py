@@ -1,9 +1,4 @@
-"""Tests de l'agrégation cross-source (`domain.publications.aggregation.refresh_from_sources`).
-
-Cible la priorité donnée aux enregistrements canoniques sur les formes secondaires convergées
-(`secondary_ids`) : le titre et les autres scalaires viennent du parent, pas d'une pièce ; les
-listes restent unionnées.
-"""
+"""Tests de l'agrégation cross-source (`domain.publications.aggregation.refresh_from_sources`)."""
 
 import pytest
 
@@ -49,49 +44,17 @@ def _publication() -> Publication:
     return Publication(id=10, title="obsolète", publication_year=2020)
 
 
-# `openalex` prioritaire sur `datacite` : sans dépriorisation, la pièce OpenAlex gagnerait le titre.
 _PRIORITY = ("openalex", "datacite")
 
 
-def test_parent_wins_title_over_higher_priority_secondary_piece():
-    parent = _source_record(
-        id=1, source="datacite", title="Jeu de données phénotypiques", keywords=("blé",)
-    )
-    piece = _source_record(
-        id=2, source="openalex", title="README_data.txt", keywords=("supplément",)
-    )
+def test_source_priority_decides_the_title_and_lists_are_merged():
+    first = _source_record(id=1, source="datacite", title="Jeu de données", keywords=("blé",))
+    second = _source_record(id=2, source="openalex", title="Données", keywords=("orge",))
 
     publication = _publication()
-    refresh_from_sources(
-        publication, [piece, parent], source_priority=_PRIORITY, secondary_ids=frozenset({2})
-    )
-
-    # Le parent (canonique) gagne le titre malgré la priorité de source de la pièce.
-    assert publication.title == "Jeu de données phénotypiques"
-    # Les mots-clés restent unionnés toutes sources confondues.
-    assert set(publication.keywords) == {"blé", "supplément"}
-
-
-def test_secondary_fills_scalar_absent_on_parent():
-    # Le parent n'a pas d'abstract : la pièce, reléguée, comble quand même le champ vide.
-    parent = _source_record(id=1, source="datacite", abstract=None)
-    piece = _source_record(id=2, source="openalex", abstract="Description du jeu de données")
-
-    publication = _publication()
-    refresh_from_sources(
-        publication, [piece, parent], source_priority=_PRIORITY, secondary_ids=frozenset({2})
-    )
-    assert publication.abstract == "Description du jeu de données"
-
-
-def test_without_secondary_ids_source_priority_decides():
-    # Comportement par défaut inchangé : sans dépriorisation, la source prioritaire gagne le titre.
-    parent = _source_record(id=1, source="datacite", title="Jeu de données phénotypiques")
-    piece = _source_record(id=2, source="openalex", title="README_data.txt")
-
-    publication = _publication()
-    refresh_from_sources(publication, [piece, parent], source_priority=_PRIORITY)
-    assert publication.title == "README_data.txt"
+    refresh_from_sources(publication, [first, second], source_priority=_PRIORITY)
+    assert publication.title == "Données"
+    assert set(publication.keywords) == {"blé", "orge"}
 
 
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():

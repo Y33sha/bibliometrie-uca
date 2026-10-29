@@ -567,17 +567,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes `doi` et `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — DOI et identifiants sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour.
-
-        La publication de chaque enregistrement source est marquée pour le groupement des auteurs : le groupement des contributions sources écarte un enregistrement source dont le DOI converge sur celui d'une autre œuvre.
-        """
-        enqueue(
-            self._conn,
-            Queue.PUBLICATION_CONTRIBUTIONS,
-            "SELECT publication_id FROM source_records"
-            " WHERE id = ANY(:ids) AND publication_id IS NOT NULL",
-            {"ids": [u.id for u in updates]},
-        )
+        """UPDATE en lot des colonnes `doi` et `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — DOI et identifiants sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
         return _persist_updates(
             self._conn,

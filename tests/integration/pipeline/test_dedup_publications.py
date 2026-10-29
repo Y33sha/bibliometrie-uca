@@ -142,40 +142,6 @@ class TestRefreshFromSources:
         oa = _scalar(sa_sync_conn, "SELECT oa_status FROM publications WHERE id = :id", id=id1)
         assert oa == "diamond"
 
-    def test_converged_piece_title_deferred_to_parent(self, sa_sync_conn):
-        """Pièce convergée (`corrected_by = DATACITE_PACKAGE_PIECE`) : le titre vient du parent
-        dataset, pas de la pièce — même quand la pièce précède le parent et partage sa source."""
-        conn = sa_sync_conn
-        publication = _insert_publication(
-            conn, doi="10.9001/set", doc_type="dataset", title="obsolète"
-        )
-        # Pièce convergée, insérée en premier : sans dépriorisation son titre gagnerait.
-        insert_source_record(
-            conn,
-            publication,
-            source="datacite",
-            source_id="dc-piece",
-            title="README_data.txt",
-            doi="10.9001/set",
-            publication_year=2024,
-            doc_type="dataset",
-            corrections={"doi": {"raw": "10.9002/file", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
-        )
-        # Parent dataset, DOI non corrigé.
-        insert_source_record(
-            conn,
-            publication,
-            source="datacite",
-            source_id="dc-parent",
-            title="Jeu de données phénotypiques",
-            doi="10.9001/set",
-            publication_year=2024,
-            doc_type="dataset",
-        )
-        refresh_from_sources(conn, publication)
-        title = _scalar(conn, "SELECT title FROM publications WHERE id = :id", id=publication)
-        assert title == "Jeu de données phénotypiques"
-
     def test_le_verdict_d_unpaywall_sur_le_doi_l_emporte_sur_les_sources(self, sa_sync_conn):
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/upw", oa_status="unknown")
         sa_sync_conn.execute(

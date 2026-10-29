@@ -12,15 +12,12 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
 )
-from infrastructure.db.queues import Queue
 from pipeline.transformation.publications.correction import serial_by_doi
 from pipeline.transformation.publications.correction.correct_by_cluster import compute_updates
 from pipeline.transformation.publications.correction.correct_unary import compute_update
 from pipeline.transformation.publications.correction.correction_store import (
     SourceRecordCorrectionStore,
 )
-from tests.integration.helpers.publications import insert_publication
-from tests.integration.helpers.queues import clear, queued
 from tests.integration.helpers.serials import (
     insert_doi_prefix,
     insert_publisher,
@@ -732,43 +729,6 @@ def test_dataset_piece_of_a_present_dataset_parent_loses_its_doi(sa_sync_conn):
             None,
             {"raw": "10.9002/file1", "corrected_by": "DATACITE_PACKAGE_PIECE"},
         )
-
-
-def test_une_correction_de_doi_regroupe_les_contributions_sources_de_la_publication(sa_sync_conn):
-    """La pièce perd son DOI : sa publication est marquée pour le groupement des contributions sources."""
-    conn = sa_sync_conn
-    publication = insert_publication(conn)
-    other = insert_publication(conn)
-    insert_source_record(
-        conn,
-        publication,
-        source="datacite",
-        source_id="d-parent",
-        title="Set",
-        doi="10.9001/set",
-        doc_type="dataset",
-    )
-    insert_source_record(
-        conn,
-        publication,
-        source="datacite",
-        source_id="d-piece",
-        title="Piece",
-        title_normalized="piece",
-        doi="10.9002/file1",
-        doc_type="dataset",
-        source_extras={
-            "related_identifiers": [{"relation_type": "IsPartOf", "doi": "10.9001/set"}]
-        },
-    )
-    insert_source_record(conn, other, source="openalex", source_id="W-other", title="Other")
-    clear(conn, Queue.PUBLICATION_CONTRIBUTIONS)
-
-    assert _apply_cluster(conn) == 1
-
-    marked = queued(conn, Queue.PUBLICATION_CONTRIBUTIONS)
-    assert publication in marked
-    assert other not in marked
 
 
 def test_dataset_piece_not_merged_when_parent_is_article(sa_sync_conn):
