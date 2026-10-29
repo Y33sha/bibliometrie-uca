@@ -1,4 +1,4 @@
-# CrossRef
+# Crossref
 
 *À jour le 2026-10-21.*
 
@@ -8,7 +8,7 @@ Documentation API:
 - https://www.crossref.org/documentation/retrieve-metadata/rest-api/
 - https://api.crossref.org/swagger-ui/index.html
 
-Le pipeline interroge CrossRef par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person)). CrossRef sert d'autorité sur les métadonnées éditeur déposées au moment de l'enregistrement du DOI.
+Le pipeline interroge Crossref par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person)). Crossref fait autorité, après theses.fr, sur les métadonnées des DOI qu'il enregistre.
 
 ## API utilisée
 
@@ -16,20 +16,20 @@ Le pipeline interroge CrossRef par DOI, pour les documents découverts par les a
 - `https://api.crossref.org/works/{doi}` : interrogation unitaire par DOI ;
 - `https://api.crossref.org/works?filter=orcid:…` : œuvres d'un lot d'ORCID, paginées par curseur (moissonnage par personne).
 
-- Polite pool obtenu via `User-Agent: BibliometrieUCA-pipeline/1.0 (mailto:<email>)` (adresse lue via `POLITE_POOL_EMAIL`)
+- Adresse électronique de contact dans le `User-Agent` (`POLITE_POOL_EMAIL`)
 - Limites du polite pool Crossref : 10 req/s et 3 requêtes simultanées. Le pipeline s'en tient à 5 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`) et à 3 requêtes simultanées (`max_concurrent=3`)
 
-**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identification du Crossref Member (= éditeur déposant) associé à un préfixe DOI. Consommée par la sous-étape `resolve_crossref_publishers` de la phase [`publishing`](../pipeline/05-publishing.md), qui complète la table `doi_prefixes` (préfixe → `crossref_member_id` + nom du déposant) une fois sa Registration Agency résolue en amont par [`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra).
+**Prefixes API** (`https://api.crossref.org/prefixes/{prefix}`) — identifie l'éditeur (membre Crossref) d'un préfixe DOI, pour la phase [`publishing`](../pipeline/05-publishing.md) (`resolve_crossref_publishers`), une fois connue l'agence d'enregistrement du préfixe ([`resolve_ra`](../pipeline/05-publishing.md#agences-denregistrement-doi-resolve_ra)).
 
 ## Données récupérées
 
-- **Publications** : DOI, titre, type, langue, journal (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_publication_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/crossref/payload.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISBN et eISBN, `isbn-type` donnant le support), métadonnées éditoriales (license, funders, dates `issued`/`published-print`/`published-online`/`created`)
+- **Publications** : DOI, titre, type, langue, revue (titre, ISSN, eISSN, éditeur), année (extraite via [`extract_crossref_publication_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/crossref/payload.py)), résumé (nettoyé du JATS XML), mots-clés (depuis `subject`), citations (`is-referenced-by-count`), biblio (volume/numéro/pages/n° d'article), identifiants externes (ISBN et eISBN, `isbn-type` donnant le support), champs propres à Crossref gardés dans `source_extras` (licence, financeurs, relations, congrès)
 - **Auteurs** : nom complet, ORCID si présent, affiliation textuelle
 - **Localisation** (`source_record_locations`) : la page vers laquelle résout le DOI (`resource.primary.URL`), avec la licence de la version éditeur. Les URL de `link` mènent à des points d'accès pour la fouille de texte : elles sont ignorées.
 
 ## Exemple de payload
 
-Document `10.1063/5.0056957` (2 auteurs en mécanique). Champs non consommés retirés : `URL`, `link` (PDF), `score`/`member`/`prefix`/`source` (métadonnées CrossRef internes), `relation` (hors scope — chantier relations entre publications), `reference` (souvent très volumineux), `indexed`/`deposited`/`issn-type`, `short-title`/`short-container-title`/`original-title`/`subtitle`/`journal-issue`/`update-policy`/`content-domain`, `references-count`/`reference-count`. Abstract tronqué.
+Document `10.1063/5.0056957` (2 auteurs en mécanique). Réduit aux champs que le pipeline lit ; résumé tronqué.
 
 ```json
 {
@@ -81,17 +81,12 @@ Crossref déclare ses relations dans `source_extras.relation`, sous des clés co
 
 ### Affiliations mal renseignées
 
-29 % des auteurs Crossref ont une affiliation, sur un sondage de 1 000 payloads, et ces affiliations sont génériques (tutelle, sans labo). Elles sont néanmoins routées vers `addresses` / `source_contribution_addresses` à la normalisation, comme HAL/OpenAlex/ScanR/theses.fr : la phase `affiliations` y détecte `in_perimeter`, ce qui fait entrer les contributions CrossRef dans le rattachement à une personne. Couverture partielle, mais strictement mieux que rien. Cette même pauvreté condamne en revanche la *discovery* par affiliation — trouver de nouvelles publis via la query affiliation, un usage distinct (cf. Statut).
+Crossref donne une affiliation pour 29 % des auteurs (sondage sur 1 000 payloads), souvent la seule tutelle. Ces affiliations deviennent des adresses, que la phase `affiliations` examine. Leur pauvreté exclut le moissonnage par affiliation.
 
-### `doc_type` : `journal-article` indistinct, arbitré contre les sous-types
+### Type de document
 
-CrossRef rend `journal-article` pour tous les sous-types d'article (review, data_paper, conference_paper, editorial, letter, erratum, retraction). Le type est stocké tel quel dans `source_records.doc_type`, et l'arbitrage final ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)) préfère un sous-type plus précis exposé par une source moins prioritaire (HAL, OpenAlex) — cf. `ARTICLE_SUBTYPES`. Sur tous les autres types (book-chapter, posted-content/preprint, monograph, etc.), CrossRef domine en tant que 2ᵉ priorité.
+Crossref donne `journal-article` pour tous les sous-types d'article (synthèse, data paper, éditorial…). L'agrégation retient le sous-type qu'une autre source donne ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)).
 
-### `oa_status` non dérivé
+### Statut open access
 
-CrossRef n'expose pas un statut OA fiable. `oa_status` reste NULL côté CrossRef — les autres sources arbitrent via `refresh_from_sources`.
-
-### Année de publication
-
-CrossRef expose plusieurs dates (`issued`, `published-print`, `published-online`, `created`). [`extract_crossref_publication_year`](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/crossref/payload.py) choisit la plus pertinente avec un plafond `current_year + 1` (les éditeurs déposent parfois des années farfelues).
-
+Crossref ne donne pas de statut open access : celui de la publication vient des autres sources.
