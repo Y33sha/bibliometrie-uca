@@ -30,6 +30,22 @@ Les 11 047 publications `conference` du périmètre se répartissent ainsi :
 
 Deux tiers des enregistrements sources HAL de ces communications sont sans résumé ni fichier. 13 % ont un fichier déposé : diaporama, résumé ou texte, indiscernables par les métadonnées.
 
+Les 2 116 enregistrements sources HAL de DUMAS (`dumas-`) sont de type HAL `MEM`, donc `memoir`, type exclu des publications. Le diplôme est dans le TEI (`label_xml`, `<note type="degree" n="…">`), présent dans le raw store pour 2 110 d'entre eux. Les libellés des codes sont dans le référentiel HAL (`ref/metadataList`, `metaName_s:dumas_degreeType`).
+
+| Diplôme (code) | Enregistrements sources |
+|---|---|
+| Thèse d'exercice de médecine (12) | 1 058 |
+| Thèse d'exercice de pharmacie (13) | 375 |
+| Mémoire du diplôme d'État de sage-femme (14) | 206 |
+| Thèse d'exercice en chirurgie dentaire (30) | 170 |
+| Mémoire du certificat de capacité d'orthophoniste (37) | 108 |
+| Mémoire du diplôme d'État d'ergothérapeute (52) | 89 |
+| Mémoire de master 2 (1) | 88 |
+| Mémoire du certificat de capacité d'orthoptiste (53) | 11 |
+| Autres mémoires (2, 3, 10) | 5 |
+
+OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
+
 ## Décisions
 
 - Les libellés des types, les familles et leur ordre sont définis dans le domaine. L'API les sert au frontend.
@@ -50,7 +66,6 @@ Deux tiers des enregistrements sources HAL de ces communications sont sans résu
 - [x] `conference` libellé « Communication ». 418245fae
 - [x] Famille « Conférences ». 6e834b66d
 - [x] Palette des couleurs des types et des familles.
-- [ ] posters et communications réunis sous un même DOI
 - [x] `data_paper` dans la famille des données et logiciels.
 - [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
 
