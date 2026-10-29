@@ -12,6 +12,7 @@ from domain.publications.licenses import DEPOSIT_LICENSE_SOURCE, publisher_licen
 from domain.publications.metadata import publication_oa_status
 from domain.publications.publication import Publication
 from domain.publishers.attribution import publication_publisher
+from domain.source_records.keys import anchor_of, doi_anchors
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import Source
 from domain.types import JsonValue, as_int, as_str
@@ -53,7 +54,7 @@ def refresh_from_sources(
         as_int(first_non_null(sorted_sources, "publication_year")) or publication.publication_year
     )
 
-    new_doi_str = as_str(first_non_null(sorted_sources, "doi"))
+    new_doi_str = publication_doi(sorted_sources)
     publication.doi = DOI(new_doi_str) if new_doi_str else None
 
     publication.serial_id = as_int(first_non_null(sorted_sources, "serial_id"))
@@ -94,6 +95,14 @@ def assign_publisher(
         (s.publisher_id for s in prioritized(sources, source_priority)),
         platform_prefix=prefix is not None and is_publisher_platform_prefix(prefix),
     )
+
+
+def publication_doi(sources: list[SourceRecord]) -> str | None:
+    """DOI d'une publication : l'ancre de ses enregistrements sources (`doi_anchors`). Entre plusieurs ancres, celle du premier enregistrement source de `sources` qui en rejoint une."""
+    anchors = doi_anchors(s.dois for s in sources)
+    if len(anchors) == 1:
+        return next(iter(anchors))
+    return next((a for s in sources if (a := anchor_of(s.dois, anchors)) is not None), None)
 
 
 def prioritized(

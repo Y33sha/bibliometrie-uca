@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 
+from domain.source_records.keys import DoiKeys
 from domain.types import JsonValue
 
 
@@ -15,7 +16,8 @@ class SourceRecord:
     title: str
     publication_year: int | None
     doc_type: str | None
-    doi: str | None
+    # DOI actifs non liés, cible appliquée.
+    dois: DoiKeys
     serial_id: int | None
     monograph_id: int | None
     container_title: str | None

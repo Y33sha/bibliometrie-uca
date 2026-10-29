@@ -1,4 +1,4 @@
-"""Intégration : la phase metadata_correction persiste l'effective + le brut réversible."""
+"""Phase `metadata_correction` : la valeur corrigée est écrite en place, la valeur d'origine est gardée dans `corrections`."""
 
 import json
 from datetime import timedelta
@@ -46,14 +46,14 @@ def _seed_serial(conn, serial_type: str, namespace: str | None = None) -> int:
 
 
 def _apply(conn) -> int:
-    """Joue la passe unaire sans committer (transaction de test rollbackée)."""
+    """Joue la correction unaire sans valider la transaction."""
     rows = SourceRecordCorrectionStore(conn).fetch_for_unary_correction()
     updates = [u for r in rows if (u := compute_update(r)) is not None]
     return SourceRecordCorrectionStore(conn).persist_corrections(updates)
 
 
 def _apply_serial_by_doi(conn) -> int:
-    """Joue le sous-step serial_by_doi sans committer."""
+    """Joue la sous-étape `serial_by_doi` sans valider la transaction."""
     namespaces = SourceRecordCorrectionStore(conn).fetch_serial_doi_namespaces()
     rows = SourceRecordCorrectionStore(conn).fetch_serial_by_doi_candidates()
     return SourceRecordCorrectionStore(conn).persist_serial_corrections(
@@ -62,8 +62,7 @@ def _apply_serial_by_doi(conn) -> int:
 
 
 def test_serial_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
-    # The Conversation : DOI dans l'espace de noms d'une revue media, sans serial_id. serial_by_doi
-    # pose la revue ; l'unaire qui suit (même run) la joint et reclasse preprint → media.
+    # The Conversation : DOI dans l'espace de noms d'une revue media, sans revue. `serial_by_doi` pose la revue ; la correction unaire qui suit, dans le même run, retype le preprint en `media`.
     conn = sa_sync_conn
     media_serial = _seed_serial(conn, "media", namespace="10.64628/aak.")
     source_record = _source_record(
@@ -82,7 +81,7 @@ def test_serial_by_doi_attaches_then_doc_type_converges_same_run(sa_sync_conn):
     doc_type, raw2 = _state(conn, source_record)
     assert doc_type == "media"
     assert raw2["doc_type"] == {"raw": "preprint", "corrected_by": "SERIAL_TYPE_MEDIA_TO_MEDIA"}
-    # Le sous-step unaire préserve la clé possédée par serial_by_doi.
+    # La correction unaire garde la clé `serial_id` écrite par `serial_by_doi`.
     assert raw2["serial_id"] == {"raw": None, "corrected_by": "SERIAL_BY_DOI_NAMESPACE"}
 
 
@@ -94,9 +93,9 @@ def test_serial_by_doi_idempotent_and_self_heals(sa_sync_conn):
     )
 
     assert _apply_serial_by_doi(conn) == 1
-    assert _apply_serial_by_doi(conn) == 0  # second run : rien ne change
+    assert _apply_serial_by_doi(conn) == 0  # second passage : rien ne change
 
-    # L'espace de noms disparaît → restauration NULL, stash retiré.
+    # L'espace de noms disparaît : la revue revient à NULL et sa clé quitte `corrections`.
     conn.execute(text("DELETE FROM serial_doi_namespaces WHERE serial_id = :id"), {"id": serial})
     assert _apply_serial_by_doi(conn) == 1
     jid, raw = conn.execute(
@@ -132,7 +131,7 @@ def test_serial_media_and_theses_url_corrected_plain_untouched(sa_sync_conn):
     plain_source_record = _source_record(conn, source_id="W_plain", doc_type="article")
 
     n = _apply(conn)
-    assert n == 2  # media + theses corrigées, plain non
+    assert n == 2  # seuls les enregistrements media et theses.fr sont corrigés
 
     media_doc_type, media_raw = _state(conn, media_source_record)
     assert media_doc_type == "media"
@@ -176,7 +175,7 @@ def test_reversibility_invariant(sa_sync_conn):
     _source_record(conn, source_id="W_media", doc_type="article", serial_id=media_serial)
     _apply(conn)
 
-    # COALESCE(corrections->'doc_type'->>'raw', doc_type::text) reconstruit le brut d'origine.
+    # Le type d'origine se reconstruit depuis `corrections`.
     reconstructed = conn.execute(
         text(
             "SELECT COALESCE(corrections->'doc_type'->>'raw', doc_type::text) "
@@ -195,7 +194,7 @@ def test_idempotent_second_run_changes_nothing(sa_sync_conn):
     )
 
     assert _apply(conn) == 2
-    assert _apply(conn) == 0  # rien à recorriger
+    assert _apply(conn) == 0  # rien à corriger
 
 
 def test_self_heals_when_serial_no_longer_media(sa_sync_conn):
@@ -207,7 +206,7 @@ def test_self_heals_when_serial_no_longer_media(sa_sync_conn):
     assert _apply(conn) == 1
     assert _state(conn, source_record)[0] == "media"
 
-    # Le journal change de type : la règle ne s'applique plus, le brut doit revenir.
+    # La revue change de type : la règle cesse de s'appliquer et le type d'origine revient.
     conn.execute(
         text("UPDATE serials SET serial_type = 'journal' WHERE id = :id"),
         {"id": media_serial},
@@ -221,8 +220,7 @@ def test_self_heals_when_serial_no_longer_media(sa_sync_conn):
 def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
     conn = sa_sync_conn
     jid = _seed_serial(conn, "journal")
-    # DOI d'éditeur (préfixe ≠ registre de thèses) : signe la version publiée → la conflation
-    # thèse↔article bascule en `article`. (Avec un DOI ABES ou sans DOI, le type resterait thèse.)
+    # Thèse dans une revue, avec un DOI d'éditeur (préfixe autre que celui des thèses) : c'est la version publiée, retypée en `article`. Avec un DOI de l'ABES ou sans DOI, le type resterait thèse.
     secondary = SourceIdentifierRole.SECONDARY
     source_record = insert_source_record(
         conn,
@@ -244,13 +242,13 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
         text("SELECT doc_type, corrections FROM source_records WHERE id = :id"),
         {"id": source_record},
     ).one()
-    assert row.doc_type == "article"  # mistype corrigé
+    assert row.doc_type == "article"  # type corrigé
     assert row.corrections["doc_type"]["corrected_by"] == "THESIS_WITH_SERIAL_TO_ARTICLE"
     # Réversibilité : les identifiants retirés restent dans la table, avec leur règle.
     removed = conn.execute(
         text("""
             SELECT id_value, removed_by FROM source_record_identifiers
-            WHERE source_record_id = :id ORDER BY id_value
+            WHERE source_record_id = :id AND id_type <> 'doi' ORDER BY id_value
         """),
         {"id": source_record},
     ).all()
@@ -263,8 +261,7 @@ def test_thesis_with_serial_corrected_and_deconflated(sa_sync_conn):
 
 def test_expired_embargo_promoted_to_green(sa_sync_conn):
     conn = sa_sync_conn
-    # `embargo_expired` est calculé au fetch (`embargo_until <= current_date`) ; date de levée
-    # passée ⇒ la règle promeut `embargoed → green`. (Règle agnostique de la source.)
+    # `embargo_expired` est calculé à la lecture (`embargo_until <= current_date`). Date de levée passée : la règle, commune à toutes les sources, passe `embargoed` à `green`.
     source_record = insert_source_record(
         conn,
         source="openalex",
@@ -318,7 +315,7 @@ def test_diamond_follows_the_journal(sa_sync_conn):
 
 def test_active_embargo_not_promoted(sa_sync_conn):
     conn = sa_sync_conn
-    # Date de levée future ⇒ `embargo_expired` faux ⇒ pas de promotion.
+    # Date de levée future : `embargo_expired` est faux, le statut reste `embargoed`.
     source_record = insert_source_record(
         conn,
         source="openalex",
@@ -339,7 +336,7 @@ def test_active_embargo_not_promoted(sa_sync_conn):
 
 
 def _apply_cluster(conn) -> int:
-    """Sous-étapes `doi_targets` puis `remove_identifiers`. Retourne le nombre d'enregistrements sources corrigés."""
+    """Sous-étapes `doi_targets` puis `remove_identifiers`. Renvoie le nombre d'enregistrements sources corrigés."""
     store = SourceRecordCorrectionStore(conn)
     store.replace_doi_targets(compute_doi_targets(store.fetch_secondary_form_declarations()))
     return store.persist_doi_corrections(compute_updates(store.fetch_doi_cluster_candidates()))
@@ -365,7 +362,7 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
     assert _apply_cluster(conn) == 1  # seul le chapitre
 
     book_doi, _ = _state(conn, book)
-    # le book garde son DOI
+    # l'ouvrage garde son DOI
     assert (
         conn.execute(
             text("SELECT doi FROM source_records WHERE id = :id"), {"id": book}
@@ -381,7 +378,7 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
     ).scalar_one()
     assert chap_raw == {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}
 
-    # Réversibilité : le DOI brut du chapitre reste reconstructible.
+    # Le DOI d'origine du chapitre se reconstruit depuis `corrections`.
     reconstructed = conn.execute(
         text("SELECT COALESCE(corrections->'doi'->>'raw', doi) FROM source_records WHERE id = :id"),
         {"id": chapter},
@@ -403,7 +400,7 @@ def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
     assert _apply_cluster(conn) == 1
     assert _apply_cluster(conn) == 0  # idempotent
 
-    # L'ouvrage est retypé (n'est plus un book) : le chapitre récupère son DOI.
+    # L'ouvrage est retypé en article : le chapitre retrouve son DOI.
     conn.execute(
         text("UPDATE source_records SET doc_type = 'article' WHERE id = :id"), {"id": book}
     )
@@ -416,7 +413,7 @@ def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
 
 
 def test_chapters_same_title_untouched(sa_sync_conn):
-    # Même chapitre (titre normalisé identique) sous un DOI : pas de conflit.
+    # Deux enregistrements du même chapitre (même titre normalisé) au même DOI : aucune correction.
     conn = sa_sync_conn
     insert_source_record(
         conn,
@@ -440,7 +437,7 @@ def test_chapters_same_title_untouched(sa_sync_conn):
 
 
 def test_chapters_distinct_titles_both_lose_doi(sa_sync_conn):
-    # Deux chapitres réellement distincts au même DOI (sans ouvrage) → tous deux perdent le DOI.
+    # Deux chapitres distincts au même DOI, sans ouvrage : tous deux perdent le DOI.
     conn = sa_sync_conn
     c1 = insert_source_record(
         conn,
@@ -471,7 +468,7 @@ def test_chapters_distinct_titles_both_lose_doi(sa_sync_conn):
 
 
 def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
-    # « chapitre 14 X » vs « X » : même chapitre après nettoyage → pas de conflit.
+    # « chapitre 14 X » et « X » désignent le même chapitre, numéro retiré : aucune correction.
     conn = sa_sync_conn
     insert_source_record(
         conn,
@@ -562,9 +559,9 @@ def _seed_work(conn, *, source_id, doi):
 
 
 def test_la_regle_lit_le_type_de_l_enregistrement_source_qui_mentionne_la_cible(sa_sync_conn):
-    """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite ne fait pas converger le groupe.
+    """Un enregistrement source OpenAlex `article` au DOI d'un working paper DataCite laisse ce DOI sans cible.
 
-    Régression : la cible était attachée à toutes les enregistrements sources du DOI, et le type de l'enregistrement source OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
+    Régression : la cible était attachée à tous les enregistrements sources du DOI, et le type de l'enregistrement source OpenAlex, que la revue déduite du DOI fait changer d'un run à l'autre, décidait pour le groupe.
     """
     conn = sa_sync_conn
     _seed_work(conn, source_id="arxiv", doi="10.48550/arxiv.1")
@@ -611,7 +608,7 @@ def test_le_doi_d_une_copie_de_l_article_absent_de_la_base_n_a_pas_de_cible(sa_s
 
 
 def test_une_cible_inconnue_de_doi_org_n_est_pas_une_cible(sa_sync_conn):
-    """Régression : une copie de repository convergeait sur l'article qu'elle déclare, que doi.org ne connaît pas."""
+    """Régression : une copie de repository avait pour cible l'article qu'elle déclare, inconnu de doi.org."""
     conn = sa_sync_conn
     _seed_work(conn, source_id="article", doi="10.1103/inconnu")
     _seed_datacite(
@@ -691,7 +688,7 @@ def test_un_changement_de_cible_marque_les_enregistrements_sources_du_doi(sa_syn
 
 
 def test_le_concept_present_comme_doi_lie_ne_compte_pas(sa_sync_conn):
-    """Le concept que seule la version mentionne, en identifiant lié, est absent de la base."""
+    """Un concept présent seulement comme identifiant lié de la version compte comme absent de la base : le DOI de la version reste sans cible."""
     conn = sa_sync_conn
     version = _seed_datacite(
         conn,
@@ -715,7 +712,7 @@ def test_le_concept_present_comme_doi_lie_ne_compte_pas(sa_sync_conn):
 
 
 def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset", title="Piece"):
-    """enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `source_extras`."""
+    """Enregistrement source DataCite déclarant une relation `IsPartOf` vers `parent_doi` dans son `source_extras`."""
     return insert_source_record(
         conn,
         source="datacite",
@@ -729,8 +726,7 @@ def _seed_datacite_piece(conn, *, source_id, doi, parent_doi, doc_type="dataset"
 
 
 def test_dataset_piece_doi_targets_the_present_dataset_parent(sa_sync_conn):
-    # Le parent dataset est moissonné ; la pièce (DOI frère, non suffixé) et son doublon
-    # cross-source gardent leur DOI, qui a pour cible celui du parent.
+    # Le dataset parent est moissonné. La pièce, de DOI sans lien de forme avec celui du parent, et son doublon d'une autre source gardent leur DOI, qui a pour cible celui du parent.
     conn = sa_sync_conn
     _typed_source_record(conn, source_id="d-parent", doi="10.9001/set", doc_type="dataset")
     piece = _seed_datacite_piece(
@@ -746,7 +742,7 @@ def test_dataset_piece_doi_targets_the_present_dataset_parent(sa_sync_conn):
 
 
 def test_dataset_piece_without_target_when_parent_is_article(sa_sync_conn):
-    # Parent moissonné mais typé `article` (dataset supplémentaire d'un article) : pas de fusion.
+    # Parent moissonné mais typé `article` (dataset complémentaire d'un article) : pas de cible.
     conn = sa_sync_conn
     _typed_source_record(conn, source_id="art", doi="10.9004/paper", doc_type="article")
     _seed_datacite_piece(conn, source_id="d-piece", doi="10.9002/data", parent_doi="10.9004/paper")
@@ -755,7 +751,7 @@ def test_dataset_piece_without_target_when_parent_is_article(sa_sync_conn):
 
 
 def test_dataset_piece_without_target_when_parent_absent(sa_sync_conn):
-    # Parent non moissonné : la pièce attend un run ultérieur.
+    # Parent non moissonné : la pièce reste sans cible jusqu'à un run ultérieur.
     conn = sa_sync_conn
     _seed_datacite_piece(conn, source_id="d-piece", doi="10.9002/data", parent_doi="10.9003/set")
     _apply_cluster(conn)

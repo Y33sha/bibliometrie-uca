@@ -1,11 +1,11 @@
 """Réconciliation des publications : rattachement, fusion et scission, en une seule décision.
 
-Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par DOI. Deux DOI distincts ne fusionnent jamais. Dans une composante à plusieurs DOI, les enregistrements sources sans DOI restent sur leur publication.
+Les enregistrements sources du voisinage se répartissent en partitions : composantes connexes de clés de confirmation, coupées par leurs ancres DOI (`doi_anchors`). Une composante à une ancre au plus reste entière. Dans une composante à plusieurs ancres, un enregistrement source rejoint l'ancre de son DOI primaire ou dérivé, à défaut l'unique ancre parmi ses DOI secondaires ; sans ancre unique, il reste sur sa publication.
 
 Chaque partition aboutit sur une seule publication, son ancre : celle qui a déjà son DOI, sinon celle du plus petit enregistrement source rattaché. L'ancre garde son identifiant, et donc les corrections faites à la main. Une partition d'enregistrements sources orphelins, sans publication, en crée une si l'un d'eux peut la fonder ; sinon, elle reste orpheline. Un enregistrement source écarté (`is_matchable`) quitte sa publication.
 """
 
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import NamedTuple
@@ -13,6 +13,7 @@ from typing import NamedTuple
 from domain.entity_resolution import connected_components
 from domain.publications.metadata import has_minimal_publication_metadata
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
+from domain.source_records.keys import DoiKeys, anchor_of, doi_anchors
 
 # Nom de clé des jetons de fusion manuelle, valeur de clé = identifiant de la fusion manuelle.
 MANUAL_MERGE_KEY = "manual_merge"
@@ -31,7 +32,7 @@ class ReconcileMember:
 
     - `tokens` : clés de confirmation et jetons de fusion manuelle.
     - `matchable` : l'enregistrement source entre dans la réconciliation (`is_matchable`).
-    - `effective_doi` : DOI corrigé, qui détermine la partition.
+    - `doi_keys` : DOI actifs non liés, qui déterminent la partition.
     - `publication_id`, `publication_doi` : publication de l'enregistrement source et son DOI, `None` s'il est orphelin.
     - `in_perimeter`, `title_normalized`, `publication_year`, `doc_type` : servent seulement à décider la création d'une publication.
     """
@@ -39,7 +40,7 @@ class ReconcileMember:
     source_record_id: int
     publication_id: int | None
     publication_doi: str | None
-    effective_doi: str | None
+    doi_keys: DoiKeys
     tokens: frozenset[tuple[str, str]]
     in_perimeter: bool = False
     title_normalized: str | None = None
@@ -60,10 +61,11 @@ class ReconcileMember:
 
 @dataclass(frozen=True, slots=True)
 class WorkGroup:
-    """Œuvre : enregistrements sources à rattacher à une seule publication. `target_publication_id` : ancre conservée, ou `None` pour créer une publication."""
+    """Œuvre : enregistrements sources à rattacher à une seule publication. `target_publication_id` : ancre conservée, ou `None` pour créer une publication. `doi` : ancre DOI de la partition."""
 
     target_publication_id: int | None
     source_record_ids: tuple[int, ...]
+    doi: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,35 +85,42 @@ class ReconcilePlan:
     detached: tuple[int, ...] = ()
 
 
-def _partitions(members: list[ReconcileMember]) -> list[list[ReconcileMember]]:
-    """Partitions du voisinage : composantes connexes, coupées par DOI. Dans une composante à plusieurs DOI, les enregistrements sources sans DOI restent hors partition."""
+def _partitions(
+    members: list[ReconcileMember],
+) -> list[tuple[str | None, list[ReconcileMember]]]:
+    """Partitions du voisinage, avec leur ancre DOI : composantes connexes, coupées par leurs ancres. Dans une composante à plusieurs ancres, un enregistrement source sans ancre unique reste hors partition."""
     by_id = {m.source_record_id: m for m in members}
     components = connected_components([(m.source_record_id, m.tokens) for m in members])
 
-    partitions: list[list[ReconcileMember]] = []
+    partitions: list[tuple[str | None, list[ReconcileMember]]] = []
     for component in components:
         comp = [by_id[source_record_id] for source_record_id in component]
-        distinct_dois = sorted({m.effective_doi for m in comp if m.effective_doi})
-        if len(distinct_dois) <= 1:
-            partitions.append(comp)
-        else:
-            partitions.extend([m for m in comp if m.effective_doi == doi] for doi in distinct_dois)
+        anchors = doi_anchors(m.doi_keys for m in comp)
+        if len(anchors) <= 1:
+            partitions.append((next(iter(anchors), None), comp))
+            continue
+        by_anchor: dict[str, list[ReconcileMember]] = defaultdict(list)
+        for m in comp:
+            if (anchor := anchor_of(m.doi_keys, anchors)) is not None:
+                by_anchor[anchor].append(m)
+        partitions.extend((anchor, by_anchor[anchor]) for anchor in sorted(by_anchor))
     return partitions
 
 
 class _Claim(NamedTuple):
-    """Revendication d'une partition. `preferred` est la publication revendiquée, `None` pour une création ; `strong` vaut pour le porteur du DOI."""
+    """Revendication d'une partition. `preferred` est la publication revendiquée, `None` pour une création ; `strong` vaut pour le porteur du DOI ; `doi` est l'ancre DOI de la partition."""
 
     preferred: int | None
     strong: bool
     min_source_record: int
     source_record_ids: tuple[int, ...]
+    doi: str | None = None
 
 
 def _claim(
-    part: list[ReconcileMember], existing_publication_by_doi: dict[str, int]
+    doi: str | None, part: list[ReconcileMember], existing_publication_by_doi: dict[str, int]
 ) -> _Claim | None:
-    """Revendication d'ancre d'une partition, ou `None` si la partition reste orpheline.
+    """Revendication d'ancre d'une partition d'ancre DOI `doi`, ou `None` si la partition reste orpheline.
 
     - Partition avec des enregistrements sources rattachés : la publication qui a son DOI (revendication forte), sinon celle du plus petit enregistrement source rattaché (faible).
     - Partition d'orphelins : création, si un membre peut fonder une publication et un membre a un titre et une année.
@@ -120,7 +129,6 @@ def _claim(
     """
     source_record_ids = tuple(sorted(m.source_record_id for m in part))
     min_source_record = min(m.source_record_id for m in part)
-    doi = next((m.effective_doi for m in part if m.effective_doi), None)
     external_carrier = existing_publication_by_doi.get(doi) if doi else None
     materialized = [m for m in part if m.publication_id is not None]
     if materialized:
@@ -132,15 +140,15 @@ def _claim(
             }
         )
         if carriers:
-            return _Claim(carriers[0], True, min_source_record, source_record_ids)
+            return _Claim(carriers[0], True, min_source_record, source_record_ids, doi)
         if external_carrier is not None:
-            return _Claim(external_carrier, True, min_source_record, source_record_ids)
+            return _Claim(external_carrier, True, min_source_record, source_record_ids, doi)
         anchor_publication = min(materialized, key=lambda m: m.source_record_id).publication_id
-        return _Claim(anchor_publication, False, min_source_record, source_record_ids)
+        return _Claim(anchor_publication, False, min_source_record, source_record_ids, doi)
     if external_carrier is not None:
-        return _Claim(external_carrier, True, min_source_record, source_record_ids)
+        return _Claim(external_carrier, True, min_source_record, source_record_ids, doi)
     if any(m.materializable for m in part) and any(m.can_found_publication for m in part):
-        return _Claim(None, False, min_source_record, source_record_ids)  # create
+        return _Claim(None, False, min_source_record, source_record_ids, doi)  # create
     return None  # skip
 
 
@@ -160,7 +168,9 @@ def plan_reconciliation(
     by_doi = existing_publication_by_doi or {}
     excluded = {m.source_record_id for m in members if not m.matchable}
     admitted = [m for m in members if m.source_record_id not in excluded]
-    claims = [c for part in _partitions(admitted) if (c := _claim(part, by_doi)) is not None]
+    claims = [
+        c for doi, part in _partitions(admitted) if (c := _claim(doi, part, by_doi)) is not None
+    ]
 
     # Revendications fortes, puis faibles, puis créations. La première à revendiquer une publication la garde.
     by_id = {m.source_record_id: m for m in admitted}
@@ -181,7 +191,7 @@ def plan_reconciliation(
             if not any(by_id[i].publication_year for i in claim.source_record_ids):
                 detached.extend(claim.source_record_ids)
                 continue
-        groups.append(WorkGroup(target, claim.source_record_ids))
+        groups.append(WorkGroup(target, claim.source_record_ids, claim.doi))
         for source_record_id in claim.source_record_ids:
             target_of_source_record[source_record_id] = target
 

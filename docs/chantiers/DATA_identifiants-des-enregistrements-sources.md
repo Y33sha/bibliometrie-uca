@@ -124,7 +124,7 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Cible appliquée au DOI cible d'une relation entre publications (`doi_or_target_sql`).
 - [x] Usages du DOI d'un enregistrement source, et réconciliation simulée selon la règle des clés DOI.
 - [x] DOI des enregistrements sources sans payload au raw store écrits dans la table (oneshot, 086044c44).
-- [ ] Clés DOI et coupe de la réconciliation selon les ancres.
+- [x] Clés DOI et coupe de la réconciliation selon les ancres ; DOI de la publication pris sur l'ancre de ses enregistrements sources.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [ ] Suppression de la colonne.
 

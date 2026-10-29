@@ -54,7 +54,7 @@ def _hal_editorial_fields(source: SourceRecord) -> bool:
 
 def attests_publication(source: SourceRecord) -> bool:
     """Vrai si l'enregistrement source décrit un texte publié : DOI, revue, monographie, congrès déclaré par Crossref, ou champs éditoriaux d'un enregistrement source HAL."""
-    if source.doi or source.serial_id or source.monograph_id:
+    if source.dois.all or source.serial_id or source.monograph_id:
         return True
     if declares_conference(source.source_extras):
         return True

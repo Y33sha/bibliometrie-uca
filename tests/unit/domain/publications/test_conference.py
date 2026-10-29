@@ -1,6 +1,7 @@
 """Communication ou texte publié dans des actes (`domain.publications.conference`)."""
 
 from domain.publications.conference import arbitrate_conference, attests_publication
+from domain.source_records.keys import DoiKeys
 from domain.source_records.source_record import SourceRecord
 
 
@@ -28,6 +29,8 @@ def _source_record(**overrides) -> SourceRecord:
         "source_extras": None,
     }
     defaults.update(overrides)
+    doi = defaults.pop("doi")
+    defaults["dois"] = DoiKeys(frozenset({doi} if doi else ()))
     return SourceRecord(**defaults)  # type: ignore[arg-type]
 
 

@@ -1,4 +1,4 @@
-"""Tests de l'agrégation cross-source (`domain.publications.aggregation.refresh_from_sources`)."""
+"""Métadonnées d'une publication agrégées depuis ses enregistrements sources (`domain.publications.aggregation`)."""
 
 import pytest
 
@@ -10,6 +10,7 @@ from domain.publications.aggregation import (
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import OA_STATUS_UNKNOWN_DEFAULT
 from domain.publications.publication import Publication
+from domain.source_records.keys import DoiKeys
 from domain.source_records.source_record import SourceRecord
 
 
@@ -37,6 +38,8 @@ def _source_record(**overrides) -> SourceRecord:
         "source_extras": None,
     }
     defaults.update(overrides)
+    doi = defaults.pop("doi")
+    defaults["dois"] = DoiKeys(frozenset({doi} if doi else ()))
     return SourceRecord(**defaults)  # type: ignore[arg-type]
 
 
@@ -58,10 +61,7 @@ def test_source_priority_decides_the_title_and_lists_are_merged():
 
 
 def test_une_source_sans_doc_type_laisse_la_suivante_le_donner():
-    """Le type vient de la première source qui en porte un, les silencieuses étant passées.
-
-    Toutes les sources ne renseignent pas le type de document. La plus prioritaire restant muette, l'agrégation lit la suivante plutôt que de conclure à l'absence de type.
-    """
+    """Le type de document vient de la première source qui en donne un."""
     muette = _source_record(id=1, source="openalex", doc_type=None)
     parlante = _source_record(id=2, source="datacite", doc_type="dataset")
 
@@ -158,7 +158,7 @@ class TestChampsAgreges:
 
 
 class TestStatutOa:
-    """Le statut OA tiré des sources et du verdict d'Unpaywall sur le DOI de la publication."""
+    """Statut open access tiré des sources et du verdict d'Unpaywall sur le DOI de la publication."""
 
     def test_le_statut_le_plus_ouvert_l_emporte(self):
         verte = _source_record(id=1, source="hal", oa_status="green")

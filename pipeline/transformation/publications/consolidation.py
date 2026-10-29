@@ -11,10 +11,11 @@ from domain.publications.aggregation import (
     assign_publisher,
     refresh_from_sources as _refresh_aggregate,
 )
-from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication
 from domain.publications.scope import OUT_OF_SCOPE_DOC_TYPES
 from domain.source_records.corrections import stash_entry
+from domain.source_records.identifiers import SourceIdentifier
+from domain.source_records.keys import doi_keys
 from domain.source_records.metadata_correction.rules import (
     MetadataForCorrection,
     effective_metadata,
@@ -22,8 +23,9 @@ from domain.source_records.metadata_correction.rules import (
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
-from infrastructure.db.doi_targets import doi_or_target_sql
+from infrastructure.db.doi_targets import fetch_doi_targets
 from infrastructure.db.rows import rows_as
+from infrastructure.db.source_record_identifiers import identifiers_json_sql, parse_identifiers
 from infrastructure.read_models.publications.copies import publication_copies
 from pipeline.transformation.publications.store import PublicationStore
 
@@ -37,7 +39,7 @@ class _SourceRecordRow(NamedTuple):
     title: str
     publication_year: int | None
     doc_type: str | None
-    doi: str | None
+    identifiers: list[dict[str, str | None]]
     serial_id: int | None
     monograph_id: int | None
     container_title: str | None
@@ -55,8 +57,10 @@ class _SourceRecordRow(NamedTuple):
     publisher_id: int | None
 
 
-def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
-    """`SourceRecord` d'une ligne de `source_records`, tableaux convertis en tuples."""
+def _source_record_from_row(
+    row: _SourceRecordRow, identifiers: tuple[SourceIdentifier, ...], doi_targets: dict[str, str]
+) -> SourceRecord:
+    """`SourceRecord` d'une ligne de `source_records`, tableaux convertis en tuples. `doi_targets` : cible du DOI de chaque forme secondaire."""
     return SourceRecord(
         id=row.id,
         source=row.source,
@@ -64,7 +68,7 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
         title=row.title,
         publication_year=row.publication_year,
         doc_type=row.doc_type,
-        doi=row.doi,
+        dois=doi_keys(identifiers, doi_targets),
         serial_id=row.serial_id,
         monograph_id=row.monograph_id,
         container_title=row.container_title,
@@ -89,7 +93,7 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
         text(f"""
             SELECT sr.id, sr.source::text AS source, sr.source_id,
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
-                   {doi_or_target_sql("sr.doi")} AS doi,
+                   {identifiers_json_sql("sr.id")} AS identifiers,
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,
@@ -100,7 +104,9 @@ def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecor
         """),
         {"id": publication_id},
     )
-    return [_source_record_from_row(row) for row in rows_as(_SourceRecordRow, result)]
+    rows = [(row, parse_identifiers(row.identifiers)) for row in rows_as(_SourceRecordRow, result)]
+    doi_targets = fetch_doi_targets(conn, (i for _, ids in rows for i in ids))
+    return [_source_record_from_row(row, ids, doi_targets) for row, ids in rows]
 
 
 def monograph_serial_ids(conn: Connection, monograph_ids: Sequence[int]) -> dict[int, int | None]:
@@ -193,7 +199,7 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
 
     # L'agrégation part des colonnes corrigées par la phase `metadata_correction`.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
-    dois = sorted({doi.value for s in sources if (doi := DOI.try_parse(s.doi)) is not None})
+    dois = sorted({d for s in sources for d in s.dois.all})
     _refresh_aggregate(
         publication,
         sources,

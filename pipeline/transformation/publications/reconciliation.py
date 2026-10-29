@@ -27,13 +27,17 @@ from domain.publications.reconciliation import (
     manual_merge_tokens,
     plan_reconciliation,
 )
-from domain.source_records.identifiers import SourceIdentifier
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
     project_confirmation_keys,
 )
-from infrastructure.db.doi_targets import doi_or_target_sql
+from infrastructure.db.doi_targets import doi_or_target_sql, fetch_doi_targets
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
@@ -60,11 +64,10 @@ from pipeline.transformation.publications import lifecycle
 class ReconcileRow(NamedTuple):
     """Projection d'une `source_record` du voisinage : clés + publication courante.
 
-    `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée de `project_confirmation_keys` (les identifiants viennent de `doi`/`identifiers`).
+    `doc_type`/`title_normalized`/`publication_year` alimentent le token métadonnée de `project_confirmation_keys` (les identifiants, DOI compris, viennent de `identifiers`).
     `publication_id` = `None` si orpheline ; `is_matchable` = l'enregistrement source entre dans la réconciliation ; `publication_doi` = DOI de la publication courante (`None` si orpheline), pour choisir l'ancre ; `in_perimeter` = l'enregistrement source a ≥1 contribution source in-périmètre (gate de création d'une publication neuve) ; `manual_merge_ids` = fusions manuelles qui désignent l'enregistrement source."""
 
     id: int
-    doi: str | None
     identifiers: tuple[SourceIdentifier, ...]
     publication_id: int | None
     doc_type: str | None
@@ -84,11 +87,7 @@ _SNAPSHOT = "source_record_keys_marks"
 # annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
 # (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
 _COLS = (
-    "{a}.id, "
-    + doi_or_target_sql("{a}.doi")
-    + " AS doi, "
-    + identifiers_json_sql("{a}.id")
-    + " AS identifiers, {a}.publication_id, "
+    "{a}.id, " + identifiers_json_sql("{a}.id") + " AS identifiers, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, {a}.is_matchable, "
     "p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
@@ -107,6 +106,12 @@ _CONFIRMATION_KEY_SQL = (
     + first_of_its_type_sql("{a}")
 )
 
+# L'identifiant aliasé `{a}` de `source_record_identifiers` est une clé DOI : un DOI actif non lié (`doi_keys`).
+_DOI_KEY_SQL = (
+    f"{{a}}.id_type = '{SourceIdentifierType.DOI.value}' AND {{a}}.removed_by IS NULL"
+    f" AND {{a}}.role <> '{SourceIdentifierRole.RELATED.value}'"
+)
+
 _UNIVERSE_SQL = text(f"""
     WITH dirty AS (
         SELECT {_COLS.format(a="sr")}
@@ -114,24 +119,29 @@ _UNIVERSE_SQL = text(f"""
         JOIN source_records sr ON sr.id = m.id
         LEFT JOIN publications p ON p.id = sr.publication_id
     )
-    SELECT id, doi, identifiers, publication_id, doc_type, title_normalized, publication_year,
+    SELECT id, identifiers, publication_id, doc_type, title_normalized, publication_year,
            is_matchable, publication_doi, in_perimeter, manual_merge_ids
     FROM dirty
     UNION
-    -- DOI : égalité directe (la colonne est toujours normalisée minuscule par `clean_doi` à
-    -- l'écriture), pour utiliser l'index btree `idx_source_records_doi` plutôt qu'un scan via `lower()`.
-    -- Le DOI de `d` est la cible de son DOI quand elle existe (`doi_targets`).
+    -- DOI : une clé DOI de l'autre enregistrement source égale à une clé DOI de `d`, cible
+    -- appliquée (`doi_targets`), par l'index `idx_source_record_identifiers_value`.
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    JOIN source_records o ON o.doi IS NOT NULL AND o.doi = d.doi
+    JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
+    JOIN source_record_identifiers oi
+      ON oi.id_type = di.id_type AND oi.id_value = {doi_or_target_sql("di.id_value")}
+         AND {_DOI_KEY_SQL.format(a="oi")}
+    JOIN source_records o ON o.id = oi.source_record_id
     LEFT JOIN publications p ON p.id = o.publication_id
-    WHERE d.doi IS NOT NULL
     UNION
-    -- DOI d'une forme secondaire dont la cible est le DOI de `d`.
+    -- DOI d'une forme secondaire dont la cible est une clé DOI de `d`.
     SELECT {_COLS.format(a="o")}
     FROM dirty d
-    JOIN doi_targets t ON t.target_doi = d.doi
-    JOIN source_records o ON o.doi = t.doi
+    JOIN source_record_identifiers di ON di.source_record_id = d.id AND {_DOI_KEY_SQL.format(a="di")}
+    JOIN doi_targets t ON t.target_doi = {doi_or_target_sql("di.id_value")}
+    JOIN source_record_identifiers oi
+      ON oi.id_type = di.id_type AND oi.id_value = t.doi AND {_DOI_KEY_SQL.format(a="oi")}
+    JOIN source_records o ON o.id = oi.source_record_id
     LEFT JOIN publications p ON p.id = o.publication_id
     UNION
     -- Identifiants : même type et même valeur, clé de confirmation de part et d'autre (index
@@ -252,7 +262,6 @@ def fetch_reconciliation_universe(conn: Connection) -> list[ReconcileRow]:
     return [
         ReconcileRow(
             r.id,
-            r.doi,
             parse_identifiers(r.identifiers),
             r.publication_id,
             r.doc_type,
@@ -271,7 +280,7 @@ def fetch_publication_ids_by_doi(conn: Connection) -> dict[str, int]:
     """Map `lower(doi) → id` des publications existantes qui ont un DOI.
 
     Permet à `plan_reconciliation` d'ancrer un groupe sur la publication qui a déjà son DOI même quand **aucun** enregistrement source du voisinage n'y est rattaché — publication devenue orpheline après un TRUNCATE + réimport des sources, ou dérive du `publications.doi` vis-à-vis de ses sources. Sans cela, le groupe créerait une publication qui heurterait la contrainte unique sur le DOI."""
-    # Clé sur `lower(doi)` : l'index unique `publications_doi_lower_key` garantit l'unicité, et le DOI de partition (`effective_doi`, via `clean_doi`) est déjà en minuscule.
+    # Clé sur `lower(doi)` : l'index unique `publications_doi_lower_key` garantit l'unicité, et l'ancre DOI d'une partition, forme normalisée d'un identifiant, est déjà en minuscule.
     rows = conn.execute(
         text("SELECT id, lower(doi) AS doi FROM publications WHERE doi IS NOT NULL")
     ).all()
@@ -327,15 +336,15 @@ def mark_publications_for_grouping(conn: Connection, publication_ids: list[int])
 # ─── Réconciliation ──────────────────────────────────────────────
 
 
-def _member(row: ReconcileRow) -> ReconcileMember:
+def _member(row: ReconcileRow, doi_targets: dict[str, str]) -> ReconcileMember:
     keys = project_confirmation_keys(
-        row.doi, row.identifiers, row.doc_type, row.title_normalized, row.publication_year
+        row.identifiers, row.doc_type, row.title_normalized, row.publication_year, doi_targets
     )
     return ReconcileMember(
         source_record_id=row.id,
         publication_id=row.publication_id,
         publication_doi=row.publication_doi,
-        effective_doi=keys.doi,
+        doi_keys=keys.doi,
         tokens=keys.tokens() | manual_merge_tokens(row.manual_merge_ids),
         in_perimeter=row.in_perimeter,
         title_normalized=row.title_normalized,
@@ -365,7 +374,7 @@ def _create_new_publication(
         title_normalized=seed.title_normalized or "",
         doc_type=seed.doc_type,
         publication_year=seed.publication_year,
-        doi=seed.doi,
+        doi=group.doi,
     )
 
 
@@ -402,8 +411,9 @@ def _plan(conn: Connection) -> tuple[ReconcilePlan, dict[int, ReconcileRow]]:
     publication_sizes = fetch_publication_sizes(
         conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
     )
+    doi_targets = fetch_doi_targets(conn, (i for row in rows for i in row.identifiers))
     plan = plan_reconciliation(
-        (_member(row) for row in rows),
+        (_member(row, doi_targets) for row in rows),
         existing_publication_by_doi=fetch_publication_ids_by_doi(conn),
         publication_sizes=publication_sizes,
     )
