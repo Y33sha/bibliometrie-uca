@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict eSDU3ACcpF7pwaInqxWWrEomfrHVEPaE1fcwlkhogIPUpRBQjbEU5XTQ3cvtdKe
+\restrict XkYdtH3b5Vv6qRd9lV1E1sVHb7YHzTBdGEH3c4CZuoATWHtvhlv1pI8Mbgq8BS8
 
 -- Dumped from database version 18.4
 -- Dumped by pg_dump version 18.4
@@ -130,6 +130,7 @@ CREATE TYPE public.doc_type AS ENUM (
     'book_chapter',
     'thesis',
     'ongoing_thesis',
+    'practice_thesis',
     'preprint',
     'review',
     'editorial',
@@ -5618,5 +5619,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict eSDU3ACcpF7pwaInqxWWrEomfrHVEPaE1fcwlkhogIPUpRBQjbEU5XTQ3cvtdKe
+\unrestrict XkYdtH3b5Vv6qRd9lV1E1sVHb7YHzTBdGEH3c4CZuoATWHtvhlv1pI8Mbgq8BS8
 

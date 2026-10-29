@@ -16,6 +16,7 @@ class DocType(StrEnum):
     BOOK_CHAPTER = "book_chapter"
     THESIS = "thesis"
     ONGOING_THESIS = "ongoing_thesis"
+    PRACTICE_THESIS = "practice_thesis"
     PREPRINT = "preprint"
     REVIEW = "review"
     EDITORIAL = "editorial"
@@ -73,6 +74,7 @@ DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.BOOK_CHAPTER: DocTypeLabel("Chapitre", "Chapitres"),
     DocType.THESIS: DocTypeLabel("Thèse", "Thèses"),
     DocType.ONGOING_THESIS: DocTypeLabel("Thèse en cours", "Thèses en cours"),
+    DocType.PRACTICE_THESIS: DocTypeLabel("Thèse d'exercice", "Thèses d'exercice"),
     DocType.PREPRINT: DocTypeLabel("Preprint", "Preprints"),
     DocType.REVIEW: DocTypeLabel("Article de synthèse", "Articles de synthèse"),
     DocType.EDITORIAL: DocTypeLabel("Éditorial", "Éditoriaux"),
@@ -120,9 +122,16 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         "Conférences", (DocType.CONFERENCE, DocType.RECORDED_TALK, DocType.POSTER)
     ),
     "preprints": DocTypeFamily("Prépublications", (DocType.PREPRINT,)),
-    # Les mémoires sont exclus des listes et les thèses en cours y sont invisibles.
+    # Les thèses d'exercice et les mémoires sont exclus des listes, les thèses en cours y sont invisibles.
     "theses": DocTypeFamily(
-        "Thèses", (DocType.THESIS, DocType.ONGOING_THESIS, DocType.HDR, DocType.MEMOIR)
+        "Thèses",
+        (
+            DocType.THESIS,
+            DocType.ONGOING_THESIS,
+            DocType.HDR,
+            DocType.PRACTICE_THESIS,
+            DocType.MEMOIR,
+        ),
     ),
     "data": DocTypeFamily(
         "Données & logiciels",

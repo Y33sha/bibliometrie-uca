@@ -194,6 +194,7 @@ class _AppliesTo(TypedDict, total=False):
     Une clé au nom d'un champ de `MetadataForCorrection` est une égalité sur ce champ. Les autres :
 
     - `doc_type` : `str` ou `frozenset[str]`, comparé en minuscules. Limite la règle aux types plausibles.
+    - `doc_type_not_in` : `frozenset[str]`, types que la règle laisse en l'état. Un type absent est hors de l'ensemble.
     - `group_title` : `frozenset[str]`, comparé en minuscules.
     - `url_contains` : sous-chaîne d'au moins une des `urls`.
     - `doi_contains` : sous-chaîne d'au moins un des `dois`.
@@ -206,6 +207,7 @@ class _AppliesTo(TypedDict, total=False):
     """
 
     doc_type: str | frozenset[str]
+    doc_type_not_in: frozenset[str]
     serial_type: str
     oa_model: str
     url_contains: str
@@ -249,16 +251,22 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"url_contains": "theses.fr/", "serial_id_present": False},
         "applies_correction": {"doc_type": DocType.THESIS},
     },
-    # DUMAS héberge seulement des mémoires. Même exception que theses.fr pour un enregistrement source rattaché à une revue.
+    # DUMAS héberge des mémoires et des thèses d'exercice. Seul l'enregistrement source HAL distingue la thèse d'exercice, par le diplôme : elle garde son type. Même exception que theses.fr pour un enregistrement source rattaché à une revue.
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
-        "applies_to": {"url_contains": "dumas.ccsd", "serial_id_present": False},
+        "applies_to": {
+            "url_contains": "dumas.ccsd",
+            "serial_id_present": False,
+            "doc_type_not_in": frozenset({DocType.PRACTICE_THESIS}),
+        },
         "applies_correction": {"doc_type": DocType.MEMOIR},
     },
     # Thèse ou mémoire rattaché à une revue, avec un DOI d'éditeur : c'est l'article publié, que OpenAlex ou ScanR confondent avec la thèse.
     # Avec un DOI de registre de thèses, ou sans DOI, le type reste thèse. L'article perd ses identifiants de thèse (`is_dissertation_identifier`).
     MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE: {
         "applies_to": {
-            "doc_type": frozenset({DocType.THESIS, DocType.ONGOING_THESIS, DocType.MEMOIR}),
+            "doc_type": frozenset(
+                {DocType.THESIS, DocType.ONGOING_THESIS, DocType.PRACTICE_THESIS, DocType.MEMOIR}
+            ),
             "serial_id_present": True,
             "doi_prefix_not_in": _THESIS_REGISTRY_DOI_PREFIXES,
         },
@@ -485,6 +493,9 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         if isinstance(value, frozenset):
             return doc_type in value
         return doc_type == value
+    if key == "doc_type_not_in":
+        assert isinstance(value, frozenset)
+        return (source_record.doc_type or "").lower() not in value
     if key == "author_count_max":
         assert isinstance(value, int)
         return source_record.author_count is not None and source_record.author_count <= value

@@ -53,6 +53,7 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - `conference_paper` reste dans la famille Publications.
 - HAL `VIDEO` et DataCite `Audiovisual` donnent `recorded_talk`. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
 - HAL `SON` et DataCite `Sound` donnent `media`.
+- Un type `practice_thesis` distingue les thèses d'exercice des mémoires. Il est exclu des publications, comme `memoir`.
 - `data_paper` rejoint la famille des données et logiciels.
 - Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
 
@@ -65,9 +66,9 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 - [x] HAL `SON` et DataCite `Sound` vers `media`. HAL `PRESCONF` vers `conference`. c2e424844
 - [x] `conference` libellé « Communication ». 418245fae
 - [x] Famille « Conférences ». 6e834b66d
-- [x] Palette des couleurs des types et des familles.
-- [x] `data_paper` dans la famille des données et logiciels.
-- [ ] DUMAS: comment distinguer mémoires et thèses d'exercice?
+- [x] Palette des couleurs des types et des familles. 574ea0878
+- [x] `data_paper` dans la famille des données et logiciels. 1bae7f9e8
+- [x] Type `practice_thesis` (« Thèse d'exercice »), famille Thèses, exclu des publications comme `memoir`. HAL `MEM` suivi du code de diplôme DUMAS (12, 13, 30, 47, 63). La règle de l'URL DUMAS laisse ce type en l'état.
 
 ### Phase 2 — Errata et rétractations
 
@@ -80,7 +81,6 @@ OpenAlex et ScanR ont 1 468 enregistrements sources `memoir` avec une URL DUMAS.
 
 ### Phase 4 — Cas particuliers
 
-- [ ] 100685 : typée preprint.
 - [ ] 107270 et 869915 « Computing Pivot-Minors » : article typé preprint par OpenAlex. Déduction du DOI depuis l'identifiant arXiv, et inversement.
 - [ ] 206476 : communication de congrès déposée en entrepôt, typée `article` par OpenAlex seul.
 * [ ] 165068 type "commmentary"; 86931 type "meeting report" => comment prendre en compte ces types (et empêcher openalex d'imposer le type article)

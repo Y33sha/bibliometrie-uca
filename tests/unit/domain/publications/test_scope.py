@@ -12,6 +12,7 @@ from domain.source_records.identifiers import (
 class TestOutOfScopeDocTypes:
     def test_contains_known_excluded_types(self):
         assert "memoir" in OUT_OF_SCOPE_DOC_TYPES
+        assert "practice_thesis" in OUT_OF_SCOPE_DOC_TYPES
         assert "peer_review" in OUT_OF_SCOPE_DOC_TYPES
         assert "physical_object" in OUT_OF_SCOPE_DOC_TYPES
 

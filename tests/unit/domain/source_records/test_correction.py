@@ -114,6 +114,11 @@ class TestDumasRule:
         assert corrected is not None
         assert corrected.value == "memoir"
 
+    def test_dumas_url_spares_practice_thesis(self):
+        # Le diplôme du dépôt HAL fait de la thèse d'exercice un type à part.
+        view = _view(doc_type="practice_thesis", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
+        assert effective_metadata(view).doc_type is None
+
     def test_no_dumas_url_no_correction(self):
         view = _view(doc_type="thesis", urls=("https://example.com/x",))
         assert effective_metadata(view).doc_type is None

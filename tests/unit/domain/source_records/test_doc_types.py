@@ -56,6 +56,15 @@ class TestMapDocType:
         assert map_doc_type("SON", source="hal") == "media"
         assert map_doc_type("Sound", source="datacite") == "media"
 
+    def test_hal_these_d_exercice_par_le_diplome_dumas(self):
+        assert map_doc_type("MEM_12", source="hal") == "practice_thesis"
+        assert map_doc_type("MEM_30", source="hal") == "practice_thesis"
+
+    def test_hal_sous_type_absent_de_la_table_prend_le_type(self):
+        """Un mémoire de sage-femme (`MEM_14`) reste un mémoire."""
+        assert map_doc_type("MEM_14", source="hal") == "memoir"
+        assert map_doc_type("ART_unknown", source="hal") == "article"
+
     def test_hal_presconf_vers_conference(self):
         assert map_doc_type("PRESCONF", source="hal") == "conference"
 

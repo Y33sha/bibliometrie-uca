@@ -89,9 +89,11 @@ def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
 
 
 def get_doc_type(doc: Mapping[str, JsonValue]) -> str | None:
-    """Type brut HAL : `docType_s`, suivi de `docSubType_s` quand HAL en donne un (ex. `ART_review-article`)."""
+    """Type brut HAL : `docType_s`, suivi de `docSubType_s` quand HAL en donne un (ex. `ART_review-article`). Un mémoire est suivi du code de son diplôme DUMAS (ex. `MEM_12`)."""
     raw_type = hal_text_field(doc.get("docType_s")) or ""
     raw_sub = hal_text_field(doc.get("docSubType_s")) or ""
+    if not raw_sub and raw_type == "MEM":
+        raw_sub = parse_tei_degree(hal_text_field(doc.get("label_xml"))) or ""
     return f"{raw_type}_{raw_sub}" if raw_sub else raw_type or None
 
 
@@ -284,6 +286,20 @@ def active_embargo_until(label_xml: str | None, today: date) -> date | None:
         return None
     latest = max(dates)
     return latest if latest > today else None
+
+
+def parse_tei_degree(label_xml: str | None) -> str | None:
+    """Code du diplôme d'un mémoire DUMAS (`note[@type='degree']/@n`), dont le référentiel HAL `dumas_degreeType` donne le libellé."""
+    if not label_xml:
+        return None
+    try:
+        root = _parse_tei(label_xml)
+    except ParseError, DefusedXmlException:
+        return None
+    for note in root.iter(f"{{{_TEI_NS['tei']}}}note"):
+        if note.get("type") == "degree" and (code := note.get("n")):
+            return code
+    return None
 
 
 def parse_tei_isbns(label_xml: str | None) -> list[str]:

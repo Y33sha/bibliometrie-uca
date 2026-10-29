@@ -361,6 +361,15 @@ class TestHalSourceRecord:
         captured = self._call({"docType_s": "BOOK"})
         assert captured.raw_doc_type == "BOOK"
 
+    def test_memoir_followed_by_dumas_degree(self):
+        tei = '<TEI xmlns="http://www.tei-c.org/ns/1.0"><text><body><note type="degree" n="12">dumas_degreeType_12</note></body></text></TEI>'
+        captured = self._call({"docType_s": "MEM", "label_xml": tei})
+        assert captured.raw_doc_type == "MEM_12"
+
+    def test_memoir_without_degree(self):
+        captured = self._call({"docType_s": "MEM"})
+        assert captured.raw_doc_type == "MEM"
+
     def test_nnt_goes_in_identifiers(self):
         captured = self._call({"nntId_s": "2024CLFAC001"})
         assert identifier_values(captured) == {"hal_id": ["hal-01234567"], "nnt": ["2024CLFAC001"]}
