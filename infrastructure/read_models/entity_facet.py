@@ -28,7 +28,7 @@ class EntitySql(NamedTuple):
     publication_count: str = "COUNT(*)"
 
 
-# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les contributions rattachées à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui porte une ligne par source pour un même couple publication–sujet.
+# La revue sort de `publications.serial_id`, l'éditeur de `publications.publisher_id`. L'organisation partenaire est un ROR des auteurs, ancêtres compris (`publication_rors`), hors les ROR propres aux structures `:own_structure_ids`, nommé par le référentiel ROR. L'auteur passe par les contributions rattachées à une personne ; une personne rejetée n'est pas proposée. Le sujet passe par `publication_subjects`, qui a une ligne par source pour un même couple publication–sujet.
 ENTITY_SQL: dict[EntityKind, EntitySql] = {
     "serial": EntitySql(
         table="serials j",
@@ -76,7 +76,7 @@ ENTITY_SQL: dict[EntityKind, EntitySql] = {
 
 
 def entity_name_clause(label_sql: str, search: str) -> tuple[str, dict[str, object]]:
-    """Condition qui restreint une facette d'entité aux noms portant le terme cherché, à ajouter au WHERE.
+    """Condition qui restreint une facette d'entité aux noms qui contiennent le terme cherché, à ajouter au WHERE.
 
     Le fragment rendu est vide en deçà de deux caractères : le terme ne discrimine alors rien.
     """

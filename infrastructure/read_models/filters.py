@@ -1,6 +1,6 @@
 """Fragments SQL et constructeurs de filtres pour les requêtes de lecture.
 
-Chaque `*_clause(...)` retourne un `WhereClause | None`, composable via `assemble_where(...)`. Les fragments utilisent la syntaxe nommée SQLAlchemy `:nom` et s'exécutent via une `Connection` SA.
+Chaque `*_clause(...)` rend un `WhereClause | None`, à assembler par `assemble_where(...)`. Les fragments emploient les paramètres nommés `:nom` de SQLAlchemy.
 """
 
 from collections.abc import Iterable
@@ -22,20 +22,14 @@ from infrastructure.sql_fragments import has_author_role, pending_name_form
 
 
 def _sql_list(values: Iterable[str]) -> str:
-    """Formate un tuple de strings en liste SQL littérale `('a','b',...)`.
-
-    Utilisé pour injecter une liste de valeurs métier stables (constantes)
-    dans du SQL inline. Ne pas utiliser avec des valeurs utilisateur.
-    """
+    """Liste SQL littérale `('a','b',…)` de constantes du domaine, interpolée telle quelle : jamais de valeur saisie."""
     return "(" + ",".join(f"'{v}'" for v in sorted(values)) + ")"
 
 
 OA_OPEN_SQL = _sql_list(OA_OPEN_STATUSES)
 OA_CLOSED_SQL = _sql_list(OA_CLOSED_STATUSES)
 
-# Colonnes de ventilation OA par statut (alias `p` = publications), partagées par les requêtes
-# stats (éditeurs/revues/labos/années) : une colonne par statut du vocabulaire `OaStatus`,
-# nommée par sa valeur, dans l'ordre de définition de l'enum.
+# Colonnes de ventilation open access par statut (alias `p` des publications), partagées par les statistiques des éditeurs, revues, laboratoires et années : une colonne par statut de `OaStatus`, nommée par sa valeur, dans l'ordre de l'enum.
 OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
     f"COUNT(DISTINCT p.id) FILTER (WHERE p.oa_status = '{status.value}') AS {status.value}"
     for status in OaStatus
@@ -43,27 +37,20 @@ OA_BREAKDOWN_COLS_SQL = ",\n            ".join(
 
 
 def publication_in_perimeter(alias: str = "p") -> str:
-    """Filtre SQL : la publication (table `publications` aliasée `alias`) est dans
-    le périmètre.
+    """Filtre SQL : la publication aliasée `alias` est dans le périmètre (`in_perimeter`, colonne générée vraie quand la publication a des indices de l'entrée dans le périmètre).
 
-    Lit `publications.in_perimeter`, colonne générée vraie quand la publication a
-    des indices de l'entrée dans le périmètre (`perimeter_evidence`).
-    Filtre **par requête** : seules les listes scopées UCA l'appliquent ; les vues
-    par personne montrent tout. `alias` paramètre l'alias appelant — nécessaire
-    quand `p` est déjà pris (ex. le publisher dans `publishers.py`)."""
+    Seules les listes du périmètre l'appliquent ; les vues par personne montrent tout. `alias` sert quand `p` est déjà pris.
+    """
     return f"({alias}.in_perimeter)"
 
 
 # La plupart des requêtes aliasent les publications `p` : constante de commodité.
 PUBLICATION_IS_IN_PERIMETER = publication_in_perimeter()
 
-# Un sujet dont l'usage global dépasse ce seuil est trop générique pour un nuage de mots :
-# « research article » ou « science » arrivent en tête de tous les contextes et masquent ce
-# qui distingue celui qu'on regarde.
+# Un sujet dont l'usage global dépasse ce seuil est trop générique pour un nuage de mots : « research article » ou « science » arrivent en tête partout, et masquent ce qui distingue le contexte affiché.
 GENERIC_SUBJECT_MAX_USAGE = 5000
 
-# Filtre SQL : le sujet (table `subjects` aliasée `s`) n'est pas générique. Partagé par les
-# quatre nuages de mots — éditeur, revue, laboratoire, personne — qui écartent le même ensemble.
+# Filtre SQL : le sujet (alias `s`) est hors des sujets génériques. Les quatre nuages de mots (éditeur, revue, laboratoire, personne) écartent le même ensemble.
 SUBJECT_IS_NOT_GENERIC = f"(s.usage_count <= {GENERIC_SUBJECT_MAX_USAGE})"
 
 
@@ -84,22 +71,14 @@ def entity_subjects_sql(entity_predicate: str) -> str:
 
 @dataclass(frozen=True)
 class WhereClause:
-    """Fragment SQL avec ses bind params nommés (syntaxe `:nom`).
-
-    À assembler via `assemble_where(...)` puis exécuter via une
-    `Connection` SA. Incompatible avec un curseur psycopg.
-    """
+    """Fragment SQL et ses paramètres nommés (`:nom`), à assembler par `assemble_where(...)` puis exécuter sur une `Connection` SQLAlchemy. Incompatible avec un curseur psycopg."""
 
     sql: str
     binds: dict[str, object]
 
 
 def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, object]]:
-    """Assemble les fragments en un `WHERE ...` SQL + dict de binds.
-
-    Retourne `("TRUE", {})` si aucune clause valide, ce qui permet au
-    caller d'écrire `f"WHERE {where_sql}"` sans cas particulier.
-    """
+    """Condition SQL et paramètres des fragments assemblés. Sans clause, rend `("TRUE", {})` : l'appelant écrit `f"WHERE {where_sql}"` sans cas particulier."""
     valid = [c for c in clauses if c is not None]
     if not valid:
         return "TRUE", {}
@@ -187,7 +166,7 @@ def oa_clause(oa_status: list[str]) -> WhereClause | None:
 def access_clause(access: list[str]) -> WhereClause | None:
     """Filtre par niveau d'accès, les niveaux demandés combinés en OR.
 
-    Les niveaux ventilent les statuts OA (`ACCESS_LEVELS`) : filtrer sur un niveau revient à filtrer sur les statuts qu'il recouvre. Un `oa_status` nul compte comme fermé, la colonne ayant précédé la valeur `unknown`.
+    Les niveaux ventilent les statuts OA (`ACCESS_LEVELS`) : filtrer sur un niveau revient à filtrer sur les statuts qu'il recouvre. Un `oa_status` nul compte comme fermé.
     """
     if not access:
         return None
@@ -221,11 +200,7 @@ def excluded_doc_type_clause(excluded_types: list[str]) -> WhereClause | None:
 
 
 def search_clause(search: str) -> WhereClause | None:
-    """Recherche plein-texte : titre normalisé ou label de sujet.
-
-    Partagée par la liste, l'export et les facettes pour que les trois comptent
-    le même ensemble. Bind `:flt_search_pat`.
-    """
+    """Recherche plein texte : titre normalisé ou libellé de sujet. La liste, l'export et les facettes la partagent : les trois comptent le même ensemble. Paramètre `:flt_search_pat`."""
     if not search:
         return None
     pattern = f"%{normalize_text(search)}%"
@@ -241,7 +216,7 @@ def search_clause(search: str) -> WhereClause | None:
 def person_search_clause(search: str) -> WhereClause | None:
     """Recherche par nom : chaque mot saisi figure dans le nom ou le prénom (accent-insensible).
 
-    L'ordre des mots est indifférent : « Valérie Legué » et « Legué Valérie » trouvent la même personne. Partagée par l'annuaire des personnes, ses facettes et l'autocomplétion. Alias `p` = persons. Binds `:flt_person_search_<rang du mot>`.
+    L'ordre des mots est indifférent : « Valérie Legué » et « Legué Valérie » trouvent la même personne. Partagée par l'annuaire des personnes, ses facettes et l'autocomplétion. Alias `p` : la personne. Paramètres `:flt_person_search_<rang du mot>`.
     """
     words = search.split()
     if not words:
@@ -259,8 +234,7 @@ def person_search_clause(search: str) -> WhereClause | None:
 
 
 def source_clause(source_values: list[str]) -> WhereClause | None:
-    """Filtre source via publications.sources (GIN). `source_values` = liste
-    `{prefix}_{yes|no}` (constantes côté front, sans bind nécessaire)."""
+    """Filtre par source, sur `publications.sources`. Les valeurs sont des `{prefix}_{yes|no}`, constantes de l'interface, interpolées sans paramètre."""
     parts: list[str] = []
     for sv in source_values:
         bits = sv.rsplit("_", 1)
@@ -307,12 +281,7 @@ def author_clause(author_id: int | None) -> WhereClause | None:
 def _toggle_clause(
     values: list[str], exists_sql: str, binds: dict[str, object]
 ) -> WhereClause | None:
-    """Facette binaire `yes`/`no` sur un prédicat EXISTS.
-
-    `values` est une liste `yes`/`no` (multi-sélection côté front) : `yes` retient
-    les publications vérifiant `exists_sql`, `no` les autres, combinés en OR. Cocher
-    les deux ne pose donc aucune contrainte. Une valeur inconnue est ignorée.
-    """
+    """Facette binaire `yes`/`no` sur un prédicat EXISTS. `yes` retient les publications qui vérifient `exists_sql`, `no` les autres, combinés en OR : cocher les deux laisse tout passer. Une valeur inconnue est ignorée."""
     parts: list[str] = []
     if "yes" in values:
         parts.append(exists_sql)
@@ -388,7 +357,7 @@ def institution_apc_payment_sql(root_ids_param: str) -> str:
 
 
 def apc_clause(has_apc: list[str], perimeter_structure_ids: list[int]) -> WhereClause | None:
-    """Filtre `yes` / `no` des publications dont un paiement d'APC est imputé au budget d'une structure du périmètre `persons` (`perimeter_structure_ids`, que les adapters résolvent)."""
+    """Filtre `yes` / `no` des publications dont un paiement d'APC est imputé au budget d'une structure du périmètre `persons` (`perimeter_structure_ids`, que les adaptateurs résolvent)."""
     return _toggle_clause(
         has_apc,
         institution_apc_payment_sql("flt_apc_root_ids"),
@@ -440,7 +409,7 @@ def language_clause(language_codes: list[str]) -> WhereClause | None:
 
 
 def subject_clause(subject_ids: list[int]) -> WhereClause | None:
-    """Filtre : la publication porte au moins un des sujets."""
+    """Filtre : la publication a au moins un des sujets."""
     if not subject_ids:
         return None
     return WhereClause(
@@ -469,10 +438,7 @@ def monograph_id_clause(monograph_id: int | None) -> WhereClause | None:
 
 
 def person_has_identifier_sql(id_type: str) -> str:
-    """Prédicat : la personne `p` porte un identifiant `id_type` au statut hors `rejected`.
-
-    `id_type` est une constante d'appel (orcid/idhal/idref), interpolée en SQL.
-    """
+    """Prédicat : la personne `p` a un identifiant de ce type, non rejeté. Le type est une constante d'appel (orcid, idhal, idref), interpolée en SQL."""
     return f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id
@@ -482,20 +448,20 @@ def person_has_identifier_sql(id_type: str) -> str:
 
 
 def person_has_identifier_clause(id_type: str, value: bool | None) -> WhereClause | None:
-    """Filtre : la personne porte (`value` vrai) ou non un identifiant `id_type` (`person_has_identifier_sql`)."""
+    """Filtre : la personne a (`value` vrai) ou non un identifiant de ce type (`person_has_identifier_sql`)."""
     if value is None:
         return None
     negate = "" if value else "NOT "
     return WhereClause(f"{negate}{person_has_identifier_sql(id_type)}", {})
 
 
-# Prédicat : la personne `p` a ≥1 forme de nom à confirmer (`pending_name_form`).
+# Prédicat : la personne `p` a au moins une forme de nom à confirmer (`pending_name_form`).
 PERSON_HAS_PENDING_NAME_FORMS_SQL = f"""EXISTS (
             SELECT 1 FROM person_name_forms pnf
             WHERE pnf.person_id = p.id AND {pending_name_form("pnf")}
         )"""
 
-# Prédicat : la personne `p` a ≥1 identifiant au statut `pending` (à confirmer).
+# Prédicat : la personne `p` a au moins un identifiant à confirmer (`pending`).
 PERSON_HAS_PENDING_IDENTIFIERS_SQL = f"""EXISTS (
             SELECT 1 FROM person_identifiers pi
             WHERE pi.person_id = p.id AND pi.status = '{AttributionStatus.PENDING.value}'
@@ -528,7 +494,7 @@ def person_department_clause(departments: list[str]) -> WhereClause | None:
 
 
 def person_role_clause(roles: list[str]) -> WhereClause | None:
-    """Filtre : la personne porte l'un des intitulés de poste donnés (alias `prh`)."""
+    """Filtre : la personne a l'un des intitulés de poste donnés (alias `prh`)."""
     if not roles:
         return None
     return WhereClause("prh.role_title = ANY(:flt_roles)", {"flt_roles": roles})
@@ -563,11 +529,7 @@ def person_exclusion_clause(exclusions: list[PersonExclusion | None]) -> WhereCl
 
 
 def person_in_lab_clause(lab_id: int | None) -> WhereClause | None:
-    """Filtre : la personne (alias `p`) a une contribution rôle author rattaché au labo.
-
-    Sert à scoper l'annuaire/les facettes personnes à un laboratoire — même
-    sémantique que le scope publications `lab_clause`, transposée sur `person_id`.
-    """
+    """Filtre : la personne (alias `p`) a une contribution d'auteur rattachée au laboratoire. Restreint l'annuaire et ses facettes à un laboratoire, comme `lab_clause` pour les publications."""
     if not lab_id:
         return None
     return WhereClause(

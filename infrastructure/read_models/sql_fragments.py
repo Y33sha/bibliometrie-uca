@@ -12,7 +12,7 @@ def contributor_display_name(source_contribution: str = "sc") -> str:
 
 
 def source_contribution_structure_ids(source_contribution: str = "sc") -> str:
-    """Sous-requête (`structure_id`) des structures atteintes par la contribution source aliasée `source_contribution`, chacune une fois. La matview `source_contribution_structures` contient une ligne par indice (adresse, ROR, structure HAL) : une structure atteinte par deux indices y figure deux fois."""
+    """Sous-requête (`structure_id`) des structures atteintes par la contribution source aliasée `source_contribution`, chacune une fois. La vue matérialisée `source_contribution_structures` contient une ligne par indice (adresse, ROR, structure HAL) : une structure atteinte par deux indices y figure deux fois."""
     return (
         "SELECT DISTINCT scs.structure_id FROM source_contribution_structures scs"
         f" WHERE scs.source_contribution_id = {source_contribution}.id"

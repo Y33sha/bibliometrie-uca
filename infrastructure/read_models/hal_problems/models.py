@@ -31,7 +31,7 @@ class HalDocSummary(BaseModel):
 
 
 class HalPublicationDetail(BaseModel):
-    """Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL)."""
+    """Métadonnées et dépôts HAL d'une publication, communs aux listes de doublons HAL."""
 
     id: int
     title: str
@@ -62,7 +62,7 @@ class HalMetaDuplicatesResponse(PaginatedResponse):
 
 
 class HalCollectionLab(BaseModel):
-    """Labo configuré avec une collection HAL (sélecteur missing-collections)."""
+    """Laboratoire doté d'une collection HAL, pour le sélecteur des manques de collection."""
 
     id: int
     acronym: str | None
@@ -92,10 +92,7 @@ class HalMissingCollectionsResponse(PaginatedResponse):
 
 
 class NoMissingCollections(StrEnum):
-    """Pourquoi la question « que manque-t-il à sa collection ? » n'a pas de réponse pour ce laboratoire.
-
-    Les deux cas se distinguent parce qu'ils tiennent à des choses différentes : l'un désigne un laboratoire qui n'existe pas, l'autre un laboratoire réel dont aucune collection HAL n'est configurée.
-    """
+    """Raison pour laquelle la question « que manque-t-il à sa collection ? » reste sans réponse pour ce laboratoire : laboratoire inexistant, ou laboratoire réel sans collection HAL configurée."""
 
     UNKNOWN_LAB = "unknown_lab"
     NO_COLLECTION = "no_collection"
@@ -109,7 +106,7 @@ class HalAffiliationConflictPublication(BaseModel):
     doi: str | None
     halids: list[str] | None = Field(exclude=True)
     laboratories: list[StructureRef]
-    """Laboratoires du périmètre que la publication porte ; l'affichage choisit entre acronyme et nom."""
+    """Laboratoires du périmètre de la publication ; l'affichage choisit entre acronyme et nom."""
 
     @computed_field
     @property

@@ -1,7 +1,4 @@
-"""Query services pour le router `/api/hal-problems/*`.
-
-Contrôles qualité HAL au niveau des publications (doublons de dépôts, manques dans les collections, conflits d'affiliation) + comptes HAL multiples par personne.
-"""
+"""Lectures des routes `/api/hal-problems/*` : contrôles de qualité HAL des publications (dépôts en double, manques dans les collections, conflits d'affiliation) et comptes HAL multiples par personne."""
 
 from collections import defaultdict
 from collections.abc import Iterator, Sequence
@@ -119,7 +116,7 @@ class HalProblemsQueries:
         }
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
-        # Note sur les agrégats MIN() ci-dessous : pour un même `hal_person_id`, les valeurs de `raw_author_name`/`orcid`/`idhal`/`idref` observées sur les `source_contributions` HAL devraient être constantes (ces champs sont attachés au compte HAL, et non à la contribution source). En théorie aucune variation possible. En pratique, si des imports à des dates différentes ont posé des valeurs divergentes (avant que la comparaison de hash ne réimporte les payloads obsolètes), MIN() ramasse une valeur déterministe arbitraire. L'optimal aurait été MAX(created_at), mais `source_contributions` n'a pas de `created_at`.
+        # Pour un même `hal_person_id`, le nom et les identifiants des contributions sources HAL sont en principe constants : ils tiennent au compte HAL. Des imports de dates différentes peuvent pourtant diverger ; MIN() en retient une valeur déterministe.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS}) sub")
@@ -287,7 +284,7 @@ class HalProblemsQueries:
         )
 
     def hal_missing_collections_labs(self) -> list[HalCollectionLab]:
-        """Structures du périmètre dont une collection HAL est renseignée — celles dont la collection se compare.
+        """Structures du périmètre dont une collection HAL est renseignée : celles dont la collection se compare.
 
         Sans collection, la question « que manque-t-il à sa collection ? » est sans objet.
         """
@@ -384,7 +381,7 @@ class HalProblemsQueries:
         self, *, page: int, per_page: int
     ) -> HalAffiliationConflictsResponse:
         offset = (page - 1) * per_page
-        # Conflit d'affiliation : HAL classe la publication in_perimeter, WoS/OpenAlex (seules à donner des adresses) non.
+        # Conflit d'affiliation : HAL met la publication dans le périmètre, WoS et OpenAlex, seules sources à donner des adresses, la laissent hors du périmètre.
         base_cte = """
         WITH hal_in_perimeter_pubs AS (
             SELECT DISTINCT sr.publication_id

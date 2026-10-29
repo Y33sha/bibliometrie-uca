@@ -1,4 +1,4 @@
-"""Query service : lectures des contributions servies par les routes `/api/contributions/*`."""
+"""Lectures des contributions servies par les routes `/api/contributions/*`."""
 
 from sqlalchemy import Connection, text
 
@@ -35,7 +35,7 @@ _MEMBERS = """
 
 
 def _displayed_member(columns: str) -> str:
-    """Sous-requête des colonnes `columns` du membre `sc_m` de la source la plus prioritaire, qui donne le nom affiché de la contribution `g`."""
+    """Sous-requête des colonnes demandées du membre `sc_m` de la source la plus prioritaire, qui donne le nom affiché de la contribution `g`."""
     return f"""
         SELECT {columns} FROM {_MEMBERS}
         ORDER BY {case_priority(SOURCE_PRIORITY, "sc_m.source")}, sc_m.id

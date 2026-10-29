@@ -1,4 +1,4 @@
-"""Query services pour `/api/addresses/*`."""
+"""Lectures des routes `/api/addresses/*`."""
 
 from dataclasses import replace
 
@@ -23,7 +23,7 @@ from infrastructure.read_models.addresses.models import (
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import address_country_conditions
 
-# « Reconnue » comme une structure = lien pending (détecté, non revu) ou confirmé ; exclut le rejeté (is_confirmed = FALSE) et l'absence de lien. Utilisé par les prédicats Structure de `list_addresses`.
+# « Reconnue » comme une structure : lien en attente ou confirmé ; un lien rejeté ou absent l'exclut. Sert les prédicats de structure de `list_addresses`.
 _RECOGNIZED_LINK = (
     "((asx.matched_form_id IS NOT NULL AND asx.is_confirmed IS NULL) OR asx.is_confirmed = TRUE)"
 )
@@ -67,7 +67,7 @@ class AddressesQueries:
         page: int,
         per_page: int,
     ) -> AddressListResponse:
-        """Liste paginée des adresses avec filtres détection/validation."""
+        """Liste paginée des adresses, filtrée par état de détection et de validation."""
         offset = (page - 1) * per_page
         use_inner_join = filters.detected == "yes"
 
@@ -107,7 +107,7 @@ class AddressesQueries:
                 f"WHERE asx.address_id = a.id AND asx.structure_id = ANY(:{bind}) "
                 f"AND {_RECOGNIZED_LINK})"
             )
-            # recognized = reconnue comme au moins une des structures (OR) ; not_recognized = reconnue comme aucune (De Morgan → NOT EXISTS).
+            # recognized : reconnue comme au moins une des structures ; not_recognized : reconnue comme aucune (NOT EXISTS).
             parts.append(exists if source_record.operator == "recognized" else f"NOT {exists}")
 
         where_clause = (" AND " + " AND ".join(parts)) if parts else ""
@@ -164,7 +164,7 @@ class AddressesQueries:
         return row is not None
 
     def get_address_raw_text(self, addr_id: int) -> str | None:
-        """Texte brut de l'adresse ; `None` signale une adresse absente, la colonne étant obligatoire."""
+        """Texte brut de l'adresse, ou `None` pour une adresse absente : la colonne est obligatoire."""
         row = self._conn.execute(
             text("SELECT raw_text FROM addresses WHERE id = :id"),
             {"id": addr_id},

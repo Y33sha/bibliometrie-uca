@@ -16,7 +16,7 @@ def page_count(total: int, per_page: int) -> int:
 class PaginatedResponse(BaseModel):
     """Socle des lectures paginées : la tranche demandée et de quoi situer le reste.
 
-    `pages` se déduit de `total` et `per_page` — c'est une conséquence, pas une donnée. Les réponses qui en héritent ajoutent leur liste de résultats et les champs propres à leur lecture.
+    `pages` se déduit de `total` et `per_page`. Les réponses qui en héritent ajoutent leur liste de résultats et les champs propres à leur lecture.
     """
 
     total: int
@@ -37,7 +37,7 @@ class SourceLink(BaseModel):
 
 
 def hal_links(halids: list[str] | None) -> list[SourceLink]:
-    """Liens des dépôts HAL `halids`."""
+    """Liens des dépôts HAL donnés."""
     return [
         SourceLink(source_id=h, record_url=source_record_url(Source.HAL, h)) for h in halids or []
     ]

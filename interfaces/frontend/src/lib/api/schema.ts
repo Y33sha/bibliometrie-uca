@@ -2878,7 +2878,7 @@ export interface components {
          * AddressListResponse
          * @description Réponse paginée de `/api/addresses`.
          *
-         *     `requires_search=True` signale que le garde-fou du router a court-circuité la lecture et rendu une liste vide : la combinaison de filtres demandée porte sur toute la base plutôt que sur une structure, faute d'un prédicat de texte ou de structure pour la réduire.
+         *     `requires_search` vrai signale une liste vide rendue sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base.
          */
         AddressListResponse: {
             /** Total */
@@ -2978,7 +2978,7 @@ export interface components {
         };
         /**
          * AddressStructureSummary
-         * @description Lien adresse ↔ structure (élément de `structures` dans la liste/review).
+         * @description Lien entre une adresse et une structure, dans la liste des adresses.
          */
         AddressStructureSummary: {
             /** Id */
@@ -3457,9 +3457,7 @@ export interface components {
         };
         /**
          * FeedbackAddressItem
-         * @description Ligne d'adresse dans false-negatives / false-positives.
-         *
-         *     `matched_forms` n'est rempli que pour les faux positifs.
+         * @description Adresse d'une liste de faux négatifs ou de faux positifs. `matched_forms` est rempli seulement pour les faux positifs.
          */
         FeedbackAddressItem: {
             /** Id */
@@ -3488,7 +3486,7 @@ export interface components {
         };
         /**
          * FeedbackMatchedForm
-         * @description Forme de nom ayant matché lors de la détection (faux positif).
+         * @description Forme de nom reconnue par la détection, dans un faux positif.
          */
         FeedbackMatchedForm: {
             /** Form Id */
@@ -3582,7 +3580,7 @@ export interface components {
         };
         /**
          * HalCollectionLab
-         * @description Labo configuré avec une collection HAL (sélecteur missing-collections).
+         * @description Laboratoire doté d'une collection HAL, pour le sélecteur des manques de collection.
          */
         HalCollectionLab: {
             /** Id */
@@ -3719,7 +3717,7 @@ export interface components {
         };
         /**
          * HalPublicationDetail
-         * @description Métadonnées + dépôts HAL d'une publication (commun aux doublons HAL).
+         * @description Métadonnées et dépôts HAL d'une publication, communs aux listes de doublons HAL.
          */
         HalPublicationDetail: {
             /** Id */
