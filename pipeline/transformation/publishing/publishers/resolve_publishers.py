@@ -1,4 +1,4 @@
-"""Volet publisher de `publishing` : préfixe DOI → éditeur, une étape par agence d'enregistrement.
+"""Éditeur de chaque préfixe DOI, une étape par agence d'enregistrement (phase `publishing`).
 
 L'étape Crossref interroge `api.crossref.org/prefixes` pour les préfixes d'agence Crossref ou inconnue. L'étape DataCite interroge `api.datacite.org/prefixes` pour les préfixes d'agence DataCite, et pour ceux d'agence inconnue que Crossref ne connaît pas. Chaque étape renseigne les métadonnées (`publisher_*`, `crossref_member_id`, `client_*`, `datacite_client_symbol`), corrige l'agence d'un préfixe inconnu qu'elle trouve, puis reconnaît ou crée l'éditeur contre `publisher_name_forms` et l'attache. Un préfixe dont l'API a répondu est marqué vu par l'agence (`crossref_checked_at`, `datacite_checked_at`). Un préfixe dont l'API est indisponible reste en attente du run suivant.
 
@@ -210,8 +210,7 @@ def _store_publisher_metadata(
     client_name_normalized: str | None = None
     datacite_client_symbol: str | None = None
 
-    # Noms mis à plat une fois : servent de nom stocké et de base au nom normalisé (clé de
-    # rapprochement), pour que les deux dérivent de la même valeur (cf. `find_or_create_serial`).
+    # Le nom stocké et le nom normalisé dérivent du même texte brut.
     if answer.crossref is not None:
         publisher_name_raw, crossref_member_id = answer.crossref
         publisher_name_raw = to_plain_text(publisher_name_raw)
@@ -223,7 +222,7 @@ def _store_publisher_metadata(
         publisher_name_normalized = normalize_text(publisher_name_raw) or None
         client_name_normalized = normalize_text(client_name_raw) or None
 
-    # Persiste même si le nom est vide : la row sera marquée vue par l'agence, donc pas de re-fetch — autant garder la RA corrigée et les colonnes à jour.
+    # Même sans nom, les métadonnées et l'agence corrigée s'écrivent : le préfixe sort de l'attente.
     prefix_store.set_prefix_publisher_metadata(
         prefix=row.prefix,
         ra=answer.ra,
