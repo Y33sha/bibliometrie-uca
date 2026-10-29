@@ -2158,7 +2158,7 @@ COMMENT ON COLUMN publishing.serial_issns.linking IS 'Vrai pour l''ISSN-L de la 
 -- Name: COLUMN serial_issns.status; Type: COMMENT; Schema: publishing; Owner: -
 --
 
-COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu).';
+COMMENT ON COLUMN publishing.serial_issns.status IS 'active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre précédent ou suivant) ; supplement ; unverified (ISSN des enregistrements sources, sans notice Sudoc).';
 
 
 --

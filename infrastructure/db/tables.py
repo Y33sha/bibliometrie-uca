@@ -494,7 +494,8 @@ serial_issns = Table(
         server_default="active",
         comment=(
             "active ; malformed (forme ou clé de contrôle fausse) ; cancelled ; related_title (titre "
-            "précédent ou suivant) ; supplement ; unverified (valeur mise de côté, motif inconnu)."
+            "précédent ou suivant) ; supplement ; unverified (ISSN des enregistrements sources, sans "
+            "notice Sudoc)."
         ),
     ),
     Column(
