@@ -5358,7 +5358,7 @@ export interface components {
          * SourceRecordMetadataOut
          * @description Métadonnées d'un enregistrement source, après normalisation.
          *
-         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée.
+         *     `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée. `raw_doc_type` est le type dans le vocabulaire de la source. Pour un type corrigé, `doc_type_uncorrected` est le type d'avant correction et `doc_type_corrected_by` la règle de correction.
          */
         SourceRecordMetadataOut: {
             /** Id */
@@ -5377,6 +5377,12 @@ export interface components {
             title_normalized: string | null;
             /** Doc Type */
             doc_type: string | null;
+            /** Raw Doc Type */
+            raw_doc_type: string | null;
+            /** Doc Type Uncorrected */
+            doc_type_uncorrected: string | null;
+            /** Doc Type Corrected By */
+            doc_type_corrected_by: string | null;
             /** Publication Year */
             publication_year: number | null;
             /** Language */

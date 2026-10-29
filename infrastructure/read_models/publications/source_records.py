@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, Row, text
 
 from domain.source_records.biblio import BiblioKey, JournalKey
+from domain.source_records.corrections import CORRECTED_BY, RAW, CorrectionKey
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.publications.models import (
@@ -45,6 +46,9 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
         title=r.title,
         title_normalized=r.title_normalized,
         doc_type=r.doc_type,
+        raw_doc_type=r.raw_doc_type,
+        doc_type_uncorrected=r.doc_type_uncorrected,
+        doc_type_corrected_by=r.doc_type_corrected_by,
         publication_year=r.publication_year,
         language=r.language,
         language_name=r.language_name,
@@ -135,7 +139,11 @@ class PublicationSourceRecordQueries:
                              AND (i.id_type <> 'doi'
                                   OR i.id_value IS DISTINCT FROM {source_record_doi_sql("sr")})
                        ), '[]'::jsonb) AS identifiers,
-                       sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
+                       sr.title, sr.title_normalized, sr.doc_type, sr.raw_doc_type,
+                       sr.corrections -> '{CorrectionKey.DOC_TYPE}' ->> '{RAW}' AS doc_type_uncorrected,
+                       sr.corrections -> '{CorrectionKey.DOC_TYPE}' ->> '{CORRECTED_BY}'
+                           AS doc_type_corrected_by,
+                       sr.publication_year, sr.language,
                        lang.name AS language_name,
                        CASE WHEN sr.raw_language IS DISTINCT FROM sr.language
                             THEN sr.raw_language END AS language_raw,

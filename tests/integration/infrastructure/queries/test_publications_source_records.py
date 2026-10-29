@@ -163,6 +163,26 @@ class TestGetPublicationSources:
         [record] = _records(sa_sync_conn, publication)
         assert record.language_raw is None
 
+    def test_doc_type_raw_and_before_correction(self, sa_sync_conn):
+        publication = insert_publication(sa_sync_conn)
+        _source_record(sa_sync_conn, publication, source="crossref", source_id="10.1/z")
+        sa_sync_conn.execute(
+            text(
+                "UPDATE source_records SET doc_type = 'media', raw_doc_type = 'journal-article', "
+                "corrections = jsonb_build_object('doc_type', jsonb_build_object("
+                "'raw', 'article', 'corrected_by', 'SERIAL_TYPE_MEDIA_TO_MEDIA')) "
+                "WHERE publication_id = :pid"
+            ),
+            {"pid": publication},
+        )
+        [record] = _records(sa_sync_conn, publication)
+        assert (
+            record.doc_type,
+            record.raw_doc_type,
+            record.doc_type_uncorrected,
+            record.doc_type_corrected_by,
+        ) == ("media", "journal-article", "article", "SERIAL_TYPE_MEDIA_TO_MEDIA")
+
 
 class TestSourceContributions:
     def test_contributions_sources_de_chaque_enregistrement_source_avec_leur_contribution(
