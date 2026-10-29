@@ -1,8 +1,8 @@
 """Recherche par DOI dans Web of Science : tâche `fetch_missing.doi.wos`.
 
-WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR ...)`). Lot de 20 DOI par requête pour éviter des URLs trop longues, pagination interne de `WOS_PER_PAGE` records, retries exponentiels sur 429/erreurs.
+WoS accepte une requête groupée par DOI (`DO=("doi1" OR "doi2" OR …)`). Un lot compte 20 DOI, pour que l'URL reste courte ; ses résultats se lisent par pages de `WOS_PER_PAGE` records.
 
-Certains DOI (preprints Zenodo, arXiv, SSRN, Research Square...) sont systématiquement absents de WoS : on les filtre côté client pour éviter les appels inutiles.
+Les DOI de preprints que WoS n'indexe pas (Zenodo, arXiv, SSRN, Research Square…) restent hors des requêtes (`filter_doi_for_wos`).
 """
 
 from __future__ import annotations
@@ -33,12 +33,12 @@ class WosDoiSearch:
     async def fetch_async(
         self, client: httpx2.AsyncClient, dois: list[str]
     ) -> LookupBatch | Unavailable:
-        # (doi d'origine, forme envoyable à WoS ou None si filtré). Les DOI preprints filtrés (c=None) ne sont pas interrogeables, donc jamais enregistrés comme not-found (le filtre client les écarte gratuitement).
+        # DOI d'origine et forme envoyée à WoS, `None` pour un DOI écarté. Un DOI écarté reste hors des absents.
         queried = [(d, filter_doi_for_wos(d)) for d in dois]
         clean = [c for _, c in queried if c]
 
         records: list[Mapping[str, JsonValue]] = []
-        # complete : a-t-on un résultat fiable pour calculer les not-found ? Mis à False sur tout arrêt prématuré (erreur réseau, corps vide, réponse mal formée) où l'absence d'un DOI ne prouve rien.
+        # Vrai tant que le lot est lu en entier : après un arrêt prématuré (réseau, corps vide, réponse mal formée), l'absence d'un DOI ne prouve rien.
         complete = True
         first_record = 1
         while clean:
@@ -47,11 +47,11 @@ class WosDoiSearch:
                 client, query, first_record=first_record, label=f"rec {first_record}"
             )
             if isinstance(data, NotFound):
-                # WoS 400 = lot sans correspondance : zéro match, le lot entier est confirmé absent (résultat fiable → on garde complete=True).
+                # 400 : lot sans correspondance, absent en entier de WoS.
                 log.warning("WoS 400 rec %d, lot ignoré", first_record)
                 break
             if isinstance(data, Unavailable):
-                # Lot non fiable (erreur réseau, corps vide) : on rend ce qu'on a sans calculer de not-found.
+                # Lot interrompu (réseau, corps vide) : les absents restent inconnus.
                 complete = False
                 break
             recs = get_records(data)
@@ -67,7 +67,7 @@ class WosDoiSearch:
         if not complete:
             # Lot interrompu : les records reçus sont écrits, sans conclure sur les absents.
             return LookupBatch(records=records) if records else UNAVAILABLE
-        # Lot complet : tout DOI interrogé sans record correspondant est confirmé absent de WoS. `extract_doi` et les candidats sont tous deux normalisés par `clean_doi`, donc comparables directement.
+        # Lot complet : un DOI interrogé sans record est absent de WoS. Les DOI des records et les DOI cherchés passent tous par `clean_doi`.
         found = {d for r in records if (d := extract_doi(r))}
         return LookupBatch(
             records=records, absent=[orig for orig, c in queried if c and c not in found]

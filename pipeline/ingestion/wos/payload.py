@@ -1,10 +1,6 @@
-"""Lecture des enregistrements sources Web of Science par la normalisation.
+"""Lecture des enregistrements sources Web of Science par la normalisation : conventions des champs de l'API Expanded et de l'export tabulé.
 
-Interprétation des champs propres au schéma WoS Expanded API — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique WoS.
-
-Les `Mapping[str, JsonValue]` ici sont des payloads JSON bruts de l'API WoS (frontière dynamique avec une source externe, schéma non typé).
-
-Les fonctions `parse_export_*` lisent les champs d'un export tabulé de l'interface WoS, où chaque colonne est désignée par une balise de deux lettres (`C1`, `RP`, `RI`…).
+Les payloads de l'API sont les objets JSON bruts, sans schéma typé. Les fonctions `parse_export_*` lisent les champs d'un export tabulé de l'interface, où une balise de deux lettres désigne chaque colonne (`C1`, `RP`, `RI`…).
 """
 
 import re
@@ -54,22 +50,18 @@ def parse_export_researcher_ids(ri: str | None) -> dict[str, str]:
 
 
 def is_wos_author_usable(author: Mapping[str, JsonValue]) -> bool:
-    """Indique si une entrée auteur WoS est utilisable côté pipeline.
+    """Vrai si une entrée auteur WoS est exploitable : elle a un nom complet et un `daisng_id`.
 
-    `daisng_id` (Distinct Author Identification System) est l'identifiant interne WoS de l'auteur. Pas utilisé côté DB (entité algorithmique WoS, non fiable) mais c'est un signal de **qualité** : son absence indique un parsing API WoS douteux (typiquement les enregistrements mal indexés ou incomplets). Combiné à l'exigence d'un `full_name`, le filtre garde une bonne approximation « auteur réel exploitable » et écarte les fragments d'erreur.
+    Le `daisng_id` est l'identifiant interne de l'auteur chez WoS, calculé et peu fiable : il reste hors de la base. Son absence signale une entrée mal lue, sur un enregistrement mal indexé ou incomplet.
     """
     return bool(author.get("daisng_id") and author.get("full_name"))
 
 
-# TODO: quand `serials.oa_model` sera disponible côté pipeline, ce mapping
-# devient superflu (signal OA WoS trop pauvre) : retirer `journal_oas_gold`
-# de la fonction de lecture et supprimer cette fonction.
+# TODO: quand `serials.oa_model` sera disponible côté pipeline, ce mapping devient superflu (signal OA WoS trop pauvre) : retirer `journal_oas_gold` de la fonction de lecture et supprimer cette fonction.
 def derive_wos_api_oa_status(journal_oas_gold: str | None) -> str | None:
-    """Mapping du signal OA WoS API → enum oa_status canonique.
+    """Statut open access d'un record de l'API WoS, d'après `pub_info.journal_oas_gold`.
 
-    Le format WoS n'expose qu'un signal binaire `journal_oas_gold` (`dynamic_data.cluster_related.publishing.publishing_information.journal_oas_gold`, `"Y"`/`"N"`/absent) : full-OA ou non, sans nuance hybrid / bronze / green.
-      - 'Y' → 'gold' (journal répertorié WoS comme full-OA)
-      - autre (incl. 'N', None, vide) → None (délégation aux autres sources via `best_oa_status` ; un 'N' WoS reste distinct de 'closed' au sens canonique)
+    WoS donne seulement ce drapeau : revue entièrement en open access ou non. `Y` donne `gold`. Toute autre valeur donne `None`, et les autres sources en décident (`best_oa_status`) : un `N` reste distinct de `closed`.
     """
     if journal_oas_gold == "Y":
         return "gold"
