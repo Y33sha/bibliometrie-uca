@@ -1,6 +1,6 @@
-"""SQL de la phase `metadata_correction`, et du recalcul ciblé des corrections d'une revue.
+"""Requêtes de la phase `metadata_correction`, et du recalcul ciblé des corrections d'une revue.
 
-La phase persiste sur `source_records` les valeurs corrigées par les règles de `domain.source_records.metadata_correction`, pour que le matching aval lise des colonnes déjà corrigées. Trois sous-étapes s'appuient sur ce module : la correction unaire, qui traite chaque `source_record` isolément ; le rattachement d'un journal par préfixe de DOI ; et la correction de DOI par groupe de `source_records` partageant un même DOI.
+La phase écrit sur les enregistrements sources les valeurs que corrigent les règles de `domain.source_records.metadata_correction` : la réconciliation lit ainsi des colonnes déjà corrigées.
 """
 
 import json
@@ -54,7 +54,7 @@ from infrastructure.sql_fragments import (
 
 
 class UnaryCorrectionRow(NamedTuple):
-    """Une `source_record` candidate à la correction unaire : les faits que lisent les règles (`facts`), ses identifiants avec leur statut, et ce dont la phase se sert pour persister."""
+    """Un enregistrement source candidat à la correction unaire : les faits que lisent les règles, ses identifiants avec leur statut, et ce que la phase réécrit."""
 
     id: int
     source_id: str
@@ -71,7 +71,7 @@ class CorrectionUpdate(NamedTuple):
 
 
 class MatchabilityRow(NamedTuple):
-    """Une `source_record` : sa valeur courante de `is_matchable` et les faits qui la décident."""
+    """Un enregistrement source : sa valeur de `is_matchable` et les faits qui la décident."""
 
     id: int
     is_matchable: bool
@@ -86,7 +86,7 @@ class MatchabilityUpdate(NamedTuple):
 
 
 class SerialCorrectionRow(NamedTuple):
-    """Une `source_record` candidate au rattachement de la revue par l'espace de noms de son DOI : son id, sa source, son type brut, son DOI courant, son `serial_id` courant et `corrections` (reconstruction du brut `serial_id` et garde « ne corriger que le manquant »)."""
+    """Un enregistrement source candidat au rattachement de la revue par l'espace de noms de son DOI. `corrections` garde le rattachement d'origine, et limite la correction à une revue manquante."""
 
     id: int
     source: str
@@ -97,7 +97,7 @@ class SerialCorrectionRow(NamedTuple):
 
 
 class SerialCorrectionUpdate(NamedTuple):
-    """Une mise à jour de rattachement : colonne `serial_id` (posée ou restaurée à NULL) + sidecar `corrections`. Produite par la sous-étape `serial_by_doi`, persistée via `persist_serial_corrections`."""
+    """Une mise à jour de rattachement : `serial_id`, posé ou remis à vide, et `corrections`."""
 
     id: int
     serial_id: int | None
@@ -112,9 +112,9 @@ class SecondaryFormRow(NamedTuple):
 
 
 class DoiClusterRow(NamedTuple):
-    """Une `source_record` candidate au retrait de DOI par groupe.
+    """Un enregistrement source candidat au retrait de DOI par groupe.
 
-    `raw_doi` est le DOI **source reconstruit** (`corrections.doi.raw` ou colonne `doi`), en minuscules — clé de regroupement par DOI. `title_normalized` sert à la comparaison chapitre/chapitre."""
+    `raw_doi` est le DOI d'avant correction (`corrections.doi.raw`, à défaut la colonne `doi`), en minuscules : la clé du groupe. Le titre normalisé sert à comparer deux chapitres."""
 
     id: int
     doc_type: str | None
@@ -134,7 +134,7 @@ class DoiClusterRow(NamedTuple):
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour de la correction par cluster : colonne `doi` (nullée ou restaurée), sidecar, et identifiants aux statuts recalculés (clés partagées avec une autre œuvre et DOI nullé retirés ou restaurés). Persistée via `persist_doi_corrections`."""
+    """Une mise à jour du retrait de DOI par groupe : `doi`, retiré ou restauré, `corrections`, et identifiants aux statuts recalculés."""
 
     id: int
     doi: str | None
@@ -142,8 +142,7 @@ class DoiCorrectionUpdate(NamedTuple):
     identifiers: tuple[SourceIdentifier, ...]
 
 
-# Bras du `CASE` et liste `IN` des relations DataCite à convergence directe, dérivés du mapping
-# métier `DATACITE_DIRECT_CONVERGENCE`.
+# Branches du `CASE` et liste `IN` des relations DataCite à convergence directe, tirées de `DATACITE_DIRECT_CONVERGENCE`.
 _DATACITE_CASE_SQL = (
     "CASE rel->>'relation_type' "
     + " ".join(
@@ -193,7 +192,7 @@ _UPDATE_STATUSES = text("""
 def _persist_statuses(
     conn: Connection, identifiers_by_source_record: Mapping[int, Iterable[SourceIdentifier]]
 ) -> None:
-    """Écrit le statut de chaque identifiant des enregistrements sources de `identifiers_by_source_record`."""
+    """Écrit le statut de chaque identifiant des enregistrements sources donnés."""
     rows = [
         {
             "source_record_id": source_record_id,
@@ -243,7 +242,7 @@ _UPDATE = (
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
-    """UPDATE en lot sur `source_records` : chaque mise à jour pose ses colonnes sur l'enregistrement source de sa clé `id` et met à jour `updated_at`. Les enregistrements sources mis à jour sont marqués pour la réconciliation. Retourne le nombre de lignes.
+    """Écrit en lot les colonnes de chaque mise à jour sur l'enregistrement source de sa clé `id`, avec `updated_at`, et marque ces enregistrements sources pour la réconciliation. Rend le nombre de lignes.
 
     Lève `ValueError` sur une clé qui ne nomme aucune colonne de `source_records`.
     """
@@ -279,22 +278,20 @@ class SourceRecordCorrectionStore:
         self._conn = conn
 
     def fetch_for_unary_correction(self) -> list[UnaryCorrectionRow]:
-        """Toutes les `source_records`, avec join `serials` et `corrections`.
+        """Tous les enregistrements sources, avec les faits que lisent les règles.
 
-        Pas de pré-filtre par règle : certaines règles sont inconditionnelles sur `doc_type` (URL theses.fr/DUMAS), et une `source_record` sans `doc_type` reste candidate. La cascade `effective_metadata` fait le filtrage fin.
+        Aucun filtre par règle : certaines règles valent quel que soit le type (URL theses.fr ou DUMAS), et un enregistrement source sans type reste candidat.
         """
         return _unary_rows(self._conn.execute(text(_SELECT)))
 
     def fetch_for_unary_correction_by_serial(self, serial_id: int) -> list[UnaryCorrectionRow]:
-        """Les `source_records` rattachées à un journal (`serial_id = :jid`).
-
-        Recompute ciblé après un changement de `serial_type` (hook admin) : seules ces `source_records` voient leur correction journal-dépendante bouger."""
+        """Enregistrements sources d'une revue, pour le recalcul ciblé après un changement de son type dans l'administration."""
         return _unary_rows(
             self._conn.execute(text(_SELECT + " WHERE sr.serial_id = :jid"), {"jid": serial_id})
         )
 
     def fetch_for_unary_correction_by_hal_ids(self, hal_ids: list[str]) -> list[UnaryCorrectionRow]:
-        """Les `source_records` HAL dont l'identifiant figure dans `hal_ids` : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
+        """Enregistrements sources HAL de ces identifiants : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
         return _unary_rows(
@@ -305,7 +302,7 @@ class SourceRecordCorrectionStore:
         )
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes effectives + `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — `doc_type` et les identifiants sont des clés de matching, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le type et les identifiants sont des clés. Rend le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.corrected.identifiers for u in updates})
         return _persist_updates(
             self._conn, [{"id": u.id, **u.corrected.columns._asdict()} for u in updates]
@@ -322,7 +319,7 @@ class SourceRecordCorrectionStore:
         return frozenset(rows.scalars())
 
     def delete_missing_hal_locations(self) -> int:
-        """Supprime les localisations dont la correction unaire a retiré le lien des `urls` de leur enregistrement source (dépôt HAL introuvable). La normalisation réécrit les localisations : la suppression se rejoue à chaque passage. Retourne le nombre de localisations supprimées."""
+        """Supprime les localisations dont la correction unaire a retiré le lien des `urls` de leur enregistrement source (dépôt HAL introuvable). La normalisation réécrit les localisations : la suppression se rejoue à chaque passage. Rend le nombre de localisations supprimées."""
         result = self._conn.execute(
             text(f"""
                 DELETE FROM source_record_locations l
@@ -337,7 +334,7 @@ class SourceRecordCorrectionStore:
         return result.rowcount
 
     def fetch_matchability_rows(self) -> list[MatchabilityRow]:
-        """Toutes les `source_records`, avec les faits que lit `is_matchable` et la valeur courante de `is_matchable`."""
+        """Tous les enregistrements sources, avec les faits que lit `is_matchable` et sa valeur."""
         rows = self._conn.execute(
             text(f"""
                 SELECT id, is_matchable, source::text AS source, source_id,
@@ -370,18 +367,18 @@ class SourceRecordCorrectionStore:
         ]
 
     def persist_matchability(self, updates: list[MatchabilityUpdate]) -> int:
-        """UPDATE en lot de `is_matchable`, bump `updated_at`, marque pour la réconciliation. Retourne le nombre de lignes."""
+        """Écrit en lot `is_matchable`, et marque les enregistrements sources pour la réconciliation. Rend le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_serial_doi_namespaces(self) -> list[DoiNamespace]:
-        """Le contenu de `serial_doi_namespaces`."""
+        """Espaces de noms DOI des revues (`serial_doi_namespaces`)."""
         rows = self._conn.execute(
             text("SELECT namespace, serial_id, dois, share FROM serial_doi_namespaces")
         )
         return rows_as(DoiNamespace, rows)
 
     def fetch_serial_by_doi_candidates(self) -> list[SerialCorrectionRow]:
-        """`source_records` candidates au rattachement : orphelines à DOI (`serial_id IS NULL AND doi IS NOT NULL`) et déjà rattachées par espace de noms (`corrections ? 'serial_id'`, pour la ré-évaluation auto-cicatrisante)."""
+        """Enregistrements sources candidats au rattachement : sans revue avec un DOI, ou déjà rattachés par espace de noms, dont le rattachement se réévalue."""
         rows = self._conn.execute(
             text(f"""
                 SELECT id, source::text AS source, raw_doc_type,
@@ -394,7 +391,7 @@ class SourceRecordCorrectionStore:
         return rows_as(SerialCorrectionRow, rows)
 
     def persist_serial_corrections(self, updates: list[SerialCorrectionUpdate]) -> int:
-        """UPDATE en lot de la colonne `serial_id` + `corrections`, bump `updated_at`, marque pour la réconciliation (pour que la réconciliation rafraîchisse le `serial_id` de la publication — bien que `serial_id` ne soit pas une clé de matching). Retourne le nombre de lignes."""
+        """Écrit en lot `serial_id` et `corrections`, et marque les enregistrements sources pour la réconciliation, qui recalcule la revue de la publication. Rend le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_secondary_form_declarations(self) -> list[SecondaryFormRow]:
@@ -513,7 +510,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
-        """Les membres des groupes-DOI candidats au retrait du DOI : groupes contenant un `book`/`book_chapter`/`proceedings`, groupes dont le DOI est inconnu de doi.org, groupes où un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref, et `source_records` déjà corrigées (`corrections.doi`, ou identifiant retiré par un cas de `DoiClusterCase`) pour la ré-évaluation auto-cicatrisante."""
+        """Membres des groupes de même DOI candidats au retrait du DOI : groupes qui contiennent un livre, un chapitre ou un volume d'actes ; groupes dont le DOI est inconnu de doi.org ; groupes où un dépôt HAL partage zéro nom d'auteur avec l'enregistrement source Crossref ; groupes d'un enregistrement source déjà corrigé, dont la correction se réévalue."""
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
@@ -602,7 +599,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def replace_doi_targets(self, targets: list[DoiTarget]) -> int:
-        """Réécrit `doi_targets` avec `targets`. Les enregistrements sources dont le DOI change de cible sont marqués pour la réconciliation. Retourne le nombre de DOI dont la cible change."""
+        """Réécrit `doi_targets` avec les cibles données. Les enregistrements sources dont le DOI change de cible sont marqués pour la réconciliation. Rend le nombre de DOI dont la cible change."""
         current = {
             r.doi: (r.target_doi, r.rule)
             for r in self._conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets"))
@@ -634,7 +631,7 @@ class SourceRecordCorrectionStore:
         return len(changed)
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """UPDATE en lot des colonnes `doi` et `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — DOI et identifiants sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""
+        """Écrit en lot `doi`, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le DOI et les identifiants sont des clés. Rend le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
         return _persist_updates(
             self._conn,

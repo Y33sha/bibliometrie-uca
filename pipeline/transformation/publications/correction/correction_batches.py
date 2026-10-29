@@ -1,6 +1,6 @@
-"""Persistance par lots des corrections de métadonnées, partagée par les sous-étapes.
+"""Écriture par lots des corrections de métadonnées, commune aux sous-étapes.
 
-Chaque sous-étape calcule une liste de mises à jour pures, puis les persiste par lots avec un commit par lot : la progression est durable si le run est interrompu et le journal de transactions reste borné.
+Chaque sous-étape calcule ses mises à jour, puis les écrit avec un commit par lot : un run interrompu garde les lots écrits, et le journal de transactions reste borné.
 """
 
 from collections.abc import Callable
@@ -15,7 +15,7 @@ def persist_in_batches[U](
     updates: list[U],
     persist: Callable[[list[U]], int | None],
 ) -> int:
-    """Persiste `updates` par lots de `PERSIST_BATCH`, un commit par lot. Retourne le total remonté par `persist` (0 si `persist` ne compte pas)."""
+    """Écrit les mises à jour par lots de `PERSIST_BATCH`, un commit par lot. Rend la somme des comptes de `persist`, 0 si elle ne compte pas."""
     total = 0
     for start in range(0, len(updates), PERSIST_BATCH):
         total += persist(updates[start : start + PERSIST_BATCH]) or 0

@@ -1,12 +1,12 @@
-"""Orchestrateur de la phase `metadata_correction` : persistance des corrections de métadonnées sur les `source_records`.
+"""Phase `metadata_correction` : écriture sur les enregistrements sources de leurs métadonnées corrigées.
 
-Cinq tâches (`pipeline.graph`), chacune dans sa propre transaction, dans l'ordre du graphe :
+Cinq tâches (`pipeline.graph`), chacune dans sa transaction, dans l'ordre du graphe :
 
-1. **serial_by_doi** — rattache la revue manquante que désigne l'espace de noms du DOI. En premier : le `serial_id` qu'il commit est consommé par l'étape suivante (`serial_type` depuis la colonne vivante), de sorte que la reclassification `doc_type` journal-dépendante a lieu dans le même run, sans feed-forward.
-2. **unaire** (per-record) — règles de correction `effective_metadata`, retrait des dépôts HAL introuvables.
-3. **doi_targets** — cible du DOI des formes secondaires DataCite d'une œuvre présente en base.
-4. **remove_identifiers** (group-by-DOI) — nullage des DOI erronés ouvrage/chapitre, volume d'actes/communication, dépôt HAL d'une autre œuvre, et des DOI inconnus de doi.org.
-5. **matchable** — enregistrements sources écartés de la réconciliation (`is_matchable`), d'après les valeurs corrigées.
+1. **serial_by_doi** rattache la revue manquante que désigne l'espace de noms du DOI. Elle passe en premier : la correction unaire lit le type de la revue rattachée, et requalifie le document au même run.
+2. **unary** applique à chaque enregistrement source les règles de correction (`correct_source_record`), et retire les dépôts HAL introuvables.
+3. **doi_targets** donne une cible au DOI des formes secondaires DataCite d'une œuvre présente en base.
+4. **remove_identifiers** retire le DOI que partagent des œuvres distinctes (ouvrage et chapitre, volume d'actes et communication, dépôt HAL d'une autre œuvre), et le DOI inconnu de doi.org.
+5. **matchable** écarte de la réconciliation des enregistrements sources (`is_matchable`), d'après les valeurs corrigées.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ class MetadataCorrectionPhase:
         metrics = PhaseMetrics()
         for node_metrics in nodes.values():
             metrics.add(seen=node_metrics.total, updated=node_metrics.updated)
-        # Chiffres plats : `{mode}_{examined,corrected}`. Le frontend les arrange en matrice (mode × examinées/corrigées) — pur agencement de présentation.
+        # Chiffres à plat, `{tâche}_{examined,corrected}`, que l'interface dispose en matrice.
         metrics.details["summary"] = {
             f"{name}_{column}": value
             for name, node_metrics in nodes.items()
@@ -102,9 +102,6 @@ class MetadataCorrectionPhase:
             "matchable": matchable,
         }
         return {f"{_PHASE}.{name}": TaskStep(steps[name]) for name in _NODES}
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

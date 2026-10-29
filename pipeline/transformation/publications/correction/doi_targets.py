@@ -1,6 +1,6 @@
-"""Phase `metadata_correction` — sous-étape **doi_targets** : cible du DOI des formes secondaires DataCite.
+"""Sous-étape `doi_targets` de la phase `metadata_correction` : cible du DOI des formes secondaires DataCite.
 
-Le DOI d'une forme secondaire a pour cible le DOI de l'œuvre principale présente en base : version → concept (`IsVersionOf`), forme variante / copie repository → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent (`IsPartOf`, ou collection figshare de même titre pour un fichier complémentaire figshare). La cible tient lieu du DOI pour tous les enregistrements sources qui ont ce DOI. La sous-étape matchable écarte de la réconciliation l'enregistrement source DataCite de la forme secondaire.
+Le DOI d'une forme secondaire a pour cible le DOI de l'œuvre principale présente en base : version → concept (`IsVersionOf`), forme variante ou copie d'entrepôt → version publiée (`IsVariantFormOf`), pièce d'un dataset → dataset parent (`IsPartOf`, ou collection figshare de même titre pour un fichier complémentaire figshare). La cible tient lieu du DOI pour tous les enregistrements sources qui ont ce DOI. La sous-étape `matchable` écarte de la réconciliation l'enregistrement source DataCite de la forme secondaire.
 
 La table `doi_targets` est réécrite à chaque passage : une relation disparue, ou une cible sortie de la base, retire la cible.
 """
@@ -38,7 +38,7 @@ def compute_doi_targets(rows: list[SecondaryFormRow]) -> list[DoiTarget]:
 
 @dataclass
 class DoiTargetStats:
-    """Bilan de la sous-étape : déclarations examinées, DOI dont la cible change, et nombre de cibles par règle."""
+    """Bilan de la sous-étape : déclarations examinées, DOI dont la cible change, cibles par règle."""
 
     examined: int
     changed: int

@@ -1,12 +1,10 @@
-"""Phase `metadata_correction` — sous-étape **remove_identifiers** (retraits d'identifiants par groupe partageant un DOI).
+"""Sous-étape `remove_identifiers` de la phase `metadata_correction` : retrait d'identifiants par groupe d'enregistrements sources de même DOI.
 
-Un DOI partagé par des œuvres distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre) est nullé sur le ou les mauvais côtés, sinon le matching les fusionnerait. Un DOI qui a une cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd.
+Un DOI que partagent des œuvres distinctes (ouvrage et chapitre, chapitres de titres différents, volume d'actes et communication, dépôt HAL d'une autre œuvre) est retiré du ou des mauvais côtés : la réconciliation fusionnerait sinon ces œuvres. Un DOI qui a une cible dans `doi_targets` est celui d'une forme secondaire : aucun membre de son groupe ne le perd. Un DOI inconnu de doi.org est retiré de tous les enregistrements sources qui le citent.
 
-Un DOI inconnu de doi.org (`failed_lookups`, source `doi_org`) est nullé sur tous les enregistrements sources qui le citent.
+Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent : par exemple le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
 
-Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec les enregistrements sources qui le perdent, par exemple le dépôt HAL d'une communication recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI nullé compris, est inscrit dans `source_record_identifiers.removed_by`.
-
-Les `doc_type` lus sont ceux que la sous-étape unaire a corrigés. Idempotent et auto-cicatrisant : on repart du **DOI brut reconstruit** (`corrections.doi`) et de tous les identifiants de la table, donc une `source_record` dont la relation/le conflit a disparu récupère son DOI et ses identifiants source au run suivant.
+Les types lus sont ceux que la sous-étape unaire a corrigés. Chaque passage repart du DOI d'avant correction (`corrections.doi`) et de tous les identifiants : un enregistrement source dont le conflit disparaît retrouve son DOI et ses identifiants au run suivant.
 """
 
 import logging
@@ -62,7 +60,10 @@ def _compute_update(
     decision: DoiClusterDecision | None,
     removal: ConfirmationIdRemoval | None = None,
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'une `source_record`. Avec une décision du domaine, le DOI est nullé, le brut stashé sous le cas de la décision, et retiré des identifiants sous ce cas. Sans décision, le DOI brut est restauré. `removal` retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés. Retourne `None` si rien ne change (idempotence / auto-cicatrisation)."""
+    """État cible d'un enregistrement source, ou `None` si rien ne change.
+
+    Avec une décision du domaine, le DOI est retiré de la colonne et des identifiants, et sa valeur d'origine est gardée sous le cas de la décision. Sans décision, le DOI d'origine revient. Un retrait de clés de confirmation retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés.
+    """
     raw_doi = raw_value(row.corrections, CorrectionKey.DOI, row.doi)
     corrections = other_entries(row.corrections, CLUSTER_KEYS)
 
@@ -87,9 +88,7 @@ def _compute_update(
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
-    """Regroupe par DOI brut, demande au domaine les membres qui perdent le DOI, renvoie les mises à jour.
-
-    Pur (hors I/O) et sans décision métier : la règle vit dans `resolve_cluster_doi_corrections` ; ici on ne fait que regrouper et persister l'état cible."""
+    """Mises à jour des groupes de même DOI d'origine. La règle de retrait vit dans `resolve_cluster_doi_corrections`."""
     groups: dict[str, list[DoiClusterRow]] = defaultdict(list)
     for row in rows:
         groups[row.raw_doi].append(row)
@@ -125,7 +124,7 @@ def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:
 
 @dataclass
 class IdentifierRemovalStats:
-    """Bilan de la sous-étape : `source_records` examinées, DOI corrigés, et nombre de corrections par cas (`DoiClusterCase` : ouvrage/chapitre, chapitres distincts, volume d'actes/communication, dépôt HAL d'une autre œuvre, DOI inconnu de doi.org)."""
+    """Bilan de la sous-étape : enregistrements sources examinés, DOI corrigés, corrections par cas (`DoiClusterCase`)."""
 
     examined: int
     corrected: int
@@ -133,7 +132,7 @@ class IdentifierRemovalStats:
 
 
 def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
-    """Nombre de corrections de DOI par cas, à partir du `corrected_by` stashé sur `doi`."""
+    """Corrections de DOI par cas, d'après la règle gardée dans la correction du DOI."""
     case_counts: dict[str, int] = {}
     for update in updates:
         entry = update.corrections.get("doi")
@@ -146,7 +145,7 @@ def tally_doi_corrections(updates: list[DoiCorrectionUpdate]) -> dict[str, int]:
 def run(
     conn: Connection, store: SourceRecordCorrectionStore, logger: logging.Logger
 ) -> IdentifierRemovalStats:
-    """Nulle le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, des dépôts HAL au DOI d'une autre œuvre, et le DOI inconnu de doi.org."""
+    """Retire le DOI des chapitres qui ont celui de l'ouvrage, des communications qui ont celui du volume d'actes, des dépôts HAL qui ont celui d'une autre œuvre, et le DOI inconnu de doi.org."""
     step(logger, "Retraits de DOI par confrontation de documents")
     t0 = time.perf_counter()
     rows = store.fetch_doi_cluster_candidates()
