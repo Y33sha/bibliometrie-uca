@@ -84,7 +84,7 @@ class PersonAlreadyInPublicationError(ConflictError):
 
 
 class RejectedPair(TypedDict):
-    """Paire (publication, personne) rejetée, qui bloque une réassignation."""
+    """Paire (publication, personne) rejetée, qui bloque une réattribution."""
 
     publication_id: int
     person_id: int
@@ -92,7 +92,7 @@ class RejectedPair(TypedDict):
 
 
 class RejectedPairError(ConflictError):
-    """Réassignation refusée : des paires (publication, personne) ont été rejetées. Une réassignation forcée lève le rejet."""
+    """Réattribution refusée : des paires (publication, personne) sont rejetées. Une réattribution forcée retire le rejet."""
 
     def __init__(self, rejected_pairs: list[RejectedPair]) -> None:
         self.rejected_pairs = rejected_pairs
