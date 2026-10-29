@@ -1,8 +1,8 @@
 """Exceptions métier : champs structurés et message lisible."""
 
 from domain.errors import (
-    CannotAttributeConflict,
     ContributionAlreadyAssignedError,
+    IdentifierAttributionConflictError,
     PublisherMergeBlockedError,
     RejectedPairError,
 )
@@ -22,9 +22,9 @@ def _paire_rejetee() -> dict:
     return {"publication_id": 10, "person_id": 20, "rejected_at": "2026-01-01T00:00:00+00:00"}
 
 
-class TestCannotAttributeConflict:
+class TestIdentifierAttributionConflictError:
     def test_porte_les_champs_du_conflit(self):
-        exc = CannotAttributeConflict(
+        exc = IdentifierAttributionConflictError(
             "ORCID déjà attribué",
             id_type="orcid",
             id_value="0000-0002-1825-0097",

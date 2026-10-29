@@ -1,31 +1,26 @@
-"""Exceptions métier du domaine bibliométrique.
-
-Ces exceptions signalent des situations métier sans dépendre de FastAPI. La traduction en codes HTTP se fait dans `interfaces/api/app.py` via des exception handlers dédiés.
-"""
+"""Exceptions métier. `interfaces/api/app.py` les traduit en codes HTTP."""
 
 from typing import TypedDict
 
 
 class DomainError(Exception):
-    """Classe de base pour toutes les erreurs métier."""
+    """Classe de base des erreurs métier."""
 
 
 class NotFoundError(DomainError):
-    """Ressource demandée introuvable (→ HTTP 404)."""
+    """Ressource demandée introuvable."""
 
 
 class ValidationError(DomainError):
-    """Entrée invalide : champ manquant, format incorrect, valeur hors domaine (→ HTTP 400)."""
+    """Entrée invalide."""
 
 
 class ConflictError(DomainError):
-    """Opération refusée : elle violerait un invariant métier — fusion d'une entité avec elle-même, suppression d'une ressource référencée, création d'un doublon interdit, etc. (→ HTTP 409)."""
+    """Opération refusée, car elle violerait un invariant métier."""
 
 
-class CannotAttributeConflict(ConflictError):
-    """Tentative d'attribution d'un identifiant déjà attribué à une autre personne avec un statut `pending` ou `confirmed`. Pour réattribuer, le statut existant doit d'abord passer à `rejected`.
-
-    Contient, quand ils sont disponibles, les champs structurés du conflit : type et valeur de l'identifiant, personne détentrice et son statut."""
+class IdentifierAttributionConflictError(ConflictError):
+    """Attribution d'un identifiant refusée par le statut de son attribution existante."""
 
     def __init__(
         self,
@@ -44,19 +39,17 @@ class CannotAttributeConflict(ConflictError):
 
 
 class BlockingSerial(TypedDict):
-    """Description structurée d'une paire de journaux qui bloque la fusion de deux éditeurs (cf. `PublisherMergeBlockedError`)."""
+    """Paire de revues qui bloque la fusion de deux éditeurs."""
 
     target_serial_id: int
     target_title: str
     source_serial_id: int
     source_title: str
-    reason: str  # explication lisible (ex: "ISSN différents : 0028-0836 vs 9999-9999")
+    reason: str  # explication lisible, p. ex. « ISSN différents : 0028-0836 vs 9999-9999 »
 
 
 class PublisherMergeBlockedError(ConflictError):
-    """Fusion d'éditeurs refusée : des paires de revues ne peuvent pas être fusionnées automatiquement (ex: ISSN divergents pour des revues partageant le même titre). L'utilisatrice doit traiter les paires bloquantes côté admin Revues d'abord, puis relancer la fusion.
-
-    `blocking_serials` énumère les paires problématiques pour que l'UI puisse les afficher et permettre l'action manuelle."""
+    """Fusion d'éditeurs refusée : des paires de revues de même titre ne se fusionnent pas automatiquement, par exemple pour des ISSN divergents."""
 
     def __init__(self, blocking_serials: list[BlockingSerial]) -> None:
         self.blocking_serials = blocking_serials
@@ -67,9 +60,7 @@ class PublisherMergeBlockedError(ConflictError):
 
 
 class ContributionAlreadyAssignedError(ConflictError):
-    """Attribution refusée : la contribution visée est déjà rattachée à une personne.
-
-    Seule une contribution orpheline s'attribue ; reprendre une contribution rattachée passe par un détachement explicite, qui enregistre le rejet de la paire. `owner_person_id` nomme la détentrice, pour que l'UI mène jusqu'à elle."""
+    """Attribution refusée : la contribution est déjà rattachée à une personne. Seule une contribution orpheline s'attribue."""
 
     def __init__(self, contribution_id: int, owner_person_id: int) -> None:
         self.contribution_id = contribution_id
@@ -81,7 +72,7 @@ class ContributionAlreadyAssignedError(ConflictError):
 
 
 class PersonAlreadyInPublicationError(ConflictError):
-    """Attribution refusée : la personne a déjà, dans la publication, une contribution rattachée par une décision humaine. Une personne a au plus une contribution par publication ; la contribution visée resterait sans elle."""
+    """Attribution refusée : la personne a déjà, dans la publication, une contribution rattachée à la main. Une personne a au plus une contribution par publication."""
 
     def __init__(self, publication_id: int, contribution_id: int) -> None:
         self.publication_id = publication_id
@@ -93,7 +84,7 @@ class PersonAlreadyInPublicationError(ConflictError):
 
 
 class RejectedPair(TypedDict):
-    """Paire (publication, personne) figurant dans le registre des rejets, qui bloque une réassignation (cf. `RejectedPairError`)."""
+    """Paire (publication, personne) rejetée, qui bloque une réassignation."""
 
     publication_id: int
     person_id: int
@@ -101,9 +92,7 @@ class RejectedPair(TypedDict):
 
 
 class RejectedPairError(ConflictError):
-    """Réassignation refusée : une ou plusieurs paires (publication, personne) ont déjà été rejetées et figurent dans `rejected_contributions`. Réassigner recréerait un lien explicitement rejeté ; l'utilisatrice doit confirmer pour lever le rejet (`force=true`).
-
-    `rejected_pairs` énumère les paires concernées (avec la date du rejet) pour que l'UI les affiche avant de demander confirmation."""
+    """Réassignation refusée : des paires (publication, personne) ont été rejetées. Une réassignation forcée lève le rejet."""
 
     def __init__(self, rejected_pairs: list[RejectedPair]) -> None:
         self.rejected_pairs = rejected_pairs

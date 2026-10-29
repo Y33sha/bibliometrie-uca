@@ -2,7 +2,7 @@
 
 import pytest
 
-from domain.errors import CannotAttributeConflict
+from domain.errors import IdentifierAttributionConflictError
 from domain.persons.identifier_attribution import (
     AttributionOutcome,
     IdentifierAttribution,
@@ -42,14 +42,14 @@ class TestReattributeTo:
 
     def test_raises_on_pending(self):
         ident = _make(status=AttributionStatus.PENDING)
-        with pytest.raises(CannotAttributeConflict):
+        with pytest.raises(IdentifierAttributionConflictError):
             ident.reattribute_to(99, source="manual")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.PENDING
 
     def test_raises_on_confirmed(self):
         ident = _make(status=AttributionStatus.CONFIRMED)
-        with pytest.raises(CannotAttributeConflict):
+        with pytest.raises(IdentifierAttributionConflictError):
             ident.reattribute_to(99, source="manual")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.CONFIRMED
@@ -66,7 +66,7 @@ class TestTransferTo:
     def test_raises_on_confirmed(self):
         # Attribution verrouillée admin : jamais transférée automatiquement.
         ident = _make(status=AttributionStatus.CONFIRMED)
-        with pytest.raises(CannotAttributeConflict):
+        with pytest.raises(IdentifierAttributionConflictError):
             ident.transfer_to(99, source="auto")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.CONFIRMED
@@ -74,7 +74,7 @@ class TestTransferTo:
     def test_raises_on_rejected(self):
         # Le rejeté relève de reattribute_to, pas du transfert automatique.
         ident = _make(status=AttributionStatus.REJECTED)
-        with pytest.raises(CannotAttributeConflict):
+        with pytest.raises(IdentifierAttributionConflictError):
             ident.transfer_to(99, source="auto")
         assert ident.person_id == 10
         assert ident.status is AttributionStatus.REJECTED
@@ -97,5 +97,5 @@ class TestAttributionOutcome:
 
     def test_held_elsewhere_conflict_names_the_holder(self):
         conflict = held_elsewhere_conflict(_make(status=AttributionStatus.CONFIRMED), 99)
-        assert isinstance(conflict, CannotAttributeConflict)
+        assert isinstance(conflict, IdentifierAttributionConflictError)
         assert (conflict.existing_person_id, conflict.existing_status) == (10, "confirmed")

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import NamedTuple
 
-from domain.errors import CannotAttributeConflict
+from domain.errors import IdentifierAttributionConflictError
 from domain.persons.identifiers import AttributionStatus, IdentifierOrigin
 
 
@@ -41,12 +41,12 @@ class IdentifierAttribution:
     def reattribute_to(self, new_person_id: int, *, source: IdentifierOrigin) -> None:
         """Déplace l'attribution vers une autre personne.
 
-        Autorisée uniquement depuis le statut `REJECTED` : un identifiant rejeté pour une personne A peut être réattribué à une personne B avec statut `PENDING`. Lève `CannotAttributeConflict` sinon.
+        Autorisée uniquement depuis le statut `REJECTED` : un identifiant rejeté pour une personne A peut être réattribué à une personne B avec statut `PENDING`. Lève `IdentifierAttributionConflictError` sinon.
 
         `source` trace l'origine de la réattribution (`IdentifierOrigin`).
         """
         if self.status is not AttributionStatus.REJECTED:
-            raise CannotAttributeConflict(
+            raise IdentifierAttributionConflictError(
                 f"Impossible de réattribuer l'identifiant {self.id_type}={self.id_value!r} "
                 f"depuis le statut {self.status.value!r} ; seuls les identifiants rejected "
                 "peuvent être réattribués.",
@@ -60,10 +60,10 @@ class IdentifierAttribution:
 
         Réservé à l'arbitrage automatique des conflits d'attribution : une valeur `pending` est déplacée vers la personne que désigne la majorité des groupes qui la portent. Le statut reste `pending` (attribution non vérifiée, simplement mieux placée).
 
-        Interdit sur `confirmed` (attribution verrouillée par l'admin — jamais déplacée automatiquement) et sur `rejected` (qui relève de `reattribute_to`). Lève `CannotAttributeConflict` sinon.
+        Interdit sur `confirmed` (attribution verrouillée par l'admin — jamais déplacée automatiquement) et sur `rejected` (qui relève de `reattribute_to`). Lève `IdentifierAttributionConflictError` sinon.
         """
         if self.status is not AttributionStatus.PENDING:
-            raise CannotAttributeConflict(
+            raise IdentifierAttributionConflictError(
                 f"Impossible de transférer l'identifiant {self.id_type}={self.id_value!r} "
                 f"depuis le statut {self.status.value!r} ; seul un identifiant pending est "
                 "transférable.",
@@ -98,9 +98,9 @@ def attribution_outcome(
 
 def held_elsewhere_conflict(
     existing: IdentifierAttribution, person_id: int
-) -> CannotAttributeConflict:
+) -> IdentifierAttributionConflictError:
     """Erreur qui refuse l'attribution à `person_id` d'un identifiant que détient l'attribution `existing` (`HELD_ELSEWHERE`)."""
-    return CannotAttributeConflict(
+    return IdentifierAttributionConflictError(
         f"Identifiant {existing.id_type}={existing.id_value!r} déjà attribué à "
         f"person_id={existing.person_id} avec statut {existing.status.value!r} ; impossible "
         f"d'attribuer à person_id={person_id}.",
