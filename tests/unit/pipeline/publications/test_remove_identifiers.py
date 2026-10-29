@@ -1,6 +1,5 @@
 """Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, dépôt HAL d'une autre œuvre) et de `compute_updates`."""
 
-from domain.source_records.corrections import stash_entry
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
@@ -22,13 +21,17 @@ from pipeline.transformation.publications.correction.remove_identifiers import (
 )
 
 
+def _doi(value, removed_by=None, role=SourceIdentifierRole.SECONDARY):
+    return SourceIdentifier(SourceIdentifierType.DOI, value, role, removed_by)
+
+
 def test_tally_doi_corrections_par_cas():
     updates = [
-        DoiCorrectionUpdate(1, None, {"doi": stash_entry("10.9005/a", "OUVRAGE_VS_CHAPITRE")}, ()),
-        DoiCorrectionUpdate(2, None, {"doi": stash_entry("10.9005/b", "OUVRAGE_VS_CHAPITRE")}, ()),
+        DoiCorrectionUpdate(1, None, {}, (_doi("10.9005/a", "OUVRAGE_VS_CHAPITRE"),)),
         DoiCorrectionUpdate(
-            3, None, {"doi": stash_entry("10.9006/x", "UNRESOLVED_DOI_TO_NULL")}, ()
+            2, None, {}, (_doi("10.9005/b", "OUVRAGE_VS_CHAPITRE"), _doi("10.9005/c"))
         ),
+        DoiCorrectionUpdate(3, None, {}, (_doi("10.9006/x", "UNRESOLVED_DOI_TO_NULL"),)),
     ]
     assert tally_doi_corrections(updates) == {
         "OUVRAGE_VS_CHAPITRE": 2,
@@ -42,7 +45,7 @@ def _row(
     doi,
     title=None,
     corrections=None,
-    raw_doi="10.1/x",
+    shared_doi="10.1/x",
     identifiers=(),
     has_target=False,
 ) -> DoiClusterRow:
@@ -52,7 +55,7 @@ def _row(
         doi,
         f"titre {'abcdefghij'[row_id % 10]}" if title is None else title,
         corrections or {},
-        raw_doi,
+        shared_doi,
         has_target=has_target,
         identifiers=tuple(identifiers),
     )
@@ -234,9 +237,32 @@ def test_communication_sans_titre_garde_le_doi():
 
 def test_un_groupe_au_doi_d_une_forme_secondaire_garde_son_doi():
     # Ouvrage et chapitre au DOI d'une version qui a une cible : aucun retrait.
-    book = _row(1, "book", "10.5281/zenodo.10", raw_doi="10.5281/zenodo.10", has_target=True)
-    chapter = _row(2, "book_chapter", "10.5281/zenodo.10", raw_doi="10.5281/zenodo.10")
+    book = _row(1, "book", "10.5281/zenodo.10", shared_doi="10.5281/zenodo.10", has_target=True)
+    chapter = _row(2, "book_chapter", "10.5281/zenodo.10", shared_doi="10.5281/zenodo.10")
     assert compute_updates([book, chapter]) == []
+
+
+def test_un_chapitre_perd_le_doi_de_l_ouvrage_et_garde_le_sien():
+    """Un chapitre OpenAlex cite son DOI et celui de l'ouvrage : il est membre des deux groupes."""
+    own, book_doi = _doi("10.1/chapitre"), _doi("10.1/livre")
+    book = _row(1, "book", "10.1/livre", title="le livre", shared_doi="10.1/livre")
+    in_book_group = _row(
+        2,
+        "book_chapter",
+        "10.1/chapitre",
+        title="un chapitre",
+        shared_doi="10.1/livre",
+        identifiers=[own, book_doi],
+    )
+    in_own_group = in_book_group._replace(shared_doi="10.1/chapitre")
+
+    updates = compute_updates([book, in_book_group, in_own_group])
+
+    assert updates == [
+        DoiCorrectionUpdate(
+            2, "10.1/chapitre", {}, (own, _doi("10.1/livre", "OUVRAGE_VS_CHAPITRE"))
+        )
+    ]
 
 
 def test_chapter_doi_nulled_book_untouched():

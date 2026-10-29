@@ -112,19 +112,19 @@ class SecondaryFormRow(NamedTuple):
 
 
 class DoiClusterRow(NamedTuple):
-    """Un enregistrement source candidat au retrait de DOI par groupe.
+    """Un enregistrement source membre d'un groupe candidat au retrait de DOI : les enregistrements sources qui ont le DOI `shared_doi`, de rôle autre que `related`, quel que soit son statut. Un enregistrement source appartient à un groupe par DOI.
 
-    `raw_doi` est le DOI d'avant correction (`corrections.doi.raw`, à défaut la colonne `doi`), en minuscules : la clé du groupe. Le titre normalisé sert à comparer deux chapitres."""
+    `doi` est la colonne `doi`. Le titre normalisé sert à comparer deux chapitres."""
 
     id: int
     doc_type: str | None
     doi: str | None
     title_normalized: str | None
     corrections: dict[str, JsonValue]
-    raw_doi: str
-    # `raw_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
+    shared_doi: str
+    # `shared_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
     unresolved: bool = False
-    # `raw_doi` a une cible dans `doi_targets`.
+    # `shared_doi` a une cible dans `doi_targets`.
     has_target: bool = False
     identifiers: tuple[SourceIdentifier, ...] = ()
     source: str = ""
@@ -524,13 +524,18 @@ class SourceRecordCorrectionStore:
         ]
 
     def fetch_doi_cluster_candidates(self) -> list[DoiClusterRow]:
-        """Membres des groupes de même DOI candidats au retrait du DOI : groupes qui contiennent un livre, un chapitre ou un volume d'actes ; groupes dont le DOI est inconnu de doi.org ; groupes où un dépôt HAL partage zéro nom d'auteur avec l'enregistrement source Crossref ; groupes d'un enregistrement source déjà corrigé, dont la correction se réévalue."""
+        """Membres des groupes de même DOI candidats au retrait du DOI : groupes qui contiennent un livre, un chapitre ou un volume d'actes ; groupes dont le DOI est inconnu de doi.org ; groupes où un dépôt HAL partage zéro nom d'auteur avec l'enregistrement source Crossref ; groupes d'un enregistrement source déjà corrigé, dont la correction se réévalue. Un groupe réunit les enregistrements sources qui ont son DOI, de rôle autre que `related`, quel que soit son statut."""
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, doi, title_normalized, corrections,
-                           lower({raw_column("doi", "source_records")}) AS eff_doi
+                    SELECT id, source, source_id, doc_type, doi, title_normalized, corrections
                     FROM source_records
+                ),
+                record_dois AS (
+                    SELECT source_record_id AS id, id_value AS doi
+                    FROM source_record_identifiers
+                    WHERE id_type = '{SourceIdentifierType.DOI.value}'
+                      AND role <> '{SourceIdentifierRole.RELATED.value}'
                 ),
                 unresolved_dois AS (
                     SELECT id_value AS d FROM failed_lookups
@@ -539,10 +544,12 @@ class SourceRecordCorrectionStore:
                 -- DOI dont un dépôt HAL n'a aucun nom d'auteur en commun avec l'enregistrement source Crossref,
                 -- les deux ayant des contributions sources individuelles.
                 hal_crossref AS MATERIALIZED (
-                    SELECT h.eff_doi AS d, h.id AS hal_id, c.id AS crossref_id
+                    SELECT hd.doi AS d, h.id AS hal_id, c.id AS crossref_id
                     FROM sr_eff h
-                    JOIN sr_eff c ON c.eff_doi = h.eff_doi AND c.source = '{Source.CROSSREF.value}'
-                    WHERE h.source = '{Source.HAL.value}' AND h.eff_doi IS NOT NULL
+                    JOIN record_dois hd ON hd.id = h.id
+                    JOIN record_dois cd ON cd.doi = hd.doi
+                    JOIN sr_eff c ON c.id = cd.id AND c.source = '{Source.CROSSREF.value}'
+                    WHERE h.source = '{Source.HAL.value}'
                 ),
                 foreign_hal_dois AS (
                     SELECT DISTINCT hc.d FROM hal_crossref hc
@@ -561,15 +568,14 @@ class SourceRecordCorrectionStore:
                       )
                 ),
                 candidate_dois AS (
-                    SELECT eff_doi AS d FROM sr_eff
-                    WHERE doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
-                      AND eff_doi IS NOT NULL
+                    SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
+                    WHERE sr.doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
                     UNION
-                    SELECT eff_doi AS d FROM sr_eff
-                    WHERE {corrected("doi", "sr_eff")}
+                    SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
+                    WHERE {corrected("doi", "sr")}
                        OR EXISTS (
                            SELECT 1 FROM source_record_identifiers i
-                           WHERE i.source_record_id = sr_eff.id
+                           WHERE i.source_record_id = sr.id
                              AND i.removed_by IN ({_CLUSTER_CASES_SQL})
                        )
                     UNION
@@ -580,18 +586,19 @@ class SourceRecordCorrectionStore:
                 SELECT sr.id, sr.doc_type, sr.doi, sr.title_normalized, sr.corrections,
                        sr.source::text AS source, sr.source_id,
                        {identifiers_json_sql("sr.id")} AS identifiers,
-                       sr.eff_doi AS raw_doi,
-                       sr.eff_doi IN (SELECT d FROM unresolved_dois) AS unresolved,
-                       EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = sr.eff_doi) AS has_target,
-                       CASE WHEN sr.eff_doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
+                       m.doi AS shared_doi,
+                       m.doi IN (SELECT d FROM unresolved_dois) AS unresolved,
+                       EXISTS (SELECT 1 FROM doi_targets t WHERE t.doi = m.doi) AS has_target,
+                       CASE WHEN m.doi IN (SELECT d FROM foreign_hal_dois) THEN ARRAY(
                            SELECT DISTINCT ci.last_name_normalized
                            FROM source_contributions sc
                            JOIN contributor_information ci ON ci.id = sc.contributor_information_id
                            WHERE sc.source_record_id = sr.id AND NOT sc.collective
                              AND ci.last_name_normalized <> ''
                        ) ELSE ARRAY[]::text[] END AS author_names
-                FROM sr_eff sr
-                JOIN candidate_dois c ON c.d = sr.eff_doi
+                FROM candidate_dois c
+                JOIN record_dois m ON m.doi = c.d
+                JOIN sr_eff sr ON sr.id = m.id
             """)
         ).all()
         return [
@@ -601,7 +608,7 @@ class SourceRecordCorrectionStore:
                 doi=row.doi,
                 title_normalized=row.title_normalized,
                 corrections=row.corrections,
-                raw_doi=row.raw_doi,
+                shared_doi=row.shared_doi,
                 unresolved=row.unresolved,
                 has_target=row.has_target,
                 identifiers=parse_identifiers(row.identifiers),

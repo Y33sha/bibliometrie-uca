@@ -125,6 +125,8 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Usages du DOI d'un enregistrement source, et réconciliation simulée selon la règle des clés DOI.
 - [x] DOI des enregistrements sources sans payload au raw store écrits dans la table (oneshot, 086044c44).
 - [x] Clés DOI et coupe de la réconciliation selon les ancres ; DOI de la publication pris sur l'ancre de ses enregistrements sources.
+- [x] DOI des déclarants de `doi_targets` lus dans la table (a9d54c779).
+- [x] Groupes de `remove_identifiers` par DOI de la table, de rôle autre que `related` : un enregistrement source appartient à un groupe par DOI et perd seulement le DOI du groupe qui le désigne. Sur la base locale, 40 retraits de plus (1 164 au lieu de 1 124), aucun en moins.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
 - [ ] Suppression de la colonne.
 
@@ -137,5 +139,8 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [ ] Mise à jour de la documentation.
 
 ## Questions ouvertes
+
+- Règles de `remove_identifiers` à revoir. La sous-étape retire les DOI manifestement faux : inconnus de doi.org, ou attribués à tort, surtout le DOI d'un ouvrage donné à un chapitre et celui d'un volume d'actes donné à une communication. Un chapitre perd le DOI d'un ouvrage quel que soit son titre ; le type que Crossref donne au DOI suffit à le trancher. L'absence de nom d'auteur commun entre un dépôt HAL et l'enregistrement source Crossref est un indice trop approximatif : beaucoup d'ouvrages Crossref n'ont aucun auteur.
+- DOI preprints.org (`10.20944/preprints…`) inscrits dans `failed_lookups` comme inconnus de doi.org, à vérifier.
 
 - Hors périmètre : retrait des identifiants secondaires trop éloignés de l'enregistrement source qui les cite, par comparaison deux à deux des titres par exemple. Ce serait une généralisation de `remove_identifiers` à tous les identifiants.
