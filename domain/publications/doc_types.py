@@ -117,6 +117,9 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
             DocType.DATA_PAPER,
         ),
     ),
+    "conferences": DocTypeFamily(
+        "Conférences", (DocType.CONFERENCE, DocType.RECORDED_TALK, DocType.POSTER)
+    ),
     "preprints": DocTypeFamily("Prépublications", (DocType.PREPRINT,)),
     # Les mémoires sont exclus des listes et les thèses en cours y sont invisibles.
     "theses": DocTypeFamily(
@@ -130,9 +133,6 @@ DOC_TYPE_FAMILIES: dict[str, DocTypeFamily] = {
         (
             DocType.OTHER,
             DocType.MEDIA,
-            DocType.CONFERENCE,
-            DocType.RECORDED_TALK,
-            DocType.POSTER,
             DocType.REPORT,
             DocType.ERRATUM,
             DocType.RETRACTION,

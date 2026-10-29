@@ -47,8 +47,9 @@ Deux tiers des enregistrements sources HAL de ces communications sont sans résu
 - [x] Libellés et familles des types servis par l'API depuis le domaine, chargés par le frontend avant l'affichage. 626a9c589
 - [x] Type `recorded_talk`. Correspondance de HAL `VIDEO` et DataCite `Audiovisual`. Règles de correction par le titre étendues à ce type, préfixes de vidéos complémentaires. 81a80a286
 - [x] HAL `SON` et DataCite `Sound` vers `media`. HAL `PRESCONF` vers `conference`. c2e424844
-- [x] `conference` libellé « Communication ».
-- [ ] Famille « Conférences ».
+- [x] `conference` libellé « Communication ». 418245fae
+- [x] Famille « Conférences ».
+- [ ] Palette des couleurs des types et des familles.
 - [ ] posters et communications réunis sous un même DOI
 - [ ] `data_paper` dans la famille des données et logiciels.
 - [ ] Libellé de `media`, réservé aux interventions dans la presse.

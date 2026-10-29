@@ -70,6 +70,7 @@ const DOC_TYPE_COLOR_KEYS = new Set([
 	'book',
 	'book_chapter',
 	'data_paper',
+	'conferences',
 	'theses',
 	'data',
 	'misc',
