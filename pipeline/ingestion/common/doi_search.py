@@ -52,19 +52,17 @@ class DoiSearch(Protocol):
 def get_missing_dois(
     conn: Connection, target: str, *, retry_after_days: int, years: list[int] | None = None
 ) -> list[str]:
-    """DOI présents dans les autres sources et absents de la cible.
+    """DOI à chercher dans la cible : DOI des publications du périmètre absents de la cible, nettoyés et sans doublon.
 
-    `years` borne les candidats à la fenêtre d'années du run : un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre. Les sources d'une même publication diffèrent souvent d'un an. `None` : aucune borne.
+    Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. Le périmètre est celui du run précédent ; les DOI des enregistrements sources nouveaux attendent le run suivant.
 
-    Pool (vue `candidate_dois`) restreint aux publications **in-périmètre** : `source_records.doi` (DOI primaire) ∪ autres DOI actifs des enregistrements sources (preprint/dépôt/édition) ∪ `publication_relations.target_doi` (cibles des relations : preprint/supplément/data paper… à rapatrier) ∪ DOI DataCite déduits de l'identifiant arXiv (préfixe `10.48550/arXiv.<id>` : tout dépôt arXiv expose ce DOI DataCite). Le périmètre (`publications.in_perimeter`) est celui matérialisé au run précédent : ne chercher que les DOI de publications in-périmètre évite de rapatrier des documents hors périmètre. Les DOI de records fraîchement ingérés sont rattrapés au run suivant (pipeline convergent).
+    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source rend un même document pour chacun de ses DOI.
 
-    Exclut les DOI que la cible porte déjà, en `source_records.doi` comme parmi ses autres DOI actifs : une source rend un même document pour l'un ou l'autre de ses identifiants, si bien qu'un DOI secondaire ramènerait un document déjà présent.
+    Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible, et définitivement s'il est inconnu de doi.org (`failed_lookups`).
 
-    Le SQL compare les `doi` par égalité directe. Les candidats retenus sont normalisés via `clean_doi` et dédoublonnés avant d'être renvoyés : les appels HTTP par DOI en aval reçoivent une forme canonique, quelle que soit la propreté de la valeur source.
+    Pour une cible agence d'enregistrement, seuls comptent les DOI dont le préfixe est résolu vers cette agence. Un préfixe encore sans agence attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, auprès d'une seule des deux agences.
 
-    Exclut les DOI dont la recherche dans la cible a échoué il y a moins de `retry_after_days` jours (`failed_lookups`), et les DOI que doi.org ne connaît pas. Le pool se borne donc de lui-même : un DOI introuvable en sort jusqu'à l'échéance du délai, un DOI inexistant en sort définitivement.
-
-    Pour une cible agence d'enregistrement (`SourceProfile.registration_agency`), retient seulement les DOI dont le préfixe est résolu vers l'agence de la cible. Un préfixe pas encore résolu attend la phase `resolve_ra`, plus loin dans le run : son DOI est cherché au run suivant, et jamais auprès des deux API.
+    `years` borne les candidats à la fenêtre d'années du run : un DOI est retenu quand l'un des enregistrements sources de sa publication a son année dans la fenêtre. Les sources d'une même publication diffèrent souvent d'un an.
     """
     if target not in VALID_SOURCES:
         raise ValueError(f"Source inconnue : {target}. Valides : {', '.join(VALID_SOURCES)}")
@@ -73,7 +71,6 @@ def get_missing_dois(
     join_clause = (
         "JOIN doi_prefixes dp ON dp.prefix = split_part(c.doi, '/', 1)" if target_ra else ""
     )
-    # Exclusion du target : `source IS DISTINCT FROM` (relations à source NULL candidates pour toutes les cibles) + absent du staging du target + absent des DOI que la cible porte déjà. `NOT EXISTS` plutôt que `NOT IN` : un NULL dans la sous-requête viderait la sélection.
     prefix_filter = " AND dp.ra = :target_ra" if target_ra else ""
     pending = pending_failed_lookup_sql(source_sql=":target", id_type="doi", value_sql="c.doi")
     unknown_to_doi_org = pending_failed_lookup_sql(
@@ -89,6 +86,8 @@ def get_missing_dois(
         if years is not None
         else ""
     )
+    # `IS DISTINCT FROM` : un DOI de relation, sans source, est candidat pour toutes les cibles.
+    # `NOT EXISTS` : avec `NOT IN`, un NULL dans la sous-requête viderait la sélection.
     query = f"""
         WITH deja_connus AS (
             SELECT sr.doi
@@ -119,7 +118,7 @@ def get_missing_dois(
     if target_ra:
         params["target_ra"] = target_ra
     rows: ScalarResult[str] = conn.execute(text(query), params).scalars()
-    # Re-nettoyage des candidats (idempotent) : `staging.doi` peut porter des DOI non normalisés ; `dict.fromkeys` dédoublonne en préservant l'ordre.
+    # `staging.doi` peut contenir des DOI non normalisés : les candidats repassent par `clean_doi`, puis `dict.fromkeys` dédoublonne en gardant l'ordre.
     return list(dict.fromkeys(c for d in rows if (c := clean_doi(d))))
 
 
@@ -132,11 +131,11 @@ async def fetch_missing_doi(
     limit: int | None = None,
     years: list[int] | None = None,
 ) -> PhaseMetrics:
-    """Cherche dans la source de `search` les DOI qu'elle n'a pas rendus, et écrit les enregistrements sources trouvés dans `staging`.
+    """Cherche dans la source les DOI qu'elle n'a pas rendus, et écrit dans `staging` les enregistrements sources trouvés.
 
-    Un DOI confirmé absent est inscrit dans `failed_lookups`. `limit` plafonne le nombre de DOI d'une exécution, `years` borne les candidats à la fenêtre d'années du run (`get_missing_dois`). Quand la source est l'agence d'enregistrement des DOI cherchés, ses DOI absents sont soumis à doi.org : un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG`.
+    Un DOI absent de la source est inscrit dans `failed_lookups`. Quand la source est une agence d'enregistrement, ses DOI absents passent ensuite à doi.org : un DOI inconnu de doi.org est inscrit sous `DOI_ORG`. `limit` plafonne le nombre de DOI d'une exécution.
 
-    Compteurs de `look_up`, et `extras["unknown_to_doi_org"]` = DOI que doi.org ne connaît pas.
+    Rend les compteurs de `look_up`, avec le nombre de DOI inconnus de doi.org (`unknown_to_doi_org`).
     """
     source = search.source_key
     dois = get_missing_dois(conn, source, retry_after_days=retry_after_days, years=years)
@@ -174,7 +173,7 @@ async def fetch_missing_doi(
 
 
 def _doi_org_channel() -> LookupChannel:
-    """Vérification auprès de doi.org de DOI qu'une agence d'enregistrement ignore. Un DOI que doi.org ne connaît pas est inscrit dans `failed_lookups` sous `DOI_ORG`."""
+    """Vérification auprès de doi.org des DOI absents d'une agence d'enregistrement."""
     user_agent = polite_user_agent()
 
     async def _fetch(client: httpx2.AsyncClient, dois: list[str]) -> LookupBatch | Unavailable:

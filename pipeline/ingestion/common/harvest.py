@@ -1,19 +1,11 @@
-"""Orchestrateur de la phase `harvest` : moissonnage des sources vers le staging.
+"""Phase `harvest` : moissonnage des sources vers `staging`, une tâche par source, en parallèle.
 
-Workflow (sans I/O ni threads : ceux-ci sont injectés) :
+La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure. La policy du mode (`modes.py`) choisit les sources et la fenêtre :
 
-- s'arrête en échec si le périmètre d'extraction ne contient aucune structure ;
-- lit la policy du mode (`modes.py`) : sources autorisées et stratégie d'années ;
-- mode `since_last` (quotidien) : les sources incrémentales (`SourceProfile.incremental`) depuis le dernier moissonnage quotidien réussi ;
-- sinon : une tâche par source retenue, en parallèle, sur la plage `[start_year … courante]` (ou `--year`) ;
-- assemble les métriques par source.
+- mode quotidien (`since_last`) : les documents modifiés depuis le dernier moissonnage quotidien réussi, à défaut depuis 30 jours ;
+- autres modes : les années de `start_year` à l'année courante, ou la seule année `--year`.
 
-Les dépendances techniques sont injectées par le composition-root :
-
-- `count_extraction_structures(ctx)` : le nombre de structures du périmètre d'extraction ;
-- `harvest_one(ctx, source, window)` : ouvre la connexion, câble le moissonneur et l'exécute ; une source dont le périmètre d'interrogation manque est sautée avec un signal (`run_harvest`) ;
-- `run_parallel` : le primitif de parallélisme (thread pool) ;
-- `get_last_daily_harvest_date` : la date du dernier moissonnage quotidien réussi (branche incrémentale).
+Une source dont le périmètre d'interrogation manque est sautée avec un signal (`run_harvest`).
 """
 
 from __future__ import annotations
@@ -132,16 +124,13 @@ class HarvestPhase:
         return metrics
 
     def _since_last_daily(self) -> tuple[date, str]:
-        """Mode quotidien : date depuis laquelle HAL est moissonné, avec son origine — le dernier moissonnage quotidien réussi, ou les 30 derniers jours."""
+        """Mode quotidien : date depuis laquelle le moissonnage reprend les documents modifiés, avec son origine. C'est la date du dernier moissonnage quotidien réussi, à défaut celle d'il y a 30 jours."""
         last = self.get_last_daily_harvest_date()
         if last is not None:
             return last, "dernier moissonnage quotidien réussi"
         return today() - timedelta(
             days=30
         ), "aucun moissonnage quotidien réussi, repli sur 30 jours"
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

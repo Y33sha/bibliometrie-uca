@@ -1,8 +1,6 @@
-"""Socle des moissonneurs : patron commun, écriture d'un document dans `staging`.
+"""Socle des moissonneurs : patron commun et écriture d'un document dans `staging`.
 
-Le patron porte l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `load_config()` et `harvest_all()` ; la pagination (curseur, `search_after`, `firstRecord`, `cursorMark`) reste propre à chaque source.
-
-Point d'entrée unique `run()` : invoqué par `run_pipeline`, il laisse remonter les exceptions à l'orchestrateur et retourne les `PhaseMetrics`.
+Le patron gère l'en-tête et le bilan du journal, la barre de progression et l'arrêt sur source indisponible. Chaque source hérite de `SourceHarvester` et implémente `load_config()` et `harvest_all()`. La pagination reste propre à chaque source.
 """
 
 from __future__ import annotations
@@ -86,12 +84,9 @@ def stage_document(
 
 
 class HarvestConfigError(Exception):
-    """Configuration d'extraction incomplète (IDs/affiliations manquants).
+    """Configuration d'extraction incomplète : il manque un paramètre indispensable à l'API (identifiants d'institution, affiliations, PPN).
 
-    Levée par `load_config` d'un moissonneur quand un paramètre API
-    indispensable (IDs institution, affiliations, PPN…) n'est pas
-    disponible. Interrompt l'extraction proprement avec un message
-    explicite au lieu d'un 400 API opaque.
+    `load_config` la lève avant toute requête, et la source est sautée avec un message explicite.
     """
 
 
@@ -108,19 +103,11 @@ class HarvestWindow:
 
 
 class SourceHarvester[ConfigT, ClientT](ABC):
-    """Template pour l'extraction API → staging.
+    """Patron d'un moissonneur, de l'API de la source vers `staging`.
 
-    `ConfigT` (paramètre PEP 695) = type de la config chargée par `load_config`, propre à chaque source. Permet aux sous-classes de retourner une dataclass typée plutôt qu'un `dict` opaque. Le base class ne consomme jamais le contenu de la config — il la passe à `harvest_all` qui sait l'interpréter.
+    `ConfigT` est le type de la configuration propre à la source, que `load_config` rend et que `harvest_all` reçoit. `ClientT` est le type du client HTTP de la source, reçu à la construction.
 
-    `ClientT` (paramètre PEP 695) = type du client HTTP de la source, injecté à la construction et stocké en `self._client`.
-
-    Points d'override obligatoires :
-    - `SOURCE` : identifiant source (ex: "hal", "openalex")
-    - `load_config(conn) -> ConfigT` : charge la config depuis la DB (URL, auth, affiliations, etc.)
-    - `harvest_all(window, config) -> PhaseMetrics` : boucle d'extraction
-
-    Points d'override optionnels :
-    - `setup_logging(window, config)` : logs de header personnalisés
+    Une sous-classe définit `SOURCE`, `load_config` et `harvest_all`, et peut définir `setup_logging`.
     """
 
     SOURCE: ClassVar[str] = ""
@@ -140,10 +127,8 @@ class SourceHarvester[ConfigT, ClientT](ABC):
         self._client = client
 
     def _years(self, window: HarvestWindow) -> list[int]:
-        """Années de publication à extraire : `--year`, sinon `[start_year … année courante]` (`window_years`). Le mode incrémental garde cette plage."""
+        """Années de publication à moissonner : `--year`, sinon de `start_year` à l'année courante. Le mode incrémental garde cette plage."""
         return window_years(self.conn, start_year=window.start_year, year=window.year)
-
-    # ── Barre et bilan de la source ─────────────────────────────
 
     def _label(self, scope: str | None = None) -> str:
         """Libellé de la barre de la source, avec la colonne du périmètre en cours."""
@@ -216,28 +201,21 @@ class SourceHarvester[ConfigT, ClientT](ABC):
             quantity(metrics.unchanged, *unchanged_form),
         )
 
-    # ── Hooks métier ────────────────────────────────────────────
-
     @abstractmethod
     def load_config(self, conn: Connection) -> ConfigT:
-        """Charge la config DB (URL, auth, affiliations, années, etc.)."""
+        """Charge depuis la base la configuration propre à la source."""
 
     @abstractmethod
     def harvest_all(self, window: HarvestWindow, config: ConfigT) -> PhaseMetrics:
-        """Pilote l'extraction complète. Retourne les métriques finales."""
+        """Moissonne la fenêtre et rend les métriques."""
 
     def setup_logging(  # noqa: B027
         self, window: HarvestWindow, config: ConfigT
     ) -> None:
-        """Logs de header personnalisés (ex: affiliations, collections, années)."""
-
-    # ── Entry point ─────────────────────────────────────────────
+        """Écrit l'en-tête du journal propre à la source : affiliations, collections, années."""
 
     def run(self, window: HarvestWindow) -> PhaseMetrics:
-        """Exécute l'extraction : `load_config` → `setup_logging` → `harvest_all`.
-
-        Invoqué par `run_pipeline`. Les exceptions (`HarvestConfigError`, HTTP, `KeyboardInterrupt`) remontent à l'orchestrateur, qui décide quoi en faire (rapport partiel, exit code).
-        """
+        """Charge la configuration, écrit l'en-tête du journal, puis moissonne. Les exceptions remontent à l'appelant."""
         config = self.load_config(self.conn)
         self.setup_logging(window, config)
         return self.harvest_all(window, config)
@@ -253,7 +231,7 @@ class Harvester(Protocol):
 
 
 type HarvesterFactory = Callable[[Connection, logging.Logger], Harvester]
-"""Construit le moissonneur d'une source sur la connexion de sa phase et le journal scopé à la source."""
+"""Construit le moissonneur d'une source sur la connexion de sa phase et le journal de la source."""
 
 
 def run_harvest(
@@ -263,9 +241,9 @@ def run_harvest(
     make_harvester: HarvesterFactory,
     window: HarvestWindow,
 ) -> PhaseMetrics:
-    """Exécute le moissonneur de `make_harvester` sur une connexion de la phase, avec le journal de la source.
+    """Exécute le moissonneur d'une source sur une connexion de la phase, avec le journal de la source.
 
-    Une source dont la configuration manque (`HarvestConfigError`) est sautée avec un signal `source_unconfigured` : la phase continue avec les autres sources.
+    Une source sans configuration (`HarvestConfigError`) est sautée avec un signal `source_unconfigured` ; la phase continue avec les autres sources.
     """
     source_log = setup_logger(source, str(PROJECT_ROOT / "logs"))
     try:

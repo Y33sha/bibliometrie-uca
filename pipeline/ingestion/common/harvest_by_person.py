@@ -1,8 +1,8 @@
-"""Phase `harvest_by_person` : moissonnage des sources par l'identifiant des personnes RH, vers le staging.
+"""Phase `harvest_by_person` : moissonnage des sources par les identifiants des personnes qui ont une fiche RH, vers `staging`.
 
-Une tâche par source de `PERSON_SEARCHED_SOURCES`, en parallèle, sur la plage d'années de l'extraction (ou `--year`). Le mode `daily` saute la phase. `--sources` restreint les sources.
+Une tâche par source, en parallèle, sur la plage d'années de l'extraction ou la seule année `--year`. Un mode dont la policy exclut la phase la saute (`daily`). `--sources` restreint les sources.
 
-Les identifiants de personne que chaque source accepte sont dans son profil (`domain/sources/registry.py`).
+Le profil de chaque source dit quels identifiants de personne elle accepte (`domain/sources/registry.py`).
 """
 
 from __future__ import annotations
@@ -69,9 +69,6 @@ class HarvestByPersonPhase:
         for source_metrics in by_task.values():
             metrics.merge(source_metrics)
         return metrics
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:
