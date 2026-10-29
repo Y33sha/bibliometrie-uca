@@ -212,7 +212,7 @@ def _only_initials(col: str) -> str:
 
 
 def _name_comparisons() -> list[cl.CustomComparison]:
-    """Patronyme et prénom, niveaux de `comparison_levels`."""
+    """Nom de famille et prénom, niveaux de `comparison_levels`."""
     last_name = cl.CustomComparison(
         output_column_name=Comparison.LAST_NAME,
         comparison_levels=[
@@ -275,7 +275,7 @@ def _identifier(column: str) -> cl.CustomComparison:
     )
 
 
-# Paires candidates du résidu : une contribution source face aux groupes de son `slot`, de trou égal ou voisin, de patronymes aux deux premières lettres égales, ou d'identifiant partagé.
+# Paires candidates du résidu : une contribution source face aux groupes de son `slot`, de trou égal ou voisin, de noms de famille aux deux premières lettres égales, ou d'identifiant partagé.
 _SAME_SLOT = "l.slot = r.slot"
 _RESIDUAL_BLOCKS: list[BlockingRuleCreator] = [
     CustomRule(f"{_SAME_SLOT} AND abs(l.gap - r.gap) <= 1"),

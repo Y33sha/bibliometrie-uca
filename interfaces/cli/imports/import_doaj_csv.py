@@ -1,9 +1,9 @@
 # STATUS: recurring (imports)
-"""Import d'un dump CSV DOAJ **local** dans `serials.doaj_payload`.
+"""Import d'un dump CSV local du DOAJ dans `serials.doaj_payload`.
 
-Le pipeline télécharge et importe le dump automatiquement, au terme du délai `doaj_refresh_after_days` (cf. `_run_enrich_serials_from_doaj`). Cette CLI sert à forcer l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors cadence pipeline.
+Le pipeline télécharge et importe le dump automatiquement, au terme du délai `doaj_refresh_after_days` (`run_enrich_serials_from_doaj`). Cette commande force l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors de la cadence du pipeline.
 
-La logique (index ISSN, reset `is_in_doaj`, match, écriture `doaj_payload`) vit dans `pipeline/transformation/publishing/serials/enrich_serials_from_doaj` ; ce script n'est qu'un point d'entrée CLI.
+La logique vit dans `pipeline/transformation/publishing/serials/enrich_serials_from_doaj.py`.
 
 Usage :
     python -m interfaces.cli.imports.import_doaj_csv data/doaj/doaj_dump.csv

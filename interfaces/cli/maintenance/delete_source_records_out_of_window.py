@@ -1,5 +1,5 @@
 # STATUS: maintenance
-"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours reste : elle n'a pas d'année de soutenance.
+"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours reste : elle est sans année de soutenance.
 
 Les enregistrements sources de la même publication sont marqués à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 

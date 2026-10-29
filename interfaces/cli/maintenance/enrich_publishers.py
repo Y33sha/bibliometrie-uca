@@ -1,5 +1,5 @@
 # STATUS: maintenance
-"""Enrichissement (cosmétique) du `country` des éditeurs depuis OpenAlex Publishers.
+"""Pays des éditeurs, d'après OpenAlex Publishers.
 
 Hors pipeline, lancé à la demande. Seuls les éditeurs sans pays reçoivent celui d'OpenAlex : une valeur saisie par un administrateur est préservée, et deux exécutions successives donnent le même résultat.
 
@@ -48,26 +48,23 @@ _COUNTRYLESS = text("""
 _SET_COUNTRY = text("UPDATE publishers SET country = :country WHERE id = :id AND country IS NULL")
 
 FetchPublishersBatch = Callable[[list[str]], dict[str, str | None]]
-"""`(openalex_ids) -> {short_id: pays}`. Le pays vaut `None` quand la source n'en donne pas ; un éditeur sur lequel elle ne répond rien est absent du dictionnaire."""
+"""Requête injectée : pays de chaque éditeur, par identifiant OpenAlex court ; `None` quand OpenAlex n'en donne pas. Un éditeur sans réponse est absent du dictionnaire."""
 
 
 def find_countryless(conn: Connection, limit: int | None = None) -> list[tuple[int, str]]:
-    """`(id, openalex_id)` des éditeurs qui ont un `openalex_id` et pas de pays, par id. `limit=None` les rend tous."""
+    """Éditeurs sans pays qui ont un `openalex_id`, par id ; tous sans `limit`."""
     return [(r.id, r.openalex_id) for r in conn.execute(_COUNTRYLESS, {"limit": limit}).all()]
 
 
 class _OpenAlexPublisher(TypedDict):
-    """Sous-ensemble de la payload OpenAlex Publishers lu ici."""
+    """Partie du payload d'OpenAlex Publishers lue ici."""
 
     id: str
     country_codes: NotRequired[list[str]]
 
 
 def extract_country(source: _OpenAlexPublisher) -> str | None:
-    """Pays d'un éditeur dans la payload OpenAlex Publishers.
-
-    Premier code de `country_codes`, en minuscule. Le premier pays correspond généralement au siège. Liste vide ou absente : `None`.
-    """
+    """Pays d'un éditeur dans le payload d'OpenAlex Publishers : le premier code de `country_codes`, en minuscules, en général celui du siège ; `None` sans code."""
     country_codes = source.get("country_codes") or []
     return country_codes[0].lower() if country_codes else None
 
@@ -77,7 +74,7 @@ def fetch_publishers_batch(
 ) -> dict[str, str | None]:
     """Interroge OpenAlex Publishers pour un lot d'identifiants (filtre à `|`, 50 au plus).
 
-    Rend `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les retries ; la boucle consulte l'état du circuit-breaker.
+    Rend `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les nouvelles tentatives ; la boucle consulte l'état du circuit-breaker.
     """
     params: dict[str, str] = {
         "filter": f"ids.openalex:{'|'.join(full_openalex_id(oid) for oid in openalex_ids)}",
@@ -180,8 +177,7 @@ def run_enrich_publishers_from_openalex(
             distrib = ", ".join(f"{c}={n}" for c, n in country_counter.most_common(10))
             logger.info("Pays les plus posés : %s", distrib)
     except KeyboardInterrupt:
-        # Un Ctrl+C en plein execute avorte la transaction : le lot en cours est annulé, les lots
-        # déjà committés restent.
+        # Un Ctrl+C en plein `execute` avorte la transaction : le lot en cours est annulé, les lots déjà commités restent.
         rollback_unless_invalidated(conn)
         logger.warning("Interruption — lots déjà committés conservés.")
         raise
@@ -218,8 +214,7 @@ def main() -> int:
         return PhaseMetrics()
 
     try:
-        # Seuil 3 : trois lots consécutifs à bout de budget (429) suffisent à conclure que le
-        # quota OpenAlex du jour est épuisé et à reporter le reste à la prochaine exécution.
+        # Trois lots consécutifs à bout de budget (429) signalent un quota OpenAlex du jour épuisé : le reste attend l'exécution suivante.
         access_source(
             "openalex",
             enrich,

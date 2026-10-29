@@ -97,7 +97,7 @@ HAL_FULL_TEXT = f"""
     )
 """
 
-# Publication `p` cosignée hors de France. Le bind `:domestic` liste les codes pays non internationaux.
+# Publication `p` cosignée hors de France. Le paramètre `:domestic` liste les codes pays non internationaux.
 INTERNATIONAL = "EXISTS (SELECT 1 FROM unnest(p.countries) c WHERE c <> ALL(:domestic))"
 
 # Revue `j` diamant : marquée diamant, ou dans le DOAJ sans APC ni autres frais.
@@ -616,7 +616,7 @@ class OpenScienceReport:
 
 
 def _with_identifier(id_type: str) -> str:
-    """Sous-requête : nombre d'auteurs de `lab_authors` dont un identifiant `id_type` n'est pas rejeté."""
+    """Sous-requête : nombre d'auteurs de `lab_authors` qui ont un identifiant de ce type, non rejeté."""
     return f"""(SELECT COUNT(DISTINCT pi.person_id) FROM person_identifiers pi
                 JOIN lab_authors la ON la.person_id = pi.person_id
                 WHERE pi.id_type = '{id_type}' AND pi.status <> 'rejected')"""

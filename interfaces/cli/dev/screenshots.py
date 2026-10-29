@@ -21,7 +21,7 @@ from infrastructure import PROJECT_ROOT
 OUT_DIR = PROJECT_ROOT / "docs" / "img" / "screenshots"
 VIEWPORT = {"width": 1440, "height": 900}
 
-# Entités montrées en exemple : (endpoint de recherche, clé de la liste, champ comparé, valeur cherchée).
+# Entités montrées en exemple : (route de recherche, clé de la liste, champ comparé, valeur cherchée).
 SAMPLES = {
     "structure": ("structures", "structures", "acronym", "LMV"),
     # Les pages d'adresses montrent l'établissement : les adresses d'un laboratoire contiennent souvent des courriels personnels.

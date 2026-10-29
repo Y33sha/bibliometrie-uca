@@ -1,7 +1,7 @@
 # STATUS: recurring (imports)
 """Charge le dump du Research Organization Registry dans `ror_organizations` et `ror_relations`.
 
-Le pipeline importe chaque version publiée en tête de la phase `affiliations`. Cette CLI force un import. Sans argument, elle télécharge la version la plus récente du dump depuis Zenodo. `--file` charge une archive déjà téléchargée, dont le nom sert de version. Le chargement vide les deux tables avant de les remplir.
+Le pipeline importe chaque version publiée en tête de la phase `affiliations`. Cette commande force un import. Sans argument, elle télécharge la version la plus récente du dump depuis Zenodo. `--file` charge une archive déjà téléchargée, dont le nom sert de version. Le chargement vide les deux tables avant de les remplir.
 
 Usage :
     python -m interfaces.cli.imports.import_ror_dump

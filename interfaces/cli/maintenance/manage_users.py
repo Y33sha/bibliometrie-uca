@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Gère les utilisateurs autorisés à ouvrir une session et leurs rôles.
 
-Le script se connecte sous le propriétaire du schéma (`DB_OWNER_USER`) : le rôle du pipeline n'écrit pas dans `ops.users` ni dans `ops.user_roles`.
+Le script se connecte sous le propriétaire du schéma (`DB_OWNER_USER`) : le rôle du pipeline est sans droit d'écriture sur `ops.users` et `ops.user_roles`.
 
 Usage :
     python -m interfaces.cli.maintenance.manage_users list

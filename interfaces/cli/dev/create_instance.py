@@ -116,7 +116,7 @@ def main() -> None:
     _migrate()
     for script in instance_scripts(seed, reseed=args.reseed):
         _run_psql(script)
-    # Les lectures de l'API passent par la clôture matérialisée des périmètres du seed.
+    # Les lectures de l'API passent par les structures des périmètres du seed (`perimeter_structures`).
     with get_sync_engine().begin() as conn:
         refresh_perimeter_structures(conn)
     log.info("Instance %s chargée sur la base %s", seed.parent.name, settings.db_name)
