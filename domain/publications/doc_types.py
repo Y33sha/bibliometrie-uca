@@ -67,7 +67,7 @@ class DocTypeLabel(NamedTuple):
 DOC_TYPE_LABELS: dict[DocType, DocTypeLabel] = {
     DocType.ARTICLE: DocTypeLabel("Article", "Articles"),
     DocType.CONFERENCE_PAPER: DocTypeLabel("Conference paper", "Conference papers"),
-    DocType.CONFERENCE: DocTypeLabel("Conférence", "Conférences"),
+    DocType.CONFERENCE: DocTypeLabel("Communication", "Communications"),
     DocType.RECORDED_TALK: DocTypeLabel("Conférence filmée", "Conférences filmées"),
     DocType.BOOK: DocTypeLabel("Ouvrage", "Ouvrages"),
     DocType.BOOK_CHAPTER: DocTypeLabel("Chapitre", "Chapitres"),
