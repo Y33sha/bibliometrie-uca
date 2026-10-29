@@ -28,6 +28,8 @@ def names_proceedings(title: str) -> bool:
     """Indique si le titre annonce des actes : « Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence ».
 
     Une société savante, une académie ou une institution publient des revues ainsi nommées : « Proceedings of the National Academy of Sciences », « Proceedings of the Institution of Civil Engineers ». Leur titre ne compte pas, pas plus qu'une procédure judiciaire : « Third Parties in Criminal Proceedings ».
+
+    Seul le mot anglais compte : en sciences humaines, les chapitres d'« Actes du colloque » restent des chapitres.
     """
     return (
         bool(_PROCEEDINGS.search(title))

@@ -9,7 +9,7 @@ from domain.serials.titles import names_proceedings
 
 
 class MonographRecord(NamedTuple):
-    """Ce qu'un enregistrement rattaché à la monographie dit de lui-même : sa source, son type brut, et le congrès qu'il déclare."""
+    """Enregistrement source d'une monographie, réduit aux indices de congrès."""
 
     source: str
     raw_doc_type: str | None
@@ -19,10 +19,7 @@ class MonographRecord(NamedTuple):
 def is_proceedings_volume(
     records: Iterable[MonographRecord], *, collection_type: str | None, title: str
 ) -> bool:
-    """Indique si une monographie est un volume d'actes.
-
-    Trois signaux suffisent chacun : un enregistrement issu d'un congrès (`is_conference`), une collection typée recueil d'actes, un titre anglais qui annonce des actes (`names_proceedings`). Les chapitres des « Actes du colloque » en sciences humaines restent ainsi des chapitres.
-    """
+    """Vrai si la monographie est un volume d'actes. Un seul indice suffit : un enregistrement source issu d'un congrès, une collection de type recueil d'actes, ou un titre qui annonce des actes."""
     return (
         any(
             is_conference(r.raw_doc_type, r.source, declares_conference=r.declares_conference)
