@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from sqlalchemy import Connection, Row, text
 
 from domain.source_records.biblio import BiblioKey, JournalKey
-from infrastructure.db.source_record_identifiers import related_doi_sql
+from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.detail import structures_by_id
 from infrastructure.read_models.publications.models import (
     ExternalIdentifierOut,
@@ -125,13 +125,15 @@ class PublicationSourceRecordQueries:
             return None
         rows = self._conn.execute(
             text(f"""
-                SELECT sr.id, sr.source::text AS source, sr.source_id, sr.doi,
+                SELECT sr.id, sr.source::text AS source, sr.source_id,
+                       {source_record_doi_sql("sr")} AS doi,
                        COALESCE((
                            SELECT jsonb_agg(jsonb_build_object('type', i.id_type, 'value', i.id_value)
                                             ORDER BY i.id_type, i.id_value)
                            FROM source_record_identifiers i
                            WHERE i.source_record_id = sr.id AND i.removed_by IS NULL
-                             AND (i.id_type <> 'doi' OR {related_doi_sql("i", "sr")})
+                             AND (i.id_type <> 'doi'
+                                  OR i.id_value IS DISTINCT FROM {source_record_doi_sql("sr")})
                        ), '[]'::jsonb) AS identifiers,
                        sr.title, sr.title_normalized, sr.doc_type, sr.publication_year, sr.language,
                        lang.name AS language_name,

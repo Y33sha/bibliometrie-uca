@@ -8,6 +8,7 @@ from sqlalchemy import Connection, bindparam, text
 from domain.normalize import to_plain_text
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.source_records.keys import DISCRIMINANT_TITLE_MIN_LENGTH
+from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models._common import StructureRef
 from infrastructure.read_models.csv_export import MAX_EXPORT_ROWS, csv_chunks
 from infrastructure.read_models.hal_problems.models import (
@@ -193,12 +194,15 @@ class HalProblemsQueries:
         self, *, page: int, per_page: int
     ) -> HalDoiDuplicatesResponse:
         offset = (page - 1) * per_page
-        # Un même DOI (insensible à la casse) déposé sur au moins deux enregistrements sources HAL de la même publication. Les enregistrements sans publication sont hors périmètre.
-        dup_query = """
-            FROM source_records sr
-            WHERE sr.source = 'hal' AND sr.publication_id IS NOT NULL
-              AND sr.doi IS NOT NULL AND sr.doi != ''
-            GROUP BY sr.publication_id, LOWER(sr.doi)
+        # Un même DOI déposé sur au moins deux enregistrements sources HAL de la même publication. Les enregistrements sources sans publication sont hors périmètre.
+        dup_query = f"""
+            FROM (
+                SELECT sr.publication_id, sr.source_id, {source_record_doi_sql("sr")} AS doi
+                FROM source_records sr
+                WHERE sr.source = 'hal' AND sr.publication_id IS NOT NULL
+            ) sr
+            WHERE sr.doi IS NOT NULL
+            GROUP BY sr.publication_id, sr.doi
             HAVING COUNT(*) >= 2
         """
 
@@ -209,11 +213,11 @@ class HalProblemsQueries:
 
         rows = self._conn.execute(
             text(f"""
-                SELECT LOWER(sr.doi) AS doi,
+                SELECT sr.doi,
                        sr.publication_id AS publication_id,
                        array_agg(sr.source_id ORDER BY sr.source_id) AS halids
                 {dup_query}
-                ORDER BY LOWER(sr.doi)
+                ORDER BY sr.doi
                 LIMIT :pg_limit OFFSET :pg_offset
             """),
             {"pg_limit": per_page, "pg_offset": offset},

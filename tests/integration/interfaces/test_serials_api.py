@@ -20,6 +20,11 @@ from functools import partial
 
 import pytest
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from tests.integration.helpers.db import owner_pool
 from tests.integration.helpers.seeds import (
     seed_in_perimeter_contributions,
@@ -39,6 +44,11 @@ _publication = partial(seed_publication, normalize_title=False)
 
 # Enregistrement source de titre « Doc », sans année.
 _seed_record = partial(seed_source_record, title="Doc", publication_year=None)
+
+
+def _derived_doi(doi: str) -> list[SourceIdentifier]:
+    """DOI `derived` d'un agrégateur : celui de la localisation principale chez OpenAlex, de l'identifiant chez ScanR."""
+    return [SourceIdentifier(SourceIdentifierType.DOI, doi, SourceIdentifierRole.DERIVED)]
 
 
 class TestListSerials:
@@ -271,8 +281,8 @@ class TestDoiNamespaceConflicts:
         parasite = seed_serial()
         seed_serial_doi_namespace(namespace, serial_id=serial, dois=40, share=0.95)
         _seed_record(serial_id=serial, doi=f"{namespace}1")
-        _seed_record("openalex", serial_id=parasite, doi=f"{namespace}2")
-        _seed_record("openalex", serial_id=parasite, doi=f"{namespace}3")
+        _seed_record("openalex", serial_id=parasite, identifiers=_derived_doi(f"{namespace}2"))
+        _seed_record("openalex", serial_id=parasite, identifiers=_derived_doi(f"{namespace}3"))
         # Revue posée par l'espace de noms : ni contradiction, ni témoin.
         _seed_record(
             serial_id=parasite,
@@ -295,9 +305,10 @@ class TestDoiNamespaceConflicts:
         serial = seed_serial()
         other = seed_serial()
         seed_serial_doi_namespace(namespace, serial_id=serial, dois=40, share=0.95)
-        for source in ("hal", "crossref", "scanr"):
+        for source in ("hal", "crossref"):
             _seed_record(source, serial_id=serial, doi=f"{namespace}1")
-        _seed_record("openalex", serial_id=other, doi=f"{namespace}1")
+        _seed_record("scanr", serial_id=serial, identifiers=_derived_doi(f"{namespace}1"))
+        _seed_record("openalex", serial_id=other, identifiers=_derived_doi(f"{namespace}1"))
 
         conflicts = client.get("/api/serials/doi-namespace-conflicts").json()["conflicts"]
 

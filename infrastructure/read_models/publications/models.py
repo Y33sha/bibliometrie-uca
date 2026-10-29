@@ -387,7 +387,7 @@ class SourceRecordMetadataOut(BaseModel):
     source: str
     source_id: str
     doi: str | None
-    identifiers: list[ExternalIdentifierOut]  # identifiants actifs, hors DOI de la colonne `doi`
+    identifiers: list[ExternalIdentifierOut]  # identifiants actifs, hors DOI du champ `doi`
     title: str
     title_normalized: str | None  # forme de comparaison du titre
     doc_type: str | None

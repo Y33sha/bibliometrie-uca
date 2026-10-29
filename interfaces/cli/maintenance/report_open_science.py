@@ -498,8 +498,10 @@ class OpenScienceReport:
             f"""
             SELECT p.publication_year AS year, p.license::text AS license,
                    ARRAY(
-                       SELECT DISTINCT split_part(sr.doi, '/', 1) FROM source_records sr
-                       WHERE sr.publication_id = p.id AND sr.doi IS NOT NULL
+                       SELECT DISTINCT split_part(i.id_value, '/', 1) FROM source_records sr
+                       JOIN source_record_identifiers i ON i.source_record_id = sr.id
+                       WHERE sr.publication_id = p.id AND i.id_type = 'doi'
+                         AND i.removed_by IS NULL AND i.role <> 'related'
                    ) AS prefixes,
                    ARRAY(
                        SELECT DISTINCT ARRAY[l.url, COALESCE(pl.openalex_id, '')]

@@ -5,10 +5,12 @@ Le serveur d'API lit les données sur sa propre connexion. Chaque fonction ouvre
 
 import datetime
 import uuid
+from collections.abc import Sequence
 
 from sqlalchemy import text
 
 from domain.normalize import normalize_text
+from domain.source_records.identifiers import SourceIdentifier
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import (
     ensure_country,
@@ -350,8 +352,9 @@ def seed_source_record(
     raw_doc_type: str | None = None,
     doi: str | None = None,
     corrections: dict[str, object] | None = None,
+    identifiers: Sequence[SourceIdentifier] = (),
 ) -> int:
-    """Enregistrement source d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma. `raw_doc_type` vaut par défaut `doc_type`."""
+    """Enregistrement source d'identifiant `source_id`, unique par défaut. Une colonne à `None` garde la valeur par défaut du schéma. `raw_doc_type` vaut par défaut `doc_type`. `identifiers` s'écrivent comme dans `insert_source_record`."""
     with owner_connection() as conn:
         return insert_source_record(
             conn,
@@ -365,6 +368,7 @@ def seed_source_record(
             raw_doc_type=raw_doc_type,
             doi=doi,
             corrections=corrections,
+            identifiers=identifiers,
         )
 
 

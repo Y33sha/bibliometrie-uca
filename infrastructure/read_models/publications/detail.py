@@ -9,6 +9,7 @@ from domain.publications.relations import RelationType, inverse_relation
 from domain.source_records.identifiers import SourceIdentifierType
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.registry import Source
+from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.publications.copies import publication_copies
 from infrastructure.read_models.publications.models import (
     AccessLinkOut,
@@ -199,8 +200,9 @@ class PublicationDetailQueries:
         keywords = publication_row.keywords or []
 
         sources_rows = self._conn.execute(
-            text("""
-                SELECT sr.source, sr.source_id, sr.oa_status, sr.doi, sr.hal_collections, sr.countries
+            text(f"""
+                SELECT sr.source, sr.source_id, sr.oa_status, {source_record_doi_sql("sr")} AS doi,
+                       sr.hal_collections, sr.countries
                 FROM source_records sr
                 WHERE sr.publication_id = :pid
                 ORDER BY sr.created_at DESC

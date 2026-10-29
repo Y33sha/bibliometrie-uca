@@ -8,6 +8,7 @@ from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatu
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
 from domain.structures.structure import StructureType
+from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.persons.models import (
     AmbiguousFormPersonOut,
     AmbiguousNameFormOut,
@@ -312,7 +313,8 @@ class PersonAdminQueries:
         auth_rows = self._conn.execute(
             text(f"""
                 SELECT sc.source, sc.id AS source_contribution_id,
-                       sr.publication_id, sr.title, sr.publication_year, sr.doi
+                       sr.publication_id, sr.title, sr.publication_year,
+                       {source_record_doi_sql("sr")} AS doi
                 FROM {CONTRIBUTIONS_AND_SOURCES}
                 JOIN source_records sr ON sr.id = sc.source_record_id
                 WHERE g.person_id = :pid AND ci.author_name_normalized = :nf

@@ -15,6 +15,7 @@ from domain.serials.serial import (
     SERIAL_TYPE_LABELS_FR,
     SERIAL_TYPES,
 )
+from infrastructure.db.source_record_identifiers import serial_doi_sql
 from infrastructure.read_models._common import (
     EntityFacetItem,
     EntityFacetResponse,
@@ -171,12 +172,13 @@ _SERIAL_RECORD_TYPES = """
     GROUP BY j.id
 """
 
-# Enregistrements à DOI et à revue. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
+# Enregistrements sources à DOI et à revue, un couple par DOI que l'enregistrement source donne avec sa revue, comme pour le calcul des espaces de noms. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
 _RECORDS_WITH_DOI_AND_SERIAL = f"""
-    SELECT doi, serial_id, source::text AS source
-    FROM source_records
-    WHERE doi IS NOT NULL AND serial_id IS NOT NULL
-      AND NOT {corrected("serial_id", "source_records")}
+    SELECT d.id_value AS doi, s.serial_id, s.source::text AS source
+    FROM source_records s
+    JOIN source_record_identifiers d ON d.source_record_id = s.id AND {serial_doi_sql("d", "s")}
+    WHERE s.serial_id IS NOT NULL
+      AND NOT {corrected("serial_id", "s")}
 """
 
 # Revues où le même ISSN est actif.
