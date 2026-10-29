@@ -34,6 +34,15 @@ class TestSplitSharedTitlePairs:
         mergeable, blockers = split_shared_title_pairs([_pair(1, 2), _pair(1, 3), _pair(4, 5)])
         assert mergeable == [_pair(4, 5)]
         assert [(b["source_serial_id"], b["reason"]) for b in blockers] == [
+            (2, "doublon interne dans l'éditeur source (titre dédupliqué)"),
+            (3, "doublon interne dans l'éditeur source (titre dédupliqué)"),
+        ]
+
+    def test_target_serial_twin_blames_target_publisher(self):
+        """Deux revues cible homonymes d'une même revue source : l'éditeur cible contient un doublon."""
+        mergeable, blockers = split_shared_title_pairs([_pair(1, 3), _pair(2, 3)])
+        assert mergeable == []
+        assert [(b["target_serial_id"], b["reason"]) for b in blockers] == [
+            (1, "doublon interne dans l'éditeur cible (titre dédupliqué)"),
             (2, "doublon interne dans l'éditeur cible (titre dédupliqué)"),
-            (3, "doublon interne dans l'éditeur cible (titre dédupliqué)"),
         ]
