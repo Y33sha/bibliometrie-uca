@@ -11,11 +11,12 @@ la migration b8e3c1d7a4f2 doit passer après le remplissage
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
 * [ ] rendre la résolution des personnes totalement indépendante de l’ordre d'arrivée + remettre en jeu les résolutions non épinglées
 * [ ] règles de priorité entre sources pour les métadonnées: assouplir selon les cas de figure (notice OpenAlex ou ScanR dérivées de HAL => HAL doit primer) / annoter un corpus et trouver une bonne fonction de décision
-
 # Données
 * [ ] gérer les adresses résultant d'une erreur de parsing (ex. publi 106296); quand un work openalex a les mêmes affiliations pour toutes les contributions => suspect (contrôler par les autres sources)
 * [ ] conserver l'historique des structures
 * [ ] financements (projets ANR, projets européens)
+# Code
+* [ ] 'fr' écrit en dur
 # UI
 ## Admin
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")

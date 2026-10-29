@@ -1,20 +1,17 @@
-"""Fusion de deux entités : nature des données rattachées à une entité, et entités dont l'identifiant absorbé redirige.
-
-Chaque étape de fusion d'une entité (`MergeStep`) déclare la nature de sa donnée. Un test confronte ces étapes au schéma de la base.
-"""
+"""Fusion de deux entités."""
 
 from enum import StrEnum
 
 
 class DataNature(StrEnum):
-    """Origine d'une donnée."""
+    """Origine d'une donnée rattachée à une entité."""
 
-    # Posée par l'administration.
     DECISION = "decision"
-    # Calculée par le pipeline ou importée.
+    """Saisie à la main."""
     DERIVED = "derived"
-    # Décision ou donnée dérivée selon la ligne ou la valeur : statut, origine, édition.
+    """Calculée par le pipeline ou importée."""
     MIXED = "mixed"
+    """Saisie à la main ou dérivée selon la ligne : un statut, une origine ou une trace d'édition les distingue."""
 
 
 class MergedEntity(StrEnum):

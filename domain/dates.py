@@ -1,23 +1,20 @@
-"""Helpers de normalisation de dates."""
+"""Jour courant et conversions entre formes française et ISO des dates."""
 
 from datetime import UTC, date, datetime
 
 
 def today() -> date:
-    """Jour civil courant, en temps universel coordonné."""
+    """Jour civil courant, en UTC."""
     return datetime.now(UTC).date()
 
 
 def date_to_french(d: date) -> str:
-    """Convertit une date en `"JJ/MM/AAAA"`, sa forme lisible en français."""
+    """Date au format `JJ/MM/AAAA`."""
     return d.strftime("%d/%m/%Y")
 
 
 def french_date_to_iso(s: str | None) -> str | None:
-    """Convertit `"JJ/MM/AAAA"` en `"YYYY-MM-DD"`.
-
-    Renvoie None si l'entrée est vide ou malformée. Valide les composants via `datetime.strptime` (rejette `32/01/2023`, `29/02/2023` non bissextile, etc.).
-    """
+    """Date `JJ/MM/AAAA` au format ISO `AAAA-MM-JJ` ; `None` pour une entrée vide ou une date invalide."""
     if not s:
         return None
     try:

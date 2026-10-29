@@ -1,7 +1,4 @@
-"""Pays d'une adresse : moyens de détection et préséance entre leurs candidats.
-
-Le pays d'une adresse est celui du lieu de l'affiliation. Chaque moyen propose des pays candidats ; `retained_countries` compose l'ensemble retenu.
-"""
+"""Pays d'une adresse : moyens de détection et préséance entre les candidats."""
 
 from collections import Counter
 from collections.abc import Iterable, Mapping

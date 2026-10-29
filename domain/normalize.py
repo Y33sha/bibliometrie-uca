@@ -1,7 +1,4 @@
-"""Fonctions de normalisation centralisées.
-
-Toutes les normalisations textuelles du projet passent par ce module afin d'éviter la duplication et les incohérences.
-"""
+"""Nettoyage des textes reçus des sources, et forme de comparaison des textes."""
 
 import html
 import re
@@ -29,6 +26,7 @@ _TRANSLITERATIONS = str.maketrans(
 )
 
 
+# Balise : `<` suivi d'une lettre ou de `/`. Le corps exclut `<` : une suite de `<` sans fermeture se parcourt en temps linéaire.
 _MARKUP_RE = re.compile(r"</?([A-Za-z][^\s<>/]*)(?:[\s/][^<>]*)?>")
 
 # Balises de mise en forme (HTML, JATS, MathML), qui s'insèrent dans un mot : `CO<sub>2</sub>`, `<i>E</i>. coli`. Comparées sans préfixe d'espace de noms (`jats:sub`, `mml:mi`).
@@ -63,13 +61,12 @@ def _strip_comments(text: str) -> str:
     return "".join(parts)
 
 
-# Nombre de passes de décodage des entités. Chaque passe raccourcit strictement la chaîne, donc
-# la stabilisation vient d'elle-même ; la borne évite d'en dépendre.
+# Certaines sources échappent plusieurs fois une valeur (`&amp;amp;`).
 _MAX_UNESCAPE_PASSES = 4
 
 
 def _unescape_fully(text: str) -> str:
-    """Décode les entités HTML jusqu'à ce que la chaîne ne bouge plus, au plus `_MAX_UNESCAPE_PASSES` fois."""
+    """Décode les entités HTML jusqu'à stabilisation."""
     for _ in range(_MAX_UNESCAPE_PASSES):
         decoded = html.unescape(text)
         if decoded == text:
@@ -79,13 +76,9 @@ def _unescape_fully(text: str) -> str:
 
 
 def to_plain_text(text: str | None) -> str:
-    """Texte brut d'une valeur reçue d'une source : commentaires, balises et entités HTML retirés, espacement réduit à un espace simple.
+    """Texte brut d'une valeur reçue d'une source : commentaires, balises et entités HTML retirés, espacement réduit à un espace simple. Une balise échappée (`&lt;p&gt;`) est retirée aussi.
 
-    Les sources déposent du balisage dans des champs dont il ne porte pas le sens — une adresse d'affiliation enveloppée dans un paragraphe, un libellé de sujet en italique, un nom d'auteur portant une entité. Ce balisage n'a aucun consommateur : l'interface affiche ces champs en texte, l'export les écrit en texte, et le rapprochement les normalise. Le retirer à l'entrée évite de le retirer dans chacun d'eux.
-
-    Les entités sont décodées avant le retrait des balises, si bien qu'une balise échappée (`&lt;p&gt;`) subit le même sort que la balise elle-même. Le décodage se répète jusqu'à stabilisation : certaines sources ré-échappent une valeur déjà échappée (`&amp;amp;`), qu'une passe unique laisserait à moitié décodée. Le retrait suit `strip_markup`, qui épargne les indices de Miller.
-
-    À ne pas appliquer aux titres ni aux résumés de publication, dont le balisage porte du sens — exposants, indices, MathML — et que l'interface rend. Leur mise à plat pour un tableur, elle, passe bien par ici.
+    Les titres et les résumés gardent leur balisage, qui a un sens (exposants, MathML). Ils passent par ici seulement pour un export en tableur.
     """
     if not text:
         return ""
@@ -93,21 +86,12 @@ def to_plain_text(text: str | None) -> str:
     return " ".join(strip_markup(without_comments).split())
 
 
-# Profondeur d'imbrication de balises que `strip_markup` retire. Chaque passe coûte un parcours du texte.
+# Le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre. Chaque passe coûte un parcours du texte.
 _MAX_MARKUP_PASSES = 8
 
 
 def strip_markup(text: str) -> str:
-    """Retire les balises HTML/MathML `<...>`. Une balise de mise en forme disparaît, ce qui garde entier le mot qu'elle coupe (`CO<sub>2</sub>` → `CO2`). Les autres balises deviennent un espace.
-
-    Une balise commence par une lettre ou `/` : les indices de Miller `<111>` / `< 110 >` (cristallographie) restent dans le texte.
-
-    Le corps d'une balise exclut `<` : une inégalité de la notation scientifique (`2.96<yCMS<3.53`) s'arrête au signe suivant, et une suite de `<` sans fermeture se parcourt linéairement.
-
-    Le retrait se répète jusqu'à stabilisation, au plus `_MAX_MARKUP_PASSES` fois : le retrait d'une balise imbriquée (`<ab<aa>a>`) en reconstitue une autre.
-
-    Sert à `to_plain_text` et à `normalize_text`.
-    """
+    """Texte sans balises HTML ni MathML. Une balise de mise en forme disparaît sans couper le mot (`CO<sub>2</sub>` → `CO2`), les autres deviennent un espace. Les indices de Miller (`<111>`) et les inégalités (`2.96<yCMS<3.53`) restent."""
     for _ in range(_MAX_MARKUP_PASSES):
         stripped = _MARKUP_RE.sub(_markup_replacement, text)
         if stripped == text:
@@ -144,7 +128,7 @@ def drop_flattened_mathml(title: str) -> str:
     for i, line in enumerate(lines):
         if not _is_tex_formula(line):
             continue
-        # Une formule en début de ligne n'a pas d'indentation : la ligne suivante porte celle du bloc.
+        # Une formule en début de ligne n'a pas d'indentation : la ligne suivante a celle du bloc.
         depth = _indent(line) or (_indent(lines[i + 1]) if i + 1 < len(lines) else 0)
         for step in (1, -1):
             j = i + step
@@ -323,18 +307,7 @@ def repair_encoding(text: str) -> str:
 
 
 def sanitize_raw_text(text: str) -> str:
-    """Assainit un texte brut de son bruit invisible, sans le dénaturer.
-
-    Contrairement à `normalize_text` (qui produit une clé de comparaison repliée), préserve casse, accents et ponctuation : sert au texte brut affiché et recherché (`addresses.raw_text`), pas à une clé de matching.
-
-    - tout caractère d'espacement Unicode (NBSP, fine insécable, tabulation…) → espace simple
-    - suppression des caractères de format/contrôle invisibles (zero-width, BOM, trait d'union conditionnel, marques directionnelles, contrôles C0/C1)
-    - collapse des espaces multiples + strip
-
-    Le balisage et les entités HTML sont retirés en amont (`to_plain_text`) : une adresse d'affiliation enveloppée dans un paragraphe ou portant `&eacute;` converge sur le même texte que la même adresse déposée en clair.
-
-    Deux adresses qui diffèrent seulement par un espace insécable convergent sur la même `raw_text`.
-    """
+    """Texte brut sans balisage, sans entités HTML ni caractères invisibles, espacement réduit à un espace simple. Casse, accents et ponctuation restent : le texte sert à l'affichage et à la recherche."""
     if not text:
         return ""
     text = to_plain_text(text)
@@ -353,12 +326,7 @@ def sanitize_raw_text(text: str) -> str:
 
 
 def sanitize_optional_text(text: str | None) -> str | None:
-    """Valeur d'un champ importé, mise à plat par `sanitize_raw_text`, ou `None` quand elle ne porte rien.
-
-    Point d'entrée des imports de fichiers : les colonnes d'un tableur ou d'un export tiers arrivent avec le même bruit que les champs moissonnés — balisage collé par un copier-coller, entités HTML, espaces insécables, caractères de format invisibles — et alimentent les mêmes rapprochements (nom d'éditeur, titre de revue, nom de personne). Les traiter comme les champs moissonnés fait converger les deux voies d'entrée sur la même forme.
-
-    Une cellule vide, ou vide une fois mise à plat, rend `None` plutôt qu'une chaîne vide : les colonnes concernées sont nullables et une chaîne vide y ferait un second cas d'absence.
-    """
+    """Valeur d'un champ importé, nettoyée par `sanitize_raw_text` ; `None` si elle est vide."""
     return sanitize_raw_text(text or "") or None
 
 
@@ -376,10 +344,7 @@ def _is_word_character(ch: str) -> bool:
 
 
 def normalize_text(text: str) -> str:
-    """Forme de comparaison d'un texte, pour le dédoublonnage et le matching.
-
-    Balises retirées (`strip_markup`), commandes LaTeX retirées (`strip_latex`), minuscules, décompositions de compatibilité (NFKD : ﬁ → fi, ² → 2), diacritiques retirés des lettres latines et grecques. Les lettres et chiffres de toutes les écritures restent. Tout autre caractère devient un espace.
-    """
+    """Forme de comparaison d'un texte, pour le dédoublonnage et le rapprochement : sans balises ni commandes LaTeX, en minuscules, ligatures et exposants décomposés (ﬁ → fi, ² → 2), sans diacritiques sur les lettres latines et grecques. Tout caractère autre qu'une lettre ou un chiffre devient un espace."""
     if not text:
         return ""
     text = strip_latex(strip_markup(text)).lower()
@@ -409,11 +374,9 @@ _TRAILING_SEPARATORS = ",;:-–—/"
 
 
 def clean_raw_author_name(raw: str) -> str:
-    """Nom d'auteur brut sans balisage, à l'encodage réparé, sans accents LaTeX ni accolades, sans chiffres, et sans la ponctuation que le retrait des chiffres laisse isolée.
+    """Nom d'auteur brut sans balisage ni chiffres, accents LaTeX et encodage réparés. La ponctuation que le retrait des chiffres isole disparaît aussi.
 
-    Un chiffre n'a pas sa place dans un nom de personne : année de naissance des formes d'autorité (« Candoni, Jean-François 1964- »), identifiant de source (« Emmanuel Moreau (1278759) »), renvoi d'affiliation (« Ibrahim1 »). Laissé en place, il contamine le nom affiché, le nom normalisé qui sert de clé aux informations du contributeur, et les formes de nom dérivées.
-
-    Un nom fait seulement de chiffres et de ponctuation (un ORCID recopié à la place du nom) reste tel quel.
+    Les chiffres d'un nom sont une année de naissance (« Candoni, Jean-François 1964- »), un identifiant de source ou un renvoi d'affiliation (« Ibrahim1 »). Un nom fait seulement de chiffres et de ponctuation reste tel quel.
     """
     if not raw:
         return raw

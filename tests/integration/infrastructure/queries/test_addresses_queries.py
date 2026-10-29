@@ -5,6 +5,7 @@ from functools import partial
 from sqlalchemy import text
 
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.countries import NO_COUNTRY_CODE
 from domain.country_detection import CountryDetectionMethod
 from infrastructure.read_models.addresses.models import (
     AddressListFilters,
@@ -316,6 +317,19 @@ class TestAddressesCountries:
 
         assert res.total == 1
         assert res.without_country == 2
+
+    def test_la_facette_place_l_absence_de_pays_en_tete(self, sa_sync_conn):
+        ensure_country(sa_sync_conn, "fr")
+        ensure_country(sa_sync_conn, NO_COUNTRY_CODE)
+        insert_address(sa_sync_conn, "Lab VJQH un", countries=["fr"])
+        insert_address(sa_sync_conn, "Lab VJQH deux", countries=["fr"])
+        insert_address(sa_sync_conn, "Lab VJQH trois", countries=[NO_COUNTRY_CODE])
+
+        res = _q(sa_sync_conn).addresses_countries(
+            filters=AddressCountryFilter(search="VJQH"), page=1, per_page=50
+        )
+
+        assert [f.value for f in res.country_facets] == [NO_COUNTRY_CODE, "fr"]
 
     def test_chaque_adresse_expose_ses_pays_trouves_et_leurs_moyens(self, sa_sync_conn):
         ensure_country(sa_sync_conn, "fr")

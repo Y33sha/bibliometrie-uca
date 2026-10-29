@@ -193,17 +193,17 @@ class TestAddIdentifier:
 
     def test_raises_when_pending_on_other_person(self, sa_sync_conn, service):
         """Si le même identifiant existe en 'pending' sur une autre personne,
-        on lève `CannotAttributeConflict` (pour réattribuer, il faut d'abord
+        on lève `IdentifierAttributionConflictError` (pour réattribuer, il faut d'abord
         passer le statut à 'rejected')."""
         import pytest
 
-        from domain.errors import CannotAttributeConflict
+        from domain.errors import IdentifierAttributionConflictError
 
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
         service.add_identifier(p1, "orcid", "0000-0001-2345-6789")
 
-        with pytest.raises(CannotAttributeConflict):
+        with pytest.raises(IdentifierAttributionConflictError):
             service.add_identifier(p2, "orcid", "0000-0001-2345-6789")
 
         # L'identifiant reste rattaché à p1.

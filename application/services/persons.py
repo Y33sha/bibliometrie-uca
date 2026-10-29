@@ -115,7 +115,7 @@ class PersonService:
 
         L'attribution passe par `PersonRepository.attribute_identifier`, qui normalise la valeur et suit `attribution_outcome`. Le type se restreint à `PUBLIC_PERSON_IDENTIFIER_TYPES` : `hal_person_id` est la référence d'un compte HAL, que l'extraction observe dans le TEI.
 
-        Lève `ValidationError` sur un type hors de cette liste ou une valeur malformée, `NotFoundError` sur une personne absente, `CannotAttributeConflict` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
+        Lève `ValidationError` sur un type hors de cette liste ou une valeur malformée, `NotFoundError` sur une personne absente, `IdentifierAttributionConflictError` si une autre personne détient l'identifiant en `pending` ou `confirmed`.
         """
         if id_type not in PUBLIC_PERSON_IDENTIFIER_TYPES:
             raise ValidationError(f"id_type doit être l'un de {PUBLIC_PERSON_IDENTIFIER_TYPES}")

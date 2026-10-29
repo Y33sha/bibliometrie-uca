@@ -24,7 +24,7 @@ allowed-tools: Read, Edit, Bash, Grep, Glob
 
 ## Contraintes de forme
 
-- Docstring de fonction simple : 4 lignes maximum. Une ligne de résumé à l'indicatif présent, puis les seuls paramètres non évidents.
+- Docstring de fonction simple : une phrase de résumé à l'indicatif présent, puis les seuls paramètres non évidents. 250 caractères au plus.
 - Une idée par phrase. 28 mots maximum.
 - Aucun adjectif d'éloge, aucun titre décoratif en commentaire.
 
