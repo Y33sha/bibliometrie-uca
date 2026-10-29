@@ -6,12 +6,8 @@
 import { ALL_TOKEN, explicitSelectionUrl, type ListFilter } from '#lib/filterRegistry.js';
 import { SOURCE_ITEMS } from '#lib/filterItems.js';
 import { institution } from '#lib/institution.svelte.js';
-import {
-	filterLabels,
-	oaLabelsMap,
-	docTypePlural,
-	docTypeFamilies,
-} from '#lib/labels.js';
+import { docTypeFamilies, docTypePluralLabels } from '#lib/docTypes.svelte.js';
+import { filterLabels, oaLabelsMap } from '#lib/labels.js';
 import { contextEntityId, type PublicationListContext } from '#lib/publicationListContext.js';
 
 /** Filtres des publications dans le contexte, dans l'ordre d'affichage. Un filtre sans `group` figure dans la barre principale. `defaultDocTypes` : types que la page sélectionne quand l'URL ne fixe pas les types, et que son URL omet. */
@@ -25,8 +21,8 @@ export function publicationFilters(
 			control: 'checkbox',
 			label: filterLabels.types,
 			param: 'doc_type',
-			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePlural },
-			groups: docTypeFamilies.map((f) => ({ label: f.label, values: f.types })),
+			facet: { type: 'label_map', apiKey: 'doc_types', labels: docTypePluralLabels() },
+			groups: docTypeFamilies().map((f) => ({ label: f.label, values: f.types })),
 			showColumns: ['type'],
 			url: explicitSelectionUrl(defaultDocTypes.length ? defaultDocTypes.join(',') : ALL_TOKEN),
 		},

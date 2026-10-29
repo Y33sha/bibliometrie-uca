@@ -152,6 +152,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/publications/doc-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Doc Types
+         * @description Familles des types de document et leurs types, avec leurs libellés français, dans l'ordre d'affichage.
+         */
+        get: operations["list_doc_types_api_publications_doc_types_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/publications/facets": {
         parameters: {
             query?: never;
@@ -3329,6 +3349,30 @@ export interface components {
             has_rh: boolean;
         };
         /**
+         * DocTypeFamilyOut
+         * @description Famille de types de document, ses types dans l'ordre d'affichage.
+         */
+        DocTypeFamilyOut: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Types */
+            types: components["schemas"]["DocTypeOut"][];
+        };
+        /**
+         * DocTypeOut
+         * @description Type de document et ses libellés français.
+         */
+        DocTypeOut: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+            /** Plural Label */
+            plural_label: string;
+        };
+        /**
          * DoiNamespaceConflict
          * @description Enregistrements de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`.
          *
@@ -6099,6 +6143,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EnumOption"][];
+                };
+            };
+        };
+    };
+    list_doc_types_api_publications_doc_types_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DocTypeFamilyOut"][];
                 };
             };
         };

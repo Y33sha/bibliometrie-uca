@@ -11,7 +11,8 @@
 	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { usePaginatedFetch } from '#lib/composables/usePaginatedFetch.svelte.js';
-	import { columnLabels, docTypeLabel } from '#lib/labels.js';
+	import { docTypeLabel } from '#lib/docTypes.svelte.js';
+	import { columnLabels } from '#lib/labels.js';
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import ListStatus from '#lib/components/ListStatus.svelte';
 	import Pagination from '#lib/components/Pagination.svelte';

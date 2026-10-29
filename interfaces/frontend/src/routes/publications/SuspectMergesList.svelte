@@ -2,7 +2,7 @@
   import { untrack } from "svelte";
   import { resolve } from "$app/paths";
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
-  import { docTypeLabel } from "#lib/labels.js";
+  import { docTypeLabel } from "#lib/docTypes.svelte.js";
   import ListStatus from "#lib/components/ListStatus.svelte";
   import Pagination from "#lib/components/Pagination.svelte";
   import PublicationTitle from "#lib/components/PublicationTitle.svelte";

@@ -8,7 +8,7 @@
 	import { cssColor } from '#lib/components/charts/cssVar.js';
 	import { countryName } from '#lib/countryNames.js';
 	import { defaultYears } from '#lib/defaultYears.js';
-	import { publicationsDocTypes } from '#lib/labels.js';
+	import { publicationsDocTypes } from '#lib/docTypes.svelte.js';
 	import { orderedPivotValues, pivotValueColor, pivotValueLabel } from '#lib/pivotValues.js';
 	import { contextParams, type PublicationListContext } from '#lib/publicationListContext.js';
 	import { paramsToQuery } from '#lib/utils.js';
@@ -62,7 +62,7 @@
 	async function load() {
 		loaded = false;
 		const all = await api<PivotResponse>(
-			`/api/stats/pivot?${query(publicationsDocTypes, { indicator: 'oa_access', compare: 'year' })}`,
+			`/api/stats/pivot?${query(publicationsDocTypes(),{ indicator: 'oa_access', compare: 'year' })}`,
 			{ key: `${apiKey}-by-year` },
 		);
 		const recent = defaultYears([...new Set(all.rows.map((r) => String(r.year)))], new Date().getFullYear());
@@ -74,13 +74,13 @@
 				api<PivotResponse>(`/api/stats/pivot?${query(null, { indicator: 'doc_type_grouped', year })}`, {
 					key: `${apiKey}-types`,
 				}).then((r) => r.rows),
-				api<CollaborationsResponse>(`/api/stats/collaborations?${query(publicationsDocTypes, { year })}`, {
+				api<CollaborationsResponse>(`/api/stats/collaborations?${query(publicationsDocTypes(),{ year })}`, {
 					key: `${apiKey}-collaborations`,
 				}),
 				oaBreakdown === 'oa_access'
 					? Promise.resolve(byYear)
 					: api<PivotResponse>(
-							`/api/stats/pivot?${query(publicationsDocTypes, { indicator: oaBreakdown, compare: 'year', year })}`,
+							`/api/stats/pivot?${query(publicationsDocTypes(),{ indicator: oaBreakdown, compare: 'year', year })}`,
 							{ key: `${apiKey}-by-year-${oaBreakdown}` },
 						).then((r) => r.rows),
 			]);

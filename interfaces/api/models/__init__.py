@@ -56,7 +56,12 @@ from interfaces.api.models.persons import (
     UpdateNameFormStatus,
     UpdatePersonName,
 )
-from interfaces.api.models.publications import PublicationMergeRequest, PublicationMergeResult
+from interfaces.api.models.publications import (
+    DocTypeFamilyOut,
+    DocTypeOut,
+    PublicationMergeRequest,
+    PublicationMergeResult,
+)
 from interfaces.api.models.serials import SerialTypeChange, SerialTypeChangeImpact
 from interfaces.api.models.structures import (
     StructureTutelleCreateResponse,
@@ -82,6 +87,8 @@ __all__ = [
     "DeletedResponse",
     "DetachContributions",
     "DetachContributionsResponse",
+    "DocTypeFamilyOut",
+    "DocTypeOut",
     "EnumOption",
     "IdentifierStatusResponse",
     "SerialTypeChange",

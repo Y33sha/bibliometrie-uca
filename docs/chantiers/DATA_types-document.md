@@ -2,7 +2,7 @@
 
 ## Contexte
 
-Le type d'une publication (`doc_type`) se décide par arbitrage entre ses enregistrements sources (`domain/publications/aggregation.py`). Le premier type renseigné dans l'ordre de priorité des sources l'emporte, et un sous-type d'article l'emporte sur `article`. La correspondance des types bruts de chaque source est dans `domain/source_records/doc_types.py`. Les familles d'affichage (`DOC_TYPE_FAMILIES`, `docTypeFamilies` côté frontend) rangent les types en Publications, Prépublications, Thèses, Données et Annexes et divers.
+Le type d'une publication (`doc_type`) se décide par arbitrage entre ses enregistrements sources (`domain/publications/aggregation.py`). Le premier type renseigné dans l'ordre de priorité des sources l'emporte, et un sous-type d'article l'emporte sur `article`. La correspondance des types bruts de chaque source est dans `domain/source_records/doc_types.py`. Les familles d'affichage (`DOC_TYPE_FAMILIES`) rangent les types en Publications, Prépublications, Thèses, Données et Annexes et divers.
 
 ### Mesures du 2026-10-28
 
@@ -10,14 +10,33 @@ Publications du périmètre, par type : `conference` 10 031, `conference_paper` 
 
 - 182 errata sur 301 sont reliés à la publication corrigée (`is_correction_of`). Aucune rétractation n'est reliée à une publication.
 - `media` réunit surtout des interventions dans la presse, typées par correction (type de la revue, préfixe du titre).
-- Les 128 enregistrements DataCite `Audiovisual` sont aussi typés `media` : pièces numérotées d'un corpus Nakala (45 publications), captations de séminaires et de conférences, vidéos jointes à un article.
-- DataCite `Sound` donne `other`, HAL `SON` et `VIDEO` donnent `media`.
+- Les 128 enregistrements DataCite `Audiovisual` sont typés `media` : pièces numérotées d'un corpus Nakala (45 publications), captations de séminaires et de conférences, vidéos jointes à un article.
+- HAL `VIDEO` et `SON`, DataCite `Sound` donnent `other`. HAL `VIDEO` réunit surtout des captations de conférences, mais aussi des films et des interviews. HAL `SON` réunit surtout des podcasts et des émissions de radio.
 - 404 publications sont typées `other` alors qu'une source moins prioritaire donne un type précis. Le `other` vient surtout de DataCite `Text` et de Crossref (`other`, `journal-issue`, `posted-content_other`). Le type précis vient surtout d'OpenAlex (`article`), sans revue.
 - 349 publications sont typées `article` d'après OpenAlex seul, sans revue. Un échantillon mêle de vrais articles déposés en entrepôt et des documents d'une autre nature (communication de congrès, introduction).
 
+### Mesures du 2026-10-29 (base locale)
+
+Les 11 047 publications `conference` du périmètre se répartissent ainsi :
+
+| Origine | Publications |
+|---|---|
+| Communication HAL sans texte publié | 9 099 |
+| Résumé OpenAlex ou WoS | 1 482 |
+| Recueil de résumés HAL | 226 |
+| DataCite `Presentation` | 40 |
+| Crossref, présentation orale (EGU) | 4 |
+| Autre | 196 |
+
+Deux tiers des enregistrements sources HAL de ces communications sont sans résumé ni fichier. 13 % ont un fichier déposé : diaporama, résumé ou texte, indiscernables par les métadonnées.
+
 ## Décisions
 
-- Une famille « Conférences » réunit les communications : communication filmée, poster, présentation ou résumé.
+- Les libellés des types, les familles et leur ordre sont définis dans le domaine. L'API les sert au frontend.
+- Une famille « Conférences » réunit `recorded_talk` (« Conférence filmée »), `conference` (« Communication ») et `poster`. Elle suit la famille Publications dans l'ordre d'affichage.
+- `conference_paper` reste dans la famille Publications.
+- HAL `VIDEO` et DataCite `Audiovisual` donnent `recorded_talk`. Les règles de correction par le titre (interview, fichiers complémentaires) s'appliquent à ce type.
+- HAL `SON` et DataCite `Sound` donnent `media`.
 - `data_paper` rejoint la famille des données et logiciels.
 - Erratum et rétractation quittent les listes de documents. Ils sont rattachés à la publication concernée.
 
@@ -25,7 +44,10 @@ Publications du périmètre, par type : `conference` 10 031, `conference_paper` 
 
 ### Phase 1 — Types et familles
 
-- [ ] Type de la communication filmée. Correspondance de DataCite `Audiovisual` et `Sound`, de HAL `VIDEO` et `SON`.
+- [x] Libellés et familles des types servis par l'API depuis le domaine, chargés par le frontend avant l'affichage.
+- [ ] Type `recorded_talk`. Correspondance de HAL `VIDEO` et DataCite `Audiovisual`. Règles de correction par le titre étendues à ce type, préfixes de vidéos complémentaires.
+- [ ] HAL `SON` et DataCite `Sound` vers `media`. HAL `PRESCONF` vers `conference`.
+- [ ] `conference` libellé « Communication ».
 - [ ] Famille « Conférences ».
 - [ ] posters et communications réunis sous un même DOI
 - [ ] `data_paper` dans la famille des données et logiciels.
@@ -58,6 +80,6 @@ Publications du périmètre, par type : `conference` 10 031, `conference_paper` 
 
 ## Questions ouvertes
 
-- `conference_paper` : famille Publications (texte publié) ou famille Conférences.
 - Pièces d'un corpus Nakala (257102) : publications distinctes, ou éléments d'un jeu de données.
+- Films, bandes-annonces et MOOC en `recorded_talk` par la correspondance de HAL `VIDEO` et DataCite `Audiovisual`.
 - « Meeting report » publié en revue, typé `article` par toutes les sources (176417, 180148, 16340).

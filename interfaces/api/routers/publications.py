@@ -2,7 +2,7 @@
 
 Les lectures passent par `PublicationsQueries`.
 
-Les chemins littéraux (`/licenses`, `/facets`, `/export.csv`, `/export-theses.csv`) précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
+Les chemins littéraux (`/licenses`, `/doc-types`, `/facets`, `/export.csv`, `/export-theses.csv`) précèdent `/{publication_id}`, qui les accepterait sinon comme identifiant.
 """
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -10,7 +10,7 @@ from fastapi.responses import StreamingResponse
 
 from application.services.publication_merge import PublicationMergeService
 from domain.merge import MergedEntity
-from domain.publications.doc_types import DOC_TYPES
+from domain.publications.doc_types import DOC_TYPE_FAMILIES, DOC_TYPE_LABELS, DOC_TYPES
 from domain.publications.licenses import LICENSE_LABELS, License
 from domain.publications.metadata import ACCESS_LEVELS
 from domain.sources.registry import SOURCE_FILTER_VALUES
@@ -37,6 +37,8 @@ from interfaces.api.filters import (
     parse_vocabulary_csv,
 )
 from interfaces.api.models import (
+    DocTypeFamilyOut,
+    DocTypeOut,
     EnumOption,
     PublicationMergeRequest,
     PublicationMergeResult,
@@ -53,6 +55,26 @@ router = APIRouter(prefix="/api/publications", tags=["publications"])
 def list_licenses() -> list[EnumOption]:
     """Licences d'une publication avec leur libellé français, dans l'ordre de `domain.publications.licenses.License`."""
     return [EnumOption(value=v, label_fr=LICENSE_LABELS[v]) for v in License]
+
+
+@router.get("/doc-types", response_model=list[DocTypeFamilyOut])
+def list_doc_types() -> list[DocTypeFamilyOut]:
+    """Familles des types de document et leurs types, avec leurs libellés français, dans l'ordre d'affichage."""
+    return [
+        DocTypeFamilyOut(
+            key=key,
+            label=family.label,
+            types=[
+                DocTypeOut(
+                    value=t,
+                    label=DOC_TYPE_LABELS[t].singular,
+                    plural_label=DOC_TYPE_LABELS[t].plural,
+                )
+                for t in family.types
+            ],
+        )
+        for key, family in DOC_TYPE_FAMILIES.items()
+    ]
 
 
 @router.get("/facets", response_model=PublicationsFacetsResponse)

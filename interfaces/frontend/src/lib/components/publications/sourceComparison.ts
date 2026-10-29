@@ -1,5 +1,6 @@
 import type { components } from '#lib/api/schema.js';
-import { CONTRIBUTION_ROLE_ORDER, docTypeLabel, oaStatusLabel } from '#lib/labels.js';
+import { docTypeLabel } from '#lib/docTypes.svelte.js';
+import { CONTRIBUTION_ROLE_ORDER, oaStatusLabel } from '#lib/labels.js';
 import { sourceOrder } from '#lib/sources.svelte.js';
 
 export type SourceRecord = components['schemas']['SourceRecordMetadataOut'];

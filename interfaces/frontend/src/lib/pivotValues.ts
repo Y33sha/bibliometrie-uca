@@ -5,13 +5,8 @@
  */
 import { cssColor, oaStatusColor } from '#lib/components/charts/cssVar.js';
 import { chartColor } from '#lib/components/charts/palette.js';
-import {
-	docTypeFamilies,
-	docTypeGroupColorVar,
-	docTypePlural,
-	licenseOrder,
-	oaStatusLabel,
-} from '#lib/labels.js';
+import { docTypeFamilies, docTypeGroupColorVar, docTypePluralLabels } from '#lib/docTypes.svelte.js';
+import { licenseOrder, oaStatusLabel } from '#lib/labels.js';
 
 const OA_VOIE_ORDER = ['diamond', 'gold', 'hybrid', 'bronze', 'green', 'embargoed', 'closed', 'unknown'];
 const OA_ACCESS_ORDER = ['ouvert', 'embargo', 'ferme', 'indetermine'];
@@ -38,7 +33,7 @@ export function pivotValueLabel(
 	if (dim === 'oa_access') return OA_ACCESS_LABELS[value] ?? value;
 	if (dim === 'oa_voie') return oaStatusLabel(value);
 	if (dim === 'doc_type_grouped')
-		return docTypePlural[value] ?? docTypeFamilies.find((f) => f.key === value)?.label ?? value;
+		return docTypePluralLabels()[value] ?? docTypeFamilies().find((f) => f.key === value)?.label ?? value;
 	if (dim === 'license') return licenseLabel?.(value) ?? value;
 	return value;
 }
@@ -61,7 +56,7 @@ export function orderedPivotValues(dim: string, rows: Record<string, unknown>[])
 	if (dim === 'license') return licenseOrder.filter((v) => present.includes(v));
 	if (dim === 'doc_type_grouped') {
 		// Famille « publications » éclatée en types fins, autres familles agrégées sous leur clé.
-		const order = docTypeFamilies.flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));
+		const order = docTypeFamilies().flatMap((f) => (f.key === 'publications' ? f.types : [f.key]));
 		return order.filter((k) => present.includes(k));
 	}
 	const totals = new Map<string, number>();

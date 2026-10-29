@@ -1,4 +1,4 @@
-"""Traduction des types de document des sources, et libellés français de chaque type dans le frontend."""
+"""Traduction des types de document des sources."""
 
 import re
 from pathlib import Path
@@ -10,7 +10,6 @@ from domain.source_records.doc_types import _SOURCE_MAPS, map_doc_type
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 SCHEMA_PATH = PROJECT_ROOT / "infrastructure" / "db" / "schema.sql"
-LABELS_PATH = PROJECT_ROOT / "interfaces" / "frontend" / "src" / "lib" / "labels.ts"
 
 
 def _read_pg_doc_type_enum() -> set[str]:
@@ -23,37 +22,10 @@ def _read_pg_doc_type_enum() -> set[str]:
     return {m.group(1) for m in re.finditer(r"'([^']+)'", match.group(1))}
 
 
-def _read_ts_label_map(var_name: str) -> dict[str, str]:
-    """Libellés de la table `<var_name>`, lus dans le source de `labels.ts`."""
-    ts = LABELS_PATH.read_text(encoding="utf-8")
-    block = re.search(
-        rf"export const {var_name}: Record<string, string> = \{{(.*?)\}};",
-        ts,
-        re.DOTALL,
-    )
-    assert block, f"Map {var_name} introuvable dans labels.ts"
-    return {m.group(1): m.group(3) for m in re.finditer(r"(\w+):\s*(['\"])(.*?)\2", block.group(1))}
-
-
 class TestDocTypeEnum:
     def test_doc_types_couvre_exactement_l_enum_pg(self):
         """`DOC_TYPES` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
         assert DOC_TYPES_SET == _read_pg_doc_type_enum()
-
-
-class TestDocTypeLabelsFrontend:
-    def test_singulier_couvre_exactement_les_doc_types(self):
-        """Chaque type de document a un libellé singulier dans le frontend."""
-        assert set(_read_ts_label_map("docTypeSingular").keys()) == DOC_TYPES_SET
-
-    def test_pluriel_couvre_exactement_les_doc_types(self):
-        """Chaque type de document a un libellé pluriel dans le frontend."""
-        assert set(_read_ts_label_map("docTypePlural").keys()) == DOC_TYPES_SET
-
-    def test_libelles_non_vides(self):
-        for var_name in ("docTypeSingular", "docTypePlural"):
-            for value, label in _read_ts_label_map(var_name).items():
-                assert label, f"Libellé vide pour {value} dans {var_name}"
 
 
 class TestMapDocType:

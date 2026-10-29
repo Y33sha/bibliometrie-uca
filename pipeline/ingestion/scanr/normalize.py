@@ -71,7 +71,7 @@ def _extract_serial_issns(source: Mapping[str, JsonValue]) -> tuple[str | None, 
 
 def is_thesis(doc: Mapping[str, JsonValue]) -> bool:
     """Vrai si le document est une thèse ou une habilitation : `source.title` nomme alors l'université de soutenance, hors conteneur."""
-    return map_doc_type(as_str(doc.get("type")) or "", "scanr") in DOC_TYPE_FAMILIES["theses"]
+    return map_doc_type(as_str(doc.get("type")) or "", "scanr") in DOC_TYPE_FAMILIES["theses"].types
 
 
 def get_container_facts(doc: Mapping[str, JsonValue]) -> ContainerDescription:
