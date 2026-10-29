@@ -46,7 +46,6 @@ from infrastructure.sql_fragments import (
     corrected,
     declares_conference_sql,
     diamond_journal_sql,
-    raw_column,
     self_declared_preprint_sql,
     source_extra,
     source_extra_json,
@@ -337,14 +336,16 @@ class SourceRecordCorrectionStore:
         """Tous les enregistrements sources, avec les faits que lit `is_matchable` et sa valeur."""
         rows = self._conn.execute(
             text(f"""
-                SELECT id, is_matchable, source::text AS source, source_id,
-                       {raw_column("doi", "source_records")} AS raw_doi, doi, title_normalized,
+                SELECT id, is_matchable, source::text AS source, source_id, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
                        {identifiers_json_sql("source_records.id")} AS identifiers,
                        EXISTS (
-                           SELECT 1 FROM doi_targets t
-                           WHERE t.doi = lower({raw_column("doi", "source_records")})
-                       ) AS raw_doi_has_target
+                           SELECT 1 FROM source_record_identifiers p
+                           JOIN doi_targets t ON t.doi = p.id_value
+                           WHERE p.source_record_id = source_records.id
+                             AND p.id_type = '{SourceIdentifierType.DOI.value}'
+                             AND p.role = '{SourceIdentifierRole.PRIMARY.value}'
+                       ) AS primary_doi_has_target
                 FROM source_records
             """)
         )
@@ -355,12 +356,10 @@ class SourceRecordCorrectionStore:
                 MatchabilityFacts(
                     r.source,
                     r.source_id,
-                    r.raw_doi,
-                    r.doi,
                     r.title_normalized,
                     r.urls,
                     parse_identifiers(r.identifiers),
-                    r.raw_doi_has_target,
+                    r.primary_doi_has_target,
                 ),
             )
             for r in rows
