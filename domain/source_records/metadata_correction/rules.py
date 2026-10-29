@@ -23,12 +23,7 @@ from domain.source_records.identifiers import SourceIdentifier, SourceIdentifier
 
 @dataclass(frozen=True, slots=True)
 class MetadataForCorrection:
-    """Faits que lisent les règles de correction, pour un enregistrement source ou une publication.
-
-    Un fait à `None` est inconnu, et un prédicat sur un fait inconnu est faux. Une publication renseigne seulement les champs que l'agrégation arbitre (`for_publication`) : les règles qui lisent un fait propre aux enregistrements sources ne s'appliquent pas à elle.
-
-    Frozen : `hydrate_raw_view` produit une vue par `dataclasses.replace`.
-    """
+    """Faits que lisent les règles de correction, pour un enregistrement source ou une publication."""
 
     title: str
     doc_type: str | None
@@ -40,13 +35,13 @@ class MetadataForCorrection:
     urls: list[str] | None = None
     # `embargo_until <= current_date`.
     embargo_expired: bool | None = None
-    # L'enregistrement déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre.
+    # L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre.
     self_declared_preprint: bool | None = None
-    # L'enregistrement nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer).
+    # L'enregistrement source nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer).
     declares_conference: bool | None = None
     # Type de l'éditeur qui a déposé le préfixe du DOI (`doi_prefixes`).
     registrant_publisher_type: str | None = None
-    # La monographie de l'enregistrement est un volume d'actes (`monographs.proceedings`).
+    # La monographie de l'enregistrement source est un volume d'actes (`monographs.proceedings`).
     in_proceedings_volume: bool | None = None
     # Forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
     group_title: str | None = None
@@ -77,10 +72,7 @@ class MetadataForCorrection:
 
 
 class MetadataCorrectionRule(StrEnum):
-    """Identifiants des règles de correction figées. Une règle = un membre.
-
-    Convention de nommage : `INPUT_CONDITION_TO_OUTPUT`. Le membre est tracé par le caller au moment où la règle est appliquée (`corrections.<champ>.corrected_by` de `source_records` comme de `publications`) — trace d'audit consultable pour le re-run ciblé et l'affichage UI.
-    """
+    """Règle de correction, nommée `ENTRÉE_CONDITION_TO_SORTIE`. Sa valeur s'enregistre dans `corrections.<champ>.corrected_by`, de `source_records` comme de `publications`."""
 
     THESES_FR_URL_TO_THESIS = "THESES_FR_URL_TO_THESIS"
     DUMAS_URL_TO_MEMOIR = "DUMAS_URL_TO_MEMOIR"
@@ -120,28 +112,23 @@ class MetadataCorrectionRule(StrEnum):
 
 
 class Correction[T](NamedTuple):
-    """Une valeur corrigée + la règle qui l'a produite."""
+    """Valeur corrigée, et règle qui la produit."""
 
     value: T
     rule: MetadataCorrectionRule
 
 
 class CorrectedFields(NamedTuple):
-    """Résultat de `effective_metadata` : pour chaque champ, soit `None` (pas de correction), soit un `Correction` (valeur corrigée + règle d'origine).
-
-    Ordre des champs aligné sur la cascade interne (doc_type puis oa_status).
-    """
+    """Correction de chaque champ, `None` sans correction."""
 
     doc_type: Correction[str] | None = None
     oa_status: Correction[str] | None = None
 
 
-# ── Constantes (préfixes, patterns) référencées par les règles ──────────
-
-# Pattern textuel récurrent dans le corpus UCA pour les interventions média.
+# Débuts de titre normalisé d'une intervention dans les médias.
 _MEDIA_TITLE_PREFIXES = ("interview", "reportage", "podcast")
 
-# Préfixes (post-`normalize_text`) reconnus comme « contenu supplémentaire ». Set ciblé plutôt que `'supplementary '` large pour éviter de matcher par accident un vrai article du type "Supplementary roles of X".
+# Débuts de titre normalisé d'un contenu supplémentaire. « Supplementary roles of X » est un article.
 _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "additional file",
     "supplementary material",
@@ -152,7 +139,7 @@ _SUPPLEMENTARY_CONTENT_TITLE_PREFIXES = (
     "data from",
 )
 
-# Pattern textuel très spécifique, univoque dans les corpus observés.
+# Débuts de titre normalisé d'un erratum.
 _ERRATUM_TITLE_PREFIXES = (
     DocType.ERRATUM,
     "errata",
@@ -161,31 +148,26 @@ _ERRATUM_TITLE_PREFIXES = (
     "publisher correction",
 )
 
-# Préfixes stricts : seules les formulations canoniques utilisées par les éditeurs. Pas « retraction » seul, qui matcherait des titres comme « Retraction of consent in clinical trials ».
+# Débuts de titre normalisé d'un avis de rétractation. « Retraction of consent in clinical trials » est un article.
 _RETRACTION_TITLE_PREFIXES = ("retraction notice", "retraction note")
 
-# « Editorial: <titre> » (Frontiers & co.). Le « : » est discriminant : `normalize_text`
-# efface la ponctuation, donc un préfixe nu « editorial » matcherait « Editorial Board »,
-# « Editorial comment »… → regex ancrée sur le titre brut (audit : motif univoque).
+# « Editorial: <titre> » (Frontiers). Le deux-points écarte « Editorial Board » ; `normalize_text` l'efface, d'où un motif sur le titre brut.
 _EDITORIAL_PREFIX_PATTERN = re.compile(r"^\s*editorial\s*:", re.IGNORECASE)
-# « Letter: <titre> » (courrier à l'éditeur / research letter).
+# « Letter: <titre> » (courrier à l'éditeur, research letter).
 _LETTER_PREFIX_PATTERN = re.compile(r"^\s*letter\s*:", re.IGNORECASE)
-# « systematic review(s) » en tête de titre OU en sous-titre (après « : »), forme
-# document-type univoque. Ancré pour exclure les mentions au fil du titre (étude primaire
-# « …cohort, and a systematic review », protocole de revue, reply) — audit : ~100% reviews.
+# « Systematic review » en tête de titre ou de sous-titre. Au fil du titre (« …cohort, and a systematic review »), la mention désigne une étude primaire.
 _SYSTEMATIC_REVIEW_PATTERN = re.compile(r"(^|:\s*)(a\s+)?systematic reviews?\b", re.IGNORECASE)
 
-# Marqueurs de recension d'ouvrage détectés sur le titre brut.
-# `_ISBN_PATTERN` : mention « ISBN » (mot entier) ou préfixe ISBN-13 (97[89] suivi de 10–17 caractères chiffres/espaces/tirets). Signal très net.
+# Recension d'ouvrage : mention « ISBN », ou ISBN-13, dans le titre brut.
 _ISBN_PATTERN = re.compile(r"\bisbn\b|\b97[89][-\s0-9]{10,17}\b", re.IGNORECASE)
-# `_YEAR_PAGES_END_PATTERN` : titre terminé par « (19|20)YY, N p[.|ages] », forme classique d'une référence biblio injectée dans le champ titre par les saisisseurs HAL pour les comptes-rendus d'ouvrage. Plus bruité que ISBN.
+# Recension d'ouvrage : titre terminé par « AAAA, N p. », référence de l'ouvrage saisie dans le titre (HAL). Moins sûr que l'ISBN.
 _YEAR_PAGES_END_PATTERN = re.compile(
     r"(19|20)\d{2}[\s,.]+\d{1,4}\s*(pp|pages?|p)\.?\s*$", re.IGNORECASE
 )
-# `_RECENSION_TITLE_PATTERN` : titre commençant par « Recension » (« Recension : … », « Recension de … », « Recensions »), ou par « Compte(s) rendu(s) : » avec deux-points immédiat. Marqueurs univoques de recension d'ouvrage en usage académique français, souvent typés article/other/preprint par les sources. Le deux-points immédiat après « compte(s) rendu(s) » écarte les rapports (« Compte rendu de mission : … », « Compte rendu de la soutenance d'HDR … ») qui ne sont pas des recensions.
+# Recension d'ouvrage : titre commençant par « Recension » ou « Compte(s) rendu(s) : ». Le deux-points écarte les rapports (« Compte rendu de mission : … »).
 _RECENSION_TITLE_PATTERN = re.compile(r"^\s*(recension|comptes?\s+rendus?\s*:)", re.IGNORECASE)
 
-# Vocabulaire d'un volume d'actes ou d'un recueil de résumés, n'importe où dans le titre. Seul, il désigne aussi des articles (discours présidentiel, introduction éditoriale) : la règle qui le lit exige un enregistrement sans auteur.
+# Vocabulaire d'un volume d'actes ou d'un recueil de résumés, n'importe où dans le titre. Seul, il désigne aussi des articles (discours présidentiel, introduction éditoriale) : la règle qui le lit exige un enregistrement source sans auteur.
 _VOLUME_TITLE_PATTERN = re.compile(
     r"\b(proceedings|abstracts?|congress|congrès|congres|meeting|symposium|conference|colloque"
     r"|communications\s+affich[ée]es|poster\s+presentations|posters)\b",
@@ -196,20 +178,13 @@ _VOLUME_TITLE_PREFIX_PATTERN = re.compile(
     r"^\s*(proceedings|abstracts|book\s+of\s+abstracts|abstract\s+book)\b", re.IGNORECASE
 )
 
-# Préfixes DOI des registres de thèses : un DOI émis par ces registres est le DOI *propre* de la
-# thèse, pas celui d'une version publiée. `10.70675` = ABES (Agence Bibliographique de
-# l'Enseignement Supérieur), résolu via `doi_prefixes` (publisher « agence bibliographique de l
-# enseignement superieur »). Ensemble volontairement incomplet : les thèses déposées en repository
-# institutionnel (Wageningen, Karlsruhe…) ont des préfixes variés non listés. Les généraliser suppose
-# une nature de registrant (éditeur, repository ou registre) dans `doi_prefixes`.
+# Préfixes DOI des registres de thèses, dont le DOI est celui de la thèse elle-même : `10.70675` (ABES).
+# Les thèses des archives institutionnelles ont des préfixes variés, absents de la liste.
 _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
 
 
-# ── Mini-DSL des règles ─────────────────────────────────────────────────
-
-
 class _AppliesTo(TypedDict, total=False):
-    """Prédicats d'une règle, tous AND-és.
+    """Prédicats d'une règle, tous requis.
 
     Une clé au nom d'un champ de `MetadataForCorrection` est une égalité sur ce champ. Les autres :
 
@@ -257,33 +232,24 @@ class _RuleDefinition(TypedDict):
     applies_correction: _AppliesCorrection
 
 
-# Whitelist récurrente : types plausibles pour une reclassification par titre.
+# Types qu'une règle de titre peut corriger.
 _ARTICLE_OR_OTHER = frozenset({DocType.ARTICLE, DocType.OTHER})
 
 
-# ── Table des règles ────────────────────────────────────────────────────
-# Ordre = priorité de la cascade (signaux forts d'abord : URL > serial_type > titre). Les whitelists `doc_type` sont calibrées pour être quasi disjointes entre règles d'une même famille, donc l'ordre intra-famille importe peu en pratique. La règle ISBN évaluée avant la règle année-pages : un titre porteur d'un ISBN explicite est plus fiable.
-
+# Ordre de priorité : URL, type de revue, puis titre.
 _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
-    # theses.fr fait autorité sur les thèses françaises (OpenAlex classe parfois ces thèses en `article` ou `dissertation`). Gardée par `serial_id_present: False` : un enregistrement source theses.fr AVEC un serial_id est une conflation thèse↔article publié — c'est l'aspect article qui prime (`THESIS_WITH_SERIAL_TO_ARTICLE`), pas l'URL theses.fr. La règle corrige donc en `thesis` les seuls enregistrements sources theses.fr **sans** journal.
+    # theses.fr fait autorité sur les thèses françaises. Un enregistrement source theses.fr rattaché à une revue relève de `THESIS_WITH_SERIAL_TO_ARTICLE`.
     MetadataCorrectionRule.THESES_FR_URL_TO_THESIS: {
         "applies_to": {"url_contains": "theses.fr/", "serial_id_present": False},
         "applies_correction": {"doc_type": DocType.THESIS},
     },
-    # DUMAS (dumas.ccsd) n'héberge que des mémoires : URL-only, même garde `serial_id_present: False` que theses.fr (un enregistrement source DUMAS avec serial_id = article publié → prime sur le mémoire).
+    # DUMAS héberge seulement des mémoires. Même exception que theses.fr pour un enregistrement source rattaché à une revue.
     MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR: {
         "applies_to": {"url_contains": "dumas.ccsd", "serial_id_present": False},
         "applies_correction": {"doc_type": DocType.MEMOIR},
     },
-    # Famille thèse + `serial_id` présent ⇒ `article`, SAUF si le DOI est celui d'un registre de
-    # thèses (`doi_prefix_not_in`). Une vraie thèse a un DOI ABES (ou pas de DOI) ; un DOI d'éditeur
-    # signe au contraire la version publiée. Le `doc_type=thesis` + `serial_id` + DOI éditeur est
-    # donc un article publié (mistype d'OpenAlex/ScanR, ou conflation thèse↔version publiée mergées
-    # par titre) → `article`. Avec un DOI ABES ou aucun DOI, le `serial_id` est parasite (la version
-    # publiée d'une conflation) : le type reste thèse, le nettoyage du serial_id relève des relations.
-    # Placée APRÈS les règles URL : un enregistrement source theses.fr/DUMAS reste thèse/mémoire (l'URL est le signal
-    # fort). Le retrait des identifiants de thèse (NNT, hal_id `tel-`/`dumas-`) de la conflation est
-    # traité à part (`is_dissertation_identifier`), hors DSL colonne.
+    # Thèse ou mémoire rattaché à une revue, avec un DOI d'éditeur : c'est l'article publié, que OpenAlex ou ScanR confondent avec la thèse.
+    # Avec un DOI de registre de thèses, ou sans DOI, le type reste thèse. L'article perd ses identifiants de thèse (`is_dissertation_identifier`).
     MetadataCorrectionRule.THESIS_WITH_SERIAL_TO_ARTICLE: {
         "applies_to": {
             "doc_type": frozenset({DocType.THESIS, DocType.ONGOING_THESIS, DocType.MEMOIR}),
@@ -292,7 +258,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.ARTICLE},
     },
-    # Journal typé `media` (typage manuel admin) ⇒ `media` quel que soit le `doc_type`.
+    # Revue typée `media` à la main ⇒ `media`, quel que soit le `doc_type`.
     MetadataCorrectionRule.SERIAL_TYPE_MEDIA_TO_MEDIA: {
         "applies_to": {"serial_type": SerialType.MEDIA},
         "applies_correction": {"doc_type": DocType.MEDIA},
@@ -321,7 +287,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PROCEEDINGS},
     },
-    # Journal d'actes + doc_type plausible ⇒ `conference_paper`. `book` exclu : un volume entier d'actes peut légitimement rester `book`.
+    # Article ou chapitre d'une revue d'actes ⇒ `conference_paper`. Un `book` peut être un volume entier d'actes.
     MetadataCorrectionRule.SERIAL_TYPE_PROCEEDINGS_TO_CONFERENCE_PAPER: {
         "applies_to": {
             "serial_type": SerialType.PROCEEDINGS,
@@ -329,7 +295,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.CONFERENCE_PAPER},
     },
-    # Article ou chapitre d'un volume d'actes (sa monographie) ⇒ `conference_paper`. Le volume d'actes remplace le recueil de `serials` comme conteneur des articles de congrès.
+    # Article ou chapitre d'un volume d'actes (sa monographie) ⇒ `conference_paper`.
     MetadataCorrectionRule.PROCEEDINGS_VOLUME_TO_CONFERENCE_PAPER: {
         "applies_to": {
             "in_proceedings_volume": True,
@@ -363,16 +329,12 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.PREPRINT},
     },
-    # L'enregistrement source déclare lui-même une relation `is-preprint-of` (Crossref `source_extras.relation`) : il EST
-    # le preprint, signal source-autoritaire et indépendant du `doc_type` (donc acyclique vis-à-vis
-    # des relations dérivées du type). Sans whitelist `doc_type` : la déclaration prime, y compris
-    # quand Crossref n'a pas typé le record (`doc_type` nul → l'arbitrage prenait `article`
-    # d'OpenAlex faute de mieux ; Crossref étant prioritaire, le `preprint` corrigé gagne).
+    # L'enregistrement source se déclare preprint d'une autre œuvre (relation Crossref `is-preprint-of`). La déclaration prime sur tout type de document, absent compris.
     MetadataCorrectionRule.PREPRINT_RELATION_TO_PREPRINT: {
         "applies_to": {"self_declared_preprint": True},
         "applies_correction": {"doc_type": DocType.PREPRINT},
     },
-    # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other} ⇒ `media`. Patterns univoques et récurrents dans le corpus UCA.
+    # Titre `interview`/`reportage`/`podcast` + `doc_type` ∈ {article, other} ⇒ `media`.
     MetadataCorrectionRule.TITLE_MEDIA_PREFIX_TO_MEDIA: {
         "applies_to": {
             "doc_type": _ARTICLE_OR_OTHER,
@@ -380,7 +342,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.MEDIA},
     },
-    # Collection figshare (`10.6084/m9.figshare.c.<id>` — le `.c.` marque un bundle de suppléments, vs un item `m9.figshare.<id>`) + doc_type ∈ {article, other} ⇒ `dataset`. Le titre d'une collection = le titre du papier parent, donc inattrapable par la règle titre supplément → discrimination par DOI. Fallback hardcodé ; une détection RA DataCite (figshare-as-client) généraliserait aux instances figshare sous d'autres préfixes.
+    # Collection Figshare (`10.6084/m9.figshare.c.<id>`), ensemble de fichiers supplémentaires ⇒ `dataset`. Son titre est celui de l'article, d'où une règle sur le DOI.
     MetadataCorrectionRule.DOI_FIGSHARE_COLLECTION_TO_DATASET: {
         "applies_to": {
             "doc_type": _ARTICLE_OR_OTHER,
@@ -388,7 +350,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.DATASET},
     },
-    # Titre suppléments / données complémentaires + doc_type ∈ {article, other, conference} ⇒ `dataset`. DataCite et certaines plateformes (Dryad, Zenodo, IFREMER) exposent les fichiers complémentaires comme entités à part ; figshare type certains d'entre eux `Presentation`. `dataset` lui-même exclu (no-op naturel).
+    # Titre de fichiers complémentaires + doc_type ∈ {article, other, conference} ⇒ `dataset`. DataCite et des entrepôts (Dryad, Zenodo) les décrivent à part ; Figshare en type certains `Presentation`.
     MetadataCorrectionRule.TITLE_SUPPLEMENTARY_CONTENT_TO_DATASET: {
         "applies_to": {
             "doc_type": _ARTICLE_OR_OTHER | {DocType.CONFERENCE},
@@ -396,7 +358,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.DATASET},
     },
-    # Titre `erratum`/`errata`/`corrigendum` + doc_type publication-like ⇒ `erratum`. OpenAlex reclasse fréquemment ces corrections en `article`/`preprint`/`data_paper`. Types-référents (thesis, book, dataset, …) épargnés.
+    # Titre d'erratum ⇒ `erratum`. OpenAlex type souvent les errata `article`, `preprint` ou `data_paper`.
     MetadataCorrectionRule.TITLE_ERRATUM_PREFIX_TO_ERRATUM: {
         "applies_to": {
             "doc_type": frozenset(
@@ -414,7 +376,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.ERRATUM},
     },
-    # Titre `retraction notice/note` + doc_type ∈ {article, other} ⇒ `retraction`. Préfixes stricts pour éviter un faux positif sur un article *sur* la rétractation.
+    # Titre d'avis de rétractation + doc_type ∈ {article, other} ⇒ `retraction`.
     MetadataCorrectionRule.TITLE_RETRACTION_PREFIX_TO_RETRACTION: {
         "applies_to": {
             "doc_type": _ARTICLE_OR_OTHER,
@@ -422,9 +384,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.RETRACTION},
     },
-    # Titre « Editorial: … » + doc_type ∈ {article, other} ⇒ `editorial`. Frontiers & co.
-    # publient les éditoriaux sous ce préfixe, qu'OpenAlex/ScanR/CrossRef typent souvent
-    # `article`. Ancré sur le « : » (cf. `_EDITORIAL_PREFIX_PATTERN`).
+    # Titre « Editorial: … » + doc_type ∈ {article, other} ⇒ `editorial`. Les sources typent souvent ces éditoriaux `article`.
     MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL: {
         "applies_to": {
             "doc_type": _ARTICLE_OR_OTHER,
@@ -432,8 +392,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.EDITORIAL},
     },
-    # Titre « Letter: … » + doc_type ∈ {article, other} ⇒ `letter`. Courriers à l'éditeur /
-    # research letters mal typés `article`.
+    # Titre « Letter: … » + doc_type ∈ {article, other} ⇒ `letter`.
     MetadataCorrectionRule.TITLE_LETTER_PREFIX_TO_LETTER: {
         "applies_to": {
             "doc_type": _ARTICLE_OR_OTHER,
@@ -441,10 +400,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.LETTER},
     },
-    # « systematic review » en tête ou en sous-titre + doc_type ∈ {article} ⇒ `review`.
-    # Ancré (cf. `_SYSTEMATIC_REVIEW_PATTERN`) pour ne prendre que la forme document-type, pas
-    # les mentions au fil du titre. La whitelist épargne conference_paper/preprint/poster/
-    # memoir/dataset (une revue systématique peut légitimement être l'un d'eux).
+    # Titre de revue systématique + doc_type `article` ⇒ `review`. Une revue systématique peut aussi être un poster, un preprint ou un mémoire.
     MetadataCorrectionRule.TITLE_SYSTEMATIC_REVIEW_TO_REVIEW: {
         "applies_to": {
             "doc_type": frozenset({DocType.ARTICLE}),
@@ -452,7 +408,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.REVIEW},
     },
-    # Titre porteur d'un ISBN explicite + doc_type ∈ {article, review, other} ⇒ `book_review`. `book`/`book_chapter` exclus (un ouvrage ou un chapitre peut légitimement porter son propre ISBN dans le titre — saisie HAL fréquente).
+    # Titre avec un ISBN + doc_type ∈ {article, review, other} ⇒ `book_review`. Un livre ou un chapitre a parfois son propre ISBN dans le titre (saisie HAL).
     MetadataCorrectionRule.TITLE_ISBN_TO_BOOK_REVIEW: {
         "applies_to": {
             "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
@@ -460,7 +416,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
     },
-    # Titre terminé par « (19|20)YY, N p[.|ages] » + même whitelist que la règle ISBN ⇒ `book_review`. Plus bruité que ISBN, évaluée après.
+    # Titre terminé par « AAAA, N p. » + mêmes types que la règle ISBN ⇒ `book_review`. Moins sûre, elle suit la règle ISBN.
     MetadataCorrectionRule.TITLE_YEAR_PAGES_END_TO_BOOK_REVIEW: {
         "applies_to": {
             "doc_type": frozenset({DocType.ARTICLE, DocType.REVIEW, DocType.OTHER}),
@@ -468,7 +424,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.BOOK_REVIEW},
     },
-    # Titre commençant par « Recension » ou « Compte(s) rendu(s) : » ⇒ `book_review`. Marqueurs univoques en usage académique français ; `preprint` inclus dans la whitelist (typage OpenAlex fréquent). `book`/`book_chapter` épargnés : la recension est l'article, pas l'ouvrage recensé.
+    # Titre de recension ⇒ `book_review`. OpenAlex type souvent les recensions `preprint`.
     MetadataCorrectionRule.TITLE_RECENSION_TO_BOOK_REVIEW: {
         "applies_to": {
             "doc_type": frozenset(
@@ -486,11 +442,7 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         },
         "applies_correction": {"doc_type": DocType.DATA_PAPER},
     },
-    # Embargo HAL levé : un dépôt typé `embargoed` dont la date de fin est passée
-    # (`embargo_expired`, calculé à la lecture) devient `green`. Promotion à l'échéance sans
-    # ré-import HAL — seule règle date-dépendante (la date est lue en SQL, hors de la
-    # fonction pure). Trace dans `corrections.oa_status` ; corrige un champ orthogonal au
-    # `doc_type`, donc aucun chaînage avec les règles ci-dessus.
+    # Embargo HAL échu ⇒ `green`. `embargo_expired` se calcule à la lecture, en SQL.
     MetadataCorrectionRule.EMBARGO_EXPIRED_TO_GREEN: {
         "applies_to": {"oa_status": "embargoed", "embargo_expired": True},
         "applies_correction": {"oa_status": "green"},
@@ -510,22 +462,18 @@ _RULES: dict[MetadataCorrectionRule, _RuleDefinition] = {
         "applies_to": {"oa_status": "diamond", "journal_diamond": False},
         "applies_correction": {"oa_status": "gold"},
     },
-    # Un `hybrid` posé par défaut au normalize (avant l'enrichissement des revues) dans
-    # une revue full-OA est en réalité `gold` : `hybrid` sort des statuts attendus pour
-    # `oa_model = full_oa`. Champ orthogonal au `doc_type`, aucun chaînage avec les autres règles.
+    # `hybrid` est le statut par défaut avant l'enrichissement des revues. Dans une revue full OA, c'est `gold`.
     MetadataCorrectionRule.HYBRID_FULL_OA_TO_GOLD: {
         "applies_to": {"oa_status": "hybrid", "oa_model": OaModel.FULL_OA},
         "applies_correction": {"oa_status": "gold"},
     },
 }
 
-# ── Moteur ──────────────────────────────────────────────────────────────
-
 _FIELDS = frozenset(f.name for f in fields(MetadataForCorrection))
 
 
 def _check_predicate(source_record: MetadataForCorrection, key: str, value: object) -> bool:
-    """Évalue un prédicat (paire clé/valeur de `applies_to`) sur la `source_record`. Voir `_AppliesTo` pour la sémantique de chaque clé."""
+    """Vrai si les faits vérifient le prédicat `key` de valeur `value` (`_AppliesTo`)."""
     if key == "doc_type":
         doc_type = (source_record.doc_type or "").lower()
         if isinstance(value, frozenset):
@@ -566,12 +514,12 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
 
 
 def _rule_applies(source_record: MetadataForCorrection, rule_def: _RuleDefinition) -> bool:
-    """True si tous les prédicats `applies_to` de la règle sont vérifiés (AND)."""
+    """Vrai si les faits vérifient tous les prédicats de la règle."""
     return all(_check_predicate(source_record, k, v) for k, v in rule_def["applies_to"].items())
 
 
 def _correct_field(source_record: MetadataForCorrection, field: str) -> Correction[str] | None:
-    """Applique les règles `_RULES` dans l'ordre ; première qui corrige `field` et dont les prédicats matchent gagne."""
+    """Correction de `field` par la première règle de `_RULES` qui le corrige et s'applique."""
     for rule_id, rule_def in _RULES.items():
         if field not in rule_def["applies_correction"]:
             continue
@@ -581,25 +529,19 @@ def _correct_field(source_record: MetadataForCorrection, field: str) -> Correcti
 
 
 def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
-    """Applique les corrections sur les champs d'un `MetadataForCorrection`. Retourne un `CorrectedFields` (vide si aucune règle ne s'applique).
-
-    Fonction pure : aucune I/O, aucun effet de bord. Les données journal consommées par les règles arrivent par le contrat (champs joints à la lecture), pas via des entités passées en paramètre — ce qui permet à la fonction de servir aussi bien la dédup (sur la `source_record` entrante) que le refresh (sur la publication canonique).
-
-    `doc_type` et `oa_status` sont corrigés **indépendamment** depuis la même vue : aucune règle de l'un ne lit la valeur corrigée de l'autre (`oa_status` est la promotion d'embargo, orthogonale au `doc_type`). Les dépendances inter-champ — un type corrigé selon le `serial_type` du journal rattaché — se résolvent par l'**ordre des sous-steps** de la phase (chacun re-lit l'état persisté du précédent), pas par un feed-forward intra-fonction.
-    """
+    """Corrections de `doc_type` et `oa_status`, indépendantes l'une de l'autre. Une correction qui dépend d'une autre, comme un type corrigé selon le type de la revue rattachée, passe par l'ordre des sous-étapes de la phase `metadata_correction`."""
     return CorrectedFields(
         doc_type=_correct_field(source_record, "doc_type"),
         oa_status=_correct_field(source_record, "oa_status"),
     )
 
 
-# Préfixes d'identifiants HAL propres aux dissertations : TEL (thèses en ligne) et DUMAS
-# (mémoires/dissertations étudiantes). Un hal_id à ce préfixe n'est jamais celui d'un article.
+# Préfixes d'identifiants HAL des thèses (TEL) et des mémoires (DUMAS).
 _DISSERTATION_HALID_PREFIXES = ("tel-", "dumas-")
 
 
 def is_dissertation_identifier(identifier: SourceIdentifier) -> bool:
-    """Indique si l'identifiant est propre à une **dissertation** : un NNT, ou un `hal_id` préfixé `tel-`/`dumas-`. Sur un enregistrement source corrigé thèse→article (`THESIS_WITH_SERIAL_TO_ARTICLE`), il est erroné : OpenAlex et ScanR fusionnent une thèse et son article dans un seul enregistrement, en gardant les identifiants de la thèse."""
+    """Vrai si l'identifiant est propre à une thèse ou un mémoire : NNT, ou identifiant HAL `tel-` ou `dumas-`. Il est erroné sur un enregistrement source corrigé en article (`THESIS_WITH_SERIAL_TO_ARTICLE`) : OpenAlex et ScanR réunissent parfois une thèse et son article, avec les identifiants de la thèse."""
     if identifier.id_type is SourceIdentifierType.NNT:
         return True
     return identifier.id_type is SourceIdentifierType.HAL_ID and identifier.value.startswith(
