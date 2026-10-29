@@ -5,6 +5,80 @@ site_dir = "site"
 exclude_docs = """
 /chantiers/
 """
+# Navigation explicite : toute page ajoutée à docs/ s'inscrit ici. Le titre d'une page est celui de son premier intertitre.
+nav = [
+  "index.md",
+  { "Guide utilisateur" = [
+    "guide-utilisateur/index.md",
+    { "Pages publiques" = [
+      "guide-utilisateur/pages-publiques/01-statistiques.md",
+      "guide-utilisateur/pages-publiques/02-publications.md",
+      "guide-utilisateur/pages-publiques/03-structures.md",
+      "guide-utilisateur/pages-publiques/04-personnes.md",
+      "guide-utilisateur/pages-publiques/05-revues-et-editeurs.md",
+      "guide-utilisateur/pages-publiques/06-sujets.md",
+      "guide-utilisateur/pages-publiques/07-problemes-hal.md",
+    ] },
+    { "Administration" = [
+      "guide-utilisateur/administration/01-referentiels.md",
+      "guide-utilisateur/administration/02-adresses.md",
+      "guide-utilisateur/administration/03-pipeline.md",
+      "guide-utilisateur/administration/04-workflow.md",
+    ] },
+  ] },
+  { "Sources" = [
+    "sources/01-vue-d-ensemble.md",
+    "sources/02-hal.md",
+    "sources/03-openalex.md",
+    "sources/04-wos.md",
+    "sources/05-scanr.md",
+    "sources/06-crossref.md",
+    "sources/07-datacite.md",
+    "sources/08-theses.md",
+    "sources/09-sources-supplementaires.md",
+    "sources/10-imports-manuels.md",
+  ] },
+  { "Pipeline" = [
+    "pipeline/01-vue-d-ensemble.md",
+    "pipeline/02-harvest.md",
+    "pipeline/03-normalize.md",
+    "pipeline/04-affiliations.md",
+    "pipeline/05-publishing.md",
+    "pipeline/06-metadata-correction.md",
+    "pipeline/07-publications.md",
+    "pipeline/08-author-grouping.md",
+    "pipeline/09-persons.md",
+    "pipeline/10-finalize.md",
+    "pipeline/11-enrichissements.md",
+  ] },
+  { "Modèle de données" = [
+    "donnees/01-vue-d-ensemble.md",
+    "donnees/02-sources.md",
+    "donnees/03-publications.md",
+    "donnees/04-contributions.md",
+    "donnees/05-persons.md",
+    "donnees/06-structures.md",
+    "donnees/07-publishing.md",
+    "donnees/08-ref-et-ops.md",
+    "donnees/09-donnees-derivees.md",
+    "donnees/10-index-des-tables.md",
+  ] },
+  { "Architecture" = [
+    "architecture/01-vue-d-ensemble.md",
+    "architecture/02-domain.md",
+    "architecture/03-application.md",
+    "architecture/04-infrastructure.md",
+    "architecture/05-interfaces.md",
+    "architecture/06-composition-roots.md",
+    "architecture/07-tests.md",
+  ] },
+  { "Exploitation" = [
+    "exploitation/01-developpement-local.md",
+    "exploitation/02-production.md",
+    "exploitation/03-pipeline.md",
+  ] },
+  "glossaire.md",
+]
 
 [project.theme]
 language = "fr"

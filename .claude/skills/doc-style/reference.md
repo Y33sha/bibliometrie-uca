@@ -192,6 +192,22 @@ APRÈS :
     - **Licence** : licence de la localisation principale (`primary_location`)
 
 
+## Micro-détail que l'interface ou le code montre
+
+La documentation sert à l'onboarding. Ce qu'un nouveau venu apprend en explorant l'interface ou en lisant une docstring ne s'y écrit pas : le supprimer, sans le déplacer ailleurs.
+
+AVANT :
+    **Administration**, en session d'administration. La barre de navigation passe en clair et propose le menu Administration :
+
+APRÈS :
+    **Administration**, en session d'administration :
+
+AVANT :
+    Les captures d'écran se refont avec `python -m interfaces.cli.dev.screenshots`, l'application en cours d'exécution.
+
+APRÈS :
+    (rien)
+
 ## Décision énoncée sans sa raison
 
 Une décision négative nue en dit trop ou trop peu : le lecteur se demande pourquoi. Donner la raison en une proposition, ou supprimer la phrase.
