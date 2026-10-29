@@ -304,9 +304,7 @@ class SourceRecordCorrectionStore:
                     FROM doi_prefixes dp JOIN publishers p ON p.id = dp.publisher_id
                     WHERE p.publisher_type IS NOT NULL
                 """)
-            )
-            .tuples()
-            .all()
+            ).all()
         )
         return [_unary_row(r, registrant_types) for r in self._conn.execute(text(query), params)]
 
