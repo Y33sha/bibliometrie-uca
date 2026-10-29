@@ -12,7 +12,7 @@ from domain.types import JsonValue
 
 
 class StoredSourceContribution(NamedTuple):
-    """Contribution source en base : identifiant, position, informations du contributeur (nom normalisé et identifiants), empreinte et rôles."""
+    """Contribution source en base. `contributor_key` : nom normalisé et identifiants du contributeur. `content_hash` : empreinte de son contenu."""
 
     id: int
     position: int | None
@@ -22,7 +22,7 @@ class StoredSourceContribution(NamedTuple):
 
 
 class IncomingSourceContribution(NamedTuple):
-    """Contribution source issue de l'enregistrement source renormalisé : clé (rang dans l'enregistrement source), position d'auteur, informations du contributeur, empreinte et rôles. Une contribution source sans rôle d'auteur est sans position."""
+    """Contribution source de l'enregistrement source renormalisé. `key` : rang dans l'enregistrement source. Une contribution source sans rôle d'auteur est sans position."""
 
     key: int
     position: int | None
@@ -50,7 +50,7 @@ def plan_source_contribution_sync(
 ) -> SourceContributionSyncPlan:
     """Rapproche les contributions sources entrantes de celles en base.
 
-    Des informations du contributeur portées par une seule contribution source de chaque côté rapprochent les deux. Répétées, elles rapprochent les contributions sources de même position d'auteur. Absentes d'un côté, ou répétées sans position commune, elles ne rapprochent rien.
+    Des informations du contributeur présentes dans une seule contribution source de chaque côté rapprochent les deux. Répétées, elles rapprochent les contributions sources de même position d'auteur.
     """
     stored_by_contributor_information: dict[Hashable, list[StoredSourceContribution]] = defaultdict(
         list
