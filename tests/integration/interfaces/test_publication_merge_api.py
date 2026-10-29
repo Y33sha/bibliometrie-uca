@@ -6,7 +6,7 @@ from tests.integration.helpers.seeds import seed_person, seed_publication, seed_
 
 
 def _authored_publication(*, doi: str | None, person_id: int | None) -> int:
-    """Publication d'un enregistrement source et d'une contribution « Martin, Anne », du périmètre, rattachée à `person_id` par le nom."""
+    """Publication d'un enregistrement source et d'une contribution du périmètre « Martin, Anne », rattachée par le nom à `person_id` quand il est fourni."""
     publication = seed_publication(uniq("Titre"), doc_type="article")
     source_record = seed_source_record(
         "crossref" if doi else "hal", publication_id=publication, doi=doi

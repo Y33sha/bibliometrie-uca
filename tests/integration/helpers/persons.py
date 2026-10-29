@@ -127,7 +127,7 @@ def insert_hr_record(
 def insert_rejected_contribution(
     conn: Connection, publication_id: int, *, person_id: int, ignore_conflict: bool = False
 ) -> None:
-    """Rejette la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit une. `ignore_conflict` ignore un rejet déjà présent."""
+    """Rejette la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit un. `ignore_conflict` ignore un rejet déjà présent."""
     conn.execute(
         text(
             "INSERT INTO source_records (source, source_id, title, publication_id) "

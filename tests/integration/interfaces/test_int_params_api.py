@@ -1,8 +1,8 @@
-"""Une liste d'entiers malformée se refuse en 422, pas en 500.
+"""Une liste d'entiers malformée est refusée en 422.
 
-Le découpage des valeurs séparées par des virgules vit dans le code de la route : une valeur non numérique y levait une `ValueError` que le filet des erreurs non gérées traduisait en 500, avec une trace au journal par requête.
+La route découpe les valeurs séparées par des virgules. Sans refus, une valeur non numérique lèverait une `ValueError`, traduite en 500 avec une trace au journal.
 
-Le découpage lui-même est couvert par `tests/unit/interfaces/test_filters.py`. Ces appels vérifient ce qu'il produit sur la surface HTTP, sur un paramètre par forme : la liste d'entiers nue, et celle qui admet une sentinelle.
+Le découpage est testé par `tests/unit/interfaces/test_filters.py`. Ces appels vérifient le refus sur la surface HTTP, pour une liste d'entiers simple et pour une liste qui admet une sentinelle.
 """
 
 
@@ -14,7 +14,7 @@ class TestValeurNonEntiere:
         assert "abc" in r.json()["detail"]
 
     def test_le_refus_vaut_pour_une_liste_a_sentinelle(self, client):
-        """`lab_id` mêle des identifiants à la sentinelle `none` ; ce qui n'est ni l'un ni l'autre est refusé."""
+        """`lab_id` admet des identifiants et la sentinelle `none` ; toute autre valeur est refusée."""
         assert client.get("/api/publications", params={"lab_id": "none,abc"}).status_code == 422
 
 

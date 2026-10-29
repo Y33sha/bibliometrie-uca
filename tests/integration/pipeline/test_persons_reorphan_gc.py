@@ -1,4 +1,4 @@
-"""Purge de la phase personnes : marquage des contributions à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
+"""Purge de la phase `persons` : marquage des contributions à forme de nom ambiguë, suppression des personnes sans contribution du périmètre."""
 
 from sqlalchemy import text
 

@@ -3,7 +3,7 @@
 Couvre :
 - GET /api/perimeters (liste)
 - POST /api/perimeters (création avec ses racines, auth)
-- PUT /api/perimeters/{id} (update partiel, auth)
+- PUT /api/perimeters/{id} (mise à jour partielle, auth)
 - DELETE /api/perimeters/{id} (suppression, auth, refus si utilisé)
 """
 
@@ -118,14 +118,13 @@ class TestDeletePerimeter:
             assert cur.fetchone() is None
 
     def test_refuses_when_used_in_pipeline_config(self, auth_client):
-        # delete_perimeter refuse si une config pipeline référence son code.
+        # La configuration du pipeline référence le périmètre.
         code = uniq("inuse")
         pid = seed_perimeter(code=code)
         seed_config("perimeter_persons", code)
         try:
             r = auth_client.delete(f"/api/perimeters/{pid}")
-            # 409 Conflict : sémantique correcte ("ressource en usage"), à
-            # distinguer de 400 (requête invalide).
+            # Ressource en usage : 409.
             assert r.status_code == 409
         finally:
             _clear_config("perimeter_persons")
@@ -141,8 +140,7 @@ def _perimeter_structure_ids(perimeter_id: int) -> set[int]:
 
 
 class TestMaterializedPerimeterStructures:
-    """La table matérialisée `perimeter_structures` est rafraîchie à chaque édition admin,
-    sans attendre le pipeline (racine + descendants `est_tutelle_de`)."""
+    """La table `perimeter_structures` (racines et leurs descendants par `est_tutelle_de`) est rafraîchie à chaque écriture de l'administration, sans attendre le pipeline."""
 
     def test_adding_root_materializes_closure(self, auth_client):
         root = seed_structure(type_="universite")
@@ -190,10 +188,7 @@ def _audit(event_type: str, aggregate_id: int) -> list[dict]:
 
 
 class TestTracabilite:
-    """La suppression d'un périmètre était consignée, sa création et sa modification non.
-
-    Un périmètre décide quelles structures entrent dans les décomptes : le poser, en changer les racines ou le retirer sont trois décisions de même portée, et la première n'est pas moins traçable que la dernière.
-    """
+    """La création et la modification d'un périmètre sont consignées : un périmètre décide quelles structures entrent dans les décomptes."""
 
     def test_la_creation_est_consignee(self, auth_client):
         code = uniq("audit_create")
@@ -223,8 +218,7 @@ class TestTracabilite:
 
         evenements = _audit("perimeter.updated", pid)
         assert len(evenements) == 1
-        # Une mise à jour partielle n'écrit que ce qu'elle a reçu : consigner les autres champs
-        # laisserait croire qu'ils ont été soumis.
+        # Une mise à jour partielle consigne seulement les champs reçus.
         assert evenements[0]["payload"] == {"name": "Après"}
 
     def test_un_changement_de_racines_est_consigne(self, auth_client):

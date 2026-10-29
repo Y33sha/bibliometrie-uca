@@ -48,7 +48,7 @@ def test_list_users_trie_par_login(sa_sync_conn_owner):
 
 
 def test_l_api_cree_un_utilisateur_admin(sa_sync_conn_app):
-    """Au démarrage, l'API crée `ADMIN_USER` sous son propre rôle de connexion."""
+    """Le rôle de connexion de l'API peut créer un utilisateur administrateur, comme `ADMIN_USER` au démarrage."""
     users = PgUserRepository(sa_sync_conn_app)
     users.ensure_user("dupont", [Role.ADMIN])
     assert users.roles_of("dupont") == {Role.ADMIN}

@@ -11,7 +11,7 @@ from tests.integration.helpers.staging import insert_failed_lookup, insert_stagi
 
 
 def _record(conn, source, source_id, identifiers=None, *, in_perimeter=True) -> None:
-    """Crée un enregistrement source `source` rattaché à une publication, avec sa ligne staging."""
+    """Crée un enregistrement source `source` rattaché à une publication, avec sa ligne de staging."""
     publication_id = insert_publication(conn, in_perimeter=in_perimeter)
     staging_id = insert_staging(conn, source, source_id=source_id)
     insert_source_record(

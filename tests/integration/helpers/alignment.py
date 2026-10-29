@@ -1,4 +1,4 @@
-"""Contributions (`contributions`, `aligned_source_contributions`) pour les tests d'intégration."""
+"""Semis des contributions (`contributions`, `aligned_source_contributions`), sur la connexion SQLAlchemy (`sa_sync_conn`)."""
 
 from sqlalchemy import Connection, text
 
@@ -19,7 +19,7 @@ def align_source_contributions(
     *,
     method: str = "name",
 ) -> int:
-    """Contribution les contributions sources `(contribution source, enregistrement source)` d'une publication, marque la contribution pour la recomposition de ses attributs comme le alignement, et renvoie l'`id` de la contribution. La première fonde la contribution ; les autres le rejoignent par `method`."""
+    """Aligne dans une contribution les contributions sources `(contribution source, enregistrement source)` d'une publication, la marque pour la recomposition de ses attributs comme la phase `author_grouping`, et renvoie son `id`. La première contribution source fonde la contribution ; les autres la rejoignent par `method`."""
     contribution_id = conn.execute(
         text("INSERT INTO contributions (publication_id) VALUES (:p) RETURNING id"),
         {"p": publication_id},
@@ -57,7 +57,7 @@ def add_aligned_source_contribution(
 
 
 def align_unaligned(conn: Connection) -> None:
-    """Donne une contribution à elle seule à chaque contribution source sans contribution d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur : la contribution que la phase `author_grouping` forme pour un auteur sans jumelle. Les contributions créées sont marquées pour la recomposition de leurs attributs."""
+    """Place dans sa propre contribution chaque contribution source non alignée d'un enregistrement source rattaché à une publication, hors collectifs et doublons d'auteur, comme la phase `author_grouping` pour un auteur sans correspondant dans les autres enregistrements sources. Marque les contributions créées pour la recomposition de leurs attributs."""
     conn.execute(
         text(f"""
             WITH ungrouped AS (
@@ -81,12 +81,12 @@ def align_unaligned(conn: Connection) -> None:
 
 
 def recompose_contribution_attributes(conn: Connection) -> None:
-    """Recompose les attributs de tous les contributions depuis leurs contributions sources, comme la phase `author_grouping` pour les contributions en file."""
+    """Recompose les attributs de toutes les contributions depuis leurs contributions sources, comme la phase `author_grouping` pour les contributions en file."""
     conn.execute(text(propagate_contribution_attributes_sql("SELECT id FROM contributions")))
 
 
 def contribution_of(conn: Connection, source_contribution_id: int) -> int:
-    """L'`id` de la contribution de la contribution source `source_contribution_id`."""
+    """L'`id` de la contribution qui contient la contribution source `source_contribution_id`."""
     return conn.execute(
         text(
             "SELECT contribution_id FROM aligned_source_contributions"
@@ -99,7 +99,7 @@ def contribution_of(conn: Connection, source_contribution_id: int) -> int:
 def set_perimeter_author_contribution(
     conn: Connection, contribution_id: int, *, person_id: int | None = None, mode: str | None = None
 ) -> None:
-    """Fait de la contribution `contribution_id` une contribution d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
+    """Fait de la contribution `contribution_id` une contribution d'auteur du périmètre (rôle d'auteur, indice `address`), rattachée à la personne `person_id` par le mode de résolution `mode`."""
     conn.execute(
         text("""
             UPDATE contributions

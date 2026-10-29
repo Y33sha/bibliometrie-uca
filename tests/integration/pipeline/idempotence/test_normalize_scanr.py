@@ -126,7 +126,7 @@ SCANR_STAGING_DOCS = [
 
 
 def insert_scanr_staging(conn, docs):
-    """Insère des documents dans staging (source='scanr')."""
+    """Insère des documents ScanR dans le staging."""
     for doc in docs:
         insert_staging(
             conn,
@@ -140,7 +140,7 @@ def insert_scanr_staging(conn, docs):
 
 
 def _count_tables(conn) -> dict:
-    """Retourne les compteurs des tables normalisées."""
+    """Renvoie le nombre de lignes des tables remplies par la normalisation."""
     from sqlalchemy import text
 
     counts = {}
@@ -163,7 +163,6 @@ class TestNormalizeScanrIdempotence:
     """La normalisation ScanR produit le même résultat si lancée deux fois."""
 
     def test_double_run_same_counts(self, sa_sync_conn):
-        """Lancer la normalisation deux fois ne crée pas de doublons."""
         from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
@@ -177,7 +176,7 @@ class TestNormalizeScanrIdempotence:
         assert counts_1["scanr_documents"] == 3
         assert counts_1["publications"] >= 3
 
-        # Reset processed flags
+        # Remet les lignes à traiter.
         sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'scanr'"))
 
         # Deuxième passe
@@ -190,7 +189,7 @@ class TestNormalizeScanrIdempotence:
         )
 
     def test_author_dedup_by_idref(self, sa_sync_conn):
-        """Un même idref sur deux documents → idref porté sur les 2 contributions."""
+        """Un même IdRef dans deux documents figure sur les deux contributions sources."""
         from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
@@ -206,13 +205,7 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 2, "Alice devrait avoir 2 contributions (article + chapitre)"
 
     def test_author_without_idref(self, sa_sync_conn):
-        """Un auteur sans idref : ses informations du contributeur sont sans clé `idref`.
-
-        Charlie Noid et Diana Durand n'ont pas d'idref ; leur contribution source pointe
-        vers des informations du contributeur (`contributor_information`) sans `idref` dans
-        `identifiers`. La personne sera reconstruite au pipeline
-        `personnes` via les name_forms.
-        """
+        """Un auteur sans IdRef a des informations du contributeur sans clé `idref`."""
         from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
@@ -230,7 +223,7 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 2
 
     def test_publication_dedup_by_doi(self, sa_sync_conn):
-        """Deux documents ScanR avec le même DOI → une seule publication."""
+        """Deux documents ScanR au même DOI donnent une seule publication."""
         from sqlalchemy import text
 
         dup = {
@@ -265,7 +258,7 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 4, "4 scanr_documents (3 originaux + 1 bis)"
 
     def test_serial_dedup(self, sa_sync_conn):
-        """Deux documents avec le même journal → un seul journal."""
+        """Deux documents de la même revue donnent une seule revue."""
         from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
@@ -277,13 +270,13 @@ class TestNormalizeScanrIdempotence:
         assert cnt == 1
 
     def test_publisher_dedup(self, sa_sync_conn):
-        """Le même éditeur n'est pas créé en double."""
+        """L'éditeur commun aux documents existe une seule fois, même après une seconde normalisation."""
         from sqlalchemy import text
 
         insert_scanr_staging(sa_sync_conn, SCANR_STAGING_DOCS)
         run_normalize_scanr(sa_sync_conn)
 
-        # Première passe ok, reset et relance
+        # Remet les lignes à traiter et relance.
         sa_sync_conn.execute(text("UPDATE staging SET processed = FALSE WHERE source = 'scanr'"))
         run_normalize_scanr(sa_sync_conn)
 

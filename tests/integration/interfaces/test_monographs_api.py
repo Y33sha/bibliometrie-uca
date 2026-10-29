@@ -1,4 +1,4 @@
-"""Tests du router monographs : liste (recherche, type, tri) et fiche."""
+"""Tests du router des monographies : liste (recherche, type, tri) et fiche."""
 
 from functools import partial
 

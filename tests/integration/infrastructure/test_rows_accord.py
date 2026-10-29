@@ -1,8 +1,8 @@
-"""Accord entre les colonnes des relevés et les types qu'ils alimentent.
+"""Accord entre les colonnes des requêtes SQL et les types qu'elles alimentent.
 
-Chaque adaptateur construit ses lignes par appariement de noms. Le relevé étant une chaîne de caractères, l'accord échappe aux vérificateurs de types : seule son exécution le montre. Ces tests exercent les relevés concernés et laissent `infrastructure.db.rows` prononcer le désaccord.
+Chaque adaptateur construit ses lignes par appariement de noms. La requête est une chaîne de caractères : l'accord échappe aux vérificateurs de types, seule l'exécution le montre. Ces tests exécutent les requêtes concernées et laissent `infrastructure.db.rows` signaler le désaccord.
 
-Un relevé nomme ses colonnes qu'il rende des lignes ou aucune : les relevés qui rendent une liste se contrôlent donc sur une base sans données. Ceux qui rendent une ligne unique demandent que la ligne existe.
+Une requête nomme ses colonnes même sans renvoyer de ligne : les requêtes qui renvoient une liste se contrôlent donc sur une base sans données. Celles qui renvoient une ligne unique demandent que la ligne existe.
 """
 
 import ast
@@ -33,7 +33,7 @@ from tests.integration.helpers.structures import (
 
 
 class TestRelevesRendantUneListe:
-    """Relevés dont l'accord se vérifie sans qu'aucune ligne existe."""
+    """Requêtes dont l'accord se vérifie sans aucune ligne."""
 
     def test_les_candidates_a_la_correction_unaire_s_accordent(self, sa_sync_conn_owner):
         assert SourceRecordCorrectionStore(sa_sync_conn_owner).fetch_for_unary_correction() == []
@@ -66,7 +66,7 @@ class TestRelevesRendantUneListe:
         assert store.fetch_source_contributions([1]) == []
 
     def test_les_facettes_de_publications_s_accordent(self, sa_sync_conn_owner):
-        """Les quatre facettes bâties par appariement aboutissent, l'accord étant prononcé au passage."""
+        """Les quatre facettes construites par appariement s'exécutent ; l'accord se vérifie au passage."""
         builder = _PublicationFacetsBuilder(
             sa_sync_conn_owner, PublicationFilters(), FilterContext([], None)
         )
@@ -74,12 +74,12 @@ class TestRelevesRendantUneListe:
         assert builder._facet_years() == []
         assert builder._facet_doc_types() == []
         assert options == [] and total == 0
-        # La facette d'accès énumère son vocabulaire, que des publications le portent ou non.
+        # La facette d'accès énumère son vocabulaire, même sans publication.
         assert {option.value for option in builder._facet_access()}
 
 
 class TestRelevesRendantUneLigne:
-    """Relevés dont l'accord demande qu'une ligne existe."""
+    """Requêtes dont l'accord demande qu'une ligne existe."""
 
     def test_une_revue_s_accorde(self, sa_sync_conn_owner):
         serial_id = insert_serial(sa_sync_conn_owner, "Revue")
@@ -114,9 +114,9 @@ TYPES_EXERCES = {
     "_StructureNameFormRow",
     "_StructureRow",
 }
-"""Types que les tests ci-dessus construisent depuis un relevé réel.
+"""Types que les tests ci-dessus construisent depuis une requête réelle.
 
-Le test qui suit confronte cette liste aux appariements que porte le code : un adaptateur ajouté sans son test fait échouer l'intégration, et un type dont le dernier appariement disparaît sort de la liste.
+Le test qui suit compare cette liste aux appariements présents dans le code : un adaptateur ajouté sans son test le fait échouer, et un type dont le dernier appariement disparaît doit sortir de la liste.
 """
 
 _APPARIEMENTS = frozenset({"row_as", "rows_as"})
@@ -125,7 +125,7 @@ _COUCHES = ("application", "infrastructure", "pipeline")
 
 
 def _types_apparies() -> set[str]:
-    """Types que le code construit par appariement de noms, relevés sur l'arbre syntaxique."""
+    """Types que le code construit par appariement de noms, trouvés dans l'arbre syntaxique."""
     racine = Path(__file__).resolve().parents[3]
     trouves: set[str] = set()
     for couche in _COUCHES:
@@ -146,7 +146,7 @@ def _types_apparies() -> set[str]:
 
 
 def test_le_parcours_trouve_les_appariements():
-    """Filet du filet : un parcours qui n'en trouverait aucun rendrait l'assertion vide, donc verte."""
+    """Le parcours trouve des appariements : un parcours vide rendrait la comparaison sans objet."""
     assert len(_types_apparies()) >= 9
 
 
@@ -168,7 +168,7 @@ def test_chaque_type_apparie_est_exerce_par_un_test():
     ],
 )
 def test_un_releve_qui_ne_s_accorde_pas_leve(sa_sync_conn_owner, requete):
-    """Le désaccord porte le nom du type visé et celui des colonnes en écart."""
+    """Une requête qui ne s'accorde pas, par colonne manquante ou en trop, lève une erreur qui nomme le type visé."""
     from infrastructure.db.rows import rows_as
     from infrastructure.repositories.serial_repository import _SerialRow
 

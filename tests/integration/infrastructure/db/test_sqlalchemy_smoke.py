@@ -1,6 +1,6 @@
 """Chaîne MetaData → SQLAlchemy Core → psycopg3, et accord de la MetaData avec les migrations.
 
-Les tests de round-trip vérifient que les types Postgres non triviaux (JSONB, ARRAY) traversent la chaîne. `TestMetaDataMatchesMigrations` est le filet contre le drift entre `infrastructure/db/tables.py` et le schéma qu'écrivent les migrations.
+Les tests de round-trip vérifient que les types Postgres non triviaux (JSONB, ARRAY) traversent la chaîne. `TestMetaDataMatchesMigrations` détecte tout écart entre `infrastructure/db/tables.py` et le schéma qu'écrivent les migrations.
 """
 
 from alembic.config import Config
@@ -9,13 +9,10 @@ from sqlalchemy import Connection, select, update
 from alembic import command
 from infrastructure.db.tables import config, perimeters, structures
 
-# ── Smoke : round-trip SQLAlchemy Core sur la table config ────────
-
 
 class TestSqlalchemyCoreSmoke:
     def test_select_returns_rows(self, sa_sync_conn: Connection):
-        # Insère une clé via SQLAlchemy. SA (re)sérialise automatiquement
-        # la valeur Python en JSONB (la colonne est typée JSONB).
+        # SQLAlchemy sérialise la valeur Python en JSONB.
         sa_sync_conn.execute(
             config.insert().values(key="poc_smoke", value="hello", description="poc")
         )
@@ -42,7 +39,7 @@ class TestSqlalchemyCoreSmoke:
         assert row.value == {"a": 1, "b": 2}
 
     def test_insert_perimeter_with_array_column(self, sa_sync_conn: Connection):
-        """Vérifie qu'un ARRAY(Integer) PostgreSQL est manipulable côté SA."""
+        """Un ARRAY(Integer) PostgreSQL s'écrit et se relit par SQLAlchemy."""
         result = sa_sync_conn.execute(
             perimeters.insert()
             .values(code="poc_perim", name="POC", root_structure_ids=[1, 2, 3])
@@ -52,7 +49,7 @@ class TestSqlalchemyCoreSmoke:
         assert row.root_structure_ids == [1, 2, 3]
 
     def test_insert_structure_with_jsonb(self, sa_sync_conn: Connection):
-        """Vérifie qu'un JSONB est sérialisé correctement par SA."""
+        """Un JSONB s'écrit et se relit par SQLAlchemy."""
         result = sa_sync_conn.execute(
             structures.insert()
             .values(
@@ -67,15 +64,12 @@ class TestSqlalchemyCoreSmoke:
         assert row.api_ids == {"ror": "0000abc"}
 
 
-# ── Cohérence MetaData ↔ migrations ────────────────────────────────
-
-
 class TestMetaDataMatchesMigrations:
     def test_alembic_check_reports_no_drift(self, alembic_config: Config):
         """Les migrations produisent le schéma que `infrastructure/db/tables.py` déclare.
 
-        La base de test est montée par `alembic upgrade head` : la confronter à la MetaData compare le schéma aux migrations qui l'écrivent, seule source de vérité. `alembic check` couvre les tables et colonnes des deux côtés, leurs types, leur nullabilité et leurs commentaires ; index, clés étrangères et vues matérialisées restent hors comparaison (`include_object` dans `alembic/env.py`).
+        La base de test est montée par `alembic upgrade head` : la confronter à la MetaData compare le schéma aux migrations qui l'écrivent. `alembic check` couvre les tables et colonnes des deux côtés, leurs types, leur nullabilité et leurs commentaires ; index, clés étrangères et vues matérialisées restent hors comparaison (`include_object` dans `alembic/env.py`).
 
-        L'échec porte le diff des opérations qu'un autogenerate produirait.
+        Le message d'échec contient le diff des opérations qu'un autogenerate produirait.
         """
         command.check(alembic_config)

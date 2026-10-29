@@ -1,4 +1,4 @@
-"""Idempotence : phase `populate_affiliations` (propagation périmètre/structures)."""
+"""Phase `affiliations` (`populate`) : indices de périmètre et structures des contributions sources, idempotence, marquages en aval."""
 
 from infrastructure.db.queues import Queue
 from tests.integration.helpers.addresses import insert_address, insert_address_structure
@@ -15,14 +15,7 @@ from tests.integration.helpers.structures import insert_perimeter, insert_struct
 
 
 def _setup_affiliations_test_data(conn):
-    """Crée des données pour tester populate_affiliations :
-    structures + périmètres + adresses + source_contributions liées.
-
-    Scénario : une structure UCA (labo, id=80001) sous la tutelle
-    d'UCA (id=80000). Une contribution OpenAlex est rattachée
-    au labo via une adresse résolue. Une contribution HAL coexiste sans
-    résolution d'adresse (sert pour l'idempotence des comptages).
-    """
+    """Un laboratoire (80001) sous la tutelle de l'université (80000), racine des périmètres. Une publication et ses enregistrements sources HAL et OpenAlex, chacun avec une contribution source. Seule la contribution source OpenAlex a une adresse, rattachée au laboratoire."""
 
     set_config(conn, "perimeter_extraction", "alliance_uca")
     set_config(conn, "perimeter_persons", "uca")
@@ -76,15 +69,14 @@ def _setup_affiliations_test_data(conn):
     insert_address_structure(conn, 80001, structure_id=80001, is_confirmed=True)
     insert_source_contribution_address(conn, 80002, address_id=80001)
 
-    # `source_contribution_structures` (matview) filtre par `perimeter_structures` :
-    # peupler la clôture du périmètre depuis les perimeters/relations semés.
+    # La vue `source_contribution_structures` filtre sur `perimeter_structures` : calcule la clôture des périmètres semés.
     from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
     refresh_perimeter_structures(conn)
 
 
 def _run_populate_affiliations(conn):
-    """Exécute populate_affiliations sur la Connection SA de test."""
+    """Exécute `populate` sur la connexion du test."""
     import logging
 
     from infrastructure.read_models.perimeters.queries import get_persons_structure_ids
@@ -121,7 +113,7 @@ def _count_affiliations(conn) -> dict:
 
 
 class TestPopulateAffiliationsIdempotence:
-    """populate_affiliations produit le même résultat si lancé deux fois."""
+    """`populate` lancé deux fois donne le même résultat."""
 
     def test_double_run_same_counts(self, sa_sync_conn):
         _setup_affiliations_test_data(sa_sync_conn)
@@ -129,9 +121,7 @@ class TestPopulateAffiliationsIdempotence:
         _run_populate_affiliations(sa_sync_conn)
         counts_1 = _count_affiliations(sa_sync_conn)
 
-        # HAL utilise maintenant le circuit adresses (comme les autres sources).
-        # Sans populate_addresses + resolve_addresses dans ce test, HAL n'est pas in_perimeter.
-        # L'idempotence est vérifiée par la comparaison counts_1 == counts_2 ci-dessous.
+        # La contribution source HAL, sans adresse, reste hors périmètre.
         assert counts_1["openalex_in_perimeter"] == 1, "La contribution OA doit être in_perimeter"
         assert counts_1["openalex_with_structs"] == 1, (
             "La contribution OA doit avoir des structure_ids"
@@ -145,14 +135,7 @@ class TestPopulateAffiliationsIdempotence:
         )
 
     def test_populate_is_source_agnostic(self, sa_sync_conn):
-        """Régression : populate doit traiter toutes les sources sans filtre.
-
-        Une weekly avec --sources=hal ne doit plus laisser les SAs OpenAlex
-        bloquées sans structure_ids quand leur adresse a été résolue entre
-        deux runs (cas observé sur publication 21743 : adresse UCA résolue mais
-        Marc Ruivard / Olivier Aumaître côté OA restés sans structure_ids
-        car la weekly run ne ciblait que hal+scanr).
-        """
+        """Régression : un run limité à certaines sources laissait sans structure les contributions sources OpenAlex dont l'adresse était résolue entre deux runs. `populate` traite toutes les sources."""
         import logging
 
         from sqlalchemy import text
@@ -182,20 +165,14 @@ class TestPopulateAffiliationsIdempotence:
 
 
 class TestPopulateAffiliationsTheses:
-    """Régression : les contributions theses doivent obtenir `in_perimeter` comme
-    les autres sources (le sync est source-agnostique, dérivé de la matview).
-    Avant fix, `BIBLIO_SOURCES` excluait theses → `in_perimeter` restait FALSE et
-    la cascade personnes ne voyait jamais ces contributions (jury, directeurs,
-    rapporteurs, voire auteurs)."""
+    """Régression : les contributions sources de theses.fr (jury, directeurs, rapporteurs, auteurs) restaient hors périmètre, donc ignorées par la phase `persons`. Elles reçoivent leurs indices de périmètre comme celles des autres sources."""
 
     def test_theses_contribution_in_perimeter_via_address(self, sa_sync_conn):
         from sqlalchemy import text
 
         _setup_affiliations_test_data(sa_sync_conn)
 
-        # Ajoute une source_record + source_contribution theses,
-        # liées à l'adresse 80001 (déjà résolue vers structure 80001
-        # via address_structures par _setup_affiliations_test_data).
+        # Enregistrement source theses.fr et sa contribution source, liée à l'adresse 80001, rattachée au laboratoire.
         insert_source_record(
             sa_sync_conn,
             80001,
@@ -238,7 +215,7 @@ def _marked_for_reconciliation(conn, source_record_id: int) -> bool:
 
 
 class TestEntreeDansLePerimetre:
-    """Régression : un enregistrement sans publication qui entre dans le périmètre après sa normalisation n'était jamais mis en publication, faute d'être marqué pour la réconciliation (1 936 publications UCA créées tardivement en septembre 2026)."""
+    """Régression : un enregistrement source sans publication qui entre dans le périmètre après sa normalisation restait sans publication, faute d'être marqué pour la réconciliation."""
 
     def _orpheline(self, conn) -> None:
         from sqlalchemy import text
@@ -263,7 +240,7 @@ class TestEntreeDansLePerimetre:
         assert _marked_for_reconciliation(sa_sync_conn, 80002) is False
 
     def test_contributions_des_contributions_sources_entrees_marquees(self, sa_sync_conn):
-        """La contribution d'une contribution source dont les indices de périmètre changent est marqué pour la recomposition de ses attributs."""
+        """La contribution d'une contribution source dont les indices de périmètre changent est marquée pour la recomposition de ses attributs."""
         from sqlalchemy import text
 
         _setup_affiliations_test_data(sa_sync_conn)
@@ -281,7 +258,7 @@ class TestEntreeDansLePerimetre:
         assert contribution in queued(sa_sync_conn, Queue.CONTRIBUTION_ATTRIBUTES)
 
     def test_recalcul_cible_recompose_la_contribution(self, sa_sync_conn):
-        """Le recalcul après une correction d'adresse recompose tout de suite les indices de la contribution de la contribution source."""
+        """Le recalcul après une correction d'adresse recompose aussitôt les indices de périmètre de la contribution qui contient la contribution source."""
         from sqlalchemy import text
 
         from pipeline.transformation.structures.perimeter_evidence import (

@@ -210,7 +210,7 @@ class TestGetLaboratorySubjects:
 
         ai = insert_subject(sa_sync_conn, "AI")
         bio = insert_subject(sa_sync_conn, "Biology")
-        # AI sur 3 publis ; Biology sur 1.
+        # AI sur 3 publications ; Biology sur 1.
         for p in (p1, p2, p3):
             insert_publication_subject(sa_sync_conn, p, subject_id=ai)
         insert_publication_subject(sa_sync_conn, p1, subject_id=bio)

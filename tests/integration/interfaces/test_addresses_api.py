@@ -1,10 +1,4 @@
-"""Tests de caractérisation pour le router addresses.
-
-Stratégie : exercer toutes les branches des endpoints pour verrouiller
-le comportement. Même approche que test_persons_api.py : tester le
-status code sur une base non-contrôlée, ajouter un seed minimal
-(module-scope) pour les endpoints qui exigent un pays ou un périmètre.
-"""
+"""Tests de caractérisation du router des adresses : chaque branche des routes, et la trace d'audit des écritures."""
 
 import pytest
 
@@ -20,24 +14,17 @@ from tests.integration.helpers.seeds import (
 
 @pytest.fixture(scope="module", autouse=True)
 def _seed_addresses_api(client):
-    """Seed minimal pour les tests addresses : pays FR + périmètre uca.
+    """Pays FR et périmètre des personnes, que demandent certaines routes.
 
-    Effectue aussi un `warmup` via client : le conftest racine recrée la
-    base via `pg_terminate_backend` au démarrage, ce qui tue les
-    connexions déjà ouvertes par la pool de `conftest.py`. Un premier
-    appel à l'API purge ces connexions mortes (la pool les discard au
-    retour). `client` dépendance → fixture lancée après la création du
-    TestClient.
+    Le conftest racine recrée la base au démarrage et coupe les connexions ouvertes. Quelques appels à l'API purgent les connexions mortes du pool.
     """
     seed_country("FR", "France")
-    # Code unique pour éviter les collisions avec d'autres tests d'intégration
-    # qui insèrent aussi une structure 'UCA' en dur.
+    # Code propre au module : d'autres tests insèrent une structure 'UCA'.
     uca_id = seed_structure("UCA-ADDR-API-SEED", "universite", name="UCA seed", reuse=True)
     seed_perimeter("uca", [uca_id], "UCA", replace=True)
     seed_config("perimeter_persons", "uca")
 
-    # Warmup : ping l'API jusqu'à ce qu'une connexion vive soit obtenue
-    # (purge les connexions mortes de la pool).
+    # Appels répétés jusqu'à obtenir une connexion vive.
     for _ in range(5):
         r = client.get("/api/countries")
         if r.status_code == 200:
@@ -49,12 +36,12 @@ def _seed_addresses_api(client):
 
 class TestListAddresses:
     def test_missing_structure_id_refused(self, client):
-        """Le scope est essentiel : sans lui la lecture n'a pas de sens, et se refuse."""
+        """Sans structure, la lecture se refuse."""
         r = client.get("/api/addresses")
         assert r.status_code == 422
 
     def test_no_search_triggers_guard(self, client):
-        # Garde-fou : detected=no sans prédicat de réduction → requires_search (pas d'accès DB)
+        # Adresses non détectées sans prédicat de réduction : la route demande une recherche sans lire la base.
         r = client.get("/api/addresses", params={"structure_id": 1, "detected": "no"})
         assert r.status_code == 200
         assert r.json().get("requires_search") is True
@@ -87,8 +74,7 @@ class TestListAddresses:
         assert r.status_code == 200
 
     def test_struct_predicate_lifts_guard(self, client):
-        # detected=no SANS texte mais AVEC un prédicat structure → pas de garde-fou,
-        # la requête accède à la DB et renvoie une liste normale.
+        # Un prédicat de structure suffit à réduire les adresses non détectées : la route renvoie la liste.
         r = client.get(
             "/api/addresses",
             params={"structure_id": 1, "detected": "no", "struct": "recognized:1"},
@@ -98,11 +84,7 @@ class TestListAddresses:
 
 
 class TestMalformedPredicates:
-    """Un prédicat qui ne se conforme pas à sa forme est refusé, non abandonné.
-
-    Abandonné, il rendait la liste non filtrée sous un code 200 : le résultat n'était pas
-    celui qu'on croyait, et rien ne le signalait.
-    """
+    """Un prédicat malformé est refusé en 422. Ignoré, il laisserait passer la liste non filtrée sous un code 200."""
 
     @pytest.mark.parametrize(
         "text",
@@ -176,7 +158,7 @@ class TestReviewAddress:
         assert r.status_code == 200
 
     def test_unknown_address_refused(self, auth_client):
-        """Une adresse inexistante rend 404, là où l'écriture ne toucherait rien en silence."""
+        """Une adresse inexistante renvoie 404, là où l'écriture ne toucherait rien en silence."""
         struct = seed_structure("LAB-REV-404")
         r = auth_client.post(
             "/api/addresses/999999999/review",
@@ -257,10 +239,7 @@ class TestSetAddressCountry:
         assert r.status_code == 200
 
     def test_set_country_visible_immediately(self, auth_client):
-        # Régression (chantier commit-avant-réponse) : la donnée écrite par le POST
-        # est lisible dès le GET suivant. Garde-fou de la dépendance commit-as-you-go
-        # et du futur passage du teardown en rollback — un handler d'écriture sans
-        # `commit()` ferait alors échouer ce test.
+        # Régression : la donnée écrite par le POST est lisible dès le GET suivant. Une route d'écriture sans `commit()` fait échouer ce test.
         addr = seed_address("Readback marker QWXZ")
         r = auth_client.post(f"/api/addresses/{addr}/country", json={"countries": ["FR"]})
         assert r.status_code == 200
@@ -301,7 +280,7 @@ class TestBatchSetCountry:
         assert r.status_code == 200
 
     def test_422_empty_filter(self, auth_client):
-        """Ni IDs ni filtre → 400 (garde-fou contre l'application en masse)."""
+        """Sans identifiants ni filtre, le lot viserait toutes les adresses : refus en 422."""
         r = auth_client.post(
             "/api/addresses/batch-country",
             json={"country_code": "FR"},
@@ -342,9 +321,7 @@ def _evenements(event_type: str) -> list[dict]:
 class TestTracabilite:
     """Les écritures sur les adresses laissent une trace nominative.
 
-    L'arbitrage du rattachement d'une adresse à une structure est la décision dont dépend le compte de publications d'un laboratoire : c'est celle dont la trace importe le plus. L'attribution d'un pays commande de la même façon les décomptes par pays.
-
-    Un lot est une décision unique, et vaut donc un seul événement : la charge utile porte ce qui a été demandé — les identifiants quand l'appel en donne, le critère de sélection sinon — et le nombre de lignes touchées. Consigner une ligne par adresse enregistrerait un fait que personne n'a décidé, et perdrait le critère.
+    Un lot vaut un seul événement. Sa charge utile contient ce qui a été demandé (les identifiants quand l'appel en donne, le critère de sélection sinon) et le nombre de lignes touchées.
     """
 
     def test_l_arbitrage_d_un_rattachement_est_consigne(self, auth_client):
@@ -418,7 +395,7 @@ class TestTracabilite:
         assert dernier["payload"]["address_ids"] == [addr]
 
     def test_un_lot_de_pays_par_filtre_porte_le_critere(self, auth_client):
-        """Une sélection par filtre peut couvrir toute la table : c'est le critère qui est la décision, non la liste qu'il rend."""
+        """Un lot sélectionné par filtre consigne le critère, sans la liste des adresses."""
         seed_address("Cible unique pour le filtre d audit")
         avant = len(_evenements("address.batch_country_set"))
 

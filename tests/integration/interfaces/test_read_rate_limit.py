@@ -1,8 +1,8 @@
 """Plafond de fréquence des lectures.
 
-Le plafond de lignes borne ce qu'une lecture coûte ; celui-ci borne ce que leur répétition coûte. Il couvre les points d'entrée de l'API par un middleware, et non par une dépendance déclarée route par route : un point d'entrée ajouté plus tard en hérite.
+Le plafond de lignes borne le coût d'une lecture ; ce plafond borne le coût de leur répétition. Un middleware l'applique à toutes les routes de l'API.
 
-Le plafond réel se compte en centaines ; les tests substituent un compteur court pour l'atteindre.
+Le plafond réel se compte en centaines ; les tests le ramènent à trois requêtes.
 """
 
 from __future__ import annotations
@@ -38,13 +38,13 @@ class TestReadRateLimit:
         assert "requêtes" in response.json()["detail"].lower()
 
     def test_le_plafond_couvre_tous_les_points_d_entree(self, client, _plafond_court):
-        """Un même compteur pour l'ensemble des lectures : c'est la même dépense pour le serveur."""
+        """Un seul compteur couvre toutes les lectures."""
         for _ in range(PLAFOND_COURT):
             client.get("/api/countries")
         assert client.get("/api/publications").status_code == 429
 
     def test_les_ecritures_gardent_leur_propre_sort(self, client, _plafond_court):
-        """Le plafond ne vise que les lectures : une écriture reste jugée sur sa session."""
+        """Le plafond vise seulement les lectures : une écriture reste jugée sur sa session."""
         for _ in range(PLAFOND_COURT):
             client.get("/api/countries")
         response = client.post("/api/auth/login", json={"username": "x", "password": "y"})
@@ -54,7 +54,7 @@ class TestReadRateLimit:
 class TestJournalisationDuRefus:
     """Un refus composé par un middleware paraît au journal comme une requête servie.
 
-    Le chronomètre enveloppe les middlewares qui coupent la requête ; sans cet ordre, un moissonnage arrêté par le plafond ne laisserait aucune trace, et la seule défense contre un parcours automatique serait muette.
+    Le chronomètre enveloppe les middlewares qui refusent la requête : un moissonnage arrêté par le plafond laisse donc une trace.
     """
 
     def test_le_refus_du_plafond_est_journalise(self, client, _plafond_court, caplog):

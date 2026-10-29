@@ -1,6 +1,6 @@
 """Plafond de fréquence des exports CSV.
 
-Le plafond de lignes borne le coût d'un export ; celui-ci borne le coût d'une rafale. Les deux exports partagent le compteur — c'est la même dépense pour le serveur — et il reste distinct de celui de la connexion : un export refusé ne doit pas empêcher de se connecter.
+Le plafond de lignes borne le coût d'un export ; ce plafond borne le coût d'une rafale. Les deux exports partagent un compteur, distinct de celui de la connexion : un export refusé laisse la connexion possible.
 """
 
 from __future__ import annotations
@@ -32,14 +32,13 @@ class TestExportRateLimit:
         assert client.get("/api/publications/export-theses.csv").status_code == 429
 
     def test_login_keeps_its_own_quota(self, client, _saturated_export_quota):
-        # Compteur distinct : le quota d'exports épuisé, la connexion reste joignable
-        # (401 sur des identifiants faux, pas 429).
+        # Le quota d'exports épuisé, la connexion répond 401 sur des identifiants faux, sans 429.
         response = client.post("/api/auth/login", json={"username": "x", "password": "y"})
         assert response.status_code == 401
 
 
 class TestExportConcurrency:
-    """Le nombre d'exports menés de front est plafonné, indépendamment du nombre de clients."""
+    """Le nombre d'exports simultanés est plafonné, tous clients confondus."""
 
     def test_un_export_passe_quand_un_droit_est_libre(self, client):
         assert client.get("/api/publications/export.csv").status_code == 200
@@ -62,6 +61,6 @@ class TestExportConcurrency:
                 slot.release()
 
     def test_le_droit_revient_une_fois_l_envoi_termine(self, client):
-        """Le flux rend le droit quand son parcours s'achève : des exports successifs passent tous."""
+        """Le flux libère son droit à la fin de l'envoi : des exports successifs passent tous."""
         for _ in range(settings.max_concurrent_exports + 2):
             assert client.get("/api/publications/export.csv").status_code == 200

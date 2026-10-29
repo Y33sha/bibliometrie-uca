@@ -1,12 +1,14 @@
-"""Tests de caractérisation pour le router publishers.
+"""Tests de caractérisation du router des éditeurs.
 
 Couvre :
-- GET /api/publishers (liste + search + sort variants + filtres)
-- GET /api/publishers/facets (3 dimensions avec comptes exclusifs)
-- GET /api/publishers/{id} (detail enrichi, 404)
-- GET /api/publishers/{id}/subjects (top sujets, exclusion sujets génériques)
-- PUT /api/publishers/{id} (update, auth requise)
-- POST /api/publishers/{id}/merge (fusion, auth requise, 404 target/source)
+- GET /api/publishers (liste, recherche, tris, filtres)
+- GET /api/publishers/facets (trois dimensions, chacune décomptée hors de sa propre sélection)
+- GET /api/publishers/{id} (fiche, 404)
+- GET /api/publishers/{id}/subjects (sujets principaux, hors sujets génériques)
+- PUT /api/publishers/{id} (mise à jour, authentification requise)
+- POST /api/publishers/{id}/merge (fusion, authentification requise, 404 sur la cible ou la source)
+- GET /api/publishers/types
+- la trace d'audit des modifications
 """
 
 import uuid
@@ -53,7 +55,7 @@ class TestListPublishers:
         assert r.status_code == 200
 
     def test_search_min_length(self, client):
-        # search < 2 caractères → ignoré (pas de filtre appliqué)
+        # Une recherche de moins de deux caractères est ignorée.
         r = client.get("/api/publishers", params={"search": "a"})
         assert r.status_code == 200
 
@@ -65,8 +67,7 @@ class TestListPublishers:
         assert any(p["name"] == name for p in r.json()["publishers"])
 
     def test_search_with_punctuation_normalizes(self, client):
-        # `.` ne figure jamais dans name_normalized (normalize_text → espace).
-        # La query doit subir la même normalisation pour matcher.
+        # `normalize_text` change `.` en espace dans `name_normalized` ; la recherche subit la même normalisation.
         suffix = uniq("Punct").split("_")[-1]
         name = f"Acme S.A. Pub {suffix}"
         seed_publisher(name)
@@ -160,7 +161,7 @@ class TestPublishersFacets:
         assert r.status_code == 200
         body = r.json()
         assert set(body) == {"publisher_types", "countries", "publications"}
-        # Le pays seedé doit apparaître dans la facette countries.
+        # Le pays posé apparaît dans la facette des pays.
         assert any(opt["value"] == country for opt in body["countries"])
 
     def test_country_label_is_the_country_name(self, client):
@@ -216,7 +217,7 @@ class TestGetPublisher:
         body = r.json()
         assert body["id"] == pid
         assert body["name"] == "TestGetPub"
-        # Le profil détaillé porte le type, les préfixes DOI et les décomptes.
+        # La fiche contient le type, les préfixes DOI et les décomptes.
         assert "publisher_type" in body
         assert "doi_prefixes" in body
         assert "serial_count" in body
@@ -225,7 +226,7 @@ class TestGetPublisher:
         assert body["publication_count"] == 0
 
     def test_doi_prefixes_aggregated(self, client):
-        """Les préfixes DOI rattachés à un éditeur sont remontés sur la page détail."""
+        """La fiche d'un éditeur renvoie ses préfixes DOI."""
         name = uniq("PrefixedPub")
         pid = seed_publisher(name)
         for prefix in ("10.9008", "10.9009"):
@@ -239,7 +240,7 @@ class TestGetPublisher:
         assert all(p["crossref_member_id"] == 42 for p in publication["doi_prefixes"])
 
     def test_doi_prefixes_in_list(self, client):
-        """Régression : la colonne « Préfixes DOI » du tableau des éditeurs restait vide, la liste ne les renvoyant pas."""
+        """Régression : la liste renvoie les préfixes DOI de chaque éditeur, qu'affiche le tableau des éditeurs."""
         name = uniq("ListedPrefixedPub")
         pid = seed_publisher(name)
         seed_doi_prefix("10.9010", ra="Crossref", publisher_id=pid)
@@ -384,10 +385,7 @@ class TestPublisherTypes:
 
 
 class TestTracabilite:
-    """La fusion de deux éditeurs était consignée, la modification de l'un d'eux non.
-
-    Renommer un éditeur ou changer son pays déplace les décomptes qui s'agrègent par éditeur, et efface la valeur antérieure sans laisser dire qui l'a décidé.
-    """
+    """La modification d'un éditeur est consignée : renommer un éditeur ou changer son pays déplace les décomptes par éditeur."""
 
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
         pid = seed_publisher(uniq("Audit éditeur"))
@@ -404,6 +402,6 @@ class TestTracabilite:
             evenements = cur.fetchall()
 
         assert len(evenements) == 1
-        # Le pays est normalisé au bord : la trace porte la valeur écrite, non la casse reçue.
+        # Le pays est normalisé à la réception : la trace contient la valeur écrite, en minuscules.
         assert evenements[0]["payload"] == {"country": "fr"}
         assert evenements[0]["user_id"]

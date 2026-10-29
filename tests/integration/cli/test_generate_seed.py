@@ -1,6 +1,6 @@
 """Smoke test de `generate_seed` : le script parcourt chaque table de référence sans buter sur une colonne ou une table périmée.
 
-Les CLI oneshot ne sont pas testés (joués une fois) ; les CLI récurrents comme celui-ci ont un smoke test, pour qu'un renommage de schéma ne les casse pas silencieusement — pyrefly et ruff ne voient pas les identifiants SQL contenus dans les chaînes `text()`.
+pyrefly et ruff ignorent les identifiants SQL des chaînes `text()` : ce test détecte un renommage de schéma qui casse le script.
 """
 
 from pathlib import Path
@@ -41,7 +41,7 @@ def test_generate_seed_walks_every_table(sa_sync_conn, tmp_path):
 
 
 def test_generate_seed_exports_structure_api_ids(sa_sync_conn, tmp_path):
-    # Les extractions OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les porter.
+    # Les extractions OpenAlex, WoS, ScanR et theses.fr lisent l'institution dans `api_ids` : une base montée depuis le seed doit les contenir.
     insert_structure(
         sa_sync_conn,
         "smoke",
@@ -82,7 +82,7 @@ def test_generate_seed_splits_config_keys(sa_sync_conn, tmp_path):
 
 
 def test_seed_se_recharge_sur_une_base_remplie(sa_sync_conn):
-    """Régression : la suppression d'un pays référencé par un candidat d'adresse faisait échouer le chargement."""
+    """Régression : le seed se recharge sur une base où un candidat d'adresse référence un pays."""
     ensure_country(sa_sync_conn, "fr", "Ancien nom")
     ensure_country(sa_sync_conn, "zz", "Absent du seed")
     address_id = insert_address(sa_sync_conn, "Clermont-Ferrand")

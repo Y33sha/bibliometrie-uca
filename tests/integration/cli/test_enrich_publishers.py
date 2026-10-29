@@ -1,4 +1,4 @@
-"""Requêtes du script d'enrichissement du pays des éditeurs, sur la base de test."""
+"""Requêtes du script d'enrichissement du pays des éditeurs."""
 
 from unittest.mock import MagicMock
 

@@ -1,4 +1,4 @@
-"""Réhydratation `staging` depuis le raw store : inverse de `StagingStore.mark_done`.
+"""Réhydratation de `staging` depuis le raw store, opération inverse de `StagingStore.mark_done`.
 
 Couvre aussi le couplage au schéma (colonnes `source, source_id, doi, raw_data, raw_hash, processed`) : un renommage casserait ces requêtes.
 """
@@ -24,7 +24,7 @@ def _fetch(conn, source_id):
 
 class TestRehydrateStagingRow:
     def test_absent_row_is_orphan(self, sa_sync_conn):
-        # Aucune ligne (source, source_id) : orpheline → False, rien créé.
+        # Clé (source, source_id) orpheline : la fonction renvoie False sans créer de ligne.
         assert rehydrate_staging_row(sa_sync_conn, "hal", "hal-absent", {"x": 1}) is False
         assert _fetch(sa_sync_conn, "hal-absent") is None
 
@@ -39,13 +39,13 @@ class TestRehydrateStagingRow:
 
 class TestRehydrateOrCreateStagingRow:
     def test_inserts_then_updates(self, sa_sync_conn):
-        # Clé orpheline (après un TRUNCATE staging) : première passe insère.
+        # Clé orpheline, par exemple après un TRUNCATE de staging : la première passe insère la ligne.
         assert rehydrate_or_create_staging_row(sa_sync_conn, "hal", "hal-2", "10.1/x", {"a": 1})
         row = _fetch(sa_sync_conn, "hal-2")
         assert row.raw_data == {"a": 1}
         assert row.processed is False
 
-        # Deuxième passe : conflit (source, source_id) → mise à jour, doi d'origine préservé.
+        # Deuxième passe : la ligne de même (source, source_id) est mise à jour et garde son DOI d'origine.
         assert not rehydrate_or_create_staging_row(
             sa_sync_conn, "hal", "hal-2", "10.1/other", {"a": 2}
         )

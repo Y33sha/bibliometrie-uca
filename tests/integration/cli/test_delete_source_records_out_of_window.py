@@ -1,4 +1,4 @@
-"""Suppression des enregistrements sources parues avant l'année de début du pipeline (`delete_source_records_out_of_window`)."""
+"""Suppression des enregistrements sources parus avant l'année de début du pipeline (`delete_source_records_out_of_window`)."""
 
 from functools import partial
 
@@ -93,7 +93,7 @@ def test_la_soeur_dans_la_plage_reste_et_se_reconcilie(sa_sync_conn_owner):
 
 
 def test_la_these_soutenue_ancienne_part_la_these_en_cours_reste(sa_sync_conn_owner):
-    """Une thèse en cours n'a pas d'année de soutenance : son année de première inscription ne la fait pas sortir de la fenêtre."""
+    """Une thèse soutenue avant l'année de début est supprimée. Une thèse en cours reste, quelle que soit son année de première inscription."""
     conn = sa_sync_conn_owner
     soutenue = _source_record_staged(
         conn,

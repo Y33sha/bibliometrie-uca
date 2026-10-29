@@ -1,4 +1,4 @@
-"""Tests d'intégration de la fusion des autres noms des éditeurs (`merge_duplicate_publishers`)."""
+"""Fusion des éditeurs qui sont un autre nom du titulaire de leurs préfixes DOI (`merge_duplicate_publishers`)."""
 
 import logging
 
@@ -15,7 +15,7 @@ from tests.integration.helpers.sources import insert_source_record
 
 
 def _records(conn, prefix: str, publisher_id: int, count: int, *, start: int = 0) -> None:
-    """`count` publications à DOI de `prefix`, chacune avec un enregistrement HAL qui nomme `publisher_id`."""
+    """`count` publications à DOI de `prefix`, chacune avec un enregistrement source HAL qui nomme `publisher_id`."""
     for i in range(start, start + count):
         publication = insert_publication(conn, doi=f"{prefix}/x{i}")
         insert_source_record(
@@ -77,7 +77,7 @@ def test_trop_peu_d_enregistrements_ou_titulaires_partages(sa_sync_conn):
     assert find_publisher_aliases(sa_sync_conn) == []
     _records(sa_sync_conn, "10.1163", named, 2)
     _records(sa_sync_conn, "10.1515", named, 2, start=4)
-    # 6 enregistrements sur 8 chez le même titulaire : moins de 90 %.
+    # 6 enregistrements sources sur 8 chez le même titulaire : moins de 90 %.
     assert find_publisher_aliases(sa_sync_conn) == []
 
 

@@ -1,4 +1,4 @@
-"""confirmed_source_contributions : épinglage à l'attache admin, désépinglage au détachement."""
+"""Épinglage des contributions sources à la personne (`confirmed_source_contributions`) au rattachement manuel, désépinglage au détachement."""
 
 import pytest
 from sqlalchemy import text
@@ -24,7 +24,7 @@ from tests.integration.helpers.sources import insert_source_contribution, insert
 
 
 def _orphan_source_contribution(conn):
-    """Publication + source_record + source_contribution orpheline, seule contribution source d'une contribution d'auteur du périmètre sans personne. Retourne (source_contribution_id, contribution, publication_id)."""
+    """Contribution source seule dans une contribution d'auteur du périmètre sans personne. Renvoie (contribution source, contribution, publication)."""
     publication = insert_publication(conn, "t", normalize_title=False, doc_type=None)
     source_record = insert_source_record(
         conn, publication, source_id=f"hal-{publication}", title="t"
@@ -75,7 +75,7 @@ def test_detach_unpins(sa_sync_conn):
 
 
 def test_name_form_rejection_spares_pinned_contributions(sa_sync_conn):
-    """Rejeter une forme de nom marque pour la redécision les contributions rattachées par le nom sous cette forme, sauf ceux que l'admin a épinglés sur la personne."""
+    """Rejeter une forme de nom met en file de résolution les contributions rattachées par le nom sous cette forme, sauf celles épinglées sur la personne par un rattachement manuel."""
     pid = insert_person(sa_sync_conn, "Durand", first_name="Paul")
     pinned, pinned_contribution, _ = _orphan_source_contribution(sa_sync_conn)
     _, matched_contribution, _ = _orphan_source_contribution(sa_sync_conn)

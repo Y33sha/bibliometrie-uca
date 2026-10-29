@@ -1,13 +1,6 @@
-"""Fixtures partagées pour les tests d'intégration API.
+"""Fixtures partagées des tests d'intégration de l'API.
 
-Fournit :
-- `client` : TestClient FastAPI pointant sur bibliometrie_test (module-scoped).
-- `auth_client` : TestClient avec cookie session admin valide.
-- une remise à zéro de la base après chaque module : les tests d'API valident leurs écritures.
-
-Le sync Engine SQLAlchemy du lifespan FastAPI est redirigé vers
-bibliometrie_test par monkey-patch de `build_sync_engine` avant l'import
-de l'app.
+L'application se connecte à bibliometrie_test : son constructeur d'engine est substitué avant son import.
 """
 
 import os
@@ -22,9 +15,9 @@ DB_PORT = int(os.environ.get("DB_PORT", "5432"))
 
 
 def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
-    """Engine SA sync sur bibliometrie_test, garde-fous installés comme sur le vrai.
+    """Engine SQLAlchemy synchrone sur bibliometrie_test, avec les garde-fous de l'engine de production.
 
-    `identity` choisit le rôle de connexion, comme le vrai constructeur : celui de l'API pour l'application, celui du pipeline pour les fixtures. Les tests exercent donc les droits qu'ils auront en production.
+    `identity` choisit le rôle de connexion : celui de l'API pour l'application, celui du pipeline ou du propriétaire du schéma pour les jeux de données. Les tests exercent donc les droits de production.
     """
     from infrastructure.db.engine import install_engine_guards
     from infrastructure.settings import settings as _s
@@ -47,7 +40,7 @@ def _build_test_sync_engine(identity: str = "pipeline") -> Engine:
     return engine
 
 
-# Patcher AVANT import de l'app
+# Le constructeur est substitué avant l'import de l'application.
 import infrastructure.db.engine as _engine_module  # noqa: E402
 
 _engine_module.build_sync_engine = _build_test_sync_engine
@@ -57,7 +50,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import interfaces.api.app as _app_module  # noqa: E402
 from interfaces.api.app import app  # noqa: E402
 
-# Patcher la copie locale dans app.py (import-time capture du nom)
+# app.py importe le nom du constructeur : sa copie locale est substituée aussi.
 _app_module.build_sync_engine = _build_test_sync_engine
 
 from collections.abc import Iterator
@@ -65,8 +58,7 @@ from collections.abc import Iterator
 from infrastructure.settings import settings as _settings  # noqa: E402
 from tests.integration.helpers.db import ConfigRow, config_rows, reset_database  # noqa: E402
 
-# Les tests s'exécutent sur http://testserver : un cookie de session marqué Secure ne serait
-# pas renvoyé par le client, ce qui casserait le parcours d'authentification par login.
+# Les tests s'exécutent sur http://testserver, et le client renvoie un cookie marqué Secure seulement en HTTPS.
 _settings.cookie_secure = False
 
 
@@ -98,14 +90,14 @@ def _reset_rate_limiters():
 
 @pytest.fixture(scope="module")
 def client() -> Iterator[TestClient]:
-    """TestClient FastAPI pointant vers bibliometrie_test."""
+    """Client de l'application, sans session."""
     with TestClient(app, raise_server_exceptions=False) as c:
         yield c
 
 
 @pytest.fixture(scope="module")
 def auth_client() -> Iterator[TestClient]:
-    """Client authentifié (cookie session valide)."""
+    """Client de l'application, avec un cookie de session valide."""
     from interfaces.api.session import issue_token
 
     with TestClient(app, raise_server_exceptions=False) as c:

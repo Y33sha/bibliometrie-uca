@@ -1,4 +1,4 @@
-"""Intégration : recalculs ciblés de publications après une fusion manuelle (`PublicationRecompute`)."""
+"""Recalculs ciblés de publications après une fusion manuelle (`PublicationRecompute`)."""
 
 from sqlalchemy import text
 

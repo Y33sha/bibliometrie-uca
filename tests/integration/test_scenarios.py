@@ -1,4 +1,4 @@
-"""Tests d'intégration — nécessitent la base bibliometrie_test."""
+"""Scénarios d'intégration : DOI insensibles à la casse, consolidation d'une publication, types énumérés PostgreSQL, fusion de personnes."""
 
 from functools import partial
 
@@ -41,15 +41,11 @@ def publication_repo(sa_sync_conn):
     return PublicationStore(sa_sync_conn)
 
 
-# ── Helpers ──
-
-
-# ── DOI case-insensitive (bug corrigé 2026-03-31) ──
+# ── DOI insensibles à la casse ──
 
 
 class TestDoiCaseInsensitive:
-    """La contrainte unique sur DOI est case-insensitive (lower(doi)).
-    Les lookups doivent aussi être case-insensitive."""
+    """La contrainte d'unicité sur le DOI ignore la casse (`lower(doi)`), comme les recherches par DOI."""
 
     def test_unique_constraint_blocks_case_variant(self, sa_sync_conn):
         _publication(sa_sync_conn, "Pub A", doi="10.1103/PhysRevC.111.024905")
@@ -65,7 +61,7 @@ class TestDoiCaseInsensitive:
         assert result is not None
 
 
-# ── Service publications ──
+# ── Consolidation des publications ──
 
 
 def _seed_publication(
@@ -77,7 +73,7 @@ def _seed_publication(
     doc_type: str = "article",
     oa_status: str = "unknown",
 ) -> int:
-    """Sème une publication directement via le repo (sans cascade de matching)."""
+    """Crée une publication par le store, sans matching."""
     return repo.create(
         title=title,
         title_normalized=title.lower(),
@@ -90,7 +86,7 @@ def _seed_publication(
 
 class TestRefreshFromSources:
     def test_enrich_via_refresh(self, sa_sync_conn, publication_repo):
-        """refresh_from_sources enrichit les métadonnées depuis les source_records."""
+        """`refresh_from_sources` reprend les métadonnées des enregistrements sources (revue, statut open access)."""
         serial_id = insert_serial(sa_sync_conn, "Science")
         publication_id = _seed_publication(publication_repo, "Pub", doi="10.5555/enrich-test")
         insert_source_record(
@@ -112,14 +108,14 @@ class TestRefreshFromSources:
         assert row.oa_status == "gold"
 
 
-# ── Cohérence des enums Postgres ──
+# ── Types énumérés PostgreSQL ──
 
 
 class TestPgEnumsMatchDb:
     def test_declared_values_match_db(self, sa_sync_conn):
-        """Chaque enum Postgres porté par `infrastructure/db/tables.py` déclare le vocabulaire de son type en base.
+        """Chaque type énuméré déclaré dans `infrastructure/db/tables.py` a les mêmes valeurs que son type en base.
 
-        Les valeurs viennent du domaine et le type est créé par migration : ce test ferme la boucle entre les trois. `alembic check` ne l'ouvre pas — il compare les colonnes, pas le contenu des types.
+        Les valeurs viennent du domaine et le type est créé par migration. `alembic check` compare les colonnes, sans le contenu des types.
 
         Une valeur en base et non déclarée casse la lecture de la colonne par SQLAlchemy (`LookupError`) ; une valeur déclarée et absente de la base casse l'écriture.
         """
@@ -147,7 +143,7 @@ class TestPgEnumsMatchDb:
         )
 
 
-# ── Merge persons ──
+# ── Fusion de personnes ──
 
 
 class TestMergePersons:
@@ -160,7 +156,7 @@ class TestMergePersons:
 
         service.merge_person(target, source)
 
-        # Source supprimée
+        # Personne absorbée supprimée.
         assert (
             sa_sync_conn.execute(
                 text("SELECT 1 FROM persons WHERE id = :id"), {"id": source}
@@ -168,9 +164,7 @@ class TestMergePersons:
             is None
         )
 
-        # Name forms transférées : la source 'hal' attachée à `source` est
-        # remontée sur la row `(j dupont, target)` après merge ; plus aucune
-        # row ne référence l'id `source`.
+        # La source 'hal' de la forme 'j dupont' passe à la conservée ; aucune forme ne reste à l'absorbée.
         row = sa_sync_conn.execute(
             text(
                 "SELECT sources FROM person_name_forms "
@@ -188,7 +182,7 @@ class TestMergePersons:
         )
 
     def test_merge_transfers_contributions_one_per_publication(self, sa_sync_conn, service):
-        """Régression : les contributions référencent la personne. Dans une publication où la conservée a déjà une contribution, la contribution de l'absorbée perd sa personne et garde ses contributions sources."""
+        """La fusion passe les contributions de l'absorbée à la conservée. Dans une publication où la conservée a déjà une contribution, celle de l'absorbée reste sans personne."""
         conn = sa_sync_conn
         target = _person(conn, "Dupont", first_name="Jean")
         source = _person(conn, "Dupont", first_name="J.")
@@ -223,7 +217,7 @@ class TestMergePersons:
         with pytest.raises(ConflictError, match="REFUS de fusion"):
             service.merge_person(target, source)
 
-        # Les deux personnes existent toujours
+        # La personne absorbée reste en base.
         assert (
             sa_sync_conn.execute(
                 text("SELECT 1 FROM persons WHERE id = :id"), {"id": source}

@@ -1,9 +1,6 @@
-"""Intégration : rapprochement par titre (signal #3) — erratums et preprints.
+"""Phase `relations` : matching par titre, relations déclarées par les sources, paires de publications à clé partagée, reconstruction de `publication_relations`.
 
-Valide sur vraie base `fetch_erratum_title_matches` (suffixe de titre) et
-`fetch_preprint_title_matches` (titre identique), et leur garde d'ambiguïté commune : un seul parent
-« substantiel » (hors formes de la même œuvre) doit porter le titre, sinon collision → abstention.
-Le parent est désigné par son `publication_id` ; son DOI peut être absent (cible au corpus sans DOI).
+Le matching par titre relie un erratum (`fetch_erratum_title_matches`, suffixe de titre) ou un preprint (`fetch_preprint_title_matches`, titre identique) à son parent. Le parent doit être la seule publication substantielle de ce titre, hors autres formes de la même œuvre ; sinon, aucun lien. Le parent est désigné par son `publication_id`, avec ou sans DOI.
 """
 
 import json
@@ -27,7 +24,7 @@ from tests.integration.helpers.sources import insert_source_record, secondary_id
 # Enregistrement source de titre « t ».
 _source_record = partial(insert_source_record, title="t")
 
-# Titre de parent assez long pour franchir la garde de longueur (> 30 caractères).
+# Titre de parent au-dessus de la garde de longueur (plus de 30 caractères).
 PARENT_TITLE = "measurement of differential cross sections in proton collisions"
 
 
@@ -69,7 +66,7 @@ class TestFetchErratumTitleMatches:
         ]
 
     def test_doiless_parent_still_matched(self, sa_sync_conn):
-        # Le parent au corpus n'a pas de DOI : rapproché quand même, parent_doi None.
+        # Le parent est sans DOI : le lien se fait, avec `parent_doi` à `None`.
         parent = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi=None
         )
@@ -83,7 +80,7 @@ class TestFetchErratumTitleMatches:
         assert [(m.child_id, m.parent_id, m.parent_doi) for m in matches] == [(err, parent, None)]
 
     def test_two_substantive_same_title_blocked(self, sa_sync_conn):
-        # Deux articles distincts au même titre = collision → abstention.
+        # Deux articles distincts au même titre : aucun lien.
         _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p1")
         _publication(sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/p2")
         _publication(
@@ -95,7 +92,7 @@ class TestFetchErratumTitleMatches:
         assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
 
     def test_preprint_does_not_block_and_article_chosen(self, sa_sync_conn):
-        # Le preprint partage le titre mais n'est pas un parent substantiel : on relie l'article.
+        # Le preprint a le même titre mais compte comme autre forme de l'œuvre : l'erratum est relié à l'article.
         article = _publication(
             sa_sync_conn, doc_type="article", title_normalized=PARENT_TITLE, doi="10.1/article"
         )
@@ -129,7 +126,7 @@ class TestFetchErratumTitleMatches:
         assert relations.fetch_erratum_title_matches(sa_sync_conn) == []
 
     def test_short_title_not_matched(self, sa_sync_conn):
-        short = "short title"  # <= 30 caractères → sous la garde de longueur
+        short = "short title"  # 30 caractères au plus : sous la garde de longueur
         _publication(sa_sync_conn, doc_type="article", title_normalized=short, doi="10.1/parent")
         _publication(
             sa_sync_conn, doc_type="erratum", title_normalized=f"erratum to {short}", doi="10.1/err"
@@ -139,7 +136,7 @@ class TestFetchErratumTitleMatches:
 
 class TestFetchPreprintTitleMatches:
     def test_unique_published_parent_matched(self, sa_sync_conn):
-        # La version publiée suit le preprint (année + 1), titre identique.
+        # La version publiée suit le preprint d'un an, sous le même titre.
         parent = _publication(
             sa_sync_conn,
             doc_type="article",
@@ -205,10 +202,7 @@ class TestFetchPreprintTitleMatches:
 
 
 class TestRelationTargetDeletionCascades:
-    """Régression : supprimer la publication cible d'une relation rapprochée par titre (cible au
-    corpus sans DOI) supprime la relation via `ON DELETE CASCADE`, au lieu de nuller sa cible — ce
-    qui la laissait sans cible, violant le CHECK `target_present` et faisant planter la dissolution
-    d'orphelins et le merge."""
+    """Régression : la suppression de la cible sans DOI d'une relation trouvée par titre laissait la relation sans cible, ce qui violait la contrainte `target_present` et faisait échouer la suppression des publications et la fusion. La relation est supprimée en cascade."""
 
     def test_repo_delete_of_target_removes_relation(self, sa_sync_conn):
         parent = _publication(
@@ -225,7 +219,7 @@ class TestRelationTargetDeletionCascades:
             target_publication_id=parent,
         )
 
-        # Le chemin qui plantait : lifecycle.refresh → store.delete sur la cible orpheline.
+        # `lifecycle.refresh` supprime ainsi une publication devenue orpheline.
         PublicationStore(sa_sync_conn).delete(parent)
 
         remaining = sa_sync_conn.execute(
@@ -273,7 +267,7 @@ class TestRelationsDeMemeOeuvre:
         assert [(s.doi, s.doc_type) for s in sources] == [("10.48550/arxiv.1", "preprint")]
 
     def test_l_enregistrement_source_expose_aussi_son_propre_type(self, sa_sync_conn):
-        """La règle de même œuvre lit le type de la notice, la relation celui de sa publication."""
+        """La règle de même œuvre lit le type de l'enregistrement source, la relation celui de sa publication."""
         publication = _publication(
             sa_sync_conn, doc_type="article", title_normalized="article", doi="10.3204/pubdb-1"
         )
@@ -317,13 +311,9 @@ class TestRelationsDeMemeOeuvre:
 
 
 class TestCountByRelationType:
-    """Distribution par type, exposée en `details` de la phase `relations`.
+    """Nombre de relations par type, affiché dans les `details` de la phase `relations`.
 
-    Régression : l'alias SQL `t` entrait en collision avec l'attribut déprécié
-    `Row.t` de SQLAlchemy, si bien que `r.t` renvoyait la Row entière. Ce `Row`
-    atterrissait dans `details["table"]` et rendait le payload non sérialisable en
-    JSON — l'INSERT de l'exécution de phase (best-effort) échouait silencieusement
-    et la phase `relations` disparaissait de l'observabilité.
+    Régression : l'alias SQL `t` masquait l'attribut `Row.t` de SQLAlchemy, et `r.t` renvoyait la ligne entière. Les `details` devenaient non sérialisables en JSON, et l'enregistrement de l'exécution de la phase échouait sans erreur visible.
     """
 
     def test_returns_json_serializable_str_int_pairs(self, sa_sync_conn):
@@ -345,18 +335,16 @@ class TestCountByRelationType:
 
         result = relations.count_by_relation_type(sa_sync_conn)
 
-        # Types natifs (pas de Row) → sérialisable, condition de l'enregistrement.
+        # Des types Python simples, sérialisables en JSON, comme l'exige l'enregistrement de l'exécution.
         assert all(isinstance(t, str) and isinstance(n, int) for t, n in result)
-        json.dumps(result)  # ne doit pas lever
+        json.dumps(result)  # sans exception
         assert dict(result) == {"is_preprint_of": 2, "has_part": 1}
 
 
 class TestRebuildRelations:
-    """Reconstruction complète et écart avec l'état précédent.
+    """Reconstruction complète de la table, et écart avec l'état précédent.
 
-    La table est purgée puis réécrite à chaque run : le nombre d'arêtes écrites ne dit pas ce qui a
-    changé. `rebuild_relations` compare les arêtes d'avant à celles d'après pour rendre les
-    ajoutées, par type, et le nombre de disparues.
+    La table est vidée puis réécrite à chaque run. `rebuild_relations` compare les relations d'avant et d'après : il compte les relations ajoutées, par type, et les relations disparues.
     """
 
     def _edge(self, from_id, relation_type, target_doi):

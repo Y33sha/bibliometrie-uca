@@ -1,8 +1,8 @@
-"""Écriture d'un paramètre applicatif, et sa trace.
+"""Écriture d'un paramètre applicatif, et sa trace d'audit.
 
-La table `config` porte les réglages d'exploitation du pipeline : années couvertes, périmètres retenus par phase, types de structure affichés. En modifier un change le comportement de l'application sans rien changer aux données — un tel changement ne se relit donc nulle part ensuite, d'où l'événement d'audit.
+La table `config` contient les réglages d'exploitation du pipeline : années couvertes, périmètres retenus par phase, types de structure affichés. Les modifier change le comportement de l'application sans changer les données : seul l'événement d'audit en garde la trace.
 
-La valeur antérieure n'est pas consignée : le journal la porte déjà, sous la forme de l'événement qui l'a posée.
+L'événement contient seulement la valeur écrite. La valeur antérieure est dans l'événement qui l'a posée.
 """
 
 import pytest
@@ -15,7 +15,7 @@ _CLE = "test_audit_config_key"
 
 @pytest.fixture
 def cle_posee(client):
-    """Un paramètre existant : la route refuse une clé inconnue, qu'elle ne crée pas."""
+    """Paramètre existant : la route refuse une clé inconnue."""
     seed_config(_CLE, "avant")
     yield _CLE
     with owner_pool() as cur:
@@ -38,8 +38,7 @@ class TestTracabilite:
         assert len(evenements) == 1
         evenement = evenements[0]
         assert evenement["aggregate_type"] == "config"
-        # La clé est un texte, là où l'identifiant d'agrégat est un entier : elle vit dans la
-        # charge utile.
+        # La clé est un texte et l'identifiant d'agrégat un entier : la clé est dans la charge utile.
         assert evenement["aggregate_id"] is None
         assert evenement["payload"] == {"key": cle_posee, "value": "apres"}
         assert evenement["user_id"]

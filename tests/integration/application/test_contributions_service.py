@@ -1,8 +1,4 @@
-"""Tests de caractérisation pour application/contributions.py.
-
-Documentent le comportement actuel des fonctions du service pour protéger
-contre les régressions lors de refactos ultérieurs.
-"""
+"""Tests de caractérisation du service des contributions : rejet d'une paire, décisions humaines sur les contributions et sur le périmètre, propagation du périmètre après la revue d'une adresse."""
 
 from functools import partial
 
@@ -67,9 +63,6 @@ def address_service(sa_sync_conn):
     return build_address_service(sa_sync_conn)
 
 
-# ── Helpers (SQLAlchemy text, paramstyle nommé) ───────────────────
-
-
 # ── exclude_contribution ────────────────────────────────────────
 
 
@@ -81,7 +74,7 @@ def _contribution_person(conn, contribution_id):
 
 
 class TestExcludeContribution:
-    """exclude_contribution enregistre le rejet dans `rejected_contributions`, puis détache la contribution de la paire (cœur partagé `reject_pair`)."""
+    """`exclude_contribution` enregistre le rejet dans `rejected_contributions`, puis détache la contribution de la paire par `reject_pair`."""
 
     def test_rejects_and_detaches_contribution(self, sa_sync_conn, service):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
@@ -92,7 +85,7 @@ class TestExcludeContribution:
         service.exclude_contribution(contribution_id)
 
         assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
-        # Rejet enregistré dans le sidecar
+        # Rejet enregistré.
         assert (
             sa_sync_conn.execute(
                 text(
@@ -109,7 +102,7 @@ class TestExcludeContribution:
             service.exclude_contribution(999999)
 
     def test_raises_not_found_for_contribution_without_person(self, sa_sync_conn, service):
-        """Une contribution sans personne n'est pas une contribution."""
+        """Exclure une contribution sans personne lève `NotFoundError`."""
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         source_contribution_id = insert_source_contribution(sa_sync_conn, source_record_id)
@@ -121,7 +114,7 @@ class TestExcludeContribution:
             service.exclude_contribution(contribution_id)
 
     def test_does_not_touch_other_contributions(self, sa_sync_conn, service):
-        """Rejeter une contribution ne touche pas les autres paires."""
+        """Rejeter une contribution laisse en place les contributions des autres personnes de la publication."""
         publication_id = _publication(sa_sync_conn)
         _source_record(sa_sync_conn, publication_id)
 
@@ -139,13 +132,13 @@ class TestExcludeContribution:
 
 
 class TestRejectPair:
-    """reject_pair : cœur partagé — store peuplé, contribution de la paire détachée."""
+    """`reject_pair` enregistre le rejet de la paire (publication, personne) et détache sa contribution."""
 
     def test_detaches_contribution_of_pair(self, sa_sync_conn, repo):
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        # Deux sources (hal + openalex) donnent la publication.
+        # La publication est présente dans HAL et dans OpenAlex.
         _source_record(sa_sync_conn, publication_id)
         _source_record(sa_sync_conn, publication_id, source="openalex", source_id="oa-1")
 
@@ -157,7 +150,7 @@ class TestRejectPair:
         )
 
         assert result == 1
-        # Store peuplé
+        # Rejet enregistré.
         assert (
             sa_sync_conn.execute(
                 text(
@@ -193,16 +186,12 @@ class TestRejectPair:
 
 
 class TestPropagateUcaForAddresses:
-    """propagate_in_perimeter_for_addresses rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources, de leurs contributions et de leurs publications, après une modification de address_structures.
+    """`propagate_in_perimeter_for_addresses` rafraîchit `source_contribution_structures`, puis recalcule les indices du périmètre des contributions sources liées aux adresses, de leurs contributions et de leurs publications.
 
-    `contribution_structures` est rafraîchie par le pipeline : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
+    Le pipeline rafraîchit `contribution_structures` : les tests qui la lisent la rafraîchissent par `refresh_structure_matviews`."""
 
     def _setup_uca(self, conn):
-        """Monte un périmètre UCA minimal + config perimeter_persons/extraction.
-
-        `perimeter_extraction` + `perimeter_structures` sont requis pour que la
-        matview `source_contribution_structures` rattache les structures du périmètre.
-        """
+        """Monte un périmètre minimal (clés `perimeter_persons` et `perimeter_extraction`) et calcule `perimeter_structures`, d'où la vue `source_contribution_structures` tire les structures du périmètre."""
         from pipeline.transformation.structures.perimeter import refresh_perimeter_structures
 
         uca_id = insert_persons_perimeter(conn)
@@ -213,12 +202,12 @@ class TestPropagateUcaForAddresses:
     def test_noop_on_empty_address_ids(self, sa_sync_conn, address_service):
         self._setup_uca(sa_sync_conn)
         address_service.propagate_in_perimeter_for_addresses([])
-        # Pas d'assertion négative utile : on vérifie juste qu'aucune exception
+        # Le test vérifie l'absence d'exception.
 
     def test_noop_if_no_perimeter_configured(self, sa_sync_conn, address_service):
-        """Si aucun périmètre configuré, la fonction sort sans rien faire."""
+        """Sans périmètre configuré, la fonction sort sans rien écrire."""
         addr_id = insert_address(sa_sync_conn, "Université Clermont Auvergne")
-        # Aucun set_config perimeter_persons
+        # Clé `perimeter_persons` absente.
         address_service.propagate_in_perimeter_for_addresses([addr_id])
 
     def test_sets_in_perimeter_when_address_confirmed(self, sa_sync_conn, address_service):
@@ -272,13 +261,13 @@ class TestPropagateUcaForAddresses:
         ).scalar_one() == ["address"]
 
     def test_unsets_in_perimeter_when_address_rejected(self, sa_sync_conn, address_service):
-        """Si l'adresse est rejetée (is_confirmed=False), la structure ne compte pas."""
+        """La structure d'une adresse rejetée est ignorée : la contribution source sort du périmètre."""
         uca_id = self._setup_uca(sa_sync_conn)
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_id = _publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
         insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
-        # source_contribution avec un flag in_perimeter déjà TRUE (état avant review)
+        # Contribution source dans le périmètre avant la revue.
         source_contribution_id = insert_source_contribution(
             sa_sync_conn, source_record_id, in_perimeter=True
         )
@@ -304,7 +293,7 @@ class TestPropagateUcaForAddresses:
 
 
 class TestRejectionAnchoredOnSourceRecords:
-    """Un rejet vise les enregistrements sources : il suit leurs regroupements, et une publication est rejetée dès qu'une de ses enregistrements sources l'est."""
+    """Un rejet vise les enregistrements sources : il suit leurs regroupements, et une publication est rejetée dès qu'un de ses enregistrements sources l'est."""
 
     def _rejected(self, conn, publication_id, person_id) -> bool:
         return (
@@ -319,7 +308,7 @@ class TestRejectionAnchoredOnSourceRecords:
         )
 
     def test_rejection_follows_its_source_record_into_another_publication(self, sa_sync_conn, repo):
-        """L'enregistrement source rejeté rejoint une autre publication, qui devient rejetée ; l'ancienne publication peut disparaître sans emporter le rejet."""
+        """L'enregistrement source rejeté rejoint une autre publication, qui devient rejetée ; la publication d'origine peut disparaître sans emporter le rejet."""
         person_id = insert_person(sa_sync_conn, "Dupont", first_name="Jean")
         publication_a = _publication(sa_sync_conn)
         publication_b = _publication(sa_sync_conn)
@@ -417,7 +406,7 @@ class TestHumanDecisionsOnPublicationPerimeter:
         assert _publication_evidence(sa_sync_conn, publication_id) == []
 
     def _orphan(self, conn, source_id):
-        """Publication hors périmètre dont le seule contribution, sans personne, est une contribution d'auteur du périmètre. Rend (publication, contribution)."""
+        """Publication hors périmètre dont la seule contribution, sans personne, est une contribution d'auteur du périmètre. Renvoie (publication, contribution)."""
         publication_id = insert_publication(conn)
         source_record_id = _source_record(conn, publication_id, source_id=source_id)
         source_contribution_id = insert_source_contribution(

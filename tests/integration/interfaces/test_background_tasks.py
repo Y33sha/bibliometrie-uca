@@ -1,6 +1,6 @@
 """Hygiène des tâches de fond.
 
-Une tâche de fond ouvre sa propre connexion (`interfaces/api/deps.py`, `with engine.begin()` : rollback et fermeture en sortie, même sur exception) et logue l'erreur de son travail. Quand la propagation lève, la tâche n'escalade pas l'erreur et rend sa connexion au pool : aucune transaction ne reste ouverte (idle in transaction).
+Une tâche de fond ouvre sa propre transaction par `engine.begin()` (rollback et fermeture en sortie, même sur exception). Quand la propagation lève une exception, la tâche la journalise sans la relancer et rend sa connexion au pool : aucune transaction ne reste ouverte.
 """
 
 from application.services.addresses import AddressService
@@ -16,13 +16,13 @@ def test_bg_propagate_in_perimeter_swallows_errors_and_releases_connection(monke
     monkeypatch.setattr(AddressService, "propagate_in_perimeter_for_addresses", _boom)
     pool = get_sync_engine().pool
     before = pool.checkedout()
-    bg_propagate_in_perimeter([1])  # ne doit pas lever (erreur loggée)
-    assert pool.checkedout() == before  # connexion rendue → pas d'idle in transaction
+    bg_propagate_in_perimeter([1])  # erreur journalisée, sans exception
+    assert pool.checkedout() == before  # connexion rendue au pool
 
 
 def test_bg_propagate_countries_swallows_errors_and_releases_connection(monkeypatch):
     monkeypatch.setattr(AddressService, "propagate_countries_to_publications", _boom)
     pool = get_sync_engine().pool
     before = pool.checkedout()
-    bg_propagate_countries([1])  # ne doit pas lever (erreur loggée)
+    bg_propagate_countries([1])  # erreur journalisée, sans exception
     assert pool.checkedout() == before

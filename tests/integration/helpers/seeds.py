@@ -247,7 +247,7 @@ def seed_person_name_form(person_id: int, *, name_form: str, sources: list[str])
 
 
 def seed_rejected_contribution(publication_id: int, *, person_id: int) -> None:
-    """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit une."""
+    """Rejet de la paire publication ↔ personne, comme l'administration : un rejet par enregistrement source de la publication. Une publication sans enregistrement source en reçoit un."""
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO source_records (source, source_id, title, publication_id) "
@@ -302,7 +302,7 @@ def seed_contribution(
     in_perimeter: bool = False,
     roles: list[str] | None = None,
 ) -> int:
-    """Contribution de `publication_id` et `person_id` : contribution rattachée à la personne. Renvoie l'`id` de la contribution. Les valeurs par défaut sont celles du schéma."""
+    """Contribution de la personne `person_id` à la publication `publication_id`, en mode de résolution `manual`. Les valeurs par défaut sont celles du schéma."""
     return _insert(
         "INSERT INTO contributions "
         "(publication_id, person_id, resolution_mode, perimeter_evidence, roles) "
@@ -312,7 +312,7 @@ def seed_contribution(
 
 
 def seed_in_perimeter_contributions(serial_id: int) -> None:
-    """Pose une contribution du périmètre (personne non rejetée) sur chaque publication de la revue, puis matérialise comme le pipeline `publications.in_perimeter` et les `publication_count` de la revue et de son éditeur."""
+    """Pose une contribution du périmètre (personne non rejetée) sur chaque publication de la revue, puis calcule comme le pipeline `publications.in_perimeter` et les `publication_count` de la revue et de son éditeur."""
     with owner_pool() as cur:
         cur.execute("SELECT id FROM publications WHERE serial_id = %s", (serial_id,))
         publication_ids = [r["id"] for r in cur.fetchall()]
@@ -411,7 +411,7 @@ def seed_source_contribution(
 
 
 def seed_alignment(publication_id: int, source_contributions: list[tuple[int, int]]) -> int:
-    """Contribution des contributions sources `(contribution source, enregistrement source)` de la publication `publication_id` ; la première le fonde, les autres le rejoignent par le nom."""
+    """Contribution des contributions sources `(contribution source, enregistrement source)` de la publication `publication_id` ; la première la fonde, les autres la rejoignent par le nom."""
     with owner_pool() as cur:
         cur.execute(
             "INSERT INTO contributions (publication_id) VALUES (%s) RETURNING id",
@@ -436,7 +436,7 @@ def seed_alignment(publication_id: int, source_contributions: list[tuple[int, in
 def seed_perimeter_author_contribution(
     contribution_id: int, *, person_id: int | None = None, mode: str | None = None
 ) -> None:
-    """Fait de la contribution `contribution_id` une contribution d'auteur du périmètre (rôle d'auteur, indice `address`), rattaché à la personne `person_id` par le mode de résolution `mode`."""
+    """Fait de la contribution `contribution_id` une contribution d'auteur du périmètre (rôle d'auteur, indice `address`), rattachée à la personne `person_id` par le mode de résolution `mode`."""
     with owner_pool() as cur:
         cur.execute(
             "UPDATE contributions SET person_id = %s, "

@@ -1,7 +1,4 @@
-"""Résolution id → libellé d'une entité de facette (`/api/entity-labels`).
-
-Seed via un pool dédié en autocommit, hors du pool partagé par l'API, avec un nettoyage en fin de module — même stratégie que les autres tests de routers.
-"""
+"""Libellé d'une entité de facette à partir de son identifiant (`/api/entity-labels`)."""
 
 import uuid
 
@@ -16,7 +13,7 @@ from tests.integration.helpers.seeds import (
 
 class TestEntityLabels:
     def test_unknown_id(self, client):
-        """Un id absent rend un libellé nul, non une erreur : la pastille reste sans nom."""
+        """Un identifiant inconnu renvoie un libellé nul, sans erreur : la pastille reste sans nom."""
         r = client.get("/api/entity-labels", params={"kind": "serial", "entity_id": 999999999})
         assert r.status_code == 200
         assert r.json() == {"label": None}
@@ -37,7 +34,7 @@ class TestEntityLabels:
         assert r.json() == {"label": name}
 
     def test_person_reads_first_then_last_name(self, client):
-        """Le libellé d'une personne est celui que propose la facette des auteurs."""
+        """Le libellé d'une personne est son prénom suivi de son nom de famille."""
         person_id = seed_person("Dupont", "Jeanne")
         try:
             r = client.get("/api/entity-labels", params={"kind": "person", "entity_id": person_id})

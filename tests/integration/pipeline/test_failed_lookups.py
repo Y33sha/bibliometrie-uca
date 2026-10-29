@@ -30,7 +30,7 @@ class TestRecordFailedLookup:
         assert _pending(sa_sync_conn, "hal", "doi", "10.1234/x", 30) is True
 
     def test_un_doi_absent_de_crossref_est_repris_apres_le_delai(self, sa_sync_conn):
-        """Régression : un échec chez l'agence d'enregistrement du DOI restait définitif, alors que Crossref peut rendre le DOI plus tard."""
+        """Régression : un échec chez l'agence d'enregistrement du DOI restait définitif, alors que Crossref peut renvoyer le DOI plus tard."""
         record_failed_lookup(sa_sync_conn, "crossref", "doi", "10.1234/x")
         sa_sync_conn.execute(
             text("UPDATE failed_lookups SET not_found_at = now() - interval '31 days'")

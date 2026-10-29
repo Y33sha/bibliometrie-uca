@@ -1,12 +1,15 @@
-"""Tests d'intégration pour le router `interfaces.api.routers.serials`.
+"""Tests d'intégration du router des revues (`interfaces.api.routers.serials`).
 
 Couvre :
-- GET /api/serials (liste, recherche titre et ISSN, publisher filter, sort variants)
-- GET /api/serials/facets/entities (facette éditeur contextuelle)
-- GET /api/serials/{id} (detail enrichi avec DOAJ, 404)
-- GET /api/serials/{id}/subjects (top sujets, exclusion sujets génériques)
-- PUT /api/serials/{id} (update, auth requise, 404)
-- POST /api/serials/{id}/merge (auth requise, 404 target/source, happy)
+- GET /api/serials (liste, recherche par titre et ISSN, filtre par éditeur, tris)
+- GET /api/serials/facets/entities (facette des éditeurs)
+- les files de contrôle : titres identiques, ISSN partagés, conflits d'espace de noms DOI, recueils d'actes probables
+- GET /api/serials/{id} (fiche avec DOAJ, 404)
+- GET /api/serials/{id}/subjects (sujets principaux, hors sujets génériques)
+- PUT /api/serials/{id} (mise à jour, authentification requise, 404) et l'aperçu d'un changement de type
+- POST /api/serials/{id}/merge (authentification requise, 404 sur la cible ou la source, fusion)
+- GET /api/serials/oa-models et /api/serials/types
+- la trace d'audit des modifications
 """
 
 from __future__ import annotations
@@ -52,7 +55,7 @@ class TestListSerials:
         assert body["page"] == 2
 
     def test_search_min_length_ignored(self, client):
-        # search < 2 caractères : pas de filtre appliqué.
+        # Une recherche de moins de deux caractères est ignorée.
         r = client.get("/api/serials", params={"search": "a"})
         assert r.status_code == 200
 
@@ -64,8 +67,7 @@ class TestListSerials:
         assert any(j["title"] == title for j in r.json()["serials"])
 
     def test_search_with_punctuation_normalizes(self, client):
-        # `.` ne figure jamais dans title_normalized (normalize_text → espace).
-        # La query doit subir la même normalisation pour matcher.
+        # `normalize_text` change `.` en espace dans `title_normalized` ; la recherche subit la même normalisation.
         suffix = uniq("Punct").split("_")[-1]
         title = f"Rev S.A. Etudes {suffix}"
         seed_serial(title)
@@ -180,12 +182,11 @@ class TestListSerials:
         ],
     )
     def test_sort_variants(self, client, sort):
-        # `unknown` doit fallback sur `title` ASC sans 500.
         r = client.get("/api/serials", params={"sort": sort})
         assert r.status_code == 200
 
     def test_per_page_above_limit_rejected(self, client):
-        # `per_page` Query(le=200) → > 200 = 422.
+        # `per_page` au-delà de 200 : 422.
         r = client.get("/api/serials", params={"per_page": 500})
         assert r.status_code == 422
 
@@ -255,7 +256,7 @@ class TestSerialsSharingIssn:
 
 
 def _seed_typed_serial_with_records(raw_types: list[tuple[str, str]]) -> int:
-    """Revue typée `journal` portant un enregistrement par couple `(source, type brut)`."""
+    """Revue typée `journal`, avec un enregistrement source par couple `(source, type brut)`."""
     jid = seed_serial(serial_type="journal")
     for source, raw_type in raw_types:
         _seed_record(source, serial_id=jid, raw_doc_type=raw_type)
@@ -355,7 +356,7 @@ class TestGetSerial:
         body = r.json()
         assert body["id"] == jid
         assert body["title"] == title
-        # Champs ajoutés par la promotion vers SerialDetailResponse.
+        # Champs propres à la fiche détaillée.
         assert "doaj_payload" in body
         assert "doaj_imported_at" in body
         assert "publication_count" in body
@@ -377,8 +378,7 @@ class TestGetSerial:
         assert body["doaj_payload"] == payload
 
     def test_doaj_url_null_when_no_url_source_in_payload(self, client):
-        """Payload sans `URL in DOAJ` ni `DOAJ id` → `doaj_url` reste null
-        pour que le front fallback sur `<span>`."""
+        """Sans `URL in DOAJ` ni `DOAJ id` dans le payload, `doaj_url` est nul : l'interface affiche le DOAJ sans lien."""
         jid = seed_serial()
         payload = {"License": "CC BY"}
         with owner_pool() as cur:
@@ -403,8 +403,7 @@ class TestGetSerial:
         assert r.json()["doaj_url"] == "https://doaj.org/toc/deadbeef1234"
 
     def test_doaj_url_from_csv_url_in_doaj(self, client):
-        """Cas massif : payload import CSV qui porte `URL in DOAJ` (URL toute
-        faite) mais pas `DOAJ id`."""
+        """Cas le plus fréquent : payload d'un import CSV, avec `URL in DOAJ` (URL complète) et sans `DOAJ id`."""
         jid = seed_serial()
         payload = {"URL in DOAJ": "https://doaj.org/toc/csvurl42"}
         with owner_pool() as cur:
@@ -439,11 +438,10 @@ class TestSerialSubjects:
     def test_returns_top_subjects_excluding_generic(self, client):
         jid = seed_serial()
         publication_ids = [_publication("p1", serial_id=jid), _publication("p2", serial_id=jid)]
-        # Sujet spécifique (sous le seuil 5000) attaché aux 2 publis.
+        # Sujet spécifique, sous le seuil de généricité (5000), attaché aux deux publications.
         specific_label = uniq("specific_subject")
         spec_id = seed_subject(specific_label, usage_count=100)
-        # Sujet trop générique (au-dessus du seuil) attaché à 1 publi —
-        # doit être exclu du top.
+        # Sujet générique, au-dessus du seuil, attaché à une publication : exclu des sujets principaux.
         generic_label = uniq("generic_subject")
         gen_id = seed_subject(generic_label, usage_count=9999)
         for publication_id, subject_id in (
@@ -466,7 +464,7 @@ class TestSerialSubjects:
         jid = seed_serial()
         r = client.get(f"/api/serials/{jid}/subjects", params={"limit": 5})
         assert r.status_code == 200
-        # Tableau vide pour ce jid neuf ; on vérifie surtout que limit=5 est accepté.
+        # Revue sans publication : la liste est vide, et `limit=5` est accepté.
         assert r.json() == []
 
     def test_limit_above_max_rejected(self, client):
@@ -487,7 +485,7 @@ class TestUpdateSerial:
         )
         assert r.status_code == 200
         assert r.json() == {"ok": True}
-        # Vérifier en base que seuls les champs envoyés sont écrits.
+        # Les champs envoyés sont écrits en base.
         with owner_pool() as cur:
             cur.execute("SELECT title, is_academic FROM serials WHERE id = %s", (jid,))
             row = cur.fetchone()
@@ -497,7 +495,7 @@ class TestUpdateSerial:
 
 class TestTypeChangeImpact:
     def test_counts_without_writing(self, auth_client):
-        """L'aperçu écrit dans un SAVEPOINT annulé : le type de la revue ne bouge pas."""
+        """L'aperçu écrit dans un SAVEPOINT annulé : le type de la revue reste inchangé."""
         jid = seed_serial()
         auth_client.put(f"/api/serials/{jid}", json={"serial_type": "journal"})
         r = auth_client.post(
@@ -510,7 +508,7 @@ class TestTypeChangeImpact:
             assert cur.fetchone()["serial_type"] == "journal"
 
     def test_404_on_unknown_serial(self, auth_client):
-        """L'aperçu emprunte le chemin de l'édition : il en hérite l'absence."""
+        """L'aperçu suit le chemin de l'édition : une revue inconnue renvoie 404."""
         r = auth_client.post(
             "/api/serials/999999/type-change-impact", json={"serial_type": "proceedings"}
         )
@@ -537,7 +535,7 @@ class TestMergeSerials:
         assert r.status_code == 200
         body = r.json()
         assert body == {"merged": True, "source_id": src, "target_id": dst}
-        # Source supprimée, target conservée.
+        # Revue source supprimée, cible conservée.
         with owner_pool() as cur:
             cur.execute("SELECT id FROM serials WHERE id IN (%s, %s)", (src, dst))
             ids = {row["id"] for row in cur.fetchall()}
@@ -553,7 +551,7 @@ class TestOaModels:
         r = client.get("/api/serials/oa-models")
         assert r.status_code == 200
         models = r.json()
-        # Source de vérité = domain.serials.journal.OA_MODELS / OA_MODEL_LABELS_FR.
+        # Référence : `OA_MODELS` et `OA_MODEL_LABELS_FR` de `domain.serials.journal`.
         values = [m["value"] for m in models]
         assert values == ["subscription", "full_oa", "diamond", "repository"]
         assert all("label_fr" in m and m["label_fr"] for m in models)
@@ -675,10 +673,7 @@ class TestSerialsPublisherFacet:
 
 
 class TestTracabiliteEdition:
-    """La requalification consécutive à un changement de type était consignée, l'édition qui la déclenche non.
-
-    Un changement d'ISSN ou de titre ne requalifie rien et ne laissait donc aucune trace, alors qu'il commande le rapprochement des publications avec leur revue.
-    """
+    """L'édition d'une revue est consignée, y compris un changement d'ISSN ou de titre : il commande le rattachement des publications à leur revue."""
 
     def test_la_modification_ne_consigne_que_les_champs_fournis(self, auth_client):
         jid = seed_serial(uniq("Audit revue"))

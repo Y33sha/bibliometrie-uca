@@ -1,8 +1,4 @@
-"""Tests de caractérisation pour le router stats.
-
-Ces endpoints concentrent du SQL complexe (agrégations, facettes
-dynamiques).
-"""
+"""Tests de caractérisation du router des statistiques : collaborations, tableau croisé et ses filtres."""
 
 import pytest
 
@@ -72,8 +68,7 @@ class TestStatsAcceptListFilters:
 class TestStatsClosedVocabularyFilters:
     """Les filtres partagés `oa_status` et `doc_type` refusent une valeur hors vocabulaire.
 
-    Même contrat que la liste des publications : une valeur intruse rend 422, non un décompte
-    silencieusement faux. `oa` n'est pas un statut stocké et n'est pas accepté ici non plus.
+    Même contrat que la liste des publications : une valeur hors vocabulaire renvoie 422. `oa`, absent des statuts stockés, est refusé aussi.
     """
 
     @pytest.mark.parametrize(

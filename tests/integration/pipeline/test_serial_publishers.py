@@ -1,4 +1,4 @@
-"""Tests d'intégration de l'éditeur d'une revue calculé d'après ses publications (`serial_publishers`)."""
+"""Éditeur d'une revue calculé d'après ses publications (`serial_publishers`)."""
 
 from sqlalchemy import text
 

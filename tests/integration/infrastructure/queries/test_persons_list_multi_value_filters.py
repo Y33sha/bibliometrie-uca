@@ -1,9 +1,4 @@
-"""Régression : la liste admin filtre sur plusieurs départements ou rôles.
-
-L'annuaire public et les facettes acceptaient une sélection multiple là où la liste admin
-n'acceptait qu'une valeur. La page cochant plusieurs options, ses compteurs de facettes
-reflétaient la sélection pendant que la liste montrait tout le monde.
-"""
+"""La liste d'administration des personnes filtre sur plusieurs départements ou rôles, comme ses facettes."""
 
 from infrastructure.read_models.persons.models import PersonFilters
 from infrastructure.read_models.persons.queries import PersonsQueries

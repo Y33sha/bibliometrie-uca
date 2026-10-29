@@ -1,14 +1,6 @@
-"""Tests d'intégration — recalcul des métadonnées des publications.
+"""Recalcul des métadonnées d'une publication depuis ses enregistrements sources (`refresh_from_sources`) : priorité par source, statut open access le plus ouvert, fusion des mots-clés et des topics.
 
-Couvre `refresh_from_sources` sur vraie base PostgreSQL (bibliometrie_test) :
-recalcul des champs d'une publication depuis ses `source_records` (priorité
-par source, statut OA le plus ouvert, fusion des keywords/topics, etc.).
-
-Chaque test tourne dans une transaction rollbackée (isolation complète). Les
-publications sont semées directement via le repo (`create`) — pas de clustering :
-la décision d'assignation + réconciliation est testée à l'unité
-(`tests/unit/domain/publications/test_reconciliation.py`) et de bout en bout sur
-la vraie passe pipeline (`tests/integration/pipeline/test_reprocessing.py`).
+Les publications sont semées par `PublicationStore.create`, sans réconciliation. La réconciliation est testée dans `tests/unit/domain/publications/test_reconciliation.py` et `tests/integration/pipeline/test_reprocessing.py`.
 """
 
 from functools import partial
@@ -29,14 +21,9 @@ from tests.integration.helpers.sources import insert_source_record
 # Enregistrement source de 2024, de titre « Test ».
 _source_record = partial(insert_source_record, title="Test", publication_year=2024)
 
-# ── Helpers ──────────────────────────────────────────────────────
-
 
 def _insert_publication(conn, **kwargs):
-    """Sème une publication directement via le repo et retourne son id.
-
-    Pas de cascade de matching : on veut juste une ligne à laquelle rattacher des `source_records`.
-    """
+    """Sème une publication sans réconciliation et renvoie son `id`."""
     title = kwargs.get("title", "Test Publication")
     return PublicationStore(conn).create(
         title=title,
@@ -52,14 +39,9 @@ def _scalar(conn, sql, **binds):
     return conn.execute(text(sql), binds).scalar_one()
 
 
-# ── Recalcul des métadonnées depuis source_records ──────────
-
-
 class TestRefreshFromSources:
-    """Teste refresh_from_sources : recalcul des métadonnées depuis source_records."""
-
     def test_language_from_source(self, sa_sync_conn):
-        """refresh_from_sources propage les métadonnées des source_records."""
+        """La langue de la publication est celle de son enregistrement source."""
         id1 = _insert_publication(
             sa_sync_conn,
             doi="10.1234/enrich",
@@ -111,7 +93,7 @@ class TestRefreshFromSources:
         )
 
     def test_oa_status_upgrade(self, sa_sync_conn):
-        """Le statut OA le plus ouvert gagne (closed + green → green)."""
+        """Le statut open access le plus ouvert l'emporte (closed et green donnent green)."""
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/oa", oa_status="closed")
         _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-closed", oa_status="closed")
         _source_record(
@@ -127,7 +109,7 @@ class TestRefreshFromSources:
         assert oa == "green"
 
     def test_diamond_always_wins(self, sa_sync_conn):
-        """Diamond prime sur tout."""
+        """Le statut diamond l'emporte sur gold."""
         id1 = _insert_publication(sa_sync_conn, doi="10.1234/dia", oa_status="gold")
         _source_record(sa_sync_conn, id1, source_id=f"hal-{id1}-gold", oa_status="gold")
         _source_record(
@@ -232,7 +214,7 @@ class TestRefreshFromSources:
         assert lang == "fr"
 
     def test_source_priority_hal_over_scanr(self, sa_sync_conn):
-        """Pour les non-thèses, HAL est prioritaire sur ScanR (cf. SOURCE_PRIORITY)."""
+        """Hors thèses, HAL est prioritaire sur ScanR."""
         id1 = _insert_publication(
             sa_sync_conn, doi="10.1234/hal-prio", publication_year=2024, doc_type="article"
         )
@@ -253,7 +235,7 @@ class TestRefreshFromSources:
         assert lang == "en"
 
     def test_ongoing_thesis_to_thesis(self, sa_sync_conn):
-        """Un ongoing_thesis passe à thesis quand theses.fr le dit."""
+        """Une thèse en cours devient une thèse soutenue quand theses.fr la type `thesis`."""
         id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="ongoing_thesis")
         _source_record(
             sa_sync_conn, id1, source="theses", source_id=f"theses-{id1}-", doc_type="thesis"
@@ -265,8 +247,7 @@ class TestRefreshFromSources:
 
     @pytest.mark.parametrize("out_of_scope_type", ["peer_review", "memoir"])
     def test_out_of_scope_doc_type_dematerializes(self, sa_sync_conn, out_of_scope_type):
-        """Un type résolu non admissible supprime la publication ; ses source_records
-        sont détachées (FK ON DELETE SET NULL), pas supprimées."""
+        """Un type résolu non admissible supprime la publication. Ses enregistrements sources restent, sans publication."""
         conn = sa_sync_conn
         pid = _insert_publication(conn, doc_type="article", publication_year=2024)
         _source_record(
@@ -283,7 +264,7 @@ class TestRefreshFromSources:
         assert source_record_publication is None
 
     def test_out_of_scope_deletion_cascades_contributions(self, sa_sync_conn):
-        """La suppression d'un type non admissible emporte les contributions (FK ON DELETE CASCADE) ; la personne, elle, survit."""
+        """La suppression pour type non admissible supprime les contributions de la publication ; la personne reste."""
         conn = sa_sync_conn
         pid = _insert_publication(conn, doc_type="article", publication_year=2024)
         _source_record(
@@ -305,7 +286,7 @@ class TestRefreshFromSources:
         assert _scalar(conn, "SELECT count(*) FROM persons WHERE id = :id", id=person_id) == 1
 
     def test_keywords_merged(self, sa_sync_conn):
-        """Les keywords sont fusionnés sans doublons."""
+        """Les mots-clés des sources sont fusionnés sans doublon."""
         id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
         _source_record(sa_sync_conn, id1, source_id="hal-kw1", keywords=["python", "data"])
         _source_record(
@@ -322,7 +303,7 @@ class TestRefreshFromSources:
             "SELECT keywords FROM publications_detail WHERE publication_id = :id",
             id=id1,
         )
-        # 'data' et 'Data' sont dédupliqués (case-insensitive), 3 mots-clés
+        # « data » et « Data » comptent pour un mot-clé, sans distinction de casse.
         assert len(kw) == 3
         lower_kw = [k.lower() for k in kw]
         assert "python" in lower_kw
@@ -330,10 +311,7 @@ class TestRefreshFromSources:
         assert "machine learning" in lower_kw
 
     def test_topics_composite_by_source(self, sa_sync_conn):
-        """publications.topics est un composite {source: data}, chaque source
-        garde sa forme native. Rien n'est perdu (même en cas de clés en
-        conflit entre sources, avant le fix les données OpenAlex étaient
-        silencieusement perdues si HAL était prioritaire)."""
+        """Les topics de la publication sont rangés par source, chacun sous sa forme d'origine, même quand deux sources utilisent la même clé."""
         id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
         _source_record(
             sa_sync_conn,
@@ -355,14 +333,11 @@ class TestRefreshFromSources:
             "SELECT topics FROM publications_detail WHERE publication_id = :id",
             id=id1,
         )
-        # Chaque source garde sa forme sous sa propre clé
         assert topics["hal"] == {"hal_domains": ["info_FacetSep_Informatique [cs]"]}
         assert topics["openalex"] == {"concepts": ["AI"], "hal_domains": ["math"]}
 
     def test_topics_composite_supports_openalex_list(self, sa_sync_conn):
-        """OpenAlex stocke les topics en liste (hiérarchie domain/field/subfield/topic).
-        Avant le fix, cette liste était silencieusement ignorée (isinstance dict check).
-        Maintenant elle est conservée sous la clé 'openalex'."""
+        """Les topics OpenAlex, une liste (hiérarchie domain/field/subfield/topic), sont gardés tels quels sous la clé `openalex`, à côté du dictionnaire de theses.fr."""
         id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
         _source_record(
             sa_sync_conn,
@@ -393,14 +368,12 @@ class TestRefreshFromSources:
             "SELECT topics FROM publications_detail WHERE publication_id = :id",
             id=id1,
         )
-        # La liste OpenAlex est préservée telle quelle
         assert isinstance(topics["openalex"], list)
         assert topics["openalex"][0]["domain"] == "SS"
-        # Et le dict theses.fr aussi
         assert topics["theses"]["discipline"] == "Info"
 
     def test_is_retracted_or(self, sa_sync_conn):
-        """is_retracted = True si au moins une source le dit."""
+        """La publication est rétractée dès qu'une source la déclare rétractée."""
         id1 = _insert_publication(sa_sync_conn, publication_year=2024, doc_type="article")
         _source_record(sa_sync_conn, id1, source_id="hal-ret1", is_retracted=False)
         _source_record(sa_sync_conn, id1, source="openalex", source_id="oa-ret1", is_retracted=True)

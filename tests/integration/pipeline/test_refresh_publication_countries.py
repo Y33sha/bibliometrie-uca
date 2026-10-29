@@ -1,8 +1,7 @@
-"""Tests d'intégration pour `pipeline.transformation.countries.refresh_publication_countries`.
+"""Recalcul des pays depuis `addresses.countries` (`pipeline.transformation.countries.refresh_publication_countries`) :
 
-Recalcul des caches pays depuis `addresses.countries` :
-1. `source_records.countries` — union des pays des adresses des source_contributions du document.
-2. `publications.countries` — union des `source_records.countries` de même publication_id.
+1. `source_records.countries` : union des pays des adresses des contributions sources de l'enregistrement source.
+2. `publications.countries` : union des pays des enregistrements sources de la publication.
 """
 
 from __future__ import annotations
@@ -80,7 +79,7 @@ class TestCascade:
         assert _get_publication_countries(sa_sync_conn, publication) == ["fr"]
 
     def test_multi_country_union_propagates(self, sa_sync_conn, log):
-        # Deux adresses sur le même sa : union des pays remontée jusqu'à publication.
+        # Deux adresses pour la même contribution source : la publication reçoit l'union des pays.
         publication = insert_publication(sa_sync_conn)
         source_record = _source_record(sa_sync_conn, publication, source_id="W1")
         sa = _insert_source_contribution(sa_sync_conn, source_record)
@@ -95,8 +94,7 @@ class TestCascade:
         assert _get_publication_countries(sa_sync_conn, publication) == ["fr", "us"]
 
     def test_multiple_sources_union_at_publication_level(self, sa_sync_conn, log):
-        # Même publication via deux sources distinctes (OA et HAL), chacune
-        # avec une adresse dans un pays différent → union au niveau publi.
+        # Deux enregistrements sources (OpenAlex et HAL) de la même publication, avec des adresses de pays différents : la publication reçoit l'union des pays.
         publication = insert_publication(sa_sync_conn)
         source_record_oa = _source_record(sa_sync_conn, publication, source_id="W1")
         source_record_hal = _source_record(
@@ -118,8 +116,7 @@ class TestCascade:
         assert _get_publication_countries(sa_sync_conn, publication) == ["de", "fr"]
 
     def test_returns_zero_when_no_changes(self, sa_sync_conn, log):
-        # Base sans adresses avec pays → la refresh ne change rien et
-        # retourne 0 publications mises à jour.
+        # Sans adresse avec pays, le recalcul laisse la publication en l'état : zéro mise à jour.
         publication = insert_publication(sa_sync_conn)
         source_record = _source_record(sa_sync_conn, publication, source_id="W1")
         _insert_source_contribution(sa_sync_conn, source_record)
@@ -132,8 +129,7 @@ class TestCascade:
 
 class TestIdempotence:
     def test_double_run_no_extra_update(self, sa_sync_conn, log):
-        # Premier run : la publi passe de NULL à ['fr']. Deuxième run :
-        # rien à changer, retour 0 (cf. `IS DISTINCT FROM` côté query).
+        # Le premier passage donne ['fr'] à la publication. Le second trouve les pays à jour et compte zéro mise à jour.
         publication = insert_publication(sa_sync_conn)
         source_record = _source_record(sa_sync_conn, publication, source_id="W1")
         sa = _insert_source_contribution(sa_sync_conn, source_record)
@@ -150,8 +146,7 @@ class TestIdempotence:
 
 class TestCleanup:
     def test_resets_source_countries_when_address_lost_country(self, sa_sync_conn, log):
-        # source_records.countries=['fr'] déjà persistées, mais l'adresse du sa
-        # n'a plus de `countries` (NULL) → le LEFT JOIN remet sp.countries à NULL.
+        # L'enregistrement source a ['fr'], mais l'adresse de sa contribution source est sans pays : ses pays reviennent à NULL.
         publication = insert_publication(sa_sync_conn)
         source_record = _source_record(sa_sync_conn, publication, source_id="W1")
         sa = _insert_source_contribution(sa_sync_conn, source_record)

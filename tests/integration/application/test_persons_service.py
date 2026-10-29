@@ -77,7 +77,7 @@ def _contribution_person(conn, contribution_id):
 
 
 def _perimeter_contribution(conn, person_id, mode, *, source_id, **source_contribution):
-    """Publication du périmètre dont le seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Rend (publication, contribution)."""
+    """Publication du périmètre dont la seule contribution d'auteur, rattachée à la personne par `mode`, réunit une contribution source décrite par `source_contribution`. Renvoie (publication, contribution)."""
     publication = insert_publication(conn, in_perimeter=True)
     source_record = _source_record(conn, publication, source_id=source_id)
     source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
@@ -89,7 +89,7 @@ def _perimeter_contribution(conn, person_id, mode, *, source_id, **source_contri
 
 
 def _orphan(conn, publication_id, *, source_id="hal-1", source="hal", **source_contribution):
-    """Contribution orpheline : contribution d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Rend (contribution, contribution source)."""
+    """Contribution orpheline : contribution d'auteur du périmètre sans personne, d'une contribution source « jean dupont » décrite par `source_contribution`. Renvoie (contribution, contribution source)."""
     source_record = _source_record(conn, publication_id, source=source, source_id=source_id)
     source_contribution_id = _jean_dupont_source_contribution(
         conn, source_record, source=source, **source_contribution
@@ -147,13 +147,13 @@ def _scalar(conn, sql_text: str, **params):
 
 class TestAddIdentifier:
     def test_refuses_hal_person_id(self, sa_sync_conn, service):
-        """`hal_person_id` est la référence d'un compte HAL, que l'extraction observe : personne ne l'attribue à la main."""
+        """`hal_person_id` identifie un compte HAL lu dans les sources : son attribution manuelle est refusée."""
         person_id = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="id_type"):
             service.add_identifier(person_id, "hal_person_id", "12345")
 
     def test_raises_on_unknown_person(self, service):
-        """Sans cette garde, l'identifiant venu d'un formulaire heurterait la clé étrangère."""
+        """Attribuer un identifiant à une personne inconnue lève `NotFoundError`."""
         with pytest.raises(NotFoundError):
             service.add_identifier(999999, "orcid", "0000-0001-2345-6789")
 
@@ -192,9 +192,7 @@ class TestAddIdentifier:
         assert row.status == "pending"
 
     def test_raises_when_pending_on_other_person(self, sa_sync_conn, service):
-        """Si le même identifiant existe en 'pending' sur une autre personne,
-        on lève `IdentifierAttributionConflictError` (pour réattribuer, il faut d'abord
-        passer le statut à 'rejected')."""
+        """Un identifiant en attente sur une autre personne lève `IdentifierAttributionConflictError` : sa réattribution demande d'abord son rejet."""
         import pytest
 
         from domain.errors import IdentifierAttributionConflictError
@@ -216,10 +214,10 @@ class TestAddIdentifier:
         )
 
     def test_idempotent_on_same_person(self, sa_sync_conn, service):
-        """Réappliquer add_identifier sur la même personne ne change rien."""
+        """Attribuer une seconde fois un identifiant à la même personne le laisse inchangé."""
         p = _person(sa_sync_conn)
         service.add_identifier(p, "orcid", "0000-0001-2345-6789")
-        result = service.add_identifier(p, "orcid", "0000-0001-2345-6789")  # no-op
+        result = service.add_identifier(p, "orcid", "0000-0001-2345-6789")  # sans effet
         assert result.outcome is AttributionOutcome.ALREADY_EXISTS
 
         row = sa_sync_conn.execute(
@@ -250,7 +248,7 @@ class TestUpdateIdentifierStatus:
 
 
 class TestIdentifierStatusPropagation:
-    """Une décision sur un identifiant s'étend aux identifiants `pending` de la même personne que portent les mêmes comptes HAL."""
+    """Une décision sur un identifiant s'étend aux identifiants `pending` de la même personne liés aux mêmes comptes HAL."""
 
     ORCID = "0000-0002-1633-8730"
     HAL_ACCOUNT = {"hal_person_id": 11581, "idhal": "nina-radosevic-robin", "orcid": ORCID}
@@ -349,7 +347,7 @@ class TestIdentifierStatusPropagation:
 
 
 class TestIdentifierRejectionOnContributions:
-    """Le rejet d'un identifiant détache de la personne les contributions que cet identifiant lui rattache."""
+    """Le rejet d'un identifiant met en file de résolution les contributions que cet identifiant rattache à la personne."""
 
     ORCID = "0000-0002-1825-0097"
 
@@ -473,8 +471,7 @@ class TestUpdateName:
         ).one()
         assert row.sources == ["persons"]
 
-        # L'ancienne forme 'dupont jean' n'avait que la source 'persons'
-        # pour ce pid : le renommage a supprimé la ligne entière.
+        # La forme 'dupont jean', de seule source 'persons', disparaît avec le renommage.
         row = sa_sync_conn.execute(
             text(
                 "SELECT 1 FROM person_name_forms "
@@ -498,7 +495,7 @@ class TestUpdateName:
         assert row.first_name == "Sophie"
 
     def test_raises_without_last_name(self, sa_sync_conn, service):
-        """Effacer le patronyme retirerait à la personne les formes que seul son nom canonique porte."""
+        """Un nom de famille vide est refusé : la personne perdrait les formes de nom dérivées de son nom."""
         p = _person(sa_sync_conn)
         with pytest.raises(ValidationError, match="nom est requis"):
             service.update_name(p, "", "Jean")
@@ -532,7 +529,7 @@ class TestCreatePerson:
         assert row.first_name == "Jean"
 
     def test_raises_without_last_name(self, sa_sync_conn, repo):
-        """Sans patronyme, `compute_person_name_forms` ne rend aucune forme : la personne ne serait atteignable par aucun nom."""
+        """Une personne sans nom de famille est refusée : elle serait sans forme de nom."""
         with pytest.raises(ValidationError, match="nom est requis"):
             repo.create("", "Jean")
 
@@ -566,7 +563,7 @@ class TestMergePerson:
         assert _name_form_status(sa_sync_conn, "intrus x", target) == "rejected"
 
     def test_target_verdict_prevails(self, sa_sync_conn, service):
-        """Sur une forme commune, le verdict de la personne qui absorbe l'emporte."""
+        """Sur une forme commune, le verdict de la personne conservée l'emporte."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         _hal_name_form(sa_sync_conn, target, name_form="forme commune", status="confirmed")
@@ -575,7 +572,7 @@ class TestMergePerson:
         assert _name_form_status(sa_sync_conn, "forme commune", target) == "confirmed"
 
     def test_pending_target_takes_absorbed_verdict(self, sa_sync_conn, service):
-        """Une forme commune en attente chez la personne qui absorbe reprend le verdict de l'autre."""
+        """Une forme commune en attente chez la personne conservée prend le verdict de l'absorbée."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         _hal_name_form(sa_sync_conn, target, name_form="forme commune")
@@ -604,7 +601,7 @@ class TestMergePerson:
         )
 
     def test_distinct_persons_transferred(self, sa_sync_conn, service):
-        """Les non-doublons de l'absorbée passent à la conservée ; celui qui oppose les deux personnes fusionnées disparaît."""
+        """Les paires de personnes distinctes de l'absorbée passent à la conservée ; la paire qui oppose les deux personnes fusionnées disparaît."""
         target = _person(sa_sync_conn)
         source = _person(sa_sync_conn, last_name="Dupond")
         other = _person(sa_sync_conn, last_name="Durand")
@@ -710,7 +707,7 @@ class TestBatchAssignOrphanContributions:
         ) == ["openalex"]
 
     def test_skips_already_assigned(self, sa_sync_conn, contribution_service):
-        """Une contribution déjà rattachée est écartée : ni épinglage, ni changement de personne ; la contribution orphelin du lot est rattaché."""
+        """Une contribution déjà rattachée est écartée : ni épinglage, ni changement de personne ; la contribution orpheline du lot est rattachée."""
         insert_persons_perimeter(sa_sync_conn)
         p1 = _person(sa_sync_conn, last_name="A", first_name="A")
         p2 = _person(sa_sync_conn, last_name="B", first_name="B")
@@ -753,8 +750,7 @@ class TestDetachContributions:
         assert _contribution_person(sa_sync_conn, contribution_id) == (None, None)
 
     def test_detaches_all_sources_of_publication_from_single_ref(self, sa_sync_conn, service):
-        """Le rejet porte sur la publication entière : sélectionner une source
-        détache la contribution de la paire et peuple le store."""
+        """Le rejet vise la publication entière : sélectionner une seule contribution source détache la contribution de la paire et enregistre le rejet."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         contribution_id = insert_contribution(sa_sync_conn, publication_id, person_id=person_id)
@@ -765,7 +761,7 @@ class TestDetachContributions:
         source_contribution_hal = _jean_dupont_source_contribution(sa_sync_conn, source_record_hal)
         _jean_dupont_source_contribution(sa_sync_conn, source_record_oa, source="openalex")
 
-        # Une seule source sélectionnée (la hal).
+        # Seule la contribution source HAL est sélectionnée.
         result = service.detach_contributions(
             person_id,
             contributions=[{"source": "hal", "source_contribution_id": source_contribution_hal}],
@@ -784,8 +780,7 @@ class TestDetachContributions:
         )
 
     def test_cleans_orphan_source_name_form(self, sa_sync_conn, repo, service):
-        """Une forme de nom attestée par une source, devenue sans aucune source
-        active après détachement, est supprimée."""
+        """Une forme de nom issue d'une source est supprimée quand le détachement lui retire sa dernière contribution source."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
@@ -811,8 +806,7 @@ class TestDetachContributions:
         )
 
     def test_preserves_rejected_orphan_name_form(self, sa_sync_conn, repo, service):
-        """Une forme `rejected` devenue orpheline est préservée : la supprimer
-        détruirait le blocage de non-retour qu'elle matérialise."""
+        """Une forme rejetée reste en base après le détachement de sa dernière contribution source : son rejet empêche tout rattachement ultérieur par ce nom."""
         person_id = _person(sa_sync_conn)
         publication_id = insert_publication(sa_sync_conn)
         source_record_id = _source_record(sa_sync_conn, publication_id)
@@ -845,8 +839,7 @@ class TestDetachContributions:
         )
 
     def test_preserves_computed_name_form(self, sa_sync_conn, repo, service):
-        """Les formes calculées depuis le nom de la personne (source `persons`)
-        ne dépendent d'aucune source et survivent au détachement."""
+        """Les formes dérivées du nom de la personne (source `persons`) restent après le détachement."""
         person_id = repo.create("Dupont", "Jean")
 
         result = service.detach_contributions(person_id, contributions=[])
@@ -861,7 +854,7 @@ class TestDetachContributions:
         )
 
     def test_keeps_source_name_form_still_backed(self, sa_sync_conn, repo, service):
-        """Une forme encore portée par une contribution source d'une contribution de la personne, dans une autre publication, reste quand on détache une seule publication."""
+        """Une forme présente dans une contribution source d'une autre publication de la personne reste après le détachement d'une seule publication."""
         person_id = _person(sa_sync_conn)
         pub1 = insert_publication(sa_sync_conn, "P1")
         pub2 = insert_publication(sa_sync_conn, "P2")
@@ -945,7 +938,7 @@ def _name_form_status(conn, form, person_id):
 
 class TestUpdateNameFormStatus:
     def test_reject_keeps_row_and_sets_status(self, sa_sync_conn, service):
-        """Rejeter une forme conserve la row (tombstone du verrou de non-retour)."""
+        """Rejeter une forme garde sa ligne, au statut `rejected`."""
         person_id = _person(sa_sync_conn, last_name="Unique", first_name="Name")
         _hal_name_form(sa_sync_conn, person_id, name_form="intrus unique")
 
@@ -964,7 +957,7 @@ class TestUpdateNameFormStatus:
         assert row["status"] == "confirmed"
 
     def test_derived_form_status_refused(self, sa_sync_conn, repo, service):
-        """Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse."""
+        """Une forme dérivée du nom de la personne est confirmée d'office : changer son statut lève `ConflictError`."""
         person_id = repo.create("Gamma", "Delta")
 
         with pytest.raises(ConflictError):
@@ -977,7 +970,7 @@ class TestUpdateNameFormStatus:
             service.update_name_form_status(person_id, "inexistante xyz", "rejected")
 
     def test_reject_sets_the_lock(self, sa_sync_conn, service):
-        """Rejeter une forme pose le verrou."""
+        """Rejeter une forme passe son statut à `rejected`."""
         pid = _person(sa_sync_conn, last_name="Foreign", first_name="Form")
         _hal_name_form(sa_sync_conn, pid, name_form="intrus etranger")
 
@@ -996,7 +989,7 @@ class TestUpdateNameFormStatus:
 
 
 class TestNameFormRejectionOnContributions:
-    """Le rejet d'une forme de nom détache de la personne les contributions rattachées par le nom dont une contribution source porte la forme."""
+    """Le rejet d'une forme de nom met en file de résolution les contributions rattachées par le nom (`name`, `compatible_name`) dont une contribution source a cette forme."""
 
     def test_marks_contributions_resolved_by_name(self, sa_sync_conn, service):
         p = _person(sa_sync_conn)
@@ -1067,7 +1060,7 @@ class TestAssignOrphanContribution:
         ) == ["hal", "openalex"]
 
     def test_raises_if_already_assigned(self, sa_sync_conn, contribution_service):
-        """Une contribution déjà rattachée n'est pas reprise : le refus nomme la détentrice."""
+        """Rattacher une contribution déjà rattachée lève une erreur qui désigne sa personne ; rien n'est écrit."""
         insert_persons_perimeter(sa_sync_conn)
         person_id = _person(sa_sync_conn)
         other_id = _person(sa_sync_conn, last_name="Other", first_name="Author")
@@ -1091,7 +1084,7 @@ class TestAssignOrphanContribution:
 
 
 class TestReassignRejectedPairUnit:
-    """Pré-contrôle de rejet sur les chemins de réassignation orphan-contributions."""
+    """Le rattachement d'une contribution orpheline à une personne rejetée de la publication est refusé ; forcé, il lève le rejet."""
 
     def test_assign_blocked_when_rejected(self, sa_sync_conn, contribution_service):
         insert_persons_perimeter(sa_sync_conn)
@@ -1176,8 +1169,7 @@ class TestReassignRejectedPairUnit:
 
 
 class TestMergePersonRejectedContributions:
-    """La fusion transfère les rejets de l'absorbée vers l'absorbante (clé
-    identique), avec dédoublonnage sur conflit de PK."""
+    """La fusion transfère les rejets de l'absorbée à la conservée ; un rejet déjà présent chez la conservée reste unique."""
 
     def test_transfers_and_dedups(self, sa_sync_conn, service):
         target = _person(sa_sync_conn, last_name="Cible", first_name="T")
@@ -1187,13 +1179,13 @@ class TestMergePersonRejectedContributions:
 
         insert_rejected_contribution(
             sa_sync_conn, publication_shared, person_id=target
-        )  # conflit : déjà rejeté côté cible
+        )  # rejet déjà présent chez la cible
         insert_rejected_contribution(
             sa_sync_conn, publication_shared, person_id=source
-        )  # doit être dédoublonné
+        )  # doublon du précédent après la fusion
         insert_rejected_contribution(
             sa_sync_conn, publication_source_only, person_id=source
-        )  # doit migrer vers la cible
+        )  # passe à la cible
 
         service.merge_person(target, source)
 
@@ -1206,7 +1198,7 @@ class TestMergePersonRejectedContributions:
         }
 
     def test_rejection_prevails_over_merged_contribution(self, sa_sync_conn, service):
-        """L'absorbée signe une publication où l'absorbante est rejetée : après fusion, le rejet l'emporte."""
+        """L'absorbée a une contribution dans une publication dont la conservée est rejetée : après la fusion, cette contribution reste sans personne."""
         target = _person(sa_sync_conn, last_name="Cible", first_name="T")
         source = _person(sa_sync_conn, last_name="Source", first_name="S")
         publication = insert_publication(sa_sync_conn, "Conflit")

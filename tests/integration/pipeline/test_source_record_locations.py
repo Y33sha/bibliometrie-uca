@@ -1,4 +1,4 @@
-"""Tests d'intégration de l'écriture des localisations et des plateformes (`pipeline.ingestion.common.locations`)."""
+"""Écriture des localisations et des plateformes (`pipeline.ingestion.common.locations`)."""
 
 from sqlalchemy import text
 

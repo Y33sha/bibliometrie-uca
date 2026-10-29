@@ -1,6 +1,6 @@
 """Statut `authenticated` : garde du trigger et écritures de l'import des ORCID authentifiés.
 
-Le statut `authenticated` atteste qu'un chercheur a lui-même authentifié son ORCID. Le trigger `protect_authenticated_identifier` en fait un statut réservé (seul l'import dédié le pose) et immuable (aucune dégradation, même admin).
+Le statut `authenticated` indique qu'un chercheur a lui-même authentifié son ORCID. Le trigger `protect_authenticated_identifier` en fait un statut réservé (seul l'import dédié le pose) et définitif (aucun changement de statut, même par l'administration).
 """
 
 from collections import Counter
@@ -79,7 +79,7 @@ class TestTriggerGuard:
         assert _status_of(sa_sync_conn, person, _ORCID) == "authenticated"
 
     def test_person_id_change_allowed_when_status_kept(self, sa_sync_conn):
-        """Une fusion déplace l'identifiant (person_id) sans toucher au statut : permis."""
+        """Le trigger permet de déplacer l'identifiant vers une autre personne, comme le fait une fusion, quand le statut reste."""
         source = insert_person(sa_sync_conn, "Source")
         target = insert_person(sa_sync_conn, "Target")
         authenticate_orcids(sa_sync_conn, [(source, _ORCID)])

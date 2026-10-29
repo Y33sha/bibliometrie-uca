@@ -85,7 +85,7 @@ class TestGetPublicationDetail:
         )
         insert_contribution(sa_sync_conn, publication, person_id=second, author_position=2)
         insert_contribution(sa_sync_conn, publication, person_id=first, author_position=1)
-        # Contribution source HAL de la personne, hors de sa contribution : sans effet sur les sources.
+        # Contribution source HAL hors de la contribution de la personne : sans effet sur ses sources.
         insert_source_contribution(sa_sync_conn, hal_record)
         openalex_contribution = insert_source_contribution(
             sa_sync_conn, openalex_record, source="openalex"
@@ -138,8 +138,7 @@ class TestGetPublicationDetail:
         assert detail.thesis_meta is None
 
     def test_doi_ra_resolved_from_doi_prefixes(self, sa_sync_conn):
-        """doi_ra = la RA du préfixe DOI (via doi_prefixes) — discrimine les DOI
-        DataCite (Zenodo/figshare/arXiv) pour le choix du lien d'accès."""
+        """`doi_ra` est l'agence d'enregistrement du préfixe DOI : elle distingue les DOI DataCite (Zenodo, figshare, arXiv) pour le choix du lien d'accès."""
         insert_doi_prefix(sa_sync_conn, "10.5281", ra="DataCite")
         publication = insert_publication(sa_sync_conn, doi="10.5281/zenodo.99")
         detail = publications_queries(sa_sync_conn).get_publication_detail(publication)
@@ -155,7 +154,7 @@ class TestGetPublicationDetail:
     def test_multiple_source_records_same_source(self, sa_sync_conn):
         """Deux enregistrements sources OpenAlex d'une même publication sont tous deux dans `sources`, le plus récent d'abord."""
         publication = insert_publication(sa_sync_conn, title="Multi-OA")
-        # Row OpenAlex la plus ancienne, avec 1 auteur "Alice"
+        # Enregistrement source OpenAlex le plus ancien, d'auteur « Alice ».
         source_record_old = insert_source_record(
             sa_sync_conn, publication, source="openalex", source_id="W1-OLD"
         )
@@ -166,7 +165,7 @@ class TestGetPublicationDetail:
         insert_source_contribution(
             sa_sync_conn, source_record_old, source="openalex", raw_author_name="Alice"
         )
-        # Row OpenAlex la plus récente, avec 1 auteur "Bob"
+        # Enregistrement source OpenAlex le plus récent, d'auteur « Bob ».
         source_record_new = insert_source_record(
             sa_sync_conn, publication, source="openalex", source_id="W2-NEW"
         )
@@ -251,8 +250,7 @@ class TestGetPublicationExternalIdentifiers:
         assert [(i.type, i.value) for i in ids] == [("pmid", "123")]
 
     def test_nnt_omitted_when_covered_by_theses_source(self, sa_sync_conn):
-        # Le `source_id` de la source `theses` *est* le NNT : le lien source theses.fr couvre
-        # déjà l'identifiant, l'entrée `nnt` externe ferait doublon.
+        # Le `source_id` de la source `theses` est le NNT : le lien vers theses.fr couvre l'identifiant, une entrée `nnt` ferait doublon.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn,
@@ -272,7 +270,7 @@ class TestGetPublicationExternalIdentifiers:
         assert ids == []
 
     def test_nnt_kept_without_theses_source(self, sa_sync_conn):
-        # NNT porté par un enregistrement HAL sans source theses.fr moissonnée : le lien reste utile.
+        # NNT d'un enregistrement source HAL, sans enregistrement source theses.fr : le lien reste utile.
         publication = insert_publication(sa_sync_conn)
         insert_source_record(
             sa_sync_conn,
@@ -292,7 +290,7 @@ class TestGetPublicationSubjects:
 
     def test_dedup_aggregates_sources(self, sa_sync_conn):
         publication = insert_publication(sa_sync_conn)
-        # Un même libellé annoté par deux sources : 1 row, sources = ['hal', 'openalex'].
+        # Un même libellé annoté par deux sources : une ligne, de sources ['hal', 'openalex'].
         sid = insert_subject(sa_sync_conn, "AI")
         for src in ("hal", "openalex"):
             insert_publication_subject(sa_sync_conn, publication, subject_id=sid, source=src)
@@ -312,5 +310,5 @@ class TestGetPublicationSubjects:
         assert len(detail.subjects) == 1
         assert detail.subjects[0].label == "genomics"
         assert detail.subjects[0].sources == ["wos"]
-        # Mots-clés libres retournés à part (hors référentiel `subjects`).
+        # Les mots-clés libres, hors du référentiel `subjects`, sont rendus à part.
         assert detail.keywords == []

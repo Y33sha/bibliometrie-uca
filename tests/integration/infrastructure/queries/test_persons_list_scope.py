@@ -1,6 +1,6 @@
-"""Scope laboratoire de la liste des personnes (`/api/persons` + facettes).
+"""Filtres de la liste des personnes et de ses facettes (`/api/persons`).
 
-Vérifie que `PersonFilters.lab_id` restreint aux personnes ayant une contribution de rôle auteur rattachée au laboratoire via `contribution_structures`, et le filtre d'exclusion.
+`PersonFilters.lab_id` restreint la liste aux personnes qui ont une contribution de rôle auteur rattachée au laboratoire. Les autres tests couvrent le filtre d'exclusion et la facette « À confirmer ».
 """
 
 from sqlalchemy import text
@@ -59,7 +59,7 @@ class TestListLabScope:
         assert {p_in, p_out} <= ids
 
     def test_contribution_counts_scoped_to_lab(self, sa_sync_conn):
-        """Sous scope labo, les dénombrements comptent seulement les contributions du labo."""
+        """Avec le filtre laboratoire, les dénombrements comptent seulement les contributions du laboratoire."""
         lab = insert_structure(sa_sync_conn, "LAB-CNT")
         person = insert_person(sa_sync_conn, "Counted")
         _contribution_in_lab(sa_sync_conn, person, lab_id=lab)
@@ -105,8 +105,7 @@ class TestListLabScope:
         q = PersonsQueries(sa_sync_conn)
         scoped = q.persons_facets(filters=PersonFilters(lab_id=lab))
         unscoped = q.persons_facets(filters=PersonFilters())
-        # Le scope labo ne compte que la personne du labo (rh.no ≥ 1 scopé,
-        # et strictement inférieur au global qui inclut les deux).
+        # Avec le filtre laboratoire, les facettes comptent seulement la personne du laboratoire.
         assert scoped.rh.yes + scoped.rh.no == 1
         assert unscoped.rh.yes + unscoped.rh.no >= 2
 
@@ -126,7 +125,7 @@ class TestListLabScope:
 
 
 class TestExclusionFilter:
-    """Le filtre d'exclusion porte de la même façon sur la liste et sur ses facettes. Les personnes sont isolées par une recherche sur leur nom."""
+    """Le filtre d'exclusion s'applique de la même façon à la liste et à ses facettes. Les personnes sont isolées par une recherche sur leur nom."""
 
     SEARCH = "zzexcl"
 
@@ -170,7 +169,7 @@ class TestExclusionFilter:
         assert q.persons_facets(filters=retained).rh.no == 1
 
     def test_excluded_person_leaves_the_lab(self, sa_sync_conn):
-        """Une personne exclue n'appartient à aucun laboratoire, dès que les matviews de structures sont rafraîchies."""
+        """Une personne exclue n'appartient à aucun laboratoire, une fois les vues des structures rafraîchies."""
         lab = insert_structure(sa_sync_conn, "LAB-EXCL")
         p_ok = insert_person(sa_sync_conn, "Active")
         _contribution_in_lab(sa_sync_conn, p_ok, lab_id=lab)
@@ -188,7 +187,7 @@ class TestExclusionFilter:
 
 
 class TestPendingFacets:
-    """Facette « À confirmer » : formes de nom / identifiants au statut `pending`."""
+    """Facette « À confirmer » : formes de nom ou identifiants au statut `pending`."""
 
     def test_pending_name_forms_filter(self, sa_sync_conn):
         p_pending = insert_person(sa_sync_conn, "Pendingform")

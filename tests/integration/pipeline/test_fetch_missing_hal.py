@@ -11,7 +11,7 @@ from tests.integration.helpers.staging import insert_failed_lookup, insert_stagi
 
 
 def _insert_source_record(conn, source, source_id, identifiers, *, publication_id) -> None:
-    """Crée un source_record `source` rattaché à `publication_id`, avec sa ligne staging."""
+    """Crée un enregistrement source `source` rattaché à `publication_id`, avec sa ligne de staging."""
     staging_id = insert_staging(conn, source, source_id=source_id)
     insert_source_record(
         conn,
@@ -25,10 +25,7 @@ def _insert_source_record(conn, source, source_id, identifiers, *, publication_i
 
 
 class TestFindMissingHalIds:
-    """Récupère les hal-ids référencés par des source_records OpenAlex ou ScanR in-périmètre.
-
-    Le hal-id doit être porté par un `source_records` OpenAlex ou ScanR rattaché à une publication `in_perimeter`, et absent du staging HAL.
-    """
+    """Hal-id à chercher : cités par un enregistrement source OpenAlex ou ScanR d'une publication du périmètre, et absents du staging HAL."""
 
     @staticmethod
     def _carry(conn, source, source_id, hal_ids, *, in_perimeter=True):
@@ -83,7 +80,7 @@ class TestFindMissingHalIds:
 
 
 class TestFindMissingNnts:
-    """Récupère les NNT des thèses soutenues in-périmètre sans document HAL."""
+    """NNT à chercher : ceux des thèses soutenues du périmètre sans document HAL."""
 
     @staticmethod
     def _thesis(conn, nnt) -> int:
@@ -105,7 +102,7 @@ class TestFindMissingNnts:
         assert self._missing(sa_sync_conn) == []
 
     def test_excludes_nnt_carried_by_a_hal_record(self, sa_sync_conn):
-        """Un document HAL porte le NNT sans être rattaché à la thèse : HAL le connaît déjà."""
+        """Un document HAL contient le NNT sans être rattaché à la thèse : HAL connaît déjà la thèse."""
         self._thesis(sa_sync_conn, "2024UCA0001")
         autre = insert_publication(sa_sync_conn, doc_type="thesis", in_perimeter=True)
         _insert_source_record(

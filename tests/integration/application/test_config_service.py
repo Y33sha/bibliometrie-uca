@@ -1,4 +1,4 @@
-"""Tests de caractérisation pour application/services/config.py."""
+"""Tests de caractérisation du service de configuration."""
 
 import pytest
 

@@ -128,7 +128,7 @@ class TestNormalizeOpenalexIdempotence:
         counts_1 = _count_oa_tables(sa_sync_conn)
         assert processed_1 == 3
 
-        # Réinjecter le raw_data (vidé par le normaliseur) et relancer
+        # Réinsère le `raw_data`, vidé par la normalisation, et relance.
         insert_oa_staging(sa_sync_conn, OA_STAGING_DOCS)
         run_normalize_oa(sa_sync_conn)
         create_all_publications(sa_sync_conn)

@@ -1,9 +1,8 @@
-"""Tests d'intégration pour le router `pipeline_runs` (`/api/pipeline/runs/*`).
+"""Tests d'intégration du router des runs du pipeline (`/api/pipeline/runs/*`).
 
 Couvre :
 - GET /api/pipeline/runs (liste agrégée par run, statut global, ordre)
-- GET /api/pipeline/runs/{run_id} (phases ordonnées, details avant/après et
-  by_source, médian de durée historique, écart de durée ; statut warning ; 404)
+- GET /api/pipeline/runs/{run_id} (phases ordonnées, volumes avant et après, indicateurs par source, médiane historique et écart de durée ; statut warning ; 404)
 """
 
 from __future__ import annotations
@@ -56,7 +55,7 @@ def _seed_phase(
 
 @pytest.fixture(scope="module")
 def seeded_runs() -> dict[str, int]:
-    """Deux runs : A tout vert, B avec une phase en warning et publications plus lente."""
+    """Deux runs : A sans warning ; B avec une phase en warning et une phase `publications` plus lente."""
     publications_details = {"tables": {"source_records": {"before": 1000, "after": 800}}}
 
     run_a = _next_run_id()
@@ -108,7 +107,7 @@ def test_list_runs_aggrege_et_ordonne(client, seeded_runs):
     run_b = by_id[seeded_runs["b"]]
     assert run_b["status"] == "warning"
     assert run_b["phase_count"] == 3
-    # Ruban : statut par phase, dans l'ordre d'exécution.
+    # Statut de chaque phase, dans l'ordre d'exécution.
     assert [p["phase"] for p in run_b["phases"]] == ["normalize", "publications", "persons"]
     assert run_b["phases"][2] == {"phase": "persons", "status": "warning"}
 
@@ -127,16 +126,16 @@ def test_get_run_detail(client, seeded_runs):
     assert [p["phase"] for p in detail["phases"]] == ["normalize", "publications", "persons"]
 
     publications = next(p for p in detail["phases"] if p["phase"] == "publications")
-    # Volumes avant/après conservés tels quels dans details (pas de ratio de rendement).
+    # Volumes avant et après rendus tels quels dans `details`.
     assert publications["details"]["tables"]["source_records"] == {
         "before": 1000,
         "after": 800,
     }
-    # Médian historique = durée de publications dans run A (10), run courant exclu.
+    # Médiane historique : durée de `publications` dans le run A (10 s), hors run courant.
     assert publications["historical_median_duration_s"] == 10.0
     assert publications["duration_ratio"] == 2.0
 
-    # Indicateur sur-mesure par source remonté tel quel.
+    # Indicateurs par source rendus tels quels.
     normalize = next(p for p in detail["phases"] if p["phase"] == "normalize")
     assert normalize["details"]["by_source"]["openalex"]["found"] == 7658
 

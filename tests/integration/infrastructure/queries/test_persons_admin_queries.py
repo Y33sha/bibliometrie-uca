@@ -28,7 +28,7 @@ _author = partial(insert_contribution, roles=["author"])
 
 
 def _person_source_contribution(conn, source_record, *, person_id, **source_contribution):
-    """Contribution source décrite par `source_contribution`, seule contribution source d'une contribution rattachée à la personne `person_id`. Rend l'`id` de la contribution source."""
+    """Contribution source décrite par `source_contribution`, seule contribution source d'une contribution rattachée à la personne `person_id`. Renvoie l'`id` de la contribution source."""
     source_contribution_id = insert_source_contribution(conn, source_record, **source_contribution)
     publication = conn.execute(
         text("SELECT publication_id FROM source_records WHERE id = :s"), {"s": source_record}
@@ -73,7 +73,7 @@ class TestNameFormContributions:
 
 
 def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_conn):
-    """Le compteur d'une forme, la modale de détachement et le panneau des personnes partageant une forme comptent les mêmes personnes."""
+    """Le compteur d'une forme, la modale de détachement et le panneau des personnes partageant une forme désignent les mêmes autres personnes : ni celles chez qui la forme est rejetée, ni les personnes exclues."""
     pid = insert_person(sa_sync_conn, "Dupond")
     porteur = insert_person(sa_sync_conn, "Martin")
     forme_rejetee = insert_person(sa_sync_conn, "Durand")
@@ -96,7 +96,7 @@ def test_compteur_modale_et_panneau_designent_les_memes_autres_porteurs(sa_sync_
 
 
 def test_une_forme_compte_les_publications_des_contributions_de_la_personne(sa_sync_conn):
-    """Seuls comptent les contributions sources des contributions de la personne : une contribution source rattachée à la personne hors de ses contributions ne compte pas."""
+    """Seules comptent les contributions sources des contributions de la personne : une contribution source de même forme hors de ses contributions ne compte pas."""
     pid = insert_person(sa_sync_conn, "Dupond")
     _hal_name_form(sa_sync_conn, pid, name_form="dupond j")
     for rank in range(2):
@@ -127,20 +127,15 @@ def test_une_forme_compte_les_publications_des_contributions_de_la_personne(sa_s
     assert len(contributions) == 2
 
 
-# Tests pour `hal_duplicate_accounts` déplacés vers
-# `tests/integration/infrastructure/queries/test_hal_problems.py` —
-# la query est maintenant exposée par HalProblemsQueries.
-
-
 def _attribute(conn, person_id, id_type, id_value, status):
-    """Attribution `person_identifiers` ; le statut `authenticated` exige le drapeau de l'import dédié."""
+    """Attribue l'identifiant à la personne ; le statut `authenticated` exige le drapeau de l'import dédié."""
     if status == "authenticated":
         conn.execute(text("SET LOCAL app.orcid_authenticated_import = 'on'"))
     insert_person_identifier(conn, person_id, id_type=id_type, id_value=id_value, status=status)
 
 
 class TestIdentifierConflicts:
-    """La détection projette `(person_id, id_type, id_value)` à la volée depuis les contributions sources des contributions des personnes ⋈ `contributor_information` : rien à rafraîchir, la lecture voit directement le seed de la transaction rollbackée du fixture."""
+    """Conflit d'identifiant : les contributions sources de deux personnes contiennent un identifiant attribué en attente à l'une d'elles. La lecture le calcule à la volée : aucune vue à rafraîchir."""
 
     def test_pair_sharing_orcid(self, sa_sync_conn):
         p1 = insert_person(sa_sync_conn, "Smith", first_name="John")
@@ -303,7 +298,7 @@ class TestNameDuplicates:
 
 
 class TestAmbiguousNameForms:
-    """Formes portées par plusieurs personnes, avec au moins un lien à trancher."""
+    """Formes de plusieurs personnes, avec au moins un lien à trancher."""
 
     def _forms(self, conn):
         return {
@@ -330,7 +325,7 @@ class TestAmbiguousNameForms:
         assert (persons[b].canonical, persons[b].status) == (False, "pending")
 
     def test_forme_rejetee_ne_compte_pas(self, sa_sync_conn):
-        """En attente chez une personne, rejetée chez l'autre : une seule personne porte la forme."""
+        """En attente chez une personne, rejetée chez l'autre : la forme désigne une seule personne."""
         a = insert_person(sa_sync_conn, "Martin")
         b = insert_person(sa_sync_conn, "Durand")
         _hal_name_form(sa_sync_conn, a, name_form="j martin")
@@ -345,7 +340,7 @@ class TestAmbiguousNameForms:
         assert "j martin" not in self._forms(sa_sync_conn)
 
     def test_seuls_les_porteurs_sont_affiches(self, sa_sync_conn):
-        """Une forme ambiguë liste ses porteurs, sans les personnes chez qui la forme est rejetée."""
+        """Une forme ambiguë liste les personnes qui l'ont, sans celles chez qui elle est rejetée."""
         a = insert_person(sa_sync_conn, "Martin")
         b = insert_person(sa_sync_conn, "Martin", first_name="Jacques")
         c = insert_person(sa_sync_conn, "Durand")

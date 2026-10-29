@@ -1,11 +1,4 @@
-"""Tests d'idempotence des phases du pipeline.
+"""Idempotence des phases du pipeline : chaque test insère des données de staging, lance la phase, compte les résultats, relance la phase et compare les comptes.
 
-Principe : insérer des données de staging, lancer la phase, compter les
-résultats, relancer, vérifier que les compteurs n'ont pas bougé.
-
-Un fichier par phase (`normalize_<source>`, `persons`, `contributions`,
-`affiliations`), plus `normalize_inter_source` pour la combinatoire
-multi-sources. Les helpers vraiment partagés vivent dans `_helpers.py`.
-
-Tournent sur la base `bibliometrie_test` (cf. `conftest.py` parent).
+Un fichier par phase (`normalize_<source>`, `affiliations`, `persons`), plus `normalize_inter_source` pour l'enchaînement de deux sources.
 """

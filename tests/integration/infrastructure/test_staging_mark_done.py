@@ -21,7 +21,7 @@ class TestMarkDoneArchivesRaw:
 
         StagingStore(sa_sync_conn, raw_store=store).mark_done(sid)
 
-        # raw_data vidé + processed posé
+        # `raw_data` vidé, `processed` posé.
         rd, processed = sa_sync_conn.execute(
             text("SELECT raw_data, processed FROM staging WHERE id = :i"), {"i": sid}
         ).one()
@@ -46,7 +46,7 @@ class TestMarkDoneArchivesRaw:
             def put(self, *args) -> None:
                 raise OSError("disk full")
 
-        # ne lève pas, et vide quand même raw_data (la BDD reste maîtresse)
+        # L'échec d'archivage ne lève pas : `raw_data` est vidé quand même.
         StagingStore(sa_sync_conn, raw_store=_BoomStore()).mark_done(sid)
 
         rd = sa_sync_conn.execute(

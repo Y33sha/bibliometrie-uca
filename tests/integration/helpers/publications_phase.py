@@ -1,9 +1,4 @@
-"""Helper de tests : exécute la vraie phase « publications » du pipeline.
-
-Partagé par les tests d'idempotence et de re-traitement, qui ont besoin de
-créer/rattacher les publications de leurs source_records orphelins sans
-réimplémenter l'assignation.
-"""
+"""Phases `metadata_correction` et `publications` du pipeline, jouées dans la transaction d'un test d'idempotence ou de retraitement."""
 
 import logging
 
@@ -26,15 +21,9 @@ from pipeline.transformation.publications.reconciliation import reconcile
 
 
 def apply_metadata_corrections(conn: Connection) -> None:
-    """Joue `metadata_correction` (unaire, cibles des DOI, retraits de DOI, puis `is_matchable`) sur toutes les enregistrements sources, en place.
+    """Joue les sous-étapes de `metadata_correction` (correction unaire, cibles des DOI, retraits de DOI, puis `is_matchable`) sur tous les enregistrements sources, sans valider la transaction.
 
-    Compose fetch→compute→persist sans le `run()` applicatif : ce dernier batche et
-    `conn.commit()` entre lots, ce qui casserait l'isolation transactionnelle du
-    fixture `sa_sync_conn` (un `begin()` rollbacké en fin de test).
-
-    À rejouer après chaque (re-)normalize qui réécrit les colonnes enregistrement source avec le brut
-    source, avant tout `refresh_from_sources` / matching : c'est l'ordre du pipeline
-    (phase `metadata_correction` avant phase `publications`).
+    Le `run()` de chaque sous-étape valide la transaction après chaque lot ; ce helper enchaîne donc lecture, calcul et écriture lui-même. À rejouer après chaque normalisation, avant la réconciliation, comme dans le pipeline.
     """
     queries = SourceRecordCorrectionStore(conn)
     missing_hal_ids = queries.fetch_missing_hal_ids()
@@ -58,23 +47,9 @@ def apply_metadata_corrections(conn: Connection) -> None:
 
 
 def create_all_publications(conn: Connection) -> None:
-    """Crée/rattache les publications des source_records orphelins via la
-    vraie passe d'assignation+réconciliation du pipeline (`reconcile`), pas une
-    cascade réimplémentée.
+    """Crée ou rattache les publications des enregistrements sources orphelins par la réconciliation du pipeline (`reconcile`), sans valider la transaction.
 
-    Joue d'abord `metadata_correction`, comme l'ordre réel
-    du pipeline : l'assignation lit le `doc_type`/`serial_id`/`oa_status` canonique
-    corrigé écrit en place sur la `source_record`, elle ne re-mappe ni ne
-    re-corrige. Sans cette passe, un enregistrement source porterait sa nomenclature source brute
-    (`ART`, `journal-article`…) jusqu'à l'enum canonique → écriture invalide.
-
-    Ces tests ne jouent pas la phase affiliations : aucun `source_contribution`
-    n'est in_perimeter, or l'assignation ne *crée* une publication que pour un
-    orphelin in_perimeter. On sème donc le périmètre à la main (indice `address`)
-    — équivalent de ce que pose la phase affiliations en prod.
-
-    `reconcile` ne commit pas (à la charge du caller), ce qui préserve l'isolation
-    transactionnelle du fixture `sa_sync_conn`.
+    Pose d'abord l'indice `address` sur toutes les contributions sources, comme la phase `affiliations` : la réconciliation crée une publication seulement pour un enregistrement source du périmètre. Joue ensuite `metadata_correction` : la réconciliation lit le type de document et la revue corrigés.
     """
     conn.execute(text("UPDATE source_contributions SET perimeter_evidence = '{address}'"))
 

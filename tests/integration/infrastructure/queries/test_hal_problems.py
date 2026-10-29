@@ -33,8 +33,7 @@ def _q(conn) -> HalProblemsQueries:
 
 def _create_lab(conn, code="LAB", hal_collection=None):
     lab_id = insert_structure(conn, code, name="L", hal_collection=hal_collection)
-    # Rattache au périmètre persons, désigné en configuration : les lectures HAL scopent
-    # au périmètre, pas au type de structure.
+    # Rattache au périmètre des personnes : les lectures HAL se limitent au périmètre, pas au type de structure.
     set_config(conn, "perimeter_persons", "uca")
     add_to_perimeter(conn, lab_id, code="uca", name="test persons perimeter")
     return lab_id
@@ -113,7 +112,7 @@ class TestHalDuplicateAccounts:
         assert res.total == 0
 
     def test_ignores_rejected_attribution(self, sa_sync_conn):
-        """Le compte rejeté pour la personne figure dans ses contributions : publication mal attribuée, hors du périmètre de la page."""
+        """Un compte rejeté pour la personne est ignoré, même présent dans ses contributions (publication mal attribuée)."""
         pid = insert_person(sa_sync_conn)
         _attribute_hal_account(sa_sync_conn, pid, 42)
         _attribute_hal_account(sa_sync_conn, pid, 43, status="rejected")
@@ -161,7 +160,7 @@ class TestHalDuplicatePublicationsByDoi:
         assert res.total == 0
 
     def test_ignores_deposits_without_publication(self, sa_sync_conn):
-        """Des dépôts hors périmètre, sans publication, partagent un DOI."""
+        """Des dépôts sans publication qui partagent un DOI ne forment pas de paire."""
         _source_record(sa_sync_conn, None, source_id="h-out-1", doi="10.1/out")
         _source_record(sa_sync_conn, None, source_id="h-out-2", doi="10.1/out")
         res = _q(sa_sync_conn).hal_duplicate_publications_by_doi(page=1, per_page=50)
@@ -171,7 +170,7 @@ class TestHalDuplicatePublicationsByDoi:
 
 class TestHalDuplicatePublicationsByMetadata:
     def test_detects_pair_with_same_title_and_year(self, sa_sync_conn):
-        # Titre > 30 chars + même année + même doc_type + taille auteurs ±2
+        # Même titre normalisé de plus de 30 caractères, même année, même type, nombres d'auteurs HAL à ±2.
         title = "Article Title That Is Long Enough To Trigger Metadata Detection"
         title_norm = title.lower()
         p1 = insert_publication(sa_sync_conn, title=title, title_normalized=title_norm)
@@ -201,7 +200,7 @@ class TestHalMissingCollections:
         assert res is NoMissingCollections.NO_COLLECTION
 
     def test_reports_an_unknown_lab_apart(self, sa_sync_conn):
-        """Les deux absences sont distinctes : le router en tire deux statuts."""
+        """Un laboratoire inconnu se distingue d'un laboratoire sans collection : la route en tire deux statuts."""
         res = _q(sa_sync_conn).hal_missing_collections(lab_id=999999, page=1, per_page=50)
         assert res is NoMissingCollections.UNKNOWN_LAB
 
@@ -214,7 +213,7 @@ class TestHalMissingCollections:
 
 
 def _create_contribution_uca(conn, publication_id, lab_id, position=0):
-    """Contribution du périmètre rattachée à `lab_id`. Retourne sa personne, rattachée aux contributions sources qui l'attestent."""
+    """Contribution du périmètre, de rôle auteur, rattachée au laboratoire `lab_id` et à une personne créée. Renvoie la personne."""
     person_id = insert_person(conn)
     contribution_id = insert_contribution(
         conn,
@@ -229,8 +228,7 @@ def _create_contribution_uca(conn, publication_id, lab_id, position=0):
 
 
 def _create_address_for_source_contribution(conn, source_contribution_id):
-    # `raw_text` doit être unique (contrainte sur md5(raw_text)). On dérive
-    # depuis source_contribution_id pour permettre plusieurs adresses dans le même test.
+    # Le texte dérivé de la contribution source rend chaque adresse unique (contrainte d'unicité sur `md5(raw_text)`).
     addr_id = insert_address(
         conn, f"addr-{source_contribution_id}", normalized_text=f"addr-{source_contribution_id}"
     )
@@ -239,8 +237,7 @@ def _create_address_for_source_contribution(conn, source_contribution_id):
 
 
 class TestHalAffiliationConflicts:
-    """Logique : publi avec ≥1 enregistrement source HAL ayant ≥1 contribution in_perimeter,
-    ≥1 enregistrement source WoS/OpenAlex, et aucun enregistrement source WoS/OA n'ayant de contribution in_perimeter."""
+    """Conflit : une contribution source HAL de la publication est dans le périmètre, aucune contribution source WoS ou OpenAlex ne l'est, et au moins une contribution source WoS ou OpenAlex a une adresse."""
 
     def test_noop_when_no_data(self, sa_sync_conn):
         res = _q(sa_sync_conn).hal_affiliation_conflicts(page=1, per_page=50)
@@ -282,9 +279,7 @@ class TestHalAffiliationConflicts:
         assert publication in [p.id for p in res.publications]
 
     def test_ignores_oa_without_address(self, sa_sync_conn):
-        # Sans adresse sur les contributions OA, la source n'a pas "examiné"
-        # l'affiliation — l'absence d'in_perimeter est du silence, pas un
-        # désaveu. Garde-fou contre les faux positifs.
+        # Sans adresse, la contribution source OpenAlex ne dit rien de l'affiliation : pas de conflit.
         publication = insert_publication(sa_sync_conn, title="OA no address")
         lab = _create_lab(sa_sync_conn, code="LAB-NOADDR")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-noaddr-1")
@@ -299,8 +294,7 @@ class TestHalAffiliationConflicts:
         assert publication not in [p.id for p in res.publications]
 
     def test_detects_regardless_of_position(self, sa_sync_conn):
-        # La nouvelle logique est au niveau publication, pas par position.
-        # HAL UCA en pos 0, OA hors-UCA en pos 1 → conflit détecté.
+        # La comparaison se fait par publication, sans égard à la position : HAL dans le périmètre en position 0, OpenAlex hors du périmètre en position 1 → conflit.
         publication = insert_publication(sa_sync_conn, title="Position independent")
         lab = _create_lab(sa_sync_conn, code="LAB-POS")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-pos-1")
@@ -318,8 +312,7 @@ class TestHalAffiliationConflicts:
         assert publication in [p.id for p in res.publications]
 
     def test_ignores_scanr(self, sa_sync_conn):
-        # ScanR moissonne HAL et reproduit ses affiliations — non informatif,
-        # exclu de la comparaison.
+        # ScanR moissonne HAL et reproduit ses affiliations : il est exclu de la comparaison.
         publication = insert_publication(sa_sync_conn, title="ScanR only")
         lab = _create_lab(sa_sync_conn, code="LAB-SCANR")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-scanr-1")
@@ -337,7 +330,7 @@ class TestHalAffiliationConflicts:
         assert publication not in [p.id for p in res.publications]
 
     def test_ignores_when_oa_confirms_uca(self, sa_sync_conn):
-        # OA atteste aussi UCA → pas de conflit.
+        # OpenAlex met aussi la publication dans le périmètre → pas de conflit.
         publication = insert_publication(sa_sync_conn, title="OA confirms")
         lab = _create_lab(sa_sync_conn, code="LAB-CONFIRM")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-confirm-1")
@@ -355,8 +348,7 @@ class TestHalAffiliationConflicts:
         assert publication not in [p.id for p in res.publications]
 
     def test_ignores_when_one_of_wos_oa_confirms(self, sa_sync_conn):
-        # OA contredit mais WoS confirme → pas de conflit (la condition NOT EXISTS
-        # cherche n'importe quelle enregistrement source WoS/OA avec in_perimeter).
+        # OpenAlex contredit HAL, WoS le confirme → pas de conflit.
         publication = insert_publication(sa_sync_conn, title="Mixed conf")
         lab = _create_lab(sa_sync_conn, code="LAB-MIXED")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-mixed-1")
@@ -381,7 +373,7 @@ class TestHalAffiliationConflicts:
         assert publication not in [p.id for p in res.publications]
 
     def test_requires_at_least_one_wos_or_oa(self, sa_sync_conn):
-        # Publi vue seulement par HAL → pas de comparaison possible, pas un conflit.
+        # Publication présente seulement dans HAL → pas de comparaison possible, pas de conflit.
         publication = insert_publication(sa_sync_conn, title="HAL only")
         lab = _create_lab(sa_sync_conn, code="LAB-HALONLY")
         hal_source_record = _source_record(sa_sync_conn, publication, source_id="h-only-1")

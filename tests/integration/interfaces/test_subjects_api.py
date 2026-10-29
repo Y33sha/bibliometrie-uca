@@ -1,8 +1,8 @@
-"""Tests d'intégration pour le router `interfaces.api.routers.subjects`.
+"""Tests d'intégration du router des sujets (`interfaces.api.routers.subjects`).
 
 Couvre :
-- GET /api/subjects (liste, pagination, search, min_count)
-- GET /api/subjects/{id} (detail, neighbors, 404)
+- GET /api/subjects (liste, pagination, recherche, min_count)
+- GET /api/subjects/{id} (fiche, voisins et liens entre voisins, 404)
 """
 
 from __future__ import annotations
@@ -17,9 +17,7 @@ from tests.integration.helpers.seeds import (
 
 
 def _seed_cooccurrence(subject_a_id: int, subject_b_id: int, count: int) -> None:
-    """Crée `count` publications liées aux deux sujets puis rafraîchit la
-    matview pour produire la paire (a, b) avec ce count. Seuil de la matview
-    `count >= 2` : passer un count < 2 ne fera pas apparaître la paire."""
+    """Crée `count` publications liées aux deux sujets, puis rafraîchit la vue matérialisée des cooccurrences. La vue retient seulement les paires d'au moins deux publications."""
     a, b = sorted([subject_a_id, subject_b_id])
     with owner_pool() as cur:
         for _ in range(count):
@@ -39,7 +37,7 @@ class TestListSubjects:
         assert {"items", "total", "page", "per_page"} <= set(body)
 
     def test_per_page_above_limit_rejected(self, client):
-        # `per_page` Query(le=200) → > 200 = 422.
+        # `per_page` au-delà de 200 : 422.
         r = client.get("/api/subjects", params={"per_page": 500})
         assert r.status_code == 422
 
@@ -62,7 +60,7 @@ class TestListSubjects:
     def test_min_count_filter(self, client):
         low = seed_subject(uniq("LowCount"), usage_count=1)
         high = seed_subject(uniq("HighCount"), usage_count=50)
-        # min_count=10 doit filtrer `low` mais retenir `high`.
+        # `min_count=10` écarte `low` et retient `high`.
         r = client.get("/api/subjects", params={"min_count": 10, "per_page": 200})
         assert r.status_code == 200
         ids = [item["id"] for item in r.json()["items"]]
@@ -121,12 +119,12 @@ class TestGetSubject:
 
         r = client.get(f"/api/subjects/{s_main}", params={"min_cooccurrence": 5})
         assert r.status_code == 200
-        # Lien de count=2 < min_cooccurrence=5 → filtré.
+        # Deux cooccurrences, sous le seuil de cinq : voisin écarté.
         ids = [n["id"] for n in r.json()["neighbors"]]
         assert s_weak not in ids
 
     def test_neighbors_limit_param_validation(self, client):
-        # Query(ge=1, le=100) — > 100 = 422.
+        # `neighbors_limit` au-delà de 100 : 422.
         s = seed_subject()
         r = client.get(f"/api/subjects/{s}", params={"neighbors_limit": 500})
         assert r.status_code == 422

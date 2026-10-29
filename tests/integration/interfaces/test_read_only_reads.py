@@ -1,10 +1,10 @@
-"""Lecture seule des méthodes HTTP sans effet de bord, enforcée par PostgreSQL.
+"""Lecture seule des méthodes HTTP sans effet de bord, imposée par PostgreSQL.
 
-La connexion s'ouvre en lecture seule sur `GET`, `HEAD` et `OPTIONS` : une écriture émise depuis un point d'entrée de lecture est refusée par la base (SQLSTATE `25006`), qu'elle soit committée ou non.
+La connexion s'ouvre en lecture seule sur `GET`, `HEAD` et `OPTIONS` : la base refuse une écriture émise depuis une route de lecture (SQLSTATE `25006`), qu'elle soit committée ou non.
 
-La règle vaut pour les deux façons dont une connexion naît pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture répartie sur plusieurs connexions. Un garde-fou d'exécution refuse celle qui naîtrait par un troisième chemin.
+La règle vaut pour les deux façons dont une connexion naît pendant une requête : celle que `db_conn` sert aux dépendances, et celles que `connection_factory` remet à une lecture répartie sur plusieurs connexions. Un garde-fou d'exécution refuse une connexion ouverte par un troisième chemin.
 
-L'écriture d'épreuve porte sur `config`, table sur laquelle le rôle de l'API détient `UPDATE` : le refus vient donc bien de la transaction en lecture seule, et non d'un privilège manquant. Sa clause `WHERE false` ne touche aucune ligne — le contrôle de PostgreSQL porte sur la commande, pas sur le nombre de lignes.
+L'écriture d'épreuve vise `config`, où le rôle de l'API a le droit `UPDATE` : le refus vient donc de la transaction en lecture seule. Sa clause `WHERE false` ne touche aucune ligne ; PostgreSQL contrôle la commande, quel que soit le nombre de lignes touchées.
 """
 
 from concurrent.futures import ThreadPoolExecutor
@@ -69,7 +69,7 @@ QUERY_CANCELED = "57014"
 
 
 class TestDureeMaximaleDesLectures:
-    """Une lecture porte un plafond de durée par requête SQL ; une écriture n'en porte pas."""
+    """Une lecture a un plafond de durée par requête SQL ; une écriture en est exempte."""
 
     def test_plafond_pose_sur_une_lecture(self, db_conn_for, monkeypatch):
         monkeypatch.setattr(deps.settings, "api_read_statement_timeout_s", 30)
@@ -89,9 +89,9 @@ class TestDureeMaximaleDesLectures:
 
 
 class TestConnectionFactory:
-    """Connexions supplémentaires d'une lecture parallélisée — les facettes de publications.
+    """Connexions supplémentaires d'une lecture parallélisée (les facettes des publications).
 
-    Elles naissent hors de `db_conn`, et portent la même règle : l'adapter reçoit la fabrique de la composition root au lieu d'atteindre l'engine, ce qu'un contrat d'import lui interdit.
+    Elles naissent hors de `db_conn` et suivent la même règle. L'adaptateur reçoit la fabrique de la composition root : un contrat d'import lui interdit d'atteindre l'engine.
     """
 
     @pytest.fixture
@@ -115,14 +115,14 @@ class TestConnectionFactory:
 
 
 class TestGardeFouDExecution:
-    """Connexion ouverte par un troisième chemin : en remontant à l'engine depuis la connexion reçue.
+    """Connexion ouverte par un troisième chemin : l'engine atteint depuis la connexion reçue.
 
-    Ni le contrat d'architecture ni l'analyse statique ne ferment ce chemin — l'un interdit d'importer le module qui construit l'engine, l'autre d'appeler son constructeur, et celui-ci ne fait ni l'un ni l'autre. Le garde-fou d'exécution le refuse au premier statement émis.
+    Ce chemin échappe au contrat d'architecture, qui interdit d'importer le module qui construit l'engine, et à l'analyse statique, qui interdit d'appeler son constructeur. Le garde-fou d'exécution le refuse à la première requête SQL émise.
     """
 
     @pytest.fixture
     def probe_client(self, monkeypatch, sa_engine_app):
-        """Application d'épreuve portant le vrai middleware, et deux routes de lecture."""
+        """Application d'épreuve avec le vrai middleware et trois routes de lecture."""
         from fastapi import FastAPI
         from starlette.testclient import TestClient
 
@@ -172,7 +172,7 @@ class TestGardeFouDExecution:
         assert reponse.json() == {"un": 1}
 
     def test_muet_hors_requete_de_lecture(self, sa_engine_app):
-        """Le pipeline et les scripts écrivent sur des connexions ordinaires, sans requête HTTP autour."""
+        """Hors d'une requête HTTP, le garde-fou laisse écrire : le pipeline et les scripts écrivent sur des connexions ordinaires."""
         with sa_engine_app.connect() as conn:
             conn.execute(text(_PROBE_WRITE))
             conn.rollback()

@@ -1,8 +1,4 @@
-"""Tests de caractérisation pour application/services/structures.py.
-
-Couvre create/update/delete sur structures, structure_parents,
-structure_name_forms.
-"""
+"""Tests de caractérisation du service des structures : création, mise à jour et suppression des structures, de leurs tutelles et de leurs formes de nom."""
 
 import pytest
 from sqlalchemy import text
@@ -22,13 +18,13 @@ from interfaces.api.deps import structure_service
 
 
 def _create_structure(*, service, structure_type, **fields):
-    """Crée une structure par le service, et rend sa réponse d'API en dict."""
+    """Crée une structure par le service, et renvoie sa réponse d'API en dict."""
     structure = service.create_structure(StructureCreate(type=structure_type, **fields))
     return StructureOut.from_structure(structure).model_dump()
 
 
 def _update_structure(structure_id, *, update, service):
-    """Met à jour une structure par le service, et rend sa réponse d'API en dict."""
+    """Met à jour une structure par le service, et renvoie sa réponse d'API en dict."""
     structure = service.update_structure(structure_id, update=update)
     return StructureOut.from_structure(structure).model_dump()
 
@@ -123,8 +119,7 @@ class TestCreateStructure:
         assert row["api_ids"] == {"openalex": ["I1"], "wos": ["WOS_TEST"]}
 
     def test_api_ids_validated_and_coerced(self, sa_sync_conn, service):
-        """Un scalaire string passé pour une source est wrappé en liste via
-        StructureApiIds. Les listes vides sont éliminées à la normalisation."""
+        """Une chaîne seule pour une source devient une liste (`StructureApiIds`) ; les listes vides disparaissent."""
         row = _create_structure(
             code="T2",
             name="T2",
@@ -135,7 +130,7 @@ class TestCreateStructure:
         assert row["api_ids"] == {"openalex": ["I1"]}
 
     def test_api_ids_invalid_raises(self, sa_sync_conn, service):
-        """Un type aberrant (int dans une liste de strings) est rejeté par le repository, que le modèle ne valide pas ici."""
+        """Un identifiant non textuel est refusé par le repository ; `model_construct` contourne la validation du modèle."""
         create = StructureCreate.model_construct(
             code="T3", name="T3", type=StructureType.LABO, api_ids={"openalex": [123, 456]}
         )
@@ -143,8 +138,7 @@ class TestCreateStructure:
             service.create_structure(create)
 
     def test_ror_id_full_url_normalized_to_short(self, sa_sync_conn, service):
-        """Une URL ROR complète est ramenée à l'ID 9-char canonique (VO RorId),
-        quelle que soit la forme envoyée par le client."""
+        """Une URL ROR complète est ramenée à l'identifiant court de 9 caractères (`RorId`)."""
         row = _create_structure(
             code="ROR1",
             name="Ror1",
@@ -232,9 +226,7 @@ class TestUpdateStructure:
         )
 
     def test_ror_id_full_url_normalized_to_short(self, sa_sync_conn, service):
-        """Régression : éditer une structure en envoyant le ROR en URL complète
-        (ce que faisait le form admin) ne doit plus stocker l'URL — le service la
-        ramène à l'ID court via le VO RorId."""
+        """Régression : éditer une structure avec un ROR en URL complète stocke l'identifiant court (`RorId`)."""
         row = _create_structure(
             code="X", name="X", structure_type="labo", ror_id="026tc4g97", service=service
         )
@@ -282,7 +274,7 @@ class TestCreateTutelle:
         assert rel["child_id"] == child["id"]
 
     def test_returns_none_on_conflict(self, sa_sync_conn, service):
-        """Si la relation existe déjà, retourne None (ON CONFLICT DO NOTHING)."""
+        """Créer une relation déjà présente renvoie `None`."""
         parent = _create_structure(code="P", name="P", structure_type="universite", service=service)
         child = _create_structure(code="C", name="C", structure_type="labo", service=service)
         service.create_tutelle(parent_id=parent["id"], child_id=child["id"])
@@ -295,7 +287,7 @@ class TestCreateTutelle:
             service.create_tutelle(parent_id=s["id"], child_id=s["id"])
 
     def test_rejects_cycle(self, sa_sync_conn, service):
-        """A → B existe ; tenter B → A doit échouer (cycle)."""
+        """A → B existe : créer B → A lève une erreur de cycle."""
         a = _create_structure(code="A", name="A", structure_type="universite", service=service)
         b = _create_structure(code="B", name="B", structure_type="labo", service=service)
         service.create_tutelle(parent_id=a["id"], child_id=b["id"])
@@ -303,7 +295,7 @@ class TestCreateTutelle:
             service.create_tutelle(parent_id=b["id"], child_id=a["id"])
 
     def test_rejects_indirect_cycle(self, sa_sync_conn, service):
-        """A → B → C ; tenter C → A doit échouer."""
+        """A → B → C existe : créer C → A lève une erreur de cycle."""
         a = _create_structure(code="A", name="A", structure_type="universite", service=service)
         b = _create_structure(code="B", name="B", structure_type="labo", service=service)
         c = _create_structure(code="C", name="C", structure_type="equipe", service=service)
@@ -336,7 +328,7 @@ class TestCreateNameForm:
     def test_creates_with_normalization(self, sa_sync_conn, service):
         s = _create_structure(code="X", name="X", structure_type="labo", service=service)
         form = _create_name_form(structure_id=s["id"], form_text="École UCA", service=service)
-        # Le form_text est normalisé
+        # Le texte de la forme est normalisé.
         assert form["form_text"] == "ecole uca"
         assert form["is_word_boundary"] is False
         assert form["is_excluding"] is False
@@ -355,7 +347,7 @@ class TestCreateNameForm:
 
     def test_forces_word_boundary_for_short_form(self, sa_sync_conn, service):
         s = _create_structure(code="X", name="X", structure_type="labo", service=service)
-        # Forme normalisée courte (<= 6) : is_word_boundary forcé même non demandé.
+        # Une forme normalisée courte (6 caractères au plus) exige une frontière de mot.
         form = _create_name_form(structure_id=s["id"], form_text="INRAE", service=service)
         assert form["form_text"] == "inrae"
         assert form["is_word_boundary"] is True
@@ -397,11 +389,7 @@ class TestUpdateNameForm:
         assert updated["is_word_boundary"] is True  # raccourcie → forcé
 
     def test_forces_word_boundary_on_unchanged_short_form(self, sa_sync_conn, service):
-        """Baisser is_word_boundary sans toucher form_text sur une forme courte : re-forcé.
-
-        Le forçage lit le form_text effectif (celui en base si le payload ne le change pas),
-        pas seulement le texte fourni ; l'invariant tient sans dépendre de la CHECK DB.
-        """
+        """Baisser `is_word_boundary` sur une forme courte sans changer son texte laisse la frontière de mot imposée : le forçage lit le texte en base quand la mise à jour ne le fournit pas."""
         s = _create_structure(code="X", name="X", structure_type="labo", service=service)
         form = _create_name_form(structure_id=s["id"], form_text="INRAE", service=service)
         assert form["is_word_boundary"] is True  # courte → forcé à la création

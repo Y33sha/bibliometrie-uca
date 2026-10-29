@@ -1,8 +1,8 @@
 """Une session de test laisse le journal de l'application observable.
 
-`alembic/env.py` appelle `fileConfig` quand rien ne l'en dispense, et `fileConfig` désactive tous les loggers déjà créés que `alembic.ini` ne nomme pas — c'est-à-dire ceux de l'application. Un logger désactivé jette ses enregistrements en silence : les tests qui observent le journal cessent alors de rien voir, et leur silence passe pour un succès.
+`alembic/env.py` appelle `fileConfig` sauf dispense. `fileConfig` désactive les loggers déjà créés que `alembic.ini` omet, donc ceux de l'application. Un logger désactivé jette ses enregistrements : un test qui observe le journal le trouve vide.
 
-La panne se déclenchait selon la manière d'appeler pytest. Les fichiers de configuration des répertoires nommés en argument se chargent avant `pytest_configure`, ceux des répertoires atteints par exploration se chargent après. Nommer `tests/integration/interfaces` en argument importait donc l'application — donc créait ses loggers — avant que la préparation de la base ne joue les migrations, et ceux-ci se retrouvaient désactivés ; nommer `tests/` les créait après, et ils survivaient. La suite passait entière, et rougissait sur un sous-ensemble.
+Le moment où les loggers sont créés dépend de la manière d'appeler pytest. Les fichiers de configuration des répertoires nommés en argument se chargent avant `pytest_configure`, ceux des répertoires atteints par exploration après. Nommer `tests/integration/interfaces` en argument crée donc les loggers de l'application avant les migrations ; nommer `tests/` les crée après.
 """
 
 import logging
@@ -26,7 +26,7 @@ def test_les_loggers_de_l_application_restent_actifs(nom):
 
 
 def test_un_avertissement_de_l_application_est_capturable(caplog):
-    """Le cas d'usage que la désactivation cassait : un test qui prend un enregistrement au vol."""
+    """Un test capte par `caplog` un avertissement de l'application."""
     with caplog.at_level(logging.WARNING, logger="interfaces.api.rate_limit"):
         logging.getLogger("interfaces.api.rate_limit").warning("sonde")
     assert [r.getMessage() for r in caplog.records] == ["sonde"]

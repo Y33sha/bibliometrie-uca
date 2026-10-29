@@ -1,6 +1,6 @@
 """Lecture de la configuration du pipeline depuis la table `config`.
 
-Les clés dont la forme est imposée — plafonds d'interrogation, délais de réinterrogation, année de départ — sont contrôlées à l'écriture, et la table refuse ce qui s'en écarte. Pour les autres, une valeur illisible ne fait pas échouer le pipeline : elle est signalée et le réglage retombe sur son défaut.
+Les clés de forme imposée (plafonds d'interrogation, délais de réinterrogation, année de départ) sont contrôlées à l'écriture, et la table refuse une valeur hors de cette forme. Pour les autres clés, une valeur illisible est signalée et le réglage prend sa valeur par défaut ; le pipeline continue.
 """
 
 import pytest
@@ -37,7 +37,7 @@ class TestGetYears:
 class TestFormeImposeeEnBase:
     """La table refuse une valeur hors de la forme que sa clé impose, quelle que soit la voie d'écriture.
 
-    Le domaine porte la même règle et la fait valoir à l'écriture (`normalize_config_value`). Ces contraintes tiennent les voies qui la contournent : psql, migration, script.
+    Le domaine applique la même règle à l'écriture (`normalize_config_value`). Ces contraintes couvrent les écritures qui contournent le domaine : psql, migration, script.
     """
 
     @pytest.mark.parametrize("valeur", ["pas une année", True, "2017", 1969, 3.5])

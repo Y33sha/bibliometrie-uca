@@ -6,7 +6,7 @@ from pipeline.ingestion.common.staging import StagingStore
 
 
 def test_bulk_upsert_clears_disappeared_marker(sa_sync_conn):
-    # Document présent puis confirmé absent par fetch_stale (disappeared_at posé).
+    # Document présent, puis absent de sa source selon `fetch_stale` (`disappeared_at` posé).
     StagingStore(sa_sync_conn).upsert(
         source="hal",
         source_id="hal-04000001",
