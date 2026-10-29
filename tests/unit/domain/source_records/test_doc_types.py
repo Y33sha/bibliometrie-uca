@@ -52,6 +52,13 @@ class TestMapDocType:
         assert map_doc_type("VIDEO", source="hal") == "recorded_talk"
         assert map_doc_type("Audiovisual", source="datacite") == "recorded_talk"
 
+    def test_enregistrements_audio_vers_media(self):
+        assert map_doc_type("SON", source="hal") == "media"
+        assert map_doc_type("Sound", source="datacite") == "media"
+
+    def test_hal_presconf_vers_conference(self):
+        assert map_doc_type("PRESCONF", source="hal") == "conference"
+
     def test_hal_protocole_de_recherche_vers_report(self):
         assert map_doc_type("REPORT_RESPROT", source="hal") == "report"
 
