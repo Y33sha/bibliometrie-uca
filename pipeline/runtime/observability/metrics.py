@@ -1,4 +1,4 @@
-"""Compteurs que rend chaque phase du pipeline. L'orchestrateur en mesure la durée et les enregistre (`to_payload`)."""
+"""Compteurs que renvoie chaque phase du pipeline. L'orchestrateur en mesure la durée et les enregistre (`to_payload`)."""
 
 from __future__ import annotations
 

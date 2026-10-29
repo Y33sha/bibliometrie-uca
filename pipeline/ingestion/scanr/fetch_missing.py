@@ -128,7 +128,7 @@ async def fetch_missing_scanr_by_hal_id(
 ) -> PhaseMetrics:
     """Cherche dans ScanR les documents repérés par hal-id (HAL, OpenAlex) et les écrit dans `staging`.
 
-    Un hal-id introuvable est inscrit dans `failed_lookups`. Rend les compteurs de `look_up`, avec le nombre de hal-id introuvables (`not_found`).
+    Un hal-id introuvable est inscrit dans `failed_lookups`. Renvoie les compteurs de `look_up`, avec le nombre de hal-id introuvables (`not_found`).
     """
     return await look_up(
         conn,

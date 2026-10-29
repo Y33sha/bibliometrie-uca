@@ -177,7 +177,7 @@ type Mapper = Callable[
     ],
     Iterator[Aligned],
 ]
-"""Applique `align_rows` aux contributions sources de chaque publication et rend les résultats dans l'ordre : `map`, ou un pool de processus."""
+"""Applique `align_rows` aux contributions sources de chaque publication et renvoie les résultats dans l'ordre : `map`, ou un pool de processus."""
 
 
 def pool_mapper(pool: ProcessPoolExecutor, workers: int) -> Mapper:
@@ -257,7 +257,7 @@ def realign(
     on_publication: Callable[[], None] = lambda: None,
     mapper: Mapper = map,
 ) -> int:
-    """Recalcule et écrit les contributions et les doublons d'auteur de ces publications, sans commit. Rend le nombre de contributions écrites ; `methods` compte les appartenances par origine."""
+    """Recalcule et écrit les contributions et les doublons d'auteur de ces publications, sans commit. Renvoie le nombre de contributions écrites ; `methods` compte les appartenances par origine."""
     plan = _plan_batch(
         store,
         publication_ids,

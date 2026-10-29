@@ -145,7 +145,7 @@ def create_tutelle(
 ) -> StructureTutelleCreateResponse:
     """Crée une tutelle entre deux structures.
 
-    Une tutelle existante (même parent, même enfant) laisse la table inchangée et rend `{"status": "already_exists"}`. Renvoie 422 si la tutelle viole le graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Renvoie 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+    Une tutelle existante (même parent, même enfant) laisse la table inchangée et renvoie `{"status": "already_exists"}`. Renvoie 422 si la tutelle viole le graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Renvoie 409 si `parent_id` ou `child_id` désigne une structure inexistante.
     """
     row = structures.create_tutelle(parent_id=data.parent_id, child_id=data.child_id)
     if row is None:

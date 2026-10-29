@@ -1,6 +1,6 @@
 """Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
 
-`entity_facet_rows` rend les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte : la liste des publications et le tableau de bord s'en servent. `entity_name_clause` borne les options au terme cherché, quelle que soit la population décomptée.
+`entity_facet_rows` renvoie les entités les plus représentées parmi les publications qui satisfont une clause fournie par l'appelant, avec leur décompte : la liste des publications et le tableau de bord s'en servent. `entity_name_clause` borne les options au terme cherché, quelle que soit la population décomptée.
 """
 
 from collections.abc import Mapping
@@ -24,7 +24,7 @@ class EntitySql(NamedTuple):
     join: str
     # Type SQL de l'identifiant, pour lire un libellé à partir de l'identifiant reçu en texte.
     id_type: str = "integer"
-    # Décompte des publications par entité. `COUNT(*)` suffit quand la jointure rend une ligne par couple publication–entité.
+    # Décompte des publications par entité. `COUNT(*)` suffit quand la jointure renvoie une ligne par couple publication–entité.
     publication_count: str = "COUNT(*)"
 
 

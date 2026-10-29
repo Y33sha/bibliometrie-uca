@@ -46,7 +46,7 @@ class AddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> int:
-        """`reset_manual_link` sur un lot. Rend le nombre de rattachements touchés : liens manuels supprimés et détections remises en attente."""
+        """`reset_manual_link` sur un lot. Renvoie le nombre de rattachements touchés : liens manuels supprimés et détections remises en attente."""
         ...
 
     def batch_upsert_structure_links(
@@ -77,11 +77,11 @@ class AddressRepository(Protocol):
         ...
 
     def add_manual_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
-        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la met dans la file `address_candidates_queue`. Rend les ids atteints."""
+        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la met dans la file `address_candidates_queue`. Renvoie les ids atteints."""
         ...
 
     def add_manual_country_by_filter(
         self, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
-        """Comme `add_manual_country_by_ids`, sur les adresses retenues par les critères. Rend les ids atteints ; sans critère, n'écrit rien et rend `[]`."""
+        """Comme `add_manual_country_by_ids`, sur les adresses retenues par les critères. Renvoie les ids atteints ; sans critère, n'écrit rien et renvoie `[]`."""
         ...

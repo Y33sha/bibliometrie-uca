@@ -77,7 +77,7 @@ def serial_filters(
 ) -> SerialFilters:
     """Filtres communs à la liste des revues et à ses facettes.
 
-    `serial_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue rend 422. `search` vise le titre et les ISSN de la revue, à partir de deux caractères.
+    `serial_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue renvoie 422. `search` vise le titre et les ISSN de la revue, à partir de deux caractères.
     """
     return SerialFilters(
         search=search,
@@ -127,7 +127,7 @@ def list_serials(
 ) -> SerialListResponse:
     """Liste paginée des revues, avec le décompte de leurs publications.
 
-    `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
     """
     return queries.list_serials(filters=filters, sort=sort, page=page, per_page=per_page)
 

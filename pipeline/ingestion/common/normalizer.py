@@ -126,7 +126,7 @@ class SourceNormalizer(ABC):
         """Contributions sources que donne le bloc auteurs."""
 
     def normalize_record(self, row: StagingRow) -> bool:
-        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Rend vrai, ou faux pour un enregistrement refusé, sans rien écrire.
+        """Normalise un enregistrement source qui a les métadonnées minimales et marque sa ligne traitée. Renvoie vrai, ou faux pour un enregistrement refusé, sans rien écrire.
 
         Écrit dans l'ordre l'éditeur, les conteneurs, l'enregistrement source rattaché à son éditeur, ses localisations et ses contributions sources.
         """
@@ -165,7 +165,7 @@ class SourceNormalizer(ABC):
         return True
 
     def process_work(self, row: StagingRow) -> bool | None:
-        """Traite une ligne de `staging`. Rend vrai pour un enregistrement normalisé, `None` pour une ligne vide, sautée, et faux pour un enregistrement refusé.
+        """Traite une ligne de `staging`. Renvoie vrai pour un enregistrement normalisé, `None` pour une ligne vide, sautée, et faux pour un enregistrement refusé.
 
         Un enregistrement sans titre, sans année, au titre trop long (`is_overlong_title`) ou refusé par la source ne fonde aucune publication (`_reject`).
         """
@@ -183,7 +183,7 @@ class SourceNormalizer(ABC):
         return result
 
     def _reject(self, row: StagingRow) -> bool:
-        """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Rend faux, compté comme enregistrement incomplet."""
+        """Écarte un enregistrement refusé : l'enregistrement source qu'il avait produit est supprimé, sa ligne marquée traitée. Renvoie faux, compté comme enregistrement incomplet."""
         self._staging.discard_source_record(row.id)
         self._staging.mark_done(row.id)
         return False
@@ -225,7 +225,7 @@ class SourceNormalizer(ABC):
             self.logger.info("%s%s", BRANCH_CONTINUATION, identifier)
 
     def run(self) -> NormalizeStats:
-        """Normalise les lignes à traiter, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et rend le bilan."""
+        """Normalise les lignes à traiter, avec un commit tous les `DEFAULT_BATCH_SIZE` enregistrements, et renvoie le bilan."""
         self.conn.rollback()
 
         # Préfixe `[source]` sur les lignes de la boucle (progression, bilan) : dans un run multi-sources, chaque batch reste rattaché à sa source sans remonter au bandeau.

@@ -105,7 +105,7 @@ def _log_retry(reason: str, label: str, wait: float, attempt: int, max_retries: 
 def _exhausted(
     breaker: SourceCircuitBreaker, label: str, reason: str, max_retries: int
 ) -> SourceUnavailableError:
-    """Compte l'échec au breaker et rend l'erreur à lever."""
+    """Compte l'échec au breaker et renvoie l'erreur à lever."""
     breaker.record_failure()
     logger.error("Échec après %s tentatives %s : %s", max_retries, label, reason)
     return SourceUnavailableError(breaker.source)
@@ -257,7 +257,7 @@ async def http_get_text_with_retry_async(
     initial_backoff: float = 1.0,
     label: str = "",
 ) -> str:
-    """Requête GET asynchrone qui rend le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry_async`. Un corps vide est retenté."""
+    """Requête GET asynchrone qui renvoie le corps de la réponse en texte (XML, par exemple), avec la politique de `http_request_with_retry_async`. Un corps vide est retenté."""
     return await _request_with_retry_async(
         client,
         "GET",

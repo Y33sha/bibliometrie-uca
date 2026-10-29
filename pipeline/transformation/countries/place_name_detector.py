@@ -13,7 +13,7 @@ import ahocorasick
 class PlaceNameDetector:
     """Détecte les pays des lieux (institutions, villes) présents dans une adresse.
 
-    `forms` : `{form_normalized: iso_code}` (codes pays ISO en minuscules). `detect` rend l'ensemble des pays des lieux matchés, vide si aucun.
+    `forms` : `{form_normalized: iso_code}` (codes pays ISO en minuscules). `detect` renvoie l'ensemble des pays des lieux matchés, vide si aucun.
     """
 
     def __init__(self, forms: Mapping[str, str]) -> None:

@@ -52,7 +52,7 @@ from pipeline.transformation.publishing.containers import ContainerStores
 from pipeline.transformation.publishing.publishers.store import PublisherStore
 
 NormalizeOne = Callable[[PhaseContext, str], NormalizeStats]
-"""Normalise une source et rend son bilan."""
+"""Normalise une source et renvoie son bilan."""
 
 
 def _selected(source: str) -> Callable[[PhaseContext], bool]:

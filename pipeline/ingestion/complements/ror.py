@@ -108,7 +108,7 @@ def fetch_ror_dump(
     user_agent: str,
     logger: logging.Logger,
 ) -> RorDumpFile:
-    """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la rend."""
+    """Télécharge l'archive de la version la plus récente du dump vers `dest_path`, et la renvoie."""
     dump = find_latest_ror_dump(user_agent=user_agent)
     download_dump(
         dump.url,

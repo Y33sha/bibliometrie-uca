@@ -70,7 +70,7 @@ def stage_document(
     record: Mapping[str, JsonValue],
     entry_mode: StagingEntryMode = StagingEntryMode.BULK,
 ) -> bool:
-    """Écrit un document reçu d'une réponse de liste dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé. Rend `False` pour un document sans identifiant, ni écrit ni compté."""
+    """Écrit un document reçu d'une réponse de liste dans `staging` et le compte dans `metrics` : nouveau, mis à jour ou inchangé. Renvoie `False` pour un document sans identifiant, ni écrit ni compté."""
     match StagingStore(conn).stage(source, record, entry_mode=entry_mode):
         case None:
             return False
@@ -105,7 +105,7 @@ class HarvestWindow:
 class SourceHarvester[ConfigT, ClientT](ABC):
     """Patron d'un moissonneur, de l'API de la source vers `staging`.
 
-    `ConfigT` est le type de la configuration propre à la source, que `load_config` rend et que `harvest_all` reçoit. `ClientT` est le type du client HTTP de la source, reçu à la construction.
+    `ConfigT` est le type de la configuration propre à la source, que `load_config` renvoie et que `harvest_all` reçoit. `ClientT` est le type du client HTTP de la source, reçu à la construction.
 
     Une sous-classe définit `SOURCE`, `load_config` et `harvest_all`, et peut définir `setup_logging`.
     """
@@ -207,7 +207,7 @@ class SourceHarvester[ConfigT, ClientT](ABC):
 
     @abstractmethod
     def harvest_all(self, window: HarvestWindow, config: ConfigT) -> PhaseMetrics:
-        """Moissonne la fenêtre et rend les métriques."""
+        """Moissonne la fenêtre et renvoie les métriques."""
 
     def setup_logging(  # noqa: B027
         self, window: HarvestWindow, config: ConfigT

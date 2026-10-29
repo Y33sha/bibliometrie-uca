@@ -54,6 +54,6 @@ class HalPersonHarvester(PersonSearchHarvester[HalClient]):
         )
         records = [as_mapping(d) for d in as_sequence(at_path(data, "response").get("docs"))]
         following = as_str(data.get("nextCursorMark"))
-        # Solr rend le marqueur reçu une fois les résultats épuisés.
+        # Solr renvoie le marqueur reçu une fois les résultats épuisés.
         done = not records or not following or following == cursor
         return PersonSearchPage(records=records, next_token=None if done else following)

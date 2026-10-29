@@ -17,7 +17,7 @@ from domain.sources.registry import ALL_SOURCES_SET
 from pipeline.runtime.modes import MODES, ModePolicy
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# Ouvreur de transaction : un appelable qui rend une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
+# Ouvreur de transaction : un appelable qui renvoie une transaction gérée en context-manager — commit en sortie de bloc si succès, rollback sur exception. Une phase ouvre une transaction par sous-étape.
 OpenTransaction = Callable[[], AbstractContextManager[Connection]]
 
 # Contrôle des identifiants d'accès : motif d'absence des identifiants d'une source, ou `None` s'ils sont utilisables.

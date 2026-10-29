@@ -1,6 +1,6 @@
 """Router du pipeline : historique des exécutions. Sert `/api/pipeline/*`.
 
-L'historique des runs est servi en base par `PipelineRunsQueries` : il agrège les exécutions de phase par run, et le détail d'un run rend ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture. Un échec ou un avertissement y figure sous forme de signal, avec son code et son message.
+L'historique des runs est servi en base par `PipelineRunsQueries` : il agrège les exécutions de phase par run, et le détail d'un run renvoie ses phases dans l'ordre, chacune avec son rendement et son écart de durée au médian historique, recalculés à la lecture. Un échec ou un avertissement y figure sous forme de signal, avec son code et son message.
 
 La trace brute d'une exécution vit dans le flux de sortie standard de l'orchestrateur, que le collecteur de l'hébergement recueille.
 """

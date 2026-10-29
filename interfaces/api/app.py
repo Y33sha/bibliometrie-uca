@@ -207,7 +207,7 @@ async def operational_error_handler(request: Request, exc: OperationalError) -> 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Rend en JSON, plutôt qu'en HTML, le 500 d'une erreur non gérée."""
+    """Renvoie en JSON, plutôt qu'en HTML, le 500 d'une erreur non gérée."""
     logger.error("Erreur non gérée sur %s %s", request.method, request.url.path, exc_info=exc)
     return JSONResponse(status_code=500, content={"detail": "Erreur interne du serveur"})
 
@@ -361,7 +361,7 @@ _API_CSP = f"default-src 'none'; base-uri 'none'; form-action 'none'; {_FRAME_AN
 _NO_STORE = "no-store"
 """Interdit à tout cache de conserver une réponse de l'API.
 
-Une même URL d'API rend un corps différent selon la session (la configuration, par exemple) : un cache partagé servirait à un appelant anonyme la réponse destinée à une session admin.
+Une même URL d'API renvoie un corps différent selon la session (la configuration, par exemple) : un cache partagé servirait à un appelant anonyme la réponse destinée à une session admin.
 """
 
 

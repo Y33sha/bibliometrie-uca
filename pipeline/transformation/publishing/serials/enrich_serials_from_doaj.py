@@ -42,7 +42,7 @@ ISSN_KEYS = (
 COMMIT_EVERY = 1000
 
 DownloadDump = Callable[[], AbstractContextManager[Iterable[dict[str, str]]]]
-"""Télécharge le dump DOAJ et rend ses rows, le temps du bloc."""
+"""Télécharge le dump DOAJ et renvoie ses rows, le temps du bloc."""
 
 
 @dataclass
@@ -92,7 +92,7 @@ def update_serial_doaj(
 
 
 def reset_is_in_doaj(conn: Connection) -> int:
-    """Efface `is_in_doaj` de toutes les revues ; l'import le pose ensuite sur les revues du dump. Rend le nombre de revues concernées."""
+    """Efface `is_in_doaj` de toutes les revues ; l'import le pose ensuite sur les revues du dump. Renvoie le nombre de revues concernées."""
     return conn.execute(
         update(serials).where(serials.c.is_in_doaj).values(is_in_doaj=False)
     ).rowcount
@@ -142,7 +142,7 @@ def run_import_doaj_dump(
     dry_run: bool = False,
     commit: bool = True,
 ) -> DoajImportStats:
-    """Importe les lignes du dump DOAJ, avec un commit par lot, sauf si `commit` est faux. Rend les compteurs.
+    """Importe les lignes du dump DOAJ, avec un commit par lot, sauf si `commit` est faux. Renvoie les compteurs.
 
     Un dump où aucune revue n'est reconnue laisse les revues en l'état : il signale un format de dump changé.
     """

@@ -19,7 +19,7 @@ describe('useTabParam', () => {
 		expect(useTabParam(['suspect-merges'], () => true).current).toBe('suspect-merges');
 	});
 
-	it('rend la liste pour une clé inconnue ou hors session admin', () => {
+	it('renvoie la liste pour une clé inconnue ou hors session admin', () => {
 		page.url = new URL('http://localhost/publications?tab=inconnu');
 		expect(useTabParam(['suspect-merges'], () => true).current).toBe('all');
 		page.url = new URL('http://localhost/publications?tab=suspect-merges');

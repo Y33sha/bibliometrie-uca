@@ -146,7 +146,7 @@ class PgStructureRepository(StructureRepository):
     # ── structures ─────────────────────────────────────────────────
 
     def add(self, structure: Structure) -> int:
-        """Insère une structure et rend son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
+        """Insère une structure et renvoie son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
         structure.api_ids = _normalize_api_ids(structure.api_ids)
         return scalar_int(
             self._conn.execute(

@@ -159,7 +159,7 @@ class PhaseExecutionRecorder:
 
 
 def start_run(*, mode: str, sources: list[str]) -> PhaseExecutionRecorder:
-    """Ouvre la connexion d'observabilité et génère le `run_id`. Rend un enregistreur désactivé si l'ouverture ou la séquence échoue."""
+    """Ouvre la connexion d'observabilité et génère le `run_id`. Renvoie un enregistreur désactivé si l'ouverture ou la séquence échoue."""
     try:
         conn = get_sync_engine().connect().execution_options(isolation_level="AUTOCOMMIT")
         run_id = next_run_id(conn)

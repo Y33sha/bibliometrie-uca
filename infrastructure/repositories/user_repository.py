@@ -57,5 +57,5 @@ class PgUserRepository(UserRepository):
         )
 
     def remove_user(self, login: str) -> bool:
-        """Supprime un utilisateur et ses rôles. Rend `False` s'il était absent."""
+        """Supprime un utilisateur et ses rôles. Renvoie `False` s'il était absent."""
         return bool(self._conn.execute(delete(users).where(users.c.login == login)).rowcount)

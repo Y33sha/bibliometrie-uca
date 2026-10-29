@@ -27,7 +27,7 @@ class PerimeterRepository(Protocol):
         ...
 
     def add(self, perimeter: Perimeter) -> int:
-        """Insère un périmètre et rend son id."""
+        """Insère un périmètre et renvoie son id."""
         ...
 
     def save(self, perimeter: Perimeter) -> None:

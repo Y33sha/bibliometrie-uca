@@ -27,7 +27,7 @@ from pipeline.runtime.parallel import RunParallel, run_parallel
 from pipeline.task_runner import TaskRun, TaskStep, run_tasks
 
 FetchChannel = Callable[[PhaseContext], PhaseMetrics]
-"""Recherche par hal-id ou par NNT : rend les métriques du canal."""
+"""Recherche par hal-id ou par NNT : renvoie les métriques du canal."""
 FetchDoiOne = Callable[[PhaseContext, str], PhaseMetrics]
 """Recherche par DOI dans une source cible."""
 

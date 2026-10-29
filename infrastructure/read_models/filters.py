@@ -1,6 +1,6 @@
 """Fragments SQL et constructeurs de filtres pour les requêtes de lecture.
 
-Chaque `*_clause(...)` rend un `WhereClause | None`, à assembler par `assemble_where(...)`. Les fragments emploient les paramètres nommés `:nom` de SQLAlchemy.
+Chaque `*_clause(...)` renvoie un `WhereClause | None`, à assembler par `assemble_where(...)`. Les fragments emploient les paramètres nommés `:nom` de SQLAlchemy.
 """
 
 from collections.abc import Iterable
@@ -78,7 +78,7 @@ class WhereClause:
 
 
 def assemble_where(clauses: list[WhereClause | None]) -> tuple[str, dict[str, object]]:
-    """Condition SQL et paramètres des fragments assemblés. Sans clause, rend `("TRUE", {})` : l'appelant écrit `f"WHERE {where_sql}"` sans cas particulier."""
+    """Condition SQL et paramètres des fragments assemblés. Sans clause, renvoie `("TRUE", {})` : l'appelant écrit `f"WHERE {where_sql}"` sans cas particulier."""
     valid = [c for c in clauses if c is not None]
     if not valid:
         return "TRUE", {}

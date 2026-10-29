@@ -32,7 +32,7 @@ class PerimeterService:
         self._config = config
 
     def create_perimeter(self, *, code: str, name: str, root_structure_ids: list[int]) -> int:
-        """Crée un périmètre avec ses structures racines, puis recalcule les structures des périmètres. Rend son id.
+        """Crée un périmètre avec ses structures racines, puis recalcule les structures des périmètres. Renvoie son id.
 
         Lève `ValidationError` si le code ou le nom est vide, `ConflictError` si le code existe déjà.
         """

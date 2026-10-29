@@ -11,7 +11,7 @@ def person_identifiers(
 ) -> dict[int, list[PersonIdentifierOut]]:
     """Identifiants indexés par personne, chacun avec son type et son statut.
 
-    `public_only` sert le profil public : seuls les types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`), sans les attributions rejetées. Sinon, la lecture rend tous les identifiants : l'interface d'administration les arbitre tous, et l'annuaire public filtre types et statuts à l'affichage.
+    `public_only` sert le profil public : seuls les types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`), sans les attributions rejetées. Sinon, la lecture renvoie tous les identifiants : l'interface d'administration les arbitre tous, et l'annuaire public filtre types et statuts à l'affichage.
     """
     if not person_ids:
         return {}

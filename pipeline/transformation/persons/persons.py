@@ -26,7 +26,7 @@ class PersonsPhase:
     repo_factory: Callable[[Connection], PgPersonRepository]
 
     def run(self, ctx: PhaseContext) -> PhaseMetrics:
-        """Exécute les quatre tâches de la phase personnes et rend ses métriques."""
+        """Exécute les quatre tâches de la phase personnes et renvoie ses métriques."""
         by_task = run_tasks(
             "persons",
             {

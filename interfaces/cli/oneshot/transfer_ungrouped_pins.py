@@ -59,7 +59,7 @@ _UNPIN = text("DELETE FROM confirmed_source_contributions WHERE source_contribut
 
 
 def transfer_pins(conn: Connection) -> Counter[str]:
-    """Transfère les épinglages, dans la transaction du caller, et rend le décompte des issues."""
+    """Transfère les épinglages, dans la transaction du caller, et renvoie le décompte des issues."""
     outcomes: Counter[str] = Counter()
     for pin in conn.execute(_PINS).all():
         if not pin.doubles:

@@ -22,7 +22,7 @@ _DELETE_EMPTY = text("""
 
 
 def delete_empty_monographs(conn: Connection) -> list[tuple[int, str]]:
-    """Supprime les monographies sans enregistrement ni publication, et rend l'id et le titre de chacune."""
+    """Supprime les monographies sans enregistrement ni publication, et renvoie l'id et le titre de chacune."""
     return sorted((r.id, r.title) for r in conn.execute(_DELETE_EMPTY))
 
 

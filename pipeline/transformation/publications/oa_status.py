@@ -206,7 +206,7 @@ async def _check(
     max_per_run: int | None,
     max_concurrent: int,
 ) -> PhaseMetrics:
-    """Interroge Unpaywall pour les DOI à vérifier, écrit les verdicts, recalcule le statut OA des publications de ces DOI, puis rend les métriques du run."""
+    """Interroge Unpaywall pour les DOI à vérifier, écrit les verdicts, recalcule le statut OA des publications de ces DOI, puis renvoie les métriques du run."""
     metrics = PhaseMetrics()
     dois = store.fetch_dois_to_check(limit=max_per_run, staleness_days=staleness_days)
     total = len(dois)

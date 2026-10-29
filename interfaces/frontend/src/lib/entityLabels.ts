@@ -1,5 +1,5 @@
 /**
- * Libellés des éditeurs, des revues, des personnes, des sujets et des organisations partenaires, par identifiant. Un libellé connu par ailleurs (option choisie dans une facette) est retenu ; les autres sont lus sur `/api/entity-labels`, qui rend `null` pour une entité introuvable.
+ * Libellés des éditeurs, des revues, des personnes, des sujets et des organisations partenaires, par identifiant. Un libellé connu par ailleurs (option choisie dans une facette) est retenu ; les autres sont lus sur `/api/entity-labels`, qui renvoie `null` pour une entité introuvable.
  */
 import { api } from '#lib/api/index.js';
 import type { components } from '#lib/api/schema.js';

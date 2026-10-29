@@ -119,7 +119,7 @@ _INSERT_MEMBERSHIPS_SQL = text("""
 
 @dataclass(frozen=True, slots=True)
 class SourceContributionRow:
-    """Contribution source à aligner, telle que la base la rend."""
+    """Contribution source à aligner, telle que la base la renvoie."""
 
     publication_id: int
     source_record: int
@@ -180,7 +180,7 @@ class AuthorGroupingStore:
         self._conn = conn
 
     def propagate_attributes(self) -> tuple[int, int]:
-        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de contributions en file et le nombre de contributions mises à jour."""
+        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Renvoie le nombre de contributions en file et le nombre de contributions mises à jour."""
         queue = Queue.CONTRIBUTION_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(
@@ -205,13 +205,13 @@ class AuthorGroupingStore:
         )
 
     def mark_all(self) -> int:
-        """Marque toutes les publications pour l'alignement. Rend le nombre de publications marquées."""
+        """Marque toutes les publications pour l'alignement. Renvoie le nombre de publications marquées."""
         return enqueue(
             self._conn, Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM publications", {}
         )
 
     def snapshot_queued_publications(self) -> list[tuple[int, int]]:
-        """Relève la file des publications à réaligner. Rend celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
+        """Relève la file des publications à réaligner. Renvoie celles qui existent, avec le nombre de contributions sources d'auteur de leurs enregistrements sources (`author_count`)."""
         snapshot(self._conn, Queue.PUBLICATION_CONTRIBUTIONS, _SNAPSHOT)
         rows = self._conn.execute(
             text(f"""

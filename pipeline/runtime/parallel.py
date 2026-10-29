@@ -7,7 +7,7 @@ from typing import Protocol
 
 
 class RunParallel(Protocol):
-    """Lance des thunks étiquetés en parallèle et rend leurs résultats par étiquette.
+    """Lance des thunks étiquetés en parallèle et renvoie leurs résultats par étiquette.
 
     Chaque thunk s'exécute dans une copie du contexte courant, qui garde l'estampille de phase des journaux. L'exception d'un thunk se propage : la phase échoue.
     """
@@ -16,7 +16,7 @@ class RunParallel(Protocol):
 
 
 def run_parallel[T](thunks: dict[str, Callable[[], T]]) -> dict[str, T]:
-    """Exécute les thunks en parallèle et rend `{étiquette: résultat}` (ordre d'achèvement)."""
+    """Exécute les thunks en parallèle et renvoie `{étiquette: résultat}` (ordre d'achèvement)."""
     if not thunks:
         return {}
     results: dict[str, T] = {}

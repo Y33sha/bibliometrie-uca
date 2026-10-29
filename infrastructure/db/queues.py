@@ -31,7 +31,7 @@ class Queue(StrEnum):
 
 
 def enqueue_sql(queue: Queue, ids_sql: str) -> str:
-    """Instruction qui marque dans `queue` les identifiants que rend la requête `ids_sql`, à une colonne. Un identifiant déjà en file reçoit un nouveau `seq`.
+    """Instruction qui marque dans `queue` les identifiants que renvoie la requête `ids_sql`, à une colonne. Un identifiant déjà en file reçoit un nouveau `seq`.
 
     L'instruction peut servir de requête d'une CTE, pour marquer les lignes qu'une autre CTE écrit.
     """
@@ -44,7 +44,7 @@ def enqueue_sql(queue: Queue, ids_sql: str) -> str:
 
 
 def enqueue(conn: Connection, queue: Queue, ids_sql: str, params: dict[str, object]) -> int:
-    """Marque dans `queue` les identifiants que rend la requête `ids_sql`, à une colonne. Rend le nombre d'identifiants marqués."""
+    """Marque dans `queue` les identifiants que renvoie la requête `ids_sql`, à une colonne. Renvoie le nombre d'identifiants marqués."""
     return conn.execute(text(enqueue_sql(queue, ids_sql)), params).rowcount
 
 

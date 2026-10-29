@@ -113,7 +113,7 @@ def find_or_create_serial(
             )
 
     def _match_and_enrich(serial_id: int, *, with_openalex: bool = True) -> int:
-        """Enrichit la revue trouvée et enregistre son titre comme forme de nom, pour les recherches par titre suivantes. Rend son id."""
+        """Enrichit la revue trouvée et enregistre son titre comme forme de nom, pour les recherches par titre suivantes. Renvoie son id."""
         repo.enrich_serial(
             serial_id,
             openalex_id=openalex_id if with_openalex else None,

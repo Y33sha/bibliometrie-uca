@@ -26,9 +26,9 @@ def neutralize_formula(value: object) -> object:
 
 
 class _EchoStream:
-    """Flux de sortie qui rend le texte écrit.
+    """Flux de sortie qui renvoie le texte écrit.
 
-    `csv.writer` rend ce que son flux a rendu à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
+    `csv.writer` renvoie ce que son flux a renvoyé à l'écriture : branché là-dessus, `writerow` formate une ligne et la retourne.
     """
 
     def write(self, value: str) -> str:
@@ -90,7 +90,7 @@ MAX_EXPORT_ROWS = 500_000
 def cap_export_rows(
     rows: Sequence[Row[tuple[object, ...]]], cap: int
 ) -> tuple[Sequence[Row[tuple[object, ...]]], bool]:
-    """Rend les lignes ramenées au plafond, et si la coupe a eu lieu.
+    """Renvoie les lignes ramenées au plafond, et si la coupe a eu lieu.
 
     Les requêtes demandent `cap + 1` lignes : la ligne excédentaire signale le dépassement, sans `COUNT` séparé. La coupe suit le tri appliqué en base.
     """

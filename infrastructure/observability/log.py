@@ -86,7 +86,7 @@ _log_phase: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 
 
 def set_log_phase(phase: str | None) -> contextvars.Token[str | None]:
-    """Pose la phase du pipeline en cours, et rend le jeton qui restaure la précédente (`reset_log_phase`)."""
+    """Pose la phase du pipeline en cours, et renvoie le jeton qui restaure la précédente (`reset_log_phase`)."""
     return _log_phase.set(phase)
 
 

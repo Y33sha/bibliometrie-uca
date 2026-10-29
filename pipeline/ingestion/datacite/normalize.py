@@ -254,7 +254,7 @@ class DataciteNormalizer(SourceNormalizer):
     def parse(self, row: StagingRow) -> Document | None:
         """Les `attributes` de la ressource JSON:API, refusés sans DOI."""
         attributes = row.raw_data.get("attributes")
-        # Garanti par `SourceNormalizer` : `minimal_metadata` rend (None, None) sinon.
+        # Garanti par `SourceNormalizer` : `minimal_metadata` renvoie (None, None) sinon.
         assert isinstance(attributes, dict)
         return attributes if datacite_doi(attributes, row.doi) else None
 

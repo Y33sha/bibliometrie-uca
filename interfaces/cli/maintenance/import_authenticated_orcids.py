@@ -94,7 +94,7 @@ def find_reassignments(
 ) -> list[tuple[str, int, int]]:
     """ORCID détenus par une autre personne que celle qui l'a authentifié, et vers qui les déplacer.
 
-    `current` associe chaque ORCID à son détenteur actuel (personne et statut), tel que le référentiel le rend. L'authentification fait autorité sur l'attribution : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
+    `current` associe chaque ORCID à son détenteur actuel (personne et statut), tel que le référentiel le renvoie. L'authentification fait autorité sur l'attribution : le déplacement a lieu. Chacun révèle en général un doublon de personne à fusionner, d'où leur signalement.
     """
     return [
         (orcid, current[orcid][0], person_id)
@@ -174,7 +174,7 @@ def authenticate_orcid(conn: Connection, person_id: int, orcid: str) -> Authenti
 def authenticate_orcids(
     conn: Connection, entries: list[tuple[int, str]]
 ) -> Counter[AuthenticateOrcidOutcome]:
-    """Authentifie les paires `(person_id, orcid)` et rend le décompte des issues.
+    """Authentifie les paires `(person_id, orcid)` et renvoie le décompte des issues.
 
     Le paramètre de session `app.orcid_authenticated_import` autorise l'écriture du statut, que le trigger `protect_authenticated_identifier` refuse ailleurs. `SET LOCAL` le borne à la transaction.
     """

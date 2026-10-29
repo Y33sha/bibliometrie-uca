@@ -2,7 +2,7 @@
 
 `doi.org/ra/<p1>,<p2>,…` renvoie l'agence d'enregistrement de chaque préfixe (`Crossref`, `DataCite`, `mEDRA`…), ou le statut `DOI does not exist` pour un préfixe inconnu. Une agence vaut pour tous les DOI d'un préfixe. Interrogé par la phase `resolve_ra`.
 
-`doi.org/api/handles/<doi>` répond 404 pour un DOI que le registre ne connaît pas. Interrogé par la phase `fetch_missing` pour un DOI que son agence d'enregistrement ne rend pas. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
+`doi.org/api/handles/<doi>` répond 404 pour un DOI que le registre ne connaît pas. Interrogé par la phase `fetch_missing` pour un DOI que son agence d'enregistrement ne renvoie pas. Les requêtes s'identifient par l'adresse polite pool, dans le `User-Agent`.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def fetch_registration_agencies(
 ) -> Iterator[tuple[str, str | None]]:
     """Agence d'enregistrement de chaque préfixe DOI, par lots de `DOI_ORG_RA_BATCH` préfixes.
 
-    Rend `(préfixe, agence)`, avec l'agence `None` quand doi.org ne connaît pas le préfixe. Les préfixes d'un lot refusé par doi.org (4xx) sont absents du résultat. L'indisponibilité de doi.org lève `SourceUnavailableError`.
+    Renvoie `(préfixe, agence)`, avec l'agence `None` quand doi.org ne connaît pas le préfixe. Les préfixes d'un lot refusé par doi.org (4xx) sont absents du résultat. L'indisponibilité de doi.org lève `SourceUnavailableError`.
     """
     headers = {"User-Agent": user_agent, "Accept": "application/json"}
     for i in range(0, len(prefixes), DOI_ORG_RA_BATCH):

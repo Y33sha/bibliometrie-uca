@@ -260,7 +260,7 @@ def _parse_tei(label_xml: str) -> Element:
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     """Date de fin d'un embargo HAL encore actif, sinon `None`.
 
-    Lit `ref[@type='file']/date/@notBefore` du TEI : la date à laquelle le fichier déposé devient accessible. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue rend `None` : un embargo levé reste hors de la base. À l'échéance d'un embargo stocké, une règle de correction de `oa_status` le lève, sans nouvel import HAL.
+    Lit `ref[@type='file']/date/@notBefore` du TEI : la date à laquelle le fichier déposé devient accessible. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None` : un embargo levé reste hors de la base. À l'échéance d'un embargo stocké, une règle de correction de `oa_status` le lève, sans nouvel import HAL.
     """
     if not label_xml:
         return None

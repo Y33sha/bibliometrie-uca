@@ -19,7 +19,7 @@ class Pace:
         self._lock = threading.Lock()
 
     def _reserve(self) -> float:
-        """Réserve le prochain départ et rend l'attente qui le sépare de maintenant."""
+        """Réserve le prochain départ et renvoie l'attente qui le sépare de maintenant."""
         with self._lock:
             now = time.monotonic()
             start = max(now, self._next_start)

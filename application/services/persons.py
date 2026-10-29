@@ -168,7 +168,7 @@ class PersonService:
 
         Une forme confirmée valide le lien. Une forme rejetée sort durablement du rattachement par nom ; le rejet marque aussi pour la redécision de leur personne les contributions de la personne rattachées par le nom dont une contribution source contient la forme (`mark_contributions_for_name_form`) : le run suivant les redécide. Les contributions épinglées restent en l'état.
 
-        Rend la ligne `{person_id, name_form, status}`. Lève `NotFoundError` si le couple (forme, personne) n'existe pas, et `ConflictError` si la forme dérive du nom de la personne, confirmée d'office.
+        Renvoie la ligne `{person_id, name_form, status}`. Lève `NotFoundError` si le couple (forme, personne) n'existe pas, et `ConflictError` si la forme dérive du nom de la personne, confirmée d'office.
         """
         row = self._persons.update_name_form_status(person_id, name_form, status)
         if status == AttributionStatus.REJECTED:
@@ -188,7 +188,7 @@ class PersonService:
 
         Le rejet vaut pour la publication entière : chaque publication des contributions sources sélectionnées reçoit `reject_pair`. Les formes de nom de la personne qu'aucune source restante ne contient sont ensuite supprimées.
 
-        Rend le nombre de contributions détachées et de formes supprimées.
+        Renvoie le nombre de contributions détachées et de formes supprimées.
         """
         publication_ids: set[int] = set()
         for a in contributions:
@@ -245,7 +245,7 @@ class PersonService:
             )
 
     def merge_person(self, target_id: int, source_id: int) -> tuple[int, int]:
-        """Fusionne deux personnes, et rend l'id conservé et l'id absorbé.
+        """Fusionne deux personnes, et renvoie l'id conservé et l'id absorbé.
 
         Les rôles demandés sont inversés si seule `source_id` a une fiche RH (`merge_roles`). Le repository reprend ensuite les clés étrangères (`PersonRepository.merge_into`).
 

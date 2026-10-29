@@ -43,7 +43,7 @@ class ScanrClient:
 async def search(
     client: httpx2.AsyncClient, query: Mapping[str, JsonValue], *, label: str
 ) -> LookupOutcome[list[Mapping[str, JsonValue]]]:
-    """Documents (`_source`) de la requête Elasticsearch `query`. Une réponse valide sans hit rend une liste vide."""
+    """Documents (`_source`) de la requête Elasticsearch `query`. Une réponse valide sans hit renvoie une liste vide."""
     outcome = await lookup_json_async(
         client,
         "POST",

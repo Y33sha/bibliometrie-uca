@@ -16,5 +16,5 @@ class ConfigRepository(Protocol):
         ...
 
     def update_config_value(self, key: str, value: JsonValue) -> dict[str, JsonValue] | None:
-        """Met à jour la valeur d'un paramètre. Rend la ligne `{key, value, description}`, ou `None` si la clé n'existe pas."""
+        """Met à jour la valeur d'un paramètre. Renvoie la ligne `{key, value, description}`, ou `None` si la clé n'existe pas."""
         ...

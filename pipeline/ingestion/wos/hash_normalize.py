@@ -1,6 +1,6 @@
 """Neutralisation du bruit volatil du payload WoS pour la détection des changements.
 
-Une ligne d'export tabulé de l'interface WoS contient la date de l'export (`DA`) et des compteurs d'usage (`U1`, `U2`), qui changent d'un export à l'autre. `strip_volatile_for_hash` rend une copie du payload sans ces balises, pour le seul calcul de l'empreinte. Le payload stocké reste fidèle à l'export. Un payload de l'API reste tel quel.
+Une ligne d'export tabulé de l'interface WoS contient la date de l'export (`DA`) et des compteurs d'usage (`U1`, `U2`), qui changent d'un export à l'autre. `strip_volatile_for_hash` renvoie une copie du payload sans ces balises, pour le seul calcul de l'empreinte. Le payload stocké reste fidèle à l'export. Un payload de l'API reste tel quel.
 """
 
 from collections.abc import Mapping

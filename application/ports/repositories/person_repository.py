@@ -33,14 +33,14 @@ class PersonRepository(Protocol):
         ...
 
     def create(self, last_name: str, first_name: str = "") -> int:
-        """Crée une personne avec ses formes de nom (`compute_person_name_forms`), et rend son id.
+        """Crée une personne avec ses formes de nom (`compute_person_name_forms`), et renvoie son id.
 
         Lève `ValidationError` sans nom de famille : les formes qui rattachent des contributions à la personne en dérivent.
         """
         ...
 
     def rename(self, person_id: int, last_name: str, first_name: str) -> tuple[str, str]:
-        """Change le nom d'une personne et recalcule ses formes de nom (`compute_person_name_forms`). Rend le nom validé (`validated_name`).
+        """Change le nom d'une personne et recalcule ses formes de nom (`compute_person_name_forms`). Renvoie le nom validé (`validated_name`).
 
         Lève `ValidationError` sans nom de famille, `NotFoundError` si la personne est introuvable.
         """
@@ -67,11 +67,11 @@ class PersonRepository(Protocol):
         person_id_a: int,
         person_id_b: int,
     ) -> tuple[int, int] | None:
-        """Marque deux personnes comme distinctes (idempotent). Rend `(a, b)` triés si la paire est insérée, `None` si elle existait déjà."""
+        """Marque deux personnes comme distinctes (idempotent). Renvoie `(a, b)` triés si la paire est insérée, `None` si elle existait déjà."""
         ...
 
     def unmark_distinct(self, person_id_a: int, person_id_b: int) -> tuple[int, int] | None:
-        """Retire la paire de personnes distinctes. Rend `(a, b)` triés si la paire existait, `None` sinon."""
+        """Retire la paire de personnes distinctes. Renvoie `(a, b)` triés si la paire existait, `None` sinon."""
         ...
 
     # ── person_identifiers ─────────────────────────────────────────
@@ -81,7 +81,7 @@ class PersonRepository(Protocol):
         ...
 
     def insert_identifier(self, ident: IdentifierAttribution) -> int:
-        """Insère l'attribution et rend son id, posé aussi sur `ident.id`. Lève si `(id_type, id_value)` existe déjà : l'appelant vérifie l'unicité par `find_identifier`."""
+        """Insère l'attribution et renvoie son id, posé aussi sur `ident.id`. Lève si `(id_type, id_value)` existe déjà : l'appelant vérifie l'unicité par `find_identifier`."""
         ...
 
     def update_identifier(self, ident: IdentifierAttribution) -> None:
@@ -98,15 +98,15 @@ class PersonRepository(Protocol):
         ...
 
     def update_identifier_status(self, ident_id: int, status: str) -> IdentifierStatusRow:
-        """Change le statut d'un identifiant et rend la ligne. Lève `NotFoundError` s'il est absent."""
+        """Change le statut d'un identifiant et renvoie la ligne. Lève `NotFoundError` s'il est absent."""
         ...
 
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
-        """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Rend le nombre d'identifiants modifiés."""
+        """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Renvoie le nombre d'identifiants modifiés."""
         ...
 
     def mark_contributions_of_rejected_identifiers(self, person_id: int) -> int:
-        """Marque pour la redécision de leur personne les contributions de la personne rattachées par un identifiant `rejected` : le mode de résolution de la contribution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur. Les contributions `manual` et celles d'un autre mode restent en l'état. Rend le nombre de contributions marquées."""
+        """Marque pour la redécision de leur personne les contributions de la personne rattachées par un identifiant `rejected` : le mode de résolution de la contribution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur. Les contributions `manual` et celles d'un autre mode restent en l'état. Renvoie le nombre de contributions marquées."""
         ...
 
     # ── person_name_forms ──────────────────────────────────────────
@@ -123,9 +123,9 @@ class PersonRepository(Protocol):
     def update_name_form_status(
         self, person_id: int, name_form: str, status: str
     ) -> NameFormStatusRow:
-        """Change le statut d'une forme de nom et rend la ligne. Lève `NotFoundError` si le couple (forme, personne) est absent. Une forme rejetée sort durablement du rattachement par nom ; une forme confirmée corrobore les rattachements par identifiant et dispense du test de nom."""
+        """Change le statut d'une forme de nom et renvoie la ligne. Lève `NotFoundError` si le couple (forme, personne) est absent. Une forme rejetée sort durablement du rattachement par nom ; une forme confirmée corrobore les rattachements par identifiant et dispense du test de nom."""
         ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
-        """Supprime les formes de nom en attente de la personne qu'aucune de ses contributions sources ne contient. Les formes dérivées de son nom (source `persons`) et les formes confirmées ou rejetées restent. Rend le nombre de formes supprimées."""
+        """Supprime les formes de nom en attente de la personne qu'aucune de ses contributions sources ne contient. Les formes dérivées de son nom (source `persons`) et les formes confirmées ou rejetées restent. Renvoie le nombre de formes supprimées."""
         ...

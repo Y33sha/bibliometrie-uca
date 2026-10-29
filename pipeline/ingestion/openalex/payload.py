@@ -50,7 +50,7 @@ def full_openalex_id(id_or_url: str) -> str:
 
 
 BULK_AUTHORSHIPS_CAP = 100
-"""Nombre maximal d'auteurs d'un work dans une réponse bulk d'OpenAlex. Un work qui en compte autant est peut-être tronqué ; sa requête individuelle rend tous ses auteurs."""
+"""Nombre maximal d'auteurs d'un work dans une réponse bulk d'OpenAlex. Un work qui en compte autant est peut-être tronqué ; sa requête individuelle renvoie tous ses auteurs."""
 
 
 def authors_may_be_truncated(work: Mapping[str, JsonValue]) -> bool:
@@ -63,7 +63,7 @@ def authors_may_be_truncated(work: Mapping[str, JsonValue]) -> bool:
 class OpenalexLocation:
     """Une `location` d'un work OpenAlex, principale ou non.
 
-    OpenAlex donne la localisation principale (`primary_location`) et toutes les localisations du work (`locations`), en général la principale en tête. Tous les champs peuvent manquer : OpenAlex rend des localisations partielles (sans page, source non identifiée…).
+    OpenAlex donne la localisation principale (`primary_location`) et toutes les localisations du work (`locations`), en général la principale en tête. Tous les champs peuvent manquer : OpenAlex renvoie des localisations partielles (sans page, source non identifiée…).
     """
 
     location_id: str | None  # location.id (ex. "pmh:2023UCFAC123")

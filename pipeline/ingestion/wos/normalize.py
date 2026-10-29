@@ -49,7 +49,7 @@ def _text_of(value: JsonValue) -> str | None:
 
 
 def _safe_list(obj: JsonValue) -> Sequence[JsonValue]:
-    """Valeurs d'un champ : l'API rend un objet seul là où elle annonce une liste."""
+    """Valeurs d'un champ : l'API renvoie un objet seul là où elle annonce une liste."""
     if obj is None:
         return []
     if isinstance(obj, (str, Mapping)):
@@ -270,7 +270,7 @@ def extract_from_api(raw: Mapping[str, JsonValue], staging_doi: str | None) -> d
             abstract = str(p)
 
     # Keywords
-    # Web of Science rend un mot-clé unique en chaîne, plusieurs en liste.
+    # Web of Science renvoie un mot-clé unique en chaîne, plusieurs en liste.
     kw_raw = at_path(frm, "keywords").get("keyword", [])
     single_word = as_str(kw_raw)
     keywords = ([single_word] if single_word else as_strs(kw_raw)) or None

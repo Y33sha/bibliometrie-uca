@@ -39,7 +39,7 @@ type Fetch = Callable[[httpx2.AsyncClient, list[str]], Awaitable[LookupBatch | U
 """Interroge la source pour un lot d'identifiants."""
 
 type Stage = Callable[[StagingStore, Mapping[str, JsonValue]], UpsertOutcome | None]
-"""Écrit un document trouvé dans `staging`. Rend `None` pour un document sans identifiant, qui n'est pas écrit."""
+"""Écrit un document trouvé dans `staging`. Renvoie `None` pour un document sans identifiant, qui n'est pas écrit."""
 
 
 def one_at_a_time(
@@ -70,7 +70,7 @@ class LookupChannel:
     on_absent: Callable[[Connection, str], None]
     """Ce que devient un identifiant dont la source confirme l'absence. Ne commite pas."""
     stage: Stage | None = None
-    """`None` : la source rend seulement la présence des identifiants, sans document à écrire."""
+    """`None` : la source renvoie seulement la présence des identifiants, sans document à écrire."""
     absent_metric: str = "not_found"
     """Compteur des identifiants absents."""
     batch_size: int = 1
@@ -149,7 +149,7 @@ def _stage(
     records: list[Mapping[str, JsonValue]],
     metrics: PhaseMetrics,
 ) -> int:
-    """Écrit `records` par `stage`, les compte dans `metrics`, et rend le nombre de documents écrits."""
+    """Écrit `records` par `stage`, les compte dans `metrics`, et renvoie le nombre de documents écrits."""
     written = 0
     for record in records:
         match stage(staging, record):

@@ -107,7 +107,7 @@ class StructureRepository(Protocol):
         ...
 
     def add(self, structure: Structure) -> int:
-        """Insère une structure et rend son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
+        """Insère une structure et renvoie son id. `api_ids` est validé, et posé sous sa forme normalisée sur l'entité."""
         ...
 
     def save(self, structure: Structure) -> None:
@@ -115,7 +115,7 @@ class StructureRepository(Protocol):
         ...
 
     def delete_structure(self, structure_id: int) -> dict[str, JsonValue] | None:
-        """Supprime la structure et rend son instantané, pris avant la suppression : la ligne `structures`, ses formes de nom, ses tutelles (`parent_ids`, `child_ids`), ses liens adresse-structure confirmés, rejetés ou manuels (listes d'`address_id`) et les périmètres dont elle est une racine. `None` si elle n'existe pas."""
+        """Supprime la structure et renvoie son instantané, pris avant la suppression : la ligne `structures`, ses formes de nom, ses tutelles (`parent_ids`, `child_ids`), ses liens adresse-structure confirmés, rejetés ou manuels (listes d'`address_id`) et les périmètres dont elle est une racine. `None` si elle n'existe pas."""
         ...
 
     # ── structure_parents ─────────────────────────────────────────
@@ -130,7 +130,7 @@ class StructureRepository(Protocol):
         parent_id: int,
         child_id: int,
     ) -> StructureTutelleRow | None:
-        """Crée une tutelle et rend la ligne, ou `None` si elle existe déjà (`(parent_id, child_id)` en conflit)."""
+        """Crée une tutelle et renvoie la ligne, ou `None` si elle existe déjà (`(parent_id, child_id)` en conflit)."""
         ...
 
     def delete_tutelle(self, tutelle_id: int) -> StructureTutelleDeletedRow | None: ...
@@ -156,7 +156,7 @@ class StructureRepository(Protocol):
         form_id: int,
         fields: StructureNameFormUpdateFields,
     ) -> StructureNameFormRow:
-        """Écrit les champs donnés (`StructureNameFormUpdateFields`) et rend la ligne. Lève `NotFoundError` si la forme est introuvable."""
+        """Écrit les champs donnés (`StructureNameFormUpdateFields`) et renvoie la ligne. Lève `NotFoundError` si la forme est introuvable."""
         ...
 
     def delete_name_form(self, form_id: int) -> StructureNameFormDeletedRow | None: ...

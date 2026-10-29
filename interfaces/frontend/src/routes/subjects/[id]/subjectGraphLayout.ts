@@ -150,7 +150,7 @@ export function subjectGraphLayout(
     y1: CY + centerR + 24,
   };
 
-  // Recouvrements : on écarte les emprises le long de l'axe du moindre recouvrement, puis chaque voisin revient sur son ellipse en gardant son nouvel angle. Rend vrai si plus rien ne se recouvre.
+  // Recouvrements : on écarte les emprises le long de l'axe du moindre recouvrement, puis chaque voisin revient sur son ellipse en gardant son nouvel angle. Renvoie vrai si plus rien ne se recouvre.
   const gap = 4;
   function relax(): boolean {
     for (let pass = 0; pass < 300; pass++) {

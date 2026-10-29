@@ -117,7 +117,7 @@ def write_misplaced_neutralizations(
 ) -> dict[int, list[str]]:
     """Réécrit les neutralisations `misplaced` de toutes les contributions sources : celles des informations du contributeur de `misplaced` (`{contributor_information_id: types d'identifiant}`) sont posées, les autres effacées. Une neutralisation `shared` du même identifiant l'emporte. Seules les lignes dont la carte change sont écrites, et leurs publications sont marquées pour le groupement des auteurs.
 
-    Rend les contributions sources qui gagnent un identifiant neutralisé, avec les types d'identifiant gagnés.
+    Renvoie les contributions sources qui gagnent un identifiant neutralisé, avec les types d'identifiant gagnés.
     """
     payload = [
         {
@@ -181,7 +181,7 @@ def write_misplaced_neutralizations(
 
 
 def mark_misplaced_contributions(conn: Connection, gained: Mapping[int, Sequence[str]]) -> int:
-    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées par un type d'identifiant dont une contribution source gagne la marque `misplaced` pour ce type (`gained` : `{source_contribution_id: types d'identifiant}`). Rend le nombre de contributions marquées."""
+    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions rattachées par un type d'identifiant dont une contribution source gagne la marque `misplaced` pour ce type (`gained` : `{source_contribution_id: types d'identifiant}`). Renvoie le nombre de contributions marquées."""
     pairs = [
         (source_contribution_id, id_type)
         for source_contribution_id, id_types in gained.items()
@@ -249,7 +249,7 @@ def fetch_identifier_contribution_votes(
 def mark_identifier_contributions(
     conn: Connection, id_type: str, id_value: str, person_id: int
 ) -> int:
-    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions de `person_id` rattachées par le type d'identifiant dont une contribution source porte la valeur (`_bears_identifier`). Rend le nombre de contributions marquées."""
+    """Marque pour la redécision de leur personne (`Queue.CONTRIBUTION_RESOLUTION`) les contributions de `person_id` rattachées par le type d'identifiant dont une contribution source porte la valeur (`_bears_identifier`). Renvoie le nombre de contributions marquées."""
     return enqueue(
         conn,
         Queue.CONTRIBUTION_RESOLUTION,

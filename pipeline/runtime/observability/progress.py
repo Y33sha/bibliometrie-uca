@@ -67,7 +67,7 @@ CLEAR_TO_END_OF_SCREEN = "\x1b[J"
 
 
 def _counter_column(done: object, total: object) -> str:
-    """Rend `done/total` à la largeur de la colonne, le total inconnu s'écrivant `?`."""
+    """Renvoie `done/total` à la largeur de la colonne, le total inconnu s'écrivant `?`."""
     return f"{done}/{total if total is not None else '?'}".ljust(COUNTER_WIDTH)
 
 

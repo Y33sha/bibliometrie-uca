@@ -126,7 +126,7 @@ _MARK_CONTRIBUTIONS_OF_UPDATED = enqueue_sql(
 
 
 def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
-    """Vide l'empreinte du bloc auteurs des enregistrements sources de `source` : leur prochaine normalisation synchronise leurs contributions sources. Rend le nombre d'enregistrements sources marqués."""
+    """Vide l'empreinte du bloc auteurs des enregistrements sources de `source` : leur prochaine normalisation synchronise leurs contributions sources. Renvoie le nombre d'enregistrements sources marqués."""
     return conn.execute(
         text("""
             UPDATE source_records SET authors_hash = NULL
@@ -139,7 +139,7 @@ def mark_source_contributions_to_resync(conn: Connection, source: str) -> int:
 def delete_orphan_contributor_information(conn: Connection) -> int:
     """Supprime les lignes de `contributor_information` qu'aucune contribution source ne référence.
 
-    Une ligne devient orpheline quand la dernière contribution source qui la référençait change de clé (nom ou identifiants corrigés) et passe à une autre ligne. Rend le nombre de lignes supprimées.
+    Une ligne devient orpheline quand la dernière contribution source qui la référençait change de clé (nom ou identifiants corrigés) et passe à une autre ligne. Renvoie le nombre de lignes supprimées.
     """
     return conn.execute(
         text("""
@@ -154,7 +154,7 @@ def delete_orphan_contributor_information(conn: Connection) -> int:
 def delete_orphan_addresses(conn: Connection) -> int:
     """Supprime les adresses qu'aucune contribution source ne référence, avec leurs liens aux structures.
 
-    Une adresse devient orpheline quand la dernière contribution source qui la référençait est réécrite sans elle ou supprimée avec son enregistrement source. Rend le nombre d'adresses supprimées.
+    Une adresse devient orpheline quand la dernière contribution source qui la référençait est réécrite sans elle ou supprimée avec son enregistrement source. Renvoie le nombre d'adresses supprimées.
     """
     return conn.execute(
         text("""

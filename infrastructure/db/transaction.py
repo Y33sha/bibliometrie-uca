@@ -1,6 +1,6 @@
 """Transaction gérée, qui satisfait le port `OpenTransaction`.
 
-Une phase du pipeline reçoit un `OpenTransaction`, qui rend une transaction gérée en context manager : elle ouvre ses transactions sans connaître l'engine.
+Une phase du pipeline reçoit un `OpenTransaction`, qui renvoie une transaction gérée en context manager : elle ouvre ses transactions sans connaître l'engine.
 
 À la différence d'`Engine.begin`, `managed_transaction` admet les commits faits dans le bloc : une phase qui commite par lots garde ce comportement, et le commit de sortie valide le reste éventuel. Sous `Engine.begin`, un commit dans le bloc ferme la transaction, et la sortie lève `InvalidRequestError`.
 """

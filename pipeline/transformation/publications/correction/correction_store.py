@@ -242,7 +242,7 @@ _UPDATE = (
 
 
 def _persist_updates(conn: Connection, updates: Sequence[Mapping[str, object]]) -> int:
-    """Écrit en lot les colonnes de chaque mise à jour sur l'enregistrement source de sa clé `id`, avec `updated_at`, et marque ces enregistrements sources pour la réconciliation. Rend le nombre de lignes.
+    """Écrit en lot les colonnes de chaque mise à jour sur l'enregistrement source de sa clé `id`, avec `updated_at`, et marque ces enregistrements sources pour la réconciliation. Renvoie le nombre de lignes.
 
     Lève `ValueError` sur une clé qui ne nomme aucune colonne de `source_records`.
     """
@@ -302,7 +302,7 @@ class SourceRecordCorrectionStore:
         )
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
-        """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le type et les identifiants sont des clés. Rend le nombre de lignes."""
+        """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le type et les identifiants sont des clés. Renvoie le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.corrected.identifiers for u in updates})
         return _persist_updates(
             self._conn, [{"id": u.id, **u.corrected.columns._asdict()} for u in updates]
@@ -319,7 +319,7 @@ class SourceRecordCorrectionStore:
         return frozenset(rows.scalars())
 
     def delete_missing_hal_locations(self) -> int:
-        """Supprime les localisations dont la correction unaire a retiré le lien des `urls` de leur enregistrement source (dépôt HAL introuvable). La normalisation réécrit les localisations : la suppression se rejoue à chaque passage. Rend le nombre de localisations supprimées."""
+        """Supprime les localisations dont la correction unaire a retiré le lien des `urls` de leur enregistrement source (dépôt HAL introuvable). La normalisation réécrit les localisations : la suppression se rejoue à chaque passage. Renvoie le nombre de localisations supprimées."""
         result = self._conn.execute(
             text(f"""
                 DELETE FROM source_record_locations l
@@ -367,7 +367,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def persist_matchability(self, updates: list[MatchabilityUpdate]) -> int:
-        """Écrit en lot `is_matchable`, et marque les enregistrements sources pour la réconciliation. Rend le nombre de lignes."""
+        """Écrit en lot `is_matchable`, et marque les enregistrements sources pour la réconciliation. Renvoie le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_serial_doi_namespaces(self) -> list[DoiNamespace]:
@@ -391,7 +391,7 @@ class SourceRecordCorrectionStore:
         return rows_as(SerialCorrectionRow, rows)
 
     def persist_serial_corrections(self, updates: list[SerialCorrectionUpdate]) -> int:
-        """Écrit en lot `serial_id` et `corrections`, et marque les enregistrements sources pour la réconciliation, qui recalcule la revue de la publication. Rend le nombre de lignes."""
+        """Écrit en lot `serial_id` et `corrections`, et marque les enregistrements sources pour la réconciliation, qui recalcule la revue de la publication. Renvoie le nombre de lignes."""
         return _persist_updates(self._conn, [u._asdict() for u in updates])
 
     def fetch_secondary_form_declarations(self) -> list[SecondaryFormRow]:
@@ -599,7 +599,7 @@ class SourceRecordCorrectionStore:
         ]
 
     def replace_doi_targets(self, targets: list[DoiTarget]) -> int:
-        """Réécrit `doi_targets` avec les cibles données. Les enregistrements sources dont le DOI change de cible sont marqués pour la réconciliation. Rend le nombre de DOI dont la cible change."""
+        """Réécrit `doi_targets` avec les cibles données. Les enregistrements sources dont le DOI change de cible sont marqués pour la réconciliation. Renvoie le nombre de DOI dont la cible change."""
         current = {
             r.doi: (r.target_doi, r.rule)
             for r in self._conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets"))
@@ -631,7 +631,7 @@ class SourceRecordCorrectionStore:
         return len(changed)
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """Écrit en lot `doi`, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le DOI et les identifiants sont des clés. Rend le nombre de lignes."""
+        """Écrit en lot `doi`, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le DOI et les identifiants sont des clés. Renvoie le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
         return _persist_updates(
             self._conn,

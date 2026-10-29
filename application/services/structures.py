@@ -64,7 +64,7 @@ class StructureService:
     # ── Structures ──
 
     def create_structure(self, create: StructureCreate) -> Structure:
-        """Crée une structure et la rend. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
+        """Crée une structure et la renvoie. Lève `ValidationError` si un champ est invalide (`type` hors énumération, `ror_id`/`hal_collection` mal formés, `api_ids` non conforme)."""
         structure = Structure.create(
             code=create.code,
             name=create.name,
@@ -122,7 +122,7 @@ class StructureService:
     # ── Tutelles (structure_parents) ──
 
     def create_tutelle(self, *, parent_id: int, child_id: int) -> StructureTutelleRow | None:
-        """Crée une tutelle, puis recalcule les structures des périmètres. Rend la ligne insérée, ou `None` si elle existait déjà.
+        """Crée une tutelle, puis recalcule les structures des périmètres. Renvoie la ligne insérée, ou `None` si elle existait déjà.
 
         Lève `ValidationError` si la tutelle viole le graphe : structure tutelle d'elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Le domaine valide, d'après les ancêtres que lit `StructureRepository.get_ancestor_ids`.
         """
@@ -163,7 +163,7 @@ class StructureService:
     # ── Formes de nom (structure_name_forms) ──
 
     def create_name_form(self, create: NameFormCreate) -> StructureNameFormRow:
-        """Crée une forme de nom et rend la ligne insérée."""
+        """Crée une forme de nom et renvoie la ligne insérée."""
         form_text_normalized = normalize_text(create.form_text)
         row = self._structures.create_name_form(
             structure_id=create.structure_id,
@@ -182,7 +182,7 @@ class StructureService:
         return row
 
     def update_name_form(self, form_id: int, update: NameFormUpdate) -> StructureNameFormRow:
-        """Met à jour une forme de nom et rend la ligne modifiée. `null` sur `requires_context_of` efface le contexte ; sur un autre champ, il vaut champ non fourni.
+        """Met à jour une forme de nom et renvoie la ligne modifiée. `null` sur `requires_context_of` efface le contexte ; sur un autre champ, il vaut champ non fourni.
 
         Lève `NotFoundError` si la forme n'existe pas, `ValidationError` si aucun champ n'est fourni.
         """

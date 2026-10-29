@@ -111,7 +111,7 @@ def get_persons_structure_ids_list(conn: Connection) -> list[int]:
 
 
 def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
-    """Racines du périmètre des personnes, sans leurs sous-structures (que rend `get_persons_structure_ids`). Sert à filtrer les racines, par exemple pour retirer l'établissement des tutelles affichées pour un laboratoire."""
+    """Racines du périmètre des personnes, sans leurs sous-structures (que renvoie `get_persons_structure_ids`). Sert à filtrer les racines, par exemple pour retirer l'établissement des tutelles affichées pour un laboratoire."""
     code = persons_perimeter_code(conn)
     if not code:
         return []

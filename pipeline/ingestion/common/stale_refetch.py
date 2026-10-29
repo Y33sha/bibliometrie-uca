@@ -97,7 +97,7 @@ async def refresh(
 ) -> PhaseMetrics:
     """Relit par identifiant natif les documents de la source que le moissonnage n'a pas revus depuis `after_days` jours. Un document que la source dit absent est marqué disparu. `years` borne la sélection (`get_stale_source_ids`).
 
-    Rend les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
+    Renvoie les compteurs de `look_up` : documents réécrits (`updated`), identiques (`unchanged`), lots non servis (`errors`), absences confirmées (`disappeared`).
     """
     source = refetch.source_key
     return await look_up(
@@ -107,7 +107,7 @@ async def refresh(
             source=source,
             fetch=one_at_a_time(refetch.fetch_by_native_id),
             on_absent=lambda conn, source_id: set_disappeared(conn, source, source_id),
-            # La lecture par identifiant natif rend le document entier : aucun plafond d'auteurs.
+            # La lecture par identifiant natif renvoie le document entier : aucun plafond d'auteurs.
             stage=lambda staging, record: staging.stage(source, record, listed=False),
             absent_metric="disappeared",
             max_concurrent=refetch.max_concurrent,

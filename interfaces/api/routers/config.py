@@ -54,7 +54,7 @@ def update_config(
 ) -> ConfigItem:
     """Met à jour la valeur d'un paramètre applicatif.
 
-    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue rend 404.
+    L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue renvoie 404.
     """
     row = config.update_config_value(key, body.value)
     return ConfigItem(

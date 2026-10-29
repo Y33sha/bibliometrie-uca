@@ -61,7 +61,7 @@ class MetadataCorrectionPhase:
         return metrics
 
     def _steps(self) -> dict[str, TaskStep]:
-        """Étape de chaque tâche. Chacune écrit sa section du journal et rend examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
+        """Étape de chaque tâche. Chacune écrit sa section du journal et renvoie examinés (`total`), corrigés (`updated`) et décompte par règle (`extras`)."""
 
         def serial_by_doi(ctx: PhaseContext) -> PhaseMetrics:
             with ctx.open_tx() as conn:

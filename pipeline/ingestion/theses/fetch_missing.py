@@ -51,7 +51,7 @@ async def fetch_missing_theses_by_nnt(
 
     Un NNT introuvable est inscrit dans `failed_lookups`. Quand theses.fr est indisponible, le NNT reste dans la sélection du run suivant.
 
-    Rend les compteurs de `look_up`, avec le nombre de NNT introuvables (`not_found`).
+    Renvoie les compteurs de `look_up`, avec le nombre de NNT introuvables (`not_found`).
     """
     nnts = get_missing_nnts(conn, retry_after_days=retry_after_days)
     return await look_up(

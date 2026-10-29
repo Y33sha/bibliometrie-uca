@@ -39,7 +39,7 @@
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);
   let editingKey: string | null = $state(null);
-  // Un champ numérique lié par `bind:value` rend un nombre, ou `null` vide.
+  // Un champ numérique lié par `bind:value` renvoie un nombre, ou `null` vide.
   let editValue: string | number | null = $state("");
   let saving = $state(false);
 

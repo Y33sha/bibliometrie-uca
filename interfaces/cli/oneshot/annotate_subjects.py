@@ -50,7 +50,7 @@ def split(sample_path: Path, out: Path, size: int, only: set[int] | None) -> Non
 
 
 def make_consistent(labels: list[dict], field: str) -> int:
-    """Applique la règle d'inclusion aux verdicts `label[field]` d'une publication. Rend le nombre de verdicts changés."""
+    """Applique la règle d'inclusion aux verdicts `label[field]` d'une publication. Renvoie le nombre de verdicts changés."""
     by_key = {(label["level"], label["label"]): label for label in labels}
 
     def ancestors(label: dict) -> list[dict]:

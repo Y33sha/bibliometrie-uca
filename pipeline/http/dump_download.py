@@ -29,7 +29,7 @@ class DumpDownloadError(Exception):
 
 
 def write_capped(resp: httpx2.Response, dest_path: str, max_bytes: int, *, label: str) -> int:
-    """Écrit le corps de la réponse dans `dest_path` et rend le nombre d'octets écrits.
+    """Écrit le corps de la réponse dans `dest_path` et renvoie le nombre d'octets écrits.
 
     Lève `DumpDownloadError` au franchissement du plafond, sans lire la suite. Le fichier partiel reste sur le disque : son effacement appartient à l'appelant, qui l'a créé. `label` nomme le dump dans le message d'erreur.
     """
@@ -116,7 +116,7 @@ def downloaded_dump(
     max_bytes: int,
     allowed_redirect_hosts: frozenset[str] = frozenset(),
 ) -> Iterator[str]:
-    """Télécharge le dump dans un fichier temporaire `file_name` et rend son chemin, le temps du bloc.
+    """Télécharge le dump dans un fichier temporaire `file_name` et renvoie son chemin, le temps du bloc.
 
     Le répertoire temporaire est le seul emplacement en écriture du conteneur (`tmpfs` sur `/tmp`). Le fichier est supprimé à la sortie du bloc. Lève `DumpUnavailableError` quand le téléchargement échoue, avant que le bloc ne commence.
     """

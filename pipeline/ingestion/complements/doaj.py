@@ -42,7 +42,7 @@ def read_doaj_dump_rows(path: str) -> Iterator[dict[str, str]]:
 def downloaded_doaj_dump(
     *, user_agent: str, logger: logging.Logger
 ) -> Iterator[Iterator[dict[str, str]]]:
-    """Télécharge le dump CSV du DOAJ et rend ses lignes, le temps du bloc.
+    """Télécharge le dump CSV du DOAJ et renvoie ses lignes, le temps du bloc.
 
     Le dump transite par un fichier temporaire, que le module CSV relit : un enregistrement peut contenir des sauts de ligne dans ses champs. Lève `DumpUnavailableError` quand le téléchargement échoue, avant que le bloc ne commence.
     """

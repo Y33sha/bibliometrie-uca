@@ -11,7 +11,7 @@ Une mesure s'agrège sur les publications distinctes de chaque groupe : leur nom
 
 Un **indicateur** est ce que l'interface propose d'afficher : une mesure, ventilée par une dimension empilée dans chaque barre. L'indicateur impose sa mesure. Un axe de comparaison facultatif s'ajoute à la ventilation (`indicator_pivot`).
 
-La requête est composée sur **liste blanche** : `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` utilise seulement les expressions du registre, indexées par des clés validées (`validate_pivot`). Le grain est tenu par une sous-requête qui rend chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui multiplie les lignes (`lab`) compte et somme ainsi chaque publication une fois.
+La requête est composée sur **liste blanche** : `SELECT <dimensions>, <mesure> … GROUP BY <dimensions>` utilise seulement les expressions du registre, indexées par des clés validées (`validate_pivot`). Le grain est tenu par une sous-requête qui renvoie chaque publication une fois par groupe (`SELECT DISTINCT <dimensions>, p.id`). Une dimension qui multiplie les lignes (`lab`) compte et somme ainsi chaque publication une fois.
 """
 
 from collections.abc import Sequence
@@ -239,7 +239,7 @@ assert all(
 def validate_pivot(measure: str, groups: Sequence[str]) -> tuple[Measure, list[Dimension]]:
     """Valide une requête de pivot contre le registre (liste blanche).
 
-    Rend la mesure et les dimensions de groupement. Lève `ValidationError` (400) pour une clé inconnue ou un groupement répété : seul le vocabulaire déclaré atteint le constructeur SQL.
+    Renvoie la mesure et les dimensions de groupement. Lève `ValidationError` (400) pour une clé inconnue ou un groupement répété : seul le vocabulaire déclaré atteint le constructeur SQL.
     """
     if measure not in MEASURES:
         raise ValidationError(f"Mesure inconnue : {measure!r}")

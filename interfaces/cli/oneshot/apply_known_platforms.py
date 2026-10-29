@@ -25,7 +25,7 @@ log = setup_logger("apply_known_platforms", os.path.dirname(__file__))
 
 
 def rename_platforms(conn: Connection) -> int:
-    """Donne à chaque plateforme de la liste le nom de la liste. Rend le nombre de plateformes renommées."""
+    """Donne à chaque plateforme de la liste le nom de la liste. Renvoie le nombre de plateformes renommées."""
     known = [(i, p.name) for p in KNOWN_PLATFORMS for i in p.openalex_ids]
     return conn.execute(
         text("""
@@ -43,7 +43,7 @@ def rename_platforms(conn: Connection) -> int:
 
 
 def retype_platforms(conn: Connection) -> int:
-    """Donne à chaque plateforme le type de la liste, à défaut entrepôt. Rend le nombre de plateformes retypées."""
+    """Donne à chaque plateforme le type de la liste, à défaut entrepôt. Renvoie le nombre de plateformes retypées."""
     known = [(i, p.platform_type.value) for p in KNOWN_PLATFORMS for i in p.openalex_ids]
     return conn.execute(
         text("""
@@ -65,7 +65,7 @@ def retype_platforms(conn: Connection) -> int:
 
 
 def enqueue_platform_prefix_records(conn: Connection) -> int:
-    """Met dans la file de réconciliation les enregistrements sources des publications à préfixe de plateforme d'éditeurs. Rend leur nombre."""
+    """Met dans la file de réconciliation les enregistrements sources des publications à préfixe de plateforme d'éditeurs. Renvoie leur nombre."""
     prefixes = sorted(
         prefix
         for p in KNOWN_PLATFORMS

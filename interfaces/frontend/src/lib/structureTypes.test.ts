@@ -20,7 +20,7 @@ describe("groupStructuresByType", () => {
 });
 
 describe("structureGroupLabel", () => {
-  it("rend le libellé d'un type connu, le code d'un type inconnu", () => {
+  it("renvoie le libellé d'un type connu, le code d'un type inconnu", () => {
     expect(structureGroupLabel("labo")).toBe("Laboratoires");
     expect(structureGroupLabel("inconnu")).toBe("inconnu");
   });

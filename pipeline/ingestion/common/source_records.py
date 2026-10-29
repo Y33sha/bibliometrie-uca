@@ -232,7 +232,7 @@ def normalized_identifiers(row: SourceRecordUpsert) -> tuple[SourceIdentifier, .
 
 
 def _delete_source_records(conn: Connection, staging_filter: str, params: dict[str, object]) -> int:
-    """Supprime les enregistrements sources dont la ligne de `staging` (alias `s`) satisfait le filtre, et rend leur nombre.
+    """Supprime les enregistrements sources dont la ligne de `staging` (alias `s`) satisfait le filtre, et renvoie leur nombre.
 
     Les autres enregistrements sources de leur publication sont d'abord marqués pour la réconciliation : la phase `publications` recalcule la publication sans les enregistrements supprimés. La publication est marquée pour le groupement des auteurs. Une publication vidée de tous ses enregistrements sources est supprimée en fin de phase `publications`. Les contributions sources suivent par cascade.
     """
@@ -283,7 +283,7 @@ def delete_disappeared_source_records(conn: Connection) -> int:
 def delete_source_records_before(conn: Connection, start_year: int) -> tuple[int, int]:
     """Supprime les enregistrements sources parus avant `start_year` (`_delete_source_records`), puis leur ligne de `staging`. Une thèse en cours reste : elle est sans année de soutenance.
 
-    Rend le nombre d'enregistrements sources et de lignes de `staging` supprimés.
+    Renvoie le nombre d'enregistrements sources et de lignes de `staging` supprimés.
     """
     staging_ids = list(
         conn.execute(

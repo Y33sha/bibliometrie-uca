@@ -39,7 +39,7 @@ def reject_pair(
     2. La personne quitte sa contribution dans la publication, et les épinglages des contributions sources de la publication à elle sont retirés (`detach_rejected_pair`).
     3. L'appartenance de la publication au périmètre se recalcule.
 
-    Rend le nombre de contributions détachées.
+    Renvoie le nombre de contributions détachées.
     """
     repo.reject_contribution(publication_id, person_id)
     detached = repo.detach_rejected_pair(publication_id, person_id)
@@ -132,7 +132,7 @@ class ContributionService:
     def assign_orphan_contribution_to_new_person(
         self, contribution_id: int, last_name: str, first_name: str, *, force: bool = False
     ) -> int:
-        """Crée une personne (`PersonRepository.create`), puis lui attribue la contribution orpheline (`assign_orphan_contribution`). Rend l'id de la personne créée.
+        """Crée une personne (`PersonRepository.create`), puis lui attribue la contribution orpheline (`assign_orphan_contribution`). Renvoie l'id de la personne créée.
 
         Lève `ValidationError` sans nom de famille, et les erreurs d'`assign_orphan_contribution`.
         """
@@ -147,7 +147,7 @@ class ContributionService:
 
         Une contribution absente, déjà rattachée, ou d'une publication où la personne a déjà une contribution manuelle est une anomalie : elle est écartée du lot et journalisée, le reste du lot est rattaché (`_attach_contributions`). Les rejets se contrôlent sur toutes les publications du lot (`_resolve_rejection`) : sans `force`, une seule paire rejetée bloque le lot (`RejectedPairError`) ; avec `force`, les rejets sont d'abord retirés.
 
-        Rend le nombre de contributions rattachées. Lève `NotFoundError` si la personne n'existe pas.
+        Renvoie le nombre de contributions rattachées. Lève `NotFoundError` si la personne n'existe pas.
         """
         if not contribution_ids:
             return 0

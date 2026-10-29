@@ -39,7 +39,7 @@ def create_perimeter(
 ) -> CreatedIdResponse:
     """Crée un périmètre avec ses structures racines, la liste pouvant être vide.
 
-    Le code est un identifiant naturel : la configuration du pipeline désigne un périmètre par sa valeur. C'est un jeton unique, sans espace ; un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
+    Le code est un identifiant naturel : la configuration du pipeline désigne un périmètre par sa valeur. C'est un jeton unique, sans espace ; un code vide ou espacé renvoie 422. Renvoie 409 sur un code déjà pris.
     """
     pid = perimeters.create_perimeter(
         code=body.code, name=body.name, root_structure_ids=body.root_structure_ids
@@ -55,7 +55,7 @@ def update_perimeter(
 ) -> OkResponse:
     """Met à jour un périmètre (nom, structures racines).
 
-    Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. Les structures du périmètre suivent le changement de racines.
+    Seuls les champs fournis sont écrits ; un corps vide renvoie 422, un périmètre inconnu 404. Les structures du périmètre suivent le changement de racines.
     """
     perimeters.update_perimeter(perimeter_id, body)
     return OkResponse()

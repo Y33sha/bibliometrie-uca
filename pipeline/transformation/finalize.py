@@ -161,7 +161,7 @@ def _timed(t0: float) -> PhaseMetrics:
 
 
 def _purge_publications(open_tx: OpenTransaction) -> int:
-    """Purge par lots, un commit par lot. Rend le nombre de publications supprimées."""
+    """Purge par lots, un commit par lot. Renvoie le nombre de publications supprimées."""
     n = 0
     with open_tx() as conn:
         while True:

@@ -70,7 +70,7 @@ class PgPerimeterRepository(PerimeterRepository):
         return result.first() is not None
 
     def add(self, perimeter: Perimeter) -> int:
-        """Insère un périmètre et rend son id."""
+        """Insère un périmètre et renvoie son id."""
         return scalar_int(
             self._conn.execute(
                 perimeters.insert()

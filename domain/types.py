@@ -1,6 +1,6 @@
 """Type d'une donnée JSON, et accesseurs typés.
 
-Une source rend parfois un champ sous une autre forme que celle documentée : une liste, un nombre ou rien au lieu d'un texte. Chaque accesseur rend la valeur au type attendu, ou une valeur vide (`None`, objet vide, liste vide). Un champ mal formé laisse donc lisible le reste de l'enregistrement source.
+Une source renvoie parfois un champ sous une autre forme que celle documentée : une liste, un nombre ou rien au lieu d'un texte. Chaque accesseur renvoie la valeur au type attendu, ou une valeur vide (`None`, objet vide, liste vide). Un champ mal formé laisse donc lisible le reste de l'enregistrement source.
 """
 
 from collections.abc import Mapping, Sequence

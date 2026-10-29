@@ -69,7 +69,7 @@ def plan(conn: Connection) -> tuple[list[dict[str, JsonValue]], Counter[str]]:
 
 
 def apply(conn: Connection, updates: list[dict[str, JsonValue]]) -> Counter[str]:
-    """Écrit `biblio` et recalcule les publications concernées. Rend le décompte des verdicts du recalcul."""
+    """Écrit `biblio` et recalcule les publications concernées. Renvoie le décompte des verdicts du recalcul."""
     conn.execute(
         text("""
             UPDATE source_records sr SET biblio = t.biblio

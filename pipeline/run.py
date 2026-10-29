@@ -397,7 +397,7 @@ def _run_one_phase(
     sources: set[str],
     recorder: PhaseExecutionRecorder,
 ) -> tuple[str, float]:
-    """Construit et exécute une phase, et enregistre son observabilité. Rend son nom et sa durée.
+    """Construit et exécute une phase, et enregistre son observabilité. Renvoie son nom et sa durée.
 
     Une interruption clavier ou une exception est enregistrée, puis termine le processus ; `--from <phase>` reprend la séquence où elle s'est arrêtée."""
     # Le nom de la phase préfixe les records émis pendant la phase, y compris par les moissonneurs en threads, qui héritent du contexte.

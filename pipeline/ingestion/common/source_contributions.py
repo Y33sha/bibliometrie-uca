@@ -303,7 +303,7 @@ def write_addresses(
     source: str,
     source_contribution_addresses: list[tuple[int | None, list[AddressRecord]]],
 ) -> dict[str, int]:
-    """Écrit les adresses d'un document, leurs pays candidats et leurs liens aux contributions sources, et rend l'identifiant de chaque adresse par son texte.
+    """Écrit les adresses d'un document, leurs pays candidats et leurs liens aux contributions sources, et renvoie l'identifiant de chaque adresse par son texte.
 
     Une adresse est unique par forme normalisée : un texte rejoint l'adresse de même forme, et un texte de forme vide est écarté. Les pays que la source donne deviennent des candidats du moyen de la source. Une adresse sans contribution source s'écrit sans lien.
     """

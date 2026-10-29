@@ -80,7 +80,7 @@ def update_name_form_status(
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
-    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des contributions sources de ses contributions. Rend le nombre de formes supprimées."""
+    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des contributions sources de ses contributions. Renvoie le nombre de formes supprimées."""
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf

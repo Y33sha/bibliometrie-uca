@@ -1,8 +1,8 @@
 """Neutralisation, pour la détection de changement, de ce qui varie dans une ressource DataCite sans que l'enregistrement change.
 
-Un même DOI se lit par deux routes : la liste (`/dois?query=…`, moissonnage et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute l'enregistrement XML encodé (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, rend `[]` là où la liste rend `None`, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, que la normalisation lit, reste dans l'empreinte.
+Un même DOI se lit par deux routes : la liste (`/dois?query=…`, moissonnage et phase `fetch_missing`) et la route unitaire (`/dois/{doi}`, phase `fetch_stale`). La route unitaire ajoute l'enregistrement XML encodé (`xml`), `prefix`, `suffix`, `published`, des `relationships` détaillées, renvoie `[]` là où la liste renvoie `None`, et donne les dates à la milliseconde. Les compteurs (`…Count`, `…OverTime`) bougent d'une lecture à l'autre ; seul le nombre de citations, que la normalisation lit, reste dans l'empreinte.
 
-`strip_volatile_for_hash` rend une copie de la ressource sans ces champs, pour le seul calcul de l'empreinte. Les métadonnées que lit la normalisation restent dans l'empreinte : un vrai changement de l'enregistrement reste détecté. Le payload stocké reste fidèle à la source.
+`strip_volatile_for_hash` renvoie une copie de la ressource sans ces champs, pour le seul calcul de l'empreinte. Les métadonnées que lit la normalisation restent dans l'empreinte : un vrai changement de l'enregistrement reste détecté. Le payload stocké reste fidèle à la source.
 """
 
 from collections.abc import Mapping

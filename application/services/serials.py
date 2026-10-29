@@ -45,7 +45,7 @@ class SerialService:
         self._conn = conn
 
     def update_serial(self, serial_id: int, update: SerialUpdate) -> int:
-        """Charge la revue, applique les champs fournis (`Serial.edit`) et l'écrit. Si son type ou son modèle open access change, rejoue les corrections de ses publications : leur type suit celui de la revue, leur statut diamant son modèle open access. Rend le nombre de publications dont le type change.
+        """Charge la revue, applique les champs fournis (`Serial.edit`) et l'écrit. Si son type ou son modèle open access change, rejoue les corrections de ses publications : leur type suit celui de la revue, leur statut diamant son modèle open access. Renvoie le nombre de publications dont le type change.
 
         Un `null` sur un champ obligatoire (titre, type, caractère académique) vaut champ non fourni. L'événement d'audit contient seulement les champs soumis.
 
@@ -94,7 +94,7 @@ class SerialService:
     def requalify_publications_for_serial(self, serial_id: int) -> int:
         """Requalifie, par le pipeline, le `doc_type` des publications d'une revue après un changement de son `serial_type`.
 
-        L'appelant a écrit le nouveau type dans la même transaction. Rend le nombre de publications dont le `doc_type` change, et émet l'audit `serial.type_requalified` si ce nombre est positif.
+        L'appelant a écrit le nouveau type dans la même transaction. Renvoie le nombre de publications dont le `doc_type` change, et émet l'audit `serial.type_requalified` si ce nombre est positif.
         """
         changed = self._recompute.requalify_publications(serial_id)
         if changed > 0:

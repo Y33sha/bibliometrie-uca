@@ -775,7 +775,7 @@ export interface paths {
          * Create Tutelle
          * @description Crée une tutelle entre deux structures.
          *
-         *     Une tutelle existante (même parent, même enfant) laisse la table inchangée et rend `{"status": "already_exists"}`. Renvoie 422 si la tutelle viole le graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Renvoie 409 si `parent_id` ou `child_id` désigne une structure inexistante.
+         *     Une tutelle existante (même parent, même enfant) laisse la table inchangée et renvoie `{"status": "already_exists"}`. Renvoie 422 si la tutelle viole le graphe : structure liée à elle-même, ou cycle (l'enfant est déjà un ancêtre du parent). Renvoie 409 si `parent_id` ou `child_id` désigne une structure inexistante.
          */
         post: operations["create_tutelle_api_structures_tutelles_post"];
         delete?: never;
@@ -1952,7 +1952,7 @@ export interface paths {
          * Update Config
          * @description Met à jour la valeur d'un paramètre applicatif.
          *
-         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue rend 404.
+         *     L'écriture exige une session : le middleware garde toutes les méthodes autres que `GET`. Les clés sont déclarées dans les migrations : la route modifie une clé existante, et une clé inconnue renvoie 404.
          */
         put: operations["update_config_api_config__key__put"];
         post?: never;
@@ -1981,7 +1981,7 @@ export interface paths {
          * Create Perimeter
          * @description Crée un périmètre avec ses structures racines, la liste pouvant être vide.
          *
-         *     Le code est un identifiant naturel : la configuration du pipeline désigne un périmètre par sa valeur. C'est un jeton unique, sans espace ; un code vide ou espacé rend 422. Renvoie 409 sur un code déjà pris.
+         *     Le code est un identifiant naturel : la configuration du pipeline désigne un périmètre par sa valeur. C'est un jeton unique, sans espace ; un code vide ou espacé renvoie 422. Renvoie 409 sur un code déjà pris.
          */
         post: operations["create_perimeter_api_perimeters_post"];
         delete?: never;
@@ -2002,7 +2002,7 @@ export interface paths {
          * Update Perimeter
          * @description Met à jour un périmètre (nom, structures racines).
          *
-         *     Seuls les champs fournis sont écrits ; un corps vide rend 422, un périmètre inconnu 404. Les structures du périmètre suivent le changement de racines.
+         *     Seuls les champs fournis sont écrits ; un corps vide renvoie 422, un périmètre inconnu 404. Les structures du périmètre suivent le changement de racines.
          */
         put: operations["update_perimeter_api_perimeters__perimeter_id__put"];
         post?: never;
@@ -2093,7 +2093,7 @@ export interface paths {
          * List Publishers
          * @description Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
          *
-         *     `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
          */
         get: operations["list_publishers_api_publishers_get"];
         put?: never;
@@ -2281,7 +2281,7 @@ export interface paths {
          * List Serials
          * @description Liste paginée des revues, avec le décompte de leurs publications.
          *
-         *     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+         *     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
          */
         get: operations["list_serials_api_serials_get"];
         put?: never;

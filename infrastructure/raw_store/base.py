@@ -1,6 +1,6 @@
 """Archive des payloads bruts des sources (raw store).
 
-Un `RawStore` garde hors base les payloads JSON bruts que rendent les API des sources, pour normaliser de nouveau, auditer ou reconstruire. Implémentations : `LocalFileRawStore`, `NullRawStore`.
+Un `RawStore` garde hors base les payloads JSON bruts que renvoient les API des sources, pour normaliser de nouveau, auditer ou reconstruire. Implémentations : `LocalFileRawStore`, `NullRawStore`.
 
 La clé est `(source, source_id)` ; son encodage en chemin relève de l'implémentation.
 """
@@ -28,7 +28,7 @@ class RawStore(Protocol):
         """Vrai si un payload est stocké pour la clé."""
 
     def delete(self, source: str, source_id: str) -> bool:
-        """Supprime le payload de la clé, et rend vrai s'il existait. Une clé absente rend faux."""
+        """Supprime le payload de la clé, et renvoie vrai s'il existait. Une clé absente renvoie faux."""
 
     def iter_keys(self, source: str) -> Iterator[str]:
         """Itère les `source_id` stockés pour la source."""

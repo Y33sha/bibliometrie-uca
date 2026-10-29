@@ -126,7 +126,7 @@ class SerialStore:
         openalex_id: str | None,
         oa_model: OaModel | None,
     ) -> int:
-        """Insère une revue et rend son id. L'éditeur se calcule d'après les publications (`refresh_serial_publishers`)."""
+        """Insère une revue et renvoie son id. L'éditeur se calcule d'après les publications (`refresh_serial_publishers`)."""
         stmt = (
             serials.insert()
             .values(

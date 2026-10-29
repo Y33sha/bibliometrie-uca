@@ -58,7 +58,7 @@ class DoiPrefixStore:
         return [row.prefix for row in result]
 
     def insert_ra(self, *, prefix: str, ra: str) -> bool:
-        """Insère un préfixe avec sa seule agence, `unknown` pour un préfixe inconnu de doi.org. Rend vrai si le préfixe est absent de la table."""
+        """Insère un préfixe avec sa seule agence, `unknown` pour un préfixe inconnu de doi.org. Renvoie vrai si le préfixe est absent de la table."""
         result = self._conn.execute(
             text(
                 "INSERT INTO doi_prefixes (prefix, ra) VALUES (:prefix, :ra) "

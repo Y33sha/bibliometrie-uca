@@ -37,7 +37,7 @@ _DELETE_SERIALS = text("DELETE FROM serials WHERE id = ANY(:ids)")
 
 
 def delete_empty_serials(conn: Connection) -> list[SerialSummary]:
-    """Supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, et les rend."""
+    """Supprime les revues sans enregistrement, sans publication, sans monographie et sans paiement APC, et les renvoie."""
     empty = [
         SerialSummary(r.id, r.title, r.publisher, tuple(r.issns))
         for r in conn.execute(_EMPTY_SERIALS).all()

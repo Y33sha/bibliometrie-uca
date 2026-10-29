@@ -1,6 +1,6 @@
 """Recherches vaines de la phase `fetch_missing` (table `failed_lookups`) : une ligne par identifiant cherché en vain dans une source, ou inconnu de doi.org (`DOI_ORG`).
 
-Un identifiant inscrit sort des sélections le temps du délai de nouvelle tentative, et définitivement s'il est absent de son registre. Un document que la source rend efface l'échec. L'appelant commite.
+Un identifiant inscrit sort des sélections le temps du délai de nouvelle tentative, et définitivement s'il est absent de son registre. Un document que la source renvoie efface l'échec. L'appelant commite.
 """
 
 from collections.abc import Sequence
@@ -43,7 +43,7 @@ _FORGET_SQL = text(
 
 
 def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str | None]) -> None:
-    """Efface les échecs inscrits dans la source pour ces DOI : DOI d'un document que la source rend, ou DOI que doi.org connaît (`DOI_ORG`).
+    """Efface les échecs inscrits dans la source pour ces DOI : DOI d'un document que la source renvoie, ou DOI que doi.org connaît (`DOI_ORG`).
 
     Les DOI passent par `clean_doi` : un document peut les donner sous toute forme.
     """
@@ -53,7 +53,7 @@ def forget_failed_doi_lookups(conn: Connection, source: str, dois: Sequence[str 
 
 
 def forget_failed_hal_id_lookup(conn: Connection, hal_id: str) -> None:
-    """Efface l'échec de la recherche d'un dépôt dans HAL, que HAL rend."""
+    """Efface l'échec de la recherche d'un dépôt dans HAL, que HAL renvoie."""
     conn.execute(_FORGET_SQL, {"source": Source.HAL.value, "id_type": "hal_id", "values": [hal_id]})
 
 

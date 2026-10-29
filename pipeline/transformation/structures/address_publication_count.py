@@ -4,7 +4,7 @@ from sqlalchemy import Connection, text
 
 
 def recompute_address_publication_count(conn: Connection) -> int:
-    """Recalcule le nombre de publications de chaque adresse, d'après les enregistrements sources de ses contributions sources. Une adresse sans publication repasse à 0. Rend le nombre d'adresses modifiées."""
+    """Recalcule le nombre de publications de chaque adresse, d'après les enregistrements sources de ses contributions sources. Une adresse sans publication repasse à 0. Renvoie le nombre d'adresses modifiées."""
     return conn.execute(
         text("""
             UPDATE addresses a

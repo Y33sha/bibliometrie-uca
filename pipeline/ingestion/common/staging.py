@@ -151,7 +151,7 @@ class StagingStore:
     ) -> UpsertOutcome | None:
         """Écrit un document de `source`, identifié par l'adaptateur de la source, et efface les recherches infructueuses que le document dément.
 
-        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Rend `None`, sans rien écrire, pour un document sans identifiant.
+        Les DOI d'un document démentent l'échec de leur recherche dans sa source, et, pour une agence d'enregistrement, auprès de doi.org. Un dépôt HAL dément l'échec de la recherche de son identifiant. `listed` : le document vient d'une réponse de liste, où la source peut plafonner les auteurs. Renvoie `None`, sans rien écrire, pour un document sans identifiant.
         """
         adapter = ADAPTERS[Source(source)]
         identity = adapter.identify(record)
@@ -180,7 +180,7 @@ class StagingStore:
     ) -> UpsertOutcome | None:
         """Réécrit un document marqué tronqué par sa version complète, sans recalculer son empreinte.
 
-        Tant que le moissonnage rend le même document tronqué, son empreinte égale celle en base, et l'écriture laisse la version complète en place. Rend `UPDATED`, ou `None` pour un document sans identifiant.
+        Tant que le moissonnage renvoie le même document tronqué, son empreinte égale celle en base, et l'écriture laisse la version complète en place. Renvoie `UPDATED`, ou `None` pour un document sans identifiant.
         """
         identity = ADAPTERS[Source(source)].identify(record)
         if identity is None:
@@ -211,7 +211,7 @@ class StagingStore:
 
         Le marqueur de troncature des auteurs suit la même règle : il se pose seulement quand l'empreinte change, et garde sinon son effacement par `fetch_truncated`. La provenance (`entry_mode`) se pose à la création seulement.
 
-        Rend `(inserted, changed)` : ligne insérée, contenu réécrit.
+        Renvoie `(inserted, changed)` : ligne insérée, contenu réécrit.
         """
         row = self._conn.execute(
             _UPSERT_STAGING_SQL,

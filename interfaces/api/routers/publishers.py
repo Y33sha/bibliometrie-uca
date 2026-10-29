@@ -53,7 +53,7 @@ def publisher_filters(
 ) -> PublisherFilters:
     """Filtres communs à la liste des éditeurs et à ses facettes.
 
-    `publisher_type` accepte plusieurs valeurs séparées par des virgules, prises dans l'énumération du domaine ; une valeur inconnue rend 422. `country` suit la même convention multi-valeurs, sur les codes du référentiel. `search` agit à partir de deux caractères.
+    `publisher_type` accepte plusieurs valeurs séparées par des virgules, prises dans l'énumération du domaine ; une valeur inconnue renvoie 422. `country` suit la même convention multi-valeurs, sur les codes du référentiel. `search` agit à partir de deux caractères.
     """
     return PublisherFilters(
         search=search,
@@ -103,7 +103,7 @@ def list_publishers(
 ) -> PublisherListResponse:
     """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
 
-    `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur rend un 422.
+    `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 

@@ -232,7 +232,7 @@ def import_persons(
     dry_run: bool = False,
     export_date: str | None = None,
 ) -> int:
-    """Insère les personnes en base, et rend le nombre d'insertions."""
+    """Insère les personnes en base, et renvoie le nombre d'insertions."""
     inserted = 0
     skipped = 0
     duplicates = 0

@@ -93,7 +93,7 @@ class Serial:
     manual_fields: frozenset[ManualField] = frozenset()
 
     def edit(self, **changes: Unpack[SerialEdit]) -> frozenset[ManualField]:
-        """Applique une saisie de l'administration. Rend les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`.
+        """Applique une saisie de l'administration. Renvoie les champs saisis à la main dont elle change la valeur ; ils rejoignent `manual_fields`.
 
         Les ISSN sont normalisés et validés (`validate_serial_issns`).
         """

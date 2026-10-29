@@ -111,7 +111,7 @@ class Structure:
         )
 
     def apply(self, **changes: Unpack[StructureEdit]) -> list[str]:
-        """Applique les champs fournis, et rend leurs noms."""
+        """Applique les champs fournis, et renvoie leurs noms."""
         if "name" in changes:
             self.name = changes["name"]
         if "structure_type" in changes:

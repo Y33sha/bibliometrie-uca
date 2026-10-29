@@ -10,9 +10,9 @@ class PublicationPerimeterRecompute(Protocol):
     """Recalcul ciblé de `publications.perimeter_evidence`."""
 
     def refresh_publications_of_person(self, person_id: int) -> int:
-        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Rend le nombre de publications changées."""
+        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Renvoie le nombre de publications changées."""
         ...
 
     def refresh_publications(self, publication_ids: list[int]) -> int:
-        """Recalcule `publications.perimeter_evidence` pour les publications données. Rend le nombre de publications changées."""
+        """Recalcule `publications.perimeter_evidence` pour les publications données. Renvoie le nombre de publications changées."""
         ...

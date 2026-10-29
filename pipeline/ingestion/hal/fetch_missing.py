@@ -114,7 +114,7 @@ async def _fetch_ids(
 ) -> PhaseMetrics:
     """Cherche chaque identifiant dans HAL et écrit les documents trouvés dans `staging`. Un identifiant introuvable est inscrit dans `failed_lookups`.
 
-    Rend les compteurs de `look_up`, avec le nombre d'identifiants introuvables (`not_found`).
+    Renvoie les compteurs de `look_up`, avec le nombre d'identifiants introuvables (`not_found`).
     """
     entry_mode = (
         StagingEntryMode.FETCH_MISSING_HAL_ID

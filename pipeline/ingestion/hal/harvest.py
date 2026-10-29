@@ -66,7 +66,7 @@ def harvest_union(
 ) -> PhaseMetrics:
     """Moissonne l'union des collections pour un périmètre temporel, page après page jusqu'à stabilisation du marqueur.
 
-    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Rend les compteurs d'écriture.
+    Chaque document est écrit une fois dans `staging` et fait avancer `progress`. Renvoie les compteurs d'écriture.
     """
     query = build_query(years=years, since=since)
     fq = build_collections_fq(list(config.all_collections))
@@ -83,7 +83,7 @@ def harvest_union(
 
         progress.advance(len(docs))
 
-        # Fin de pagination : Solr rend le marqueur reçu une fois l'union épuisée. Une page vide arrête aussi la boucle, en cas d'incohérence du serveur.
+        # Fin de pagination : Solr renvoie le marqueur reçu une fois l'union épuisée. Une page vide arrête aussi la boucle, en cas d'incohérence du serveur.
         next_cursor = as_str(data.get("nextCursorMark")) or cursor
         if next_cursor == cursor or not docs:
             break

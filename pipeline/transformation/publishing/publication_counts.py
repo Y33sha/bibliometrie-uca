@@ -37,7 +37,7 @@ def refresh_publisher_publication_count(conn: Connection, publisher_id: int) -> 
 def refresh_serial_publication_counts(conn: Connection) -> int:
     """Recalcule le `publication_count` de chaque revue.
 
-    Rend le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
+    Renvoie le nombre de lignes changées (garde `IS DISTINCT FROM` : les lignes inchangées ne comptent pas).
     """
     return conn.execute(
         text("""
@@ -58,7 +58,7 @@ def refresh_serial_publication_counts(conn: Connection) -> int:
 
 
 def refresh_publisher_publication_counts(conn: Connection) -> int:
-    """Recalcule le `publication_count` de chaque éditeur. Rend le nombre de lignes changées."""
+    """Recalcule le `publication_count` de chaque éditeur. Renvoie le nombre de lignes changées."""
     return conn.execute(
         text("""
             WITH counts AS (

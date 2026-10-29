@@ -62,7 +62,7 @@ def scanr_derived_identifier(scanr_id: str) -> SourceIdentifier | None:
 def split_scanr_concepts(domains: JsonValue) -> tuple[list[str], list[JsonValue]]:
     """Répartit les concepts ScanR (`domains`) en mots-clés libres et en sujets.
 
-    Rend d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc telles que ScanR les donne, avec leur code. Un concept d'un autre type est écarté.
+    Renvoie d'abord les libellés des concepts wikidata et des mots-clés, dédoublonnés sans tenir compte de la casse, puis les vedettes sudoc telles que ScanR les donne, avec leur code. Un concept d'un autre type est écarté.
     """
     keywords: list[str] = []
     seen: set[str] = set()

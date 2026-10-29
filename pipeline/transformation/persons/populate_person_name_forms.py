@@ -146,7 +146,7 @@ BATCH_SIZE = 5000
 
 
 def populate(conn: Connection) -> SyncCounts:
-    """Synchronise `person_name_forms` avec les formes attendues. Rend les formes insérées, modifiées et supprimées."""
+    """Synchronise `person_name_forms` avec les formes attendues. Renvoie les formes insérées, modifiées et supprimées."""
     create_temp_raw_forms_table(conn)
     batch: list[RawFormBatchItem] = []
     for r in fetch_persons_names(conn):

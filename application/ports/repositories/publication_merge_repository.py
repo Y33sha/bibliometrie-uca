@@ -22,7 +22,7 @@ class PublicationMergeRepository(Protocol):
         ...
 
     def record_manual_merge(self, source_record_ids: Sequence[int]) -> int:
-        """Enregistre la fusion manuelle des enregistrements sources donnés, par leur clé naturelle. Rend son identifiant."""
+        """Enregistre la fusion manuelle des enregistrements sources donnés, par leur clé naturelle. Renvoie son identifiant."""
         ...
 
     def attributions(self, publication_ids: Sequence[int]) -> dict[int, Attribution]:

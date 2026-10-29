@@ -94,7 +94,7 @@ SEARCHED_IDENTIFIER_STATUSES: frozenset[AttributionStatus] = frozenset(
 
 
 def source_label(source: str) -> str:
-    """Nom lisible d'une source. Une clé inconnue se rend telle quelle."""
+    """Nom lisible d'une source. Une clé inconnue est renvoyée telle quelle."""
     return SOURCE_LABELS.get(source, source)
 
 

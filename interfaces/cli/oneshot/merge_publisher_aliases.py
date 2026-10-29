@@ -94,7 +94,7 @@ def publisher_ids(conn: Connection, name: str) -> list[int]:
 
 
 def merge_aliases(conn: Connection, *, apply: bool) -> Counter[str]:
-    """Fusionne chaque autre nom dans son éditeur, commite chaque fusion si `apply`, et rend le décompte des issues."""
+    """Fusionne chaque autre nom dans son éditeur, commite chaque fusion si `apply`, et renvoie le décompte des issues."""
     outcomes: Counter[str] = Counter()
     for alias, target_name in ALIASES:
         targets, sources = publisher_ids(conn, target_name), publisher_ids(conn, alias)

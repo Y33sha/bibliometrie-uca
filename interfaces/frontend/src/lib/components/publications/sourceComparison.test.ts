@@ -187,7 +187,7 @@ describe('authorRows', () => {
 });
 
 describe('otherRoles', () => {
-	it("rend les rôles autres qu'auteur dans l'ordre d'affichage", () => {
+	it("renvoie les rôles autres qu'auteur dans l'ordre d'affichage", () => {
 		expect(otherRoles(contribution({ roles: ['contributor', 'author', 'editor'] }))).toEqual([
 			'editor',
 			'contributor',

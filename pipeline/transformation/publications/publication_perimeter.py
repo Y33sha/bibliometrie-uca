@@ -68,7 +68,7 @@ def _thesis_ppns(conn: Connection) -> list[str]:
 def refresh_publications_perimeter_evidence(
     conn: Connection, person_id: int | None = None, publication_ids: list[int] | None = None
 ) -> int:
-    """Matérialise `publications.perimeter_evidence`, pour toutes les publications, celles de la personne `person_id`, ou `publication_ids`. Rend le nombre de publications changées. Idempotent."""
+    """Matérialise `publications.perimeter_evidence`, pour toutes les publications, celles de la personne `person_id`, ou `publication_ids`. Renvoie le nombre de publications changées. Idempotent."""
     params: dict[str, object] = {"thesis_ppns": _thesis_ppns(conn)}
     if person_id is not None:
         return conn.execute(_OF_PERSON, {**params, "pid": person_id}).rowcount
@@ -86,11 +86,11 @@ class PublicationPerimeterRecompute:
         self._conn = conn
 
     def refresh_publications_of_person(self, person_id: int) -> int:
-        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Rend le nombre de publications changées."""
+        """Recalcule `publications.perimeter_evidence` pour les publications de la personne. Renvoie le nombre de publications changées."""
         return refresh_publications_perimeter_evidence(self._conn, person_id)
 
     def refresh_publications(self, publication_ids: list[int]) -> int:
-        """Recalcule `publications.perimeter_evidence` pour les publications `publication_ids`. Rend le nombre de publications changées."""
+        """Recalcule `publications.perimeter_evidence` pour les publications `publication_ids`. Renvoie le nombre de publications changées."""
         if not publication_ids:
             return 0
         return refresh_publications_perimeter_evidence(self._conn, publication_ids=publication_ids)

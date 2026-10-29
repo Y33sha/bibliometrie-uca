@@ -38,7 +38,7 @@ _CANDIDATES_SQL = text(r"""
 
 
 def delete_persons(conn: Connection, *, apply: bool) -> list[int]:
-    """Supprime les personnes candidates et rend leurs identifiants."""
+    """Supprime les personnes candidates et renvoie leurs identifiants."""
     rows = conn.execute(_CANDIDATES_SQL).all()
     for r in rows:
         log.info("%d : %s / %s", r.id, r.last_name, r.first_name)

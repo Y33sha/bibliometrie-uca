@@ -27,7 +27,7 @@ def fetch_sources_batch(
 ) -> dict[str, str | None]:
     """Type brut de chaque source d'un lot, par identifiant court.
 
-    Un lot refusé (4xx), ou qui reste sans réponse après les nouvelles tentatives, rend `{}` ; l'appelant consulte le circuit-breaker pour s'arrêter.
+    Un lot refusé (4xx), ou qui reste sans réponse après les nouvelles tentatives, renvoie `{}` ; l'appelant consulte le circuit-breaker pour s'arrêter.
     """
     full_ids = [full_openalex_id(oid) for oid in openalex_ids]
     params: dict[str, str] = {

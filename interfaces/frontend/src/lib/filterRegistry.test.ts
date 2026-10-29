@@ -222,7 +222,7 @@ describe('filterRegistry', () => {
 		expect(Object.keys(facetDefs(FILTERS))).toEqual(['years', 'types', 'labs', 'perimeter']);
 	});
 
-	it('rend les colonnes des filtres actifs proposés dans la page', () => {
+	it('renvoie les colonnes des filtres actifs proposés dans la page', () => {
 		const values = initialValues(FILTERS);
 		values.checkbox.types = ['article'];
 		values.entity.serial = ['12'];

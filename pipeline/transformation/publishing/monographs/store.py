@@ -69,7 +69,7 @@ class MonographStore:
         publisher_id: int | None,
         serial_id: int | None,
     ) -> int:
-        """Insère une monographie et rend son id."""
+        """Insère une monographie et renvoie son id."""
         return scalar_int(
             self._conn.execute(
                 _CREATE,

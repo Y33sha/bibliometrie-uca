@@ -48,7 +48,7 @@ class SubjectStore:
         label: str,
         language: str | None = None,
     ) -> int:
-        """Écrit un sujet, unique par libellé en minuscules, et rend son identifiant. Une langue déjà posée reste."""
+        """Écrit un sujet, unique par libellé en minuscules, et renvoie son identifiant. Une langue déjà posée reste."""
         label = to_plain_text(label)
         return scalar_int(
             self._conn.execute(
@@ -67,7 +67,7 @@ class SubjectStore:
         source: str,
         rows: list[PublicationSubjectLink],
     ) -> int:
-        """Insère les liens publication-sujet d'une source, sans doublon. Rend le nombre de liens insérés."""
+        """Insère les liens publication-sujet d'une source, sans doublon. Renvoie le nombre de liens insérés."""
         if not rows:
             return 0
         payload = [{"pid": link.publication_id, "sid": link.subject_id} for link in rows]
@@ -84,7 +84,7 @@ class SubjectStore:
         ).rowcount
 
     def clear_publication_subjects_for_publications(self, *, publication_ids: list[int]) -> int:
-        """Supprime les liens non rejetés de ces publications, toutes sources. Rend leur nombre."""
+        """Supprime les liens non rejetés de ces publications, toutes sources. Renvoie leur nombre."""
         if not publication_ids:
             return 0
         return self._conn.execute(
@@ -113,7 +113,7 @@ class SubjectStore:
         )
 
     def mark_all_publications_to_reingest(self) -> int:
-        """Vide `subjects_ingested_at` sur toutes les publications : elles entrent toutes dans la sélection. Rend le nombre de publications marquées."""
+        """Vide `subjects_ingested_at` sur toutes les publications : elles entrent toutes dans la sélection. Renvoie le nombre de publications marquées."""
         return self._conn.execute(
             text(
                 "UPDATE publications SET subjects_ingested_at = NULL "
@@ -144,7 +144,7 @@ class SubjectStore:
         ]
 
     def purge_orphan_subjects(self) -> int:
-        """Supprime les sujets sans lien dans `publication_subjects`, rejeté ou non. Rend leur nombre."""
+        """Supprime les sujets sans lien dans `publication_subjects`, rejeté ou non. Renvoie leur nombre."""
         return self._conn.execute(
             text(
                 "DELETE FROM subjects s WHERE NOT EXISTS "

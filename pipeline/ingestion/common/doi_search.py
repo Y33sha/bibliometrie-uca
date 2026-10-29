@@ -56,7 +56,7 @@ def get_missing_dois(
 
     Les candidats viennent de la vue `candidate_dois` : DOI des enregistrements sources, cibles des relations entre publications, DOI DataCite déduits des identifiants arXiv. Le périmètre est celui du run précédent ; les DOI des enregistrements sources nouveaux attendent le run suivant.
 
-    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source rend un même document pour chacun de ses DOI.
+    Un DOI est absent de la cible s'il manque à son `staging` et à tous les DOI de ses enregistrements sources : une source renvoie un même document pour chacun de ses DOI.
 
     Un DOI sort de la sélection pendant `retry_after_days` jours après une recherche vaine dans la cible, et définitivement s'il est inconnu de doi.org (`failed_lookups`).
 
@@ -135,7 +135,7 @@ async def fetch_missing_doi(
 
     Un DOI absent de la source est inscrit dans `failed_lookups`. Quand la source est une agence d'enregistrement, ses DOI absents passent ensuite à doi.org : un DOI inconnu de doi.org est inscrit sous `DOI_ORG`. `limit` plafonne le nombre de DOI d'une exécution.
 
-    Rend les compteurs de `look_up`, avec le nombre de DOI inconnus de doi.org (`unknown_to_doi_org`).
+    Renvoie les compteurs de `look_up`, avec le nombre de DOI inconnus de doi.org (`unknown_to_doi_org`).
     """
     source = search.source_key
     dois = get_missing_dois(conn, source, retry_after_days=retry_after_days, years=years)

@@ -1,6 +1,6 @@
 """Nouvelle lecture d'un work OpenAlex par son identifiant : tâche `fetch_stale.openalex`.
 
-`GET /works/{id}` rend le work complet, avec tous ses auteurs. Un 404 confirme l'absence : work supprimé ou fusionné dans OpenAlex.
+`GET /works/{id}` renvoie le work complet, avec tous ses auteurs. Un 404 confirme l'absence : work supprimé ou fusionné dans OpenAlex.
 """
 
 from __future__ import annotations

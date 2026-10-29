@@ -83,7 +83,7 @@ def refresh_source_contribution_structures(conn: Connection) -> None:
 def sync_perimeter_evidence(
     conn: Connection, *, perimeter_ids: list[int], source_contribution_ids: list[int] | None = None
 ) -> InPerimeterSyncCounts:
-    """Aligne les indices des contributions sources sur leur calcul, pour toutes ou pour la liste donnée. Rend le nombre d'entrées et de sorties du périmètre."""
+    """Aligne les indices des contributions sources sur leur calcul, pour toutes ou pour la liste donnée. Renvoie le nombre d'entrées et de sorties du périmètre."""
     if source_contribution_ids is None:
         row = conn.execute(_SYNC_ALL, {"perimeter_ids": perimeter_ids}).one()
     else:

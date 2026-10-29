@@ -174,7 +174,7 @@ class PublicationStore:
         doi: str | None,
         oa_status: str,
     ) -> int:
-        """Insère une publication, sans dédoublonnage, la marque pour l'alignement des auteurs et rend son `id`. Les colonnes autres que les colonnes NOT NULL et le DOI prennent leur valeur par défaut ; `save` les pose."""
+        """Insère une publication, sans dédoublonnage, la marque pour l'alignement des auteurs et renvoie son `id`. Les colonnes autres que les colonnes NOT NULL et le DOI prennent leur valeur par défaut ; `save` les pose."""
         return scalar_int(
             self._conn.execute(
                 text(f"""

@@ -28,7 +28,7 @@ _PARTNERS = text(f"""
 
 
 def resolve_thesis_partners(conn: Connection, logger: logging.Logger) -> int:
-    """Rattache chaque PPN de laboratoire partenaire aux structures que ses noms désignent. Rend le nombre de PPN rattachés à au moins une structure. L'appelant commite."""
+    """Rattache chaque PPN de laboratoire partenaire aux structures que ses noms désignent. Renvoie le nombre de PPN rattachés à au moins une structure. L'appelant commite."""
     step(logger, "Identification des laboratoires partenaires de thèse")
     matcher = StructureNameMatcher.load(conn)
     detected: dict[tuple[str, int], int] = {}

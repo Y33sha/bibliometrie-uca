@@ -38,7 +38,7 @@ _session: contextvars.ContextVar[_AuditSession | None] = contextvars.ContextVar(
 
 
 def set_current_user(user_id: str | None) -> contextvars.Token[_AuditSession | None]:
-    """Ouvre la session d'audit de la requête en cours, au nom de l'utilisatrice (aucune avec `None`), et rend le jeton qui restaure l'état précédent (`reset_current_user`)."""
+    """Ouvre la session d'audit de la requête en cours, au nom de l'utilisatrice (aucune avec `None`), et renvoie le jeton qui restaure l'état précédent (`reset_current_user`)."""
     return _session.set(_AuditSession(user_id) if user_id is not None else None)
 
 

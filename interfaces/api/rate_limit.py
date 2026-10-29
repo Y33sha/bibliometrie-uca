@@ -79,7 +79,7 @@ class FixedWindowRateLimiter:
             self._hits.popitem(last=False)
 
     def allow(self, key: str) -> bool:
-        """Enregistre une tentative pour la clé, et rend vrai si elle reste sous le plafond."""
+        """Enregistre une tentative pour la clé, et renvoie vrai si elle reste sous le plafond."""
         now = self._clock()
         counter = self._hits.get(key)
 
@@ -218,7 +218,7 @@ class ExportSlot:
 
 
 def export_slot() -> Iterator[ExportSlot]:
-    """Dépendance FastAPI : réserve un droit d'export, ou rend 503.
+    """Dépendance FastAPI : réserve un droit d'export, ou renvoie 503.
 
     Le refus signale une indisponibilité passagère, d'où un statut distinct de celui du plafond de fréquence.
 

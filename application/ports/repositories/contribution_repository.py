@@ -38,7 +38,7 @@ class ContributionRepository(Protocol):
     # ── Contributions ─────────────
 
     def mark_contributions_for_name_form(self, person_id: int, name_form: str) -> int:
-        """Marque pour la redécision de leur personne les contributions de la personne rattachées par le nom (`name`, `compatible_name`) dont une contribution source contient la forme de nom. Les contributions `manual` et celles d'un autre mode restent en l'état. Rend le nombre de contributions marquées."""
+        """Marque pour la redécision de leur personne les contributions de la personne rattachées par le nom (`name`, `compatible_name`) dont une contribution source contient la forme de nom. Les contributions `manual` et celles d'un autre mode restent en l'état. Renvoie le nombre de contributions marquées."""
         ...
 
     def find_contributions(self, contribution_ids: list[int]) -> list[ContributionRow]:
@@ -70,7 +70,7 @@ class ContributionRepository(Protocol):
         ...
 
     def detach_rejected_pair(self, publication_id: int, person_id: int) -> int:
-        """Retire la personne à sa contribution de cette publication, où elle est rejetée, et retire les épinglages des contributions sources de la publication à elle. Rend le nombre de contributions détachées."""
+        """Retire la personne à sa contribution de cette publication, où elle est rejetée, et retire les épinglages des contributions sources de la publication à elle. Renvoie le nombre de contributions détachées."""
         ...
 
     # ── Épinglage par l'administration ─────────────────────────────

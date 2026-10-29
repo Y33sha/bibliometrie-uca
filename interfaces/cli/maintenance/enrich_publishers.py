@@ -74,7 +74,7 @@ def fetch_publishers_batch(
 ) -> dict[str, str | None]:
     """Interroge OpenAlex Publishers pour un lot d'identifiants (filtre à `|`, 50 au plus).
 
-    Rend `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les nouvelles tentatives ; la boucle consulte l'état du circuit-breaker.
+    Renvoie `{}` si OpenAlex refuse le lot (4xx) ou reste indisponible après les nouvelles tentatives ; la boucle consulte l'état du circuit-breaker.
     """
     params: dict[str, str] = {
         "filter": f"ids.openalex:{'|'.join(full_openalex_id(oid) for oid in openalex_ids)}",

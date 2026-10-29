@@ -71,7 +71,7 @@ _REHYDRATE_UPSERT_SQL = text(
 def rehydrate_staging_row(
     conn: Connection, source: str, source_id: str, raw_data: Mapping[str, JsonValue]
 ) -> bool:
-    """Remet un payload archivé dans une ligne `staging` existante, prête à normaliser : `raw_data`, `raw_hash` (`change_detection_hash`) et état à traiter. Rend faux si la ligne est absente (clé orpheline du raw store)."""
+    """Remet un payload archivé dans une ligne `staging` existante, prête à normaliser : `raw_data`, `raw_hash` (`change_detection_hash`) et état à traiter. Renvoie faux si la ligne est absente (clé orpheline du raw store)."""
     return (
         conn.execute(
             _REHYDRATE_UPDATE_SQL,
@@ -95,7 +95,7 @@ def rehydrate_or_create_staging_row(
 ) -> bool:
     """Réhydrate une ligne `staging`, en la créant si elle manque (après un `TRUNCATE staging`, où tout est orphelin).
 
-    Réinsère les clés orphelines et écrase les lignes existantes. Le DOI se pose seulement à l'insertion : une ligne existante garde le sien. Rend vrai pour une ligne insérée, faux pour une ligne mise à jour.
+    Réinsère les clés orphelines et écrase les lignes existantes. Le DOI se pose seulement à l'insertion : une ligne existante garde le sien. Renvoie vrai pour une ligne insérée, faux pour une ligne mise à jour.
     """
     return bool(
         conn.execute(

@@ -224,7 +224,7 @@ PERSON_DUP_QUERIES = [
 ]
 
 
-# Recouvrements de réseau entre deux personnes : chaque dimension rend (person_id, valeur) au grain des contributions. Des réseaux disjoints signalent un homonyme, des réseaux communs un doublon. Les sujets sont écartés : un même domaine ne fait pas une même personne.
+# Recouvrements de réseau entre deux personnes : chaque dimension renvoie (person_id, valeur) au grain des contributions. Des réseaux disjoints signalent un homonyme, des réseaux communs un doublon. Les sujets sont écartés : un même domaine ne fait pas une même personne.
 _OVERLAP_DIMENSIONS: dict[str, str] = {
     "coauthors": """
         SELECT a1.person_id AS person, a2.person_id AS val
