@@ -1,8 +1,8 @@
-"""Client api.datacite.org/prefixes : provider + client (repository) d'un préfixe DOI.
+"""Client DataCite des préfixes DOI : provider et client (repository) d'un préfixe.
 
-`GET /prefixes/<prefix>?include=clients,providers` (réponse JSON:API) renvoie le provider DataCite (organisation-mère, occupe le slot `publisher_*`) et le client (repository : Zenodo, NAKALA, INRAE, …). Interrogé par le volet publisher de `publishing` quand la RA du préfixe est `'DataCite'`.
+`GET /prefixes/<prefix>?include=clients,providers` donne le provider DataCite, organisation mère tenue pour l'éditeur, et le client : un entrepôt comme Zenodo, NAKALA ou INRAE. La phase `publishing` l'interroge pour un préfixe dont l'agence est DataCite.
 
-Hiérarchie DataCite : `provider → client → prefix → DOI`. Un préfixe est alloué à un seul client. Le `client_symbol` (ex. `cern.zenodo`, `inist.inra`) est l'identifiant stable assigné par DataCite, distinct du nom et persistant au-delà des renommages.
+DataCite hiérarchise `provider → client → préfixe → DOI` ; un préfixe appartient à un seul client. Le symbole du client (`cern.zenodo`, `inist.inra`) est son identifiant stable, distinct du nom, qui survit aux renommages.
 """
 
 from __future__ import annotations
@@ -20,9 +20,9 @@ from pipeline.ingestion.datacite.api import fetch_prefix
 async def fetch_datacite_prefix(
     client: httpx2.AsyncClient, prefix: str
 ) -> LookupOutcome[tuple[str, str, str]]:
-    """Interroge `api.datacite.org/prefixes/<prefix>` pour récupérer provider + client.
+    """Nom du provider, nom et symbole du client d'un préfixe.
 
-    Renvoie `(provider_name, client_name, client_symbol)`. `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite (404 ou 400), ou une réponse sans provider ni client.
+    `NOT_FOUND` couvre un préfixe malformé, inconnu de DataCite (404 ou 400), ou une réponse à laquelle manque le provider ou le client.
     """
     parsed = DoiPrefix.try_parse(prefix)
     cleaned = str(parsed) if parsed else None
@@ -36,10 +36,7 @@ async def fetch_datacite_prefix(
 
 
 def _parse_datacite_prefix_payload(data: JsonValue) -> tuple[str, str, str] | None:
-    """Extrait `(provider_name, client_name, client_symbol)` du payload JSON:API.
-
-    Isolé pour la testabilité : pas de réseau, juste du parsing défensif.
-    """
+    """Nom du provider, nom et symbole du client, lus dans la réponse JSON:API ; `None` s'il en manque un."""
     if not isinstance(data, dict):
         return None
     relationships = at_path(data, "data", "relationships")

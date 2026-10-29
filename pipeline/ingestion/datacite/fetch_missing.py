@@ -1,12 +1,8 @@
 """Recherche par DOI dans DataCite : tâche `fetch_missing.doi.datacite`.
 
-DataCite est ingérée DOI-driven : pour les DOI présents dans une autre source mais absents du staging DataCite, on interroge l'endpoint `GET /dois` en **batch** via `query=doi:"a" OR doi:"b" …` (réponse JSON:API, liste de tâches `data`) et on insère chaque nœud (id + `attributes` + `relationships`) dans `staging` avec `source='datacite'`.
+Les DOI vus dans une autre source et absents de DataCite s'interrogent par lots : `GET /dois?query=doi:"a" OR doi:"b" …`. Chaque ressource JSON:API reçue s'écrit dans `staging`. Au-delà d'une dizaine de clauses `OR`, la latence de DataCite s'envole (0,3 s à 10 DOI, 2,6 s à 20) : un lot compte 10 DOI, et le débit plafonne alors le coût.
 
-Batch de `batch_size` DOI par requête : la latence DataCite a une falaise nette au-delà d'une dizaine de clauses `OR` (mesuré : ~0,3 s à 10 DOI, ~2,6 s à 20), on reste à 10 — coût par DOI minimal, et c'est alors le rate-limit qui borne. Les DOI absents de la réponse d'un batch sont les introuvables (cf. ci-dessous).
-
-Le pool de DOI candidats est filtré en amont par `get_missing_dois` : seuls les DOI dont le préfixe résout à la RA `DataCite` (ou pas encore résolu) sont soumis, ce qui évite les 404 systématiques sur les DOI Crossref.
-
-Un DOI absent de la réponse du batch est inscrit dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org.
+`get_missing_dois` soumet seulement les DOI dont le préfixe relève de DataCite. Un DOI absent de la réponse de son lot est inscrit dans `failed_lookups`, et `fetch_missing_doi` le soumet à doi.org.
 """
 
 from __future__ import annotations
@@ -36,7 +32,7 @@ class DataciteDoiSearch:
         records = await search_dois(client, dois)
         if isinstance(records, NotFound | Unavailable):
             return UNAVAILABLE
-        # Les nœuds reçus se rapportent aux DOI demandés par comparaison stricte (lowercase), sans se fier à l'ordre ni au volume. DOI demandés non retournés = confirmés absents de DataCite.
+        # Les ressources reçues se rattachent aux DOI demandés par comparaison exacte en minuscules, quels que soient leur ordre et leur nombre. Un DOI demandé sans ressource est absent de DataCite.
         found: dict[str, Mapping[str, JsonValue]] = {}
         for record in records:
             if doi := record_doi(record):

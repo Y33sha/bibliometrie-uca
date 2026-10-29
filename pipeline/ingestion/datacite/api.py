@@ -34,7 +34,7 @@ def headers() -> dict[str, str]:
 
 @dataclass(frozen=True)
 class DatacitePage:
-    """Une page de résultats : ses nœuds, et l'URL de la page suivante (`None` en fin de résultats)."""
+    """Une page de résultats : ses ressources, et l'URL de la page suivante (`None` en fin de résultats)."""
 
     records: list[Mapping[str, JsonValue]]
     next_url: str | None

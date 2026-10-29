@@ -50,7 +50,7 @@ def harvest_year(
     progress: Progress,
     metrics: PhaseMetrics,
 ) -> None:
-    """Moissonne les DOI d'une année, page après page, et les compte dans `metrics`. Un nœud sans DOI est ignoré."""
+    """Moissonne les DOI d'une année, page après page, et les compte dans `metrics`. Une ressource sans DOI est ignorée."""
     next_url: str | None = None
     query = build_query(year, keywords)
     while True:
