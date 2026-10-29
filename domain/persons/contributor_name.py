@@ -19,17 +19,14 @@ _PLACEHOLDER_RE = re.compile(
 
 
 def is_placeholder_name(name: str) -> bool:
-    """Le nom est fait seulement de mots qui tiennent lieu de nom absent (« (:Unap) », « None, None »). Un nom réel qui contient l'un de ces mots (« Paolo None ») n'en est pas un."""
+    """Vrai si le nom se compose seulement de mots écrits à la place d'un nom absent (« (:Unap) », « None, None »). « Paolo None » est un nom réel."""
     words = [w for w in re.split(r"[\s,]+", name) if w]
     return bool(words) and all(_PLACEHOLDER_RE.fullmatch(w) for w in words)
 
 
 @dataclass(frozen=True, slots=True)
 class ContributorName:
-    """Nom d'auteur d'une contribution source (VO) : nom et prénom séparés, ou chaîne brute.
-
-    La forme suit la source : Crossref, DataCite, WoS, HAL et theses.fr séparent nom et prénom, OpenAlex et ScanR donnent une chaîne. Les fabriques `from_parts` et `from_raw` nettoient les valeurs (`clean_raw_author_name`).
-    """
+    """Nom d'auteur d'une contribution source : nom et prénom séparés, ou chaîne brute, selon la source. `from_parts` et `from_raw` nettoient les valeurs."""
 
     last_name: str | None = None
     first_name: str | None = None
@@ -43,7 +40,7 @@ class ContributorName:
 
     @property
     def split_by_source(self) -> bool:
-        """Vrai quand la source sépare nom et prénom, faux pour une chaîne brute découpée par le parseur."""
+        """Vrai si la source sépare nom et prénom."""
         return self.raw is None
 
     @classmethod
@@ -67,19 +64,19 @@ class ContributorName:
     def from_columns(
         cls, raw: str | None, last_name: str | None, first_name: str | None
     ) -> ContributorName:
-        """Nom stocké d'une contribution source (`raw_author_name`, `raw_last_name`, `raw_first_name`), déjà nettoyé."""
+        """Nom lu en base, déjà nettoyé."""
         if last_name is not None:
             return cls(last_name=last_name, first_name=first_name)
         return cls(raw=raw)
 
     def split(self) -> tuple[str, str]:
-        """(nom de famille, prénom) : ceux de la source, sinon le découpage de `parse_raw_author_name`. Un nom de la source réduit à des initiales passe en prénom (`orient_initials`)."""
+        """Nom de famille et prénom : ceux de la source, sinon un découpage de la chaîne brute. Un nom de famille réduit à des initiales passe en prénom."""
         if self.last_name is not None:
             return orient_initials(self.last_name, self.first_name or "")
         return parse_raw_author_name(self.raw)
 
     def splits(self) -> list[tuple[str, str]]:
-        """Découpages (nom de famille, prénom) possibles : celui de la source, sinon ceux de `family_name_splits`."""
+        """Découpages possibles en nom de famille et prénom : celui de la source, sinon tous ceux de la chaîne brute."""
         if self.last_name is not None:
             return [self.split()]
         return family_name_splits(self.raw)
@@ -93,7 +90,7 @@ class ContributorName:
         return None
 
     def normalized(self) -> tuple[str, str | None]:
-        """(nom de famille, prénom) normalisés, initiales du prénom séparées (`normalize_first_name`). Prénom `None` quand il est vide."""
+        """Nom de famille et prénom sous leur forme de comparaison, initiales du prénom séparées. Prénom `None` s'il est vide."""
         last, first = self.split()
         return normalize_text(last), normalize_first_name(first) or None
 
