@@ -194,7 +194,7 @@ def _normalize_hal_person_id(raw: str | None) -> str | None:
 class HalPersonId(NormalizedIdentifier):
     """Identifiant d'un compte HAL (`personId`), entier positif."""
 
-    label = "hal_person_id"
+    label = "Compte HAL"
     normalize = staticmethod(_normalize_hal_person_id)
 
 

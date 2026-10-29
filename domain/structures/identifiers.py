@@ -47,7 +47,7 @@ class RorId(NormalizedIdentifier):
     Format ROR : `0` + 8 caractères de l'alphabet ROR (chiffres + lettres sans i/l/o/u). Stocké et comparé en forme courte ; l'URL complète `https://ror.org/<id>` est une décoration d'affichage uniquement.
     """
 
-    label = "RorId"
+    label = "ROR"
     normalize = staticmethod(normalize_ror_id)
 
 
@@ -84,5 +84,5 @@ class HalCollection(NormalizedIdentifier):
     Normalisé en majuscules. Le format admis est `[A-Z0-9][A-Z0-9_-]*` — observation empirique sur le corpus, pas de spec HAL formelle.
     """
 
-    label = "HalCollection"
+    label = "Collection HAL"
     normalize = staticmethod(normalize_hal_collection)
