@@ -31,7 +31,7 @@ def scalar_int(result: ScalarResult) -> int:
 
 
 def scalar_datetime_or_none(result: ScalarResult) -> datetime | None:
-    """L'instant unique du relevé, ou `None` — le cas d'un agrégat sur un ensemble vide."""
+    """L'instant unique du relevé, ou `None` : le cas d'un agrégat sur un ensemble vide."""
     value = result.scalar_one()
     if value is None or isinstance(value, datetime):
         return value

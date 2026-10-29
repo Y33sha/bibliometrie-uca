@@ -12,13 +12,9 @@ def savepoint(
     *,
     on_rollback_failure: Callable[[], None] | None = None,
 ) -> Iterator[None]:
-    """Context manager autour d'un SAVEPOINT SQLAlchemy (`Connection.begin_nested()`).
+    """Encadre un traitement dans un SAVEPOINT (`Connection.begin_nested()`).
 
-    Si le rollback du SAVEPOINT échoue (transaction cassée), `on_rollback_failure` est appelé (typiquement `conn.rollback`) pour permettre au caller de récupérer un état utilisable. L'exception originale est re-raise, même si ce second rollback échoue aussi (connexion perdue).
-
-    Usage :
-        with savepoint(conn):
-            do_work(conn)
+    Si l'annulation du SAVEPOINT échoue (transaction cassée), `on_rollback_failure`, en général `conn.rollback`, rend la connexion utilisable. L'exception d'origine remonte, même si cette seconde annulation échoue aussi (connexion perdue).
     """
     source_record: NestedTransaction = conn.begin_nested()
     try:

@@ -1,10 +1,8 @@
 """Garde-fou d'exécution : aucune connexion en écriture pendant une requête de lecture.
 
-Une requête de lecture ouvre ses connexions par la composition root de l'API, qui les met en lecture seule. Une connexion ouverte par un autre chemin — en remontant à l'engine depuis une connexion déjà reçue, le seul que ni le contrat d'architecture ni l'analyse statique ne savent fermer — porterait le droit d'écrire. Ce garde-fou l'attrape au premier statement qu'elle exécute.
+Une requête de lecture ouvre ses connexions par la composition root de l'API, qui les met en lecture seule. Une connexion ouverte par un autre chemin, en remontant à l'engine depuis une connexion reçue, pourrait écrire : le garde-fou l'arrête à sa première instruction. Ni le contrat d'architecture ni l'analyse statique ne ferment ce chemin.
 
-Le contrôle se fait à l'exécution plutôt qu'à la lecture du code : il porte sur la propriété qui compte — aucune connexion en écriture pendant une lecture — au lieu des formes d'écriture par lesquelles on l'enfreindrait.
-
-Un middleware de l'API déclare la requête de lecture par `read_request()`. Hors de cette déclaration, le garde-fou est muet : le pipeline et les scripts en ligne de commande écrivent, c'est leur métier.
+Un middleware de l'API déclare la requête de lecture par `read_request()`. Hors de cette déclaration, le garde-fou reste muet : le pipeline et les scripts en ligne de commande écrivent.
 """
 
 from collections.abc import Iterator

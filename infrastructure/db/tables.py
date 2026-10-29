@@ -1,12 +1,10 @@
-"""Modèle SQLAlchemy des tables Postgres — surface de query-building.
+"""Modèle SQLAlchemy des tables PostgreSQL : tables, colonnes, contraintes uniques, CHECK et commentaires.
 
-Décrit tables, colonnes, contraintes uniques, CHECK et comments, pour deux usages :
-- le query-building côté SQLAlchemy Core (`select(config.c.key)…`),
-- servir de référence à `alembic revision --autogenerate` (comparaison MetaData ↔ DB).
+Il sert à composer les requêtes de SQLAlchemy Core (`select(config.c.key)…`), et de référence à `alembic revision --autogenerate`.
 
-Ce modèle n'est pas la source de vérité du schéma : les migrations Alembic (`alembic/versions/`, écrites à la main) font foi, et `infrastructure/db/schema.sql` en est un snapshot descriptif régénéré par `python -m interfaces.cli.dev.dump_schema`. Le fichier est maintenu à la main en miroir de la base ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, tient l'accord entre les deux.
+Les migrations Alembic (`alembic/versions/`, écrites à la main) font foi sur le schéma ; `infrastructure/db/schema.sql` en est un instantané, régénéré par `python -m interfaces.cli.dev.dump_schema`. Ce fichier suit la base à la main ; `alembic check`, joué par `tests/integration/infrastructure/db/test_sqlalchemy_smoke.py` sur une base montée par les migrations, contrôle l'accord.
 
-Le périmètre du metadata s'arrête aux tables et à leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) appartiennent aux seules migrations ; le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison.
+Le modèle couvre les tables et leurs colonnes. Index, clés étrangères et vues matérialisées (`contribution_structures`, `publication_author_alignment`, `publication_rors`, `publication_structures`, `source_contribution_structures`, `subject_cooccurrences`) relèvent des seules migrations : le filtre `include_object` d'`alembic/env.py` les écarte de la comparaison. Le code lit les vues matérialisées en SQL par leur nom, et les rafraîchit (`REFRESH`).
 """
 
 from sqlalchemy import (
@@ -252,9 +250,7 @@ perimeters = Table(
 )
 
 
-# Clôture transitive (est_tutelle_de) du périmètre, matérialisée et maintenue
-# par `refresh_perimeter_structures`. FK CASCADE des deux côtés (déclarées en
-# migration, omises ici comme pour les autres tables de jointure).
+# Structures de chaque périmètre : ses racines et toutes les structures dont elles sont tutelles, recalculées par `refresh_perimeter_structures`.
 perimeter_structures = Table(
     "perimeter_structures",
     metadata,
@@ -269,10 +265,8 @@ perimeter_structures = Table(
 )
 
 
-# Les enums Postgres déclarent leur type côté SA pour que les binds produisent un cast typé — un
-# paramètre VARCHAR ne rejoint pas une enum — et pour que la lecture reconnaisse la valeur reçue.
-# Leur vocabulaire vient du domaine, qui le déclare ; `create_type=False` laisse les migrations
-# créer le type. `TestPgEnumsMatchDb` vérifie l'accord des trois.
+# Les enums PostgreSQL déclarent leur type côté SQLAlchemy : un paramètre lié prend le type de l'enum (un paramètre VARCHAR échoue), et la lecture reconnaît la valeur.
+# Le domaine déclare le vocabulaire ; `create_type=False` laisse les migrations créer le type. `TestPgEnumsMatchDb` vérifie l'accord des trois.
 structure_type_enum = PgEnum(
     *(t.value for t in StructureType),
     name="structure_type",
@@ -341,8 +335,7 @@ structure_name_forms = Table(
     Column("requires_context_of", ARRAY(Integer)),
     Column("is_excluding", Boolean, nullable=False, server_default="false"),
     UniqueConstraint("structure_id", "form_text", name="uq_snf_structure_form"),
-    # Une forme courte ne s'apparie qu'aux frontières de mot : sans cela, un acronyme de
-    # quelques lettres se retrouverait au milieu de n'importe quel mot d'une adresse.
+    # Une forme courte s'apparie seulement aux frontières de mot : un acronyme de quelques lettres se trouverait sinon au milieu de n'importe quel mot d'une adresse.
     CheckConstraint(
         "char_length(form_text) > 6 OR is_word_boundary",
         name="ck_structure_name_forms_short_word_boundary",
@@ -457,11 +450,9 @@ serials = Table(
     Column("is_academic", Boolean, server_default="true"),
     Column("doaj_payload", Jsonb),
     Column("doaj_imported_at", DateTime(timezone=True)),
-    # Compte matérialisé des publications in-perimeter de la revue. Maintenu par le
-    # pipeline (après le rollup in_perimeter) + aux fusions admin. Évite de re-scanner
-    # publications pour le filtre `with_publications` / le tri / l'affichage.
+    # Nombre de publications du périmètre de la revue, que le pipeline et les fusions de l'administration tiennent à jour. Filtres, tris et affichage se passent ainsi de parcourir les publications.
     Column("publication_count", Integer, nullable=False, server_default="0"),
-    # Champs saisis à la main (`domain.serials.journal.ManualField`) : le pipeline ne les écrit pas.
+    # Champs saisis à la main (`domain.serials.serial.ManualField`) : le pipeline les laisse en l'état.
     Column("manual_fields", ARRAY(Text), nullable=False, server_default="{}"),
     UniqueConstraint("openalex_id", name="serials_openalex_id_key"),
     schema="publishing",
@@ -593,8 +584,7 @@ publishers = Table(
         nullable=False,
         server_default="unknown",
     ),
-    # Compte matérialisé des publications in-perimeter de l'éditeur (= somme de ses
-    # revues). Maintenu par le pipeline + aux fusions admin. Cf. `serials.publication_count`.
+    # Nombre de publications du périmètre de l'éditeur, somme de celles de ses revues, que le pipeline et les fusions de l'administration tiennent à jour (comme `serials.publication_count`).
     Column("publication_count", Integer, nullable=False, server_default="0"),
     UniqueConstraint("openalex_id", name="publishers_openalex_id_key"),
     schema="publishing",
@@ -641,8 +631,7 @@ identifier_status_enum = PgEnum(
     create_type=False,
 )
 
-# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les contributions sources. Le
-# vocabulaire vit ici, le domaine ne le déclarant pas.
+# Provenance d'un identifiant : posé par une utilisatrice, ou promu depuis les contributions sources. Le vocabulaire est déclaré ici : le domaine en est dépourvu.
 identifier_origin_enum = PgEnum(
     "manual",
     "auto",
@@ -677,8 +666,6 @@ addresses = Table(
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("publication_count", Integer, server_default="0"),
     Column("countries", ARRAY(CHAR(2))),
-    # Index UNIQUE sur expression md5(normalized_text) — complété à la main, hors
-    # de portée de --autogenerate qui ne sait pas représenter l'expression.
     schema="structures",
 )
 
@@ -706,12 +693,10 @@ place_name_forms = Table(
     "place_name_forms",
     metadata,
     Column("id", Integer, primary_key=True),
-    # `iso_code` en minuscule (cf. countries.code / addresses.countries).
+    # `iso_code` en minuscules (comme countries.code et addresses.countries).
     Column("iso_code", CHAR(2), nullable=False),
     Column("form_normalized", Text, nullable=False),
-    # `country` (noms de pays, détectés en fin d'adresse) | `institution` /
-    # `city` (lieux détectés n'importe où, via la passe place). Défaut `country` :
-    # cas d'usage principal (résolution d'un nom de pays vers son code ISO).
+    # `country` : nom de pays, détecté en fin d'adresse ; `institution`, `city` : lieu détecté n'importe où. Le défaut est le cas principal, `country`.
     Column("kind", Text, nullable=False, server_default=PlaceNameKind.COUNTRY.value),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     UniqueConstraint("form_normalized", name="place_name_forms_form_normalized_key"),
@@ -757,16 +742,8 @@ idref_structures = Table(
 # ── Contributions et contributions sources alignées ──────────────────────────
 
 
-# `contribution_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) relie une contribution
-# rattachée à une personne non exclue aux structures de ses contributions sources.
-# Pas modélisée dans le metadata SQLAlchemy — tous les accès se font en SQL brut par nom
-# (lectures) ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
-# en table.
-#
-# `publication_structures` (MATERIALIZED VIEW, migration 3c8e1f5a9d27) : lien
-# publication↔structure dédoublonné, dérivé des contributions × `contribution_structures`.
-# Sert la facette labos (COUNT par structure sans DISTINCT). Même statut (SQL brut
-# + REFRESH dans le pipeline, après `contribution_structures`).
+# `contribution_structures` (vue matérialisée) relie une contribution rattachée à une personne non exclue aux structures de ses contributions sources.
+# `publication_structures` (vue matérialisée) : liens sans doublon entre publication et structure, dérivés des contributions et de `contribution_structures`. Elle sert la facette des laboratoires (COUNT par structure sans DISTINCT) ; le pipeline la rafraîchit après `contribution_structures`.
 
 
 rejected_contributions = Table(
@@ -849,15 +826,11 @@ aligned_source_contributions = Table(
     schema="publications",
 )
 
-# `publication_author_alignment` (MATERIALIZED VIEW, migration 5c1d8e3a7f20) : recouvrement des
-# listes d'auteurs de chaque publication à plusieurs enregistrements sources, dérivé des contributions.
-# Sert la file des fusions suspectes. SQL brut + REFRESH en fin de phase `author_grouping`.
+# `publication_author_alignment` (vue matérialisée) : recouvrement des listes d'auteurs de chaque publication à plusieurs enregistrements sources, dérivé des contributions. Elle sert la file des fusions suspectes ; la tâche `author_grouping` la rafraîchit.
 
 
-# Informations du contributeur dédupliquées : la clé (nom et prénom normalisés,
-# identifiants) est extraite des contributions sources (une ligne
-# pour ~35 contributions sources). L'unique est `NULLS NOT DISTINCT` : les lignes sans
-# identifiant collapsent sur leur seul nom, sans recourir à un sentinel `'{}'`.
+# Informations du contributeur sans doublon : la clé (nom et prénom normalisés, identifiants) vient des contributions sources, une ligne pour 35 contributions sources environ.
+# L'unicité est `NULLS NOT DISTINCT` : les lignes sans identifiant se confondent sur leur nom, sans valeur sentinelle `'{}'`.
 contributor_information = Table(
     "contributor_information",
     metadata,
@@ -876,11 +849,8 @@ contributor_information = Table(
             persisted=True,
         ),
     ),
-    # Hash de la clé des informations du contributeur, chemin de lookup indexé et NULL-safe (un `=` ne
-    # matche pas les NULL, un `IS NOT DISTINCT FROM` n'est pas indexable). Les
-    # sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont impossibles dans un
-    # nom normalisé ou un jsonb::text. Respecte le NULLS NOT DISTINCT de l'unique.
-    # Aligné sur `key_hash_sql` (pipeline/ingestion/common/source_contribution_store.py).
+    # Empreinte de la clé des informations du contributeur : la recherche passe par son index et traite NULL comme une valeur (un `=` écarte les NULL, un `IS NOT DISTINCT FROM` se passe d'index).
+    # Les sentinelles E'\x01' (NULL) et E'\x1f' (séparateur) sont absentes des noms normalisés et du texte JSON. Alignée sur `key_hash_sql` (`pipeline/ingestion/common/source_contribution_store.py`).
     Column(
         "key_hash",
         Text,
@@ -902,8 +872,7 @@ contributor_information = Table(
 )
 
 
-# Arbitrages admin au grain de la contribution source : la paire (contribution source, personne) que la
-# phase `persons` relit comme entrée fixe, sans jamais la re-dériver.
+# Arbitrages de l'administration au grain de la contribution source : la paire (contribution source, personne), que la phase `persons` lit comme une donnée fixe.
 confirmed_source_contributions = Table(
     "confirmed_source_contributions",
     metadata,
@@ -964,15 +933,11 @@ source_contributions = Table(
     ),
     Column("is_corresponding", Boolean, server_default="false"),
     Column("roles", ARRAY(Text), server_default="{author}"),
-    # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute
-    # (contrainte `source_contributions_name_form`).
+    # Nom tel que la source le donne : nom et prénom séparés, ou chaîne brute (contrainte `source_contributions_name_form`).
     Column("raw_author_name", Text),
     Column("raw_last_name", Text),
     Column("raw_first_name", Text),
-    # FK vers `contributor_information` (informations dédupliquées : nom normalisé +
-    # identifiants observés de la contribution source). La contrainte FK n'est pas
-    # modélisée ici (pattern du projet : les FK vivent en DB, pas dans la
-    # MetaData).
+    # Informations du contributeur de la contribution source. La clé étrangère vit en base, comme les autres.
     Column("contributor_information_id", Integer, nullable=False),
     Column(
         "neutralized_identifiers",
@@ -1001,10 +966,6 @@ source_contributions = Table(
         deferrable=True,
         initially="IMMEDIATE",
     ),
-    # Index couvrant : `person_id` en tête sert les recherches par personne ;
-    # `contributor_information_id` en colonne incluse permet l'index-only scan de la projection
-    # `(person_id, identifiants)` de la file « conflits d'identifiant » (admin),
-    # qui rejoint `contributor_information` sur `contributor_information_id`.
     schema="sources",
     # Place gardée dans chaque page pour les mises à jour HOT de `countries`, `perimeter_evidence` et `neutralized_identifiers`.
     postgresql_with={"fillfactor": 90},
@@ -1061,12 +1022,7 @@ source_contribution_rors = Table(
 )
 
 
-# `source_contribution_structures` est une MATERIALIZED VIEW (DDL via migration
-# e8f1a3c5d7b9), pas une table : dérivée de `source_contribution_addresses ⋈
-# address_structures ⋈ perimeter_structures` (périmètre d'affiliation). Non
-# modélisée dans le metadata SQLAlchemy — accès en SQL brut par nom (lectures)
-# ou via REFRESH — pour éviter qu'`alembic --autogenerate` tente de la recréer
-# en table.
+# `source_contribution_structures` (vue matérialisée) : liens des contributions sources aux structures du périmètre, dérivés de `source_contribution_addresses`, `address_structures` et `perimeter_structures`.
 
 
 # ── Personnes ─────────────────────────────────────────────────────
@@ -1126,8 +1082,7 @@ person_identifiers = Table(
 )
 
 
-# Formes de nom désignant une personne. `name_form` est une chaîne « prénom nom »
-# normalisée, au format de `contributor_information.author_name_normalized`.
+# Formes de nom d'une personne. `name_form` est une chaîne « prénom nom » normalisée, au format de `contributor_information.author_name_normalized`.
 person_name_forms = Table(
     "person_name_forms",
     metadata,
@@ -1189,9 +1144,7 @@ publications = Table(
         server_default=text("'{}'::jsonb"),
     ),
     Column("is_retracted", Boolean, nullable=False, server_default="false"),
-    # abstract / keywords / topics / biblio sont dans `publications_detail` (1:1) :
-    # colonnes grasses lues uniquement par la page détail, sorties pour garder
-    # `publications` étroite (scans listes/facettes).
+    # Résumé, mots-clés, topics et numérotation sont dans `publications_detail` (1:1), que lit seulement la page de détail : `publications` reste étroite pour les listes et les facettes.
     # Indices des contributions de personnes non exclues, maintenus par la phase `finalize` et à l'exclusion d'une personne. `in_perimeter` en découle ; le filtre de périmètre des listes le lit.
     Column(
         "perimeter_evidence",
@@ -1205,18 +1158,8 @@ publications = Table(
         Computed("cardinality(perimeter_evidence) > 0", persisted=True),
         nullable=False,
     ),
-    # Date de la dernière ingestion des sujets (NULL = à ingérer), posée par la phase
-    # `subjects`, que la publication ait des sujets ou non. L'enregistrement d'une
-    # publication recalculée depuis ses sources la remet à NULL.
+    # Date de la dernière ingestion des sujets, posée par la phase `subjects`, que la publication ait des sujets ou non ; NULL : à ingérer. Le recalcul d'une publication depuis ses sources la remet à NULL.
     Column("subjects_ingested_at", DateTime(timezone=True)),
-    # Listes scopées au périmètre : tri par défaut (publication_year DESC) et sous-requêtes
-    # publication_count par éditeur/revue (jointure via serial_id), restreints au périmètre.
-    # Index UNIQUE sur expression lower(doi) — complété à la main. L'unicité
-    # « 1 DOI = 1 publication » est garantie par la DB : la réconciliation des
-    # composantes ne produit jamais deux publications au même DOI (assignation à
-    # l'unique publication ancre de la partition `(composante ∩ DOI)`). Partiel : les
-    # publications sans DOI (NULL) ne sont pas contraintes.
-    # Fetch incrémental oa_status : jamais vérifiés (NULL) d'abord, puis les plus périmés.
     CheckConstraint(
         "jsonb_typeof(corrections) = 'object'",
         name="publications_corrections_is_object",
@@ -1225,9 +1168,7 @@ publications = Table(
 )
 
 
-# Colonnes grasses detail-only sorties de `publications` (1:1, FK ON DELETE CASCADE
-# côté schéma — voir migration). Lues par la page détail et `find_by_id`, écrites
-# par `PublicationStore.save` (upsert).
+# Colonnes lourdes de la page de détail, sorties de `publications` (1:1, ON DELETE CASCADE en base). La page de détail et `find_by_id` les lisent, `PublicationStore.save` les écrit.
 publications_detail = Table(
     "publications_detail",
     metadata,
@@ -1488,10 +1429,8 @@ distinct_persons = Table(
 )
 
 
-# Relevés de paiements de frais de publication (Article Processing Charges) :
-# une ligne par paiement, importés depuis des exports comptables (colonnes à
-# plat ; `source_file` trace le fichier d'origine). `publication_id`,
-# `serial_id`, `publisher_id` et `*_structure_id` sont rapprochés après import.
+# Paiements de frais de publication (Article Processing Charges), une ligne par paiement, importés d'exports comptables à plat ; `source_file` garde le fichier d'origine.
+# Publication, revue, éditeur et structures se rattachent après l'import.
 apc_payments = Table(
     "apc_payments",
     metadata,
@@ -1527,7 +1466,6 @@ apc_payments = Table(
     UniqueConstraint(
         "doi", "institution", "amount_eur_ht", "open_access_fee", name="apc_payments_payment_key"
     ),
-    # Index sur expression lower(doi) — complété à la main.
     schema="publishing",
 )
 
@@ -1594,8 +1532,7 @@ staging = Table(
     ),
     Column("last_seen_at", DateTime(timezone=True), server_default=func.now()),
     Column("disappeared_at", DateTime(timezone=True)),
-    # OpenAlex : payload bulk plafonné à 100 auteurs → work probablement tronqué.
-    # Posé à l'extraction, consommé puis effacé par `fetch_truncated`.
+    # OpenAlex : une réponse de liste plafonne les auteurs à 100, le work est peut-être tronqué. Posé au moissonnage, effacé par `fetch_truncated`.
     Column("authors_truncated", Boolean, nullable=False, server_default="false"),
     # Provenance d'entrée : vocabulaire `StagingEntryMode`.
     Column("entry_mode", Text, nullable=False, server_default=StagingEntryMode.BULK.value),
@@ -1694,10 +1631,7 @@ relation_type_enum = PgEnum(
 )
 
 
-# Relations sémantiques entre publications distinctes, dirigées du sujet vers l'objet.
-# La cible est une publication du corpus (`target_publication_id`) ou un DOI hors corpus
-# (`target_doi`), d'où l'unique `NULLS NOT DISTINCT`, qui dédoublonne sur celle des deux
-# qui est renseignée.
+# Relations sémantiques entre publications distinctes, du sujet vers l'objet. La cible est une publication du corpus (`target_publication_id`) ou un DOI hors corpus (`target_doi`) : l'unicité `NULLS NOT DISTINCT` dédoublonne sur celle des deux qui est renseignée.
 publication_relations = Table(
     "publication_relations",
     metadata,
@@ -1723,8 +1657,7 @@ publication_relations = Table(
 )
 
 
-# Journal d'exécution du pipeline, une ligne par phase et par run : l'admin y lit le
-# déroulé, les signaux d'entrée et les métriques de sortie de chaque phase.
+# Journal d'exécution du pipeline, une ligne par phase et par run : l'administration y lit le déroulé, les signaux d'entrée et les métriques de sortie de chaque phase.
 pipeline_phase_executions = Table(
     "pipeline_phase_executions",
     metadata,
@@ -1770,8 +1703,4 @@ contribution_attributes_queue = _queue("contribution_attributes_queue")
 contribution_resolution_queue = _queue("contribution_resolution_queue")
 
 
-# `subject_cooccurrences` est une MATERIALIZED VIEW (migration c8a3f2e5b4d7),
-# pas une table : paires de sujets co-présents sur une même publication, avec
-# leur effectif (seuil `count >= 2`). Non modélisée dans le metadata SQLAlchemy
-# — accès en SQL brut par nom (lectures) ou via REFRESH — pour éviter
-# qu'`alembic --autogenerate` tente de la recréer en table.
+# `subject_cooccurrences` (vue matérialisée) : paires de sujets présents sur une même publication, avec leur effectif, à partir de 2.

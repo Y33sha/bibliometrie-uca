@@ -2,7 +2,7 @@
 
 Marquer une ligne, c'est insérer son identifiant dans la file avec un nouveau numéro de marquage `seq`. Une tâche relève les couples `(id, seq)` de la file au début, puis supprime exactement ceux-là à la fin. Un marquage fait pendant la tâche change `seq`, donc reste dans la file pour l'exécution suivante.
 
-Les files n'ont pas de clé étrangère. L'identifiant d'une ligne supprimée reste en file : la tâche qui lit la file l'ignore en joignant la table traitée, puis supprime son marquage avec les autres.
+Les files sont sans clé étrangère. L'identifiant d'une ligne supprimée reste en file : la tâche qui lit la file l'ignore en joignant la table traitée, puis supprime son marquage avec les autres.
 """
 
 from collections.abc import Sequence
@@ -44,7 +44,7 @@ def enqueue_sql(queue: Queue, ids_sql: str) -> str:
 
 
 def enqueue(conn: Connection, queue: Queue, ids_sql: str, params: dict[str, object]) -> int:
-    """Marque dans `queue` les identifiants que rend la requête `ids_sql`, à une colonne. Retourne le nombre d'identifiants marqués."""
+    """Marque dans `queue` les identifiants que rend la requête `ids_sql`, à une colonne. Rend le nombre d'identifiants marqués."""
     return conn.execute(text(enqueue_sql(queue, ids_sql)), params).rowcount
 
 

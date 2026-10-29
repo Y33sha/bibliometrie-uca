@@ -18,7 +18,7 @@ DbIdentity = Literal["owner", "app", "pipeline"]
 
 
 def db_url(identity: DbIdentity = "pipeline") -> URL:
-    """URL de connexion PostgreSQL, construite depuis les réglages (réutilisée par Alembic).
+    """URL de connexion PostgreSQL, construite depuis les réglages. Alembic s'en sert aussi.
 
     `identity` désigne le rôle PostgreSQL du processus (cf. `infrastructure/db/roles.sql`) : celui du pipeline par défaut. Un rôle non configuré fait échouer la construction.
     """
