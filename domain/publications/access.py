@@ -1,12 +1,8 @@
 """Liens d'accès d'une publication : ses copies ouvertes, une par plateforme.
 
-Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL. Quand une plateforme décrit elle-même la publication (HAL pour HAL), sa description décide de l'ouverture de ses copies : les copies que les autres sources lui attribuent sont écartées.
+Une copie se classe par sa version (éditeur, acceptée, soumise, inconnue), puis par l'ordre d'arrivée de son enregistrement source. Chaque plateforme donne sa meilleure copie ; une copie sans plateforme se range sous l'hôte de son URL. Quand une plateforme décrit elle-même la publication (HAL pour HAL), seule sa description décide de l'ouverture de ses copies.
 
-Une plateforme du registre (`domain.platforms.registry`) se reconnaît par l'URL de la copie ou par sa source OpenAlex, et prend le nom du registre. Une autre plateforme prend le nom que lui donne la source.
-
-Seule une copie à adresse `http` ou `https` compte : l'adresse vient des sources, et alimente un lien. La meilleure copie est l'adresse d'accès. Une copie désignée par le DOI de la publication peut l'être, mais ne figure pas parmi les liens : le DOI est affiché à part. Une copie désignée par un autre DOI figure parmi les liens seulement si une plateforme l'héberge.
-
-Le lien d'accès affiché (`access_url`) mène à la meilleure copie, à défaut à la page du DOI d'une publication ouverte.
+Seule une copie à adresse `http` ou `https` compte. La meilleure copie donne l'adresse d'accès. Une copie désignée par le DOI de la publication est absente des liens : le DOI s'affiche à part. Une copie désignée par un autre DOI figure parmi les liens seulement si une plateforme l'héberge.
 """
 
 from collections.abc import Iterable
@@ -66,7 +62,7 @@ def _label(copy: Copy) -> str:
 
 
 def _listed(copy: Copy, doi: str | None) -> bool:
-    """La copie figure parmi les liens : elle est désignée par une adresse autre qu'un DOI, ou par un autre DOI que celui de la publication sur une plateforme."""
+    """Vrai si la copie figure parmi les liens."""
     if _host(copy) not in _DOI_HOSTS:
         return True
     target = unquote(urlsplit(copy.url).path).lstrip("/").lower()
@@ -103,7 +99,7 @@ def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
 
 
 def access_url(best_copy_url: str | None, *, oa_status: str | None, doi: str | None) -> str | None:
-    """Lien d'accès d'une publication. Une publication fermée ou sous embargo n'en a pas."""
+    """Lien d'accès d'une publication : la meilleure copie, à défaut la page du DOI d'une publication ouverte. `None` pour une publication fermée ou sous embargo."""
     if oa_status in (OaStatus.CLOSED, OaStatus.EMBARGOED):
         return None
     if best_copy_url:
