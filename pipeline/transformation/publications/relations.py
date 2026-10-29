@@ -96,7 +96,7 @@ class SharedKeyPair(NamedTuple):
 
 
 class TitleMatch(NamedTuple):
-    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). `child` porte la relation dirigée vers `parent` (`is_correction_of`, `is_preprint_of`)."""
+    """Une publication rapprochée par titre de l'œuvre dont elle dépend (signal #3) : un erratum de l'article qu'il corrige, un preprint de sa version publiée. Le parent est au corpus, désigné par son `publication_id` (et son DOI quand il en a un). La relation dirigée part de `child` vers `parent` (`is_correction_of`, `is_preprint_of`)."""
 
     child_id: int
     parent_id: int
@@ -266,7 +266,7 @@ def fetch_erratum_title_matches(conn: Connection) -> list[TitleMatch]:
 def fetch_preprint_title_matches(conn: Connection) -> list[TitleMatch]:
     """Les preprints rapprochés par titre de leur version publiée (signal #3).
 
-    Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée portent le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
+    Pour chaque preprint, candidats = publications non-preprint au `title_normalized` **identique** (le preprint et sa version publiée ont le même titre), titre assez long, publiées dans la fenêtre `[année … année + 2]`. Même garde d'ambiguïté : un seul candidat substantiel (hors `dataset`) au même titre."""
     rows = conn.execute(_PREPRINT_TITLE_MATCHES_SQL).all()
     return [TitleMatch(r.child_id, r.parent_id, r.parent_doi) for r in rows]
 
@@ -277,7 +277,7 @@ _IDENTITY_COLUMNS = "from_publication_id, relation_type, target_publication_id, 
 
 
 def rebuild_relations(conn: Connection, edges: list[RelationEdge]) -> RelationsRebuild:
-    """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête portant sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
+    """Reconstruit `publication_relations` : purge la table, puis insère `edges` (chaque arête avec sa `source`). Résout les `target_doi` en `target_publication_id`, écarte les auto-relations, dédoublonne par `(from, type, target)` — l'ordre de `edges` fixe la priorité. Retourne ce que la reconstruction a écrit et changé."""
     # La table temporaire, créée avant la purge, sert la comparaison puis est supprimée. Un échec annule sa création avec le reste de la transaction.
     conn.execute(
         text(
@@ -414,7 +414,7 @@ def _build_distinct_work_edges(
                 continue
             relation, subject = inferred
             if subject == "b":
-                # Une cible typée est au corpus : c'est elle qui porte la relation dirigée.
+                # Une cible typée est au corpus : la relation dirigée part d'elle.
                 assert target is not None
                 edges.append(
                     RelationEdge(
