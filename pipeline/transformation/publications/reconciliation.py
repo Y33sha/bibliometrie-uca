@@ -220,7 +220,7 @@ def mark_publication_siblings(conn: Connection) -> int:
 
 
 def snapshot_queued_source_records(conn: Connection) -> list[int]:
-    """Relève la file des `source_records` à réconcilier, orphelines comprises : la réconciliation est aussi l'assignation. Rend les identifiants de celles qui existent. `delete_processed_marks` retire de la file tous les marquages relevés."""
+    """Relève la file des `source_records` à réconcilier, orphelines comprises : la réconciliation est aussi l'assignation. Renvoie les identifiants de celles qui existent. `delete_processed_marks` retire de la file tous les marquages relevés."""
     snapshot(conn, Queue.SOURCE_RECORD_KEYS, _SNAPSHOT)
     return list(
         conn.execute(
@@ -406,7 +406,7 @@ class AppliedReconciliation(NamedTuple):
 
 
 def _plan(conn: Connection) -> tuple[ReconcilePlan, dict[int, ReconcileRow]]:
-    """Planifie la réconciliation du voisinage des enregistrements sources relevés. Rend le plan et les lignes du voisinage par enregistrement source."""
+    """Planifie la réconciliation du voisinage des enregistrements sources relevés. Renvoie le plan et les lignes du voisinage par enregistrement source."""
     rows = fetch_reconciliation_universe(conn)
     publication_sizes = fetch_publication_sizes(
         conn, sorted({row.publication_id for row in rows if row.publication_id is not None})
@@ -512,7 +512,7 @@ def _publications_to_refresh(
 
 
 def reconcile(conn: Connection, logger: logging.Logger, *, rebuild: bool = False) -> ReconcileStats:
-    """Planifie et applique la réconciliation du voisinage des enregistrements sources en file, puis supprime les marquages traités. Rend un bilan à zéro si la file est vide. Le commit est à la charge de l'appelant.
+    """Planifie et applique la réconciliation du voisinage des enregistrements sources en file, puis supprime les marquages traités. Renvoie un bilan à zéro si la file est vide. Le commit est à la charge de l'appelant.
 
     `rebuild` marque d'abord toutes les `source_records` : la réconciliation reprend alors le stock entier.
     """
