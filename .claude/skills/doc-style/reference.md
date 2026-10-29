@@ -208,6 +208,24 @@ AVANT :
 APRÈS :
     (rien)
 
+## Mot qui fait poser une question au lecteur
+
+Relire hors du contexte du projet. Un mot qui fait poser une question (meilleure selon quel critère ? lequel parmi d'autres ?) se remplace par un mot plus simple qui ne la pose pas.
+
+AVANT :
+    Le bouton « Accéder » mène à la meilleure copie ouverte, à défaut au DOI.
+
+APRÈS :
+    Le bouton « Accéder » mène au texte intégral, à défaut au DOI.
+
+Une sélection sans critère fait aussi poser la question « pourquoi ceux-là ? ». Citer quelques éléments d'une liste parce qu'ils ont un lien vers le glossaire n'est pas un critère : supprimer.
+
+AVANT :
+    Les filtres couvrent notamment le paiement d'[APC](../../glossaire.md#apc), la [voie *open access*](../../glossaire.md#voies-open-access) et les [organisations partenaires](../../glossaire.md#organisation-partenaire).
+
+APRÈS :
+    (rien)
+
 ## Décision énoncée sans sa raison
 
 Une décision négative nue en dit trop ou trop peu : le lecteur se demande pourquoi. Donner la raison en une proposition, ou supprimer la phrase.
