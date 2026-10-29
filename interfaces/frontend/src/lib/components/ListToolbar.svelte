@@ -52,7 +52,7 @@
 	let bar = $state<HTMLElement | undefined>();
 	// Part de la barre glissée sous le menu, en pixels, de zéro à la hauteur de la barre.
 	let offset = $state(0);
-	const hidden = $derived(bar !== undefined && offset >= bar.offsetHeight);
+	const hidden = $derived(bar !== undefined && offset >= bar.getBoundingClientRect().height);
 	// Détachée : la barre a quitté l'écran en suivant la page ; elle glisse alors d'un bloc, vers le bas à la remontée et vers le haut à la descente, jusqu'au retour de la page en haut.
 	let detached = $state(false);
 	let lastY = 0;
@@ -86,7 +86,7 @@
 		const delta = y - lastY;
 		lastY = y;
 		const headerHeight = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--header-height')) || 0;
-		const height = bar.offsetHeight;
+		const height = bar.getBoundingClientRect().height;
 		const travelled = headerHeight - anchor.getBoundingClientRect().top;
 		if (!detached) {
 			// À sa place, la barre suit la page jusqu'à quitter l'écran. Elle se détache au défilement suivant : sa sortie de l'écran se fait sans glissement.

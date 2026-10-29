@@ -23,9 +23,9 @@ describe('ListToolbar', () => {
 			props: { list: { loaded: true, error: null, total: 0 }, one: 'résultat', many: 'résultats' },
 		});
 		flushSync();
-		const anchor =target.querySelector<HTMLElement>('.list-toolbar-anchor')!;
+		const anchor = target.querySelector<HTMLElement>('.list-toolbar-anchor')!;
 		const bar = target.querySelector<HTMLElement>('.list-toolbar')!;
-		Object.defineProperty(bar, 'offsetHeight', { value: 100 });
+		bar.getBoundingClientRect = () => ({ height: 100 }) as DOMRect;
 		anchor.getBoundingClientRect = () => ({ top: -30 }) as DOMRect;
 
 		window.dispatchEvent(new Event('scroll'));
