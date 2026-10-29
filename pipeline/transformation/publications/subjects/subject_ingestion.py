@@ -1,15 +1,8 @@
-"""Ingestion des sujets d'une publication — première étape de la phase `subjects` (avant les co-occurrences).
+"""Sujets des publications, première tâche de la phase `subjects`.
 
-Incrémental et publication-centré :
-  1. Sélectionne les publications à ingérer : `publications.subjects_ingested_at` vide. L'enregistrement d'une publication recalculée depuis ses sources vide cette date ; les autres écritures sur la publication (statut OA…) la laissent en place.
-  2. Dégage leurs liens `publication_subjects` (non rejetés).
-  3. Ré-ingère, par `source_record`, via l'extracteur de libellés de chaque source (`extractors`), avec un `SubjectCache` global (un même label ne déclenche qu'un seul UPSERT, y compris entre sources).
-  4. Date l'ingestion de chaque publication traitée, qu'elle ait des sujets ou non.
-  5. Purge les `subjects` devenus orphelins (plus aucun lien).
+Une publication s'ingère quand `publications.subjects_ingested_at` est vide : le recalcul d'une publication depuis ses enregistrements sources vide cette date. Ses liens non rejetés sont supprimés, puis reconstruits depuis le champ `topics` de chacun de ses enregistrements sources, lu selon sa source (`SUBJECT_EXTRACTORS`). `publication_subjects.source` garde ainsi la source de chaque sujet. Les sujets sans lien sont ensuite supprimés.
 
-Seuls les concepts issus des ontologies sources (champ `topics` : domaines, topics, disciplines…) sont ingérés. Les mots-clés libres (`keywords`) restent portés par `source_records` et affichés via `publications_detail.keywords`, hors de `subjects`.
-
-On lit les `source_records` (et non `publications_detail`) pour préserver l'attribution par-source : `publication_subjects.source` dit quelle source a fourni chaque sujet.
+Les mots-clés libres (`keywords`) restent hors de `subjects`.
 """
 
 import logging
@@ -40,9 +33,9 @@ def run(
 ) -> PhaseMetrics:
     """Ré-ingère les sujets des publications à ingérer.
 
-    `metrics.new` porte le nombre de liens publication↔sujet créés ; le résumé sur-mesure expose les sujets ajoutés (évolution nette du référentiel, ingestion moins purge des orphelins), le nouveau total du vocabulaire et le nombre de publications ré-ingérées.
+    `metrics.new` compte les liens publication-sujet créés. Le résumé donne l'évolution nette du nombre de sujets, leur total et le nombre de publications ingérées.
 
-    `rebuild` marque d'abord toutes les publications à ingérer : chaque lien non rejeté est effacé puis reconstruit, et la purge finale retire les sujets devenus sans lien. Sert à propager une évolution des règles d'ingestion sur tout le stock.
+    `rebuild` marque d'abord toutes les publications : une évolution des règles d'ingestion s'applique alors à tout le stock.
     """
     subjects_before = store.count_all_subjects()
     step(logger, "Liens publications-sujets")

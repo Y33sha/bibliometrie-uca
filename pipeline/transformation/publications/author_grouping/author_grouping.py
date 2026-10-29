@@ -1,6 +1,6 @@
 """Phase `author_grouping` : contributions des contributions sources d'un même auteur dans chaque publication (`contributions`, `aligned_source_contributions`).
 
-Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes ; les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent par la règle de noms, le filtre d'ordre, l'ordre dans les trous et le modèle du résidu (`domain.publications.author_grouping`). Chaque contribution reprend l'identifiant de la contribution en base avec lequel il partage le plus de contributions sources.
+Les publications de la file `publication_contributions_queue` se recalculent entièrement, par lots ; `--rebuild-author-grouping` les marque toutes. Les publications d'un lot se répartissent entre des processus, un par processeur disponible (`available_cpus`). Les doublons d'auteur d'un enregistrement source (`domain.publications.list_copies`) reçoivent `duplicate_of` et restent hors des contributions. Les autres contributions sources, tous rôles réunis, s'alignent selon `domain.publications.author_grouping`. Chaque contribution reprend l'identifiant de la contribution en base avec laquelle elle partage le plus de contributions sources.
 
 Tâche `author_grouping.build`.
 """

@@ -17,15 +17,13 @@ _MARK_INSERTED = enqueue_sql(Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM in
 
 
 class PublicationStore:
-    """Accès PostgreSQL à l'agrégat Publication via une `Connection` SQLAlchemy."""
+    """Lectures et écritures des publications."""
 
     def __init__(self, conn: Connection) -> None:
         self._conn = conn
 
-    # ── Recherches ─────────────────────────────────────────────────
-
     def find_ids_by_serial_id(self, serial_id: int) -> list[int]:
-        """Ids des publications rattachées à ce journal. Utilisé pour requalifier le stock quand un input éditable du journal (ex. `serial_type`) change."""
+        """Publications de cette revue, à recalculer quand un champ modifiable de la revue change (`serial_type`)."""
         result = self._conn.execute(
             text("SELECT id FROM publications WHERE serial_id = :jid ORDER BY id"),
             {"jid": serial_id},
@@ -33,7 +31,7 @@ class PublicationStore:
         return [row.id for row in result]
 
     def find_doc_types_by_ids(self, publication_ids: list[int]) -> dict[int, str]:
-        """`doc_type` de chaque publication demandée, en une lecture. Une publication absente de la table manque de la réponse — un refresh peut l'avoir supprimée."""
+        """`doc_type` de chaque publication demandée. Une publication supprimée, par un recalcul par exemple, manque de la réponse."""
         if not publication_ids:
             return {}
         result = self._conn.execute(
@@ -44,10 +42,8 @@ class PublicationStore:
         )
         return {row.id: row.doc_type for row in result}
 
-    # ── Chargement / persistance de l'aggregate Publication ────────
-
     def find_by_id(self, publication_id: int) -> Publication | None:
-        """Hydrate l'agrégat `Publication` depuis `publications` (attributs canoniques), ou `None` si absente. Les contributions ne sont pas chargées ici (projection lecture séparée au besoin)."""
+        """Publication de cet identifiant, sans ses contributions, ou `None`."""
         row = self._conn.execute(
             text("""
                 SELECT p.id, p.title, p.title_normalized,
@@ -95,7 +91,7 @@ class PublicationStore:
         )
 
     def save(self, publication: Publication) -> None:
-        """Persiste l'état mutable de l'agrégat `Publication` (tous les champs éditables ; `publication_year` reste immuable après création). Requiert `publication.id` posé."""
+        """Enregistre les champs modifiables d'une publication déjà insérée ; `publication_year` reste celle de la création."""
         if publication.id is None:
             raise ValueError(
                 "save(publication) : publication.id doit être posé (utiliser create pour insérer)"
@@ -146,7 +142,7 @@ class PublicationStore:
                 "corrections": json.dumps(publication.corrections),
             },
         )
-        # Colonnes grasses (abstract / keywords / topics / biblio) → table 1:1 publications_detail (upsert).
+        # Les colonnes volumineuses (résumé, mots-clés, sujets, biblio) vont dans `publications_detail`.
         self._conn.execute(
             text("""
                 INSERT INTO publications_detail
@@ -168,8 +164,6 @@ class PublicationStore:
             },
         )
 
-    # ── Création ───────────────────────────────────────────────────
-
     def create(
         self,
         *,
@@ -180,7 +174,7 @@ class PublicationStore:
         doi: str | None,
         oa_status: str,
     ) -> int:
-        """Insère une publication (INSERT brut, la déduplication relève du caller), la marque pour le groupement des auteurs, et retourne son `id`. Les colonnes hors NOT NULL et DOI prennent leur défaut ; `save` les pose."""
+        """Insère une publication, sans dédoublonnage, la marque pour l'alignement des auteurs et rend son `id`. Les colonnes autres que les colonnes NOT NULL et le DOI prennent leur valeur par défaut ; `save` les pose."""
         return scalar_int(
             self._conn.execute(
                 text(f"""
@@ -205,10 +199,8 @@ class PublicationStore:
             )
         )
 
-    # ── Suppression ────────────────────────────────────────────────
-
     def has_source_records(self, publication_id: int) -> bool:
-        """Vrai si au moins une `source_record` est rattachée à la publication."""
+        """Vrai si au moins un enregistrement source est rattaché à la publication."""
         return bool(
             self._conn.execute(
                 text("SELECT EXISTS (SELECT 1 FROM source_records WHERE publication_id = :id)"),
@@ -227,7 +219,7 @@ class PublicationStore:
         )
 
     def delete(self, publication_id: int) -> None:
-        """Supprime une publication. Le cascade DB nettoie `contributions` et `publication_subjects` ; `apc_payments` et `source_records.publication_id` passent à NULL. Appelée par le module du cycle de vie (`pipeline.transformation.publications.lifecycle`)."""
+        """Supprime une publication, avec ses `contributions` et ses `publication_subjects`. `apc_payments.publication_id` et `source_records.publication_id` passent à NULL."""
         self._conn.execute(
             text("DELETE FROM publications WHERE id = :id"),
             {"id": publication_id},
@@ -235,7 +227,7 @@ class PublicationStore:
 
 
 def _json_dumps_or_none(value: Mapping[str, JsonValue] | None) -> str | None:
-    """Sérialise un dict en string JSON pour `CAST(:p AS jsonb)`. None passé tel quel."""
+    """Texte JSON de `value` pour `CAST(:p AS jsonb)`, ou `None`."""
     if value is None:
         return None
     return json.dumps(value)

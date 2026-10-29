@@ -166,7 +166,7 @@ class BatchPlan:
     memberships: list[MembershipRow]
     """Appartenances à insérer."""
     unmatched: list[int]
-    """Contributions en base sans correspondant, supprimés."""
+    """Contributions en base sans correspondant, à supprimer."""
     recomposed: list[int]
     """Contributions en base dont les contributions sources changent : elles perdent leur personne, que la phase `persons` redécide."""
     copies: dict[int, int]
@@ -180,7 +180,7 @@ class AuthorGroupingStore:
         self._conn = conn
 
     def propagate_attributes(self) -> tuple[int, int]:
-        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de contributions en file et le nombre de contributions mis à jour."""
+        """Recompose les attributs des contributions en file depuis leurs contributions sources (`propagate_contribution_attributes_sql`), puis supprime les marquages traités. Rend le nombre de contributions en file et le nombre de contributions mises à jour."""
         queue = Queue.CONTRIBUTION_ATTRIBUTES
         snapshot(self._conn, queue, _ATTRIBUTES_SNAPSHOT)
         queued = int(
@@ -205,7 +205,7 @@ class AuthorGroupingStore:
         )
 
     def mark_all(self) -> int:
-        """Marque toutes les publications pour le alignement. Rend le nombre de publications marquées."""
+        """Marque toutes les publications pour l'alignement. Rend le nombre de publications marquées."""
         return enqueue(
             self._conn, Queue.PUBLICATION_CONTRIBUTIONS, "SELECT id FROM publications", {}
         )
@@ -272,7 +272,7 @@ class AuthorGroupingStore:
     def write(self, plan: BatchPlan) -> None:
         """Écrit les contributions et les doublons d'auteur des publications du lot, et marque leurs contributions pour la recomposition de leurs attributs.
 
-        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution dont les contributions sources changent est marqué pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
+        Une contribution déjà en base garde son identifiant, sa personne et son mode de résolution. Une contribution dont les contributions sources changent est marquée pour la redécision de sa personne (`Queue.CONTRIBUTION_RESOLUTION`). Les autres contributions sources des publications du lot perdent leur `duplicate_of`.
         """
         publication_ids, contributions, removed = (
             plan.publication_ids,

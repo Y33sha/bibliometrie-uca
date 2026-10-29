@@ -29,7 +29,7 @@ from pipeline.transformation.publications.store import PublicationStore
 
 
 class _SourceRecordRow(NamedTuple):
-    """Projection SQL `get_source_records` : colonnes de `source_records` consommées par l'agrégation canonique (`refresh_from_sources` côté domain)."""
+    """Colonnes de `source_records` que lit l'agrégation."""
 
     id: int
     source: str
@@ -56,7 +56,7 @@ class _SourceRecordRow(NamedTuple):
 
 
 def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
-    """Mapping d'une row SQL `source_records` ⨝ `serials` vers la vue de lecture. Convertit les `text[]` Postgres en tuples immutables."""
+    """`SourceRecord` d'une ligne de `source_records`, tableaux convertis en tuples."""
     return SourceRecord(
         id=row.id,
         source=row.source,
@@ -83,11 +83,8 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
     )
 
 
-# ── Lectures du recalcul ──────────────────────────────────────────────
-
-
 def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
-    """Les `SourceRecord` attachées à une publication, matière de l'agrégation. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
+    """Enregistrements sources d'une publication, pour l'agrégation. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
     result = conn.execute(
         text(f"""
             SELECT sr.id, sr.source::text AS source, sr.source_id,
@@ -140,7 +137,7 @@ def crossref_prefix_publishers(conn: Connection, prefixes: Sequence[str]) -> dic
 
 
 def serial_type_of(conn: Connection, serial_id: int) -> str | None:
-    """`serial_type` d'un journal, pour le rejeu des corrections qui dépendent de la revue. None si le journal n'existe pas ou son type n'est pas posé."""
+    """Type d'une revue, ou `None`, pour le rejeu des corrections qui en dépendent."""
     return conn.execute(
         text("SELECT serial_type::text FROM serials WHERE id = :id"),
         {"id": serial_id},
@@ -177,13 +174,13 @@ class RefreshVerdict(StrEnum):
 
 
 def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdict:
-    """Recalcule les métadonnées canoniques d'une publication depuis ses `source_records`.
+    """Recalcule les métadonnées d'une publication depuis ses enregistrements sources.
 
     Recalcul complet : lit toutes les sources attachées, agrège (`domain.publications.aggregation`), rejoue les corrections nées de l'arbitrage, retient la meilleure copie ouverte (`domain.publications.access`), pose l'éditeur d'après le type corrigé, persiste. Rattrape les métadonnées périmées (`ongoing_thesis` → `thesis` après soutenance).
 
     Une publication sans source rattachée (`NO_SOURCE`), ou dont le `doc_type` résolu tombe dans `OUT_OF_SCOPE_DOC_TYPES` (`INADMISSIBLE_TYPE`), reste en l'état. Le module du cycle de vie la supprime sur ce verdict.
 
-    Ne touche que la publication reçue et ses sources : quelles `source_records` forment une même œuvre relève de la réconciliation. Laisse `notes` inchangé.
+    Touche seulement la publication reçue : la réconciliation décide quels enregistrements sources forment une même œuvre. Laisse `notes` inchangé.
     """
     store = PublicationStore(conn)
     publication = store.find_by_id(publication_id)
@@ -194,7 +191,7 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
     if not sources:
         return RefreshVerdict.NO_SOURCE
 
-    # L'agrégation repart des colonnes déjà corrigées par la phase `metadata_correction`, pas du brut.
+    # L'agrégation part des colonnes corrigées par la phase `metadata_correction`.
     monograph_ids = sorted({s.monograph_id for s in sources if s.monograph_id is not None})
     dois = sorted({doi.value for s in sources if (doi := DOI.try_parse(s.doi)) is not None})
     _refresh_aggregate(
@@ -233,7 +230,7 @@ def refresh_from_sources(conn: Connection, publication_id: int) -> RefreshVerdic
 def _apply_canonical_doc_type_correction(
     publication: Publication, *, serial_type: str | None
 ) -> None:
-    """Rejoue les corrections de `doc_type` sur la publication canonique après l'arbitrage.
+    """Rejoue les corrections de `doc_type` sur la publication, après l'arbitrage.
 
     L'arbitrage prend chaque champ de la source la plus prioritaire qui le renseigne : la publication réunit alors un `doc_type` d'une source et un `serial_id` d'une autre, combinaison qu'aucune correction par source n'a vue.
 
