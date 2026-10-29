@@ -88,15 +88,15 @@
 	--chart-10: #edc948;
 
 	/* Types de document, par clé de groupement de la page Statistiques (`docTypeColorVar()`). */
-	--doctype-article: #1f63c8;
-	--doctype-review: #6eaaf0;
-	--doctype-conference_paper: #1baf7a;
-	--doctype-book: #d9530f;
-	--doctype-book_chapter: #eda100;
-	--doctype-conferences: #2f8f2f;
-	--doctype-preprints: #e57aa8;
-	--doctype-theses: #7a5cd0;
-	--doctype-data: #0089a8;
+	--doctype-article: #3b6fb6;
+	--doctype-review: #8bb0dc;
+	--doctype-conference_paper: #4f9c82;
+	--doctype-book: #c46a3f;
+	--doctype-book_chapter: #e2b960;
+	--doctype-conferences: #6a9f5b;
+	--doctype-preprints: #c6d9ee;
+	--doctype-theses: #c0665f;
+	--doctype-data: #4f93a3;
 	--doctype-misc: #cfd3d6;
 
 	/* Licences : domaine public (bleu), puis du plus ouvert (vert) au moins ouvert (jaune, orange), puis les autorisations sans licence ouverte et l'absence de licence (gris sombre). */
