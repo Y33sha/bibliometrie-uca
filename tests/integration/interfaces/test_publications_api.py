@@ -22,6 +22,13 @@ def test_licenses_follow_the_domain_enum(client):
     ]
 
 
+def test_sources_are_readable_without_session(client):
+    """Le volet d'une publication s'ouvre hors session admin : sa route de lecture répond sans cookie."""
+    r = client.get("/api/publications/999999/sources")
+    assert r.status_code == 404
+    assert r.json()["detail"] == "Publication introuvable"
+
+
 class TestSuspectMerges:
     """File des fusions suspectes : la lecture de la vue matérialisée passe sous le rôle de l'API."""
 

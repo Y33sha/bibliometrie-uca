@@ -8,6 +8,7 @@
   import SourceTag from "#lib/components/SourceTag.svelte";
   import Tooltip from "#lib/components/Tooltip.svelte";
   import { contributionRoleLabels } from "#lib/labels.js";
+  import { isAdmin } from "#lib/session.svelte.js";
   import { structsTooltip } from "#lib/structureLabels.js";
   import { authorRows, comparisonRows, orderRecords, otherRoles } from "./sourceComparison";
 
@@ -174,7 +175,9 @@
         {/each}
       </tbody>
     </table>
-    <PublicationMergeSection {publicationId} onmerged={merged} />
+    {#if isAdmin()}
+      <PublicationMergeSection {publicationId} onmerged={merged} />
+    {/if}
   {/if}
 </Drawer>
 

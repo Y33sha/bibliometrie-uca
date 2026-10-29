@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Volet droit des référentiels de l'administration : il se ferme par Échap, par le fond et par son bouton.
+  // Volet droit : il se ferme par Échap, par le fond et par son bouton.
   import type { Snippet } from "svelte";
 
   let {
