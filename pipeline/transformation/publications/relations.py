@@ -26,7 +26,7 @@ from domain.publications.relations import (
     extract_datacite_relations,
     infer_shared_key_relation,
 )
-from domain.source_records.identifiers import SourceIdentifierType
+from domain.source_records.identifiers import SourceIdentifierRole, SourceIdentifierType
 from domain.source_records.keys import (
     CONFIRMATION_ID_TYPES,
     DISCRIMINANT_TITLE_MIN_LENGTH,
@@ -38,7 +38,7 @@ from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.jsonb import Jsonb
 from infrastructure.db.scalars import scalar_int
 from infrastructure.db.source_record_identifiers import first_of_its_type_sql
-from infrastructure.sql_fragments import has_source_extra, in_clause, raw_column
+from infrastructure.sql_fragments import has_source_extra, in_clause
 from pipeline.runtime.context import Phase, PhaseContext
 from pipeline.runtime.observability.log_format import (
     LAST_BRANCH,
@@ -54,7 +54,7 @@ from pipeline.task_runner import TaskStep, run_tasks
 class DeclaredRelationSource(NamedTuple):
     """Enregistrement source rattaché qui déclare des relations dans son `source_extras` (DataCite `related_identifiers` ou Crossref `relation`).
 
-    Son DOI d'origine et son `source_record_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
+    Son DOI `primary` et son `source_record_doc_type` disent si une relation de même œuvre relie deux œuvres. Le `doc_type` de sa publication type alors la relation.
     """
 
     publication_id: int
@@ -204,11 +204,14 @@ _PREPRINT_TITLE_MATCHES_SQL = text(f"""
 
 def fetch_declared_relation_sources(conn: Connection) -> list[DeclaredRelationSource]:
     """Enregistrements sources rattachés dont le `source_extras` déclare des relations."""
-    # Le DOI d'avant correction est celui que l'enregistrement source déclare : son préfixe dit si une relation de même œuvre franchit un registrant.
+    # Le DOI `primary`, quel que soit son statut, est celui de l'enregistrement source déclarant : son préfixe dit si une relation de même œuvre franchit un registrant.
     rows = conn.execute(
         text(f"""
             SELECT sr.publication_id, sr.source::text AS source, sr.source_extras,
-                   lower({raw_column("doi")}) AS doi,
+                   (SELECT min(i.id_value) FROM source_record_identifiers i
+                    WHERE i.source_record_id = sr.id
+                      AND i.id_type = '{SourceIdentifierType.DOI.value}'
+                      AND i.role = '{SourceIdentifierRole.PRIMARY.value}') AS doi,
                    p.doc_type::text AS doc_type, sr.doc_type AS source_record_doc_type
             FROM source_records sr
             JOIN publications p ON p.id = sr.publication_id

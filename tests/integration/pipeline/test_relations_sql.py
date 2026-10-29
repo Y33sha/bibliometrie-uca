@@ -10,6 +10,11 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.source_records.identifiers import (
+    SourceIdentifier,
+    SourceIdentifierRole,
+    SourceIdentifierType,
+)
 from pipeline.runtime.context import PhaseContext, RunOptions
 from pipeline.transformation.publications import relations
 from pipeline.transformation.publications.relations import (
@@ -229,18 +234,21 @@ class TestRelationTargetDeletionCascades:
         assert remaining == 0
 
 
-def _source_record_datacite(conn, publication_id, *, doi, doi_d_origine, cible, doc_type=None):
-    """Enregistrement source DataCite dont le DOI d'origine est gardé dans `corrections`."""
+def _source_record_datacite(conn, publication_id, *, doi, cible, doc_type=None, removed_by=None):
+    """Enregistrement source DataCite de DOI `primary` `doi`, retiré par la règle `removed_by`."""
     insert_source_record(
         conn,
         publication_id,
         source="datacite",
-        source_id=doi_d_origine,
+        source_id=doi,
         title="T",
-        doi=doi,
         doc_type=doc_type,
         source_extras={"related_identifiers": [{"relation_type": "IsVersionOf", "doi": cible}]},
-        corrections={"doi": {"raw": doi_d_origine, "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}},
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI, doi, SourceIdentifierRole.PRIMARY, removed_by
+            )
+        ],
     )
 
 
@@ -255,9 +263,9 @@ class TestRelationsDeMemeOeuvre:
         _source_record_datacite(
             sa_sync_conn,
             publication,
-            doi=None,
-            doi_d_origine="10.48550/arxiv.1",
+            doi="10.48550/arxiv.1",
             cible="10.1007/article",
+            removed_by="ACTES_VS_COMMUNICATION",
         )
         sources = [
             s
@@ -275,7 +283,6 @@ class TestRelationsDeMemeOeuvre:
             sa_sync_conn,
             publication,
             doi="10.3204/pubdb-1",
-            doi_d_origine="10.3204/pubdb-1",
             cible="10.1140/article",
             doc_type="preprint",
         )
