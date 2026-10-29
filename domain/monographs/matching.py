@@ -1,6 +1,6 @@
-"""Rapprochement des monographies de même titre, selon l'éditeur et les ISBN.
+"""Matching des monographies de même titre, selon l'éditeur et les ISBN.
 
-Deux monographies de même titre sont compatibles quand leurs éditeurs ne diffèrent pas, un éditeur absent ne séparant rien, et qu'elles ne portent pas chacune des ISBN : deux ISBN différents désignent deux volumes d'un même ouvrage, ou deux éditions.
+Deux monographies de même titre sont compatibles si leurs éditeurs sont égaux ou l'un absent, et si au plus l'une a des ISBN. Deux ISBN différents désignent deux volumes d'un même ouvrage, ou deux éditions.
 """
 
 from collections.abc import Sequence
@@ -8,7 +8,7 @@ from typing import NamedTuple
 
 
 class MonographCandidate(NamedTuple):
-    """Une monographie de même titre qu'un document, avec ses ISBN et son éditeur."""
+    """Monographie de même titre qu'un enregistrement source."""
 
     id: int
     isbn: str | None
@@ -21,7 +21,7 @@ class MonographCandidate(NamedTuple):
 
 
 class MonographChoice(NamedTuple):
-    """Issue du rapprochement par titre : une monographie existante, une création, ou aucune monographie."""
+    """Monographie existante retenue, création d'une monographie, ou ni l'une ni l'autre."""
 
     monograph_id: int | None
     create: bool
@@ -38,9 +38,9 @@ def _same_publisher(first: int | None, second: int | None) -> bool:
 def choose_monograph(
     candidates: Sequence[MonographCandidate], *, publisher_id: int | None, has_isbn: bool
 ) -> MonographChoice:
-    """Monographie d'un document parmi celles de son titre (`candidates`), trouvées faute d'ISBN commun.
+    """Monographie d'un enregistrement source parmi celles de même titre, à défaut de monographie de même ISBN.
 
-    La monographie du même éditeur passe avant celle sans éditeur. Un document qui porte un ISBN rejoint une monographie sans ISBN. Un document sans ISBN rejoint la seule monographie compatible, ou la seule sans ISBN ; entre plusieurs volumes, il reste sans monographie. Sans candidat, la monographie est créée.
+    Les monographies du même éditeur passent avant celles sans éditeur. Avec ISBN, l'enregistrement rejoint une monographie sans ISBN, sinon il en crée une. Sans ISBN, il rejoint la seule monographie compatible, ou la seule sans ISBN. Entre plusieurs volumes, il reste sans monographie. Sans monographie compatible, il en crée une.
     """
     compatible = [c for c in candidates if _same_publisher(c.publisher_id, publisher_id)]
     same = [c for c in compatible if publisher_id is not None and c.publisher_id == publisher_id]
@@ -70,7 +70,7 @@ def duplicate_monographs(
 ) -> list[tuple[int, int]]:
     """Fusions `(cible, source)` parmi des monographies de même titre.
 
-    Une monographie fusionne dans la seule monographie compatible de son titre, quand celle-ci en dit davantage : ISBN, puis éditeur, puis antériorité. Une monographie compatible avec plusieurs autres reste en place : rien ne dit laquelle elle double.
+    Une monographie fusionne dans la seule monographie compatible, si celle-ci prime : par la présence d'ISBN, puis d'éditeur, puis par l'antériorité. Une monographie compatible avec plusieurs autres reste en place, faute de savoir laquelle elle double.
     """
     merges: list[tuple[int, int]] = []
     for source in same_title:
