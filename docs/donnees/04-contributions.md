@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-26.*
 
-Une contribution est la participation d'un auteur à une publication. Elle réunit les contributions sources de cet auteur, au plus une par enregistrement source de la publication. Elle désigne la personne de l'auteur, ou aucune : la contribution est alors orpheline. Une personne a au plus une contribution par publication.
+Une contribution est la participation d'une personne à une publication. Elle réunit les contributions sources de cette personne, au plus une par enregistrement source de la publication. Elle désigne la personne quand la [résolution des personnes](../pipeline/09-persons.md) l'a trouvée ; sinon, la contribution est orpheline. Une personne a au plus une contribution par publication.
 
 Les contributions sources collectives et les doublons d'auteur restent hors de toute contribution, comme d'autres cas décrits par l'[alignement des auteurs](../pipeline/08-author-grouping.md#contributions-sources-écartées).
 
@@ -13,7 +13,7 @@ Schéma PostgreSQL `publications`.
 | Table | Contenu | Contrainte |
 |---|---|---|
 | `contributions` | Publication, personne et mode de rattachement (`resolution_mode`). `reference_position` : position de l'auteur dans la liste d'auteurs la plus longue. `roles`, `is_corresponding` et `perimeter_evidence` : union de ceux des contributions sources alignées. `in_perimeter` : vrai dès qu'il y a un indice de périmètre | Une contribution par personne et par publication. `resolution_mode` est renseigné si et seulement si la personne l'est |
-| `aligned_source_contributions` | Contribution source alignée dans une contribution, avec l'origine du lien (`method`). Le score et la marge accompagnent un lien établi par le modèle | Une contribution source par enregistrement source dans une contribution |
+| `aligned_source_contributions` | Contribution source alignée dans une contribution, avec l'origine du lien (`method`). | Une contribution source par enregistrement source dans une contribution |
 
 Les décisions humaines sur le rattachement sont décrites avec les [personnes](05-persons.md#décisions-humaines). Les vues matérialisées `contribution_structures` et `publication_structures` sont décrites avec les [données dérivées](09-donnees-derivees.md).
 
