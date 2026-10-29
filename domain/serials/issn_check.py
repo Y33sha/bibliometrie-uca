@@ -1,9 +1,4 @@
-"""Vérification des ISSN d'une revue par les notices Sudoc.
-
-Les ISSN de la revue connus du Sudoc sont regroupés. Deux ISSN vont ensemble quand leurs notices ont le même ISSN-L, quand l'une désigne l'autre comme la même publication sur un autre support (`452`), ou quand l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent actifs, avec le support de leur notice.
-
-La vérification donne un statut aux autres : un autre support que le papier et l'en ligne (CD-ROM) reste actif, un ISSN annulé devient `cancelled`, un titre précédent ou suivant de la même revue (`430`, `440`) `related_title`, l'ISSN de son supplément ou de la revue dont elle est le supplément (`421`, `422`) `supplement`. Elle écarte de la revue les ISSN d'une autre publication : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste actif. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN actif ; à défaut, parmi ceux dont le titre est emboîté dans celui de la revue. Les ISSN portés par les enregistrements de la revue sont examinés avec les mêmes règles. La vérification corrige les valeurs mal formées à une faute de frappe près.
-"""
+"""Vérification des ISSN d'une revue par les notices Sudoc."""
 
 from __future__ import annotations
 
@@ -193,16 +188,20 @@ def _main_group(
 def _reference_issnl(
     members: Sequence[str], records: Mapping[str, SudocSerialRecord]
 ) -> str | None:
-    """ISSN-L des notices du groupe. Un ISSN-L qui est l'ISSN d'un membre l'emporte : une notice porte parfois l'ISSN-L d'un titre précédent."""
+    """ISSN-L des notices du groupe. Un ISSN-L qui est l'ISSN d'un membre l'emporte : une notice donne parfois l'ISSN-L d'un titre précédent."""
     issnls = [issnl for i in members if (issnl := records[i].issnl)]
     pool = [issnl for issnl in issnls if issnl in members] or issnls
     return Counter(pool).most_common(1)[0][0] if pool else None
 
 
 def check_serial_issns(serial: SerialIssns, records: Mapping[str, SudocSerialRecord]) -> SudocCheck:
-    """Vérifie les ISSN d'une revue.
+    """Vérifie les ISSN d'une revue, et ceux de ses enregistrements sources. `records` : notice Sudoc de chaque ISSN connu du Sudoc, parmi les ISSN de la revue, les candidats à la correction de ses valeurs mal formées (`correction_candidates`) et les ISSN d'autre support de ses notices.
 
-    `records` porte la notice Sudoc de chaque ISSN connu du Sudoc : ISSN de la revue, candidats à la correction de ses valeurs mal formées (`correction_candidates`) et ISSN d'autre support de ses notices.
+    Les ISSN connus du Sudoc sont regroupés. Deux ISSN vont ensemble si leurs notices ont le même ISSN-L, si l'une désigne l'autre comme la même publication sur un autre support (`452`), ou si l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN actif, à défaut parmi ceux dont le titre est emboîté dans celui de la revue. C'est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent actifs, avec le support de leur notice.
+
+    Les autres ISSN prennent un statut. Un autre support que le papier et l'en ligne (CD-ROM) reste actif. Un ISSN annulé devient `cancelled`, un titre précédent ou suivant de la revue (`430`, `440`) `related_title`, l'ISSN de son supplément ou de la revue dont elle est le supplément (`421`, `422`) `supplement`. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste actif. Les ISSN d'une autre publication sont écartés : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption.
+
+    Les valeurs mal formées sont corrigées à une faute de frappe près.
     """
     own = serial.examined()
     active = set(serial.active())
@@ -397,7 +396,7 @@ def _by_support(
 ) -> tuple[list[str], list[str]]:
     """ISSN retenus et ISSN d'une autre publication : `(retenus, autres publications)`.
 
-    Un support papier ou en ligne absent des ISSN retenus se complète par un ISSN d'autre support d'une notice de la revue. Parmi plusieurs ISSN d'un même support, ceux dont la notice porte un autre ISSN-L que la revue sont d'une autre publication.
+    Un support papier ou en ligne absent des ISSN retenus se complète par un ISSN d'autre support d'une notice de la revue. Parmi plusieurs ISSN d'un même support, ceux dont la notice donne un autre ISSN-L que la revue sont d'une autre publication.
     """
     retained = list(kept)
     for support in (IssnSupport.PRINT, IssnSupport.ELECTRONIC):

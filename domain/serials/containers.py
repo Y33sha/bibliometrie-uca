@@ -46,7 +46,7 @@ def container_role(
 
 
 def is_book_or_chapter(raw_doc_type: str | None, source: str) -> bool:
-    """Indique si un document est un livre ou un chapitre, hors article de congrès."""
+    """Vrai si un document est un livre ou un chapitre, hors article de congrès."""
     types = _doc_types(raw_doc_type, source)
     return bool(types & {_BOOK, _BOOK_CHAPTER}) and _CONFERENCE_PAPER not in types
 
@@ -54,7 +54,7 @@ def is_book_or_chapter(raw_doc_type: str | None, source: str) -> bool:
 def is_conference(
     raw_doc_type: str | None, source: str, *, declares_conference: bool = False
 ) -> bool:
-    """Indique si un document est issu d'un congrès : sa monographie est un volume d'actes."""
+    """Vrai si un document est issu d'un congrès : sa monographie est un volume d'actes."""
     return declares_conference or _CONFERENCE_PAPER in _doc_types(raw_doc_type, source)
 
 
@@ -71,23 +71,23 @@ def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[i
 
 
 def is_dated_event_without_issn(title: str, *, has_issn: bool) -> bool:
-    """Indique si une revue sans ISSN porte le titre d'une édition datée de congrès (`names_a_dated_event`). Une revue avec ISSN peut porter une année dans son titre (« Periodontology 2000 »)."""
+    """Vrai si une revue sans ISSN a pour titre une édition datée de congrès (`names_a_dated_event`). Le titre d'une revue avec ISSN peut contenir une année (« Periodontology 2000 »)."""
     return not has_issn and names_a_dated_event(title)
 
 
 def is_proceedings_title_without_issn(title: str, *, has_issn: bool) -> bool:
-    """Indique si une revue sans ISSN porte un titre d'actes (`names_proceedings`)."""
+    """Vrai si une revue sans ISSN a un titre d'actes (`names_proceedings`)."""
     return not has_issn and names_proceedings(title)
 
 
 def holds_mostly_conference_papers(records: Iterable[tuple[str, str | None]]) -> bool:
-    """Indique si la majorité stricte des documents d'une revue sont des articles de congrès (`conference_paper_share`)."""
+    """Vrai si la majorité stricte des documents d'une revue sont des articles de congrès (`conference_paper_share`)."""
     conference, total = conference_paper_share(records)
     return conference * 2 > total
 
 
 def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
-    """Indique si la majorité stricte des documents d'une revue sont des articles, d'après le type brut de chacun : `(source, type brut)`."""
+    """Vrai si la majorité stricte des documents d'une revue sont des articles, d'après le type brut de chacun : `(source, type brut)`."""
     records = list(records)
     articles = sum(_ARTICLE in _doc_types(raw_doc_type, source) for source, raw_doc_type in records)
     return articles * 2 > len(records)
@@ -97,7 +97,7 @@ def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
 class ContainerDescription:
     """Ce qu'une source dit du conteneur d'un document, tous niveaux mêlés.
 
-    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; un livre porte son propre titre, `document_title`. Les ISSN sont ceux de la revue ou de la collection, avec le support que donne la source ; la construction les normalise (`received_issns`). Elle retire aussi les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
+    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; le titre d'un livre est `document_title`. Les ISSN sont ceux de la revue ou de la collection, avec le support que donne la source ; la construction les normalise (`received_issns`). Elle retire aussi les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
     """
 
     source: str
@@ -123,7 +123,7 @@ class ContainerDescription:
 
     @property
     def has_issn(self) -> bool:
-        """Au moins un ISSN valide."""
+        """Vrai si un ISSN au moins est valide."""
         return any(r.status is not IssnStatus.MALFORMED for r in self.issns)
 
 
