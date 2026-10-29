@@ -4064,7 +4064,7 @@ export interface components {
         };
         /**
          * OaModel
-         * @description Modèle OA d'un journal — les membres portent les libellés de l'enum PostgreSQL `oa_model`.
+         * @description Modèle open access d'une revue. Reflet du type PostgreSQL `oa_model`.
          * @enum {string}
          */
         OaModel: "subscription" | "full_oa" | "diamond" | "repository";
@@ -5187,7 +5187,7 @@ export interface components {
         };
         /**
          * SerialType
-         * @description Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`.
+         * @description Type de publication en série. Reflet du type PostgreSQL `serial_type`.
          * @enum {string}
          */
         SerialType: "journal" | "data_journal" | "proceedings" | "repository" | "book_series" | "preprint_server" | "media" | "unknown";

@@ -1,9 +1,4 @@
-"""Aggregate root `Serial` — une publication en série : revue, collection d'ouvrages, série d'actes ou média.
-
-Clé surrogate : `id`. Identifiant naturel : `title`, via la normalisation de `serial_name_forms`. Les ISSN sont fortement discriminants mais facultatifs. `publisher_id` référence l'aggregate `Publisher` par son id.
-
-`SERIAL_TYPES` reste synchronisé avec l'enum SQL `serial_type` — cohérence vérifiée par `tests/integration/test_scenarios.py::TestPgEnumsMatchDb`.
-"""
+"""Publications en série : revue, collection d'ouvrages, série d'actes ou média."""
 
 from collections.abc import Iterable
 from dataclasses import dataclass, field
@@ -14,7 +9,7 @@ from domain.serials.issns import SerialIssn, validate_serial_issns
 
 
 class SerialType(StrEnum):
-    """Type de support de publication — les membres portent les libellés de l'enum PostgreSQL `serial_type`."""
+    """Type de publication en série. Reflet du type PostgreSQL `serial_type`."""
 
     JOURNAL = "journal"
     # Revue dont les articles décrivent des jeux de données (data papers).
@@ -30,7 +25,7 @@ class SerialType(StrEnum):
 SERIAL_TYPES: tuple[SerialType, ...] = tuple(SerialType)
 SERIAL_TYPES_SET: frozenset[str] = frozenset(SerialType)
 
-# Labels FR des valeurs d'enum, source de vérité Python pour l'UI (dropdowns admin, badges publics), exposés via `/api/serials/types`.
+# Libellés français des types, servis à l'interface par `/api/serials/types`.
 SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
     SerialType.JOURNAL: "Revue",
     SerialType.DATA_JOURNAL: "Revue de données",
@@ -44,7 +39,7 @@ SERIAL_TYPE_LABELS_FR: dict[SerialType, str] = {
 
 
 class OaModel(StrEnum):
-    """Modèle OA d'un journal — les membres portent les libellés de l'enum PostgreSQL `oa_model`."""
+    """Modèle open access d'une revue. Reflet du type PostgreSQL `oa_model`."""
 
     SUBSCRIPTION = "subscription"
     FULL_OA = "full_oa"
@@ -55,7 +50,7 @@ class OaModel(StrEnum):
 
 OA_MODELS: tuple[OaModel, ...] = tuple(OaModel)
 
-# Labels FR exposés via `/api/serials/oa-models` (dropdowns/facettes UI, modal d'édition admin).
+# Libellés français des modèles, servis à l'interface par `/api/serials/oa-models`.
 OA_MODEL_LABELS_FR: dict[OaModel, str] = {
     OaModel.SUBSCRIPTION: "Abonnement",
     OaModel.FULL_OA: "Full OA (gold/diamond)",
@@ -65,7 +60,7 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
 
 
 class ManualField(StrEnum):
-    """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Un champ saisi à la main n'est plus écrit par le pipeline."""
+    """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Le pipeline laisse inchangé un champ saisi à la main."""
 
     TITLE = "title"
     SERIAL_TYPE = "serial_type"
@@ -86,8 +81,6 @@ class SerialEdit(TypedDict, total=False):
 
 @dataclass(slots=True)
 class Serial:
-    """Publication en série (aggregate root)."""
-
     id: int | None
     title: str
     issns: list[SerialIssn] = field(default_factory=list)

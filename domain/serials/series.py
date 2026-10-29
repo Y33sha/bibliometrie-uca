@@ -49,7 +49,7 @@ _SERIES_OF_VOLUMES = frozenset({SerialType.PROCEEDINGS, SerialType.BOOK_SERIES})
 
 
 def holds_volumes(serial_type: SerialType) -> bool:
-    """Indique si une entrée de `serials` de ce type réunit des volumes : série d'actes ou collection de livres. Une revue peut porter une année dans son titre (« Periodontology 2000 »)."""
+    """Vrai si une entrée de `serials` de ce type réunit des volumes : série d'actes ou collection de livres. Le titre d'une revue peut contenir une année (« Periodontology 2000 »)."""
     return serial_type in _SERIES_OF_VOLUMES
 
 
@@ -111,7 +111,7 @@ def series_key(title: str) -> str:
 
 
 class VolumeTitle(NamedTuple):
-    """Un volume candidat à une série : son identifiant, son titre et son éditeur."""
+    """Volume candidat à une série."""
 
     id: int
     title: str
