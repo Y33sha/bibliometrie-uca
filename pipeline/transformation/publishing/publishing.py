@@ -1,10 +1,4 @@
-"""Orchestrateur de la phase `publishing` : enrichissement des référentiels d'éditeurs, de revues et de monographies.
-
-Trois groupes de sous-étapes, dans l'ordre :
-
-- **Éditeurs** — `resolve_crossref_publishers`, puis `resolve_datacite_publishers` : éditeur Crossref, provider et repository DataCite de chaque préfixe DOI en attente ; `merge_duplicate_publishers` : autres noms des titulaires de préfixe.
-- **Revues** — `enrich_serials_from_openalex` (type et frais de publication), `check_serials_in_sudoc` (ISSN vérifiés, corrigés et rangés par support), `merge_duplicate_serials`, `type_proceedings_serials`, `type_journal_serials`, `learn_serial_doi_namespaces`, `enrich_serials_from_doaj`.
-- **Monographies** — `merge_duplicate_monographs`, `link_monographs_to_collections`, `type_proceedings_volumes`.
+"""Phase `publishing` : référentiels des éditeurs, des revues et des monographies. Chaque sous-étape est une tâche du graphe (`pipeline.graph`).
 
 Contraintes d'ordre :
 
@@ -14,9 +8,7 @@ Contraintes d'ordre :
 - Les espaces de noms DOI suivent la fusion et le typage des revues.
 - Le rattachement des monographies suit la fusion des revues. La nature des monographies lit le type de la collection que pose le rattachement.
 
-`enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`. L'enrichissement des éditeurs — pays, ROR, type — se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
-
-Chaque sous-étape est une tâche du graphe (`pipeline.graph`), exécutée par `pipeline.task_runner` dans l'ordre du graphe : une ligne du journal par tâche, sous le titre de sa section. Une tâche qui interroge une source passe par l'accès à cette source : sans identifiants, elle est sautée avec un signal `source_unconfigured`. Ici, les étapes de chaque tâche et l'assemblage des métriques.
+`enrich_serials_from_doaj` importe le dump CSV du DOAJ, qui fait autorité sur `is_in_doaj`, quand le dernier import date de plus que le délai `doaj_refresh_after_days`. L'enrichissement des éditeurs (pays, ROR, type) se lance à la demande, par `interfaces/cli/maintenance/enrich_publishers.py`.
 """
 
 from __future__ import annotations
@@ -175,7 +167,7 @@ _TABLE: tuple[tuple[str, str, Callable[[PhaseMetrics], int]], ...] = (
 
 def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     """Reporte dans `metrics` les métriques des sous-étapes, dans l'ordre de leur exécution."""
-    # Les compteurs et signaux des sous-étapes remontent à la phase : l'observabilité (`to_payload()`) et le passage en avertissement sur circuit-breaker tripé en dépendent. Les `details` sur-mesure sont posés juste après.
+    # Les compteurs et signaux des sous-étapes remontent à la phase : une source coupée la fait passer en avertissement.
     for sub in by_step.values():
         metrics.merge(sub)
 
@@ -194,9 +186,6 @@ def _assemble(metrics: PhaseMetrics, by_step: dict[str, PhaseMetrics]) -> None:
     metrics.details["summary"] = {
         "doaj_matched": by_step["enrich_serials_from_doaj"].extras.get("matched", 0)
     }
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

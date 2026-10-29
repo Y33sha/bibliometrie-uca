@@ -1,9 +1,6 @@
-"""Compteurs `publication_count` (publications in-perimeter) sur `serials` + `publishers`.
+"""Nombre de publications du périmètre de chaque revue et de chaque éditeur (`publication_count`).
 
-`serials.publication_count` = nombre de publications in-perimeter de la revue.
-`publishers.publication_count` = nombre de publications in-perimeter de l'éditeur (`publications.publisher_id`).
-
-Les deux recalculs en masse tournent dans la phase `finalize`, après `in_perimeter`. Les variantes ciblées servent aux fusions de revues et d'éditeurs. Tous sont idempotents (`IS DISTINCT FROM`).
+Les recalculs de toutes les revues et de tous les éditeurs se font dans la phase `finalize`, après celui du périmètre. Les recalculs ciblés servent aux fusions de revues et d'éditeurs. Tous sont idempotents.
 """
 
 from sqlalchemy import Connection, text

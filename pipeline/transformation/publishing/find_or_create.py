@@ -97,9 +97,7 @@ def find_or_create_serial(
     if not title:
         return None
 
-    # La mise à plat précède tout : la clé de rapprochement et le titre affiché en dérivent
-    # tous deux, sans quoi un titre reçu avec des entités (`Wood &amp; Fire Safety`) a une
-    # clé étrangère à celle du même titre reçu en clair, et la même revue naît deux fois.
+    # La clé de comparaison et le titre affiché dérivent du texte brut : un titre reçu avec des entités (`Wood &amp; Fire Safety`) retrouve la même revue que reçu en clair.
     title = to_plain_text(title)
     title_normalized = normalize_text(title)
     issns = received_issns(issns)
@@ -115,7 +113,7 @@ def find_or_create_serial(
             )
 
     def _match_and_enrich(serial_id: int, *, with_openalex: bool = True) -> int:
-        """Enrichit le journal trouvé et enregistre son titre en forme de nom — accumulation des variantes pour un futur match par titre. Retourne son id."""
+        """Enrichit la revue trouvée et enregistre son titre comme forme de nom, pour les recherches par titre suivantes. Rend son id."""
         repo.enrich_serial(
             serial_id,
             openalex_id=openalex_id if with_openalex else None,
@@ -130,11 +128,9 @@ def find_or_create_serial(
         if openalex_id:
             jid = repo.find_serial_by_openalex_id(openalex_id)
             if jid:
-                # Cas openalex_id : enrichit sans passer openalex_id/oa_model
-                # (déjà présents par définition)
+                # La revue trouvée a déjà cet `openalex_id` et son modèle open access.
                 return _match_and_enrich(jid, with_openalex=False)
-            # openalex_id inconnu : on cherche quand même par ISSN/name_form
-            # avant de créer, pour rattacher l'openalex_id à un journal existant
+            # `openalex_id` inconnu : la recherche continue, pour le rattacher à une revue existante.
 
         # 2. Par chacun des ISSN valides, parmi les ISSN des revues
         for row in issns:
@@ -144,8 +140,7 @@ def find_or_create_serial(
             if jid:
                 return _match_and_enrich(jid)
 
-        # 3. Par forme de nom (priorité aux serials à ISSN électronique actif). Un titre dont la normalisation ne
-        # garde rien (alphabet non latin, symboles) ne désigne aucune revue.
+        # 3. Par forme de nom, priorité aux revues à ISSN électronique actif. Un titre vide une fois normalisé (alphabet non latin, symboles) ne désigne aucune revue.
         jid = (
             repo.find_serial_by_name_form(title_normalized, publisher_id)
             if title_normalized
