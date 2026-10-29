@@ -9,3 +9,5 @@ Thématiques que les sources attribuent aux publications.
 ## Détails `/subjects/{id}`
 
 Le graphe des sujets associés relie les sujets qui apparaissent dans les mêmes publications.
+
+![Sujets associés](../../img/screenshots/subject_graph.png)

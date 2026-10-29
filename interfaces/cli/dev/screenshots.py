@@ -6,7 +6,7 @@ Usage :
 
 L'application doit tourner (`bash start.sh`). Les captures des pages d'administration demandent une session : le script se connecte avec `SCREENSHOT_LOGIN` et `SCREENSHOT_PASSWORD`, lus dans l'environnement. Sans eux, il saute ces captures.
 
-Les pages d'exemple (une structure, l'établissement, une revue, un éditeur) se trouvent par la recherche de l'API, d'après les noms de `SAMPLES`. Les fichiers vont dans `docs/img/screenshots/`, sous le nom de chaque capture.
+Les pages d'exemple (une structure, l'établissement, une revue, un éditeur, un sujet) se trouvent par la recherche de l'API, d'après les noms de `SAMPLES`. Les fichiers vont dans `docs/img/screenshots/`, sous le nom de chaque capture.
 """
 
 import argparse
@@ -28,12 +28,13 @@ SAMPLES = {
     "institution": ("structures", "structures", "code", "uca"),
     "serial": ("serials", "serials", "title", "Journal of High Energy Physics"),
     "publisher": ("publishers", "publishers", "name", "Elsevier"),
+    "subject": ("subjects", "items", "label", "Volcanologie"),
 }
 
 
 @dataclass(frozen=True)
 class Shot:
-    """Une capture : le fichier produit, la page (avec `{structure}`, `{institution}`, `{serial}`, `{publisher}` remplacés par l'identifiant de l'exemple) et la session demandée."""
+    """Une capture : le fichier produit, la page (avec `{structure}`, `{institution}`, `{serial}`, `{publisher}`, `{subject}` remplacés par l'identifiant de l'exemple) et la session demandée."""
 
     name: str
     path: str
@@ -52,11 +53,16 @@ SHOTS = [
     Shot("journal_dashboard", "journals/{serial}"),
     Shot("publisher_dashboard", "publishers/{publisher}"),
     Shot("subjects", "subjects"),
-    Shot("admin_structure_management", "structures?structure={structure}", admin=True),
+    Shot("subject_graph", "subjects/{subject}"),
+    Shot("hal_problems", "hal-problems/affiliation-conflicts"),
+    # Le volet de l'établissement montre les identifiants de structure des sources, que les laboratoires n'ont pas.
+    Shot("admin_structure_management", "structures?structure={institution}", admin=True),
     Shot("admin_config", "admin/config", admin=True, full_page=True),
     Shot("admin_addresses", "admin/addresses?structure_id={institution}", admin=True),
-    Shot("admin_feedback", "admin/feedback?structure_id={institution}", admin=True),
+    Shot("admin_countries", "admin/countries", admin=True),
+    Shot("admin_pipeline", "admin/pipeline", admin=True),
     Shot("admin_publications", "publications?tab=suspect-merges", admin=True),
+    Shot("admin_orphan_contributions", "admin/orphan-contributions", admin=True),
 ]
 
 
