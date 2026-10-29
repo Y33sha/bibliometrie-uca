@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Y2GMOVUaw7o1KWQxuHcit71w8su3pjKzsGiMWxMMBgNFfXhPDfmf3MKGeDmIAND
+\restrict mGZlLMNrcsPPLIUpzVkH6WsJU8jzki2oF7GcR5xOAS1Ydk6JLuteK7XZe4Y8bdZ
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -2627,22 +2627,12 @@ COMMENT ON COLUMN sources.source_record_identifiers.removed_by IS 'Règle de cor
 --
 
 CREATE VIEW sources.known_dois AS
- SELECT sp.doi,
-    sp.source,
-    sp.publication_id
-   FROM sources.source_records sp
-  WHERE (sp.doi IS NOT NULL)
-UNION
  SELECT i.id_value AS doi,
     sp.source,
     sp.publication_id
    FROM (sources.source_records sp
      JOIN sources.source_record_identifiers i ON ((i.source_record_id = sp.id)))
-  WHERE ((i.id_type = 'doi'::public.source_identifier_type) AND (i.removed_by IS NULL) AND (i.id_value IS DISTINCT FROM
-        CASE
-            WHEN ((sp.corrections -> 'doi'::text) ? 'raw'::text) THEN ((sp.corrections -> 'doi'::text) ->> 'raw'::text)
-            ELSE sp.doi
-        END))
+  WHERE ((i.id_type = 'doi'::public.source_identifier_type) AND (i.removed_by IS NULL))
 UNION
  SELECT pr.target_doi AS doi,
     NULL::public.source_type AS source,
@@ -2678,7 +2668,7 @@ UNION
 -- Name: VIEW known_dois; Type: COMMENT; Schema: sources; Owner: -
 --
 
-COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI des enregistrements sources, DOI liés, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
+COMMENT ON VIEW sources.known_dois IS 'Tous les DOI connus : DOI actifs des enregistrements sources, cibles des relations, DOI DataCite déduits des identifiants arXiv. publication_id est la publication de l''enregistrement source, ou la publication d''origine de la relation ; NULL pour un enregistrement source orphelin.';
 
 
 --
@@ -5635,5 +5625,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Y2GMOVUaw7o1KWQxuHcit71w8su3pjKzsGiMWxMMBgNFfXhPDfmf3MKGeDmIAND
+\unrestrict mGZlLMNrcsPPLIUpzVkH6WsJU8jzki2oF7GcR5xOAS1Ydk6JLuteK7XZe4Y8bdZ
 
