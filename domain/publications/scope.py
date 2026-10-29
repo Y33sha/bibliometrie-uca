@@ -9,6 +9,7 @@ from domain.source_records.identifiers import (
     SourceIdentifierRole,
     SourceIdentifierType,
     active,
+    own_dois,
 )
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
@@ -69,31 +70,16 @@ class MatchabilityFacts(NamedTuple):
     primary_doi_has_target: bool = False
 
 
-def _own_dois(identifiers: Sequence[SourceIdentifier]) -> set[str]:
-    """DOI propres d'un enregistrement source, quel que soit leur statut : ses DOI `primary` ou `derived`, à défaut ses DOI `secondary`."""
-    dois = [
-        i
-        for i in identifiers
-        if i.id_type is SourceIdentifierType.DOI and i.role is not SourceIdentifierRole.RELATED
-    ]
-    strong = {
-        i.value
-        for i in dois
-        if i.role in (SourceIdentifierRole.PRIMARY, SourceIdentifierRole.DERIVED)
-    }
-    return strong or {i.value for i in dois}
-
-
 def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     """Vrai si l'enregistrement source entre dans la réconciliation. Il en est écarté si :
 
-    - tous ses DOI propres (`_own_dois`) ont un préfixe de `EXCLUDED_DOI_PREFIXES` ;
+    - tous ses DOI propres (`own_dois`), quel que soit leur statut, ont un préfixe de `EXCLUDED_DOI_PREFIXES` ;
     - il vient de DataCite et son DOI `primary` a une cible : l'enregistrement source est une forme secondaire d'une œuvre présente en base ;
     - son titre normalisé est dans `PARATEXT_TITLES` ;
     - il vient de ScanR et il est issu d'un dépôt HAL de `missing_hal_ids` ;
     - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a aucun DOI actif de rôle autre que `related`, aucune URL de copie et aucune clé de confirmation active.
     """
-    own = _own_dois(facts.identifiers)
+    own = own_dois(facts.identifiers)
     if own and all(doi.split("/", 1)[0] in EXCLUDED_DOI_PREFIXES for doi in own):
         return False
     if facts.source == Source.DATACITE and facts.primary_doi_has_target:

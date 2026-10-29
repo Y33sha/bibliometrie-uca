@@ -27,8 +27,9 @@ class MetadataForCorrection:
 
     title: str
     doc_type: str | None
-    doi: str | None
     serial_id: int | None
+    # DOI propres actifs d'un enregistrement source (`own_dois`), DOI d'une publication.
+    dois: frozenset[str] = frozenset()
     serial_type: str | None = None
     oa_status: str | None = None
     oa_model: str | None = None
@@ -39,8 +40,8 @@ class MetadataForCorrection:
     self_declared_preprint: bool | None = None
     # L'enregistrement source nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer).
     declares_conference: bool | None = None
-    # Type de l'éditeur qui a déposé le préfixe du DOI (`doi_prefixes`).
-    registrant_publisher_type: str | None = None
+    # Types des éditeurs qui ont déposé le préfixe de l'un des `dois` (`doi_prefixes`).
+    registrant_publisher_types: frozenset[str] = frozenset()
     # La monographie de l'enregistrement source est un volume d'actes (`monographs.proceedings`).
     in_proceedings_volume: bool | None = None
     # Forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
@@ -65,7 +66,7 @@ class MetadataForCorrection:
         return cls(
             title=title,
             doc_type=doc_type,
-            doi=doi,
+            dois=frozenset({doi} if doi else ()),
             serial_id=serial_id,
             serial_type=serial_type,
         )
@@ -191,11 +192,12 @@ class _AppliesTo(TypedDict, total=False):
     - `doc_type` : `str` ou `frozenset[str]`, comparé en minuscules. Limite la règle aux types plausibles.
     - `group_title` : `frozenset[str]`, comparé en minuscules.
     - `url_contains` : sous-chaîne d'au moins une des `urls`.
-    - `doi_contains` : sous-chaîne du DOI.
+    - `doi_contains` : sous-chaîne d'au moins un des `dois`.
     - `title_prefix_normalized` : préfixes de `normalize_text(title)`.
     - `title_regex` : motif cherché dans le titre.
     - `serial_id_present` : présence d'un `serial_id`.
-    - `doi_prefix_not_in` : le DOI existe et son préfixe est hors du tuple.
+    - `doi_prefix_not_in` : au moins un des `dois` a un préfixe hors du tuple.
+    - `registrant_publisher_type` : élément de `registrant_publisher_types`.
     - `author_count_max` : `author_count` connu et au plus égal à la valeur.
     """
 
@@ -490,7 +492,7 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         return any(value in (u or "") for u in (source_record.urls or ()))
     if key == "doi_contains":
         assert isinstance(value, str)
-        return value in (source_record.doi or "")
+        return any(value in doi for doi in source_record.dois)
     if key == "title_prefix_normalized":
         assert isinstance(value, tuple)
         if not source_record.title:
@@ -505,9 +507,9 @@ def _check_predicate(source_record: MetadataForCorrection, key: str, value: obje
         return (source_record.serial_id is not None) == value
     if key == "doi_prefix_not_in":
         assert isinstance(value, tuple)
-        if not source_record.doi:
-            return False
-        return source_record.doi.split("/", 1)[0] not in value
+        return any(doi.split("/", 1)[0] not in value for doi in source_record.dois)
+    if key == "registrant_publisher_type":
+        return value in source_record.registrant_publisher_types
     if key in _FIELDS:
         return bool(getattr(source_record, key) == value)
     raise ValueError(f"Prédicat inconnu : {key!r}")

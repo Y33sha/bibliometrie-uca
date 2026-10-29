@@ -96,7 +96,7 @@ def _hal(*values, removed_by=None):
 
 
 def _source_record(**overrides: object) -> UnaryCorrectionRow:
-    """Ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles."""
+    """Ligne de correction unaire ; une clé hors des champs de la ligne est un fait des règles, et `doi` donne le seul DOI propre."""
     row: dict[str, object] = {
         "id": 1,
         "source_id": "W1",
@@ -107,7 +107,6 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
         "source": "openalex",
         "title": "Un titre quelconque",
         "doc_type": "article",
-        "doi": None,
         "serial_id": None,
         "embargo_expired": False,
         "self_declared_preprint": False,
@@ -116,6 +115,8 @@ def _source_record(**overrides: object) -> UnaryCorrectionRow:
         "journal_diamond": False,
         "author_count": 1,
     }
+    if doi := overrides.pop("doi", None):
+        facts["dois"] = frozenset({doi})
     for key, value in overrides.items():
         (row if key in _ROW_FIELDS else facts)[key] = value
     return UnaryCorrectionRow(**row, facts=MetadataForCorrection(**facts))  # type: ignore[arg-type]

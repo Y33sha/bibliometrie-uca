@@ -17,7 +17,6 @@ def _facts(**overrides: object) -> MetadataForCorrection:
     defaults: dict[str, object] = {
         "title": "Un titre",
         "doc_type": "article",
-        "doi": None,
         "serial_id": None,
     }
     defaults.update(overrides)

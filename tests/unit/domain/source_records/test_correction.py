@@ -28,11 +28,12 @@ def _publication(**overrides: object) -> MetadataForCorrection:
     return MetadataForCorrection.for_publication(**defaults)  # type: ignore[arg-type]
 
 
-def _view(**overrides: object) -> MetadataForCorrection:
+def _view(doi: str | None = None, **overrides: object) -> MetadataForCorrection:
+    """Faits d'un enregistrement source ; `doi` : son seul DOI propre."""
     defaults: dict[str, object] = {
         "title": "Some title",
         "doc_type": None,
-        "doi": None,
+        "dois": frozenset({doi} if doi else ()),
         "serial_id": None,
         "oa_status": None,
         "urls": (),
@@ -41,7 +42,6 @@ def _view(**overrides: object) -> MetadataForCorrection:
         "embargo_expired": False,
         "self_declared_preprint": False,
         "declares_conference": False,
-        "registrant_publisher_type": None,
     }
     defaults.update(overrides)
     return MetadataForCorrection(**defaults)  # type: ignore[arg-type]
@@ -149,6 +149,13 @@ class TestThesisWithSerialRule:
     def test_no_doi_is_not_corrected(self):
         view = _view(doc_type="thesis", serial_id=42, doi=None)
         assert effective_metadata(view).doc_type is None
+
+    def test_publisher_doi_among_registry_dois_corrects_to_article(self):
+        view = _view(
+            doc_type="thesis", serial_id=42, dois=frozenset({self.ABES_DOI, self.PUBLISHER_DOI})
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "article"
 
     def test_no_serial_id_is_not_corrected(self):
         view = _view(doc_type="thesis", serial_id=None, doi=self.PUBLISHER_DOI)
@@ -352,14 +359,21 @@ class TestDoiRegistrantMediaRule:
     def test_doi_depose_par_un_editeur_de_presse_devient_media(self):
         """Cas réel : article de The Conversation, que Crossref type `posted-content`, sans revue."""
         corrected = effective_metadata(
-            _view(doc_type="preprint", registrant_publisher_type="media")
+            _view(doc_type="preprint", registrant_publisher_types=frozenset({"media"}))
         ).doc_type
         assert corrected is not None
         assert corrected.value == "media"
         assert corrected.rule == MetadataCorrectionRule.DOI_REGISTRANT_MEDIA_TO_MEDIA
 
+    def test_un_des_deposants_de_presse_suffit(self):
+        view = _view(
+            doc_type="article", registrant_publisher_types=frozenset({"commercial", "media"})
+        )
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "media"
+
     def test_autre_type_de_deposant_sans_effet(self):
-        view = _view(doc_type="article", registrant_publisher_type="commercial")
+        view = _view(doc_type="article", registrant_publisher_types=frozenset({"commercial"}))
         assert effective_metadata(view).doc_type is None
 
 
@@ -975,6 +989,11 @@ class TestDoiFigshareCollectionRule:
 
     def test_no_doi_not_matched(self):
         assert effective_metadata(_view(doc_type="other", doi=None)).doc_type is None
+
+    def test_collection_doi_among_other_dois_corrects_to_dataset(self):
+        view = _view(doc_type="other", dois=frozenset({"10.1038/nature12345", self.COLL}))
+        corrected = effective_metadata(view).doc_type
+        assert corrected is not None and corrected.value == "dataset"
 
     def test_doc_type_outside_whitelist_noop(self):
         # collection de type `book` (improbable) : type conservé

@@ -18,6 +18,8 @@ from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierRole,
     SourceIdentifierType,
+    active,
+    own_dois,
 )
 from domain.source_records.metadata_correction.rules import (
     MetadataCorrectionRule,
@@ -155,11 +157,10 @@ _DATACITE_DIRECT_RELATIONS_SQL = (
     "(" + ", ".join(f"'{relation}'" for relation in DATACITE_DIRECT_CONVERGENCE) + ")"
 )
 
-# Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`.
+# Expression SQL de chaque fait de `MetadataForCorrection`, sur l'enregistrement source `sr` et les jointures de `_SELECT`. Les faits de `_DOI_FACTS` se calculent sur les identifiants (`_unary_rows`).
 _FACTS: dict[str, str] = {
     "title": "sr.title",
     "doc_type": "sr.doc_type",
-    "doi": "sr.doi",
     "serial_id": "sr.serial_id",
     "serial_type": "j.serial_type::text",
     "oa_status": "sr.oa_status",
@@ -168,14 +169,14 @@ _FACTS: dict[str, str] = {
     "embargo_expired": "(sr.embargo_until IS NOT NULL AND sr.embargo_until <= current_date)",
     "self_declared_preprint": self_declared_preprint_sql(),
     "declares_conference": declares_conference_sql(),
-    "registrant_publisher_type": "rp.publisher_type::text",
     "in_proceedings_volume": "COALESCE(m.proceedings, false)",
     "group_title": source_extra(SourceExtra.GROUP_TITLE),
     "journal_diamond": f"COALESCE({diamond_journal_sql('j')}, false)",
     "source": "sr.source::text",
     "author_count": "sr.author_count",
 }
-assert set(_FACTS) == {f.name for f in fields(MetadataForCorrection)}, (
+_DOI_FACTS = frozenset({"dois", "registrant_publisher_types"})
+assert set(_FACTS) | _DOI_FACTS == {f.name for f in fields(MetadataForCorrection)}, (
     "projection des faits désynchronisée de MetadataForCorrection"
 )
 
@@ -214,22 +215,26 @@ _SELECT = f"""
     FROM source_records sr
     LEFT JOIN serials j ON j.id = sr.serial_id
     LEFT JOIN monographs m ON m.id = sr.monograph_id
-    LEFT JOIN doi_prefixes dp ON dp.prefix = split_part(sr.doi, '/', 1)
-    LEFT JOIN publishers rp ON rp.id = dp.publisher_id
 """
 
 
-def _unary_rows(rows: Iterable[Row[tuple[object, ...]]]) -> list[UnaryCorrectionRow]:
-    return [
-        UnaryCorrectionRow(
-            id=r.id,
-            source_id=r.source_id,
-            corrections=r.corrections,
-            facts=MetadataForCorrection(**{name: r._mapping[name] for name in _FACTS}),
-            identifiers=parse_identifiers(r.identifiers),
-        )
-        for r in rows
-    ]
+def _unary_row(
+    r: Row[tuple[object, ...]], registrant_types: Mapping[str, str]
+) -> UnaryCorrectionRow:
+    identifiers = parse_identifiers(r.identifiers)
+    dois = frozenset(own_dois(active(identifiers)))
+    types = {registrant_types.get(doi.split("/", 1)[0]) for doi in dois}
+    return UnaryCorrectionRow(
+        id=r.id,
+        source_id=r.source_id,
+        corrections=r.corrections,
+        facts=MetadataForCorrection(
+            **{name: r._mapping[name] for name in _FACTS},
+            dois=dois,
+            registrant_publisher_types=frozenset(t for t in types if t is not None),
+        ),
+        identifiers=identifiers,
+    )
 
 
 # Les colonnes du SET sont les clés des paramètres, typées par la table.
@@ -281,24 +286,33 @@ class SourceRecordCorrectionStore:
 
         Aucun filtre par règle : certaines règles valent quel que soit le type (URL theses.fr ou DUMAS), et un enregistrement source sans type reste candidat.
         """
-        return _unary_rows(self._conn.execute(text(_SELECT)))
+        return self._unary_rows(_SELECT, {})
 
     def fetch_for_unary_correction_by_serial(self, serial_id: int) -> list[UnaryCorrectionRow]:
         """Enregistrements sources d'une revue, pour le recalcul ciblé après un changement de son type dans l'administration."""
-        return _unary_rows(
-            self._conn.execute(text(_SELECT + " WHERE sr.serial_id = :jid"), {"jid": serial_id})
-        )
+        return self._unary_rows(_SELECT + " WHERE sr.serial_id = :jid", {"jid": serial_id})
 
     def fetch_for_unary_correction_by_hal_ids(self, hal_ids: list[str]) -> list[UnaryCorrectionRow]:
         """Enregistrements sources HAL de ces identifiants : dépôts d'origine des enregistrements sources ScanR d'une correction ciblée."""
         if not hal_ids:
             return []
-        return _unary_rows(
-            self._conn.execute(
-                text(_SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)"),
-                {"ids": hal_ids},
-            )
+        return self._unary_rows(
+            _SELECT + " WHERE sr.source = 'hal' AND sr.source_id = ANY(:ids)", {"ids": hal_ids}
         )
+
+    def _unary_rows(self, query: str, params: Mapping[str, object]) -> list[UnaryCorrectionRow]:
+        registrant_types: dict[str, str] = dict(
+            self._conn.execute(
+                text("""
+                    SELECT dp.prefix, p.publisher_type::text
+                    FROM doi_prefixes dp JOIN publishers p ON p.id = dp.publisher_id
+                    WHERE p.publisher_type IS NOT NULL
+                """)
+            )
+            .tuples()
+            .all()
+        )
+        return [_unary_row(r, registrant_types) for r in self._conn.execute(text(query), params)]
 
     def persist_corrections(self, updates: list[CorrectionUpdate]) -> int:
         """Écrit en lot les colonnes corrigées, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le type et les identifiants sont des clés. Renvoie le nombre de lignes."""

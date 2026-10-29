@@ -169,6 +169,35 @@ def test_doi_of_a_media_registrant_becomes_media(sa_sync_conn):
     assert raw["doc_type"]["corrected_by"] == "DOI_REGISTRANT_MEDIA_TO_MEDIA"
 
 
+def test_registrant_rule_reads_the_active_own_dois(sa_sync_conn):
+    """Le DOI de presse actif d'un work OpenAlex décide du type ; un DOI de presse retiré par la correction est ignoré."""
+    conn = sa_sync_conn
+    publisher = insert_publisher(conn, "The Conversation Media Group", publisher_type="media")
+    insert_doi_prefix(conn, "10.64628", ra="Crossref", publisher_id=publisher)
+    secondary = SourceIdentifierRole.SECONDARY
+    kept = _source_record(
+        conn,
+        source_id="W1",
+        doc_type="article",
+        identifiers=[SourceIdentifier(SourceIdentifierType.DOI, "10.64628/aak.x", secondary)],
+    )
+    removed = _source_record(
+        conn,
+        source_id="W2",
+        doc_type="article",
+        identifiers=[
+            SourceIdentifier(
+                SourceIdentifierType.DOI, "10.64628/aak.y", secondary, "UNRESOLVED_DOI_TO_NULL"
+            )
+        ],
+    )
+
+    _apply(conn)
+
+    assert _state(conn, kept)[0] == "media"
+    assert _state(conn, removed)[0] == "article"
+
+
 def test_reversibility_invariant(sa_sync_conn):
     conn = sa_sync_conn
     media_serial = _seed_serial(conn, "media")
