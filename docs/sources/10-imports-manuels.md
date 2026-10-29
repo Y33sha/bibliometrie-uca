@@ -7,22 +7,17 @@
 Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://github.com/Y33sha/bibliometrie-uca/blob/master/interfaces/cli/imports/import_persons.py) → table `hr_records`.
 - Contient : email, nom, prénom, département, rôle, dates de début/fin;
 - Rattaché à une personne du référentiel via `hr_records.person_id`;
-- Sert de filtre dans la [liste des personnes](../guide-utilisateur/pages-publiques/04-personnes.md#liste-persons) (filtre "Base RH") et permet d'afficher une *blue checkmark* sur les personnes concernées.
+- Les personnes présentes dans la base RH se filtrent et sont marquées d'une coche dans la [liste des personnes](../guide-utilisateur/pages-publiques/04-personnes.md#liste-persons).
 
-Données fournies datées du 15/12/2025. La date est documentée dans la colonne `hr_export_date`. Cette extraction contient uniquement les **enseignants-chercheurs UCA**: pas les chercheurs CNRS, Inrae, etc., ni les personnels BIATSS UCA.
+Le département RH est affiché pour information. Les liens entre personnes et structures viennent des [contributions](../glossaire.md#contribution).
 
-L'**affiliation** renseignée dans cette source est une chaîne de caractères (`UFR Médecine Pr Paramédic`, `IUT Info 43`) qui ne permet pas un mapping avec les laboratoires. Elle est affichée pour information, mais ne sert pas à créer les liens personne-structure dans l'appli. Les **liens personne-structure** dépendent des [*contributions*](../glossaire.md#contribution).
-
-La [création de personnes](../pipeline/09-persons.md) se fait via les contributions des publications, indépendamment de l'existence d'une entrée `hr_records`.
-La FK sur la table `hr_records` permet:
-- d'enrichir les données sur les personnes;
-- d'empêcher la suppression de ces personnes lors de fusions de doublons.
+Les personnes naissent des contributions des publications ([création de personnes](../pipeline/09-persons.md)), fiche RH ou non. La fiche RH enrichit la personne, et une personne qui en a une est toujours conservée par une fusion.
 
 ## Données APC
 
 `python -m interfaces.cli.imports.import_apc <fichier>` importe un fichier de frais de publication dans `apc_payments`. Le script reconnaît trois formats à leurs colonnes :
 
-- le jeu de données [OpenAPC](../glossaire.md#openapc), fichier brut [`apc_de.csv`](https://github.com/OpenAPC/openapc-de/blob/master/data/apc_de.csv) (OpenAPC ne propose pas d'API) : frais d'open access déclarés par les établissements participants ;
+- le jeu de données [OpenAPC](../glossaire.md#openapc), fichier brut [`apc_de.csv`](https://github.com/OpenAPC/openapc-de/blob/master/data/apc_de.csv) : frais d'open access déclarés par les établissements participants ;
 - le fichier « frais hors OA » de l'enquête nationale : autres frais de publication ;
 - la réponse d'un établissement à l'enquête APC. Un montant négatif y annule un paiement.
 

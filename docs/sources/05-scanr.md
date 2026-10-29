@@ -110,7 +110,7 @@ Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `doma
 
 ### Identifiants ScanR
 
-L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publication dans cette source, sans séparateur. Sondage sur 10 000 documents UCA :
+L'`id` ScanR concatène le préfixe de source et l'identifiant natif de la publication dans cette source, sans séparateur. Sondage sur 10 000 documents :
 
 | Préfixe | Part | Exemple |
 |---|---|---|

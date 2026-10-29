@@ -35,7 +35,7 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 
 ## Exemple de payload
 
-*Preprint* `10.17181/b5jnp-h2c36` (déposé sur l'entrepôt du CERN, un auteur UCA). Réduit aux champs que le pipeline lit ; résumé tronqué.
+*Preprint* `10.17181/b5jnp-h2c36` (déposé sur l'entrepôt du CERN). Réduit aux champs que le pipeline lit ; résumé tronqué.
 
 ```json
 {
