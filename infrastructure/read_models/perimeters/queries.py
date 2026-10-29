@@ -10,12 +10,15 @@ from sqlalchemy import Connection, text
 from domain.config import (
     BRAND_HUE_KEY,
     DEFAULT_BRAND_HUE,
+    DEFAULT_INSTITUTION_COUNTRY,
+    INSTITUTION_COUNTRY_KEY,
     PERIMETER_EXTRACTION_KEY,
     PERIMETER_PERSONS_KEY,
     SITE_TITLE_KEY,
 )
 from infrastructure.read_models.perimeters.models import (
     InstitutionOut,
+    PerimeterCountryOut,
     PerimeterOut,
     PerimeterStructureItem,
 )
@@ -124,6 +127,14 @@ def get_persons_perimeter_root_ids(conn: Connection) -> list[int]:
     return list(row.root_structure_ids) if row.root_structure_ids else []
 
 
+def get_institution_country(conn: Connection) -> str:
+    """Pays de l'établissement lu dans `config`, `DEFAULT_INSTITUTION_COUNTRY` si la clé est absente."""
+    value = conn.execute(
+        text("SELECT value FROM config WHERE key = :key"), {"key": INSTITUTION_COUNTRY_KEY}
+    ).scalar_one_or_none()
+    return value if isinstance(value, str) else DEFAULT_INSTITUTION_COUNTRY
+
+
 def get_persons_perimeter_name(conn: Connection) -> str:
     """Nom du périmètre des personnes, qui désigne l'établissement dans l'interface, ou son code s'il manque. Vide sans périmètre configuré."""
     code = persons_perimeter_code(conn)
@@ -158,6 +169,24 @@ class PerimetersQueries:
             title=values.get(SITE_TITLE_KEY) or None,
             brand_hue=hue if isinstance(hue, int) else DEFAULT_BRAND_HUE,
         )
+
+    def persons_perimeter_countries(self) -> list[PerimeterCountryOut]:
+        """Pays des organisations ROR des structures du périmètre des personnes, du plus fréquent au moins fréquent."""
+        rows = self._conn.execute(
+            text(
+                "SELECT lower(r.country_code) AS code, c.name, count(*) AS structure_count "
+                "FROM structures s "
+                "JOIN ror_organizations r ON r.ror_id = s.ror_id "
+                "LEFT JOIN countries c ON c.code = lower(r.country_code) "
+                "WHERE s.id = ANY(:ids) "
+                "GROUP BY 1, 2 ORDER BY 3 DESC, 1"
+            ),
+            {"ids": get_persons_structure_ids_list(self._conn)},
+        ).all()
+        return [
+            PerimeterCountryOut(code=r.code, name=r.name, structure_count=r.structure_count)
+            for r in rows
+        ]
 
     def list_perimeters_with_structures(self) -> list[PerimeterOut]:
         """Tous les périmètres, avec leurs structures racines et leur nombre de structures, lu dans `perimeter_structures`."""

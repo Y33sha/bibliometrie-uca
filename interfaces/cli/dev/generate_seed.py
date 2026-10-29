@@ -92,7 +92,7 @@ COMMON_SEED = SeedSpec(
 INSTITUTION_SEED = SeedSpec(
     description=(
         "Seed d'établissement : structures, tutelles, périmètres, formes de noms, "
-        "clés de configuration des périmètres et titre de l'application."
+        "clés de configuration propres à l'établissement."
     ),
     tables=(
         {"table": tables.structures},

@@ -22,6 +22,14 @@ class PerimeterOut(BaseModel):
     is_persons: bool
 
 
+class PerimeterCountryOut(BaseModel):
+    """Pays d'organisations ROR du périmètre des personnes, avec le nombre de structures rattachées à une organisation ROR de ce pays."""
+
+    code: str
+    name: str | None
+    structure_count: int
+
+
 class InstitutionOut(BaseModel):
     """Établissement servi par l'instance : nom et structures racines du périmètre des personnes, titre et teinte de l'application."""
 

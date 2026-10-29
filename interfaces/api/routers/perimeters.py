@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from application.ports.repositories.perimeter_repository import PerimeterUpdate
 from application.services.perimeters import PerimeterService
 from infrastructure.read_models.perimeters.models import (
+    PerimeterCountryOut,
     PerimeterOut,
 )
 from infrastructure.read_models.perimeters.queries import PerimetersQueries
@@ -30,6 +31,14 @@ def list_perimeters(
     `structures` contient seulement les racines ; `structure_count` compte toutes les structures du périmètre, racines et descendantes.
     """
     return queries.list_perimeters_with_structures()
+
+
+@router.get("/countries", response_model=list[PerimeterCountryOut])
+def list_perimeter_countries(
+    queries: PerimetersQueries = Depends(perimeters_queries),
+) -> list[PerimeterCountryOut]:
+    """Pays des organisations ROR des structures du périmètre des personnes, avec leur nombre de structures. Sert à choisir le pays de l'établissement."""
+    return queries.persons_perimeter_countries()
 
 
 @router.post("", response_model=CreatedIdResponse)

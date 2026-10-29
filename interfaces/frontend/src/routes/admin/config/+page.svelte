@@ -35,6 +35,8 @@
   ];
   type PerimeterStructure = components["schemas"]["PerimeterStructureItem"];
   type Perimeter = components["schemas"]["PerimeterOut"];
+  type PerimeterCountry = components["schemas"]["PerimeterCountryOut"];
+  type Country = components["schemas"]["CountryOut"];
 
   let configs: ConfigItem[] = $state([]);
   let perimeters: Perimeter[] = $state([]);
@@ -206,6 +208,32 @@
     hueDraft = null;
   }
 
+  // Pays de l'établissement : les pays ROR des structures du périmètre des personnes en tête, puis le reste du référentiel.
+  const INSTITUTION_COUNTRY_KEY = "institution_country";
+  const institutionCountryItem = $derived(configByKey(INSTITUTION_COUNTRY_KEY));
+  let perimeterCountries: PerimeterCountry[] = $state([]);
+  let countries: Country[] = $state([]);
+  const otherCountries = $derived.by(() => {
+    const listed = new Set(perimeterCountries.map((c) => c.code));
+    return countries.filter((c) => !listed.has(c.code));
+  });
+
+  async function loadCountries() {
+    [perimeterCountries, countries] = await Promise.all([
+      api<PerimeterCountry[]>("/api/perimeters/countries"),
+      api<Country[]>("/api/countries"),
+    ]);
+  }
+
+  async function saveInstitutionCountry(code: string) {
+    try {
+      await configApi.setValue(INSTITUTION_COUNTRY_KEY, code);
+      await load();
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), "error");
+    }
+  }
+
   async function toggleLabType(type: string) {
     const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
     await configApi.setValue("laboratories_display_types", next);
@@ -269,7 +297,10 @@
     saving = false;
   }
 
-  onMount(load);
+  onMount(() => {
+    load();
+    loadCountries();
+  });
 </script>
 
 <PageHeader title="Configuration" />
@@ -457,6 +488,34 @@
           />
           <span class="config-value-inline">{hueShown}°</span>
         </div>
+      </div>
+    {/if}
+    {#if institutionCountryItem}
+      <div class="config-row">
+        <span class="config-label">
+          <Tooltip text="Une publication co-affiliée à un autre pays est une collaboration internationale.">
+            <span class="role-phase">Pays de l'établissement</span>
+          </Tooltip>
+        </span>
+        <select
+          class="select"
+          aria-label="Pays de l'établissement"
+          value={institutionCountryItem.value}
+          onchange={(e) => saveInstitutionCountry((e.target as HTMLSelectElement).value)}
+        >
+          {#if perimeterCountries.length > 0}
+            <optgroup label="Pays des structures du périmètre">
+              {#each perimeterCountries as c (c.code)}
+                <option value={c.code}>{c.name ?? c.code.toUpperCase()} ({c.structure_count} structure{c.structure_count > 1 ? "s" : ""})</option>
+              {/each}
+            </optgroup>
+          {/if}
+          <optgroup label="Autres pays">
+            {#each otherCountries as c (c.code)}
+              <option value={c.code}>{c.name}</option>
+            {/each}
+          </optgroup>
+        </select>
       </div>
     {/if}
     <div class="config-row stacked">

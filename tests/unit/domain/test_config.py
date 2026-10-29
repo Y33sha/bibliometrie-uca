@@ -7,6 +7,7 @@ import pytest
 
 from domain.config import (
     BRAND_HUE_KEY,
+    INSTITUTION_COUNTRY_KEY,
     MAX_YEAR,
     MIN_YEAR,
     SITE_TITLE_KEY,
@@ -96,6 +97,16 @@ class TestTeinte:
     def test_une_valeur_hors_de_0_a_359_est_refusee(self, valeur):
         with pytest.raises(ValidationError, match="0 à 359"):
             normalize_config_value(BRAND_HUE_KEY, valeur)
+
+
+class TestPaysEtablissement:
+    def test_le_code_est_ramene_en_minuscules(self):
+        assert normalize_config_value(INSTITUTION_COUNTRY_KEY, " BE ") == "be"
+
+    @pytest.mark.parametrize("valeur", [None, "", "fra", "xx", 33, ["fr"]])
+    def test_une_valeur_autre_qu_un_code_pays_est_refusee(self, valeur):
+        with pytest.raises(ValidationError, match="code pays"):
+            normalize_config_value(INSTITUTION_COUNTRY_KEY, valeur)
 
 
 def test_une_cle_sans_forme_imposee_passe_telle_quelle():

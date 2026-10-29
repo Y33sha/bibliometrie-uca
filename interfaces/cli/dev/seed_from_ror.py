@@ -16,10 +16,13 @@ from pathlib import Path
 from domain.config import (
     BRAND_HUE_KEY,
     DEFAULT_BRAND_HUE,
+    DEFAULT_INSTITUTION_COUNTRY,
+    INSTITUTION_COUNTRY_KEY,
     PERIMETER_EXTRACTION_KEY,
     PERIMETER_PERSONS_KEY,
     SITE_TITLE_KEY,
 )
+from domain.countries import normalize_country_code
 from domain.normalize import normalize_text
 from domain.structures.identifiers import normalize_ror_id
 from domain.structures.name_forms import is_short_form
@@ -67,6 +70,7 @@ _SITE_TITLE_DESCRIPTION = (
     "Titre de l'application. Vide : « Bibliométrie » suivi du nom de l'établissement."
 )
 _BRAND_HUE_DESCRIPTION = "Teinte de l'interface : angle OKLCH en degrés, de 0 à 359."
+_INSTITUTION_COUNTRY_DESCRIPTION = "Pays de l'établissement, code ISO 3166-1. Une publication co-affiliée à un autre pays est une collaboration internationale."
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,7 @@ class RorOrganization:
     acronyms: tuple[str, ...]
     labels: tuple[str, ...]
     child_ids: tuple[str, ...]
+    country_code: str | None = None
 
     @property
     def acronym(self) -> str | None:
@@ -94,7 +99,7 @@ class InstitutionSeed:
 
 
 def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
-    """Fiche ROR (API v2) réduite à son identifiant, ses noms, ses types et ses filles.
+    """Fiche ROR (API v2) réduite à son identifiant, ses noms, ses types, ses filles et le pays de sa première localisation.
 
     Quand le nom affiché tient en un mot (« CRAN »), le nom est le premier libellé de plusieurs mots, et le nom affiché sert d'acronyme.
     """
@@ -114,6 +119,14 @@ def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
         full_name = next((n for n in labels if " " in n and not _UNIT_CODE.match(n)), None)
     acronyms = values("acronym") or ((display,) if full_name else ())
     relationships = [as_mapping(r) for r in as_sequence(record.get("relationships"))]
+    locations = [as_mapping(loc) for loc in as_sequence(record.get("locations"))]
+    country_code = (
+        normalize_country_code(
+            as_str(as_mapping(locations[0].get("geonames_details")).get("country_code"))
+        )
+        if locations
+        else None
+    )
     return RorOrganization(
         ror_id=_ror_short_id(as_str(record.get("id")) or ""),
         name=full_name or display,
@@ -125,6 +138,7 @@ def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
             for r in relationships
             if r.get("type") == "child"
         ),
+        country_code=country_code,
     )
 
 
@@ -250,6 +264,13 @@ def build_institution_seed(
     config.append({"key": SITE_TITLE_KEY, "value": "", "description": _SITE_TITLE_DESCRIPTION})
     config.append(
         {"key": BRAND_HUE_KEY, "value": DEFAULT_BRAND_HUE, "description": _BRAND_HUE_DESCRIPTION}
+    )
+    config.append(
+        {
+            "key": INSTITUTION_COUNTRY_KEY,
+            "value": root.country_code or DEFAULT_INSTITUTION_COUNTRY,
+            "description": _INSTITUTION_COUNTRY_DESCRIPTION,
+        }
     )
 
     rows_by_table = {

@@ -3,6 +3,7 @@
 from enum import StrEnum
 from typing import NamedTuple
 
+from domain.countries import NO_COUNTRY_CODE, normalize_country_code
 from domain.errors import ValidationError
 from domain.types import JsonValue
 
@@ -106,8 +107,20 @@ BRAND_HUE_KEY = "brand_hue"
 DEFAULT_BRAND_HUE = 196
 """Teinte de l'interface quand la clé est absente."""
 
+INSTITUTION_COUNTRY_KEY = "institution_country"
+"""Clé du pays de l'établissement : code ISO 3166-1 en minuscules. Une publication co-affiliée à un autre pays est une collaboration internationale."""
+
+DEFAULT_INSTITUTION_COUNTRY = "fr"
+"""Pays de l'établissement quand la clé est absente."""
+
 INSTITUTION_CONFIG_KEYS: frozenset[str] = frozenset(
-    {PERIMETER_EXTRACTION_KEY, PERIMETER_PERSONS_KEY, SITE_TITLE_KEY, BRAND_HUE_KEY}
+    {
+        PERIMETER_EXTRACTION_KEY,
+        PERIMETER_PERSONS_KEY,
+        SITE_TITLE_KEY,
+        BRAND_HUE_KEY,
+        INSTITUTION_COUNTRY_KEY,
+    }
 )
 """Clés propres à l'établissement."""
 
@@ -145,6 +158,11 @@ def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
         if teinte is None or not (0 <= teinte <= 359):
             raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
         return teinte
+    if key == INSTITUTION_COUNTRY_KEY:
+        code = normalize_country_code(value) if isinstance(value, str) else None
+        if code is None or code == NO_COUNTRY_CODE:
+            raise ValidationError(f"`{key}` attend un code pays à deux lettres ; reçu : {value!r}")
+        return code
     if key in CAP_KEYS:
         if value is None or (isinstance(value, str) and not value.strip()):
             return 0

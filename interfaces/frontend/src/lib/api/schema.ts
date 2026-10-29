@@ -2010,6 +2010,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/perimeters/countries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Perimeter Countries
+         * @description Pays des organisations ROR des structures du périmètre des personnes, avec leur nombre de structures. Sert à choisir le pays de l'établissement.
+         */
+        get: operations["list_perimeter_countries_api_perimeters_countries_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/perimeters/{perimeter_id}": {
         parameters: {
             query?: never;
@@ -4234,6 +4254,18 @@ export interface components {
             label: string;
             /** Count */
             count: number;
+        };
+        /**
+         * PerimeterCountryOut
+         * @description Pays d'organisations ROR du périmètre des personnes, avec le nombre de structures rattachées à une organisation ROR de ce pays.
+         */
+        PerimeterCountryOut: {
+            /** Code */
+            code: string;
+            /** Name */
+            name: string | null;
+            /** Structure Count */
+            structure_count: number;
         };
         /** PerimeterCreate */
         PerimeterCreate: {
@@ -9182,6 +9214,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_perimeter_countries_api_perimeters_countries_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerimeterCountryOut"][];
                 };
             };
         };
