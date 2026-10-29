@@ -1,4 +1,4 @@
-# Statistiques
+# Stats
 
 `/stats`
 
@@ -10,4 +10,4 @@ L'indicateur choisit ce que montre chaque barre :
 
 Les barres se comparent par année, laboratoire, éditeur, revue ou [organisation partenaire](../../glossaire.md#organisation-partenaire), en nombre ou en part. Les filtres sont ceux de la [liste des publications](02-publications.md#liste-publications).
 
-![Statistiques](../../img/screenshots/stats.png)
+![Stats](../../img/screenshots/stats.png)

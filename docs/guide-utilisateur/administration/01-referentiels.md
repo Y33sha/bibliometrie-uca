@@ -1,6 +1,6 @@
 # Référentiels
 
-## Structures
+## Labos
 
 `/structures`, en session d'administration
 
@@ -8,7 +8,7 @@ Le volet de gestion d'une structure règle ses détails, ses tutelles et ses for
 
 ![Gestion d'une structure](../../img/screenshots/admin_structure_management.png)
 
-## Personnes
+## Chercheurs
 
 `/persons`, en session d'administration
 
@@ -23,6 +23,8 @@ Le volet de gestion d'une personne permet :
 
 [Contributions](../../glossaire.md#contribution) de l'établissement sans personne, à attribuer à une personne existante ou nouvelle.
 
+![Contributions orphelines](../../img/screenshots/admin_orphan_contributions.png)
+
 ## Publications
 
 `/publications`, en session d'administration
@@ -33,6 +35,6 @@ Le volet d'une publication compare les métadonnées de chaque source, une colon
 
 ![Fusions suspectes](../../img/screenshots/admin_publications.png)
 
-## Éditeurs et revues
+## Éditeurs et publications en série
 
-En session d'administration, la fiche d'un éditeur ou d'une revue permet de le modifier et de le fusionner avec un doublon. Changer le type d'une revue change le type de ses publications.
+En session d'administration, la fiche d'un éditeur ou d'une publication en série permet de les modifier et de les fusionner avec un doublon. Changer le type d'une publication en série change le type de ses publications.

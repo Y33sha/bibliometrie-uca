@@ -1,6 +1,6 @@
-# Revues et éditeurs
+# Publications en série et éditeurs
 
-## Revues `/journals`
+## Publications en série `/journals`
 
 Revues, séries d'actes de conférence, collections de livres, archives ouvertes, serveurs de preprints et médias.
 

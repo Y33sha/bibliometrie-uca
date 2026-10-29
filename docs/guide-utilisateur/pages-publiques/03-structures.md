@@ -1,10 +1,10 @@
-# Structures
+# Labos
 
 ## Liste `/structures`
 
 Établissements, organismes de recherche, laboratoires, équipes et services.
 
-![Structures](../../img/screenshots/structures.png)
+![Labos](../../img/screenshots/structures.png)
 
 ## Détails `/structures/{id}`
 

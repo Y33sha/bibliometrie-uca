@@ -11,3 +11,5 @@ Le bouton « Qualité de la détection » liste les rattachements créés ou rej
 ## Pays des adresses `/admin/countries`
 
 Correction des pays des adresses. Une correction se propage aux publications, sans relancer le pipeline.
+
+![Pays des adresses](../../img/screenshots/admin_countries.png)
