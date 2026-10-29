@@ -1,11 +1,11 @@
-"""Entrée de `serials` d'une monographie, d'après celles que portent ses enregistrements."""
+"""Choix de l'entrée de `serials` d'une monographie, parmi celles de ses enregistrements sources."""
 
 from collections.abc import Sequence
 from typing import NamedTuple
 
 
 class MonographSerialChoice(NamedTuple):
-    """Entrée de `serials` retenue pour une monographie, ou le conflit qui empêche d'en retenir une."""
+    """Entrée de `serials` retenue pour une monographie, ou les entrées en conflit."""
 
     serial_id: int | None
     conflict: tuple[int, ...] = ()
@@ -14,10 +14,7 @@ class MonographSerialChoice(NamedTuple):
 def choose_monograph_serial(
     with_issn: Sequence[int], without_issn: Sequence[int], series_id: int | None = None
 ) -> MonographSerialChoice:
-    """Entrée de `serials` d'une monographie, parmi celles que portent ses enregistrements.
-
-    La seule entrée à ISSN est sa collection. À défaut, la série sans ISSN reconnue entre plusieurs volumes (`series_id`). À défaut, la seule entrée sans ISSN, qui décrit le volume lui-même. À défaut, aucune. Plusieurs entrées au même niveau forment un conflit : rien ne dit laquelle retenir.
-    """
+    """Entrée retenue : l'entrée à ISSN, qui est la collection, sinon la série sans ISSN reconnue entre plusieurs volumes (`series_id`), sinon l'entrée sans ISSN, qui décrit le volume. Plusieurs entrées au même rang forment un conflit."""
     if len(with_issn) > 1:
         return MonographSerialChoice(None, tuple(with_issn))
     if with_issn:
