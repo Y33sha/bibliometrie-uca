@@ -3204,7 +3204,7 @@ export interface components {
         };
         /**
          * ConsolidatedContributionOut
-         * @description Contribution consolidée (liens certifiés person ↔ publication).
+         * @description Contribution d'une personne à la publication.
          */
         ConsolidatedContributionOut: {
             /** Author Position */
@@ -3336,7 +3336,7 @@ export interface components {
         };
         /**
          * DoiNamespaceConflict
-         * @description Enregistrements de `record_serial` dont le DOI tombe dans l'espace de noms `namespace` de `namespace_serial`.
+         * @description Enregistrements de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`.
          *
          *     `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part des DOI qui désigne `namespace_serial`, un DOI partagé entre plusieurs revues au prorata de ses enregistrements. `records` compte les enregistrements de `record_serial`, `sources` les répartit par source.
          */
@@ -3368,7 +3368,7 @@ export interface components {
         };
         /**
          * DoiPrefixInfo
-         * @description Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`).
+         * @description Préfixe DOI rattaché à un éditeur (`doi_prefixes`).
          */
         DoiPrefixInfo: {
             /** Prefix */
@@ -3380,9 +3380,7 @@ export interface components {
         };
         /**
          * EcoleDoctorale
-         * @description École doctorale d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
-         *
-         *     Lu depuis la colonne JSONB `source_extras.ecoles_doctorales`. `extra="allow"` tolère les clés inconnues du JSONB.
+         * @description École doctorale d'une thèse, d'après theses.fr (`source_extras.ecoles_doctorales`). `extra="allow"` accepte les clés inconnues.
          */
         EcoleDoctorale: {
             /** Nom */
@@ -4182,9 +4180,7 @@ export interface components {
         };
         /**
          * PartenaireThese
-         * @description Partenaire de recherche d'une thèse (metadata theses.fr), champ de `ThesisMeta` dans la réponse détail publication.
-         *
-         *     Lu depuis la colonne JSONB `source_extras.partenaires`. `extra="allow"` tolère les clés inconnues du JSONB.
+         * @description Partenaire de recherche d'une thèse, d'après theses.fr (`source_extras.partenaires`). `extra="allow"` accepte les clés inconnues.
          */
         PartenaireThese: {
             /** Nom */
@@ -4646,7 +4642,7 @@ export interface components {
         };
         /**
          * PublicationDetailResponse
-         * @description Détail complet d'une publication : métadonnées + sources + contributions.
+         * @description Détail complet d'une publication : métadonnées, sources et contributions.
          */
         PublicationDetailResponse: {
             publication: components["schemas"]["PublicationDetailCore"];
@@ -4685,7 +4681,7 @@ export interface components {
         };
         /**
          * PublicationListItem
-         * @description Ligne de `/api/publications` (liste + recherche).
+         * @description Ligne de `/api/publications` (liste et recherche).
          */
         PublicationListItem: {
             /** Id */
@@ -4799,7 +4795,7 @@ export interface components {
          * PublicationsFacetsResponse
          * @description Facettes dynamiques pour la page publications.
          *
-         *     Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est vide tant qu'un labo unique n'est pas sélectionné. `corresponding`, `in_perimeter` sont vides sans `person_id`.
+         *     Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est rempli seulement quand un seul laboratoire est sélectionné, `corresponding` et `in_perimeter` seulement avec `person_id`.
          */
         PublicationsFacetsResponse: {
             /** Years */
@@ -4923,7 +4919,7 @@ export interface components {
          * PublishersFacetsResponse
          * @description Facettes dynamiques pour `/api/publishers`.
          *
-         *     Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le nom du pays. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
+         *     Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le nom du pays. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte écarte le filtre de sa dimension.
          */
         PublishersFacetsResponse: {
             /** Publisher Types */
@@ -4958,7 +4954,7 @@ export interface components {
          * RelatedPublicationOut
          * @description Une publication apparentée, vue depuis la publication courante.
          *
-         *     `relation_type` est exprimé du point de vue de la publication courante (les relations entrantes sont inversées). `publication_id`/`title`/`publication_year`/`doc_type` sont renseignés quand la cible est au corpus ; le `doi` peut être absent (cible au corpus sans DOI), auquel cas la cible se lie par son `publication_id` ; une cible hors corpus n'a, elle, que son `doi`.
+         *     `relation_type` se lit depuis la publication courante : les relations entrantes sont inversées. Une cible du corpus a son identifiant, son titre, son année et son type, et son DOI s'il existe ; elle se lie par son identifiant. Une cible hors corpus a son seul DOI.
          */
         RelatedPublicationOut: {
             /** Relation Type */
@@ -5061,7 +5057,7 @@ export interface components {
          * SerialDetailResponse
          * @description GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
          *
-         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload est exposé tel quel : son exploration précède le choix des colonnes typées qu'on en tirerait.
+         *     Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload DOAJ est rendu tel quel.
          */
         SerialDetailResponse: {
             /** Id */
@@ -5145,9 +5141,7 @@ export interface components {
         };
         /**
          * SerialListItem
-         * @description Ligne de la liste paginée `/api/serials` — un résumé ; le profil complet est `SerialDetailResponse`.
-         *
-         *     `publisher_name` est joint depuis `publishers`, `publication_count` est un agrégat sur `publications` ; ni l'un ni l'autre ne sont des colonnes natives de la table `serials`.
+         * @description Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`). Le nom de l'éditeur vient de `publishers`, le nombre de publications des publications.
          */
         SerialListItem: {
             /** Id */
@@ -5220,7 +5214,7 @@ export interface components {
          * SerialsFacetsResponse
          * @description Facettes de `/api/serials`.
          *
-         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ expose `Indexée` / `Non indexée`. `publications` compte les revues avec et sans publication.
+         *     Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ a pour libellés `Indexée` et `Non indexée`. `publications` compte les revues avec et sans publication.
          */
         SerialsFacetsResponse: {
             /** Serial Types */
@@ -5271,7 +5265,7 @@ export interface components {
          * SourceContributionOut
          * @description Contribution source d'un enregistrement source, avec sa contribution : les contributions sources d'un même auteur dans la publication.
          *
-         *     `position` : rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes de la contribution source. `contribution_id` et `reference_position`, position de la contribution source de référence de la contribution : absents pour une contribution source hors des contributions (collective, ou enregistrement écarté de l'alignement). `person_id` : personne de la contribution. `method`, `score`, `margin` : entrée de la contribution source dans sa contribution ; score et marge en bits, pour le modèle.
+         *     `position` est le rang d'auteur dans l'enregistrement source, à partir de 0 ; il manque pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes. `contribution_id` et `reference_position` (position de la contribution source de référence de la contribution) manquent pour une contribution source hors contribution : collective, ou d'un enregistrement écarté de l'alignement. `person_id` est la personne de la contribution. `method`, `score` et `margin` décrivent l'entrée de la contribution source dans sa contribution ; score et marge sont en bits.
          */
         SourceContributionOut: {
             /** Id */

@@ -1,4 +1,4 @@
-"""Query services pour les revues (table `serials`)."""
+"""Lectures des revues (table `serials`)."""
 
 from collections import Counter, defaultdict
 from collections.abc import Iterator
@@ -101,17 +101,15 @@ def _build_serial_where(
     skip_oa_models: bool = False,
     skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
-    """Construit la clause WHERE pour `list_serials` et `serials_facets`.
+    """Clause WHERE de `list_serials` et `serials_facets`.
 
-    Le terme de recherche porte sur le titre et, quand il a la forme d'un ISSN, sur les ISSN de la revue.
-
-    Les flags `skip_*` permettent à chaque facette d'exclure sa propre dimension du filtrage — convention « comptes exclusifs » identique à celle des facettes publications.
+    Le terme de recherche vise le titre et, quand il a la forme d'un ISSN, les ISSN de la revue. Les drapeaux `skip_*` écartent le filtre de la dimension d'une facette, comme pour les publications.
     """
     binds: dict[str, object] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
         searched: list[str] = []
-        # title_normalized passe par `normalize_text` à l'ingestion ; la query doit subir la même normalisation pour matcher les titres contenant ponctuation ou accents.
+        # `title_normalized` passe par `normalize_text` au moissonnage : la recherche subit la même normalisation, pour trouver les titres à ponctuation ou accents.
         normalized = normalize_text(filters.search)
         if normalized:
             searched.append("j.title_normalized LIKE '%' || :search || '%'")
@@ -126,7 +124,7 @@ def _build_serial_where(
         parts.append("j.publisher_id = :publisher_id")
         binds["publisher_id"] = filters.publisher_id
     if filters.serial_types and not skip_serial_types:
-        # serial_type est un enum Postgres → cast explicite en text pour comparer à un array text[].
+        # `serial_type` est une enum PostgreSQL, convertie en texte pour la comparer à un `text[]`.
         parts.append("j.serial_type::text = ANY(:serial_types)")
         binds["serial_types"] = filters.serial_types
     if filters.is_in_doaj is not None and not skip_doaj:
@@ -152,8 +150,7 @@ _SORT_MAP = {
 }
 
 
-# Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN. Un titre dont la
-# normalisation ne garde rien (alphabet non latin, symboles) n'en rapproche aucun autre.
+# Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN. Un titre que la normalisation vide (alphabet non latin, symboles) reste à l'écart.
 _SAME_TITLE_GROUPS = f"""
     SELECT title_normalized AS value, array_agg(id) AS ids
     FROM serials j
@@ -372,7 +369,7 @@ class SerialQueries:
             binds_jt,
         ).all()
         jt_counts = {r.value: r.n for r in jt_rows}
-        # On expose toutes les options de l'enum (count=0 si pas observé) — UX cohérente avec les facettes publications qui montrent les options connues, pas seulement celles présentes.
+        # Toutes les options de l'enum sont rendues, à 0 si absentes, comme les facettes des publications montrent toutes les options connues.
         serial_types_facet = [
             FacetOption(
                 value=v,
@@ -498,7 +495,7 @@ class SerialQueries:
     def get_serial_subjects(self, serial_id: int, *, limit: int) -> list[SubjectFrequency]:
         """Sujets des publications de la revue, les plus fréquents d'abord.
 
-        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui porte une ligne par source pour une même paire (publication, sujet).
+        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui a une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(entity_subjects_sql("p.serial_id = :id")),

@@ -32,7 +32,7 @@ class PublisherFilters:
 
 
 class DoiPrefixInfo(BaseModel):
-    """Préfixe DOI rattaché à un éditeur (lecture seule, vient de la table `doi_prefixes`)."""
+    """Préfixe DOI rattaché à un éditeur (`doi_prefixes`)."""
 
     prefix: str
     ra: str
@@ -66,7 +66,7 @@ class PublisherListResponse(PaginatedResponse):
 class PublishersFacetsResponse(BaseModel):
     """Facettes dynamiques pour `/api/publishers`.
 
-    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le nom du pays. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte est exclusif à sa dimension (filtre courant moins cette facette).
+    Pour `publisher_types`, `label` reprend `PUBLISHER_TYPE_LABELS_FR` ; pour `countries` (code ISO observé en base), `label` est le nom du pays. `publications` compte les éditeurs avec et sans publication du périmètre. Chaque décompte écarte le filtre de sa dimension.
     """
 
     publisher_types: list[FacetOption]

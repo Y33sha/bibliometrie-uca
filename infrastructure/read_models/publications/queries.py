@@ -1,4 +1,4 @@
-"""Lecture des publications (router publications).
+"""Lectures des publications, pour les routes `/api/publications`.
 
 Le package est organisé par thème, une classe par module :
 - `list` : liste paginée, exports CSV des publications et des thèses
@@ -33,11 +33,11 @@ class PublicationsQueries(
 ):
     """Lectures sur les publications.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre là où il sert : ses appelants n'ont pas à le connaître pour lister des publications.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre elle-même : ses appelants se passent de le connaître.
     """
 
     def __init__(self, conn: Connection, *, open_connection: Callable[[], Connection]) -> None:
-        """`open_connection` ouvre les connexions supplémentaires dont le calcul parallèle des facettes se sert. Elle est fournie par la composition root, qui y met les caractéristiques de la requête en cours ; l'adapter reçoit ses connexions, il n'en ouvre pas de son propre chef."""
+        """`open_connection` ouvre les connexions supplémentaires dont le calcul parallèle des facettes se sert. La composition root la fournit, avec les caractéristiques de la requête en cours : l'adaptateur reçoit ses connexions, sans en ouvrir lui-même."""
         self._conn = conn
         self._open_connection = open_connection
 

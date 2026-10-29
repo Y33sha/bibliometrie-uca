@@ -1,4 +1,4 @@
-"""Liste paginée + export CSV des publications."""
+"""Liste paginée et exports CSV des publications et des thèses."""
 
 import json
 import logging
@@ -36,9 +36,7 @@ logger = logging.getLogger(__name__)
 # Libellés des statuts thèse pour l'export CSV.
 _THESES_STATUS_LABELS = {"thesis": "Soutenue", "ongoing_thesis": "En cours"}
 
-# Pivot des identifiants source (alias `sd` sur `source_records`) : une colonne `<source>_id`
-# par source d'extraction. Partagé par les deux listes qui exposent cinq identifiants ; l'export
-# thèses n'en expose que quatre (pas `wos`) et garde son pivot en clair.
+# Pivot des identifiants sources (alias `sd` sur `source_records`) : une colonne `<source>_id` par source moissonnée. Les deux listes qui donnent cinq identifiants le partagent ; l'export des thèses en donne quatre (sans `wos`) et garde son propre pivot.
 _SOURCE_ID_COLUMNS = ",\n                    ".join(
     f"max(CASE WHEN sr.source = '{source.value}' THEN sr.source_id END) AS {source.value}_id"
     for source in (Source.HAL, Source.OPENALEX, Source.SCANR, Source.WOS, Source.THESES)
@@ -61,7 +59,7 @@ _APC_SORT = (
 
 
 def _thesis_author(column: str) -> str:
-    """Sous-requête scalaire : `column` lu sur l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou si aucune contribution d'auteur n'a de personne.
+    """Sous-requête scalaire : la colonne demandée de l'auteur de la thèse `p` (personne aliasée `pe`, contribution aliasée `ath`). NULL hors thèse, ou sans contribution d'auteur rattachée à une personne.
 
     L'ordre sur `person_id` désigne la même personne à chaque appel. La contribution se lit dans l'index unique `(publication_id, person_id)`, puis la personne par sa clé primaire : une jointure laisse le planificateur parcourir un index entier à chaque ligne."""
     return f"""(SELECT {column}
@@ -135,7 +133,7 @@ def _sort_clauses(sort: str, *, person_filter: bool = False) -> tuple[str, str]:
 
 
 def _plain_text(s: str | None) -> str:
-    """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur n'interprète pas le balisage — il l'afficherait tel quel dans la cellule."""
+    """Texte brut pour le CSV : mise à plat du titre par `to_plain_text`. Un tableur afficherait le balisage tel quel dans la cellule."""
     return to_plain_text(s)
 
 
@@ -232,7 +230,7 @@ class PublicationListQueries:
         per_page: int,
         sort: str,
     ) -> PublicationListResponse:
-        """Liste paginée des publications avec sources, labos, journal."""
+        """Liste paginée des publications, avec leurs sources, laboratoires et revue."""
         context = filter_context(self._conn, filters)
         perimeter_structure_ids = context.perimeter_structure_ids
         self._conn.execute(text("SET LOCAL jit = off"))
@@ -246,7 +244,7 @@ class PublicationListQueries:
             else WhereClause("NULL", {})
         )
 
-        # Quand la recherche match un sujet (cf. _search_clause), on remonte d'abord les publis dont le *titre* match — les correspondances purement via sujet sont reléguées en deuxième.
+        # Quand la recherche trouve un sujet (`search_clause`), les publications dont le titre répond passent en premier ; celles trouvées par leurs seuls sujets suivent.
         if filters.search:
             order = (
                 "(CASE WHEN p.title_normalized ILIKE :sort_search_pat THEN 0 ELSE 1 END), " + order
@@ -368,18 +366,18 @@ class PublicationListQueries:
         sort: str,
         columns: list[str],
     ) -> Iterator[str]:
-        """Export CSV (sans pagination) qui reflète le tableau affiché : mêmes filtres que list_publications (même constructeur de WHERE) ET mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et accès toujours présents.
+        """Export CSV du tableau affiché : mêmes filtres que la liste (`publication_filter_where`), mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
 
-        Rend le CSV par blocs, à emballer dans une réponse en flux : composer le fichier entier en mémoire coûtait une quinzaine de fois son poids, entre le tampon qui double en croissant, la copie de sa relecture et l'ajout du BOM en tête.
+        Le CSV sort par blocs, pour une réponse en flux : composer le fichier entier en mémoire coûterait une quinzaine de fois son poids (tampon qui double en croissant, copie à la relecture, marque d'ordre des octets en tête).
 
-        **Cette méthode n'est pas un générateur**, et ne doit pas le devenir : la requête s'exécute à l'appel, sous la connexion que la dépendance FastAPI tient ouverte pour la durée du traitement. Cette connexion est refermée avant que le corps de la réponse ne parte ; un générateur qui interrogerait la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire sont parcourues ensuite.
+        La méthode doit rester hors générateur : la requête s'exécute à l'appel, sur la connexion que la dépendance FastAPI tient ouverte le temps du traitement. Cette connexion se ferme avant l'envoi du corps de la réponse ; un générateur qui lirait la base pendant l'envoi la trouverait fermée. Seules les lignes déjà en mémoire se parcourent ensuite.
         """
         self._conn.execute(text("SET LOCAL jit = off"))
         context = filter_context(self._conn, filters)
         where_clause, binds = publication_filter_where(filters, context)
         sort_join, order = _sort_clauses(sort, person_filter=bool(filters.person_id))
 
-        # Le statut HAL coûte deux sous-requêtes par ligne : il n'est calculé que si sa colonne est demandée.
+        # Le statut HAL coûte deux sous-requêtes par ligne : il se calcule seulement si sa colonne est demandée.
         hal_status = (
             hal_status_expression(context.lab_hal_collection)
             if not columns or "hal_status" in columns
@@ -458,7 +456,7 @@ class PublicationListQueries:
     def export_theses_csv(
         self, *, filters: PublicationFilters, sort: str, columns: list[str]
     ) -> Iterator[str]:
-        """Export CSV de la page thèses, qui reflète le tableau affiché : mêmes filtres, même tri, mêmes colonnes (`columns` = clés des colonnes visibles ; si vide, toutes). Titre et accès toujours présents.
+        """Export CSV du tableau affiché par la page des thèses : mêmes filtres, même tri, mêmes colonnes (clés des colonnes visibles, toutes si `columns` est vide). Titre et accès sont toujours présents.
 
         Rendu par blocs, aux mêmes conditions que l'export des publications : la requête s'exécute à l'appel, le parcours qui suit lit des lignes en mémoire.
         """

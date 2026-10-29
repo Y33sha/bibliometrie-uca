@@ -67,7 +67,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
 
 
 def _source_contributions(conn: Connection, publication_id: int) -> list[SourceContributionOut]:
-    """Contributions sources des enregistrements sources de la publication, avec leur groupe et leur entrée dans le groupe."""
+    """Contributions sources des enregistrements sources de la publication, avec leur contribution et leur entrée dans la contribution."""
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
