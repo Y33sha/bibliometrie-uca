@@ -208,6 +208,16 @@ AVANT :
 APRÈS :
     (rien)
 
+## Définition qui mêle l'essentiel et l'accidentel
+
+Une définition dit ce qu'est l'entité. La façon dont elle est alimentée (saisie à la main, import, calcul) est un détail d'implémentation : elle va ailleurs, ou nulle part.
+
+AVANT :
+    | structure | `structures` | Établissement, laboratoire, site ou service, saisi à la main |
+
+APRÈS :
+    | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
+
 ## Mot qui fait poser une question au lecteur
 
 Relire hors du contexte du projet. Un mot qui fait poser une question (meilleure selon quel critère ? lequel parmi d'autres ?) se remplace par un mot plus simple qui ne la pose pas.

@@ -7,11 +7,11 @@ Le modèle sépare ce que disent les sources du référentiel que le pipeline en
 | Niveau | Notion | Table | Définition |
 |---|---|---|---|
 | source | enregistrement source | `source_records` | Description d'un document par une source (HAL, OpenAlex, Crossref…) |
-| source | contribution source | `source_contributions` | Auteur tel que la source le donne dans un enregistrement source |
+| source | contribution source | `source_contributions` | Personne telle que la source la nomme dans un enregistrement source, avec son rôle (auteur, direction de thèse, jury…) |
 | référentiel | publication | `publications` | Document unique, qui réunit les enregistrements sources qui le décrivent |
-| référentiel | contribution | `contributions` | Participation d'un auteur à une publication, qui réunit ses contributions sources |
-| référentiel | personne | `persons` | Chercheur unifié à travers les sources |
-| référentiel | structure | `structures` | Établissement, laboratoire, site ou service, saisi à la main |
+| référentiel | contribution | `contributions` | Participation d'une personne à une publication, qui réunit ses contributions sources |
+| référentiel | personne | `persons` | Personne réelle, identifiée à travers les sources |
+| référentiel | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
 
 ```mermaid
 flowchart TB
