@@ -1,20 +1,11 @@
-"""Vocabulaire canonique des relations entre publications + mapping des sources.
+"""Relations entre publications distinctes : types, et traduction des vocabulaires de DataCite (`relationType`) et de Crossref (clés de `relation`).
 
-Les relations modélisées ici lient des publications **distinctes** (pas des doublons). Deux sources déclarent des relations, avec des vocabulaires différents :
+Restent hors du vocabulaire, et donnent `None` :
 
-- **DataCite** : `relatedIdentifiers[].relationType` (`IsSupplementTo`, `IsPartOf`…), stocké dans `source_records.source_extras.related_identifiers`.
-- **Crossref** : clés de `source_extras.relation` (`is-preprint-of`, `erratum`…), stocké dans `source_records.source_extras.relation`.
-
-Ce module fige un jeu de **types canoniques** (directionnels) et le mapping de chaque vocabulaire source vers ce jeu. Les types hors scope renvoient `None`.
-
-Hors scope (renvoient `None`), avec leur raison :
-
-- **Même œuvre** (versions, formes identiques) : `IsVersionOf` / `HasVersion` / `IsIdenticalTo` / `IsNewVersionOf` / `IsVariantFormOf` / `IsOriginalFormOf` côté DataCite ; `is-version-of` / `has-version` / `new_version` / `is-identical-to` / `is-same-as` côté Crossref. → déduplication (phase `metadata_correction`), pas une relation. Quand `IsVersionOf` ou `IsVariantFormOf` relient deux œuvres (cf. `meme_oeuvre_declaree`), `extract_datacite_distinct_works` les isole, et leur couple de `doc_type` les type.
-- **Citations** : `References` / `Cites` / `IsCitedBy` / `IsReferencedBy` ; `references` / `is-referenced-by` / `is-cited-by`. → graphe bibliographique.
-- **Peer-review / discussion** : `has-review` / `is-review-of` / `is-comment-on` / `has-comment` (Crossref), `IsReviewedBy` (DataCite). → évaluation ou commentaire (le porteur de `is-comment-on` est un `peer_review`), pas une œuvre apparentée.
-- **Vague / dérivation** : `IsDerivedFrom`, `IsSourceOf`, `Requires`, `Continues`, `IsPublishedIn` ; `has-manifestation`, `is-related-material`, `has-related-material`, `is-basis-for`.
-
-Directionnalité : chaque relation est stockée depuis la publication qui la **déclare** (toujours en corpus), avec un type qui porte le sens. Les paires inverses (ex. `IsSupplementTo` / `IsSupplementedBy`) mappent vers des types canoniques inverses. La déduplication des arêtes inverses (quand les deux bouts sont en corpus et déclarent tous deux) relève de la phase de population.
+- les formes d'une même œuvre (versions, formes identiques), que la phase `metadata_correction` fusionne ;
+- les citations ;
+- les évaluations et commentaires (`is-review-of`, `is-comment-on`) ;
+- les dérivations vagues (`IsDerivedFrom`, `is-related-material`…).
 """
 
 from __future__ import annotations
@@ -31,10 +22,7 @@ from domain.types import JsonValue, as_str
 
 
 class RelationType(StrEnum):
-    """Types canoniques de relation entre publications distinctes (directionnels).
-
-    Convention : `<sujet> <type> <objet>`, le sujet étant la publication porteuse. Chaque type a son inverse pour pouvoir stocker la relation depuis le bout qui la déclare (l'autre bout pouvant être hors corpus).
-    """
+    """Type orienté de relation : `<sujet> <type> <objet>`. Chaque type a son inverse : la relation s'enregistre depuis la publication qui la déclare, l'autre pouvant être hors corpus."""
 
     IS_PREPRINT_OF = "is_preprint_of"
     HAS_PREPRINT = "has_preprint"
@@ -50,13 +38,10 @@ class RelationType(StrEnum):
     HAS_CONCERN = "has_concern"
     IS_TRANSLATION_OF = "is_translation_of"
     HAS_TRANSLATION = "has_translation"
-    # Data paper ↔ jeu de données décrit. Sert aussi à détecter et retyper les
-    # data papers (un article qui `describes` un dataset en est un).
+    # Data paper → jeu de données décrit. Un article qui décrit un jeu de données est un data paper.
     DESCRIBES = "describes"
     IS_DESCRIBED_BY = "is_described_by"
-    # Apparentée, type à qualifier : deux publications distinctes partagent une clé de confirmation
-    # (DOI distincts) mais leur couple de doc_type ne permet pas (encore) d'inférer une relation
-    # précise. Symétrique (non directionnel), bucket d'attente du signal #2.
+    # Symétrique : deux publications distinctes partagent une clé de confirmation, et leurs types de document ne précisent pas la relation.
     IS_RELATED_TO = "is_related_to"
 
 
@@ -79,60 +64,48 @@ RELATION_PAIR_LABELS: dict[RelationType, str] = {
     RelationType.IS_DESCRIBED_BY: "data paper/jeu de données",
     RelationType.IS_RELATED_TO: "apparentées, type à qualifier",
 }
-"""Nom du lien qu'un type et son inverse désignent en commun : le même lien, vu de chaque bout.
-
-Dit les relations dans les mots d'un lecteur, là où l'enum nomme leur direction. Le frontend formule les mêmes types depuis la publication qui les porte (« Préprint de », « Corrigé par ») : deux phrasés pour deux points de vue.
-"""
+"""Libellé commun à un type et à son inverse."""
 
 
-# Mapping DataCite `relationType` → type canonique. Les types absents (citations,
-# même-œuvre, vague — cf. docstring) sont hors scope et renvoient `None`.
+# Types DataCite du vocabulaire.
 _DATACITE_MAP: dict[str, RelationType] = {
     "IsSupplementTo": RelationType.IS_SUPPLEMENT_TO,
     "IsSupplementedBy": RelationType.HAS_SUPPLEMENT,
-    # Partie structurelle (ouvrage ↔ chapitre, actes ↔ communication). Les pièces
-    # intra-package (sous-fichiers d'un même dépôt de données) sont collapsées en
-    # déduplication en amont (`metadata_correction`), donc absentes ici en régime.
+    # Partie d'un ensemble (chapitre d'un ouvrage, communication d'actes). La phase `metadata_correction` fusionne les fichiers d'un même dépôt de données.
     "IsPartOf": RelationType.IS_PART_OF,
     "HasPart": RelationType.HAS_PART,
-    # Data paper ↔ dataset décrit.
     "Describes": RelationType.DESCRIBES,
     "IsDescribedBy": RelationType.IS_DESCRIBED_BY,
     "IsDocumentedBy": RelationType.IS_DESCRIBED_BY,
 }
 
-# Mapping Crossref (clés de `source_extras.relation`) → type canonique.
+# Clés Crossref du vocabulaire.
 _CROSSREF_MAP: dict[str, RelationType] = {
     CROSSREF_PREPRINT_OF: RelationType.IS_PREPRINT_OF,
     "has-preprint": RelationType.HAS_PREPRINT,
     "is-supplement-to": RelationType.IS_SUPPLEMENT_TO,
     "is-supplemented-by": RelationType.HAS_SUPPLEMENT,
-    # Famille correction : la clé est portée par l'article, pointant vers son erratum
-    # (erratum/corrigendum/addendum). Sens : l'article « a une correction ».
+    # Correction : l'article déclare la clé, vers son erratum.
     "erratum": RelationType.HAS_CORRECTION,
     "correction": RelationType.HAS_CORRECTION,
     "corrigendum": RelationType.HAS_CORRECTION,
     "addendum": RelationType.HAS_CORRECTION,
     "clarification": RelationType.HAS_CORRECTION,
     "corrected": RelationType.IS_CORRECTION_OF,
-    # Rétractation : l'article pointe vers l'avis de rétractation ou de retrait.
+    # Rétractation : l'article déclare la clé, vers l'avis de rétractation ou de retrait.
     "retraction": RelationType.HAS_RETRACTION,
     "withdrawal": RelationType.HAS_RETRACTION,
-    # Expression of concern : avis éditorial de doute post-publication (un cran sous
-    # la rétractation), déclaré par l'article vers l'avis.
+    # Avis de préoccupation de l'éditeur : l'article déclare la clé, vers l'avis.
     "expression_of_concern": RelationType.HAS_CONCERN,
     "is-translation-of": RelationType.IS_TRANSLATION_OF,
     "has-translation": RelationType.HAS_TRANSLATION,
-    # Data paper ↔ dataset décrit. Crossref l'exprime via `is-part-of` (data paper
-    # Copernicus → dataset). Cible attendue = un dataset (à confirmer par audit).
+    # Data paper → jeu de données : Crossref l'exprime par `is-part-of` (data papers de Copernicus).
     "is-part-of": RelationType.DESCRIBES,
     "has-part": RelationType.IS_DESCRIBED_BY,
 }
 
 
-# Paires inverses : une même relation vue depuis l'autre bout. `is_related_to` est symétrique
-# (son propre inverse). Sert à présenter une relation entrante du point de vue de la publication
-# courante (sur la fiche de B, l'arête `A is_preprint_of B` se lit `B has_preprint A`).
+# Paires inverses : sur la page de B, `A is_preprint_of B` se lit `B has_preprint A`.
 _INVERSE_PAIRS: tuple[tuple[RelationType, RelationType], ...] = (
     (RelationType.IS_PREPRINT_OF, RelationType.HAS_PREPRINT),
     (RelationType.IS_SUPPLEMENT_TO, RelationType.HAS_SUPPLEMENT),
@@ -157,19 +130,19 @@ def inverse_relation(relation: RelationType) -> RelationType:
 
 
 def map_datacite_relation(relation_type: str) -> RelationType | None:
-    """Type canonique d'un `relationType` DataCite, ou `None` si hors scope."""
+    """Type d'un `relationType` DataCite, ou `None`."""
     return _DATACITE_MAP.get(relation_type)
 
 
 def map_crossref_relation(relation_key: str) -> RelationType | None:
-    """Type canonique d'une clé `source_extras.relation` Crossref, ou `None` si hors scope."""
+    """Type d'une clé de `relation` Crossref, ou `None`."""
     return _CROSSREF_MAP.get(relation_key)
 
 
 def extract_datacite_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
-    """Relations en scope déclarées par un payload DataCite, depuis `source_extras.related_identifiers` (`[{doi, relation_type}]`). Renvoie `(type canonique, DOI cible)` ; ignore les types hors scope et les entrées sans DOI."""
+    """Relations du vocabulaire déclarées par un enregistrement source DataCite : `(type, DOI cible)`. Les entrées sans DOI sont ignorées."""
     related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
     if not isinstance(related, list):
         return []
@@ -187,7 +160,7 @@ def extract_datacite_relations(
 def extract_datacite_distinct_works(
     source_extras: dict[str, JsonValue] | None, own_doi: str | None, doc_type: str | None
 ) -> list[str]:
-    """DOI qu'un payload DataCite déclare comme autre forme de son œuvre, quand la relation relie deux œuvres.
+    """DOI qu'un enregistrement source DataCite déclare comme autre forme de son œuvre, quand la relation relie deux œuvres.
 
     `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, que lit `meme_oeuvre_declaree`.
     """
@@ -207,11 +180,8 @@ def extract_datacite_distinct_works(
     return out
 
 
-# Types de document « dépendants » : une publication de ce type est, par nature, sujet d'une relation
-# dirigée vers l'œuvre principale (le preprint est_preprint_de l'article publié, l'erratum corrige
-# l'article, le dataset complète l'article). Point de vérité partagé : le signal #2 l'utilise pour
-# inférer la relation d'une paire à clé de confirmation partagée (`infer_shared_key_relation`), le
-# signal #3 pour typer un rapprochement par titre (phase `relations`).
+# Types de document dépendants, sujets d'une relation vers l'œuvre principale : preprint, erratum, jeu de données.
+# Ils typent la relation de deux publications qui partagent une clé (`infer_shared_key_relation`) ou un titre (phase `relations`).
 DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
     "preprint": RelationType.IS_PREPRINT_OF,
     "erratum": RelationType.IS_CORRECTION_OF,
@@ -222,11 +192,10 @@ DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
 def infer_shared_key_relation(
     doc_type_a: str | None, doc_type_b: str | None
 ) -> tuple[RelationType, str] | None:
-    """Infère la relation entre deux publications **distinctes** qui partagent une clé de confirmation, depuis leur couple de `doc_type`.
+    """Relation de deux publications distinctes qui partagent une clé de confirmation, d'après leurs types de document : `(type, sujet)`, le sujet valant `"a"`, `"b"`, ou `"sym"` pour `is_related_to`. `None` pour une évaluation par les pairs.
 
-    Renvoie `(type, sujet)` où `sujet` désigne le bout porteur de la relation dirigée : `"a"` (sujet = A), `"b"` (sujet = B), ou `"sym"` pour `is_related_to` (symétrique — le caller oriente par convention). Renvoie `None` si la paire est hors scope (peer-review).
-
-    Un couple typé (preprint, erratum, dataset, ou ouvrage ↔ chapitre) donne une relation précise et dirigée ; tout autre couple donne `is_related_to`, en attendant d'être qualifié."""
+    Un preprint, un erratum, un jeu de données, ou un chapitre face à son ouvrage, donnent une relation orientée. Les autres couples donnent `is_related_to`.
+    """
     if "peer_review" in (doc_type_a, doc_type_b):
         return None
     for dependent, relation in DEPENDENT_DOC_TYPE_RELATIONS.items():
@@ -245,7 +214,7 @@ def infer_shared_key_relation(
 def extract_crossref_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
-    """Relations en scope déclarées par un payload Crossref, depuis `source_extras.relation` (`{clé: [{id, id-type, …}]}`). Renvoie `(type canonique, DOI cible)` ; ne garde que les cibles de type DOI et les clés en scope."""
+    """Relations du vocabulaire déclarées par un enregistrement source Crossref : `(type, DOI cible)`. Seules comptent les cibles de type DOI."""
     relation = (source_extras or {}).get(SourceExtra.RELATION)
     if not isinstance(relation, dict):
         return []
