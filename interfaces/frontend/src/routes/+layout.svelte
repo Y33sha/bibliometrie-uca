@@ -24,11 +24,12 @@
 
   let mobileNavOpen = $state(false);
   type NavMenu = "referentiels" | "hal-problems" | "admin" | "account";
-  // Un seul sous-menu est ouvert à la fois. Un sous-menu ouvert au survol se referme quand la souris le quitte ; un sous-menu ouvert au clic reste ouvert.
+  // Un seul sous-menu est ouvert à la fois. Un sous-menu ouvert au survol se referme quand la souris le quitte ; un clic le garde ouvert. Un sous-menu ouvert au clic reste ouvert.
   let openMenu = $state<NavMenu | null>(null);
   let openedByHover = false;
-  // Délai d'ouverture au survol : un passage rapide de la souris n'ouvre pas le sous-menu.
-  const HOVER_OPEN_DELAY_MS = 250;
+  // Délais du survol : un passage rapide de la souris n'ouvre pas le sous-menu, un léger débordement ne le referme pas.
+  const HOVER_OPEN_DELAY_MS = 300;
+  const HOVER_CLOSE_DELAY_MS = 300;
   let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 
   // Referme le menu mobile et le sous-menu ouvert après chaque navigation.
@@ -44,18 +45,18 @@
   }
 
   function toggleMenu(menu: NavMenu) {
-    setOpenMenu(openMenu === menu ? null : menu);
+    setOpenMenu(openMenu === menu && !openedByHover ? null : menu);
   }
 
   function openOnHover(e: PointerEvent, menu: NavMenu) {
-    if (e.pointerType !== "mouse" || openMenu === menu) return;
-    clearTimeout(hoverTimer);
-    hoverTimer = setTimeout(() => setOpenMenu(menu, true), HOVER_OPEN_DELAY_MS);
-  }
-  function closeOnHoverLeave(e: PointerEvent, menu: NavMenu) {
     if (e.pointerType !== "mouse") return;
     clearTimeout(hoverTimer);
-    if (openMenu === menu && openedByHover) setOpenMenu(null);
+    if (openMenu !== menu) hoverTimer = setTimeout(() => setOpenMenu(menu, true), HOVER_OPEN_DELAY_MS);
+  }
+  function closeOnHoverLeave(e: PointerEvent) {
+    if (e.pointerType !== "mouse") return;
+    clearTimeout(hoverTimer);
+    if (openMenu && openedByHover) hoverTimer = setTimeout(() => setOpenMenu(null), HOVER_CLOSE_DELAY_MS);
   }
 
   // Un sous-menu se referme quand le focus le quitte, sur Échap (le focus revient à son bouton) et sur un clic hors des sous-menus.
@@ -91,7 +92,7 @@
 
 <!-- Sous-menu de la navigation : ouvert et fermé au clic ou au clavier, ouvert au survol prolongé de la souris. -->
 {#snippet dropdown(menu: NavMenu, label: Snippet, items: Snippet, { active = false, right = false, switchLink = false } = {})}
-  <div class="nav-dropdown" class:active role="none" onfocusout={(e) => closeOnFocusLeave(e, menu)} onpointerenter={(e) => openOnHover(e, menu)} onpointerleave={(e) => closeOnHoverLeave(e, menu)}>
+  <div class="nav-dropdown" class:active role="none" onfocusout={(e) => closeOnFocusLeave(e, menu)} onpointerenter={(e) => openOnHover(e, menu)} onpointerleave={closeOnHoverLeave}>
     <button id="nav-button-{menu}" class="nav-link" class:active class:nav-switch-link={switchLink} aria-expanded={openMenu === menu} aria-controls="nav-menu-{menu}" onclick={() => toggleMenu(menu)}>{@render label()} <span class="chevron" aria-hidden="true"></span></button>
     <div id="nav-menu-{menu}" class="nav-dropdown-menu" class:nav-dropdown-menu-right={right} class:open={openMenu === menu}>
       {@render items()}
