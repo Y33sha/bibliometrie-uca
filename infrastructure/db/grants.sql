@@ -135,7 +135,7 @@ TO bibliometrie_app;
 
 GRANT UPDATE ON
     structures.addresses, publishing.apc_payments, ops.config, publishing.doi_prefixes, publishing.monographs, sources.source_contributions,
-    sources.source_records, publications.contributions
+    sources.source_records, sources.source_record_identifiers, publications.contributions
 TO bibliometrie_app;
 
 -- Ce qui n'est délibérément pas accordé : TRUNCATE, l'écriture sur les tables du pipeline,

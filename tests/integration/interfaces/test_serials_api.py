@@ -507,6 +507,22 @@ class TestTypeChangeImpact:
             cur.execute("SELECT serial_type FROM serials WHERE id = %s", (jid,))
             assert cur.fetchone()["serial_type"] == "journal"
 
+    def test_corrections_with_identifiers_are_counted(self, auth_client):
+        """Régression : la correction unaire rejouée écrit les statuts des identifiants, et le rôle de l'API n'en avait pas le droit (erreur 500)."""
+        jid = seed_serial(serial_type="journal")
+        publication_id = _publication(doc_type="article", serial_id=jid)
+        _seed_record(
+            publication_id=publication_id,
+            serial_id=jid,
+            doc_type="article",
+            doi=f"10.1/{uniq('x')}",
+        )
+        r = auth_client.post(
+            f"/api/serials/{jid}/type-change-impact", json={"serial_type": "media"}
+        )
+        assert r.status_code == 200
+        assert r.json()["count"] == 1
+
     def test_404_on_unknown_serial(self, auth_client):
         """L'aperçu suit le chemin de l'édition : une revue inconnue renvoie 404."""
         r = auth_client.post(
