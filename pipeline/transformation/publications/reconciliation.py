@@ -8,7 +8,7 @@ Recalcule les composantes connexes du voisinage 1-hop des `source_records` de la
 
 Les `contributions` sont laissées à la phase `contributions` (`insert_missing` + `prune_orphan`, set-based) — la réconciliation gère l'appartenance des enregistrements sources et les métadonnées des publications, et laisse les contributions.
 
-Voisinage 1-hop, pas de fermeture transitive : l'invariant du marquage garantit que toute arête neuve a une extrémité marquée (raisonnement détaillé dans `domain/publications/reconciliation.py`). La passe s'ouvre sur le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
+Voisinage 1-hop, pas de fermeture transitive : l'invariant du marquage garantit que toute arête neuve a une extrémité marquée. La passe s'ouvre sur le marquage des enregistrements sources co-rattachés à une publication avec un enregistrement source marqué, qui clôt le voisinage sur les arêtes **retirées** autant que sur les neuves.
 
 `reconcile_source_records` applique la même passe à une liste d'enregistrements sources, hors de la file : l'administration l'appelle après une fusion manuelle.
 
