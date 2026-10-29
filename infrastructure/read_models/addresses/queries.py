@@ -5,6 +5,7 @@ from dataclasses import replace
 from sqlalchemy import Connection, text
 
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.countries import NO_COUNTRY_CODE
 from domain.types import JsonValue
 from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.addresses.models import (
@@ -263,6 +264,7 @@ class AddressesQueries:
         ]
 
         # La facette pays couvre la présence d'un pays et le pays retenu : elle écarte ces deux critères.
+        # L'absence de pays vient en tête, comme dans `CountriesQueries.list_countries`.
         facet_filters = replace(filters, country_code=None, has_country=None)
         cf_where, cf_binds = _countries_where(facet_filters)
         cf_rows = self._conn.execute(
@@ -270,9 +272,9 @@ class AddressesQueries:
                 SELECT c AS code, COUNT(*) AS cnt
                 FROM addresses a, unnest(a.countries) AS c
                 {cf_where}
-                GROUP BY c ORDER BY cnt DESC
+                GROUP BY c ORDER BY (c = :no_country) DESC, cnt DESC
             """),
-            cf_binds,
+            {**cf_binds, "no_country": NO_COUNTRY_CODE},
         ).all()
         country_facets = [FacetOption(value=r.code, count=r.cnt) for r in cf_rows]
         nc_where, nc_binds = _countries_where(replace(facet_filters, has_country=False))

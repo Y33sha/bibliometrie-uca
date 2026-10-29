@@ -62,19 +62,14 @@
 	let batchCountry = $state('');
 	const allSelected = $derived(addresses.length > 0 && addresses.every(a => selectedIds.has(a.id)));
 
-	// Code du référentiel marquant l'absence de pays : la facette le place juste après « Aucun », c'est l'arbitrage le plus fréquent et le seul qui ne se cherche pas par son nom.
-	const NO_COUNTRY_CODE = 'xx';
 	let countryFacets: { value: string; count: number }[] = $state([]);
 	let withoutCountryCount: number | undefined = $state(undefined);
 	const countryOptions = $derived.by((): FacetOption[] => {
 		const none: FacetOption = { value: NONE, text: 'Aucun', count: withoutCountryCount };
 		if (countryFacets.length > 0) {
-			const noCountry = countryFacets.find(f => f.value === NO_COUNTRY_CODE);
-			const rest = countryFacets.filter(f => f.value !== NO_COUNTRY_CODE);
-			const sorted = [...(noCountry ? [noCountry] : []), ...rest];
 			return [
 				none,
-				...sorted.map(f => ({
+				...countryFacets.map(f => ({
 					value: f.value,
 					text: `${countryMap[f.value] || f.value.toUpperCase()} (${f.value.toUpperCase()})`,
 					count: f.count,
