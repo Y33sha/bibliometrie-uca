@@ -30,6 +30,7 @@ from domain.source_records.metadata_correction.shared_doi import (
     FIGSHARE_COLLECTION_DOI_PREFIX,
     FIGSHARE_ITEM_DOI_PATTERN,
     DoiClusterCase,
+    DoiTarget,
 )
 from domain.source_records.metadata_correction.source_record import UnaryCorrection
 from domain.source_records.source_extras import SourceExtra
@@ -338,7 +339,11 @@ class SourceRecordCorrectionStore:
                 SELECT id, is_matchable, source::text AS source, source_id,
                        {raw_column("doi", "source_records")} AS raw_doi, doi, title_normalized,
                        COALESCE(urls, '{{}}') AS urls,
-                       {identifiers_json_sql("source_records.id")} AS identifiers
+                       {identifiers_json_sql("source_records.id")} AS identifiers,
+                       EXISTS (
+                           SELECT 1 FROM doi_targets t
+                           WHERE t.doi = lower({raw_column("doi", "source_records")})
+                       ) AS raw_doi_has_target
                 FROM source_records
             """)
         )
@@ -354,6 +359,7 @@ class SourceRecordCorrectionStore:
                     r.title_normalized,
                     r.urls,
                     parse_identifiers(r.identifiers),
+                    r.raw_doi_has_target,
                 ),
             )
             for r in rows
@@ -565,6 +571,38 @@ class SourceRecordCorrectionStore:
             )
             for row in rows
         ]
+
+    def replace_doi_targets(self, targets: list[DoiTarget]) -> int:
+        """Réécrit `doi_targets` avec `targets`. Les enregistrements sources dont le DOI change de cible sont marqués pour la réconciliation. Retourne le nombre de DOI dont la cible change."""
+        current = {
+            r.doi: (r.target_doi, r.rule)
+            for r in self._conn.execute(text("SELECT doi, target_doi, rule FROM doi_targets"))
+        }
+        new = {t.doi: (t.target_doi, t.case.value) for t in targets}
+        changed = sorted(d for d in current.keys() | new.keys() if current.get(d) != new.get(d))
+        if not changed:
+            return 0
+        self._conn.execute(
+            text("DELETE FROM doi_targets WHERE doi = ANY(:dois)"), {"dois": changed}
+        )
+        inserted = [
+            {"doi": d, "target_doi": new[d][0], "rule": new[d][1]} for d in changed if d in new
+        ]
+        if inserted:
+            self._conn.execute(
+                text(
+                    "INSERT INTO doi_targets (doi, target_doi, rule)"
+                    " VALUES (:doi, :target_doi, :rule)"
+                ),
+                inserted,
+            )
+        enqueue(
+            self._conn,
+            Queue.SOURCE_RECORD_KEYS,
+            "SELECT id FROM source_records WHERE doi = ANY(:dois)",
+            {"dois": changed},
+        )
+        return len(changed)
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
         """UPDATE en lot des colonnes `doi` et `corrections` et des statuts des identifiants, bump `updated_at`, marque pour la réconciliation — DOI et identifiants sont des clés de confirmation, dont la mutation appelle une réconciliation. Retourne le nombre de lignes mises à jour."""

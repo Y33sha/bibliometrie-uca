@@ -867,10 +867,10 @@ TASKS: tuple[Task, ...] = (
             "source_records.doi",
             "source_records.corrections",
             "source_record_identifiers.removed_by",
+            "doi_targets",
             "source_record_keys_queue",
-            "publication_contributions_queue",
         ),
-        previous_run=("source_records", "source_record_identifiers.removed_by"),
+        previous_run=("source_records", "source_record_identifiers.removed_by", "doi_targets"),
     ),
     _task(
         "metadata_correction.matchable",
@@ -890,6 +890,7 @@ TASKS: tuple[Task, ...] = (
                 )
             ),
             "source_record_identifiers",
+            "doi_targets",
             # Dépôts HAL introuvables dans HAL.
             "failed_lookups",
         ),
@@ -902,6 +903,7 @@ TASKS: tuple[Task, ...] = (
         reads=(
             "source_records",
             "source_record_identifiers",
+            "doi_targets",
             "source_record_keys_queue",
             "source_contributions.in_perimeter",
             "manual_merge_source_records",

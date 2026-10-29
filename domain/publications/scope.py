@@ -5,9 +5,8 @@ from typing import NamedTuple
 
 from domain.publications.identifiers import DOI
 from domain.publications.metadata import normalized_title
-from domain.source_records.identifiers import SourceIdentifier, SourceIdentifierType, active
+from domain.source_records.identifiers import SourceIdentifier, active
 from domain.source_records.keys import CONFIRMATION_ID_TYPES
-from domain.source_records.metadata_correction.shared_doi import CONVERGENCE_CASES
 from domain.sources.registry import AGGREGATOR_SOURCES, Source
 from domain.sources.scanr import extract_hal_id_from_scanr_id
 
@@ -71,7 +70,7 @@ PARATEXT_TITLES = frozenset(
 class MatchabilityFacts(NamedTuple):
     """Faits d'un enregistrement source que lit `is_matchable`.
 
-    `raw_doi` est le DOI d'avant correction. `doi` et `urls` sont les valeurs corrigées, privées des dépôts HAL introuvables. `identifiers` sont les identifiants de l'enregistrement source, avec leur statut.
+    `raw_doi` est le DOI d'avant correction. `doi` et `urls` sont les valeurs corrigées, privées des dépôts HAL introuvables. `identifiers` sont les identifiants de l'enregistrement source, avec leur statut. `raw_doi_has_target` : `raw_doi` est le DOI d'une forme secondaire, qui a une cible dans `doi_targets`.
     """
 
     source: str
@@ -81,13 +80,14 @@ class MatchabilityFacts(NamedTuple):
     title_normalized: str | None
     urls: Sequence[str]
     identifiers: Sequence[SourceIdentifier]
+    raw_doi_has_target: bool = False
 
 
 def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     """L'enregistrement source entre dans la réconciliation. Il en est écarté dans cinq cas :
 
     - son DOI d'avant correction a un préfixe de `EXCLUDED_DOI_PREFIXES` ;
-    - son DOI d'avant correction est retiré par un cas de `CONVERGENCE_CASES` : l'enregistrement source est une forme secondaire d'une œuvre présente en base ;
+    - il vient de DataCite et son DOI d'avant correction a une cible : l'enregistrement source est une forme secondaire d'une œuvre présente en base ;
     - son titre normalisé est dans `PARATEXT_TITLES` ;
     - il vient de ScanR et il est issu d'un dépôt HAL de `missing_hal_ids` ;
     - il vient d'une source de `AGGREGATOR_SOURCES` et il n'a ni DOI, ni lien, ni clé de confirmation active.
@@ -95,12 +95,7 @@ def is_matchable(facts: MatchabilityFacts, missing_hal_ids: Set[str]) -> bool:
     raw_doi = DOI.try_parse(facts.raw_doi)
     if raw_doi is not None and raw_doi.prefix.value in EXCLUDED_DOI_PREFIXES:
         return False
-    if raw_doi is not None and any(
-        i.id_type is SourceIdentifierType.DOI
-        and i.value == str(raw_doi)
-        and i.removed_by in CONVERGENCE_CASES
-        for i in facts.identifiers
-    ):
+    if facts.source == Source.DATACITE and facts.raw_doi_has_target:
         return False
     if facts.title_normalized in PARATEXT_TITLES:
         return False

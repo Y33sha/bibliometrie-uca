@@ -1,15 +1,15 @@
 """Correction du DOI d'un groupe d'enregistrements partageant un même DOI.
 
-Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_records` partageant un DOI** et on en déduit le DOI effectif de chaque membre. Deux familles opposées :
+Les corrections unaires (`rules`) décident d'un enregistrement seul. Ici on regarde le **groupe de `source_records` partageant un DOI** et on en déduit la cible du DOI, ou les membres qui le perdent. Deux familles opposées :
 
-- **convergence (même œuvre)** : une forme secondaire DataCite d'une œuvre principale présente en base, désignée par un `relatedIdentifiers`, perd son DOI. Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un dataset, forme du DOI indifférente). Un fichier complémentaire figshare, sans relation déclarée, est une pièce de la collection figshare de même titre. Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
+- **convergence (même œuvre)** : le DOI d'une forme secondaire DataCite, désignée par un `relatedIdentifiers`, a pour cible le DOI de l'œuvre principale présente en base (`DoiTarget`). Trois cas : version → concept (`IsVersionOf`) ; forme variante → forme principale (`IsVariantFormOf`) ; pièce d'un dataset → dataset parent (`IsPartOf` vers un dataset, forme du DOI indifférente). Un fichier complémentaire figshare, sans relation déclarée, est une pièce de la collection figshare de même titre. Les conditions de préfixe sont décrites par `meme_oeuvre_declaree` ; une relation qui relie deux œuvres va à la phase `relations`.
 - **divergence (œuvres distinctes)** : un DOI partagé par des œuvres réellement distinctes (ouvrage/chapitre, chapitres de titres différents, volume d'actes/communication, dépôt HAL d'une autre œuvre), erroné sur le ou les mauvais côtés → nullage du DOI sur ces membres. Les membres qui gardent le DOI perdent aussi les clés de confirmation qu'ils partagent avec ceux qui le perdent (`confirmation_id_removals`).
 
 Un DOI que doi.org ne connaît pas est nullé sur tous les membres du groupe, avant toute autre décision.
 
-La décision est **agnostique de la source** : le caller applicatif regroupe par DOI (brut reconstruit) et persiste la décision de chaque membre. La famille de cas est extensible.
+La décision est **agnostique de la source** : le caller applicatif regroupe par DOI (brut reconstruit) et persiste la cible du DOI et la décision de chaque membre. La famille de cas est extensible.
 
-`CONVERGENCE_CASES` liste les cas de convergence. La sous-étape matchable écarte de la réconciliation l'enregistrement source dont le DOI est retiré par l'un de ces cas. `DATACITE_DIRECT_CONVERGENCE` mappe la `relation_type` d'un `relatedIdentifiers` (vocabulaire DataCite, gardé en chaîne) au cas de correction ; la requête de candidats au clustering le consomme pour former son `CASE` et son filtre.
+`DATACITE_DIRECT_CONVERGENCE` mappe la `relation_type` d'un `relatedIdentifiers` (vocabulaire DataCite, gardé en chaîne) au cas de correction ; la requête de candidats au clustering le consomme pour former son `CASE` et son filtre.
 """
 
 import re
@@ -27,7 +27,7 @@ from domain.sources.scanr import extract_hal_id_from_scanr_id
 
 
 class DoiClusterCase(StrEnum):
-    """Cas de correction du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `corrections.doi.corrected_by`."""
+    """Cas de correction d'un groupe partageant un DOI. Inscrit dans `doi_targets.rule` pour une forme secondaire, dans `corrections.doi.corrected_by` pour un membre qui perd le DOI."""
 
     # Formes secondaires DataCite d'une œuvre présente en base.
     DATACITE_VERSION_TO_CONCEPT = "DATACITE_VERSION_TO_CONCEPT"  # version → concept (IsVersionOf)
@@ -53,16 +53,6 @@ class DoiClusterCase(StrEnum):
 
     # DOI que doi.org ne connaît pas (`failed_lookups`, source `doi_org`) → tous les membres le perdent.
     UNRESOLVED_DOI_TO_NULL = "UNRESOLVED_DOI_TO_NULL"
-
-
-# Cas de convergence (cf. docstring du module).
-CONVERGENCE_CASES: frozenset[str] = frozenset(
-    {
-        DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
-        DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-        DoiClusterCase.DATACITE_PACKAGE_PIECE,
-    }
-)
 
 
 # Convergence directe : le `relatedIdentifiers` pointe le DOI de l'œuvre canonique, pris tel quel.
@@ -113,6 +103,14 @@ class DoiClusterDecision(NamedTuple):
     """Retrait du DOI d'un membre, et le cas qui le décide."""
 
     id: int
+    case: DoiClusterCase
+
+
+class DoiTarget(NamedTuple):
+    """Cible du DOI d'une forme secondaire : le DOI de l'œuvre principale, et le cas qui relie les deux DOI."""
+
+    doi: str
+    target_doi: str
     case: DoiClusterCase
 
 
@@ -289,13 +287,26 @@ def _meme_oeuvre(member: DoiClusterMember, shared_doi: str) -> bool:
     )
 
 
+def doi_target(
+    group: list[DoiClusterMember], *, shared_doi: str, unresolved: bool = False
+) -> DoiTarget | None:
+    """Cible de `shared_doi` quand un membre du groupe le déclare forme secondaire de l'œuvre de son `canonical_doi` (cf. `_meme_oeuvre`) : version → concept, variante → version publiée, fichier → dépôt parent. Un DOI inconnu de doi.org (`unresolved`) n'a pas de cible."""
+    if unresolved:
+        return None
+    canonical = next((m for m in group if _meme_oeuvre(m, shared_doi)), None)
+    if canonical is None:
+        return None
+    assert canonical.canonical_doi is not None and canonical.same_work_case is not None
+    return DoiTarget(shared_doi, canonical.canonical_doi, canonical.same_work_case)
+
+
 def resolve_cluster_doi_corrections(
     group: list[DoiClusterMember], *, shared_doi: str, unresolved: bool = False
 ) -> list[DoiClusterDecision]:
     """Pour un groupe de `source_records` partageant `shared_doi`, renvoie les membres qui perdent le DOI, avec le cas qui le décide. Pur, déterministe, sans effet de bord, agnostique de la source — c'est le caller qui forme le groupe par DOI.
 
     - **DOI inconnu de doi.org** (`unresolved`) : tous les membres perdent le DOI. Prime sur les cas ci-dessous.
-    - **Même œuvre DataCite** (un membre a un `canonical_doi`, cf. `_meme_oeuvre`) : tous les membres perdent le DOI, sous le cas de ce membre (version → concept, variante → version publiée, fichier → dépôt parent). Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
+    - **Même œuvre DataCite** (`doi_target`) : aucun membre ne perd le DOI. Prime sur les cas ci-dessous, réservés à la famille ouvrage/chapitre.
     - **Ouvrage + chapitre** : les `book_chapter` d'un autre titre que l'ouvrage perdent le DOI, celui de l'ouvrage. Un chapitre au titre de l'ouvrage est la même œuvre, typée autrement par sa source : il garde le DOI.
     - **Chapitres seuls, titres réellement différents** : tous les `book_chapter` perdent le DOI (celui de l'ouvrage hôte absent). Détection par nettoyage + containment + égalité stricte (`_group_has_distinct_chapters`), sans similarité floue. Les faux positifs résiduels (coquilles) relèvent d'une correction admin.
     - **Volume d'actes + communications** : les membres dont le titre diffère de celui du volume (`proceedings`) perdent le DOI, quel que soit leur type. Les membres au titre du volume le gardent.
@@ -306,10 +317,8 @@ def resolve_cluster_doi_corrections(
     Différé : thèse/article (souvent un mistype → correction de `doc_type`, pas du DOI)."""
     if unresolved:
         return [DoiClusterDecision(m.id, DoiClusterCase.UNRESOLVED_DOI_TO_NULL) for m in group]
-    canonical = next((m for m in group if _meme_oeuvre(m, shared_doi)), None)
-    if canonical is not None:
-        assert canonical.same_work_case is not None
-        return [DoiClusterDecision(m.id, canonical.same_work_case) for m in group]
+    if doi_target(group, shared_doi=shared_doi) is not None:
+        return []
 
     decisions = _divergence_decisions(group)
     decided = {d.id for d in decisions}

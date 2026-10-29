@@ -1,6 +1,8 @@
 """Tests purs : corrections de DOI par cluster (convergence même-œuvre, ouvrage/chapitre,
 chapitre/chapitre, volume d'actes/communication) + `compute_updates`."""
 
+from dataclasses import replace
+
 from domain.source_records.corrections import stash_entry
 from domain.source_records.identifiers import (
     SourceIdentifier,
@@ -11,9 +13,12 @@ from domain.source_records.metadata_correction.shared_doi import (
     DoiClusterCase,
     DoiClusterDecision,
     DoiClusterMember,
+    DoiTarget,
+    doi_target,
     resolve_cluster_doi_corrections,
 )
 from pipeline.transformation.publications.correction.correct_by_cluster import (
+    compute_doi_targets,
     compute_updates,
     tally_doi_corrections,
 )
@@ -121,8 +126,12 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_sur_tous_les_membres_avant_toute_au
 # ── domaine pur : convergence même-œuvre ─────────────────────────────────
 
 
-def test_same_work_all_members_lose_the_doi():
-    # Un membre (datacite) désigne l'œuvre principale et son cas ; tous perdent le DOI.
+def _cible(group, shared_doi):
+    return doi_target(group, shared_doi=shared_doi)
+
+
+def test_same_work_targets_the_main_work_and_no_member_loses_the_doi():
+    # Un membre (datacite) désigne l'œuvre principale et son cas : le DOI partagé a pour cible celui de l'œuvre.
     group = [
         _m(
             1,
@@ -132,13 +141,13 @@ def test_same_work_all_members_lose_the_doi():
         ),
         _m(2, "dataset"),
     ]
-    assert _resoudre(group, "10.5281/zenodo.10") == [
-        DoiClusterDecision(1, DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
-        DoiClusterDecision(2, DoiClusterCase.DATACITE_VERSION_TO_CONCEPT),
-    ]
+    assert _cible(group, "10.5281/zenodo.10") == DoiTarget(
+        "10.5281/zenodo.10", "10.5281/zenodo.1", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT
+    )
+    assert _resoudre(group, "10.5281/zenodo.10") == []
 
 
-def test_forme_secondaire_d_elle_meme_garde_son_doi():
+def test_forme_secondaire_d_elle_meme_sans_cible():
     """Un dépôt non versionné déclare son propre DOI comme concept."""
     group = [
         _m(
@@ -148,14 +157,26 @@ def test_forme_secondaire_d_elle_meme_garde_son_doi():
             same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
         )
     ]
-    assert _resoudre(group, "10.5281/zenodo.5") == []
+    assert _cible(group, "10.5281/zenodo.5") is None
+
+
+def test_un_doi_inconnu_de_doi_org_n_a_pas_de_cible():
+    group = [
+        _m(
+            1,
+            "dataset",
+            canonical_doi="10.9/canon",
+            same_work_case=DoiClusterCase.DATACITE_PACKAGE_PIECE,
+        )
+    ]
+    assert doi_target(group, shared_doi="10.9/forme", unresolved=True) is None
 
 
 def test_same_work_carries_its_case():
     # Le cas porté par le membre est restitué (variante, pièce de package…).
     for case in (DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY, DoiClusterCase.DATACITE_PACKAGE_PIECE):
         group = [_m(1, "dataset", canonical_doi="10.9/canon", same_work_case=case)]
-        assert _resoudre(group, "10.9/forme") == [DoiClusterDecision(1, case)]
+        assert _cible(group, "10.9/forme") == DoiTarget("10.9/forme", "10.9/canon", case)
 
 
 def test_same_work_takes_precedence_over_book_chapter():
@@ -168,8 +189,7 @@ def test_same_work_takes_precedence_over_book_chapter():
         ),
         _m(2, "book_chapter"),
     ]
-    cases = {d.case for d in _resoudre(group, "10.5281/zenodo.10")}
-    assert cases == {DoiClusterCase.DATACITE_VERSION_TO_CONCEPT}
+    assert _resoudre(group, "10.5281/zenodo.10") == []
 
 
 def test_version_d_un_autre_prefixe_reste_distincte():
@@ -183,10 +203,11 @@ def test_version_d_un_autre_prefixe_reste_distincte():
         ),
         _m(2, "preprint"),
     ]
+    assert _cible(group, "10.48550/arxiv.2210.12000") is None
     assert _resoudre(group, "10.48550/arxiv.2210.12000") == []
 
 
-def test_copie_de_l_article_d_un_autre_prefixe_converge():
+def test_copie_de_l_article_d_un_autre_prefixe_a_pour_cible_l_article():
     """Une copie déposée à RWTH déclare `IsVariantFormOf` vers l'article publié : une seule œuvre."""
     group = [
         _m(
@@ -196,9 +217,8 @@ def test_copie_de_l_article_d_un_autre_prefixe_converge():
             same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
         ),
     ]
-    assert _resoudre(group, "10.18154/rwth-2022-02923") == [
-        DoiClusterDecision(1, DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY)
-    ]
+    target = _cible(group, "10.18154/rwth-2022-02923")
+    assert target is not None and target.target_doi == "10.1103/physrevd.105.012010"
 
 
 def test_copie_de_preprint_d_un_autre_prefixe_reste_distincte():
@@ -211,10 +231,10 @@ def test_copie_de_preprint_d_un_autre_prefixe_reste_distincte():
             same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
         ),
     ]
-    assert _resoudre(group, "10.3204/pubdb-2017-13318") == []
+    assert _cible(group, "10.3204/pubdb-2017-13318") is None
 
 
-def test_copie_de_preprint_du_meme_prefixe_converge():
+def test_copie_de_preprint_du_meme_prefixe_a_une_cible():
     group = [
         _m(
             1,
@@ -223,13 +243,11 @@ def test_copie_de_preprint_du_meme_prefixe_converge():
             same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
         ),
     ]
-    assert _resoudre(group, "10.5281/zenodo.2") == [
-        DoiClusterDecision(1, DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY)
-    ]
+    assert _cible(group, "10.5281/zenodo.2") is not None
 
 
-def test_variante_du_meme_prefixe_converge():
-    """Une version de logiciel Zenodo déclarée `IsVariantFormOf` rejoint son concept."""
+def test_variante_du_meme_prefixe_a_pour_cible_son_concept():
+    """Une version de logiciel Zenodo déclarée `IsVariantFormOf` a pour cible son concept."""
     group = [
         _m(
             1,
@@ -238,13 +256,12 @@ def test_variante_du_meme_prefixe_converge():
             same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
         ),
     ]
-    assert _resoudre(group, "10.5281/zenodo.17224613") == [
-        DoiClusterDecision(1, DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY)
-    ]
+    target = _cible(group, "10.5281/zenodo.17224613")
+    assert target is not None and target.target_doi == "10.5281/zenodo.13354942"
 
 
-def test_piece_de_dataset_converge_quel_que_soit_le_prefixe():
-    """Une pièce rejoint son dataset parent, dont le DOI prend souvent une autre forme."""
+def test_piece_de_dataset_a_pour_cible_son_parent_quel_que_soit_le_prefixe():
+    """Une pièce a pour cible son dataset parent, dont le DOI prend souvent une autre forme."""
     group = [
         _m(
             1,
@@ -253,9 +270,8 @@ def test_piece_de_dataset_converge_quel_que_soit_le_prefixe():
             same_work_case=DoiClusterCase.DATACITE_PACKAGE_PIECE,
         ),
     ]
-    assert _resoudre(group, "10.15454/fichier") == [
-        DoiClusterDecision(1, DoiClusterCase.DATACITE_PACKAGE_PIECE)
-    ]
+    target = _cible(group, "10.15454/fichier")
+    assert target is not None and target.target_doi == "10.1594/pangaea.1"
 
 
 def test_version_d_un_autre_prefixe_laisse_les_regles_ouvrage_s_appliquer():
@@ -406,8 +422,8 @@ def test_communication_sans_titre_garde_le_doi():
 # ── compute_updates (orchestration mécanique) ────────────────────────────
 
 
-def test_version_loses_its_doi():
-    # raw_doi = la version ; le membre datacite désigne le concept → DOI nullé, stashé et retiré.
+def test_version_doi_targets_the_concept_and_every_member_keeps_it():
+    # raw_doi = la version ; le membre datacite désigne le concept → cible du DOI, aucun membre corrigé.
     version = SourceIdentifier(
         SourceIdentifierType.DOI, "10.5281/zenodo.10", SourceIdentifierRole.PRIMARY
     )
@@ -421,22 +437,37 @@ def test_version_loses_its_doi():
         identifiers=[version],
     )
     hal = _row(2, "dataset", "10.5281/zenodo.10", raw_doi="10.5281/zenodo.10")
-    updates = compute_updates([datacite, hal])
-    assert {u.id for u in updates} == {1, 2}
-    assert all(u.doi is None for u in updates)
-    assert all(
-        u.corrections["doi"]
-        == {"raw": "10.5281/zenodo.10", "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}
-        for u in updates
+    assert compute_doi_targets([datacite, hal]) == [
+        DoiTarget(
+            "10.5281/zenodo.10", "10.5281/zenodo.1", DoiClusterCase.DATACITE_VERSION_TO_CONCEPT
+        )
+    ]
+    assert compute_updates([datacite, hal]) == []
+
+
+def test_version_privee_de_son_doi_le_retrouve():
+    # Une version qui avait perdu son DOI sous un cas de convergence le récupère, actif.
+    retired = SourceIdentifier(
+        SourceIdentifierType.DOI,
+        "10.5281/zenodo.10",
+        SourceIdentifierRole.PRIMARY,
+        "DATACITE_VERSION_TO_CONCEPT",
     )
-    assert updates[0].identifiers == (
-        SourceIdentifier(
-            SourceIdentifierType.DOI,
-            "10.5281/zenodo.10",
-            SourceIdentifierRole.PRIMARY,
-            "DATACITE_VERSION_TO_CONCEPT",
-        ),
+    row = _row(
+        1,
+        "dataset",
+        None,
+        corrections={
+            "doi": {"raw": "10.5281/zenodo.10", "corrected_by": "DATACITE_VERSION_TO_CONCEPT"}
+        },
+        raw_doi="10.5281/zenodo.10",
+        canonical_doi="10.5281/zenodo.1",
+        same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
+        identifiers=[retired],
     )
+    assert compute_updates([row]) == [
+        DoiCorrectionUpdate(1, "10.5281/zenodo.10", {}, (replace(retired, removed_by=None),))
+    ]
 
 
 def test_copie_de_preprint_d_un_autre_prefixe_garde_son_doi():
@@ -450,25 +481,6 @@ def test_copie_de_preprint_d_un_autre_prefixe_garde_son_doi():
         same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
     )
     assert compute_updates([row]) == []
-
-
-def test_copie_de_l_article_perd_son_doi():
-    row = _row(
-        1,
-        "article",
-        "10.18154/rwth-1",
-        raw_doi="10.18154/rwth-1",
-        canonical_doi="10.1103/published",
-        same_work_case=DoiClusterCase.DATACITE_VARIANT_TO_PRIMARY,
-    )
-    assert compute_updates([row]) == [
-        DoiCorrectionUpdate(
-            1,
-            None,
-            {"doi": {"raw": "10.18154/rwth-1", "corrected_by": "DATACITE_VARIANT_TO_PRIMARY"}},
-            (),
-        )
-    ]
 
 
 def test_preprint_d_un_autre_prefixe_retrouve_son_doi():
@@ -488,25 +500,6 @@ def test_preprint_d_un_autre_prefixe_retrouve_son_doi():
         same_work_case=DoiClusterCase.DATACITE_VERSION_TO_CONCEPT,
     )
     assert compute_updates([row]) == [DoiCorrectionUpdate(1, "10.48550/arxiv.2210.12000", {}, ())]
-
-
-def test_package_piece_loses_its_doi():
-    row = _row(
-        1,
-        "dataset",
-        "10.15454/abc/file1",
-        raw_doi="10.15454/abc/file1",
-        canonical_doi="10.15454/abc",
-        same_work_case=DoiClusterCase.DATACITE_PACKAGE_PIECE,
-    )
-    assert compute_updates([row]) == [
-        DoiCorrectionUpdate(
-            1,
-            None,
-            {"doi": {"raw": "10.15454/abc/file1", "corrected_by": "DATACITE_PACKAGE_PIECE"}},
-            (),
-        )
-    ]
 
 
 def test_self_heals_when_canonical_gone():

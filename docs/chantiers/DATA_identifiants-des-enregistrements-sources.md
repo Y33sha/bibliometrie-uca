@@ -60,7 +60,9 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 - Statut : actif, ou retiré par une règle de correction nommée. Chaque passage de `metadata_correction` recalcule les statuts à partir de tous les identifiants de la table. Chaque sous-étape réécrit seulement les statuts de ses règles. Un identifiant retiré par la règle d'une autre sous-étape reste retiré.
 - `corrections` garde seulement les valeurs d'origine des colonnes.
 - La correction par DOI partagé garde ou retire chaque DOI.
-- Une version, une variante ou une pièce de dataset est écartée de la réconciliation (`is_matchable`) quand son DOI cible est présent en base : DOI concept, forme principale ou dataset parent. Son DOI est retiré de tous les enregistrements sources qui le citent.
+- Le DOI d'une version, d'une variante ou d'une pièce de dataset a une cible quand l'œuvre principale est présente en base : DOI concept, forme principale ou dataset parent. La table `doi_targets` relie les deux DOI.
+- La cible tient lieu du DOI pour tous les enregistrements sources qui ont ce DOI, dans la réconciliation et la consolidation.
+- L'enregistrement source DataCite de la forme secondaire est écarté de la réconciliation (`is_matchable`).
 - Deux DOI distincts empêchent la fusion, quel que soit le rôle des identifiants.
 - Clés de la réconciliation : DOI, `hal_id`, NNT, PMID et identifiant arXiv. Pour les quatre derniers, la clé est l'identifiant actif de rôle le plus fort, puis de plus petite valeur.
 - Un identifiant absent de son registre est invalide. L'invalidité se calcule par jointure sur `failed_lookups`.
@@ -100,9 +102,9 @@ Publications de la base locale scindées quand seuls les identifiants primaires 
 
 ### Phase 6 — Retrait de la colonne `doi`
 
-- [x] Versions, variantes et pièces de dataset écartées quand leur DOI cible est en base.
 - [x] Code mort des formes secondaires rattachées à une publication : priorité de la consolidation, groupement des contributions sources, copies et sources secondaires de l'API.
-- [ ] DOI d'une version, d'une variante ou d'une pièce de dataset retiré des enregistrements sources qui le citent.
+- [x] Table `doi_targets`, écrite par la correction par DOI partagé et lue par la réconciliation et la consolidation. Enregistrement source DataCite de la forme secondaire écarté.
+- [ ] Cible appliquée aux DOI secondaires des enregistrements sources, par exemple les localisations OpenAlex.
 - [ ] DOI d'un enregistrement source à plusieurs DOI actifs.
 - [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API.
 - [ ] Suppression de la colonne.

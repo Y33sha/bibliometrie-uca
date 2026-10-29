@@ -22,6 +22,7 @@ from domain.source_records.metadata_correction.rules import (
 from domain.source_records.source_record import SourceRecord
 from domain.sources.registry import SOURCE_PRIORITY
 from domain.types import JsonValue
+from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models.publications.copies import publication_copies
 from pipeline.transformation.publications.store import PublicationStore
@@ -86,12 +87,12 @@ def _source_record_from_row(row: _SourceRecordRow) -> SourceRecord:
 
 
 def source_records_of(conn: Connection, publication_id: int) -> list[SourceRecord]:
-    """Les `SourceRecord` attachées à une publication canonique, matière de l'agrégation."""
+    """Les `SourceRecord` attachées à une publication, matière de l'agrégation. Le DOI d'une forme secondaire est remplacé par sa cible (`doi_targets`)."""
     result = conn.execute(
-        text("""
+        text(f"""
             SELECT sr.id, sr.source::text AS source, sr.source_id,
                    sr.title, sr.publication_year, sr.doc_type::text AS doc_type,
-                   sr.doi,
+                   {doi_or_target_sql("sr")} AS doi,
                    sr.serial_id, sr.monograph_id, sr.container_title, sr.language,
                    sr.oa_status::text AS oa_status, sr.is_retracted, sr.abstract,
                    sr.countries, sr.urls, sr.keywords,

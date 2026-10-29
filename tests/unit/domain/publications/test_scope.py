@@ -50,24 +50,19 @@ class TestIsMatchable:
     def test_gresis_doi_nulled_by_correction_is_still_excluded(self):
         assert not is_matchable(_facts("datacite", raw_doi="10.60692/m2raz-tjw54"), set())
 
-    def test_secondary_form_of_a_work_in_base_is_excluded(self):
-        """Une version Zenodo dont le concept est en base perd son DOI sous un cas de convergence."""
+    def test_datacite_record_of_a_secondary_form_is_excluded(self):
+        """L'enregistrement DataCite d'une version Zenodo dont le concept est en base."""
         version = "10.5281/zenodo.10"
-        for case in ("DATACITE_VERSION_TO_CONCEPT", "DATACITE_PACKAGE_PIECE"):
-            record = _facts(
-                "datacite",
-                version,
-                raw_doi=version,
-                identifiers=[_id(SourceIdentifierType.DOI, version, case)],
-            )
-            assert not is_matchable(record, set())
-
-    def test_doi_removed_by_a_divergence_case_keeps_the_record(self):
-        chapter = _facts(
-            raw_doi="10.1/book",
-            identifiers=[_id(SourceIdentifierType.DOI, "10.1/book", "OUVRAGE_VS_CHAPITRE")],
+        record = _facts("datacite", version, raw_doi=version, doi=version)._replace(
+            raw_doi_has_target=True
         )
-        assert is_matchable(chapter, set())
+        assert not is_matchable(record, set())
+
+    def test_other_record_with_the_doi_of_a_secondary_form_is_kept(self):
+        """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté avec la version."""
+        version = "10.5281/zenodo.10"
+        record = _facts(raw_doi=version, doi=version)._replace(raw_doi_has_target=True)
+        assert is_matchable(record, set())
 
     def test_paratext_title_is_excluded(self):
         for title in ("List of Contributors", "README.txt", "Table des matières"):

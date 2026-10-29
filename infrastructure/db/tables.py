@@ -1413,6 +1413,24 @@ source_record_identifiers = Table(
 )
 
 
+doi_targets = Table(
+    "doi_targets",
+    metadata,
+    Column(
+        "doi",
+        Text,
+        primary_key=True,
+        comment="DOI d'une version, d'une variante ou d'une pièce de dataset.",
+    ),
+    Column(
+        "target_doi", Text, nullable=False, comment="DOI de l'œuvre principale, présent en base."
+    ),
+    Column("rule", Text, nullable=False, comment="Règle de correction qui relie les deux DOI."),
+    comment="Cible du DOI d'une forme secondaire, réécrite par la correction par DOI partagé. La cible tient lieu du DOI pour la réconciliation et la consolidation.",
+    schema="sources",
+)
+
+
 platforms = Table(
     "platforms",
     metadata,

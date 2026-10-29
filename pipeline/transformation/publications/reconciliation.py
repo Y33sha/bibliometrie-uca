@@ -35,6 +35,7 @@ from domain.source_records.keys import (
     DISCRIMINANT_TITLE_MIN_LENGTH,
     project_confirmation_keys,
 )
+from infrastructure.db.doi_targets import doi_or_target_sql
 from infrastructure.db.queues import Queue, delete_processed, enqueue, snapshot
 from infrastructure.db.savepoint import savepoint
 from infrastructure.db.scalars import scalar_int
@@ -85,7 +86,11 @@ _SNAPSHOT = "source_record_keys_marks"
 # annotée en ligne). `publication_doi` (via LEFT JOIN) choisit l'ancre ; `in_perimeter`
 # (EXISTS) gate la création d'une publication neuve pour une partition d'orphelins.
 _COLS = (
-    "{a}.id, {a}.doi, " + identifiers_json_sql("{a}.id") + " AS identifiers, {a}.publication_id, "
+    "{a}.id, "
+    + doi_or_target_sql("{a}")
+    + " AS doi, "
+    + identifiers_json_sql("{a}.id")
+    + " AS identifiers, {a}.publication_id, "
     "{a}.doc_type, {a}.title_normalized, {a}.publication_year, {a}.is_matchable, "
     "p.doi AS publication_doi, "
     "EXISTS (SELECT 1 FROM source_contributions sc "
@@ -117,11 +122,19 @@ _UNIVERSE_SQL = text(f"""
     UNION
     -- DOI : égalité directe (la colonne est toujours normalisée minuscule par `clean_doi` à
     -- l'écriture), pour utiliser l'index btree `idx_source_records_doi` plutôt qu'un scan via `lower()`.
+    -- Le DOI de `d` est la cible de son DOI quand elle existe (`doi_targets`).
     SELECT {_COLS.format(a="o")}
     FROM dirty d
     JOIN source_records o ON o.doi IS NOT NULL AND o.doi = d.doi
     LEFT JOIN publications p ON p.id = o.publication_id
     WHERE d.doi IS NOT NULL
+    UNION
+    -- DOI d'une forme secondaire dont la cible est le DOI de `d`.
+    SELECT {_COLS.format(a="o")}
+    FROM dirty d
+    JOIN doi_targets t ON t.target_doi = d.doi
+    JOIN source_records o ON o.doi = t.doi
+    LEFT JOIN publications p ON p.id = o.publication_id
     UNION
     -- Identifiants : même type et même valeur, clé de confirmation de part et d'autre (index
     -- `idx_source_record_identifiers_value`).

@@ -97,6 +97,16 @@ def _manual_merge(conn, source_record_ids) -> int:
     return manual_merge_id
 
 
+def _add_doi_target(conn, doi, target_doi) -> None:
+    conn.execute(
+        text(
+            "INSERT INTO doi_targets (doi, target_doi, rule)"
+            " VALUES (:doi, :target, 'DATACITE_VERSION_TO_CONCEPT')"
+        ),
+        {"doi": doi, "target": target_doi},
+    )
+
+
 def _universe(conn) -> set[int]:
     """Relève la file, puis rend les identifiants du voisinage 1-hop."""
     snapshot_queued_source_records(conn)
@@ -118,6 +128,19 @@ class TestUniverse:
         _source_record(conn, unrelated_publication, source_id="c", doi="10.9/z", marked=False)
 
         assert _universe(conn) == {dirty, neighbor}
+
+    def test_neighbor_by_doi_target(self, sa_sync_conn):
+        """Le DOI d'une version a pour cible celui du concept : les enregistrements sources des deux DOI sont voisins."""
+        conn = sa_sync_conn
+        _add_doi_target(conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
+        dirty = _source_record(conn, source_id="hal", doi="10.5281/zenodo.101")
+        concept = _source_record(conn, source_id="c", doi="10.5281/zenodo.100", marked=False)
+        version = _source_record(conn, source_id="v", doi="10.5281/zenodo.101", marked=False)
+
+        assert _universe(conn) == {dirty, concept, version}
+        clear(conn, Queue.SOURCE_RECORD_KEYS)
+        mark(conn, Queue.SOURCE_RECORD_KEYS, [concept])
+        assert _universe(conn) == {dirty, concept, version}
 
     def test_neighbor_by_hal_id(self, sa_sync_conn):
         conn = sa_sync_conn
@@ -284,6 +307,33 @@ class TestEndToEnd:
         assert _source_record_state(conn, source_record_other)[0] == publication_b
         assert _publication_exists(conn, publication_b)
         assert redirect_of(conn, MergedEntity.PUBLICATION, publication_b) is None
+
+    def test_deposit_with_a_version_doi_joins_the_concept_publication(self, sa_sync_conn):
+        """Régression : un dépôt HAL au DOI d'une version Zenodo était écarté de la réconciliation avec la version.
+
+        Le DOI de la version a pour cible le concept : le dépôt HAL rejoint la publication du concept, qui garde le DOI du concept. L'enregistrement DataCite de la version, écarté, reste orphelin."""
+        conn = sa_sync_conn
+        _add_doi_target(conn, "10.5281/zenodo.101", "10.5281/zenodo.100")
+        publication = _seed_publication(conn, doi="10.5281/zenodo.100")
+        concept = _source_record(
+            conn, publication, source="datacite", source_id="c", doi="10.5281/zenodo.100"
+        )
+        version = _source_record(
+            conn, source="datacite", source_id="v", doi="10.5281/zenodo.101", is_matchable=False
+        )
+        hal = _source_record(conn, source="hal", source_id="hal-1", doi="10.5281/zenodo.101")
+
+        reconcile(conn, logger)
+
+        assert _source_record_state(conn, concept)[0] == publication
+        assert _source_record_state(conn, hal)[0] == publication
+        assert _source_record_state(conn, version)[0] is None
+        assert (
+            conn.execute(
+                text("SELECT doi FROM publications WHERE id = :id"), {"id": publication}
+            ).scalar_one()
+            == "10.5281/zenodo.100"
+        )
 
     def test_publication_of_excluded_records_only_is_deleted(self, sa_sync_conn):
         """Régression : une publication faite de copies GRESIS (DOI 10.60692) est supprimée, ses enregistrements sources restent orphelins."""
