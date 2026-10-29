@@ -48,6 +48,7 @@
 - Pose tes questions en **texte libre**. Pas de QCM à choix limités.
 - Gère les **commits** git. Fais un commit à chaque changement cohérent (au minimum une fois par phase de chantier, voire à chaque item d'une phase).
 - Commite **par chemin** pour éviter que ton travail soit commité par une autre instance parallèle. Si un hook pre-commit est en cours, attends 5 secondes et réessaie.
+- Laura applique les migrations Alembic. Dès qu'une migration est appliquée, **régénère le snapshot du schéma** (`python -m interfaces.cli.dev.dump_schema`) et commite `infrastructure/db/schema.sql` avec la migration.
 - **Ne fais PAS tourner toute la suite de tests** avant chaque commit (sauf les tests directement concernés par tes modifs). Les hooks et la CI sont là pour ça.
 
 ## Phases du pipeline
