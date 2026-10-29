@@ -8,11 +8,8 @@ from domain.types import JsonValue
 
 
 class JsonbModel(BaseModel):
-    """Base des modèles de colonne JSONB.
-
-    `to_dict` sérialise pour l'écriture en base en omettant les clés None.
-    """
+    """Base des modèles de colonne JSONB."""
 
     def to_dict(self) -> Mapping[str, JsonValue]:
-        """Sérialise pour écriture en base (colonne JSONB). Omet les clés None."""
+        """Sérialise pour l'écriture en base, sans les clés nulles."""
         return self.model_dump(exclude_none=True)

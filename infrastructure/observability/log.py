@@ -1,10 +1,10 @@
-"""Configuration centralisée du logging.
+"""Configuration du logging.
 
-Par défaut, les logs sont émis au format JSON (une ligne = un record) pour permettre leur agrégation par un collecteur externe (Loki, ELK, stdout→fluentd). Pour le format texte lisible en dev : `export LOG_FORMAT=text`.
+Les logs sortent en JSON, une ligne par record, pour un collecteur externe (Loki, ELK, fluentd). `LOG_FORMAT=text` donne le format texte, lisible en développement.
 
-Tous les fichiers .log sont consolidés sous `PROJECT_ROOT/logs/`, en reproduisant l'arborescence du caller (voir `_rebase_log_dir`).
+Les fichiers `.log` se rangent sous `PROJECT_ROOT/logs/`, dans l'arborescence de l'appelant (`_rebase_log_dir`).
 
-Une ligne émise avec `extra={"detail": True}` porte le cas d'une donnée : un terminal la masque, le journal la garde (voir `_FiltreDetail`).
+Une ligne émise avec `extra={"detail": True}` rapporte le cas d'une donnée : le terminal la masque, le journal la garde (`_FiltreDetail`).
 """
 
 import contextvars
@@ -78,28 +78,25 @@ RUN_MARKER = "Run pipeline #"
 PHASE_MARKER = "PHASE : "
 RUN_END_MARKER = "PIPELINE TERMINÉ"
 
-# Phase pipeline courante, injectée comme nom de logger dans chaque record émis pendant la phase (voir `_PhaseNameFilter`).
-# Posée par l'orchestrateur (`run_pipeline`) ; jamais renseignée hors run pipeline (API, scripts CLI).
+# Phase du pipeline en cours, qui devient le nom du logger de chaque record émis pendant la phase (`_PhaseNameFilter`).
+# L'orchestrateur la pose ; hors run (API, scripts), elle reste vide.
 _log_phase: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "pipeline_log_phase", default=None
 )
 
 
 def set_log_phase(phase: str | None) -> contextvars.Token[str | None]:
-    """Définit la phase pipeline courante. Retourne un token à passer à `reset_log_phase` pour restaurer la valeur précédente."""
+    """Pose la phase du pipeline en cours, et rend le jeton qui restaure la précédente (`reset_log_phase`)."""
     return _log_phase.set(phase)
 
 
 def reset_log_phase(token: contextvars.Token[str | None]) -> None:
-    """Restaure la phase pipeline précédant `set_log_phase`."""
+    """Restaure la phase du pipeline d'avant `set_log_phase`."""
     _log_phase.reset(token)
 
 
 class _PhaseNameFilter(logging.Filter):
-    """Réécrit `record.name` avec la phase pipeline courante quand elle est posée.
-
-    Rend chaque ligne auto-située : `record.name` porte le nom de la phase (`normalize:`, `subjects:`…). Sans phase active (API, scripts), le nom du logger d'origine est conservé.
-    """
+    """Écrit la phase du pipeline en cours dans `record.name` : chaque ligne dit sa phase (`normalize:`, `subjects:`…). Sans phase (API, scripts), le nom du logger d'origine reste."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         phase = _log_phase.get()
@@ -108,7 +105,7 @@ class _PhaseNameFilter(logging.Filter):
         return True
 
 
-# Attributs internes de logging.LogRecord à ne PAS inclure dans la sortie JSON (déjà couverts, ou trop verbeux).
+# Attributs internes de `LogRecord` exclus de la sortie JSON : déjà repris, ou trop bavards.
 _STD_RECORD_ATTRS = {
     "name",
     "msg",
@@ -138,7 +135,7 @@ _STD_RECORD_ATTRS = {
 class JsonFormatter(logging.Formatter):
     """Formatter produisant une ligne JSON par record.
 
-    Champs : timestamp (ISO UTC), level, logger, message, et `template` quand le message est formaté à l'émission. Le gabarit reste identique d'une occurrence à l'autre là où le message porte les valeurs du moment : un collecteur y regroupe les lignes d'un même événement, les compte et les surveille sans lire le texte. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
+    Champs : timestamp (ISO UTC), level, logger, message, et `template` quand le message est formaté à l'émission. Le gabarit reste identique d'une occurrence à l'autre là où le message contient les valeurs du moment : un collecteur y regroupe les lignes d'un même événement, les compte et les surveille sans lire le texte. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -169,7 +166,7 @@ class _FormatTexte(logging.Formatter):
 
 
 def _make_formatter() -> logging.Formatter:
-    """Retourne le formatter selon LOG_FORMAT (json par défaut, text en fallback)."""
+    """Formatter choisi par `LOG_FORMAT` : JSON par défaut, texte sur demande."""
     fmt = os.environ.get("LOG_FORMAT", "json").lower()
     if fmt == "text":
         return _FormatTexte("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -198,9 +195,9 @@ def _console_lisible() -> bool:
 
 
 def _make_console_formatter() -> logging.Formatter:
-    """Retourne le formatter des lignes de console.
+    """Formatter des lignes de console.
 
-    Devant un terminal, le format texte se réduit au message. Une sortie redirigée ou capturée porte l'horodatage, le niveau et la phase.
+    Devant un terminal, le format texte se réduit au message. Une sortie redirigée ou capturée ajoute l'horodatage, le niveau et la phase.
     """
     if _console_lisible():
         return _FormatConsole()
@@ -224,9 +221,9 @@ def _add_console_filters(handler: logging.Handler) -> None:
 
 
 def _rebase_log_dir(log_dir: str) -> Path:
-    """Rebase `log_dir` vers `PROJECT_ROOT/logs/<relpath>/`.
+    """Répertoire `PROJECT_ROOT/logs/<chemin relatif>/` de `log_dir`.
 
-    Le relpath est calculé à partir du chemin du caller relatif à la racine du projet. Un suffixe `logs` final est éliminé pour éviter une imbrication redondante `logs/.../logs/`. Un chemin hors projet est replié sous `PROJECT_ROOT/logs/` en préservant ses segments nommés.
+    Le chemin relatif part de la racine du projet. Un `logs` final est retiré, pour éviter `logs/.../logs/`. Un chemin hors projet se range sous `PROJECT_ROOT/logs/`, avec ses segments nommés.
     """
     p = Path(log_dir)
     if not p.is_absolute():
@@ -242,21 +239,16 @@ def _rebase_log_dir(log_dir: str) -> Path:
 
 
 def setup_logger(name: str, log_dir: str) -> logging.Logger:
-    """Configure un logger avec sortie console, et fichier optionnel.
+    """Configure un logger nommé, avec une sortie console et, sur demande, un fichier.
 
-    Le FileHandler est **opt-in** via `LOG_TO_FILE=true` : par défaut l'app n'écrit pas sur disque (logs sur stdout, 12-factor). Activer en dev local pour garder un historique.
-
-    Quand activé, le `log_dir` passé par le caller est rebasé vers `PROJECT_ROOT/logs/<relpath>/` (voir `_rebase_log_dir`), regroupant tous les fichiers `.log` sous une arborescence unique. Crée le répertoire si nécessaire, et se rabat sur la seule sortie standard si le disque le refuse (voir `_attach_file_handler`).
-
-    Configure uniquement le logger nommé (pas le root logger). Format : JSON par défaut, texte si LOG_FORMAT=text.
+    Le fichier s'active par `LOG_TO_FILE=true` ; sans lui, l'application écrit seulement sur la sortie standard. Le répertoire passé se range sous `PROJECT_ROOT/logs/` (`_rebase_log_dir`), créé au besoin. Un disque qui refuse l'écriture laisse la seule sortie standard (`_attach_file_handler`). Format JSON par défaut, texte avec `LOG_FORMAT=text`.
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    # Le logger porte ses propres handlers : propager en plus émettrait chaque record une
-    # seconde fois par ceux du root.
+    # Le logger a ses propres handlers : propager émettrait chaque record une seconde fois par ceux du root.
     logger.propagate = False
 
-    # Éviter les doublons si le logger est configuré plusieurs fois
+    # Évite les doublons quand le logger est configuré plusieurs fois.
     if logger.handlers:
         return logger
 
@@ -290,7 +282,7 @@ def _attach_file_handler(
 ) -> None:
     """Ajoute au logger un fichier sous `PROJECT_ROOT/logs/`, ou s'en passe si le disque le refuse.
 
-    Un système de fichiers en lecture seule — le conteneur de production est cloisonné ainsi — ou un répertoire fermé en écriture rend le fichier impossible. La journalisation retombe alors sur la seule sortie standard, que le runtime collecte de toute façon, et un avertissement dit ce qui manque : une destination de logs indisponible n'est pas une raison d'empêcher l'application de démarrer.
+    Un système de fichiers en lecture seule — le conteneur de production est cloisonné ainsi — ou un répertoire fermé en écriture rend le fichier impossible. La journalisation retombe alors sur la seule sortie standard, que le runtime collecte, avec un avertissement : l'application démarre quand même.
     """
     target_dir = _rebase_log_dir(log_dir)
     try:
@@ -316,13 +308,10 @@ def configure_root_logging(level: int = logging.INFO) -> None:
     """
     root = logging.getLogger()
     root.setLevel(level)
-    # Nettoyer les handlers par défaut (uvicorn peut en ajouter après)
+    # Retire les handlers par défaut, qu'uvicorn peut ajouter ensuite.
     for h in list(root.handlers):
         root.removeHandler(h)
-    # Sous pytest, ne pas attacher de StreamHandler : pytest pose son
-    # propre LogCaptureHandler (accessible via la fixture `caplog` et
-    # affiché automatiquement sur échec). Attacher un handler stdout en
-    # plus duplique les records et pollue la sortie des tests.
+    # Sous pytest, `caplog` capte déjà les records et les affiche en cas d'échec : un handler de sortie standard les dupliquerait.
     if os.environ.get("PYTEST_VERSION") or os.environ.get("PYTEST_CURRENT_TEST"):
         return
     handler = logging.StreamHandler(stream=_FluxConsole(console_stream()))
