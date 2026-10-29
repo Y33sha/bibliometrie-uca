@@ -6,7 +6,7 @@
 
 Une section sans identifiant à chercher se ferme sur « Rien à faire ».
 
-Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`. WoS est opt-in (`--include-wos`).
+Un identifiant cherché en vain est inscrit dans `failed_lookups`, et cherché de nouveau après le délai `fetch_missing_retry_after_days`. Auprès du registre qui l'attribue (HAL pour un hal-id, theses.fr pour un NNT, doi.org pour un DOI), l'échec est définitif. WoS est opt-in (`--include-wos`).
 """
 
 from __future__ import annotations

@@ -25,5 +25,5 @@ def extract_doi(thesis: Mapping[str, JsonValue]) -> str | None:
 
 
 def is_ongoing(thesis: Mapping[str, JsonValue]) -> bool:
-    """Vrai pour une thèse en cours, qui n'a ni soutenance ni NNT."""
+    """Vrai pour une thèse en cours, sans soutenance ni NNT."""
     return as_str(thesis.get("status")) == "enCours"

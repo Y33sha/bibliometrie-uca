@@ -1,6 +1,6 @@
 """Recherche dans theses.fr de la phase `fetch_missing` : tâche `fetch_missing.theses_by_nnt`.
 
-NNT de thèses soutenues que d'autres sources contiennent (scanR, OpenAlex, HAL) et que le staging theses.fr n'a pas : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Une requête à la fois, par la boucle commune (`pipeline.ingestion.common.lookup`).
+NNT de thèses soutenues que d'autres sources contiennent (ScanR, OpenAlex, HAL), absents du staging theses.fr : thèses soutenues dans un autre établissement, liées au périmètre par un auteur, un directeur ou un membre du jury. Une requête à la fois, par la boucle commune (`pipeline.ingestion.common.lookup`).
 """
 
 from __future__ import annotations
@@ -49,9 +49,9 @@ async def fetch_missing_theses_by_nnt(
 ) -> PhaseMetrics:
     """Cherche dans theses.fr les thèses repérées par NNT dans d'autres sources et les écrit dans `staging`.
 
-    Un NNT introuvable est inscrit dans `failed_lookups` et cherché de nouveau après `retry_after_days` jours. theses.fr indisponible laisse le NNT dans la sélection du run suivant.
+    Un NNT introuvable est inscrit dans `failed_lookups`. Quand theses.fr est indisponible, le NNT reste dans la sélection du run suivant.
 
-    Compteurs de `look_up`, et `extras["not_found"]` = NNT introuvables.
+    Rend les compteurs de `look_up`, avec le nombre de NNT introuvables (`not_found`).
     """
     nnts = get_missing_nnts(conn, retry_after_days=retry_after_days)
     return await look_up(
