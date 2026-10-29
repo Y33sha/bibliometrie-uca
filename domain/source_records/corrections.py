@@ -1,10 +1,10 @@
-"""Sidecar `corrections` : format de réversibilité des corrections de `source_records`.
+"""Valeurs d'avant correction des enregistrements sources (colonne `corrections`).
 
-Quand une correction écrit la valeur **effective** dans une colonne typée de `source_records`, la valeur d'avant correction est stashée dans la colonne JSONB `corrections`, par champ, au format :
+Une correction écrit la valeur corrigée dans la colonne de `source_records`, et garde la valeur d'avant correction dans `corrections`, par champ :
 
     {"<champ>": {"raw": <valeur d'avant correction>, "corrected_by": "<règle>"}}
 
-Ce module centralise **lecture** (reconstruction de la valeur d'avant correction) et **écriture** (stash) de ce format, de sorte que le contrat de réversibilité — `COALESCE(corrections->'<champ>'->>'raw', <colonne>)` côté SQL, `hydrate_raw_view` côté Python — soit défini en un seul endroit. Inverse des corrections (`domain/source_records/metadata_correction/`).
+En SQL, la valeur d'avant correction se lit `COALESCE(corrections->'<champ>'->>'raw', <colonne>)`.
 """
 
 from collections.abc import Mapping
@@ -57,12 +57,12 @@ def other_entries(
 
 
 def stash_entry(raw: JsonValue, corrected_by: str) -> dict[str, JsonValue]:
-    """Entrée `corrections` pour un champ corrigé : la valeur d'avant correction + sa provenance."""
+    """Entrée de `corrections` d'un champ corrigé : valeur d'avant correction et règle de correction."""
     return {RAW: raw, CORRECTED_BY: corrected_by}
 
 
 def raw_value[T](corrections: Mapping[str, JsonValue] | None, field: str, current: T) -> T:
-    """Valeur d'avant correction d'un champ : la valeur stashée si la `source_record` a été corrigée sur ce champ, sinon la valeur courante de la colonne."""
+    """Valeur d'avant correction d'un champ : celle de `corrections` si le champ est corrigé, sinon `current`."""
     entry = corrections.get(field) if corrections else None
     if isinstance(entry, dict) and RAW in entry:
         return cast("T", entry[RAW])
@@ -73,10 +73,7 @@ def hydrate_raw_view[ViewT: DataclassInstance](
     view: ViewT,
     corrections: Mapping[str, JsonValue] | None,
 ) -> ViewT:
-    """Reconstruit la vue aux valeurs **source d'origine** (avant correction), en réinjectant chaque champ stashé dans `corrections`. Les champs jamais corrigés gardent leur valeur courante. Inverse de la persistance des corrections.
-
-    Générique : réinjecte tout champ présent dans `corrections` *et* sur la vue, sans liste figée — un champ corrigeable de plus est pris en charge sans modification ici.
-    """
+    """Vue aux valeurs d'avant correction : chaque champ présent dans `corrections` et sur la vue reprend sa valeur d'avant correction."""
     if not corrections:
         return view
     overrides = {
