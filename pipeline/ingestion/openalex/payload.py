@@ -1,8 +1,6 @@
-"""Lecture des enregistrements sources OpenAlex par la normalisation.
+"""Lecture des enregistrements sources OpenAlex par la normalisation : conventions des champs d'OpenAlex.
 
-Interprétation des champs propres au schéma OpenAlex — prédicats et fonctions de lecture qui encapsulent la connaissance de la sémantique OpenAlex.
-
-Les payloads reçus de l'API sont décrits par `JsonValue` : leur forme est celle qu'ils ont, non celle que le schéma annonce, et chaque champ lu passe par un accesseur qui la contrôle.
+Les payloads reçus de l'API sont décrits par `JsonValue` : leur forme est celle qu'ils ont, et chaque champ lu passe par un accesseur qui la contrôle.
 """
 
 import re
@@ -27,13 +25,7 @@ from domain.source_records.identifiers import (
 from domain.types import JsonValue, as_mapping, as_str
 from domain.urls import is_host, url_host
 
-# =============================================================
-# IDENTIFIANT OPENALEX (court ↔ URL)
-# =============================================================
-
-# OpenAlex expose ses identifiants sous forme d'URL (`https://openalex.org/<id>`)
-# pour tous les types d'entité : W works, A auteurs, S sources, I institutions,
-# P éditeurs. En base on conserve la forme courte (`S20400310`).
+# OpenAlex donne ses identifiants en URL (`https://openalex.org/<id>`) pour tous les types d'entité : W works, A auteurs, S sources, I institutions, P éditeurs. La base garde la forme courte (`S20400310`).
 _OPENALEX_ID_PREFIX = "https://openalex.org/"
 
 
@@ -57,12 +49,8 @@ def full_openalex_id(id_or_url: str) -> str:
     return _OPENALEX_ID_PREFIX + id_or_url
 
 
-# =============================================================
-# AUTEURS
-# =============================================================
-
 BULK_AUTHORSHIPS_CAP = 100
-"""Nombre maximal d'auteurs d'un work dans une réponse bulk d'OpenAlex. Un work qui en porte autant est peut-être tronqué ; sa requête individuelle rend tous ses auteurs."""
+"""Nombre maximal d'auteurs d'un work dans une réponse bulk d'OpenAlex. Un work qui en compte autant est peut-être tronqué ; sa requête individuelle rend tous ses auteurs."""
 
 
 def authors_may_be_truncated(work: Mapping[str, JsonValue]) -> bool:
@@ -71,22 +59,11 @@ def authors_may_be_truncated(work: Mapping[str, JsonValue]) -> bool:
     return isinstance(authorships, list) and len(authorships) == BULK_AUTHORSHIPS_CAP
 
 
-# =============================================================
-# LOCATIONS
-# =============================================================
-
-
 @dataclass(frozen=True, slots=True)
 class OpenalexLocation:
-    """Vue structurée d'une `location` d'un work OpenAlex.
+    """Une `location` d'un work OpenAlex, principale ou non.
 
-    OpenAlex expose deux entrées de même shape :
-    - `work.primary_location` : la location principale (où OA a moissonné le document).
-    - `work.locations` (liste) : toutes les locations connues pour le document (incluant typiquement la primary en `locations[0]`).
-
-    Cette dataclass représente une location quelconque, indépendamment de son rôle primary/secondaire ; `parse_primary_location` en construit la vue depuis `work.primary_location`.
-
-    Tous les champs sont nullable : OpenAlex peut retourner une location partielle (publi sans landing page, source non identifiée…).
+    OpenAlex donne la localisation principale (`primary_location`) et toutes les localisations du work (`locations`), en général la principale en tête. Tous les champs peuvent manquer : OpenAlex rend des localisations partielles (sans page, source non identifiée…).
     """
 
     location_id: str | None  # location.id (ex. "pmh:2023UCFAC123")
@@ -117,31 +94,20 @@ def parse_primary_location(work: Mapping[str, JsonValue]) -> OpenalexLocation | 
     return _parse_one_location(work.get("primary_location"))
 
 
-# =============================================================
-# PRÉDICATS SUR LES LOCATIONS
-# =============================================================
-
-
 def is_theses_fr_location(loc: OpenalexLocation) -> bool:
-    """True si la location pointe vers theses.fr (display_name ou URL)."""
+    """Vrai si la localisation désigne theses.fr, par son nom ou son URL."""
     if "theses.fr" in (loc.source_display_name or "").lower():
         return True
     return is_host(loc.landing_page_url, "theses.fr")
 
 
 def is_repository_location(loc: OpenalexLocation) -> bool:
-    """True si la location est de type 'repository' (HAL, Zenodo, etc.)."""
+    """Vrai si la source de la localisation est un `repository` (HAL, Zenodo…)."""
     return loc.source_type == "repository"
 
 
 def is_hal_location(loc: OpenalexLocation) -> bool:
-    """True si la location pointe vers HAL.
-
-    Trois signaux :
-    1. La landing page est un identifiant HAL reconnu (`extract_hal_id_from_url`).
-    2. `source.type == 'repository'` ET `source.homepage_url` désigne un portail HAL.
-    3. `source.type == 'repository'` ET `source.display_name` contient 'hal'.
-    """
+    """Vrai si la localisation désigne HAL : sa page est un identifiant HAL reconnu (`extract_hal_id_from_url`), ou sa source est un `repository` dont la page d'accueil est un portail HAL ou dont le nom contient « hal »."""
     if extract_hal_id_from_url(loc.landing_page_url) is not None:
         return True
     if loc.source_type == "repository":
@@ -154,34 +120,24 @@ def is_hal_location(loc: OpenalexLocation) -> bool:
 
 
 def names_publisher(loc: OpenalexLocation | None) -> bool:
-    """Indique si la source de la primary_location nomme l'éditeur du work. HAL, theses.fr et tout autre repository (Zenodo, SPIRE, etc.) hébergent le work sans le publier. Sans primary_location (rare en pratique), la source est réputée nommer l'éditeur."""
+    """Vrai si la source de la localisation principale nomme l'éditeur du work. HAL, theses.fr et les autres entrepôts (Zenodo, SPIRE…) hébergent le work sans le publier. Sans localisation principale, la source est réputée nommer l'éditeur."""
     if loc is None:
         return True
     return not (is_hal_location(loc) or is_theses_fr_location(loc) or is_repository_location(loc))
 
 
 def names_serial(loc: OpenalexLocation | None) -> bool:
-    """Indique si la source de la primary_location est la revue ou la collection du work. Une plateforme d'ebooks a l'éditeur pour organisation hôte, et ne contient aucun document."""
+    """Vrai si la source de la localisation principale est la revue ou la collection du work. Une plateforme d'ebooks a l'éditeur pour organisation hôte, et ne contient aucun document."""
     return names_publisher(loc) and (loc is None or loc.source_type != "ebook platform")
 
 
-# =============================================================
-# EXTRACTEURS
-# =============================================================
-
-
-# NNT via PMH : "pmh:{NNT}" — exclut les identifiants OAI (oai:HAL:...)
+# NNT d'un identifiant PMH : « pmh:{NNT} », hors identifiants OAI (`oai:HAL:…`).
 _PMH_NNT_RE = re.compile(r"^pmh:([A-Za-z0-9]+)$", re.IGNORECASE)
 _THESES_FR_URL_RE = re.compile(r"theses\.fr/([A-Za-z0-9]+)")
 
 
 def extract_nnt_from_location(loc: OpenalexLocation) -> str | None:
-    """Extrait le NNT d'une location quand celle-ci pointe vers theses.fr.
-
-    Cascade :
-    1. `location.id` au format `"pmh:{NNT}"` (OAI-PMH harvest)
-    2. `landing_page_url` au format `"…/theses.fr/{NNT}/…"`
-    """
+    """NNT d'une localisation theses.fr : d'après `location.id` (`pmh:{NNT}`), à défaut sa page (`…/theses.fr/{NNT}/…`)."""
     if loc.location_id:
         m = _PMH_NNT_RE.match(loc.location_id)
         if m:
@@ -209,21 +165,13 @@ _KNOWN_OA_STATUSES = frozenset(
 def map_openalex_oa_status(raw: str | None) -> str | None:
     """Statut open access (`OaStatus`) d'un `open_access.oa_status` d'OpenAlex.
 
-    OpenAlex utilise les mêmes labels que notre enum (gold, diamond, hybrid, bronze, green, closed). Mapping identitaire pour les valeurs connues, plus :
-
-    - `None` ou `""` → `None` (OpenAlex ne s'est pas prononcé ; on délègue aux autres sources via `best_oa_status` côté `refresh_from_sources`. Cas rare : OpenAlex peuple presque toujours `open_access.oa_status` quand `open_access` est présent. Cohérent avec la sémantique HAL/ScanR : un champ vide ne se mappe pas à `closed`.)
-    - valeur inattendue → `'unknown'` (catch-all si OpenAlex introduit un label pas encore intégré au mapping).
+    OpenAlex emploie les mêmes valeurs que `OaStatus` (gold, diamond, hybrid, bronze, green, closed). Une valeur vide donne `None` : les autres sources en décident (`best_oa_status`), et un champ vide reste distinct de `closed`. Une valeur inattendue donne `unknown`.
     """
     if not raw:
         return None
     if raw in _KNOWN_OA_STATUSES:
         return raw
     return "unknown"
-
-
-# =============================================================
-# IDs DEPUIS LES URLs
-# =============================================================
 
 
 def url_identifiers(urls: list[str]) -> list[SourceIdentifier]:
