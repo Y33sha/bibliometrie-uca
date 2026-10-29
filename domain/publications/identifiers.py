@@ -1,7 +1,4 @@
-"""Identifiants de publication, au contrat de `domain.identifiers.NormalizedIdentifier` : DOI et son préfixe (DoiPrefix), HALId (document HAL), NNT (Numéro National de Thèse), PMID (PubMed), PMCID (PubMed Central), ArxivId (arXiv), ISSN (publication en série), ISBN (livre).
-
-`clean_doi`, `normalize_nnt`, `extract_hal_id_from_url`, `normalize_pmid`, `normalize_pmcid` et `normalize_arxiv_id` rendent la forme canonique d'une URL ou d'un identifiant brut, sans construire de value object.
-"""
+"""Identifiants de publication : DOI et son préfixe, identifiant HAL, NNT, PMID, PMCID, identifiant arXiv, ISSN, ISBN."""
 
 import re
 from urllib.parse import unquote, urlparse
@@ -9,15 +6,9 @@ from urllib.parse import unquote, urlparse
 from domain.identifiers import NormalizedIdentifier
 from domain.urls import is_host
 
-# ── DOI ────────────────────────────────────────────────────────────
-
-# Suffixe de version sur les DOI de dépôts de données (figshare, zenodo,
-# techrxiv, opticaopen…). On normalise vers le DOI "concept" (sans version)
-# qui pointe toujours vers la dernière version.
+# Suffixe de version des DOI d'entrepôts de données (Figshare, Zenodo…). Le DOI sans version désigne l'œuvre.
 _DOI_VERSION_SUFFIX = re.compile(r"\.v\d+$", re.IGNORECASE)
-# Suffixe d'URL d'éditeur (`/pdf`, `/full`, `/abstract`) collé au DOI quand une source expose
-# l'URL d'une page de l'article au lieu du DOI seul. Le DOI suffixé est inconnu de doi.org
-# et double la publication du DOI sans suffixe.
+# Suffixe d'URL de page d'éditeur (`/pdf`, `/full`, `/abstract`) collé au DOI. Le DOI suffixé est inconnu de doi.org.
 _DOI_URL_PAGE_SUFFIX = re.compile(r"/(?:pdf|full|abstract)$", re.IGNORECASE)
 _DOI_URL_PREFIXES = (
     "https://doi.org/",
@@ -27,29 +18,22 @@ _DOI_URL_PREFIXES = (
     "https://www.doi.org/",
     "http://www.doi.org/",
 )
-# Tirets typographiques Unicode (hyphen, non-breaking, figure, en/em dash, minus,
-# variantes small/fullwidth) ramenés sur le `-` ASCII : un DOI saisi/copié avec un
-# de ces caractères ne s'apparierait pas à sa forme ASCII (faux doublon).
+# Tirets typographiques Unicode, ramenés sur le `-` ASCII.
 _DASH_TRANSLATION = {ord(c): "-" for c in "‐‑‒–—―−﹘﹣－"}
 # Forme d'un DOI : le préfixe `10.<chiffres>`, une barre oblique, un suffixe non vide.
 _DOI_SHAPE = re.compile(r"10\.\d+/\S")
-# Préfixe DOI en tête d'une chaîne, ni prolongé par une lettre, un chiffre ou un point
-# (« 10.101621gloenvcha.2020.102168 », DOI privé de sa barre oblique, n'en porte pas).
+# Préfixe DOI en tête d'une chaîne, suivi d'autre chose qu'une lettre, un chiffre ou un point (« 10.101621gloenvcha.2020.102168 » est sans préfixe).
 _DOI_PREFIX_RE = re.compile(r"(10\.\d+)(?![\w.])")
 # Séparateurs des identifiants qui s'écrivent par groupes de chiffres (ISSN, ISBN), retirés pour les comparer.
 _SEPARATORS_RE = re.compile(r"[\s-]")
 
 
 def clean_doi(raw: str | None) -> str | None:
-    """Normalise un DOI brut vers sa forme canonique : minuscule, sans préfixe URL ni schéma, sans artefact de copier-coller, ramené sur son concept (suffixe de version retiré).
-
-    Lowercase systématique : la spec DOI Handbook précise que le préfixe `10.xxxx` est insensible à la casse, et CrossRef (registre officiel) traite l'ensemble du DOI en case-insensitive. Stocker tout en minuscules évite les faux doublons cross-sources.
-
-    Idempotent par construction : une passe (`_normalize_doi_step`) est réappliquée jusqu'au point fixe. Chaque transformation retire des caractères ou est une substitution idempotente (minuscule, tirets Unicode), sans jamais en ajouter : l'itération converge, et un DOI déjà normalisé est renvoyé inchangé. L'itération est nécessaire parce qu'une étape de fin (suffixe `.vN`) peut ré-exposer du travail pour une étape de début (slash ou suffixe d'URL d'éditeur final), résidu qu'une passe unique laisserait.
-    """
+    """Forme normalisée d'un DOI brut : en minuscules, sans préfixe d'URL ni schéma, sans artefact de copier-coller ni suffixe de version. `None` si la valeur n'a pas la forme d'un DOI. Les DOI sont insensibles à la casse."""
     if not raw:
         return None
     s = raw.strip().lower()
+    # Une étape de fin (suffixe `.vN`) peut laisser un résidu pour une étape de début : la passe se répète jusqu'à stabilité.
     while s:
         reduced = _normalize_doi_step(s)
         if reduced == s:
@@ -60,34 +44,26 @@ def clean_doi(raw: str | None) -> str | None:
 
 
 def _normalize_doi_step(s: str) -> str:
-    """Une passe de normalisation d'un DOI déjà minuscule. Retire, dans l'ordre : le préfixe de schéma `doi:`, un préfixe URL (`https://doi.org/`…), l'encodage pourcent (`%2f` → `/`), les tirets typographiques Unicode (ramenés sur `-`), une query string (`?utm_…`), les DOI surnuméraires d'une liste au point-virgule (le premier est gardé), le slash final, la ponctuation/markup de fin (`. , ; : < >` et parenthèse non appariée — les parenthèses appariées de `10.1007/jhep07(2020)108` sont conservées), puis les suffixes d'URL d'éditeur (`/pdf`, `/full`, `/abstract`) et `.vN`.
-
-    Ne converge pas seule : c'est `clean_doi` qui la réitère jusqu'au point fixe."""
+    """Une passe de nettoyage d'un DOI en minuscules."""
     if s.startswith("doi:"):
-        # Préfixe de schéma (relatedIdentifier DataCite, location.id OAI-PMH côté OpenAlex) :
-        # sinon `doi:10.x` ≠ `10.x` (faux doublon, cible de correction irrésoluble en base).
+        # Préfixe de schéma (DataCite, identifiant OAI-PMH d'OpenAlex).
         s = s[len("doi:") :]
     for prefix in _DOI_URL_PREFIXES:
         if s.startswith(prefix):
             s = s[len(prefix) :]
             break
     s = s.strip()
-    # Décodage pourcent (DOI tiré d'une URL : `%2f` = `/`, `%28` = `(`…). Une seule passe ici ;
-    # le double encodage (`%252f`) est résorbé par l'itération externe.
+    # Décodage pourcent (`%2f` = `/`). La passe suivante décode un double encodage (`%252f`).
     if "%" in s:
         s = unquote(s)
-    # Tirets typographiques Unicode → `-` ASCII.
     s = s.translate(_DASH_TRANSLATION)
-    # Query string parasite (paramètres de tracking accolés à un DOI tiré d'une URL).
+    # Paramètres de suivi d'une URL (`?utm_…`).
     s = s.split("?", 1)[0]
-    # Liste de DOI concaténés au point-virgule : on garde le premier (l'œuvre ; les suivants
-    # sont des formes liées — versions, rapports de relecture — qui ont leur propre DOI).
+    # Liste de DOI : le premier désigne l'œuvre, les suivants des formes liées (versions, rapports de relecture).
     s = s.split(";", 1)[0].strip()
-    # Slash final parasite (artefact d'URL) : `10.x/abc/` ≠ `10.x/abc` sinon, faux doublon.
+    # Barre oblique finale d'une URL.
     s = s.rstrip("/")
-    # Ponctuation/markup final parasite (copier-coller, fragment HTML, parsing d'URL) : un DOI ne
-    # se termine pas par `. , ; : < >` ; une parenthèse finale n'est retirée que si elle est non
-    # appariée — les DOI type `10.1007/jhep07(2020)108` portent des parenthèses légitimes.
+    # Ponctuation finale de copier-coller. Une parenthèse finale part seulement si elle est non appariée (`10.1007/jhep07(2020)108`).
     s = s.rstrip(".,;:<>")
     if s.endswith(")") and s.count(")") > s.count("("):
         s = s[:-1]
@@ -98,11 +74,7 @@ def _normalize_doi_step(s: str) -> str:
 
 
 class DOI(NormalizedIdentifier):
-    """Digital Object Identifier, normalisé et validé.
-
-    Lève ValidationError à la construction si la valeur est invalide ou vide : après nettoyage, un DOI a la forme `10.<chiffres>/<suffixe>`.
-    Utiliser `DOI.try_parse()` quand l'absence est un cas normal.
-    """
+    """DOI normalisé. Lève `ValidationError` si la valeur nettoyée n'a pas la forme `10.<chiffres>/<suffixe>`."""
 
     label = "DOI"
     normalize = staticmethod(clean_doi)
@@ -120,41 +92,23 @@ def _doi_prefix(raw: str | None) -> str | None:
 
 
 class DoiPrefix(NormalizedIdentifier):
-    """Préfixe DOI (`10.<chiffres>`), partie registrant d'un DOI, avant la première barre oblique.
-
-    À la construction, tolère une entrée bruitée : espaces, DOI complet, ponctuation finale. Lève ValidationError si aucun préfixe n'est en tête de la valeur (« doi:10.5194 », « https: », « 10.101621gloenvcha.2020.102168 »).
-    """
+    """Préfixe DOI (`10.<chiffres>`), partie d'un DOI avant la première barre oblique. Accepte un DOI complet, des espaces ou une ponctuation finale. Lève `ValidationError` sans préfixe en tête (« doi:10.5194 », « https: »)."""
 
     label = "Préfixe DOI"
     normalize = staticmethod(_doi_prefix)
 
 
-# ── HAL ID (document) ──────────────────────────────────────────────
-
-# Un HAL ID est `<code de collection>-<numéro à 8 chiffres>`, avec `_` pour séparateur sur le portail ArchiveSIC (`sic_01848892`). Le code de collection est ouvert :
-# `hal`, `tel`, `halshs`, `dumas`, `emse`, `in2p3`, `inserm`, `insu`, `cea`… — des dizaines de
-# portails institutionnels, et de nouveaux apparaissent. On matche donc tout préfixe alphanumérique
-# plutôt qu'une liste blanche fermée, qui exclurait silencieusement de la déduplication les
-# collections non listées (deux dépôts au même `hal_id` `emse-…` ne se relieraient pas).
-#
-# Le numéro est exigé à 8 chiffres minimum (le docid CCSD est uniforme : tous les hal_id observés en
-# base, tous portails confondus, ont exactement 8 chiffres). Ce plancher écarte les fragments
-# `mot-chiffres` glanés dans des URLs étrangères — un suffixe de DOI DataCite (`pubdb-2020`,
-# `rwth-2020`) ou un PURL (`gro-2`) ne ressemble plus à un hal_id.
+# Dépôt HAL : `<code de portail>-<numéro>`, `_` pour séparateur sur ArchiveSIC. Tout code est accepté. Au moins 8 chiffres, pour écarter des fragments d'URL (`pubdb-2020`).
 HAL_DOC_PATTERN = r"[a-z][a-z0-9]*[-_]\d{8,}"
 """Motif d'un identifiant de dépôt HAL, insensible à la casse ; repris en SQL par `sql_fragments`."""
 _HAL_DOC_BASE = re.compile(f"({HAL_DOC_PATTERN})", re.IGNORECASE)
 
-# Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`. Les works OpenAlex
-# exposent la source structurée de leurs locations sous cette forme : `oai:HAL:hal-04123456v1` pour
-# HAL, mais aussi `oai:pure.rug.nl:openaire/<uuid>` pour des dépôts institutionnels quelconques.
+# Autorité d'un identifiant OAI-PMH `[<préfixe>:]oai:<autorité>:<id local>`, comme `oai:HAL:hal-04123456v1` dans les localisations OpenAlex.
 _OAI_AUTHORITY = re.compile(r"(?:^|:)oai:([^:]+):", re.IGNORECASE)
 
 
 def is_hal_host(host: str) -> bool:
-    """True si l'hôte est un portail HAL : `hal.science` et ses sous-portails, l'infrastructure
-    CCSD historique (`*.archives-ouvertes.fr`, `*.ccsd.cnrs.fr`) et les portails white-label
-    institutionnels reconnaissables au label `hal` (`hal.inrae.fr`, `www.hal.inserm.fr`…)."""
+    """Vrai si l'hôte est un portail HAL : `hal.science` et ses sous-portails, `*.archives-ouvertes.fr`, `*.ccsd.cnrs.fr`, et les portails institutionnels dont un label est `hal` ou commence par `hal-` (`hal.inrae.fr`)."""
     host = host.lower()
     if host.endswith((".archives-ouvertes.fr", ".ccsd.cnrs.fr")):
         return True
@@ -162,21 +116,9 @@ def is_hal_host(host: str) -> bool:
 
 
 def extract_hal_id_from_url(raw: str | None) -> str | None:
-    """Extrait le HAL ID canonique d'une chaîne ou URL.
+    """Identifiant HAL sans version, tiré d'une URL de portail HAL, d'un identifiant OAI-PMH HAL (`oai:HAL:hal-04123456v1`) ou d'un identifiant nu.
 
-    Accepte une URL (hal.science, tel.archives-ouvertes.fr, …), un identifiant OAI-PMH HAL
-    (`oai:HAL:hal-04123456v1`) ou un HAL ID brut avec éventuel suffixe de version (v1, v2).
-    Retourne l'ID sans version (concept HAL).
-
-    Le regex de docid (`mot-chiffres`) est appliqué en dernier recours et attrape n'importe quel
-    fragment ; deux garde-fous en amont écartent les sources qui n'en portent pas :
-
-    - une URL dont l'hôte n'est pas un portail HAL (fragment d'un DOI ou d'un PURL étranger) ;
-    - un identifiant OAI-PMH dont l'autorité n'est pas HAL (un UUID de dépôt institutionnel comme
-      `oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee` piégerait sinon le regex sur
-      `b454-3339841149`).
-
-    Un token nu (sans hôte ni autorité OAI) reste accepté tel quel.
+    `None` pour une URL d'un autre hôte, ou un identifiant OAI-PMH d'une autre autorité : leurs fragments `mot-chiffres` ressemblent à un identifiant HAL (`oai:pure.rug.nl:openaire/1b9c53c2-4cfa-49c4-b454-3339841149ee`).
     """
     if not raw:
         return None
@@ -192,24 +134,17 @@ def extract_hal_id_from_url(raw: str | None) -> str | None:
 
 
 class HALId(NormalizedIdentifier):
-    """Identifiant HAL d'un document (hal-XXXXX, tel-XXXXX, halshs-XXXXX, …).
-
-    Normalisé en minuscules sans suffixe de version (`hal-04123456v2` →
-    `hal-04123456`). Accepte une URL en entrée.
-    """
+    """Identifiant HAL d'un dépôt (`hal-…`, `tel-…`, `halshs-…`), en minuscules et sans version (`hal-04123456v2` → `hal-04123456`). Accepte une URL."""
 
     label = "HAL ID"
     normalize = staticmethod(extract_hal_id_from_url)
-
-
-# ── NNT (Numéro National de Thèse) ─────────────────────────────────
 
 
 _NNT_RE = re.compile(r"[0-9A-Z]+")
 
 
 def normalize_nnt(raw: str | None) -> str | None:
-    """Normalise un NNT : uppercase + strip. Format variable, on exige une valeur strictement alphanumérique ASCII (chiffres et lettres non accentuées). Ce garde rejette les identifiants OAI-PMH (`oai:HAL:…`, `doi:…`, `ark:/…`) qu'OpenAlex expose dans `primary_location.id` et qui ne sont pas des NNT — sans lui, ces valeurs alimenteraient un lien theses.fr mort."""
+    """NNT en majuscules. `None` s'il contient autre chose que des chiffres et des lettres ASCII, comme les identifiants OAI-PMH qu'OpenAlex donne à sa place (`oai:HAL:…`, `ark:/…`)."""
     if not raw:
         return None
     s = raw.strip().upper()
@@ -219,16 +154,11 @@ def normalize_nnt(raw: str | None) -> str | None:
 
 
 class NNT(NormalizedIdentifier):
-    """Numéro National de Thèse. Format typique : YYYY + code établissement + séquence (ex. 2021CLFAC030), sans être garanti.
-
-    On normalise en majuscules, trim, et on exige une valeur alphanumérique.
-    """
+    """Numéro national de thèse, le plus souvent de la forme année, code d'établissement, séquence (`2021CLFAC030`)."""
 
     label = "NNT"
     normalize = staticmethod(normalize_nnt)
 
-
-# ── PMID / PMCID (PubMed) ──────────────────────────────────────────
 
 _PMID_URL_RE = re.compile(r"pubmed\.ncbi\.nlm\.nih\.gov/(\d+)")
 _PMC_URL_RE = re.compile(
@@ -249,7 +179,7 @@ def normalize_pmid(raw: str | None) -> str | None:
 
 
 def normalize_pmcid(raw: str | None) -> str | None:
-    """PMCID (`PMC<digits>`) depuis une URL PubMed Central ou un id brut."""
+    """PMCID (`PMC<chiffres>`) depuis une URL PubMed Central ou un identifiant brut."""
     if not raw:
         return None
     s = raw.strip()
@@ -261,20 +191,18 @@ def normalize_pmcid(raw: str | None) -> str | None:
 
 
 class PMID(NormalizedIdentifier):
-    """PubMed ID (suite de chiffres). Accepte une URL PubMed en entrée."""
+    """PubMed ID (suite de chiffres). Accepte une URL PubMed."""
 
     label = "PMID"
     normalize = staticmethod(normalize_pmid)
 
 
 class PMCID(NormalizedIdentifier):
-    """PubMed Central ID (`PMC<digits>`). Accepte une URL PMC en entrée."""
+    """PubMed Central ID (`PMC<chiffres>`). Accepte une URL PubMed Central."""
 
     label = "PMCID"
     normalize = staticmethod(normalize_pmcid)
 
-
-# ── arXiv ──────────────────────────────────────────────────────────
 
 _ARXIV_URL_RE = re.compile(
     r"arxiv\.org/(?:abs|pdf)/(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})",
@@ -284,10 +212,7 @@ _ARXIV_BARE_RE = re.compile(r"^(\d{4}\.\d{4,5}|[a-z.\-]+/\d{7})(?:v\d+)?$", re.I
 
 
 def normalize_arxiv_id(raw: str | None) -> str | None:
-    """Identifiant arXiv depuis une URL `arxiv.org/abs|pdf/<id>` ou un id brut.
-
-    Gère les deux schémas d'identifiant : `AAAA.NNNNN` (`2103.00001`) et `catégorie/NNNNNNN` (`math/0211159`), en ignorant le suffixe de version (`v2`) et l'extension `.pdf`.
-    """
+    """Identifiant arXiv, `AAAA.NNNNN` (`2103.00001`) ou `catégorie/NNNNNNN` (`math/0211159`), depuis une URL `arxiv.org/abs|pdf/<id>` ou un identifiant brut. Suffixe de version (`v2`) et extension `.pdf` sont ignorés."""
     if not raw:
         return None
     s = raw.strip()
@@ -299,13 +224,11 @@ def normalize_arxiv_id(raw: str | None) -> str | None:
 
 
 class ArxivId(NormalizedIdentifier):
-    """Identifiant arXiv. Accepte une URL arXiv ou un id brut en entrée."""
+    """Identifiant arXiv. Accepte une URL arXiv."""
 
     label = "arXiv ID"
     normalize = staticmethod(normalize_arxiv_id)
 
-
-# ── ISSN ───────────────────────────────────────────────────────────
 
 _ISSN_RE = re.compile(r"(?:ISSN[:\s]*)?(\d{4})-?(\d{3})([\dX])", re.IGNORECASE | re.ASCII)
 
@@ -318,7 +241,7 @@ def _mod11_check_digit(digits: str) -> str:
 
 
 def _normalize_issn(raw: str | None) -> str | None:
-    """ISSN sous la forme `NNNN-NNNC`, `X` en majuscule. Tolère l'absence de tiret et le préfixe `ISSN`. None si la clé de contrôle est fausse."""
+    """ISSN sous la forme `NNNN-NNNC`, `X` en majuscule. Tolère l'absence de tiret et le préfixe `ISSN`. `None` si la clé de contrôle est fausse."""
     if not raw:
         return None
     m = _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION))
@@ -331,7 +254,7 @@ def _normalize_issn(raw: str | None) -> str | None:
 
 
 def issn_rejection_reason(raw: str) -> str:
-    """Motif du rejet d'une valeur d'ISSN : clé de contrôle fausse quand la forme `NNNN-NNNC` est respectée, forme invalide sinon."""
+    """Motif du rejet d'une valeur d'ISSN : clé de contrôle fausse si la forme `NNNN-NNNC` est respectée, forme invalide sinon."""
     if _ISSN_RE.fullmatch(raw.strip().translate(_DASH_TRANSLATION)):
         return "clé de contrôle fausse"
     return "forme invalide"
@@ -348,10 +271,7 @@ _ISSN_SEARCH_RE = re.compile(r"\d{1,8}|\d{7}X", re.ASCII)
 
 
 def issn_search_prefix(raw: str) -> str | None:
-    """Début d'ISSN que porte un terme de recherche, sans séparateur et `X` en majuscule, ou None quand le terme n'en porte pas.
-
-    Un ISSN s'écrit `NNNN-NNNC`, la clé `C` valant un chiffre ou `X` ; le terme est reconnu sur cette forme, tronquée à droite. La clé de contrôle n'est pas vérifiée : les valeurs mal formées d'une revue restent ainsi cherchables.
-    """
+    """Début d'ISSN d'un terme de recherche, sans séparateur, `X` en majuscule ; `None` si le terme n'a pas cette forme. Le terme peut être tronqué à droite. La clé de contrôle n'est pas vérifiée : les ISSN mal formés d'une revue restent cherchables."""
     cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION)).upper()
     return cleaned if _ISSN_SEARCH_RE.fullmatch(cleaned) else None
 
@@ -360,7 +280,7 @@ _ISBN_SEARCH_RE = re.compile(r"97[89]\d{0,10}", re.ASCII)
 
 
 def isbn_search_prefix(raw: str) -> str | None:
-    """Début d'ISBN-13 que porte un terme de recherche, sans séparateur, ou None quand le terme n'en porte pas. Un ISBN-13 commence par 978 ou 979."""
+    """Début d'ISBN-13 d'un terme de recherche, sans séparateur ; `None` si le terme n'a pas cette forme. Un ISBN-13 commence par 978 ou 979."""
     cleaned = _SEPARATORS_RE.sub("", raw.strip().translate(_DASH_TRANSLATION))
     return cleaned if _ISBN_SEARCH_RE.fullmatch(cleaned) else None
 
@@ -375,8 +295,6 @@ def issn_typo_candidates(raw: str) -> frozenset[str]:
     return frozenset(str(issn) for v in variants if (issn := ISSN.try_parse(v)))
 
 
-# ── ISBN ───────────────────────────────────────────────────────────
-
 _ISBN_PREFIX_RE = re.compile(r"ISBN(?:-1[03])?[:\s]*", re.IGNORECASE)
 _ISBN13_RE = re.compile(r"97[89]\d{10}", re.ASCII)
 _ISBN10_RE = re.compile(r"\d{9}[\dX]", re.ASCII)
@@ -389,7 +307,7 @@ def _isbn13_check_digit(digits: str) -> str:
 
 
 def _normalize_isbn(raw: str | None) -> str | None:
-    """ISBN-13 sans séparateur. Un ISBN-10 est converti en ISBN-13 (préfixe 978). Tolère tirets, espaces et préfixe `ISBN`. None si la clé de contrôle est fausse."""
+    """ISBN-13 sans séparateur. Un ISBN-10 est converti en ISBN-13 (préfixe 978). Tolère tirets, espaces et préfixe `ISBN`. `None` si la clé de contrôle est fausse."""
     if not raw:
         return None
     s = _ISBN_PREFIX_RE.sub("", raw.strip().translate(_DASH_TRANSLATION), count=1)
@@ -409,13 +327,12 @@ class ISBN(NormalizedIdentifier):
     normalize = staticmethod(_normalize_isbn)
 
 
-# Suite de chiffres, tirets et espaces de la longueur d'un ISBN, isolée de ce qui l'entoure. La
-# clé de contrôle départage ensuite les vrais ISBN.
+# Suite de chiffres, tirets et espaces de la longueur d'un ISBN, isolée de ce qui l'entoure. La clé de contrôle départage ensuite les vrais ISBN.
 _ISBN_CANDIDATE_RE = re.compile(r"(?<![\dXx])(?:97[89][-\s]?)?(?:\d[-\s]?){9}[\dXx](?![\dXx])")
 
 
 def find_isbns(text: str | None) -> list[str]:
-    """ISBN-13 portés par `text`, dans l'ordre, sans doublon.
+    """ISBN-13 contenus dans `text`, dans l'ordre, sans doublon.
 
     Une zone donne parfois plusieurs ISBN (`978-2-84867-659-3 ; 978-2-84867-660-9`), un EAN qui répète l'ISBN, ou un ISBN suivi d'un numéro de chapitre (`978-3-319-77273-8_16`). Une suite de chiffres dont la clé de contrôle est fausse est écartée, de même qu'un ISSN, plus court.
     """
@@ -428,14 +345,13 @@ def find_isbns(text: str | None) -> list[str]:
 
 
 def meme_registrant(doi_a: str | None, doi_b: str | None) -> bool:
-    """Vrai si deux DOI portent le même préfixe, c'est-à-dire relèvent du même registrant."""
+    """Vrai si deux DOI ont le même préfixe, donc le même registrant."""
     prefixe = DoiPrefix.try_parse(doi_a)
     return prefixe is not None and prefixe == DoiPrefix.try_parse(doi_b)
 
 
 def extract_doi_from_url(url: str | None) -> str | None:
-    """Extrait le DOI d'une URL `doi.org`/`dx.doi.org` ou d'un identifiant
-    OAI-PMH `doi:<doi>` (forme prise par `location.id` côté OpenAlex). None sinon.
+    """DOI d'une URL `doi.org` ou d'un identifiant OAI-PMH `doi:<doi>`, ou `None`.
 
     >>> extract_doi_from_url("https://doi.org/10.1234/x")
     '10.1234/x'
