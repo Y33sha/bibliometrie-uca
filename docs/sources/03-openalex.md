@@ -27,8 +27,6 @@ https://developers.openalex.org/
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
 - **Revues et éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
 
-> L'identifiant OpenAlex est stocké sous sa forme courte (`W…`, `S…`, `I…`), pour les publications, les revues, les éditeurs et les institutions.
-
 ## Exemple de payload
 
 Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverted_index` élidé (reconstitué en texte pendant la [phase `normalize`](../pipeline/03-normalize.md) via `reconstruct_abstract`), `locations` réduit à un placeholder (la `primary_location` est conservée intégralement), 2 topics sur 3 abrégés.

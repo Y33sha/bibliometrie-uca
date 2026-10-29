@@ -10,18 +10,17 @@ https://developer.clarivate.com/apis/wos
 - Clé API nécessaire, obtenue sur demande après enregistrement de l'application (compter plusieurs jours de délai).
 - Requête par champ OG (Organization) + année de publication
 - Pagination par offset (`firstRecord`), 10 résultats/page, à 2 req/s (`MAX_PER_SECOND`, `pipeline/ingestion/api_params.py`)
-- Tentatives successives, espacées par un délai qui double à chaque fois : l'API est instable et limite le débit sans le dire
-- Quota annuel limité (vérification au démarrage) : le quota dépend du contrat ; pour l'UCA, la limite est de 50000 *full records* par an.
+- Quota annuel fixé par le contrat (50 000 enregistrements par an pour l'UCA), vérifié au démarrage.
 
 ## Données récupérées
 
-- **Publications** : UID (identifiant interne WoS), titre, DOI, année, type de document, langue, OA status, nombre de citations, résumé, mots-clés, topics (sujets + headings WoS), biblio (volume/numéro/pages), journal (titre, ISSN, eISSN, éditeur), ISBN et eISBN (identifiants `isbn` et `eisbn`, qui disent le support)
-- **Auteurs** : nom complet, position, rôle, drapeau corresponding, ResearcherID Clarivate (identifiant stable de l'auteur côté WoS).
-- **Affiliations** : adresses textuelles + noms d'organisations rattachés à chaque auteur (pas d'identifiant stable d'institution côté WoS — le nom fait office d'identifiant).
+- **Publications** : UID (identifiant interne WoS), titre, DOI, année, type de document, langue, statut open access, nombre de citations, résumé, mots-clés, topics (sujets + headings WoS), biblio (volume/numéro/pages), revue (titre, ISSN, eISSN, éditeur), ISBN et eISBN
+- **Auteurs** : nom complet, position, rôle, auteur correspondant, ResearcherID Clarivate (identifiant stable de l'auteur côté WoS).
+- **Affiliations** : adresses textuelles et organisations de chaque auteur, avec leur ROR quand WoS le donne.
 
 ## Exemple de payload
 
-Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes). Réduit aux structures que le code consomme — sont retirés/élidés : `static_data.item`, `dates`, `contributors`, `fund_ack`, `refs`, les ~22 entrées de `tc_list.silo_tc` (un compteur de citations par base WoS : `RSCI`, `PQDT`, `CCC`, etc.) sauf celle de `WOK` (l'agrégateur toutes bases que le code lit comme `cited_by_count`), et les multiples variantes de `titles` (`abbrev_*`) et de `pub_info` (`early_access`, `sortdate`, etc.). Abstract tronqué.
+Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes). Réduit aux champs que le pipeline lit ; résumé tronqué.
 
 ```json
 {
@@ -162,4 +161,4 @@ Document `WOS:001759398100001` (2 auteurs, article de mathématiques discrètes)
 ## Particularités
 
 - **Source sous contrat, moissonnée sur demande.** Le crédit d'appels est acheté à l'année, donc WoS reste hors des exécutions ordinaires : l'option `--include-wos` l'y ajoute.
-- **`daisng_id` sert de filtre, pas d'identifiant.** Cette entité auteur algorithmique n'est pas conservée en base. Une entrée qui en manque, ou qui manque de nom complet, est écartée : elle ne donne aucune contribution source exploitable.
+- **Identifiants calculés par WoS.** L'ORCID (`PreferredORCID`) et l'entité auteur (`daisng_id`) viennent des algorithmes de WoS : ils restent hors de la base. Une entrée auteur sans `daisng_id` ou sans nom complet est écartée.
