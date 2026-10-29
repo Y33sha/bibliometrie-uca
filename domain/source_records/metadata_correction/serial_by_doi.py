@@ -1,6 +1,6 @@
 """Rattachement d'une revue à un enregistrement source via l'espace de noms de son DOI.
 
-Une `source_record` à DOI mais sans `serial_id` reçoit la revue que désigne l'espace de noms de son DOI (`domain/serials/doi_namespaces.py`). Un livre ou un chapitre n'en reçoit pas : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`).
+Un enregistrement source à DOI mais sans revue reçoit la revue que désigne l'espace de noms de son DOI (`domain/serials/doi_namespaces.py`). Un livre ou un chapitre n'en reçoit pas : un éditeur publie sous un même espace de noms une revue et des livres (EAC, `10.17184/eac.`), ou une revue et les livres de sa collection (Hermès chez CAIRN, `10.3917/herm.`).
 """
 
 from collections.abc import Mapping
