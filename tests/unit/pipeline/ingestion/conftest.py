@@ -63,7 +63,7 @@ def configuration(monkeypatch):
 
 @pytest.fixture
 def ecritures(monkeypatch) -> list[Ecriture]:
-    """Remplace l'écriture dans `staging` et renvoie la liste des écritures.
+    """Simule l'écriture dans `staging` et renvoie la liste des écritures.
 
     L'issue de l'écriture est lue dans le champ `_route` du document (`UpsertOutcome.NEW` par défaut).
     """

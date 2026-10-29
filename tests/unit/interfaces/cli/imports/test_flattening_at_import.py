@@ -1,6 +1,6 @@
 """Mise à plat des cellules lues par les imports de fichiers.
 
-Un fichier composé dans un tableur porte le même bruit qu'un champ moissonné : espaces insécables, caractères de format invisibles, et — sur les cellules recopiées depuis une page web — balisage et entités HTML. Les imports appliquent la même mise à plat que le pipeline, sans quoi deux voies d'entrée déposeraient deux formes du même texte et le rapprochement échouerait en silence.
+Un fichier composé dans un tableur contient le même bruit qu'un champ moissonné : espaces insécables, caractères de format invisibles et, dans les cellules recopiées depuis une page web, balisage et entités HTML. Les imports appliquent la même mise à plat que le pipeline. Sinon, deux voies d'entrée déposeraient deux formes du même texte, et le matching échouerait sans signalement.
 """
 
 import csv
@@ -81,7 +81,7 @@ class TestDumpDoaj:
 
 
 def test_le_lecteur_rh_accepte_le_tsv(tmp_path):
-    """Filet : la mise à plat des cellules ne perturbe pas la détection du séparateur."""
+    """La mise à plat des cellules laisse intacte la détection du séparateur."""
     path = tmp_path / "rh.tsv"
     with open(path, "w", encoding="utf-8", newline="") as f:
         writer = csv.writer(f, delimiter="\t")

@@ -20,7 +20,7 @@ class TestOutOfScopeDocTypes:
             assert active not in OUT_OF_SCOPE_DOC_TYPES
 
     def test_is_frozenset(self):
-        """Immuable pour éviter les modifications accidentelles."""
+        """L'ensemble est immuable."""
         assert isinstance(OUT_OF_SCOPE_DOC_TYPES, frozenset)
 
 

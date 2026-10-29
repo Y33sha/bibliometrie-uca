@@ -1,4 +1,4 @@
-"""Tests du mapping doc_types et cohérence des libellés FR frontend."""
+"""Traduction des types de document des sources, et libellés français de chaque type dans le frontend."""
 
 import re
 from pathlib import Path
@@ -24,12 +24,7 @@ def _read_pg_doc_type_enum() -> set[str]:
 
 
 def _read_ts_label_map(var_name: str) -> dict[str, str]:
-    """Extrait `export const <var_name>: Record<...> = { ... }` de labels.ts.
-
-    Même approche que la lecture de l'enum dans schema.sql : on parse le
-    fichier frontend pour vérifier que les libellés codés en dur restent
-    alignés sur l'enum PG / `DOC_TYPES` sans devoir exécuter le frontend.
-    """
+    """Libellés de la table `<var_name>`, lus dans le source de `labels.ts`."""
     ts = LABELS_PATH.read_text(encoding="utf-8")
     block = re.search(
         rf"export const {var_name}: Record<string, string> = \{{(.*?)\}};",
@@ -42,17 +37,17 @@ def _read_ts_label_map(var_name: str) -> dict[str, str]:
 
 class TestDocTypeEnum:
     def test_doc_types_couvre_exactement_l_enum_pg(self):
-        """Garde-fou : `DOC_TYPES` doit refléter exactement l'enum PG."""
+        """`DOC_TYPES` a exactement les valeurs de l'enum PostgreSQL `doc_type`."""
         assert DOC_TYPES_SET == _read_pg_doc_type_enum()
 
 
 class TestDocTypeLabelsFrontend:
     def test_singulier_couvre_exactement_les_doc_types(self):
-        """Tout doc_type doit avoir son libellé singulier côté frontend."""
+        """Chaque type de document a un libellé singulier dans le frontend."""
         assert set(_read_ts_label_map("docTypeSingular").keys()) == DOC_TYPES_SET
 
     def test_pluriel_couvre_exactement_les_doc_types(self):
-        """Tout doc_type doit avoir son libellé pluriel côté frontend."""
+        """Chaque type de document a un libellé pluriel dans le frontend."""
         assert set(_read_ts_label_map("docTypePlural").keys()) == DOC_TYPES_SET
 
     def test_libelles_non_vides(self):

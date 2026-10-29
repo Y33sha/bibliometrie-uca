@@ -1,8 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.hal.normalize`.
 
-Couvre les helpers (get_title, build_hal_identifiers, get_container_facts), `hal_source_record` (métadonnées canoniques, collections, biblio, keywords, NNT, topics), le parsing TEI, le parsing auteurs `build_hal_author_records` (composite + TEI) et les méthodes de `HalNormalizer` (métadonnées minimales, refus, éditeur, enregistrement source).
-
-Pattern : doublures de stores + `MagicMock`, pas de DB.
+Couvre les fonctions de lecture d'un document HAL, la lecture du TEI, la lecture des auteurs (champ composite Solr et TEI) et les méthodes de `HalNormalizer`. Les stores sont des doublures, sans base de données.
 """
 
 from __future__ import annotations
@@ -40,9 +38,6 @@ from tests.helpers.normalize_doubles import (
     identifier_values,
     staging_row,
 )
-
-# ── Stubs ────────────────────────────────────────────────────────
-
 
 # ── hal_text_field ───────────────────────────────────────────────────────
 
@@ -161,7 +156,7 @@ class TestContainerDescription:
         assert facts.isbns == ("9782410013221",)
 
     def test_le_congres_d_une_communication_ne_designe_pas_un_volume(self):
-        """Régression : une communication HAL nomme son congrès, avec ou sans actes publiés."""
+        """Régression : HAL donne le congrès d'une communication avec ou sans actes publiés ; ce titre ne désigne aucun volume."""
         facts = get_container_facts({"docType_s": "COMM", "conferenceTitle_s": "NuFACT 2022"})
         assert facts.book_title is None
 
@@ -201,7 +196,7 @@ class TestCanonicalMetadata:
         assert record.title == "T"
         assert record.publication_year == 2024
         assert record.serial_id == 42
-        # Pas de container_title si serial_id présent.
+        # Une revue identifiée laisse `container_title` vide.
         assert record.container_title is None
 
     def test_book_title_fallback_when_no_serial(self):
@@ -351,7 +346,7 @@ class TestHalSourceRecord:
 
     def test_collections_from_coll_codes(self):
         captured = self._call({"collCode_s": ["UCA", "LIMOS", "UCA"]})
-        # Dédupliquées, triées, depuis le seul `collCode_s` du raw_data.
+        # Lues dans `collCode_s`, dédupliquées et triées.
         assert captured.hal_collections == ["LIMOS", "UCA"]
 
     def test_no_collections_returns_none(self):
@@ -473,11 +468,10 @@ class TestHalSourceRecord:
         assert self._call({}, Containers(7, None)).serial_id == 7
 
 
-# `parse_tei_author_identifiers` est testé dans
-# `tests/unit/application/test_parse_tei_author_identifiers.py` — pas de duplication ici.
+# `parse_tei_author_identifiers` est testé dans `test_tei_author_identifiers.py`.
 
 
-# ── build_hal_author_records (parsing pur) ───────────────────────
+# ── build_hal_author_records ───────────────────────
 
 
 class TestBuildHalAuthorRecords:
@@ -497,15 +491,14 @@ class TestBuildHalAuthorRecords:
         assert records[0].name == ContributorName(raw="Marie Dupont")
 
     def test_composite_extracts_name_and_hal_person_id(self):
-        # Le composite fournit le nom et le hal_person_id (2e segment). L'idhal
-        # vient du TEI, pas du composite (cf. test suivant).
+        # Le champ composite donne le nom et le hal_person_id (deuxième segment). L'idHAL vient du TEI.
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Marie Dupont_FacetSep_49236-749496_FacetSep_marie-dupont"
             ],
         }
         record = build_hal_author_records(doc)[0]
-        # Pas de TEI → nom Solr en chaîne brute, pas d'idhal (le 3e segment du composite est ignoré).
+        # Sans TEI, le nom Solr reste brut et l'idHAL est absent : le troisième segment du composite est ignoré.
         assert record.name == ContributorName(raw="Marie Dupont")
         assert record.identifiers == {"hal_person_id": "749496"}
 
@@ -526,7 +519,7 @@ class TestBuildHalAuthorRecords:
         )
 
     def test_idhal_comes_from_tei(self):
-        # L'idhal slug vient du TEI (notation="string"), aligné par position.
+        # L'idHAL vient du TEI (notation="string"), aligné par position.
         label_xml = (
             '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
             '<author><idno type="idhal" notation="string">marie-dupont</idno></author>'
@@ -544,9 +537,7 @@ class TestBuildHalAuthorRecords:
         }
 
     def test_composite_numeric_idhal_not_promoted(self):
-        # Régression : quand l'auteur n'a pas de slug, HAL recopie le person_id
-        # numérique dans le 3e segment du composite. Sans idhal TEI, on ne doit
-        # PAS créer d'idhal numérique (== hal_person_id) — seul hal_person_id reste.
+        # Régression : pour un auteur sans idHAL, HAL recopie le person_id numérique dans le troisième segment du composite. Sans idHAL dans le TEI, seul le hal_person_id est retenu.
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": [
                 "Christian Duale_FacetSep_106-921527_FacetSep_921527"
@@ -557,15 +548,15 @@ class TestBuildHalAuthorRecords:
         }
 
     def test_composite_with_zero_person_id_filtered(self):
-        """person_id == 0 = non identifié par HAL, on l'ignore."""
+        """Un person_id nul désigne un auteur non identifié par HAL : il est ignoré."""
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": ["X_FacetSep_49236-0_FacetSep_"],
         }
-        # Sans hal_person_id ni idhal, identifiers est None.
+        # Sans hal_person_id ni idHAL, les identifiants valent None.
         assert build_hal_author_records(doc)[0].identifiers is None
 
     def test_duplicate_hal_person_id_kept_on_each_record(self):
-        """La lecture rend les identifiants de chaque auteur tels que le dépôt les donne, compte HAL et IdRef alignés par position ; le writer neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie les identifiants de chaque auteur tels que le dépôt les donne, compte HAL et IdRef alignés par position ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
         label_xml = (
             '<TEI xmlns="http://www.tei-c.org/ns/1.0"><biblFull><titleStmt>'
             '<author><idno type="IDREF">111111111</idno></author>'
@@ -599,13 +590,13 @@ class TestBuildHalAuthorRecords:
         assert record.ror_ids == {RorId("03vgfxd91")}
 
     def test_quality_maps_to_roles(self):
-        """`authQuality_s = 'dir'` est mappé en rôle via `map_role('hal', ...)` (cf. domain.publications.contribution_roles)."""
+        """La qualité `dir` de `authQuality_s` devient un rôle par `map_role`."""
         doc = {
             "authFullNameFormIDPersonIDIDHal_fs": ["Director_FacetSep_0-0_FacetSep_"],
             "authQuality_s": ["dir"],
         }
         record = build_hal_author_records(doc)[0]
-        # On valide juste que map_role a été appelé et a produit une liste non-vide.
+        # Seule la présence d'un rôle est vérifiée.
         assert record.roles is not None
         assert len(record.roles) > 0
 

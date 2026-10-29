@@ -1,10 +1,10 @@
 """Toute liste de valeurs reçue en query string est prise dans un vocabulaire fermé, ou motivée.
 
-Une valeur séparée par des virgules échappe à la validation de FastAPI : c'est le code de la route qui la découpe, et rien n'oblige à en vérifier le contenu. Une valeur inconnue laissée passer ne provoque pas d'erreur — elle traverse jusqu'au constructeur de clause SQL, qui l'ignore, et la lecture rend alors un ensemble plus large que celui qu'on croit avoir demandé, sous un code 200.
+Une valeur séparée par des virgules échappe à la validation de FastAPI : le code de la route la découpe, sans obligation d'en vérifier le contenu. Une valeur inconnue traverse jusqu'au constructeur de clause SQL, qui l'ignore. La lecture renvoie alors, sous un code 200, un ensemble plus large que celui demandé.
 
-Fermer chaque vocabulaire est le remède ; s'en souvenir à chaque paramètre ajouté n'en est pas un. Ce module confronte donc le code à la liste : `parse_str_csv` rend une liste de chaînes sans rien vérifier, et chacun de ses appels dans l'API doit figurer ci-dessous, motivé. Un paramètre ajouté sans vocabulaire fait échouer l'intégration.
+`parse_str_csv` renvoie une liste de chaînes sans vérification. Chacun de ses appels dans l'API figure donc ci-dessous, avec son motif. Un paramètre ajouté sans vocabulaire fermé fait échouer ce test.
 
-Les vocabulaires fermés eux-mêmes sont exercés par la surface HTTP (`tests/integration/interfaces/test_query_vocabularies_api.py`), qui vérifie qu'une valeur intruse rend 422.
+Les vocabulaires fermés sont testés par la surface HTTP (`tests/integration/interfaces/test_query_vocabularies_api.py`), qui vérifie qu'une valeur intruse donne 422.
 """
 
 import re
@@ -42,7 +42,7 @@ LISTES_LIBRES: dict[tuple[str, str], str] = {
 }
 """Appels à `parse_str_csv` dans l'API, et ce qui justifie l'absence de vocabulaire fermé.
 
-Clé : le module et l'expression passée à l'appel. Y inscrire une entrée est un geste délibéré — la question à trancher étant « puis-je énumérer les valeurs admises ? », et la réponse « non » demandant de dire pourquoi.
+Clé : le module et l'expression passée à l'appel. Une entrée répond « non » à la question « puis-je énumérer les valeurs admises ? », et dit pourquoi.
 """
 
 
@@ -59,7 +59,7 @@ def _appels_dans_les_routes() -> set[tuple[str, str]]:
 
 class TestListesLibres:
     def test_chaque_liste_sans_vocabulaire_est_motivee(self):
-        """Un paramètre à valeurs multiples ajouté sans vocabulaire fermé fait échouer l'intégration."""
+        """Un paramètre à valeurs multiples sans vocabulaire fermé a un motif dans `LISTES_LIBRES`."""
         non_motives = _appels_dans_les_routes() - set(LISTES_LIBRES)
         assert not non_motives, (
             f"Listes de valeurs sans vocabulaire fermé ni motif : {sorted(non_motives)}. "
@@ -68,7 +68,7 @@ class TestListesLibres:
         )
 
     def test_la_liste_ne_porte_pas_de_motif_devenu_inutile(self):
-        """Un paramètre fermé depuis, ou retiré, sort de la liste : elle décrit le code, non son passé."""
+        """Chaque entrée de la liste correspond à un appel présent dans le code."""
         obsoletes = set(LISTES_LIBRES) - _appels_dans_les_routes()
         assert not obsoletes, sorted(obsoletes)
 
@@ -81,7 +81,7 @@ class TestVocabulairesFermes:
     """Les vocabulaires que les routes opposent aux paramètres, et d'où ils viennent."""
 
     def test_les_valeurs_du_filtre_par_source_derivent_du_registre(self):
-        """Le vocabulaire se calcule depuis les préfixes plutôt que de s'écrire à côté d'eux : une source ajoutée au registre entre dans le filtre sans autre geste."""
+        """Le vocabulaire se calcule depuis les préfixes : une source ajoutée au registre entre dans le filtre sans autre modification."""
         from domain.sources.registry import SOURCE_FILTER_PREFIXES, SOURCE_FILTER_VALUES
 
         assert SOURCE_FILTER_VALUES == {

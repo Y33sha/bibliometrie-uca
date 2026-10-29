@@ -35,7 +35,7 @@ def test_parse_member_id_from_url():
 
 
 def test_parse_member_id_from_plain_string():
-    """Un enregistrement source rend le membre en chaîne numérique, là où un préfixe le rend en URL."""
+    """Un enregistrement source renvoie le membre en chaîne numérique, là où un préfixe le renvoie en URL."""
     assert parse_member_id("54812") == 54812
 
 

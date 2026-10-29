@@ -30,7 +30,7 @@ def sortie_capturee(monkeypatch):
 
 @pytest.fixture
 def delai_de_rafraichissement(monkeypatch):
-    """Configuration lue par les libellés de phase, sans base : les documents se rafraîchissent après 7 jours."""
+    """Délai de rafraîchissement lu par les libellés de phase, sans base : 7 jours, modifiable par le test."""
     delay_days = {"jours": 7}
     monkeypatch.setattr("pipeline.run.open_tx", contextlib.nullcontext)
     monkeypatch.setattr("pipeline.run.delay", lambda conn, key: delay_days["jours"])
@@ -78,7 +78,7 @@ def test_un_libelle_long_tient_sur_deux_lignes(terminal) -> None:
 
 
 def test_une_sortie_capturee_recoit_des_filets(sortie_capturee) -> None:
-    """Un fichier de journal ignore la largeur d'une fenêtre."""
+    """Une sortie capturée reçoit des filets horizontaux à la place d'un cadre : un fichier de journal ignore la largeur de la fenêtre."""
     lines = _titre("normalize")
     assert lines[0].startswith("─")
     assert "PHASE : normalize" in lines[1]
@@ -86,14 +86,14 @@ def test_une_sortie_capturee_recoit_des_filets(sortie_capturee) -> None:
 
 
 def test_une_phase_sans_libelle_garde_son_cadre(terminal) -> None:
-    """Les tests de l'orchestrateur nomment des phases hors du pipeline."""
+    """Une phase absente du pipeline, comme celles des tests de l'orchestrateur, a un cadre sans libellé."""
     lines = _titre("une")
     assert len(lines) == 3
     assert "une" in lines[1]
 
 
 def _args(**modifications) -> argparse.Namespace:
-    """Arguments par défaut de la CLI, puis `modifications`."""
+    """Arguments par défaut de la CLI, modifiés par `modifications`."""
     return argparse.Namespace(**{**vars(_build_arg_parser().parse_args([])), **modifications})
 
 

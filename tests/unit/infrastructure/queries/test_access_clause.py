@@ -1,8 +1,6 @@
-"""Filtre par bucket d'accès (`access_clause`).
+"""Filtre par catégorie d'accès (`access_clause`).
 
-Régression : une sélection multi-buckets (`closed,embargo`) était ignorée et ne
-posait aucune contrainte, affichant les publications ouvertes malgré le filtre.
-Le découpage de la liste se fait côté routeur ; la clause reçoit une `list[str]`.
+La clause reçoit la liste des catégories cochées, découpée par le routeur. Plusieurs catégories se combinent par OR ; la catégorie `closed` inclut les publications sans statut open access.
 """
 
 from infrastructure.read_models.filters import (
@@ -46,7 +44,7 @@ def test_multiple_buckets_combined_with_or():
 
 def test_unknown_bucket_is_ignored():
     assert access_clause(["bogus"]) is None
-    # Un bucket inconnu mêlé à un valide ne pollue pas la contrainte.
+    # Une catégorie inconnue, cochée avec une catégorie valide, est ignorée.
     clause = access_clause(["open", "bogus"])
     assert clause is not None
     assert clause.binds["flt_access_statuses"] == sorted(OA_OPEN_STATUSES)

@@ -1,6 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.scanr.normalize`.
 
-Couvre l'entrée `source_records` construite par `scanr_source_record` (métadonnées canoniques comprises), l'éditeur, le conteneur, et le parsing des auteurs par `build_scanr_author_records` (orcid/idref, rôles, affiliations → adresses et pays détectés). Fonctions pures et `MagicMock`, sans base de données.
+Couvre l'enregistrement source construit par `scanr_source_record`, l'éditeur, le conteneur et la lecture des auteurs par `build_scanr_author_records` (ORCID et IdRef, rôles, adresses des affiliations et leurs pays). Fonctions pures et `MagicMock`, sans base de données.
 """
 
 from __future__ import annotations
@@ -120,7 +120,7 @@ class TestScanrSourceRecordExternalIds:
         assert "doi" not in identifier_values(captured)
 
 
-# ── build_scanr_author_records (parsing pur) ─────────────────────
+# ── build_scanr_author_records ─────────────────────
 
 
 class TestBuildScanrAuthorRecords:
@@ -161,7 +161,7 @@ class TestBuildScanrAuthorRecords:
         }
         rec = build_scanr_author_records(doc)[0]
         assert [a.text for a in rec.addresses] == ["Lab A"]
-        # detected_countries = pays d'autorité (en minuscules, dédupliqués, triés), jamais suggested.
+        # Les pays de l'adresse sont les pays d'autorité, en minuscules, dédupliqués et triés ; les pays suggérés sont ignorés.
         assert rec.addresses[0].countries == ["be", "fr"]
 
     def test_le_nom_de_l_affiliation_n_ecrase_pas_celui_de_l_auteur(self):
@@ -208,7 +208,7 @@ class TestBuildScanrAuthorRecords:
         assert len(build_scanr_author_records(doc)) == 3
 
     def test_affiliation_sans_nom_ne_donne_pas_son_pays_aux_autres(self):
-        """Une affiliation sans nom n'écrit pas d'adresse, et son pays n'est posé sur aucune autre."""
+        """Une affiliation sans nom ne donne aucune adresse, et son pays reste hors des autres adresses."""
         doc = {
             "authors": [
                 {
@@ -260,7 +260,7 @@ class TestExtractDoi:
 
 class TestGetTitle:
     def test_titre_multilingue(self):
-        """ScanR rend un titre par langue ; celui de la langue par défaut fait foi."""
+        """ScanR renvoie un titre par langue ; celui de la langue par défaut fait foi."""
         assert get_title({"title": {"default": "Un titre", "en": "A title"}}) == "Un titre"
 
     def test_titre_en_clair(self):
@@ -304,7 +304,7 @@ class TestEditeurEtConteneur:
 
 
 class TestThese:
-    """La source d'une thèse ScanR est l'université de soutenance, pas un conteneur."""
+    """La source d'une thèse ScanR est l'université de soutenance : elle ne donne aucun conteneur."""
 
     _DOC = {
         "type": "thesis",
@@ -340,8 +340,10 @@ class TestScanrSourceRecordMetadonnees:
         assert record.doi == "10.1/a"
         assert record.oa_status == "closed"
         assert "nnt" not in identifier_values(record)
-        assert record.container_title is None  # la revue est créée : son titre n'est pas recopié
-        assert record.raw_language is None  # la source ne l'expose pas
+        assert (
+            record.container_title is None
+        )  # la revue existe : son titre reste hors de container_title
+        assert record.raw_language is None  # absente de la source
 
     def test_titre_de_contenant_conserve_faute_de_revue(self):
         doc = {"source": {"title": "Actes du colloque"}}
@@ -398,7 +400,7 @@ class TestScanrSourceRecordChamps:
         assert self._call({"keywords": {"default": None}}).keywords is None
 
     def test_concepts_wikidata_et_mots_cles_rejoignent_les_mots_cles(self):
-        """Les libellés s'ajoutent aux mots-clés de la notice, sans doublon de casse."""
+        """Les libellés s'ajoutent aux mots-clés de l'enregistrement source, sans doublon de casse."""
         document = self._call(
             {
                 "keywords": {"default": ["Cirrhose"]},
@@ -422,7 +424,7 @@ class TestScanrSourceRecordChamps:
         assert document.keywords is None
 
     def test_topics_openalex_ignores(self):
-        """`topics` reprend les topics OpenAlex, que la source OpenAlex fournit."""
+        """Le champ `topics` de ScanR reprend les topics OpenAlex : il est ignoré, la source OpenAlex les fournit."""
         document = self._call({"topics": [{"id": "T11207", "display_name": "Alcohol Consumption"}]})
 
         assert document.topics is None
@@ -433,7 +435,7 @@ class TestScanrSourceRecordChamps:
         assert document.impact == {"cited_by_count": 10}
 
     def test_adresses_du_document_dedupliquees(self):
-        """Les adresses viennent du document et du constat d'accès ouvert : les doublons tombent."""
+        """Les URL viennent du document et de la preuve d'open access, sans doublon."""
         document = self._call(
             {
                 "landingPage": "https://exemple.fr/a",
@@ -470,7 +472,7 @@ def _normalizer() -> ScanrNormalizer:
 
 class TestScanrNormalizer:
     def test_entree_source_records_de_la_ligne_et_des_conteneurs(self):
-        """L'identifiant ScanR de la ligne donne le numéro de thèse ; la revue créée remplace le titre du contenant."""
+        """L'identifiant ScanR de la ligne donne le NNT ; une revue identifiée laisse le titre du contenant vide."""
         row = staging_row(staging_id=42, source_id="these2021CLFAC030")
         doc = {
             "title": {"default": "Un titre"},
@@ -501,7 +503,7 @@ class TestScanrNormalizer:
 
 class TestGetLocations:
     def test_copie_chez_l_editeur_confondue_avec_la_page_du_document(self):
-        """La page du document et celle de la copie ouverte ne diffèrent que par le schéma : une seule localisation."""
+        """La page du document et celle de la copie ouverte diffèrent seulement par le schéma : une seule localisation."""
         doc = {
             "landingPage": "http://doi.org/10.1093/ehjcr/ytac172",
             "oaEvidence": {

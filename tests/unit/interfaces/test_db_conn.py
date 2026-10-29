@@ -1,4 +1,4 @@
-"""La transaction de la requête : `db_conn` committe une écriture qui aboutit avec ses événements d'audit, et une seule connexion sert toute la requête."""
+"""Transaction de la requête : `db_conn` commite une écriture réussie avec ses événements d'audit, annule une écriture en erreur, et une seule connexion sert toute la requête."""
 
 from collections.abc import Iterable, Iterator
 from types import SimpleNamespace
@@ -13,7 +13,7 @@ from interfaces.api.app import app
 
 
 class _Connection:
-    """Connexion factice qui consigne les gestes de fin de transaction."""
+    """Connexion factice qui enregistre les opérations de fin de transaction."""
 
     def __init__(self) -> None:
         self.gestes: list[str] = []

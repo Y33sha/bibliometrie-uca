@@ -1,4 +1,4 @@
-"""Le démarrage de l'API pose la taille du threadpool déclarée par les réglages."""
+"""Le démarrage de l'API applique la taille du threadpool déclarée dans les réglages."""
 
 import anyio
 import anyio.to_thread
@@ -7,7 +7,7 @@ from interfaces.api import app as app_module
 
 
 class _EngineFactice:
-    """Tient la place de l'engine SQLAlchemy : le lifespan le construit et le libère."""
+    """Engine SQLAlchemy factice, que le lifespan construit et libère."""
 
     def dispose(self) -> None:
         pass

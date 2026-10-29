@@ -1,6 +1,6 @@
 """Appariement d'une ligne de relevé avec le type qu'elle alimente.
 
-Le désaccord entre les colonnes d'un relevé et les champs d'un type échappe aux vérificateurs de types, le relevé étant une chaîne de caractères. Ces tests portent sur le contrôle qui le rattrape à l'exécution, et sur ce que son message nomme.
+Les vérificateurs de types ignorent le désaccord entre les colonnes d'un relevé et les champs d'un type : la requête SQL est une chaîne de caractères. Ces tests vérifient le contrôle qui détecte ce désaccord à l'exécution, et ce que son message nomme.
 """
 
 from typing import NamedTuple
@@ -23,7 +23,7 @@ class _Modele(BaseModel):
 
 
 class _FausseLigne:
-    """Ligne de relevé portant les colonnes données, telle que SQLAlchemy l'expose."""
+    """Ligne de relevé aux colonnes données, sous la forme que SQLAlchemy expose."""
 
     def __init__(self, **colonnes: object) -> None:
         self._colonnes = colonnes
@@ -73,7 +73,7 @@ def test_un_modele_pydantic_s_apparie_comme_un_tuple_nomme():
 
 
 class _FauxReleve:
-    """Relevé portant les colonnes données, telle que SQLAlchemy l'expose."""
+    """Relevé aux colonnes données, sous la forme que SQLAlchemy expose."""
 
     def __init__(self, colonnes: tuple[str, ...], lignes: list[_FausseLigne]) -> None:
         self._colonnes = colonnes
@@ -95,7 +95,7 @@ def test_plusieurs_lignes_se_construisent_ensemble():
 
 
 def test_un_releve_vide_fait_quand_meme_le_controle():
-    """Le relevé nomme ses colonnes sans rendre de ligne : le désaccord paraît sur un ensemble vide."""
+    """Un relevé sans ligne nomme quand même ses colonnes : le désaccord est détecté."""
     releve = _FauxReleve(("id", "editeur"), [])
     with pytest.raises(TypeError, match="titre.*editeur"):
         rows_as(_Ligne, releve)  # type: ignore[arg-type]

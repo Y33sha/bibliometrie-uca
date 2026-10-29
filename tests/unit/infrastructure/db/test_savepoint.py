@@ -1,4 +1,4 @@
-"""Tests unitaires du context manager `infrastructure.db.savepoint.savepoint`."""
+"""Context manager `savepoint` : commit en cas de succès, rollback et propagation de l'exception en cas d'erreur."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def test_error_rolls_back_and_reraises():
 
 
 def test_rollback_failure_triggers_fallback():
-    """Si le rollback du SAVEPOINT échoue (transaction cassée), `on_rollback_failure` récupère la connexion et l'exception d'origine remonte."""
+    """Si le rollback du SAVEPOINT échoue (transaction cassée), `on_rollback_failure` est appelé et l'exception d'origine remonte."""
     conn = MagicMock()
     source_record = conn.begin_nested.return_value
     source_record.rollback.side_effect = RuntimeError("savepoint rollback fails")

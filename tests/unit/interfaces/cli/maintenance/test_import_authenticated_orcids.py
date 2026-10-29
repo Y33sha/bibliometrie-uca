@@ -1,8 +1,8 @@
 """Import des ORCID authentifiés par leur titulaire.
 
-Le fichier associe un email à un ORCID que le chercheur a lui-même authentifié en se connectant à son compte. L'import confronte ces lignes aux personnes connues et n'authentifie que celles dont l'identité est certaine : un email inconnu ou porté par plusieurs personnes laisse la ligne de côté.
+Le fichier associe un email à un ORCID que le chercheur a authentifié en se connectant à son compte. L'import rattache chaque ligne à une personne par son email, et authentifie seulement les lignes dont la personne est certaine : un email inconnu ou partagé par plusieurs personnes écarte la ligne.
 
-L'authentification faisant autorité sur l'attribution, un ORCID déjà rattaché à quelqu'un d'autre est déplacé vers le titulaire — chaque déplacement est signalé, car il révèle en général un doublon de personne à fusionner.
+L'authentification fait autorité sur l'attribution : un ORCID rattaché à une autre personne est déplacé vers le titulaire. Chaque déplacement est signalé ; il révèle en général un doublon de personne à fusionner.
 """
 
 import sys
@@ -46,7 +46,7 @@ class TestLoadRows:
         assert _load_rows(chemin) == []
 
     def test_caracteres_invisibles_d_un_tableur_retires(self, tmp_path):
-        """Un fichier composé dans un tableur glisse des espaces insécables, qui feraient échouer le rapprochement en silence."""
+        """Les espaces insécables d'un fichier composé dans un tableur sont retirés ; sinon le matching des emails échouerait sans signalement."""
         chemin = self._fichier(tmp_path, f" marie@uca.fr , {_ORCID}\n")
 
         assert _load_rows(chemin) == [("marie@uca.fr", _ORCID)]
@@ -77,7 +77,7 @@ class TestPlanAuthentications:
         assert plan.unmatched == ["inconnu@uca.fr"]
 
     def test_email_partage_par_plusieurs_personnes_ecarte(self):
-        """La personne visée est indécidable : mieux vaut ne rien authentifier que se tromper de personne."""
+        """Un email partagé désigne plusieurs personnes : la ligne est écartée."""
         plan = plan_authentications([("marie@uca.fr", _ORCID)], {"marie@uca.fr": [7, 9]})
 
         assert plan.entries == []

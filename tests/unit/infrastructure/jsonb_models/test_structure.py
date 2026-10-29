@@ -1,4 +1,4 @@
-"""Tests du modèle JSONB infrastructure/jsonb_models/structure.py."""
+"""Modèle Pydantic de la colonne JSONB `structures.api_ids`."""
 
 import pytest
 from pydantic import ValidationError as PydanticValidationError
@@ -28,8 +28,7 @@ class TestStructureApiIds:
         assert d["wos"] == ["org-1234"]
 
     def test_string_coerced_to_list(self):
-        """Données historiques : un scalaire passé au lieu d'une liste
-        est wrappé automatiquement."""
+        """Une chaîne seule est mise en liste."""
         s = StructureApiIds(openalex="I123456789")
         assert s.openalex == ["I123456789"]
 
@@ -38,28 +37,25 @@ class TestStructureApiIds:
         assert s.wos is None
 
     def test_empty_lists_omitted_from_dict(self):
-        """to_dict compact : les listes vides sont éliminées."""
+        """`to_dict` omet les listes vides."""
         s = StructureApiIds(openalex=["I123"], wos=[])
         d = s.to_dict()
         assert "openalex" in d
         assert "wos" not in d
 
     def test_rejects_unknown_source(self):
-        """Clés strictes : une source hors whitelist est rejetée
-        (la liste des sources `api_ids` est connaissance métier centralisée
-        dans `domain.sources.STRUCTURE_API_SOURCES`)."""
+        """Une source absente de `STRUCTURE_API_SOURCES` est rejetée."""
         with pytest.raises(PydanticValidationError):
             StructureApiIds.model_validate({"openalex": ["I123"], "crossref": ["10.5281/..."]})
 
     def test_fields_match_domain_whitelist(self):
-        """Les champs déclarés du modèle doivent correspondre exactement
-        à la whitelist `domain.sources.registry.STRUCTURE_API_SOURCES`."""
+        """Les champs du modèle sont exactement les sources de `STRUCTURE_API_SOURCES`."""
         from domain.sources.registry import STRUCTURE_API_SOURCES
 
         assert set(StructureApiIds.model_fields.keys()) == set(STRUCTURE_API_SOURCES)
 
     def test_rejects_non_string_in_list(self):
-        """Les valeurs d'une liste doivent être des strings."""
+        """Une liste qui contient autre chose que des chaînes est rejetée."""
         with pytest.raises(PydanticValidationError):
             StructureApiIds(openalex=[123, 456])
 

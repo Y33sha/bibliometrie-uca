@@ -10,8 +10,7 @@ class TestExtractOpenalexId:
         assert extract_openalex_id({"id": "https://openalex.org/W2741809807"}) == "W2741809807"
 
     def test_no_prefix_unchanged(self):
-        # `str.replace` ne fait rien si la sous-chaîne est absente — pas
-        # d'erreur, on retombe sur l'id tel quel.
+        # Sans préfixe, l'identifiant reste tel quel.
         assert extract_openalex_id({"id": "W2741809807"}) == "W2741809807"
 
 

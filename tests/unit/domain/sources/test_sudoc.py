@@ -115,7 +115,7 @@ class TestParseSudocSerialRecord:
         )
 
     def test_title_includes_part_number(self):
-        """La notice de Physical review D porte « D » en `200$h`."""
+        """La notice de Physical review D a « D » en `200$h`."""
         record = parse_sudoc_serial_record(
             "1", [_field("200", ("a", "Physical review"), ("h", "D"))]
         )

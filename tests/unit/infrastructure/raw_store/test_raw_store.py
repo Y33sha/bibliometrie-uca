@@ -1,4 +1,4 @@
-"""Tests `RawStore` — implémentation locale + factory."""
+"""Store des réponses brutes : implémentation sur disque et factory."""
 
 import gzip
 
@@ -45,7 +45,7 @@ class TestLocalFileRawStore:
             store.get("hal", "absent")
 
     def test_unsafe_source_ids_roundtrip(self, tmp_path):
-        """Les `/` (ScanR) et `:` (WoS) sont URL-encodés puis décodés."""
+        """Les identifiants qui contiennent `/` (ScanR) ou `:` (WoS) sont encodés pour l'URL, puis décodés."""
         store = LocalFileRawStore(tmp_path)
         for source, sid in (("scanr", "doi10.1002/abc"), ("wos", "WOS:000123456")):
             store.put(source, sid, b"{}")
@@ -74,7 +74,7 @@ class TestLocalFileRawStore:
         assert store.delete("hal", "absent") is False
 
     def test_delete_unsafe_source_id(self, tmp_path):
-        """La suppression décode la même clé que `put` (ids ScanR avec `/`)."""
+        """La suppression encode l'identifiant comme `put` (identifiants ScanR avec `/`)."""
         store = LocalFileRawStore(tmp_path)
         store.put("scanr", "doi10.1002/abc", b"{}")
         assert store.delete("scanr", "doi10.1002/abc") is True

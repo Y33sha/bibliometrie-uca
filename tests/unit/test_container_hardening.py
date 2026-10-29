@@ -1,8 +1,6 @@
-"""Durcissement des conteneurs de production, tel que la description de déploiement le porte.
+"""Durcissement des conteneurs de production décrits par `docker-compose.prod.yml`.
 
-Chaque service tient cinq propriétés : exécution sous un compte non privilégié, refus de l'élévation de privilèges, abandon des capacités du noyau, racine en lecture seule, plafonds de ressources. Elles ne tiennent qu'à `docker-compose.prod.yml` : un service ajouté sans elles, ou un réglage retiré, ne se signale nulle part.
-
-Ce module confronte l'énoncé au fichier, service par service, plutôt que de le laisser à la relecture.
+Chaque service a cinq propriétés, vérifiées une à une : exécution sous un compte non privilégié, refus de l'élévation de privilèges, abandon des capacités du noyau, racine en lecture seule, plafonds de ressources.
 """
 
 import re
@@ -69,7 +67,7 @@ def test_le_service_borne_ses_ressources(service: str) -> None:
 
 @pytest.mark.parametrize("service", _noms())
 def test_le_service_ne_s_execute_pas_en_root(service: str) -> None:
-    """Un service nomme son compte, ou hérite de celui que son image déclare — jamais `root`."""
+    """Le compte d'un service, nommé ou hérité de son image, est autre que `root`."""
     compte = str(_services()[service].get("user", "")).strip()
     assert compte not in _COMPTES_PRIVILEGIES, (
         f"Le service `{service}` s'exécute sous un compte privilégié (`{compte}`)."
@@ -77,7 +75,7 @@ def test_le_service_ne_s_execute_pas_en_root(service: str) -> None:
 
 
 def test_l_image_de_production_bascule_sur_un_compte_non_privilegie() -> None:
-    """Les services construits ici ne nomment pas leur compte : ils tiennent celui de l'image."""
+    """Les services construits depuis le `Dockerfile` héritent du compte de l'image : un compte non privilégié, d'identifiant fixé."""
     description = _DOCKERFILE.read_text(encoding="utf-8")
     comptes = _USER.findall(description)
     assert comptes, "L'image de production reste sous `root` : aucune directive `USER`."

@@ -1,6 +1,6 @@
 """Doublures des requêtes d'écriture, communes aux tests des normaliseurs.
 
-Un normalizer verse ses documents dans `source_records`, écrit leurs contributions sources, et marque sa ligne de staging traitée — les mêmes gestes quelle que soit la source qu'il lit. Ce qui varie d'une source à l'autre, c'est le format lu, non ce qui est écrit : ces doublures valent donc pour toutes, et chaque module de test n'y ajoute que ce qui lui est propre.
+Quelle que soit sa source, un normaliseur verse ses documents dans `source_records`, écrit leurs contributions sources et marque sa ligne de staging traitée. Ces doublures valent donc pour toutes les sources.
 """
 
 from domain.source_records.identifiers import SourceIdentifierType, normalize_identifiers
@@ -51,9 +51,9 @@ class FakeStagingStore:
 
 
 class FakeSourceContributionStore:
-    """`SourceContributionStore` : retient les contributions sources insérées, et les restitue comme contributions sources en base.
+    """`SourceContributionStore` : retient les contributions sources insérées, et les renvoie comme contributions sources en base.
 
-    `synced_for` retient les documents dont les contributions sources sont synchronisées. Les adresses ne sont pas retenues : leurs lectures rendent des tables vides.
+    `synced_for` retient les documents dont les contributions sources sont synchronisées. Les adresses sont ignorées : leurs lectures renvoient des tables vides.
     """
 
     def __init__(self) -> None:

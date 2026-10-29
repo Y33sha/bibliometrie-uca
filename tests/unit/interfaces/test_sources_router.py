@@ -1,4 +1,4 @@
-"""Router des sources (`/api/sources`) : libellés dans l'ordre d'affichage."""
+"""Routeur des sources (`/api/sources`) : sources et libellés dans l'ordre d'affichage."""
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

@@ -1,6 +1,6 @@
 """Plafond du décalage qu'une lecture paginée peut demander.
 
-Le coût d'une lecture profonde tient au produit du rang de page par la taille de page : un rang arbitrairement grand fait trier à la base l'ensemble du résultat pour n'en rendre aucune ligne. C'est donc le décalage qui se borne, non le rang seul.
+Le coût d'une lecture profonde dépend du produit du rang de page par la taille de page : un rang arbitrairement grand fait trier tout le résultat par la base, pour aucune ligne rendue. Le plafond s'applique donc au décalage, et non au rang seul.
 """
 
 import pytest
@@ -27,7 +27,7 @@ class TestDecalageDemande:
         [
             {},  # aucune pagination demandée
             {"per_page": "50"},  # taille sans rang
-            {"page": "deux"},  # illisible : la route rend son propre refus
+            {"page": "deux"},  # illisible : la route renvoie son propre refus
             {"page": "0"},  # hors bornes : idem
             {"page": "2", "per_page": "-1"},
         ],
@@ -38,8 +38,7 @@ class TestDecalageDemande:
 
 class TestPlafond:
     def test_le_plafond_est_un_reglage(self):
-        # Le franchissement, le jour où un ensemble servi dépasse la valeur, se traite par la
-        # configuration plutôt que par une livraison.
+        # Si un ensemble servi dépasse la valeur, la configuration suffit à relever le plafond, sans livraison.
         assert isinstance(settings.max_pagination_offset, int)
         assert settings.max_pagination_offset > 0
 

@@ -49,7 +49,7 @@ class TestSerialsWorkerStopsOnTrippedBreaker:
     def _run(self, fetch_batch, n_batches):
         conn = MagicMock()
         serial_repo = MagicMock()
-        # row = (serial_id, oa_id) ; BATCH_SIZE journaux par batch.
+        # Ligne : (serial_id, identifiant OpenAlex) ; BATCH_SIZE revues par lot.
         rows = [(i, f"S{i}") for i in range(n_batches * serials_mod.BATCH_SIZE)]
         serial_repo.find_serials_of_unknown_type.return_value = rows
         with _bound(serial_repo), source_circuit_breaker("openalex"):
@@ -57,21 +57,21 @@ class TestSerialsWorkerStopsOnTrippedBreaker:
         return conn
 
     def test_stops_when_breaker_trips(self):
-        """Le worker s'arrête au tour où le breaker est tripé, sans parcourir tout le stock."""
+        """Le worker s'arrête au tour qui suit la coupure du circuit-breaker, sans parcourir toutes les revues."""
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):
             calls["n"] += 1
             if calls["n"] >= 3 and (breaker := get_current_breaker()) is not None:
-                breaker.tripped = True  # le 3e batch épuise le budget
+                breaker.tripped = True  # le troisième lot coupe le circuit-breaker
             return {}
 
         conn = self._run(fetch_batch, n_batches=20)
-        assert calls["n"] == 3  # arrêt au tour suivant (breaker.tripped), pas les 20 batches
-        conn.commit.assert_called()  # le déjà-fait est committé avant de couper
+        assert calls["n"] == 3  # arrêt après le troisième lot, sur vingt
+        conn.commit.assert_called()  # le travail fait est commité avant l'arrêt
 
     def test_runs_all_batches_when_breaker_stays_up(self):
-        """Sans trip, tous les batches sont parcourus."""
+        """Sans coupure du circuit-breaker, tous les lots sont parcourus."""
         calls = {"n": 0}
 
         def fetch_batch(_oa_ids):

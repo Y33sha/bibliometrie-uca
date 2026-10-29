@@ -1,4 +1,4 @@
-"""Tests du mapping des relations sources → vocabulaire canonique."""
+"""Relations entre publications : traduction des relations des sources, extraction, inférence par clé partagée."""
 
 from domain.publications.relations import (
     RelationType,
@@ -39,7 +39,7 @@ class TestDataciteMapping:
         assert map_datacite_relation("IsDocumentedBy") == RelationType.IS_DESCRIBED_BY
 
     def test_out_of_scope(self):
-        # Citations, même-œuvre, peer-review, vague.
+        # Citations, même œuvre, peer review, relation imprécise.
         for raw in ("References", "Cites", "IsVersionOf", "IsVariantFormOf", "IsReviewedBy"):
             assert map_datacite_relation(raw) is None
 
@@ -69,7 +69,7 @@ class TestCrossrefMapping:
         assert map_crossref_relation("has-part") == RelationType.IS_DESCRIBED_BY
 
     def test_out_of_scope(self):
-        # Peer-review / commentaire (porteur peer_review), citations, même-œuvre.
+        # Peer review et commentaire (type `peer_review`), citations, même œuvre.
         for raw in ("has-review", "is-review-of", "is-comment-on", "references", "is-version-of"):
             assert map_crossref_relation(raw) is None
 
@@ -79,9 +79,9 @@ class TestExtractDatacite:
         source_extras = {
             "related_identifiers": [
                 {"doi": "10.1/sup", "relation_type": "IsSupplementTo"},
-                {"doi": "10.1/concept", "relation_type": "IsVersionOf"},  # même-œuvre → exclu
-                {"doi": "10.1/cited", "relation_type": "References"},  # citation → exclu
-                {"relation_type": "IsSupplementTo"},  # sans DOI → ignoré
+                {"doi": "10.1/concept", "relation_type": "IsVersionOf"},  # même œuvre : exclu
+                {"doi": "10.1/cited", "relation_type": "References"},  # citation : exclu
+                {"relation_type": "IsSupplementTo"},  # sans DOI : ignoré
             ]
         }
         assert extract_datacite_relations(source_extras) == [
@@ -157,10 +157,10 @@ class TestExtractCrossref:
         source_extras = {
             "relation": {
                 "is-preprint-of": [{"id": "10.1/pub", "id-type": "doi", "asserted-by": "subject"}],
-                "has-review": [{"id": "10.1/rev", "id-type": "doi"}],  # peer-review → exclu
+                "has-review": [{"id": "10.1/rev", "id-type": "doi"}],  # peer review : exclu
                 "is-part-of": [
                     {"id": "10.1/ds", "id-type": "doi"},
-                    {"id": "abc", "id-type": "issn"},  # pas un DOI → ignoré
+                    {"id": "abc", "id-type": "issn"},  # autre qu'un DOI : ignoré
                 ],
             }
         }
@@ -194,7 +194,7 @@ class TestInferSharedKeyRelation:
         assert infer_shared_key_relation("peer_review", "preprint") is None
 
     def test_preprint_directed_to_published(self):
-        # Le preprint est sujet, pointe vers l'autre bout.
+        # Le preprint est le sujet de la relation.
         assert infer_shared_key_relation("article", "preprint") == (
             RelationType.IS_PREPRINT_OF,
             "b",

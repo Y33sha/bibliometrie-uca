@@ -110,10 +110,10 @@ class TestRorId:
         ("raw", "expected"),
         [
             ("02feahw73", "02feahw73"),  # forme courte
-            ("https://ror.org/02feahw73", "02feahw73"),  # strip https
-            ("http://ror.org/02feahw73", "02feahw73"),  # strip http
-            ("ror.org/02feahw73", "02feahw73"),  # strip préfixe nu
-            ("02FEAHW73", "02feahw73"),  # lowercase
+            ("https://ror.org/02feahw73", "02feahw73"),  # schéma https retiré
+            ("http://ror.org/02feahw73", "02feahw73"),  # schéma http retiré
+            ("ror.org/02feahw73", "02feahw73"),  # domaine retiré
+            ("02FEAHW73", "02feahw73"),  # minuscules
         ],
     )
     def test_normalizes(self, raw, expected):
@@ -122,11 +122,11 @@ class TestRorId:
     @pytest.mark.parametrize(
         "raw",
         [
-            "02feai073",  # 'i' interdit (alphabet ROR exclut i/l/o/u)
+            "02feai073",  # 'i' interdit (l'alphabet ROR exclut i, l, o, u)
             "02feal073",  # 'l' interdit
-            "02feahw7",  # 8 chars
-            "02feahw733",  # 10 chars
-            "12feahw73",  # mauvais préfixe (tous les ROR commencent par '0')
+            "02feahw7",  # 8 caractères
+            "02feahw733",  # 10 caractères
+            "12feahw73",  # premier caractère autre que '0'
         ],
     )
     def test_raises_on_invalid(self, raw):
@@ -151,7 +151,7 @@ class TestHalCollection:
             ("LIMOS", "LIMOS"),  # code simple
             ("INSTITUT_PASCAL", "INSTITUT_PASCAL"),  # underscore
             ("LPC-CLERMONT", "LPC-CLERMONT"),  # tiret
-            ("  limos  ", "LIMOS"),  # case + whitespace
+            ("  limos  ", "LIMOS"),  # casse et espaces
         ],
     )
     def test_normalizes(self, raw, expected):
@@ -161,7 +161,7 @@ class TestHalCollection:
         "raw",
         [
             "",  # vide
-            "   ",  # whitespace seul
+            "   ",  # espaces seuls
             "LAB X",  # espace interne
             "LABO.X",  # point
             "ÉCOLE",  # accent

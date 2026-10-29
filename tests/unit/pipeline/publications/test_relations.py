@@ -1,4 +1,4 @@
-"""Tests de l'assemblage des arêtes des signaux #2 (clés partagées) et #3 (rapprochement par titre), et de ce que la phase journalise de ses changements."""
+"""Tests de l'assemblage des arêtes des signaux #2 (clés de confirmation partagées) et #3 (titre), et du journal des changements de la phase."""
 
 import logging
 
@@ -49,14 +49,14 @@ class TestBuildSharedKeyEdges:
         assert [(e.from_publication_id, e.relation_type) for e in edges] == [(30, "is_related_to")]
 
     def test_is_related_to_suppressed_when_pair_already_declared(self):
-        # La paire {30, 40} porte déjà une relation précise (signal #1) → pas de is_related_to.
+        # La paire {30, 40} a déjà une relation précise (signal #1) : aucun is_related_to.
         edges = _build_shared_key_edges(
             [_pair(30, "article", 40, "article")], declared_pairs={frozenset((30, 40))}
         )
         assert edges == []
 
     def test_precise_relation_kept_even_if_declared(self):
-        # Une relation précise du signal #2 n'est pas écartée par une paire déclarée.
+        # Une relation précise du signal #2 reste, même sur une paire déclarée.
         edges = _build_shared_key_edges(
             [_pair(10, "article", 20, "preprint")], declared_pairs={frozenset((10, 20))}
         )
@@ -71,7 +71,7 @@ class TestBuildSharedKeyEdges:
 
 
 class TestDeclaredPairs:
-    """Les paires déclarées se déduisent des arêtes du run, et non de la table du run précédent."""
+    """Les paires déclarées se déduisent des arêtes du run en cours."""
 
     def test_cible_resolue_par_son_doi(self):
         edges = [RelationEdge(10, "is_supplement_to", "10.1/b", "datacite")]
@@ -182,7 +182,7 @@ class TestBuildTitleMatchEdges:
         assert e.source == "title_match"
 
     def test_preprint_type_and_doiless_parent(self):
-        # Parent au corpus sans DOI : la cible est désignée par publication_id, target_doi reste None.
+        # Parent sans DOI : la cible est désignée par son publication_id, et target_doi vaut None.
         edges = _build_title_match_edges(
             [TitleMatch(child_id=7, parent_id=3, parent_doi=None)],
             RelationType.IS_PREPRINT_OF,
@@ -195,7 +195,7 @@ class TestBuildTitleMatchEdges:
 
 
 class TestChangementsJournalises:
-    """Le journal dit les relations ajoutées depuis le run précédent, dans les mots d'un lecteur."""
+    """Le journal compte les relations ajoutées et retirées depuis le run précédent, nommées par leurs libellés."""
 
     def test_un_type_et_son_inverse_comptent_pour_un_meme_lien(self):
         compte = _count_by_pair_label([("is_preprint_of", 6), ("has_preprint", 2)])
@@ -227,5 +227,5 @@ class TestChangementsJournalises:
             _log_changes(RelationsRebuild(4569, [], removed=0), logger)
 
         assert "aucun changement" in caplog.text
-        # Le nombre d'arêtes réécrites ne paraît pas : la table est reconstruite entière.
+        # Le nombre d'arêtes réécrites reste hors du journal : la table est reconstruite entière.
         assert "4569" not in caplog.text

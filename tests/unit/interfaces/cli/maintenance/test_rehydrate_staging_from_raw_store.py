@@ -1,8 +1,8 @@
-"""Réinjection des payloads archivés, pour rejouer une normalisation.
+"""Réinjection des payloads archivés dans `staging`, pour rejouer une normalisation.
 
-La normalisation archive le payload d'un document puis vide la colonne qui le portait : une fois la source normalisée, le brut ne subsiste qu'à l'archive. Ce script l'y reprend et le réinjecte, en remettant la ligne en attente de traitement.
+La normalisation archive le payload d'un document puis vide la colonne qui le contient : le payload subsiste alors seulement dans l'archive. Le script l'y reprend, le réinjecte et remet la ligne en attente de traitement.
 
-Deux régimes s'y opposent. Par défaut, seules les lignes encore présentes sont mises à jour, et une clé sans ligne correspondante est signalée. En mode complet, ces clés orphelines sont recréées — le cas d'une table vidée, où tout l'est par définition. Le document y est alors reconstruit depuis le seul payload, ce qui demande d'en ré-extraire le DOI par la logique propre à chaque source.
+Par défaut, seules les lignes présentes sont mises à jour ; une clé sans ligne correspondante est signalée. En mode complet (`--full`), ces clés orphelines sont recréées, par exemple après une table vidée. Le document est alors reconstruit depuis le payload seul, et l'adaptateur de la source en extrait le DOI.
 """
 
 import json
@@ -35,7 +35,7 @@ class TestParseSources:
 
 
 class TestDoiFor:
-    """Le DOI se relit dans le payload, par l'adaptateur de la source."""
+    """L'adaptateur de la source extrait le DOI du payload."""
 
     @pytest.mark.parametrize(
         ("source", "payload"),
@@ -50,7 +50,7 @@ class TestDoiFor:
 
 
 _ILLISIBLE = object()
-"""Payload d'archive corrompue : sa lecture lève `UnreadablePayloadError`."""
+"""Payload corrompu dans l'archive : sa lecture lève `UnreadablePayloadError`."""
 
 
 class _FakeStore:
@@ -77,7 +77,7 @@ class _FakeConnection:
 
 @pytest.fixture
 def lancer(monkeypatch):
-    """Lance le script sur une archive donnée, et retient les réinjections demandées."""
+    """Lance le script sur une archive donnée, et enregistre les réinjections demandées."""
 
     @contextmanager
     def _contexte(conn):
@@ -135,7 +135,7 @@ def test_cle_sans_ligne_signalee_et_ignoree(lancer, caplog):
 
 
 def test_mode_complet_recree_les_orphelines(lancer):
-    """Après une table vidée, tout est orphelin : le document est reconstruit depuis le payload."""
+    """Après une table vidée, toutes les clés sont orphelines : le document est reconstruit depuis le payload."""
     resultat = lancer(
         {"hal": {"hal-1": {"halId_s": "hal-1", "doiId_s": "10.1/a"}}},
         "--sources",
@@ -149,7 +149,7 @@ def test_mode_complet_recree_les_orphelines(lancer):
 
 
 def test_mode_complet_met_a_jour_ce_qui_existe_deja(lancer, caplog):
-    """Une clé dont la ligne subsiste est mise à jour, non réinsérée."""
+    """Une clé dont la ligne existe est mise à jour, sans nouvelle insertion."""
     import logging
 
     with caplog.at_level(logging.INFO):
@@ -171,7 +171,7 @@ def test_simulation_n_ouvre_pas_la_base(lancer, caplog):
 
 
 def test_transaction_close_par_lots(lancer, monkeypatch):
-    """Un parcours long commite en cours de route : sa progression survit à une interruption."""
+    """Un parcours long commite par lots : sa progression survit à une interruption."""
     monkeypatch.setattr(module, "_COMMIT_BATCH", 2)
     cles = {f"hal-{i}": {} for i in range(5)}
 
@@ -181,7 +181,7 @@ def test_transaction_close_par_lots(lancer, monkeypatch):
 
 
 def test_payload_illisible_signale_sans_interrompre(lancer, caplog):
-    """Une archive corrompue laisse sa ligne de staging inchangée ; les autres clés sont réinjectées."""
+    """Un payload illisible laisse sa ligne de `staging` inchangée ; les autres clés sont réinjectées."""
     import logging
 
     with caplog.at_level(logging.WARNING):

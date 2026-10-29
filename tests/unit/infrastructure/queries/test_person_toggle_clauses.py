@@ -1,9 +1,6 @@
-"""Facettes binaires yes/no liées à une personne (`corresponding`, `in_perimeter`).
+"""Facettes oui/non liées à une personne (`corresponding`, `in_perimeter`).
 
-Régression : cocher les deux valeurs (`yes,no`) tombait dans un cas non prévu —
-`in_perimeter` basculait à tort sur la seule branche `no`, n'affichant que le
-hors-périmètre au lieu de tout. Le découpage se fait côté routeur ; la clause
-reçoit une `list[str]`.
+La clause reçoit la liste des valeurs cochées, découpée par le routeur. Cocher `yes` et `no` combine les deux branches par OR et retient toutes les publications.
 """
 
 from infrastructure.read_models.filters import (
@@ -60,7 +57,6 @@ def test_in_perimeter_no_is_negated():
 
 
 def test_in_perimeter_both_selected_shows_all_not_just_out():
-    # Régression : `yes,no` basculait à tort sur la seule branche NOT EXISTS.
     clause = in_perimeter_person_clause(["yes", "no"], 42)
     assert clause is not None
     assert " OR " in clause.sql

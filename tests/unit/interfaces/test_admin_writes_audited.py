@@ -1,16 +1,14 @@
 """Toute écriture d'administration laisse une trace nominative.
 
-Les décisions humaines sont consignées. La règle qui décide lesquelles n'était écrite nulle part, et la table des événements couvrait les fusions et les structures sans couvrir les adresses, la configuration ni la plupart des modifications d'attributs.
+Règle : **toute écriture de l'API d'administration est consignée**, sauf l'ouverture et la fermeture de session (plafonnées à part, et admises par le middleware avant toute garde). Une route d'écriture ajoutée sans décision sur son cas fait échouer ce test.
 
-La règle tient ici : **toute écriture de l'API d'administration est consignée**, la connexion et la déconnexion mises à part — elles ont leur propre plafonnement, et le middleware les laisse passer avant toute garde. Un point d'entrée qu'on ajoute sans trancher son cas fait échouer l'intégration.
+Trois vérifications complémentaires :
 
-Trois confrontations, qu'aucune ne suffit à elle seule :
+1. le registre ci-dessous couvre exactement les routes d'écriture du contrat OpenAPI : aucune route oubliée, aucune entrée sans route ;
+2. chaque type d'événement du registre est émis dans la couche applicative ;
+3. chaque type d'événement émis par la couche applicative est nommé par au moins une route, ou décrit la conséquence d'une décision.
 
-1. le registre ci-dessous couvre la surface d'écriture du contrat OpenAPI, exactement — ni point d'entrée oublié, ni entrée devenue sans objet ;
-2. chaque type d'événement qu'il nomme s'émet réellement quelque part dans la couche applicative, ce qui empêche de déclarer une trace qui n'existe pas ;
-3. chaque type d'événement émis par la couche applicative est nommé par au moins un point d'entrée, ce qui signale un vocabulaire devenu mort.
-
-L'énumération part du contrat publié, comme celle de la garde d'authentification : un point d'entrée soustrait au contrat échapperait aux deux.
+L'énumération part du contrat publié, comme celle de la garde d'authentification : une route absente du contrat échapperait aux deux.
 """
 
 from __future__ import annotations
@@ -61,7 +59,7 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/structures/tutelles"): "structure_relation.created",
     ("DELETE", "/api/structures/tutelles/{tutelle_id}"): "structure_relation.deleted",
 }
-"""Point d'entrée d'écriture → type d'événement qu'il émet."""
+"""Route d'écriture → type d'événement qu'elle émet."""
 
 EXEMPTES: dict[tuple[str, str], str] = {
     ("POST", "/api/auth/login"): "Ouverture de session : plafonnée par adresse, hors garde.",
@@ -75,13 +73,13 @@ EXEMPTES: dict[tuple[str, str], str] = {
         "point de reprise qui l'enveloppe, et l'événement émis est écarté."
     ),
 }
-"""Point d'entrée d'écriture qui ne consigne rien, et la raison qui l'en dispense."""
+"""Route d'écriture sans événement, et la raison de l'exemption."""
 
 _EMISSION = re.compile(r'emit_event\(\s*[^)]*?"([a-z_]+\.[a-z_]+)"', re.S)
 
 
 def _surface_d_ecriture() -> set[tuple[str, str]]:
-    """Points d'entrée d'écriture du contrat OpenAPI publié."""
+    """Routes d'écriture du contrat OpenAPI publié."""
     return {
         (methode.upper(), chemin)
         for chemin, operations in app.openapi()["paths"].items()
@@ -91,7 +89,7 @@ def _surface_d_ecriture() -> set[tuple[str, str]]:
 
 
 def _evenements_emis() -> set[str]:
-    """Types d'événements que la couche applicative émet réellement."""
+    """Types d'événements émis dans la couche applicative (appels à `emit_event`)."""
     emis: set[str] = set()
     for source in (PROJECT_ROOT / "application").rglob("*.py"):
         emis.update(_EMISSION.findall(source.read_text(encoding="utf-8")))
@@ -140,11 +138,11 @@ CONSEQUENCES: dict[str, str] = {
         "et l'attribution porte déjà sa propre trace."
     ),
 }
-"""Types d'événements qui décrivent la conséquence d'une décision, non la décision."""
+"""Types d'événements qui décrivent la conséquence d'une décision, et non la décision."""
 
 
 def test_aucun_evenement_emis_ne_reste_sans_point_d_entree() -> None:
-    """Un type d'événement qu'aucun point d'entrée ne nomme, et qui ne suit aucune décision, est un vocabulaire devenu mort."""
+    """Un type d'événement qu'aucune route ne nomme, et qui ne suit aucune décision, est un vocabulaire mort."""
     orphelins = _evenements_emis() - set(AUDITE.values()) - set(CONSEQUENCES)
     assert not orphelins, (
         f"Types d'événements émis sans point d'entrée déclaré : {sorted(orphelins)}. "

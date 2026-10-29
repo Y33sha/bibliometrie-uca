@@ -1,6 +1,6 @@
 """Lecture de la session côté API.
 
-`session_user` rend l'utilisateur désigné par le cookie de session, avec ses rôles, ou `None`, sans jamais refuser l'appel : l'appelant décide de ce qu'il sert selon la réponse.
+`session_user` renvoie l'utilisateur désigné par le cookie de session, avec ses rôles, ou `None`, sans jamais refuser l'appel : l'appelant décide de ce qu'il sert selon la réponse.
 """
 
 from starlette.requests import Request
@@ -51,11 +51,11 @@ class TestSessionUser:
         assert deps.session_user(_request(), conn=None) is None
 
     def test_rend_none_sur_un_jeton_invalide(self, monkeypatch):
-        """Un cookie présent dont la signature ne tient pas vaut un cookie absent."""
+        """Un cookie dont la signature est invalide équivaut à un cookie absent."""
         self._simuler(monkeypatch)
         assert deps.session_user(_request("forge"), conn=None) is None
 
     def test_rend_none_pour_un_login_absent_des_utilisateurs(self, monkeypatch):
-        """Un jeton valide dont le login est absent de `ops.users` vaut un cookie absent."""
+        """Un jeton valide dont le login est absent de `ops.users` équivaut à un cookie absent."""
         self._simuler(monkeypatch)
         assert deps.session_user(_request("jeton-parti"), conn=None) is None

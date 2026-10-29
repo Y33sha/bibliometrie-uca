@@ -47,7 +47,7 @@ class TestExtractCrossrefPublicationYearOrder:
 
 
 class TestExtractCrossrefPublicationYearFutureBound:
-    """Garde-fou : les éditeurs déposent parfois des dates de "futur numéro" (2030+, parfois 2080, 2200…). Au-dessus de max_year, l'année est None. La normalisation refuse alors l'enregistrement et laisse les autres sources arbitrer."""
+    """Les éditeurs déposent parfois des dates de numéros futurs (2030, 2080, 2200…). Au-dessus de `max_year`, l'année vaut None et la normalisation refuse l'enregistrement."""
 
     def test_skips_far_future(self):
         msg = {"published": _date_field(2030), "issued": _date_field(2030)}
@@ -63,8 +63,7 @@ class TestExtractCrossrefPublicationYearFutureBound:
         assert extract_crossref_publication_year(msg, max_year=_NEXT_YEAR) is None
 
     def test_falls_back_when_first_field_in_future(self):
-        """Hypothèse rare mais correcte : si published est en futur mais
-        un fallback est passé, on prend le fallback."""
+        """Des dates futures dans `published` et `issued` : l'année vient du champ suivant."""
         future = _NEXT_YEAR + 5
         msg = {
             "published": _date_field(future),
@@ -95,7 +94,7 @@ class TestExtractCrossrefPublicationYearMalformed:
         )
 
     def test_pre_1500_rejected(self):
-        """Bornage bas : un DOI antérieur à 1500 est manifestement aberrant."""
+        """Une année antérieure à 1500 est refusée."""
         assert (
             extract_crossref_publication_year({"published": _date_field(1200)}, max_year=_NEXT_YEAR)
             is None
@@ -132,8 +131,8 @@ class TestParseCrossrefIssns:
     def test_ignores_malformed_entries(self):
         msg = {
             "issn-type": [
-                {"type": "print"},  # pas de value
-                {"value": "1234-5678"},  # pas de type → ignoré
+                {"type": "print"},  # sans valeur
+                {"value": "1234-5678"},  # sans type : ignoré
                 {"type": "print", "value": "  "},  # vide
                 {"type": "print", "value": "1111-2222"},  # OK
             ]
@@ -171,7 +170,7 @@ class TestStripJatsTags:
         )
 
     def test_keeps_html_markup(self):
-        """Le formatage HTML relève de l'affichage, non des balises JATS."""
+        """Le formatage HTML est conservé : seules les balises JATS sont retirées."""
         assert strip_jats_tags("Surface <i>en italique</i> et <111>") == (
             "Surface <i>en italique</i> et <111>"
         )
@@ -193,7 +192,7 @@ class TestExtractCrossrefMeta:
             "relation": {"is-supplemented-by": []},
             "references-count": 42,
             "indexed": {"timestamp": 1234567890},
-            "title": ["ignored"],  # hors whitelist
+            "title": ["ignored"],  # hors de la liste des champs conservés
         }
         meta = extract_crossref_source_extras(msg)
         assert meta is not None

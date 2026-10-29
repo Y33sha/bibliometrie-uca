@@ -1,8 +1,8 @@
 """Tests unitaires des fonctions pures de `pipeline.ingestion.crossref.normalize`.
 
-Couvre les fonctions sans I/O qui parsent un payload CrossRef brut : `get_doi`, `get_title`, `get_container_title`, `get_publisher_name`, `get_keywords`, `get_abstract`, `get_cited_by_count`, `get_language`, `get_isbns`, `crossref_identifiers`, `get_biblio`, `get_container_facts`, `_author_name`, `_author_affiliations`, `build_crossref_author_records`, `crossref_source_record`, et les méthodes `parse` et `publisher` de `CrossrefNormalizer`.
+Couvre les fonctions qui lisent un payload Crossref brut, et les méthodes `parse` et `publisher` de `CrossrefNormalizer`.
 
-Les délégations vers `pipeline.ingestion.crossref.payload` (`extract_crossref_source_extras`, `extract_crossref_publication_year`, `parse_crossref_issns`, `strip_jats_tags`) sont testées dans `test_payload.py`. Ici, seul le branchement est vérifié (1-2 cas par délégation).
+Les fonctions de `pipeline.ingestion.crossref.payload` sont testées dans `test_payload.py`. Ici, seul leur appel est vérifié.
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ class TestGetTitle:
         assert get_title({"title": ["Primary Title", "Alt Title"]}) == "Primary Title"
 
     def test_string_direct(self):
-        # Cas legacy : `title` peut être une string brute selon les payloads.
+        # Certains payloads donnent `title` en chaîne.
         assert get_title({"title": "Direct title"}) == "Direct title"
 
     def test_strips_whitespace(self):
@@ -105,15 +105,13 @@ class TestGetTitle:
         assert get_title({}) is None
 
     def test_none_when_first_non_string(self):
-        # Élément non-str dans la liste → on retombe sur None
-        # (pas de cast forcé).
+        # Un premier élément qui n'est pas une chaîne donne None, sans conversion.
         assert get_title({"title": [12345]}) is None
 
 
 class TestGetPublicationYear:
     def test_delegates_to_domain(self):
-        # Délégation : on s'assure que la borne max est bien appliquée.
-        # Plus de cas détaillés dans test_crossref.py côté domain.
+        # Le détail est testé dans `test_payload.py`.
         assert get_publication_year({"published": {"date-parts": [[2024]]}}) == 2024
 
     def test_none_when_unparseable(self):
@@ -131,7 +129,7 @@ class TestGetContainerTitle:
         assert get_container_title({"container-title": []}) is None
 
     def test_none_when_first_entry_is_blank(self):
-        # Une entrée vide en tête ne vaut pas un titre, et rien ne la remplace.
+        # Une entrée vide en tête donne None.
         assert get_container_title({"container-title": ["  "]}) is None
 
     def test_none_when_absent(self):
@@ -143,7 +141,7 @@ class TestGetContainerTitle:
 
 class TestGetIssns:
     def test_delegates_to_domain(self):
-        # Délégation à `parse_crossref_issns`. Le détail est testé côté domain.
+        # Le détail de `parse_crossref_issns` est testé dans `test_payload.py`.
         issn, eissn = get_issns({"ISSN": ["1234-5679"], "issn-type": []})
         assert issn == "1234-5679" or eissn == "1234-5679"
 
@@ -167,14 +165,14 @@ class TestGetKeywords:
         assert get_keywords({"subject": ["A", "B", "C"]}) == ["A", "B", "C"]
 
     def test_strips_and_filters_empty(self):
-        # Strip + filter des valeurs vides après strip.
+        # Les espaces de bord sont retirés, les valeurs vides écartées.
         assert get_keywords({"subject": ["  A  ", "", "   ", "B"]}) == ["A", "B"]
 
     def test_filters_non_strings(self):
         assert get_keywords({"subject": ["A", 123, None, "B"]}) == ["A", "B"]
 
     def test_none_when_empty_list(self):
-        # Liste vide après filtrage → None (pas une liste vide).
+        # Une liste vide donne None.
         assert get_keywords({"subject": []}) is None
 
     def test_none_when_not_list(self):
@@ -186,7 +184,7 @@ class TestGetKeywords:
 
 class TestGetAbstract:
     def test_strips_jats_tags(self):
-        # JATS XML stripping délégué à `strip_jats_tags`.
+        # Les balises JATS sont retirées par `strip_jats_tags`.
         raw = "<jats:p>Hello <jats:bold>world</jats:bold></jats:p>"
         assert get_abstract({"abstract": raw}) == "Hello world"
 
@@ -203,8 +201,7 @@ class TestGetAbstract:
         assert get_abstract({"abstract": 12345}) is None
 
     def test_none_after_strip_only_tags(self):
-        # Si l'abstract est constitué uniquement de balises (rare mais possible),
-        # le résultat post-strip est vide → None.
+        # Un résumé fait seulement de balises donne None.
         assert get_abstract({"abstract": "<jats:p></jats:p>"}) is None
 
 
@@ -309,7 +306,7 @@ class TestGetBiblio:
         assert get_biblio({"volume": "  12  "}) == {"volume": "12"}
 
     def test_renames_article_number_key(self):
-        # `article-number` (CrossRef) → `article_number` (interne JSONB).
+        # `article-number` de Crossref devient `article_number`.
         assert get_biblio({"article-number": "e1"}) == {"article_number": "e1"}
 
     def test_none_when_empty(self):
@@ -322,8 +319,7 @@ class TestGetBiblio:
         assert get_biblio({"publisher": "Elsevier"}) == {"publisher": "Elsevier"}
 
     def test_serial_built_from_container_title_and_issns(self):
-        # Format `issn-type` permet de distinguer print/electronic ; la liste
-        # `ISSN` plate ne sert qu'à hydrater `issn` (eissn reste None).
+        # `issn-type` donne le support de chaque ISSN ; la liste `ISSN` seule alimente `issn`.
         msg = {
             "container-title": ["Journal of Physics"],
             "issn-type": [
@@ -355,7 +351,7 @@ class TestAuthorName:
         assert _author_name({"family": "Dupont"}) == ContributorName(last_name="Dupont")
 
     def test_given_only(self):
-        # Rare : auteur avec un prénom mais pas de nom de famille (mononymie, ou erreur d'ingestion).
+        # Auteur avec un prénom et sans nom de famille : le nom reste brut.
         assert _author_name({"given": "Jean"}) == ContributorName(raw="Jean")
 
     def test_strips_whitespace(self):
@@ -388,7 +384,7 @@ class TestAuthorAffiliations:
         assert _texts({}) == []
 
 
-# ── build_crossref_author_records (parsing pur) ──────────────────
+# ── build_crossref_author_records ──────────────────
 
 
 class TestBuildCrossrefAuthorRecords:
@@ -415,7 +411,7 @@ class TestBuildCrossrefAuthorRecords:
         }
         rec = build_crossref_author_records(msg)[0]
         assert rec.name == ContributorName(last_name="Dupont", first_name="Jean")
-        # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
+        # Le rôle par défaut est `author`.
         assert rec.roles == ["author"]
         assert rec.identifiers == {"orcid": "0000-0001-2345-6789"}
         assert [a.text for a in rec.addresses] == ["UCA"]
@@ -440,7 +436,7 @@ class TestBuildCrossrefAuthorRecords:
         ]
 
     def test_shared_orcid_kept_on_each_record(self):
-        """La lecture rend l'ORCID de chaque auteur tel que la source le donne ; le writer neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie l'ORCID de chaque auteur tel que la source le donne ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
         msg = {
             "author": [
                 {"family": "Acharya", "ORCID": "https://orcid.org/0000-0001-2345-6789"},
@@ -574,7 +570,7 @@ class TestAuteursIllisibles:
 
 
 def _message(**surcharges) -> dict:
-    """Enregistrement source Crossref minimale et acceptable, que chaque test dégrade à sa guise."""
+    """Payload Crossref minimal et acceptable, que chaque test dégrade à sa guise."""
     return {
         "DOI": "10.1000/abc",
         "title": ["Un article"],
@@ -608,7 +604,7 @@ class TestCrossrefSourceRecord:
         assert document.doi == "10.1000/abc"
         assert document.publication_year == 2024
         assert document.raw_doc_type == "journal-article"
-        assert document.oa_status is None  # Crossref ne renseigne pas l'accès ouvert
+        assert document.oa_status is None  # Crossref ne renseigne pas le statut open access
 
     def test_titre_de_conteneur_garde_sans_revue(self):
         msg = _message(**{"container-title": ["J. Things"]})

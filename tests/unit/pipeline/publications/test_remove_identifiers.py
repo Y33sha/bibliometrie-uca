@@ -1,4 +1,4 @@
-"""Tests purs : retraits de DOI par groupe (ouvrage/chapitre, chapitre/chapitre, volume d'actes/communication, dépôt HAL d'une autre œuvre) + `compute_updates`."""
+"""Tests purs du retrait des DOI par groupe (ouvrage et chapitre, chapitres entre eux, volume d'actes et communication, dépôt HAL d'une autre œuvre) et de `compute_updates`."""
 
 from domain.source_records.corrections import stash_entry
 from domain.source_records.identifiers import (
@@ -108,7 +108,7 @@ def test_le_doi_d_une_forme_secondaire_prime_sur_les_regles_ouvrage():
     )
 
 
-# ── domaine pur : ouvrage/chapitre (divergence) ──────────────────────────
+# Ouvrage et chapitre
 
 
 def test_book_and_chapter_chapter_loses_doi():
@@ -131,7 +131,7 @@ def test_article_sharing_book_doi_is_ignored():
     assert _resoudre(group) == [DoiClusterDecision(2, DoiClusterCase.OUVRAGE_VS_CHAPITRE)]
 
 
-# ── domaine pur : chapitre/chapitre (nettoyage + containment + strict) ────
+# Chapitres entre eux
 
 
 def test_chapters_distinct_titles_all_lose_doi():
@@ -192,10 +192,10 @@ def test_chapters_typo_is_false_positive_left_to_admin():
         _m(1, "book_chapter", "les effets thermomecaniques"),
         _m(2, "book_chapter", "les effets thermomecanqiues"),
     ]
-    assert _resoudre(g) != []  # déterministe, pas de fuzzy
+    assert _resoudre(g) != []  # comparaison exacte des titres, sans tolérance aux fautes de frappe
 
 
-# ── domaine pur : volume d'actes/communication ────────────────────────────
+# Volume d'actes et communication
 
 
 def test_communications_d_un_volume_perdent_le_doi():
@@ -229,7 +229,7 @@ def test_communication_sans_titre_garde_le_doi():
     assert _resoudre(group) == []
 
 
-# ── compute_updates (orchestration mécanique) ────────────────────────────
+# compute_updates
 
 
 def test_un_groupe_au_doi_d_une_forme_secondaire_garde_son_doi():
@@ -281,7 +281,7 @@ def test_self_heals_when_book_gone():
     assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {}, ())]
 
 
-# ── identifiants partagés avec une œuvre qui perd le DOI ──────────────────
+# Identifiants partagés avec une œuvre qui perd le DOI
 
 
 def test_volume_perd_le_hal_id_de_ses_communications():
@@ -394,7 +394,7 @@ def test_sans_divergence_aucun_retrait():
     assert compute_updates([a, b]) == []
 
 
-# ── dépôt HAL au DOI d'une autre œuvre ────────────────────────────────────
+# Dépôt HAL au DOI d'une autre œuvre
 
 
 def _source_record(member_id, source, title, authors, doc_type="article"):

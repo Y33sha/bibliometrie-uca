@@ -1,4 +1,4 @@
-"""Tests des règles de politique de création de personnes."""
+"""Création d'une personne selon les rôles de la contribution."""
 
 from domain.persons.creation import allow_person_creation
 
@@ -8,8 +8,7 @@ class TestAllowPersonCreation:
         assert allow_person_creation(["author"]) is True
 
     def test_author_among_jury_roles_allows_creation(self):
-        """Une personne peut cumuler 'author' + 'thesis_director' pour des
-        thèses différentes — la mention 'author' suffit ici."""
+        """Le rôle `author` suffit, même cumulé avec un rôle de jury."""
         assert allow_person_creation(["author", "thesis_director"]) is True
 
     def test_jury_roles_alone_block_creation(self):

@@ -1,6 +1,6 @@
 """Doublures partagées par les tests des orchestrateurs de phase, importées par les `conftest.py` de leurs répertoires.
 
-Un orchestrateur de phase ne connaît ni la base ni les adapters : il reçoit un `OpenTransaction` et des ports. Ces doublures les remplacent, ce qui permet d'exercer l'enchaînement des sous-étapes, les métriques assemblées et les bornes de boucle sans base de données.
+Un orchestrateur de phase reçoit un `OpenTransaction` et des ports. Ces doublures en tiennent lieu : les tests exercent l'enchaînement des sous-étapes, les métriques assemblées et les bornes de boucle sans base de données.
 """
 
 import logging
@@ -26,7 +26,7 @@ class FakeConnection:
 class FakeOpenTransaction:
     """Satisfait `OpenTransaction` : chaque appel ouvre une transaction sur la même connexion.
 
-    Le nombre de transactions ouvertes est retenu : une phase qui doit isoler ses sous-étapes les unes des autres l'affirme en le comptant.
+    Le nombre de transactions ouvertes est retenu : un test vérifie ainsi qu'une phase isole ses sous-étapes dans des transactions distinctes.
     """
 
     def __init__(self) -> None:
@@ -48,7 +48,7 @@ def open_tx() -> FakeOpenTransaction:
 def contexte(open_tx: FakeOpenTransaction) -> Callable[..., PhaseContext]:
     """Fabrique le contexte d'une phase sur `open_tx`, avec les options du run passées en arguments.
 
-    Toutes les sources ont leurs identifiants, sauf contrôle `credentials_missing` fourni.
+    Toutes les sources ont leurs identifiants de connexion, sauf contrôle `credentials_missing` fourni.
     """
 
     def fabriquer(

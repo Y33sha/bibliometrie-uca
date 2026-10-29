@@ -22,8 +22,7 @@ class TestBuildQuery:
         )
 
     def test_empty_affiliations_raises(self):
-        # `OG=()` côté WoS renvoie 400 Bad Request — on échoue tôt côté client
-        # plutôt que d'envoyer une requête qu'on sait inutile.
+        # WoS répond 400 à `OG=()` : la requête est refusée avant l'envoi.
         with pytest.raises(ValueError, match="affiliations vide"):
             build_query(year=2024, affiliations=[])
 
@@ -54,15 +53,13 @@ class TestGetRecordsFound:
 
 
 class TestFilterDoiForWos:
-    # `filter_doi_for_wos` reçoit un DOI déjà normalisé par `clean_doi` (forme
-    # canonique minuscule) et ne fait que le filtrage propre à WoS : la
-    # normalisation (préfixe URL, casse, espaces) est testée pour `clean_doi`.
+    # `filter_doi_for_wos` reçoit un DOI normalisé par `clean_doi` et fait seulement le filtrage propre à WoS.
 
     def test_passes_through_indexed_doi(self):
         assert filter_doi_for_wos("10.1000/abc") == "10.1000/abc"
 
     def test_filters_zenodo(self):
-        # Préfixes WoS-unindexed → None pour éviter l'appel inutile.
+        # Un préfixe absent de l'index WoS donne None.
         assert filter_doi_for_wos("10.5281/zenodo.123") is None
 
     def test_filters_arxiv(self):
@@ -75,7 +72,7 @@ class TestFilterDoiForWos:
         assert filter_doi_for_wos("10.21203/rs.3.rs-12345") is None
 
     def test_filters_doi_with_double_quote(self):
-        # `"` casserait la requête WoS `DO=("...")` côté backend.
+        # Un guillemet casserait la requête WoS `DO=("...")`.
         assert filter_doi_for_wos('10.1000/abc"def') is None
 
     def test_filters_doi_with_newline(self):

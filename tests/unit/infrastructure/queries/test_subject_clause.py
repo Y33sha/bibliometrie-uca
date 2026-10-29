@@ -1,4 +1,4 @@
-"""Filtre par sujets de la liste des publications : une publication est retenue si elle porte au moins un des sujets cochés, comme pour les autres cases à cocher."""
+"""Filtre par sujets de la liste des publications : une publication est retenue si elle a au moins un des sujets cochés."""
 
 from infrastructure.read_models.filters import subject_clause
 

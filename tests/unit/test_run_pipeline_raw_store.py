@@ -28,7 +28,7 @@ def test_avec_archivage_le_store_disque_est_construit(monkeypatch):
 
 
 def test_le_defaut_archive(monkeypatch):
-    # Sans drapeau, le comportement d'archivage est conservé.
+    # Par défaut, la normalisation archive les payloads.
     obtenus = []
     monkeypatch.setattr(
         "pipeline.ingestion.common.normalize.get_raw_store",

@@ -67,7 +67,7 @@ class TestPlanSourceContributionSync:
         )
 
     def test_identite_differente_ne_rapproche_rien(self):
-        """Le nom normalisé fait partie des informations du contributeur : un nom corrigé donne une contribution source nouvelle."""
+        """Le nom normalisé fait partie des informations du contributeur : un nom corrigé donne une autre contribution source."""
         plan = _plan([(10, 0, "bartoli adrien 1977", "h1")], [(0, "bartoli adrien", "h1")])
         assert plan == SourceContributionSyncPlan(
             updates=(), kept=(), inserts=(0,), deletes=(10,), regroup=True

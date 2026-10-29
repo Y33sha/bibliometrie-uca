@@ -1,8 +1,6 @@
 """Tests unitaires de `pipeline.ingestion.openalex.normalize`.
 
-Couvre les helpers de parsing (extract_locations_data, reconstruct_abstract, extract_topics), `get_publisher`, les branches de `get_container_facts` / `openalex_source_record`, le parsing auteurs `build_openalex_author_records` et les méthodes de `OpenalexNormalizer`.
-
-Pas de DB : les stores du normaliseur sont des doublures.
+Couvre les fonctions de lecture d'un work OpenAlex, la lecture des auteurs et les méthodes de `OpenalexNormalizer`. Les stores du normaliseur sont des doublures, sans base de données.
 """
 
 from __future__ import annotations
@@ -38,9 +36,6 @@ from tests.helpers.normalize_doubles import (
     identifier_values,
     staging_row,
 )
-
-# ── Helpers de fabrication de données de test ────────────────────
-
 
 # ── extract_locations_data ───────────────────────────────────────
 
@@ -338,7 +333,7 @@ class TestExtractOpenalexOrcid:
         assert result == "https://orcid.org/0000-0001-2345-6789"
 
     def test_author_orcid_ignored(self):
-        """`author.orcid` (entité désambiguïsée OA) est ignoré au profit de `raw_orcid`."""
+        """Seul `raw_orcid` est lu : `author.orcid`, qui vient de l'auteur désambiguïsé par OpenAlex, est ignoré."""
         assert _extract_openalex_orcid({"author": {"orcid": "0000-0001-2345-6789"}}) is None
 
     def test_no_raw_orcid(self):
@@ -398,7 +393,7 @@ class TestContainerDescription:
         assert get_container_facts(work).oa_model == "subscription"
 
     def test_issns_sans_support_et_issnl(self):
-        """OpenAlex ne donne pas le support de ses ISSN : ils restent de support inconnu ; `issn_l` porte le drapeau ISSN-L."""
+        """OpenAlex ne donne pas le support de ses ISSN : ils restent de support inconnu ; `issn_l` a le drapeau ISSN-L."""
         work = {
             "primary_location": {
                 "source": {
@@ -461,7 +456,7 @@ class TestOpenalexSourceRecordMetadata:
         assert record.title == "DN"
 
     def test_with_serial_id_no_container_title(self):
-        """Si serial_id présent, container_title reste None (la revue identifie tout)."""
+        """Une revue identifiée laisse `container_title` à None."""
         work = {
             "title": "T",
             "primary_location": {"source": {"display_name": "Some Source"}},
@@ -571,8 +566,7 @@ class TestOpenalexSourceRecord:
             },
         }
         captured = self._call(work)
-        # `issn_l` est mis dans `issnl` ; le premier non-issn_l de la liste passe en
-        # `issn` (pas de typage `electronic`/`print` côté OpenAlex sur ce chemin).
+        # `issn_l` va dans `issnl` ; le premier autre ISSN de la liste va dans `issn`, sans support.
         assert captured.biblio == {
             "publisher": "Elsevier",
             "journal": {
@@ -625,7 +619,7 @@ class TestOpenalexSourceRecord:
         assert identifier_values(captured)["nnt"] == ["2024CLFAC001"]
 
 
-# ── build_openalex_author_records (parsing pur) ──────────────────
+# ── build_openalex_author_records ──────────────────
 
 
 class TestBuildOpenalexAuthorRecords:
@@ -633,7 +627,7 @@ class TestBuildOpenalexAuthorRecords:
         assert build_openalex_author_records({"authorships": []}) == []
 
     def test_shared_orcid_kept_on_each_record(self):
-        """La lecture rend l'ORCID de chaque contribution source tel que la source le donne ; le writer neutralise ceux que partagent plusieurs contributions sources."""
+        """La lecture renvoie l'ORCID de chaque contribution source tel que la source le donne ; l'écriture des contributions sources neutralise ceux que partagent plusieurs contributions sources."""
         work = {
             "authorships": [
                 {
@@ -650,7 +644,7 @@ class TestBuildOpenalexAuthorRecords:
         ]
 
     def test_skip_without_raw_name(self):
-        # Sans raw_author_name → authorship inexploitable, ignorée.
+        # Une authorship sans raw_author_name est ignorée.
         records = build_openalex_author_records(
             {"authorships": [{"author": {"display_name": "X"}}]}
         )
@@ -662,7 +656,7 @@ class TestBuildOpenalexAuthorRecords:
                 {
                     "raw_author_name": "DUPONT Marie",
                     "raw_orcid": "https://orcid.org/0000-0001-2345-6789",
-                    # author.orcid divergent : doit être ignoré au profit de raw_orcid.
+                    # author.orcid divergent, ignoré : seul raw_orcid est lu.
                     "author": {"orcid": "https://orcid.org/9999-9999-9999-9999"},
                     "is_corresponding": True,
                     "raw_affiliation_strings": ["Univ Clermont"],
@@ -673,7 +667,7 @@ class TestBuildOpenalexAuthorRecords:
         rec = build_openalex_author_records(work)[0]
         assert rec.name == ContributorName(raw="DUPONT Marie")
         assert rec.is_corresponding is True
-        # roles posé explicitement (reproduit l'ancien défaut DB ARRAY['author']).
+        # Le rôle par défaut est `author`.
         assert rec.roles == ["author"]
         assert rec.identifiers == {"orcid": "0000-0001-2345-6789"}
         assert [a.text for a in rec.addresses] == ["Univ Clermont"]
@@ -795,7 +789,7 @@ def _make_normalizer():
 
 class TestOpenalexNormalizerClass:
     def test_metadonnees_minimales_d_un_work_sans_annee(self):
-        """Régression : OpenAlex renvoie W3131333980 sans DOI ni année ; l'enregistrement source ne passe pas le filtre de la boucle."""
+        """Régression : OpenAlex renvoie W3131333980 sans DOI ni année ; les métadonnées minimales donnent son titre et une année vide."""
         work = {"title": "Inequality of Opportunity, Inequality of Income and Economic Growth"}
         assert _make_normalizer().minimal_metadata(staging_row(raw=work)) == (work["title"], None)
 

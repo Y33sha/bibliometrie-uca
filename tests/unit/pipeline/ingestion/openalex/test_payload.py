@@ -91,7 +91,7 @@ class TestUrlIdentifiers:
 
 
 def _loc(**kwargs) -> OpenalexLocation:
-    """Helper : OpenalexLocation avec tous les champs à None par défaut."""
+    """OpenalexLocation dont les champs valent None par défaut."""
     defaults = {
         "location_id": None,
         "landing_page_url": None,
@@ -110,7 +110,7 @@ class TestMapOpenalexOaStatus:
             assert map_openalex_oa_status(raw) == raw
 
     def test_none_returns_none(self):
-        # OpenAlex ne s'est pas prononcé → délégation aux autres sources
+        # Sans statut OpenAlex, la décision revient aux autres sources.
         assert map_openalex_oa_status(None) is None
 
     def test_empty_string_returns_none(self):
@@ -220,7 +220,7 @@ class TestIsHalLocation:
         )
 
     def test_repository_without_hal_signal(self):
-        # Repository qui n'est pas HAL (Zenodo, SPIRE…) → False
+        # Un repository autre que HAL (Zenodo, SPIRE…) donne False.
         assert not is_hal_location(_loc(source_type="repository", source_display_name="Zenodo"))
 
     def test_serial(self):
@@ -277,7 +277,7 @@ class TestExtractNntFromLocation:
         )
 
     def test_pmh_id_takes_precedence(self):
-        # Si les deux sont présents, pmh: gagne
+        # Les deux présents : `pmh:` l'emporte.
         loc = _loc(
             location_id="pmh:2023UCFAC123",
             landing_page_url="https://theses.fr/2024OTHERNNT",
@@ -290,9 +290,7 @@ class TestExtractNntFromLocation:
         assert extract_nnt_from_location(_loc(landing_page_url="https://example.com/")) is None
 
     def test_pmh_wrapping_an_oai_id_is_not_a_nnt(self):
-        # Cas réel : un dépôt HAL moissonné en OAI-PMH a un location.id
-        # « pmh:oai:HAL:hal-04677016v1 ». Les deux-points cassent le motif
-        # alphanumérique → pas de NNT (sinon lien theses.fr mort sur la fiche).
+        # Cas réel : un dépôt HAL moissonné en OAI-PMH a pour location.id « pmh:oai:HAL:hal-04677016v1 ». Les deux-points sortent du motif alphanumérique du NNT.
         assert extract_nnt_from_location(_loc(location_id="pmh:oai:HAL:hal-04677016v1")) is None
 
 

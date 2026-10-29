@@ -1,5 +1,4 @@
-"""Tests des constantes et helpers de `domain/sources.py` — registre
-des sources et ordres de priorité."""
+"""Registre des sources (`domain.sources.registry`) : sources connues, ordre de priorité, sources interrogeables par DOI."""
 
 import pytest
 
@@ -35,7 +34,7 @@ class TestSourcePriority:
 
 class TestDoiSearchableSources:
     def test_excludes_theses(self):
-        """theses.fr ne se requête pas par DOI mais par NNT — exclue du pool DOI-driven."""
+        """theses.fr s'interroge par NNT : elle est absente des sources interrogeables par DOI."""
         assert "theses" not in DOI_SEARCHABLE_SOURCES
 
     def test_contains_all_doi_searchable(self):

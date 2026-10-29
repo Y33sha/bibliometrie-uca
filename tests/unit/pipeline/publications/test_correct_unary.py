@@ -54,7 +54,7 @@ def test_tally_corrections_compte_les_regles():
                 (),
             ),
         ),
-        # deux champs corrigés sur un même enregistrement source → 1 enregistrement source, 2 déclenchements
+        # deux champs corrigés sur un même enregistrement source : un enregistrement source, deux déclenchements
         CorrectionUpdate(
             3,
             UnaryCorrection(
@@ -126,8 +126,7 @@ def test_no_rule_returns_none():
 
 
 def test_thesis_with_serial_id_and_publisher_doi_is_mistyped_article():
-    # Mistype OpenAlex/ScanR : un article typé thèse, rattaché à un journal, avec un DOI d'éditeur
-    # (préfixe ≠ registre de thèses) → article.
+    # Erreur de type d'OpenAlex ou de ScanR : un article typé thèse, rattaché à une revue, avec un DOI d'éditeur (hors du registre des thèses), devient un article.
     upd = _update(_source_record(doc_type="thesis", serial_id=42, doi="10.1016/j.ex.2020.01.001"))
     assert upd is not None
     assert upd.corrected.columns.doc_type == "article"
@@ -137,13 +136,12 @@ def test_thesis_with_serial_id_and_publisher_doi_is_mistyped_article():
 
 
 def test_thesis_with_serial_id_but_thesis_registry_doi_stays_thesis():
-    # DOI ABES (registre des thèses FR) : c'est le DOI propre de la thèse, le serial_id est parasite
-    # (conflation thèse↔version publiée) → le type reste thèse, pas de correction.
+    # Un DOI ABES (registre des thèses françaises) est celui de la thèse : la revue vient de la version publiée, et le type reste thèse.
     assert _update(_source_record(doc_type="thesis", serial_id=42, doi="10.70675/abc123")) is None
 
 
 def test_thesis_with_serial_id_no_doi_stays_thesis():
-    # Sans DOI, rien ne distingue le mistype de la conflation : on ne bascule pas, le type reste thèse.
+    # Sans DOI, rien ne distingue l'erreur de type de la confusion avec la version publiée : le type reste thèse.
     assert _update(_source_record(doc_type="thesis", serial_id=42, doi=None)) is None
 
 
@@ -152,7 +150,7 @@ def test_real_thesis_without_serial_id_untouched():
 
 
 def test_retrait_par_cluster_garde():
-    """L'étape unaire garde le retrait d'identifiants noté par l'étape cluster : aucune mise à jour."""
+    """La correction unaire garde le retrait d'identifiants noté par le retrait par groupe : aucune mise à jour."""
     identifiers = (*_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"), *_hal("hal-2"))
     row = _source_record(identifiers=identifiers)
     assert _update(row) is None
@@ -180,8 +178,7 @@ def test_retrait_par_cluster_compose_avec_la_conflation_these():
 
 
 def test_thesis_to_article_strips_dissertation_keys():
-    # Conflation : l'enregistrement source corrigé thèse→article perd le NNT et les hal_id tel-/dumas-,
-    # garde les autres hal_id (article) et les autres identifiants.
+    # Thèse confondue avec sa version publiée : l'enregistrement source corrigé en article perd le NNT et les hal_id tel- et dumas-, et garde ses autres identifiants.
     upd = _update(
         _source_record(
             doc_type="thesis",
@@ -207,7 +204,7 @@ def test_thesis_to_article_strips_dissertation_keys():
 
 
 def test_thesis_to_article_without_dissertation_keys_leaves_identifiers():
-    # Mistype pur (pas d'identifiant de thèse) : identifiants inchangés.
+    # Erreur de type sans identifiant de thèse : identifiants inchangés.
     identifiers = _ids(SourceIdentifierType.PMID, "123")
     upd = _update(
         _source_record(
@@ -224,9 +221,7 @@ def test_thesis_to_article_without_dissertation_keys_leaves_identifiers():
 
 
 def test_serial_id_wins_over_theses_fr_url_conflation():
-    # Conflation thèse↔article : un enregistrement source theses.fr AVEC un serial_id ET un DOI d'éditeur → article
-    # (`serial_id_present: False` garde la règle URL ; `doi_prefix_not_in` distingue l'article
-    # publié — DOI éditeur — d'une vraie thèse à DOI ABES).
+    # Un enregistrement source à URL theses.fr, avec une revue et un DOI d'éditeur, devient un article. `serial_id_present: False` restreint la règle d'URL ; `doi_prefix_not_in` distingue l'article publié (DOI d'éditeur) d'une thèse à DOI ABES.
     upd = _update(
         _source_record(
             doc_type="thesis",
@@ -271,8 +266,7 @@ def test_already_corrected_is_idempotent_noop():
 
 
 def test_self_heals_when_rule_no_longer_applies():
-    # doc_type figé à 'media' par une règle journal, mais le journal n'est plus 'media' :
-    # la correction doit être défaite, le brut canonique 'article' restauré.
+    # doc_type mis à 'media' par une règle de revue, pour une revue d'un autre type : la correction est défaite, et le type brut 'article' revient.
     source_record = _source_record(
         doc_type="media",
         serial_type=None,
@@ -285,7 +279,7 @@ def test_self_heals_when_rule_no_longer_applies():
 
 
 def test_expired_embargo_promotes_oa_status_to_green():
-    # oa_status `embargoed` + embargo expiré (calculé au fetch) → `green`, brut stashé.
+    # oa_status `embargoed` et embargo échu (constaté à la lecture de la source) : `green`, la valeur brute est conservée dans `corrections`.
     upd = _update(_source_record(oa_status="embargoed", embargo_expired=True))
     assert upd is not None
     assert upd.corrected.columns.oa_status == "green"
@@ -296,7 +290,7 @@ def test_expired_embargo_promotes_oa_status_to_green():
 
 
 def test_active_embargo_oa_status_untouched():
-    # Embargo non expiré → pas de promotion, no-op.
+    # Embargo en cours : aucune mise à jour.
     assert _update(_source_record(oa_status="embargoed", embargo_expired=False)) is None
 
 
@@ -305,7 +299,7 @@ def test_null_doc_type_left_null_when_no_rule():
 
 
 def test_preserves_unmanaged_corrections_keys():
-    # La clé `doi` (gérée par la sous-étape relationnelle) doit survivre à la passe unaire.
+    # La clé `doi`, gérée par le retrait des DOI par groupe, survit à la correction unaire.
     source_record = _source_record(
         doc_type="article",
         urls=["https://theses.fr/2020ABCD"],
@@ -339,11 +333,11 @@ def test_le_journal_compte_seulement_les_documents_corriges_par_une_regle(caplog
     assert "  ├─ 1 document à corriger" in caplog.messages
 
 
-# ── Dépôts HAL introuvables ─────────────────────────────────────────────────────────
+# Dépôts HAL introuvables
 
 
 def test_depot_hal_introuvable_retire_des_identifiants_et_des_liens():
-    """Régression : l'enregistrement OpenAlex W4287257393 citait le seul dépôt hal-03178520, introuvable dans HAL."""
+    """Cas réel : l'enregistrement OpenAlex W4287257393 cite le dépôt hal-03178520, introuvable dans HAL."""
     row = _source_record(
         identifiers=(
             *_hal("hal-03178520", "hal-03263588"),
@@ -395,11 +389,11 @@ def test_depot_hal_retrouve_restaure_identifiants_et_liens():
     assert upd.corrected.columns.corrections == {}
 
 
-# ── Enregistrements sources ScanR issues d'un dépôt HAL ─────────────────────────────
+# Enregistrements sources ScanR issus d'un dépôt HAL
 
 
 def test_scanr_from_hal_takes_corrected_hal_type():
-    """Un enregistrement source ScanR issue de HAL prend le type corrigé de son dépôt, calculé depuis l'enregistrement source HAL."""
+    """Un enregistrement source ScanR issu de HAL prend le type corrigé de l'enregistrement source HAL de son dépôt."""
     hal = _source_record(id=1, source="hal", source_id="hal-04565713", doc_type="poster")
     scanr = _source_record(id=2, source="scanr", source_id="halhal-04565713", doc_type="other")
 

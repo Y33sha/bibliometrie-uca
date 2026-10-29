@@ -1,4 +1,4 @@
-"""Tests de la consolidation des logs (infrastructure/log.py)."""
+"""Configuration du logging : filtres, emplacement des fichiers, formats et handlers."""
 
 import logging
 import uuid
@@ -32,8 +32,7 @@ class TestFiltreDetail:
 
 
 class TestPhaseNameFilter:
-    """`_PhaseNameFilter` réécrit `record.name` avec la phase courante, pour que
-    chaque ligne soit estampillée `normalize:` plutôt que `pipeline:`."""
+    """Le nom du logger de chaque ligne devient la phase courante, s'il y en a une."""
 
     def test_no_phase_keeps_logger_name(self):
         record = _record("pipeline")
@@ -57,8 +56,7 @@ class TestPhaseNameFilter:
         assert record.name == "scanr"
 
     def test_phase_propagates_to_worker_thread(self):
-        """Un worker qui rejoue sa tâche dans une copie du contexte hérite de la
-        phase — indispensable aux moissonneurs threadés (`copy_context().run`)."""
+        """Un thread qui exécute sa tâche dans une copie du contexte (`copy_context().run`) hérite de la phase."""
         import contextvars
         from concurrent.futures import ThreadPoolExecutor
 
@@ -80,52 +78,49 @@ class TestPhaseNameFilter:
 
 class TestRebaseLogDir:
     def test_absolute_path_under_project(self):
-        """Caller interne : reproduit l'arborescence sous logs/."""
+        """Un chemin du projet garde son arborescence sous `logs/`."""
         result = _rebase_log_dir(str(_PROJECT_ROOT / "infrastructure" / "sources" / "hal" / "logs"))
         assert result == _PROJECT_ROOT / "logs" / "infrastructure" / "sources" / "hal"
 
     def test_relative_path(self):
-        """Chemin relatif : résolu par rapport à la racine."""
+        """Un chemin relatif part de la racine du projet."""
         result = _rebase_log_dir("processing/logs")
         assert result == _PROJECT_ROOT / "logs" / "processing"
 
     def test_strips_trailing_logs_only(self):
-        """Seul le 'logs' final est supprimé, pas les autres segments intermédiaires."""
+        """Seul le segment `logs` final est retiré."""
         result = _rebase_log_dir(str(_PROJECT_ROOT / "a" / "logs" / "b" / "logs"))
         assert result == _PROJECT_ROOT / "logs" / "a" / "logs" / "b"
 
     def test_no_logs_suffix(self):
-        """Si pas de suffixe 'logs', tout est conservé."""
+        """Sans segment `logs` final, tous les segments sont conservés."""
         result = _rebase_log_dir(str(_PROJECT_ROOT / "some" / "dir"))
         assert result == _PROJECT_ROOT / "logs" / "some" / "dir"
 
     def test_outside_project(self, tmp_path):
-        """Chemin hors du projet : replié sous logs/ avec ses segments nommés."""
+        """Un chemin hors du projet se range sous `logs/`, avec ses segments nommés."""
         external = tmp_path / "other" / "logs"
         result = _rebase_log_dir(str(external))
-        # On attend que le rebase fallback ait construit un chemin sous logs/
         assert _PROJECT_ROOT / "logs" in [result, *result.parents]
 
     def test_just_logs(self):
-        """log_dir = 'logs' seul : résultat = PROJECT_ROOT/logs."""
+        """Le répertoire `logs` de la racine reste `logs/`."""
         result = _rebase_log_dir(str(_PROJECT_ROOT / "logs"))
         assert result == _PROJECT_ROOT / "logs"
 
 
 def _nom_de_logger_inedit(prefixe: str) -> str:
-    """Nom qu'aucun logger du processus ne porte encore.
+    """Nom de logger encore inutilisé dans le processus.
 
-    Le registre de `logging` vit autant que le processus, et pytest attache sa capture aux loggers existants qui ne propagent pas. Un logger de nom inédit arrive donc sans handler dans `setup_logger`, même d'une session pytest à l'autre.
+    Le registre de `logging` dure autant que le processus, et pytest attache sa capture aux loggers existants qui ne propagent pas. Un logger de nom inédit arrive donc sans handler dans `setup_logger`, même d'une session pytest à l'autre.
     """
     return f"{prefixe}_{uuid.uuid4().hex}"
 
 
 class TestSetupLoggerFileLocation:
-    """Valide que setup_logger (version d'origine) écrit sous logs/<relpath>/.
+    """Emplacement du fichier de `setup_logger` sous `logs/`.
 
-    conftest.py remplace setup_logger par un stub NullHandler pour éviter
-    la pollution disque en tests. On recharge la vraie implémentation
-    via importlib.util.
+    `conftest.py` substitue à `setup_logger` un logger sans sortie. Chaque test recharge donc le module pour exercer la vraie implémentation.
     """
 
     def test_writes_under_logs_tree(self, tmp_path, monkeypatch):
@@ -139,8 +134,7 @@ class TestSetupLoggerFileLocation:
         fresh = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(fresh)
         monkeypatch.setattr(fresh, "_PROJECT_ROOT", tmp_path)
-        # Le FileHandler est opt-in via LOG_TO_FILE ; ce test vérifie
-        # l'emplacement du fichier quand il est activé.
+        # Le fichier de log s'active par `LOG_TO_FILE`.
         monkeypatch.setenv("LOG_TO_FILE", "true")
 
         nom = _nom_de_logger_inedit("pytest_fake_logger")
@@ -158,7 +152,7 @@ class TestSetupLoggerFileLocation:
                 logger.removeHandler(h)
 
     def test_unwritable_directory_falls_back_to_stdout(self, tmp_path, monkeypatch, capsys):
-        """Racine en lecture seule : le logger démarre quand même, sur la seule sortie standard."""
+        """Sur un disque en lecture seule, le logger démarre avec la sortie standard seule."""
         import importlib.util
 
         import infrastructure.observability.log as log_module
@@ -180,8 +174,7 @@ class TestSetupLoggerFileLocation:
         try:
             assert not [h for h in logger.handlers if isinstance(h, logging.FileHandler)]
             assert logger.handlers  # la console reste
-            # Le logger porte ses propres handlers sans propager : l'avertissement se lit sur la
-            # sortie où il part, pas sur celle du root.
+            # Le logger a ses propres handlers, sans propagation au root : l'avertissement se lit sur sa propre sortie.
             assert "sortie standard" in capsys.readouterr().out
         finally:
             for h in list(logger.handlers):
@@ -195,8 +188,7 @@ class TestMakeFormatter:
 
         from infrastructure.observability.log import _make_formatter
 
-        # Le .env du projet définit LOG_FORMAT=text ; on isole le test
-        # pour vérifier le fallback "json" quand la var n'est pas posée.
+        # Sans `LOG_FORMAT` (que le `.env` du projet définit), le format est JSON.
         monkeypatch.delenv("LOG_FORMAT", raising=False)
         fmt = _make_formatter()
         record = _logging.LogRecord(
@@ -271,7 +263,7 @@ class TestMakeFormatter:
 
 
 class TestMakeConsoleFormatter:
-    """Le terminal reçoit le message seul ; une sortie qui se relit plus tard porte le reste."""
+    """Le terminal reçoit le message seul, précédé du niveau pour un avertissement. Une sortie capturée garde l'horodatage, le niveau et la phase."""
 
     @staticmethod
     def _ligne(monkeypatch, *, log_format: str, terminal: bool, level: int = logging.INFO) -> str:
@@ -359,10 +351,10 @@ class TestJsonFormatter:
 
 class TestConfigureRootLogging:
     def test_replaces_handlers(self, monkeypatch):
-        """Sans pytest dans l'env, un StreamHandler est attaché au root."""
+        """Hors de pytest, le root garde un seul handler : celui de la console."""
         import logging as _logging
 
-        # Retirer le marqueur pytest pour exercer la branche "prod"
+        # Retire les variables qui signalent pytest.
         monkeypatch.delenv("PYTEST_VERSION", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
@@ -381,7 +373,7 @@ class TestConfigureRootLogging:
                 root.removeHandler(h)
 
     def test_le_root_ecrit_par_l_ecrivain_de_console(self, monkeypatch):
-        """Un module appelant `logging.getLogger(__name__)` atteint l'écrivain de console, qui pose sa ligne au-dessus des barres de progression."""
+        """Un module appelant `logging.getLogger(__name__)` atteint l'écrivain de console, qui affiche sa ligne au-dessus des barres de progression."""
         monkeypatch.delenv("PYTEST_VERSION", raising=False)
         monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
 
@@ -397,9 +389,9 @@ class TestConfigureRootLogging:
                 root.removeHandler(h)
 
     def test_un_logger_nomme_ne_propage_pas_au_root(self, tmp_path):
-        """Un logger configuré porte ses propres handlers et garde ses records, qu'un seul jeu de handlers traite.
+        """Un logger configuré par `setup_logger` a ses propres handlers et garde ses records : un seul jeu de handlers les traite.
 
-        L'instance chargée ici porte le vrai `setup_logger` ; `conftest.py` en donne un logger null à la session de tests.
+        Le module est rechargé pour exercer le vrai `setup_logger`, que `conftest.py` neutralise pour la session de tests.
         """
         import importlib.util
 
@@ -420,9 +412,7 @@ class TestConfigureRootLogging:
                 logger.removeHandler(h)
 
     def test_skips_handler_under_pytest(self, monkeypatch):
-        """Sous pytest, aucun StreamHandler n'est attaché : pytest a son
-        propre LogCaptureHandler, attacher en plus polluerait la sortie
-        des tests (duplications, échappement de la capture)."""
+        """Sous pytest, le root reste sans handler : la capture de pytest affiche déjà les records."""
         import logging as _logging
 
         monkeypatch.setenv("PYTEST_VERSION", "test")
@@ -442,9 +432,9 @@ class TestConfigureRootLogging:
 
 
 class TestGabaritDuMessage:
-    """Le format JSON porte le gabarit du message à côté du message formaté.
+    """Le format JSON contient le gabarit du message à côté du message formaté.
 
-    Le gabarit reste identique d'une occurrence à l'autre d'un même événement, là où le message porte les valeurs du moment : c'est sur lui qu'un collecteur regroupe, compte et surveille.
+    Le gabarit est identique d'une occurrence à l'autre d'un même événement ; le message contient les valeurs du moment. Un collecteur regroupe, compte et surveille donc sur le gabarit.
     """
 
     def _rendu(self, msg, args):

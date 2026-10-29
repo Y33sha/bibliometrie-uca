@@ -1,8 +1,6 @@
-"""Orchestrateur de la phase `harvest` : sélection des sources par mode, skip des non configurées.
+"""Orchestrateur de la phase `harvest` : sélection des sources par mode, sources non configurées sautées.
 
-Les dépendances techniques (extraction d'une source, parallélisme, dernière date) sont injectées,
-donc l'orchestrateur se teste sans I/O ni threads : `run_parallel` est remplacé par une exécution
-synchrone déterministe.
+Les dépendances techniques (extraction d'une source, parallélisme, dernière date) sont injectées. L'orchestrateur se teste donc sans I/O ni threads : `run_parallel` est simulé par une exécution synchrone déterministe.
 """
 
 import logging
@@ -20,7 +18,7 @@ from pipeline.transformation.structures.perimeter import EmptyExtractionPerimete
 
 
 def _sync_run_parallel(thunks):
-    """Exécute les thunks en séquence (déterministe) — même contrat que le primitif parallèle."""
+    """Exécute les thunks en séquence, avec le contrat de `run_parallel`."""
     return {label: thunk() for label, thunk in thunks.items()}
 
 
@@ -48,7 +46,7 @@ def test_parallel_skips_unconfigured_source(contexte):
     metrics = _phase(harvest_one).run(contexte(mode="full", sources={"openalex", "theses"}))
 
     assert {r["key"] for r in metrics.details["table"]["rows"]} == {"theses"}
-    assert metrics.new == 3  # la source configurée est mergée
+    assert metrics.new == 3  # les métriques de la source configurée sont reprises
     assert [s["code"] for s in metrics.signals] == ["source_unconfigured"]
 
 
@@ -81,7 +79,7 @@ def test_toutes_les_sources_suivent_la_fenetre_d_annees(contexte):
 
 
 def _indisponible(source: str) -> PhaseMetrics:
-    """Métriques que rend l'accès à une source indisponible."""
+    """Métriques que renvoie l'accès à une source indisponible."""
     metrics = PhaseMetrics()
     signal_source_unavailable(metrics, source, logger=logging.getLogger("test"), phase="harvest")
     return metrics

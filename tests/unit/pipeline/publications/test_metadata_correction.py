@@ -1,8 +1,8 @@
 """Orchestrateur de la phase de correction des métadonnées.
 
-Cinq passes se succèdent, chacune dans sa transaction. Leur ordre compte. Le rattachement d'une revue par son préfixe DOI vient en premier, parce que la passe suivante reclassifie le type de document d'après le type de la revue — celle que la première vient de poser. Les inverser reporterait la reclassification au run d'après. Les cibles des DOI précèdent les retraits de DOI, qui épargnent le DOI d'une forme secondaire. Le calcul de `is_matchable` vient en dernier : il lit le DOI, les identifiants, les liens et les cibles corrigés par les passes précédentes.
+Cinq passes se succèdent, chacune dans sa transaction. Le rattachement d'une revue par son préfixe DOI précède la correction unaire, qui reclasse le type de document d'après le type de la revue. Le calcul des cibles des DOI précède le retrait des DOI, qui épargne le DOI d'une forme secondaire. Le calcul de `is_matchable` vient en dernier : il lit le DOI, les identifiants, les liens et les cibles corrigés par les passes précédentes.
 
-La phase assemble ensuite un bilan : les compteurs des passes, et la ventilation par règle déclenchée, du plus fréquent au moins fréquent.
+La phase assemble ensuite un bilan : les compteurs des passes, et la ventilation par règle déclenchée, de la plus fréquente à la moins fréquente.
 """
 
 from unittest.mock import patch
@@ -42,7 +42,7 @@ def _run(contexte, *, serial=None, unary=None, targets=None, removals=None, matc
 
 
 def test_ordre_des_passes(contexte):
-    """La revue posée par la première passe est ce sur quoi la deuxième s'appuie ; les cibles précèdent les retraits."""
+    """La deuxième passe lit la revue posée par la première ; les cibles précèdent les retraits."""
     _, ordre = _run(contexte)
 
     assert ordre == ["serial_by_doi", "unaire", "doi_targets", "remove_identifiers", "matchable"]

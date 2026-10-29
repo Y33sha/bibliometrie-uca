@@ -1,4 +1,4 @@
-"""Tests de `effective_metadata` (correction des métadonnées canoniques)."""
+"""Règles de correction des métadonnées d'un enregistrement source (`effective_metadata`)."""
 
 import pytest
 
@@ -85,7 +85,7 @@ class TestThesesFrRule:
         assert corrected.rule == MetadataCorrectionRule.THESES_FR_URL_TO_THESIS
 
     def test_theses_fr_wins_over_dumas(self):
-        # Une vue portant les deux marqueurs : theses.fr fait autorité.
+        # Vue qui a les deux URL : theses.fr prime.
         view = _view(
             doc_type="thesis",
             urls=("https://theses.fr/s1", "https://dumas.ccsd.cnrs.fr/dumas-1"),
@@ -108,7 +108,7 @@ class TestDumasRule:
         assert corrected.rule == MetadataCorrectionRule.DUMAS_URL_TO_MEMOIR
 
     def test_dumas_url_corrects_regardless_of_doc_type(self):
-        # Règle sur la seule URL : un `doc_type` `article` (mauvais classement ou entité mêlant thèse et article) passe en `memoir`.
+        # La règle lit seulement l'URL : un `article` passe aussi en `memoir`.
         view = _view(doc_type="article", urls=("https://dumas.ccsd.cnrs.fr/dumas-1",))
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
@@ -120,8 +120,7 @@ class TestDumasRule:
 
 
 class TestThesisWithSerialRule:
-    # Famille thèse + serial_id + DOI d'éditeur ⇒ article ; DOI de registre de thèses (ABES) ou
-    # pas de DOI ⇒ pas de correction (le serial_id est parasite, conflation → relations).
+    # Type de la famille thèse, avec revue et DOI d'éditeur : article. Avec un DOI du registre des thèses (ABES), ou sans DOI, la revue est parasite et le type reste.
     PUBLISHER_DOI = "10.1016/j.ex.2020.01.001"
     ABES_DOI = "10.70675/abc123"
 
@@ -156,7 +155,7 @@ class TestThesisWithSerialRule:
         assert effective_metadata(view).doc_type is None
 
     def test_article_with_serial_is_spared(self):
-        # `article` hors whitelist thèse : pas de bascule (rien à corriger).
+        # `article` est hors des types corrigés par la règle.
         view = _view(doc_type="article", serial_id=42, doi=self.PUBLISHER_DOI)
         assert effective_metadata(view).doc_type is None
 
@@ -170,7 +169,7 @@ class TestTitleEditorialRule:
         assert corrected.rule == MetadataCorrectionRule.TITLE_EDITORIAL_PREFIX_TO_EDITORIAL
 
     def test_editorial_without_colon_no_correction(self):
-        # « Editorial Board », « Editorial comment »… ne sont pas le motif éditorial univoque.
+        # « Editorial Board », « Editorial comment »… : motif éditorial ambigu.
         assert (
             effective_metadata(_view(doc_type="article", title="Editorial Board")).doc_type is None
         )
@@ -210,14 +209,14 @@ class TestTitleSystematicReviewRule:
         assert corrected is not None and corrected.value == "review"
 
     def test_mid_title_mention_not_corrected(self):
-        # Étude primaire mentionnant une revue au fil du titre (ni début, ni après « : ») → épargnée.
+        # Étude primaire qui mentionne une revue au fil du titre (ni au début, ni après « : ») : type conservé.
         view = _view(
             doc_type="article", title="French cohort of systemic sclerosis and a systematic review"
         )
         assert effective_metadata(view).doc_type is None
 
     def test_spares_conference_paper(self):
-        # Une revue systématique peut légitimement être un conference_paper : whitelist {article, other}.
+        # Une revue systématique peut être un `conference_paper` : la règle corrige seulement `article` et `other`.
         view = _view(
             doc_type="conference_paper", title="Systematic review of serious games on livestock"
         )
@@ -244,13 +243,12 @@ class TestSerialTypeMediaRule:
         assert effective_metadata(view).doc_type is None
 
     def test_serial_type_none_no_correction(self):
-        # Cas dédup-entrée (pas de JOIN sur serials → serial_type=None) : la règle media ne fire pas.
+        # Sans type de revue (`serial_type=None`), la règle media est inactive.
         view = _view(doc_type="article", serial_type=None)
         assert effective_metadata(view).doc_type is None
 
     def test_theses_fr_wins_over_serial_type_media(self):
-        # Une thèse hébergée sur theses.fr publiée par un journal typé media :
-        # la cascade donne priorité à l'URL (autoritative sur le type de doc).
+        # Thèse sur theses.fr, publiée par une revue de type media : la règle de l'URL prime.
         view = _view(
             doc_type="article",
             urls=("https://theses.fr/s1",),
@@ -313,7 +311,7 @@ class TestTitleSupplementaryContentRule:
         assert effective_metadata(view).doc_type is None
 
     def test_rule_on_unwhitelisted_type_is_spared(self):
-        # `thesis` n'est pas dans la whitelist : titre suspect mais on ne corrige pas aveuglément.
+        # `thesis` est hors des types corrigés par la règle, malgré le titre suspect.
         view = _view(doc_type="thesis", title="Additional file 1")
         assert effective_metadata(view).doc_type is None
 
@@ -322,12 +320,12 @@ class TestTitleSupplementaryContentRule:
         assert effective_metadata(view).doc_type is None
 
     def test_supplementary_without_specific_subprefix_no_correction(self):
-        # Le set est ciblé : "Supplementary roles of X" (vrai article hypothétique) ne matche aucun préfixe précis et reste tel quel.
+        # « Supplementary roles of X » (titre d'article plausible) ne commence par aucun préfixe de la liste : type conservé.
         view = _view(doc_type="article", title="Supplementary roles of microbiota in X")
         assert effective_metadata(view).doc_type is None
 
     def test_match_is_case_insensitive_and_diacritic_insensitive(self):
-        # `normalize_text` ramène à `lower()` + strip d'accents + collapse non-alphanum.
+        # Le titre est comparé normalisé : minuscules, sans accents, ponctuation réduite à des espaces.
         for raw_title in ("Additional File 1", "ADDITIONAL FILE 1", "additional file 1"):
             view = _view(doc_type="article", title=raw_title)
             corrected = effective_metadata(view).doc_type
@@ -339,7 +337,7 @@ class TestTitleSupplementaryContentRule:
         assert effective_metadata(view).doc_type is None
 
     def test_theses_fr_wins_over_supplementary_rule(self):
-        # Combinaison improbable mais cascade-couverte : URL theses.fr autoritaire.
+        # Combinaison improbable : la règle de l'URL theses.fr prime.
         view = _view(
             doc_type="article",
             title="Additional file 1",
@@ -495,7 +493,7 @@ class TestSerialTypeProceedingsRule:
         assert corrected is not None and corrected.value == "conference_paper"
 
     def test_serial_type_proceedings_book_is_spared(self):
-        # `book` hors whitelist : un volume entier d'actes peut rester `book`.
+        # `book` est hors des types corrigés : un volume entier d'actes peut rester `book`.
         view = _view(doc_type="book", serial_type="proceedings")
         assert effective_metadata(view).doc_type is None
 
@@ -508,12 +506,12 @@ class TestSerialTypeProceedingsRule:
         assert effective_metadata(view).doc_type is None
 
     def test_serial_type_none_no_correction(self):
-        # Cas dédup-entrée (pas de JOIN sur serials → serial_type=None).
+        # Sans type de revue (`serial_type=None`).
         view = _view(doc_type="article", serial_type=None)
         assert effective_metadata(view).doc_type is None
 
     def test_theses_fr_wins_over_serial_type_proceedings(self):
-        # Cas combinaison improbable : URL theses.fr autoritaire.
+        # Combinaison improbable : la règle de l'URL theses.fr prime.
         view = _view(
             doc_type="article",
             urls=("https://theses.fr/s1",),
@@ -541,7 +539,7 @@ class TestSerialTypePreprintServerRule:
         assert effective_metadata(view).doc_type is None
 
     def test_serial_type_preprint_server_dataset_is_spared(self):
-        # `dataset` hors whitelist : un dataset déposé sur arXiv/Zenodo reste dataset.
+        # `dataset` est hors des types corrigés : un jeu de données déposé sur arXiv ou Zenodo reste `dataset`.
         view = _view(doc_type="dataset", serial_type="preprint_server")
         assert effective_metadata(view).doc_type is None
 
@@ -623,12 +621,12 @@ class TestTitleMediaPrefixRule:
         assert corrected is not None and corrected.value == "media"
 
     def test_rule_on_media_is_noop(self):
-        # `media` hors whitelist : pas de re-correction.
+        # `media` est hors des types corrigés.
         view = _view(doc_type="media", title="Interview RTL")
         assert effective_metadata(view).doc_type is None
 
     def test_rule_on_thesis_is_spared(self):
-        # `thesis` hors whitelist : titre suspect mais on n'écrase pas.
+        # `thesis` est hors des types corrigés, malgré le titre suspect.
         view = _view(doc_type="thesis", title="Interview as data collection method")
         assert effective_metadata(view).doc_type is None
 
@@ -648,8 +646,7 @@ class TestTitleMediaPrefixRule:
         assert effective_metadata(view).doc_type is None
 
     def test_serial_type_media_wins_over_title_media_rule(self):
-        # Les deux règles produisent `media` ; la priorité est sur serial_type
-        # (signal admin-typé, plus fiable que l'heuristique titre).
+        # Les deux règles donnent `media` ; la règle du type de revue prime sur celle du titre.
         view = _view(doc_type="article", title="Interview pour France Inter", serial_type="media")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None
@@ -676,7 +673,7 @@ class TestTitleErratumPrefixRule:
         assert corrected is not None and corrected.value == "erratum"
 
     def test_preprint_with_erratum_title_corrects(self):
-        # Audit a montré des errata CERN livrés comme `preprint` par OpenAlex.
+        # OpenAlex donne `preprint` à des errata du CERN.
         view = _view(doc_type="preprint", title="Erratum to: Search for CP violation")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None and corrected.value == "erratum"
@@ -687,12 +684,12 @@ class TestTitleErratumPrefixRule:
         assert corrected is not None and corrected.value == "erratum"
 
     def test_rule_on_erratum_is_noop(self):
-        # `erratum` n'est pas dans la whitelist : pas de re-correction.
+        # `erratum` est hors des types corrigés.
         view = _view(doc_type="erratum", title="Erratum to: …")
         assert effective_metadata(view).doc_type is None
 
     def test_rule_on_thesis_is_spared(self):
-        # `thesis` hors whitelist : titre suspect mais on n'écrase pas.
+        # `thesis` est hors des types corrigés, malgré le titre suspect.
         view = _view(doc_type="thesis", title="Erratum to: a doctoral thesis")
         assert effective_metadata(view).doc_type is None
 
@@ -712,7 +709,7 @@ class TestTitleErratumPrefixRule:
         assert effective_metadata(view).doc_type is None
 
     def test_serial_type_media_wins_over_erratum_rule(self):
-        # Cascade : la règle media (plus haute) gagne sur erratum (plus basse).
+        # La règle media précède la règle erratum.
         view = _view(doc_type="article", title="Erratum to: X", serial_type="media")
         corrected = effective_metadata(view).doc_type
         assert corrected is not None and corrected.value == "media"
@@ -738,8 +735,7 @@ class TestTitleRetractionPrefixRule:
         assert corrected is not None and corrected.value == "retraction"
 
     def test_strict_prefix_avoids_false_positive_on_retraction_alone(self):
-        # Préfixe strict : "Retraction of consent in clinical trials" est un vrai
-        # article sur la rétractation de consentement, pas un avis de rétractation.
+        # Préfixe strict : « Retraction of consent in clinical trials » est un article sur le retrait du consentement.
         view = _view(doc_type="article", title="Retraction of consent in clinical trials")
         assert effective_metadata(view).doc_type is None
 
@@ -748,7 +744,7 @@ class TestTitleRetractionPrefixRule:
         assert effective_metadata(view).doc_type is None
 
     def test_rule_on_thesis_is_spared(self):
-        # Hors whitelist `{article, other}`.
+        # Hors des types corrigés (`article`, `other`).
         view = _view(doc_type="thesis", title="Retraction note: a thesis on …")
         assert effective_metadata(view).doc_type is None
 
@@ -794,8 +790,7 @@ class TestTitleIsbnBookReviewRule:
         assert corrected is not None and corrected.value == "book_review"
 
     def test_isbn_on_book_is_spared(self):
-        # `book` hors whitelist : un livre peut légitimement porter son propre
-        # ISBN dans le titre (saisie HAL fréquente, faux positif sinon).
+        # `book` est hors des types corrigés : la saisie HAL met souvent l'ISBN d'un livre dans son titre.
         view = _view(doc_type="book", title="Un vrai livre, Éditions Y, ISBN 978-2-12345-678-9")
         assert effective_metadata(view).doc_type is None
 
@@ -821,7 +816,7 @@ class TestTitleIsbnBookReviewRule:
         assert effective_metadata(view).doc_type is None
 
     def test_isbn_substring_not_matched(self):
-        # `isbn` doit être un mot entier — ne pas matcher "Isbnxyz" ou "disbn".
+        # `isbn` est reconnu seulement comme mot entier : « Isbnxyz » et « disbn » sont ignorés.
         view = _view(doc_type="article", title="A study of Disbnophilia in laboratory mice")
         assert effective_metadata(view).doc_type is None
 
@@ -862,8 +857,7 @@ class TestTitleYearPagesEndBookReviewRule:
         assert corrected is not None and corrected.value == "book_review"
 
     def test_year_pages_on_book_is_spared(self):
-        # `book` hors whitelist (vrais livres dont le titre porte leur propre
-        # référence biblio — cf. audit 2026-05-28).
+        # `book` est hors des types corrigés : le titre d'un livre contient parfois sa propre référence bibliographique.
         view = _view(doc_type="book", title="Un vrai livre, Éditeur, 2020, 244 p")
         assert effective_metadata(view).doc_type is None
 
@@ -872,8 +866,7 @@ class TestTitleYearPagesEndBookReviewRule:
         assert effective_metadata(view).doc_type is None
 
     def test_year_pages_requires_end_anchor(self):
-        # Pattern « 2020, 244 p » au milieu d'un titre suivi d'autre chose
-        # n'est pas le marqueur attendu.
+        # Le motif « 2020, 244 p » au milieu du titre, suivi d'autre chose, est ignoré.
         view = _view(
             doc_type="article",
             title="In 2020, 244 papers were published on the topic of climate change",
@@ -887,8 +880,7 @@ class TestTitleYearPagesEndBookReviewRule:
             assert corrected is not None and corrected.value == "book_review"
 
     def test_isbn_wins_over_year_pages(self):
-        # Les deux patterns matchent ; ISBN passe d'abord dans la cascade,
-        # la règle ISBN posée gagne.
+        # Les deux motifs sont présents ; la règle ISBN, appliquée d'abord, prime.
         view = _view(
             doc_type="article",
             title="Titre, Éditeur, ISBN 978-2-12345-678-9, 2020, 244 p",
@@ -935,8 +927,7 @@ class TestTitleRecensionBookReviewRule:
         assert corrected is not None and corrected.value == "book_review"
 
     def test_compte_rendu_de_mission_is_not_a_recension(self):
-        # Le deux-points immédiat est requis : un « Compte rendu de mission : … » est un
-        # rapport, pas une recension — pas de correction.
+        # Le deux-points immédiat est requis : « Compte rendu de mission : … » est un rapport, type conservé.
         view = _view(doc_type="other", title="Compte rendu de mission : Ile de Santiago (Cap-Vert)")
         assert effective_metadata(view).doc_type is None
 
@@ -947,7 +938,7 @@ class TestTitleRecensionBookReviewRule:
         assert effective_metadata(view).doc_type is None
 
     def test_book_is_spared(self):
-        # `book`/`book_chapter` hors whitelist : la recension est l'article, pas l'ouvrage.
+        # `book` et `book_chapter` sont hors des types corrigés : la recension est un article, distinct de l'ouvrage recensé.
         view = _view(doc_type="book", title="Recension de cet ouvrage")
         assert effective_metadata(view).doc_type is None
 
@@ -974,7 +965,7 @@ class TestDoiFigshareCollectionRule:
         assert effective_metadata(_view(doc_type="dataset", doi=self.COLL)).doc_type is None
 
     def test_figshare_item_not_matched(self):
-        # un item figshare (pas de `.c.`) ne doit PAS matcher
+        # un item figshare (sans `.c.`) est ignoré
         assert effective_metadata(_view(doc_type="other", doi=self.ITEM)).doc_type is None
 
     def test_non_figshare_doi_not_matched(self):
@@ -986,11 +977,11 @@ class TestDoiFigshareCollectionRule:
         assert effective_metadata(_view(doc_type="other", doi=None)).doc_type is None
 
     def test_doc_type_outside_whitelist_noop(self):
-        # collection typée `book` (improbable) : pas corrigée aveuglément
+        # collection de type `book` (improbable) : type conservé
         assert effective_metadata(_view(doc_type="book", doi=self.COLL)).doc_type is None
 
     def test_wins_over_title_supplement_rule(self):
-        # même output (dataset) mais la règle DOI, plus en amont, est créditée
+        # même résultat (dataset) ; la règle DOI, appliquée d'abord, est créditée
         corrected = effective_metadata(
             _view(doc_type="other", doi=self.COLL, title="Additional file 1 of X")
         ).doc_type
@@ -1075,7 +1066,7 @@ class TestDiamondJournalRules:
 
 class TestPreprintRelationRule:
     def test_declared_preprint_retyped_even_without_doc_type(self):
-        # Crossref n'a pas typé le record (doc_type nul) mais déclare is-preprint-of.
+        # Crossref donne un `doc_type` nul, mais déclare `is-preprint-of`.
         corrected = effective_metadata(_view(doc_type=None, self_declared_preprint=True)).doc_type
         assert corrected is not None
         assert corrected.value == "preprint"

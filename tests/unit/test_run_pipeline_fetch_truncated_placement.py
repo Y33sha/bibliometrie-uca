@@ -1,11 +1,6 @@
-"""Régression : `fetch_truncated` est une phase distincte, placée entre
-`fetch_stale` et `normalize` (ni dans la phase `harvest`, ni dans la phase `normalize`).
+"""`fetch_truncated` est une phase distincte, entre `fetch_stale` et `normalize` ; les phases `harvest` et `normalize` l'excluent.
 
-Elle cible les works OpenAlex staging à 100 auteurs `processed=FALSE` juste avant
-que normalize ne les consomme — placement qui capte aussi les tronqués ramenés
-par fetch_missing et fetch_stale. La placer en harvest (état antérieur) les
-ratait ; la garder dans normalize mêlait un fetch réseau à une phase de
-transformation.
+Elle recharge les enregistrements OpenAlex en staging, non traités, dont la liste d'auteurs est tronquée à 100, juste avant leur normalisation. Elle couvre donc aussi ceux qu'apportent `fetch_missing` et `fetch_stale`.
 """
 
 from unittest.mock import AsyncMock, patch
@@ -17,7 +12,7 @@ from pipeline.runtime.context import RunOptions
 from pipeline.runtime.execution import phase_context
 from pipeline.runtime.observability.metrics import PhaseMetrics
 
-# La tâche de la phase `fetch_truncated`, lancée via `asyncio.run`.
+# Tâche de la phase `fetch_truncated`, lancée par `asyncio.run`.
 _REFETCH = "pipeline.ingestion.openalex.fetch_truncated.refetch_openalex"
 
 

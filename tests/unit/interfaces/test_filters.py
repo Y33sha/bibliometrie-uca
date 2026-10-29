@@ -1,6 +1,6 @@
-"""Lecture des paramètres de requête portant plusieurs valeurs séparées par des virgules.
+"""Lecture des paramètres de requête à plusieurs valeurs séparées par des virgules.
 
-Le découpage par virgules garde les URL lisibles, mais soustrait la liste à la validation de FastAPI : ce qu'elle aurait refusé, ces fonctions le refusent à sa place, et sous le même code.
+Le découpage par virgules garde les URL lisibles, mais soustrait la liste à la validation de FastAPI. Ces fonctions refusent à sa place ce qu'elle aurait refusé, avec le même code (422).
 """
 
 import pytest
@@ -31,7 +31,7 @@ class TestListeDEntiers:
 
     @pytest.mark.parametrize("brut", ["abc", "2024,abc", "2024;2025", "1e3", "2 024"])
     def test_refuse_ce_qui_n_est_pas_un_entier(self, brut):
-        """Sans ce refus, la conversion lève et la requête malformée se rend en 500."""
+        """Une valeur non entière donne 422 ; sans ce contrôle, l'erreur de conversion donnerait 500."""
         with pytest.raises(HTTPException) as leve:
             parse_int_csv(brut, param="year")
         assert leve.value.status_code == 422

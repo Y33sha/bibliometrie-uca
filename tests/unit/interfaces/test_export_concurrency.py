@@ -1,6 +1,6 @@
-"""Nombre d'exports menés de front.
+"""Nombre d'exports simultanés.
 
-Un export compose sa réponse en mémoire avant de l'envoyer : la requête s'exécute d'un coup, et les lignes tiennent en mémoire tant que le corps part. Le plafond de lignes borne ce qu'un export coûte, celui de fréquence ce qu'une rafale coûte à un client ; celui-ci borne ce que le processus porte à un instant donné, quel que soit le nombre de clients.
+Un export exécute sa requête d'un coup, et ses lignes restent en mémoire tant que le corps de la réponse part. Le plafond de lignes borne le coût d'un export, le plafond de fréquence le coût d'une rafale pour un client. Le plafond d'exports simultanés borne la mémoire du processus à un instant donné, quel que soit le nombre de clients.
 """
 
 import pytest
@@ -74,7 +74,7 @@ class TestDependance:
             slot.release()
 
     def test_le_droit_est_rendu_si_le_flux_ne_le_reprend_pas(self):
-        """Une erreur survenue avant la construction de la réponse ne doit pas immobiliser un droit."""
+        """Une erreur avant la construction de la réponse libère le droit."""
         generateur = export_slot()
         next(generateur)
         generateur.close()
@@ -85,7 +85,7 @@ class TestDependance:
 
 class TestRestitutionParLeFlux:
     def test_le_droit_survit_a_la_fin_de_la_dependance(self):
-        """La mémoire reste prise tant que le corps part, et le cycle des dépendances s'achève avant."""
+        """Le droit reste pris tant que le corps de la réponse part, après la fin du cycle des dépendances."""
         generateur = export_slot()
         slot = next(generateur)
         flux = releasing(iter(["a", "b"]), slot)

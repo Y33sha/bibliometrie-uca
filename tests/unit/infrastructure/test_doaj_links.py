@@ -1,6 +1,6 @@
 """Composition des URL de fiche DOAJ.
 
-Le dump CSV stocke tantôt l'URL toute faite (`URL in DOAJ`), tantôt le seul identifiant (`DOAJ id`) : la résolution doit rendre une URL dans les deux cas, et rien quand elle n'a ni l'un ni l'autre.
+Le dump CSV fournit tantôt l'URL toute faite (`URL in DOAJ`), tantôt seulement l'identifiant (`DOAJ id`). La résolution produit une URL dans les deux cas, et `None` sans l'un ni l'autre.
 """
 
 import pytest
@@ -32,9 +32,9 @@ class TestResolveDoajUrl:
 
 
 class TestUrlDuPayload:
-    """L'URL de fiche que le dump fournit toute faite alimente l'attribut `href` d'un lien.
+    """L'URL fournie par le dump alimente l'attribut `href` d'un lien.
 
-    Elle est confrontée à l'hôte et au schéma attendus, ce qui donne aux liens affichés une propriété uniforme : leur adresse porte un hôte écrit dans le code. Les 2178 valeurs relevées en base désignent toutes une fiche DOAJ en `https`.
+    Elle est retenue seulement si son schéma est `http` ou `https` et son hôte `doaj.org`. Sinon, l'URL est composée depuis l'identifiant.
     """
 
     @pytest.mark.parametrize(

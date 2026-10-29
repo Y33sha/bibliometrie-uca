@@ -1,8 +1,8 @@
 """Tout terme de recherche reçu en query string est borné en longueur.
 
-Un terme part dans un motif `ILIKE '%…%'`, dont le coût croît avec sa longueur : sans borne, une requête fait balayer la table sur un motif arbitrairement long, et le plafond de fréquence est la seule digue.
+Un terme part dans un motif `ILIKE '%…%'`, dont le coût croît avec sa longueur : sans borne, une requête fait parcourir la table sur un motif arbitrairement long, avec le plafond de fréquence pour seule limite.
 
-Le contrat d'API publié porte la borne de chaque paramètre : la lire là confronte l'invariant à la surface entière, routes ajoutées comprises, plutôt qu'à une liste de routes tenue à la main.
+Le contrat d'API publié déclare la borne de chaque paramètre. Le test le lit pour couvrir toutes les routes, sans liste tenue à la main.
 """
 
 from typing import Any
@@ -10,13 +10,12 @@ from typing import Any
 from interfaces.api.app import app
 from interfaces.api.params import MAX_SEARCH_LENGTH
 
-# Plancher du nombre de paramètres attendus : un parcours qui n'en trouverait aucun rendrait
-# les assertions vides, donc vertes.
+# Nombre minimal de paramètres attendus : un parcours qui n'en trouverait aucun rendrait les assertions vides, donc vertes.
 _PLANCHER = 20
 
 
 def _parametres_de_recherche() -> list[tuple[str, str, dict[str, Any]]]:
-    """Paramètres de recherche de la surface publiée : chemin, nom et schéma déclaré."""
+    """Paramètres de recherche du contrat publié : chemin, nom et schéma déclaré."""
     return [
         (chemin, parametre["name"], parametre["schema"])
         for chemin, operations in app.openapi()["paths"].items()
@@ -27,7 +26,7 @@ def _parametres_de_recherche() -> list[tuple[str, str, dict[str, Any]]]:
 
 
 def _bornes_declarees(schema: dict[str, Any]) -> set[int | None]:
-    """Bornes de longueur que porte un schéma, y compris sous une union avec le type nul."""
+    """Bornes de longueur d'un schéma, y compris dans une union avec le type nul."""
     variantes = schema.get("anyOf", [schema])
     return {
         variante.get("maxLength")
@@ -53,7 +52,7 @@ def test_chaque_terme_de_recherche_est_borne():
 
 
 def test_la_borne_couvre_une_adresse_d_affiliation_entiere():
-    """La valeur laisse passer ce qu'une personne cherche réellement : la recherche d'adresses reçoit des affiliations recopiées telles quelles."""
+    """La borne laisse passer une affiliation entière, recopiée telle quelle dans la recherche d'adresses."""
     affiliation = (
         "Université Clermont Auvergne, CNRS, Laboratoire de Mathématiques Blaise Pascal, "
         "UMR 6620, Campus Universitaire des Cézeaux, 3 place Vasarely, "

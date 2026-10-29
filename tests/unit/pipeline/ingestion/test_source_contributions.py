@@ -1,4 +1,4 @@
-"""Tests du writer partagé des contributions sources : neutralisation des identifiants partagés dans un document, colonnes de nom, texte des adresses."""
+"""Tests de l'écriture partagée des contributions sources : neutralisation des identifiants partagés dans un document, colonnes de nom, texte des adresses."""
 
 from domain.persons.contributor_name import ContributorName
 from pipeline.ingestion.common.source_contributions import (

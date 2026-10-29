@@ -56,7 +56,7 @@ from domain.publications.licenses import (
         ("http://www.cecill.info/licences/Licence_CeCILL-B_V1-en.html", License.OPEN_SOURCE),
         ("http://rightsstatements.org/vocab/InC/1.0/", License.ALL_RIGHTS_RESERVED),
         ("https://en.wikipedia.org/wiki/All_rights_reserved", License.ALL_RIGHTS_RESERVED),
-        # Archives.
+        # Archives ouvertes.
         ("https://about.hal.science/hal-authorisation-v1/", License.REPOSITORY_DISTRIBUTION),
         ("http://arxiv.org/licenses/nonexclusive-distrib/1.0/", License.REPOSITORY_DISTRIBUTION),
         ("http://hal.science/licences/copyright/", License.ALL_RIGHTS_RESERVED),

@@ -1,10 +1,10 @@
 """Toute image de base est désignée par son empreinte, et son emplacement est suivi.
 
-Une étiquette (`python:3.12-slim`) se redéplace sur un autre contenu : deux constructions à deux moments partent d'images différentes sans que rien ne le dise. L'empreinte désigne l'image qui a été examinée.
+Une étiquette (`python:3.12-slim`) peut désigner un autre contenu d'une construction à l'autre ; l'empreinte désigne l'image examinée.
 
-Chaque répertoire portant une description de construction figure dans la configuration du robot de mise à jour, qui propose la montée des empreintes qu'il y trouve.
+Chaque répertoire qui contient une description de construction figure dans la configuration du robot de mise à jour, qui propose la montée des empreintes qu'il y trouve.
 
-Toutes les déclarations de version de langage du dépôt s'accordent : les descriptions de construction, que l'intégration continue lit plutôt que de les recopier, et `.nvmrc`, qui donne au poste de développement le Node sous lequel les contrôles du frontend s'exécutent. La version de uv suit la même règle.
+Toutes les déclarations de version de langage du dépôt s'accordent : les descriptions de construction, que l'intégration continue lit, et `.nvmrc`, qui donne le Node du poste de développement. La version de uv suit la même règle.
 
 Les conteneurs de service des workflows reprennent les images des compositions, que le robot suit.
 """
@@ -56,7 +56,7 @@ def test_chaque_image_de_base_porte_son_empreinte():
 
 
 def test_chaque_description_de_construction_est_suivie_par_le_robot():
-    """Un répertoire portant une description de construction figure dans la configuration du robot de mise à jour."""
+    """Un répertoire qui contient une description de construction figure dans la configuration du robot de mise à jour."""
     config = yaml.safe_load(_DEPENDABOT.read_text(encoding="utf-8"))
     suivis = {
         chemin.rstrip("/") or "/"
@@ -107,9 +107,9 @@ def _versions_declarees_par_l_integration() -> dict[str, list[str]]:
 
 
 def _versions_declarees() -> dict[str, set[str]]:
-    """Version de chaque langage, telle que chaque déclaration du dépôt la porte.
+    """Version de chaque langage selon chaque déclaration du dépôt : images de base et `.nvmrc`.
 
-    Aux images de base s'ajoute `.nvmrc`, que `nvm use` lit sans argument : les contrôles du frontend joués avant un envoi s'exécutent sous le Node du terminal, et une version antérieure y fait échouer l'environnement de test au chargement d'`undici`.
+    `nvm use` lit `.nvmrc` sans argument : les contrôles du frontend lancés avant un push s'exécutent sous ce Node.
     """
     versions = _versions_des_images()
     if _NVMRC.is_file():

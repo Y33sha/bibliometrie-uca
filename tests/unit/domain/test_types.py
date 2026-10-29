@@ -1,6 +1,6 @@
 """Lecture d'une valeur JSON : ce que chaque accesseur accepte, et ce qu'il écarte.
 
-Une donnée reçue de l'extérieur n'a pas la forme annoncée mais celle qu'elle a. Ces tests fixent la frontière : ce qui est reconnu, ce qui vaut « absent », et les deux pièges que Python tend — le booléen qui est un entier, et la chaîne qui est une suite de caractères.
+Ces tests fixent ce qui est reconnu, ce qui vaut « absent », et deux cas particuliers de Python : le booléen est un entier, la chaîne est une suite de caractères.
 """
 
 import pytest
@@ -73,7 +73,7 @@ class TestAsMapping:
         assert as_mapping(valeur) == {}
 
     def test_lecture_imbriquee_sans_verifier_chaque_niveau(self):
-        """Le repli sur un objet vide permet d'enchaîner : une branche absente rend `None` au bout."""
+        """Le repli sur un objet vide permet d'enchaîner : une branche absente renvoie `None` au bout."""
         document = {"source": "pas un objet"}
 
         assert as_str(as_mapping(document.get("source")).get("titre")) is None

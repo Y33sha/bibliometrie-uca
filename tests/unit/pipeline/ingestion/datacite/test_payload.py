@@ -1,5 +1,4 @@
-"""Tests des fonctions de lecture pures `domain.sources.datacite` et du mapping
-doc_type DataCite."""
+"""Tests des fonctions de lecture pures de `pipeline.ingestion.datacite.payload` et de la correspondance des types de document DataCite."""
 
 from domain.source_records.doc_types import map_doc_type
 from pipeline.ingestion.datacite.payload import (
@@ -283,7 +282,7 @@ class TestRelatedDois:
     def test_meta_keeps_all_doi_relations_with_type(self):
         meta = extract_datacite_source_extras(self._attrs())
         related = meta["related_identifiers"]
-        # Toutes les relations DOI (citations comprises), avec leur type ; pas les URL.
+        # Toutes les relations vers un DOI (citations comprises), avec leur type ; les URL sont écartées.
         types = {r["relation_type"] for r in related}
         assert types == {"IsVersionOf", "Cites", "IsSupplementTo"}
         assert all(r["doi"].startswith("10.") for r in related)
@@ -409,7 +408,7 @@ class TestMeta:
 class TestEntreesAEcarterAvantLaBonne:
     """Chaque fonction de lecture passe les entrées inexploitables et lit la suivante.
 
-    Une source place ce qu'elle veut dans ses listes : une entrée d'une autre forme, ou au texte vide, précède parfois celle qui porte la valeur.
+    Une source place ce qu'elle veut dans ses listes : une entrée d'une autre forme, ou au texte vide, précède parfois celle qui contient la valeur.
     """
 
     def test_le_titre_vient_de_la_premiere_entree_exploitable(self):

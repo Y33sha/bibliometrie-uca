@@ -7,8 +7,6 @@ from pipeline.transformation.structures.name_recognition import (
     StructureNameMatcher,
 )
 
-# ── Helpers pour construire des formes de test ───────────────────
-
 
 def _form(
     structure_id,
@@ -20,10 +18,7 @@ def _form(
     is_excluding=False,
     structure_type=StructureType.LABO,
 ):
-    """Construit un MatchableNameForm pour les tests.
-
-    Reproduit l'invariant garanti en base : une forme courte a toujours `is_word_boundary`.
-    """
+    """MatchableNameForm de test. Comme en base, une forme courte a toujours `is_word_boundary`."""
     normalized = form_normalized or form_text.lower()
     return MatchableNameForm(
         id=form_id or structure_id * 100,
@@ -37,23 +32,23 @@ def _form(
 
 
 def _matches(form: MatchableNameForm, text: str) -> bool:
-    """Vrai si `form` (seule) est détectée dans `text` par l'automate."""
+    """Vrai si `form`, seule, est reconnue dans `text`."""
     return bool(StructureNameMatcher([form]).resolve(text))
 
 
-# ── Matching d'une forme (sous-chaîne / mot entier) ──────────────
+# Reconnaissance d'une forme : sous-chaîne ou mot entier
 
 
 class TestFormMatching:
     def test_long_substring(self):
-        """Forme > 6 chars : simple recherche de sous-chaîne."""
+        """Une forme de plus de six caractères est cherchée comme sous-chaîne."""
         assert _matches(_form(1, "clermont", "clermont"), "univ clermont auvergne") is True
 
     def test_long_not_found(self):
         assert _matches(_form(1, "grenoble", "grenoble"), "univ clermont auvergne") is False
 
     def test_short_word_boundary(self):
-        """Forme <= 6 chars : doit être un mot entier (boundaries)."""
+        """Une forme de six caractères au plus est cherchée comme mot entier."""
         form = _form(1, "limos", "limos")
         assert _matches(form, "limos clermont") is True
         assert _matches(form, "polimos lab") is False
@@ -65,7 +60,7 @@ class TestFormMatching:
         assert _matches(_form(1, "limos", "limos"), "limos") is True
 
     def test_word_boundary_flag(self):
-        """Forme avec is_word_boundary=True, même si > 6 chars."""
+        """Une forme à `is_word_boundary` est cherchée comme mot entier, quelle que soit sa longueur."""
         form = _form(1, "clermont", is_word_boundary=True)
         assert _matches(form, "clermont ferrand") is True
         assert _matches(form, "preclermont") is False
@@ -74,7 +69,7 @@ class TestFormMatching:
         assert _matches(_form(1, "", form_normalized=""), "some text") is False
 
 
-# ── StructureNameMatcher.resolve ─────────────────────────────────
+# StructureNameMatcher.resolve
 
 
 class TestResolve:
@@ -99,7 +94,7 @@ class TestResolve:
         assert structure_ids == {1, 2}
 
     def test_deduplicate_same_structure(self):
-        """Deux formes de la même structure → une seule occurrence."""
+        """Deux formes reconnues de la même structure donnent une seule occurrence."""
         forms = [
             _form(1, "limos", "limos", form_id=10),
             _form(1, "laboratoire limos", "laboratoire limos", form_id=11),
@@ -109,7 +104,7 @@ class TestResolve:
         assert result[0][0] == 1
 
     def test_context_satisfied(self):
-        """Forme avec requires_context_of : le contexte est présent."""
+        """Forme à `requires_context_of` : le contexte est présent."""
         forms = [
             _form(1, "limos", "limos", form_id=10, requires_context_of=[2]),
             _form(2, "clermont", "clermont", form_id=20),
@@ -119,7 +114,7 @@ class TestResolve:
         assert 1 in structure_ids
 
     def test_context_not_satisfied(self):
-        """Forme avec requires_context_of : le contexte est absent."""
+        """Forme à `requires_context_of` : le contexte est absent."""
         forms = [
             _form(1, "limos", "limos", form_id=10, requires_context_of=[2]),
             _form(2, "grenoble", "grenoble", form_id=20),
@@ -129,11 +124,7 @@ class TestResolve:
         assert 1 not in structure_ids
 
     def test_u999_paris_no_match_lrl(self):
-        """Régression : u999 dans une adresse parisienne ne doit pas matcher LRL.
-
-        u999 est une forme de LRL avec requires_context_of = [UCA].
-        L'adresse parisienne ne contient pas UCA → pas de match.
-        """
+        """Régression : « u999 », forme de LRL qui exige le contexte de l'UCA, reste sans effet dans une adresse parisienne sans l'UCA."""
         forms = [
             _form(
                 217, "u999", "u999", form_id=1566, is_word_boundary=True, requires_context_of=[169]
@@ -148,10 +139,10 @@ class TestResolve:
         )
         result = StructureNameMatcher(forms).resolve(text)
         matched_ids = {sid for sid, _ in result}
-        assert 217 not in matched_ids  # LRL ne doit PAS matcher
+        assert 217 not in matched_ids  # LRL non reconnu
 
     def test_u999_clermont_matches_lrl(self):
-        """u999 dans une adresse clermontoise avec UCA → matche LRL."""
+        """« u999 » dans une adresse clermontoise qui cite l'UCA : LRL est reconnu."""
         forms = [
             _form(
                 217, "u999", "u999", form_id=1566, is_word_boundary=True, requires_context_of=[169]
@@ -161,7 +152,7 @@ class TestResolve:
         text = "inserm u999 universite clermont auvergne"
         result = StructureNameMatcher(forms).resolve(text)
         matched_ids = {sid for sid, _ in result}
-        assert 217 in matched_ids  # LRL doit matcher
+        assert 217 in matched_ids  # LRL reconnu
         assert 169 in matched_ids  # UCA aussi
 
     def test_site_serves_as_context_without_being_returned(self):
@@ -214,7 +205,7 @@ class TestResolve:
         assert StructureNameMatcher(forms).resolve("limos uca cote d azur") == []
 
     def test_context_tutelles(self):
-        """requires_context_of = [99] (IDs directs)."""
+        """`requires_context_of` désigne les structures de contexte par leur identifiant."""
         forms = [
             _form(1, "limos", "limos", form_id=10, requires_context_of=[99]),
             _form(99, "uca", "uca", form_id=99),
@@ -224,7 +215,7 @@ class TestResolve:
         assert 1 in structure_ids
 
     def test_excluding_form_blocks_structure(self):
-        """Une forme `is_excluding=True` qui matche retire la structure des résultats même si une autre forme de cette structure matche."""
+        """Une forme d'exclusion reconnue retire sa structure des résultats, même si une autre forme de cette structure est reconnue."""
         forms = [
             _form(1, "limos", "limos", form_id=10),
             _form(1, "limos paris", "limos paris", form_id=11, is_excluding=True),
@@ -233,10 +224,7 @@ class TestResolve:
         assert result == []
 
     def test_excluding_form_skipped_when_not_matching(self):
-        """Une forme `is_excluding=True` qui ne matche pas n'affecte rien.
-
-        On la met sur une *autre* structure que la forme matchante.
-        """
+        """Une forme d'exclusion non reconnue, sur une autre structure, laisse le résultat intact."""
         forms = [
             _form(2, "grenoble", "grenoble", form_id=20, is_excluding=True),
             _form(1, "limos", "limos", form_id=10),

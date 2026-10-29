@@ -1,6 +1,6 @@
 """Confinement des valeurs secrètes de la configuration.
 
-Les mots de passe, la clé de signature des sessions et les identifiants d'accès aux sources sont typés `SecretStr` : un relevé de la configuration, une trace d'erreur ou un journal qui traverserait l'objet rend un masque, et la valeur se lit par un appel explicite.
+Les mots de passe, la clé de signature des sessions et les identifiants d'accès aux sources sont typés `SecretStr`. Leur représentation et leur sérialisation affichent un masque ; la valeur se lit par un appel explicite.
 """
 
 from pydantic import SecretStr
@@ -24,8 +24,7 @@ class TestTypage:
             assert isinstance(getattr(settings, nom), SecretStr), nom
 
     def test_les_identifiants_publics_restent_en_clair(self):
-        # Un nom d'utilisateur ou une adresse d'hôte se lit dans une trace sans dommage, et
-        # le masquer gênerait le diagnostic.
+        # Un nom d'utilisateur ou une adresse d'hôte se lit dans une trace sans dommage ; le masquer gênerait le diagnostic.
         for nom in ("admin_user", "db_app_user", "db_owner_user", "db_host", "scanr_username"):
             assert isinstance(getattr(settings, nom), str), nom
 

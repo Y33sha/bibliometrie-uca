@@ -1,4 +1,4 @@
-"""Garde-régression des chemins de `generate_seed` : les sorties par défaut visent `infrastructure/db/`, qui doit exister, et le commentaire d'usage écrit le chemin avec des barres obliques."""
+"""Chemins de `generate_seed` : les sorties par défaut visent `infrastructure/db/`, qui existe, et le commentaire d'usage écrit le chemin avec des barres obliques."""
 
 import pytest
 
@@ -13,7 +13,7 @@ def test_default_seed_path_is_canonical(seed: SeedSpec, name: str):
     assert path.name == name
     assert path.parent.name == "db"
     assert path.parent.parent.name == "infrastructure"
-    # Le dossier de sortie doit exister : sinon l'écriture lève FileNotFoundError.
+    # Sans dossier de sortie, l'écriture lèverait FileNotFoundError.
     assert path.parent.is_dir(), f"dossier de sortie absent : {path.parent}"
 
 

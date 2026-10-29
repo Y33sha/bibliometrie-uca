@@ -1,6 +1,6 @@
 """Import du personnel depuis un export des ressources humaines.
 
-Le fichier vient d'un tableur : son séparateur varie, ses intitulés de colonnes aussi, et ses dates prennent tous les formats — y compris la sérialisation numérique d'Excel. La lecture s'accommode de cette variabilité ; ces tests en fixent les bornes, et ce qu'elle refuse : un fichier sans colonne de nom.
+Le fichier vient d'un tableur : son séparateur, ses intitulés de colonnes et le format de ses dates varient, y compris la sérialisation numérique d'Excel. Ces tests fixent ce que la lecture accepte, et ce qu'elle refuse : un fichier sans colonne de nom de famille ou de prénom.
 """
 
 import sys
@@ -83,9 +83,9 @@ class TestReadCsvTsv:
         assert len(read_csv_tsv(chemin)) == 2
 
     def test_cellule_manquante_en_fin_de_ligne(self, tmp_path):
-        """Une ligne plus courte que l'en-tête ne fait pas échouer la lecture.
+        """Une ligne plus courte que l'en-tête est lue ; ses cellules manquantes sont vides.
 
-        Le séparateur se devine sur les premiers milliers d'octets : une ligne amputée au-delà de cette fenêtre échappe à la détection, et c'est la lecture qui doit s'en accommoder.
+        Le séparateur se devine sur les premiers milliers d'octets : une ligne courte au-delà de cette fenêtre échappe à la détection.
         """
         completes = "".join(f"Nom{i},Prenom{i},p{i}@uca.fr\n" for i in range(300))
         chemin = self._fichier(tmp_path, f"nom,prenom,email\n{completes}Dupont,Marie\n")
@@ -125,7 +125,7 @@ class _FakeConnection:
 class TestImportPersons:
     @pytest.fixture
     def personnes_importees(self, monkeypatch):
-        """Retient les appels au cas d'usage, et laisse chaque test décider de leur issue."""
+        """Enregistre les appels au cas d'usage ; chaque test choisit leur issue."""
         appels: list[dict] = []
         issues: list = []
 
@@ -175,7 +175,7 @@ class TestImportPersons:
         assert appels[0]["export_date"] == "2024-03-15"
 
     def test_transaction_close_par_lots(self, personnes_importees):
-        """Un import long commite en cours de route : sa progression survit à une interruption."""
+        """Un import long commite par lots : sa progression survit à une interruption."""
         conn = _FakeConnection()
         records = [{"last_name": f"Nom{i}", "first_name": "X"} for i in range(500)]
 
@@ -195,11 +195,11 @@ class _FakeMainConnection:
 
 
 class TestMain:
-    """Le script : lecture du fichier, aperçu du contenu, puis versement — sauf en simulation."""
+    """Le script lit le fichier, affiche un aperçu du contenu, puis importe les personnes, sauf en simulation."""
 
     @pytest.fixture
     def script(self, tmp_path, monkeypatch):
-        """Prépare un fichier lisible et retient ce que le script en fait."""
+        """Prépare un fichier lisible et enregistre ce que le script en fait."""
         chemin = tmp_path / "rh.csv"
         chemin.write_text(
             "nom,prenom,departement\nDupont,Marie,LMBP\nDurand,Jean,LPC\n", encoding="utf-8"
@@ -230,7 +230,7 @@ class TestMain:
         self._lancer(monkeypatch, script.chemin)
 
         assert [r["last_name"] for r in script.verses[0]] == ["Dupont", "Durand"]
-        assert script.conn.closed  # la connexion est refermée quoi qu'il arrive
+        assert script.conn.closed  # la connexion est fermée dans tous les cas
 
     def test_simulation_ne_verse_rien(self, script, monkeypatch):
         self._lancer(monkeypatch, script.chemin, "--dry-run")
@@ -246,4 +246,4 @@ class TestMain:
 
         self._lancer(monkeypatch, str(chemin))
 
-        assert appels == []  # rien à verser : la base n'est pas même ouverte
+        assert appels == []  # rien à importer : la base reste fermée

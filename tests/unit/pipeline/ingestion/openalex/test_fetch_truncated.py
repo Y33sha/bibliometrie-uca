@@ -1,6 +1,6 @@
-"""Nouvelle lecture des works OpenAlex tronqués (`pipeline.ingestion.openalex.fetch_truncated`).
+"""Relecture des works OpenAlex tronqués (`pipeline.ingestion.openalex.fetch_truncated`).
 
-Pas de réseau ni de base : la lecture d'un work est remplacée, et une connexion simulée rend les works marqués et retient les écritures. Ce qui est éprouvé ici est le triage : le work qui dépasse cent auteurs est réécrit, celui qui en compte cent pile perd son marqueur sans réécriture, celui qu'OpenAlex ne connaît plus perd le sien, celui dont OpenAlex est indisponible garde le sien pour le run suivant.
+Pas de réseau ni de base : la lecture d'un work est simulée, et une connexion simulée renvoie les works marqués et retient les écritures. Les tests vérifient le triage : le work qui dépasse cent auteurs est réécrit ; celui qui en compte exactement cent perd son marqueur sans réécriture ; celui qui est absent d'OpenAlex perd son marqueur ; celui dont OpenAlex est indisponible garde son marqueur pour le run suivant.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ def _work(nb_auteurs: int) -> dict:
 
 
 class _Connexion:
-    """Connexion simulée : rend les works marqués, retient les réécritures et les marqueurs levés."""
+    """Connexion simulée : renvoie les works marqués, retient les réécritures et les marqueurs levés."""
 
     def __init__(self, openalex_ids) -> None:
         self._ids = list(openalex_ids)
@@ -46,7 +46,7 @@ class _Connexion:
 
 @pytest.fixture
 def openalex(monkeypatch):
-    """Pose les réponses d'OpenAlex, indexées par identifiant : un work, `NOT_FOUND` ou `UNAVAILABLE`. Rend la connexion simulée."""
+    """Pose les réponses d'OpenAlex, indexées par identifiant : un work, `NOT_FOUND` ou `UNAVAILABLE`. Renvoie la connexion simulée."""
 
     def _poser(works: dict) -> _Connexion:
         async def _fetch(client, openalex_id):
@@ -76,7 +76,7 @@ async def test_work_reellement_tronque_est_reecrit(openalex):
 
 
 async def test_work_a_cent_auteurs_pile_perd_son_marqueur(openalex):
-    """Cent auteurs sans troncature : le marqueur s'efface, `raw_data` n'est pas réécrit."""
+    """Cent auteurs sans troncature : le marqueur s'efface, `raw_data` reste tel quel."""
     conn = openalex({"W1": _work(100)})
     metrics = await refetch_openalex(conn, _LOGGER)
     assert metrics.unchanged == 1
@@ -91,7 +91,7 @@ async def test_openalex_indisponible_garde_le_marqueur(openalex):
 
 
 async def test_work_inconnu_d_openalex_perd_son_marqueur(openalex):
-    """Work supprimé ou fusionné dans OpenAlex : le marqueur s'efface, le work n'est plus redemandé."""
+    """Work supprimé ou fusionné dans OpenAlex : le marqueur s'efface, donc le run suivant ignore le work."""
     conn = openalex({"W1": NOT_FOUND})
     metrics = await refetch_openalex(conn, _LOGGER)
     assert metrics.extras.get("not_found") == 1

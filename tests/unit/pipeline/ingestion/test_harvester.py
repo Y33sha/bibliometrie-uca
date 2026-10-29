@@ -1,8 +1,8 @@
 """Tests unitaires de `pipeline.ingestion.common.harvester.SourceHarvester`.
 
-Couvre le cycle `run` (load_config → setup_logging → harvest_all) et le log de résumé.
+Couvre la séquence de `run` (`load_config`, `setup_logging`, puis `harvest_all`) et le bilan journalisé.
 
-Pas de DB ni de réseau : fake extractor avec `load_config`/`harvest_all` déterministes et `Connection` mockée.
+Sans base ni réseau : un faux moissonneur déterministe et une connexion simulée.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ def conn():
 
 
 class _ParAnnee(SourceHarvester):
-    """Moissonneur dont chaque année rapporte un nouveau document et des inchangés, selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
+    """Moissonneur dont chaque année rapporte un document inséré et des documents inchangés, selon `volumes`. La source est indisponible à partir de l'année `unavailable_from`."""
 
     SOURCE = "hal"
 

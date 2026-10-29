@@ -60,8 +60,7 @@ class TestDeriveWosApiOaStatus:
         assert derive_wos_api_oa_status("Y") == "gold"
 
     def test_n_returns_none(self):
-        # 'N' WoS ne signifie pas closed (WoS ne connaît pas vraiment
-        # la voie OA), on délègue
+        # « N » de WoS laisse le statut indéterminé : la décision revient aux autres sources.
         assert derive_wos_api_oa_status("N") is None
 
     def test_none_returns_none(self):

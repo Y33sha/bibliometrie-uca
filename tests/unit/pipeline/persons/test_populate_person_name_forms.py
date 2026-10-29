@@ -1,8 +1,8 @@
 """Tests unitaires de `populate_person_name_forms.populate`.
 
-Les fonctions SQL du module sont remplacées par un faux. Pas de DB.
+Les fonctions SQL du module sont simulées, sans base de données.
 
-L'orchestrateur calcule les formes de noms en Python via `compute_person_name_forms` (déjà testé côté domain) puis insère par batches dans une table temp avant un sync SQL final.
+`populate` calcule les formes du nom de chaque personne (`compute_person_name_forms`), les insère par lots dans une table temporaire, puis lance la synchronisation SQL.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ class _FakeQueries:
         self.create_temp_called = True
 
     def insert_raw_forms_batch(self, conn: object, rows: list[RawFormBatchItem]) -> None:
-        # Snapshot par copie : le code source réutilise la liste `batch` en la réaffectant à `[]`, donc une référence directe serait OK, mais on copie pour figer le contenu vu à l'appel.
+        # Copie du lot, pour garder son contenu au moment de l'appel.
         self.batches.append(list(rows))
 
     def drop_temp_raw_forms_table(self, conn: object) -> None:
@@ -73,7 +73,7 @@ def test_rend_le_bilan_de_la_synchronisation(queries):
 
 
 def test_empty_persons_still_creates_temp_and_syncs(queries):
-    """Pas de personnes : pas d'insert batch, mais le sync SQL est appelé (cas pertinent : il agrège aussi en SQL les formes des contributions sources des contributions, donc peut produire des lignes)."""
+    """Sans personne, aucun lot n'est inséré et la synchronisation SQL a lieu : elle ajoute aussi les noms des contributions sources des contributions."""
     populate(_FakeConn())
 
     assert queries.create_temp_called is True
@@ -83,7 +83,7 @@ def test_empty_persons_still_creates_temp_and_syncs(queries):
 
 
 def test_single_person_single_batch(queries):
-    """Quelques personnes : tout passe dans un seul `insert_raw_forms_batch` final."""
+    """Quelques personnes : toutes leurs formes passent dans un seul lot."""
     queries.persons_rows = [
         PersonNameRow(id=1, last_name="Dupont", first_name="Marie"),
         PersonNameRow(id=2, last_name="Martin", first_name="Jean"),
@@ -91,31 +91,31 @@ def test_single_person_single_batch(queries):
 
     populate(_FakeConn())
 
-    # Un seul batch (sous le seuil BATCH_SIZE).
+    # Un seul lot, sous le seuil BATCH_SIZE.
     assert len(queries.batches) == 1
     rows = queries.batches[0]
     assert rows, "Au moins une forme calculée par personne"
-    # Chaque ligne respecte le contrat attendu par sync_from_raw_forms.
+    # Chaque ligne a les clés que lit sync_from_raw_forms.
     assert all(set(r.keys()) == {"name_form", "person_id", "source"} for r in rows)
     assert all(r["source"] == "persons" for r in rows)
     assert {r["person_id"] for r in rows} == {1, 2}
 
 
 def test_strips_whitespace_in_names(queries):
-    """Les noms / prénoms reçus de la DB sont strippés avant `compute_person_name_forms`."""
+    """Les espaces de bord des noms et prénoms lus en base sont retirés avant `compute_person_name_forms`."""
     queries.persons_rows = [PersonNameRow(id=1, last_name="  Dupont  ", first_name="  Marie  ")]
 
     populate(_FakeConn())
 
     rows = queries.batches[0]
-    # Les formes générées s'appuient sur le strip ; aucune ne contient le whitespace de bord.
+    # Aucune forme ne commence ni ne finit par une espace.
     for r in rows:
         assert not r["name_form"].startswith(" ")
         assert not r["name_form"].endswith(" ")
 
 
 def test_handles_null_first_name(queries):
-    """`first_name = None` est converti en chaîne vide avant strip — pas d'AttributeError."""
+    """Un prénom absent est traité comme une chaîne vide."""
     queries.persons_rows = [PersonNameRow(id=1, last_name="Sansprenom", first_name=None)]
 
     populate(_FakeConn())
@@ -126,10 +126,7 @@ def test_handles_null_first_name(queries):
 
 
 def test_batches_flush_at_batch_size(queries, monkeypatch):
-    """Au-delà de BATCH_SIZE lignes, le batch est flushé et un nouveau démarre.
-
-    On baisse `BATCH_SIZE` à 3 pour ne pas avoir à générer 5000+ formes.
-    """
+    """Un lot qui atteint `BATCH_SIZE` lignes est inséré, et le lot suivant commence."""
     monkeypatch.setattr(populate_person_name_forms, "BATCH_SIZE", 3)
 
     # Chaque personne produit plusieurs formes ; quelques personnes suffisent à dépasser 3.
@@ -139,11 +136,11 @@ def test_batches_flush_at_batch_size(queries, monkeypatch):
 
     populate(_FakeConn())
 
-    # Plusieurs flushes : au moins 2 batches.
+    # Au moins deux lots.
     assert len(queries.batches) >= 2
-    # Pas de batch vide.
+    # Aucun lot vide.
     assert all(len(b) > 0 for b in queries.batches)
-    # Premiers batches plafonnés à 3 (sauf possiblement le dernier qui peut être < 3).
+    # Chaque lot sauf le dernier compte au plus trois formes.
     assert all(len(b) <= 3 for b in queries.batches[:-1])
 
 
@@ -161,8 +158,5 @@ def test_la_table_temporaire_ne_survit_pas_a_la_synchronisation(queries, caplog)
 
 
 def test_assert_BATCH_SIZE_default():
-    """Le BATCH_SIZE par défaut est volontairement gros (commit en un seul lot SQL côté insertion).
-
-    Pin la valeur courante pour éviter une régression silencieuse de perf.
-    """
+    """La taille de lot par défaut est de 5000 formes."""
     assert BATCH_SIZE == 5000

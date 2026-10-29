@@ -22,7 +22,7 @@ def test_success_resets_counter():
     b = SourceCircuitBreaker("wos", threshold=3)
     b.record_failure()
     b.record_failure()
-    b.record_success()  # remet à 0
+    b.record_success()  # remet le compteur à zéro
     b.record_failure()
     b.record_failure()
     assert not b.tripped
@@ -32,7 +32,7 @@ def test_success_resets_counter():
 
 def test_check_raises_only_when_tripped():
     b = SourceCircuitBreaker("zenodo", threshold=1)
-    b.check()  # pas tripé → ne lève rien
+    b.check()  # circuit fermé : aucune exception
     b.record_failure()
     assert b.tripped
     with pytest.raises(SourceUnavailableError) as exc:

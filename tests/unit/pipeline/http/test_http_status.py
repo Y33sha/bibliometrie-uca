@@ -1,6 +1,6 @@
 """Tests de la levée d'erreur de statut sur les requêtes vers les sources.
 
-Non-régression : la clé d'API OpenAlex voyage en paramètre de requête, et le message que compose `httpx2.Response.raise_for_status` porte l'URL entière. Un 401 ou un 403 — le cas d'une clé invalide ou révoquée — écrivait donc la clé en clair dès qu'un appelant journalisait l'exception.
+Non-régression : la clé d'API OpenAlex est un paramètre de requête, et le message que compose `httpx2.Response.raise_for_status` contient l'URL entière. Un 401 ou un 403 (clé invalide ou révoquée) écrirait la clé en clair dans le journal de l'appelant.
 """
 
 import httpx2
@@ -36,7 +36,7 @@ def test_le_message_porte_le_statut():
 
 
 def test_aucune_exception_chainee_ne_reintroduit_l_url():
-    """L'erreur naît hors d'un bloc `except` : rien à quoi la chaîner, donc aucun message d'origine à réafficher dans une trace."""
+    """L'erreur est levée hors d'un bloc `except` : elle n'a aucune exception chaînée dont la trace afficherait le message."""
     with pytest.raises(httpx2.HTTPStatusError) as excinfo:
         raise_for_status(_response(403))
     assert excinfo.value.__cause__ is None
@@ -44,7 +44,7 @@ def test_aucune_exception_chainee_ne_reintroduit_l_url():
 
 
 def test_le_statut_reste_lisible_sur_la_reponse():
-    """Les adapters de sources attrapent `httpx2.HTTPStatusError` nommément et décident sur `response.status_code` — jamais sur le message."""
+    """L'erreur donne accès au statut de la réponse, sur lequel décident les adaptateurs des sources."""
     with pytest.raises(httpx2.HTTPStatusError) as excinfo:
         raise_for_status(_response(429))
     assert excinfo.value.response.status_code == 429

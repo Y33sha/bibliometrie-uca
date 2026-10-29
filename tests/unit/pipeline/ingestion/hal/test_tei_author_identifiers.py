@@ -100,10 +100,7 @@ def test_empty_idno_values_are_skipped():
 
 
 def test_idhal_keeps_only_string_notation():
-    """HAL emet souvent deux <idno type="idhal"> par auteur :
-    notation="string" (le slug `prenom-nom`, vrai idhal) et
-    notation="numeric" (le hal_person_id, ré-étiqueté idhal). Seul
-    notation="string" doit être capturé sous la clé `idhal`."""
+    """HAL donne souvent deux <idno type="idhal"> par auteur : notation="string" (le slug `prenom-nom`, qui est l'idHAL) et notation="numeric" (le hal_person_id). Seul le premier est retenu sous la clé `idhal`."""
     xml = _tei("""
       <author>
         <persName><forename>Pascal</forename><surname>André</surname></persName>
@@ -116,9 +113,7 @@ def test_idhal_keeps_only_string_notation():
 
 
 def test_idhal_without_notation_is_ignored():
-    """Un <idno type="idhal"> sans attribut `notation` est ignoré : on
-    ne sait pas si c'est un slug ou un hal_person_id mal étiqueté.
-    Le composite Solr fournit l'idhal en fallback de toute façon."""
+    """Un <idno type="idhal"> sans attribut `notation` est ignoré : il peut désigner un slug ou un hal_person_id."""
     xml = _tei("""
       <author>
         <persName><forename>Z</forename><surname>Doe</surname></persName>
@@ -131,7 +126,7 @@ def test_idhal_without_notation_is_ignored():
 class TestDocumentForge:
     """Le TEI joint aux enregistrements sources HAL est déposé par un tiers : sa lecture refuse les déclarations d'entités.
 
-    L'analyseur de la bibliothèque standard les développe, et quelques centaines d'octets suffisent à en produire des milliards — de quoi épuiser la mémoire du processus qui normalise.
+    L'analyseur de la bibliothèque standard les développe : quelques centaines d'octets en produisent des milliards et épuisent la mémoire du processus de normalisation.
     """
 
     @staticmethod

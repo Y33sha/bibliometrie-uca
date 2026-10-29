@@ -53,7 +53,7 @@ def test_espace_retenu_malgre_une_erreur_isolee():
 
 
 def test_doi_partage_entre_deux_revues_vote_au_prorata_des_enregistrements():
-    """Cas réel : le volume 109 de *Physical Review C*, porté par la revue dans quatre sources et par un titre parasite dans OpenAlex. Le volume ne désigne pas le parasite."""
+    """Cas réel : le volume 109 de *Physical Review C*, attribué à la revue par quatre sources, et à un titre parasite par OpenAlex. Le volume ne désigne pas le parasite."""
     evidence = _evidence("10.1103/physrevc.1", 1, 20)
     for i in range(7):
         doi = f"10.1103/physrevc.109.{i:06d}"
@@ -97,7 +97,7 @@ def test_sous_le_seuil_non_retenu():
 
 
 def test_une_plateforme_n_est_designee_par_aucun_espace():
-    """Cas réel : SSRN, dont le préfixe désigne la plateforme. Ses DOI comptent dans le total : une revue qui en porte quelques-uns ne capte pas l'espace."""
+    """Cas réel : SSRN, dont le préfixe désigne la plateforme. Ses DOI comptent dans le total : une revue qui en a quelques-uns ne capte pas l'espace."""
     evidence = _evidence("10.2139/ssrn.", 1, 20) + [("10.2139/ssrn.00003", 2)]
     namespaces = learn_namespaces(evidence, platforms={1})
     assert resolve_serial("10.2139/ssrn.99999", namespaces) is None

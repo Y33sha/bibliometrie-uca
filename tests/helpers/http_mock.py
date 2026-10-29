@@ -1,10 +1,10 @@
-"""Helper de test : router des requêtes HTTP simulées au-dessus de `httpx2.MockTransport`.
+"""Routeur de requêtes HTTP simulées, au-dessus de `httpx2.MockTransport`.
 
-`MockTransport` répond à toute requête par une fonction unique. Ce module lui ajoute ce dont les tests ont besoin : des routes déclarées par méthode et URL, la réponse ou l'exception que chacune sert, et le compte des appels reçus.
+`MockTransport` répond à toute requête par une fonction unique. Ce module lui ajoute des routes déclarées par méthode et URL, la réponse ou l'exception que chacune sert, et le compte des appels reçus.
 
-Une route se déclare par une URL sans paramètres de requête ; les paramètres portés par la requête réelle — clés d'API, pagination, filtres — ne participent pas au filtrage. Le rapprochement porte donc sur la méthode, le schéma, l'hôte, le port et le chemin.
+Une route se déclare par une URL sans paramètres de requête. Une requête la sollicite d'après sa méthode, son schéma, son hôte, son port et son chemin ; ses paramètres (clés d'API, pagination, filtres) sont ignorés.
 
-La fixture `http_mock` de `tests/conftest.py` installe le routeur sur les clients construits pendant le test, que le test les crée lui-même ou que le code appelé les crée pour son compte.
+La fixture `http_mock` de `tests/conftest.py` installe le routeur sur les clients construits pendant le test.
 """
 
 from __future__ import annotations
@@ -22,10 +22,7 @@ def _target(url: httpx2.URL) -> tuple[str, str, int | None, str]:
 
 
 def _replay(response: httpx2.Response) -> httpx2.Response:
-    """Copie d'une réponse, servie à la place de l'originale.
-
-    Un flux lu ne se relit pas : sans copie, une route rejouée rendrait une réponse inutilisable au deuxième appel.
-    """
+    """Copie d'une réponse, servie à la place de l'originale : une route peut ainsi servir la même réponse à plusieurs appels, chacun avec un flux non lu."""
     return httpx2.Response(response.status_code, headers=response.headers, content=response.content)
 
 
@@ -66,7 +63,7 @@ class Route:
         return request.method == self.method and _target(request.url) == self.target
 
     def serve(self, request: httpx2.Request) -> httpx2.Response:
-        """Enregistre l'appel, puis rend la réponse suivante ou lève l'exception posée."""
+        """Enregistre l'appel, puis renvoie la réponse suivante ou lève l'exception posée."""
         self.calls.append(request)
         outcome = self._queue.pop(0) if self._queue else self._repeated
         if outcome is None:
@@ -81,7 +78,7 @@ class Route:
 class HttpMock:
     """Routeur des requêtes simulées d'un test.
 
-    Les routes sont essayées dans l'ordre de déclaration. Une requête qu'aucune ne réclame fait échouer le test, pour qu'un appel sortant imprévu ne passe pas pour un succès.
+    Les routes sont essayées dans l'ordre de déclaration. Une requête sans route fait échouer le test.
     """
 
     def __init__(self) -> None:

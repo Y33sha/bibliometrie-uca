@@ -1,8 +1,8 @@
 """Déroulement d'un run : sélection des phases, capture d'observabilité, interruptions.
 
-L'orchestrateur choisit les phases à exécuter, les enchaîne, et consigne l'issue de chacune. Ce qu'il consigne compte autant que ce qu'il exécute : le tableau de bord et la reprise après incident en dépendent. Une phase interrompue doit laisser une trace distinguant l'arrêt demandé par l'utilisatrice de l'échec, et indiquer par où reprendre.
+L'orchestrateur choisit les phases à exécuter, les enchaîne et consigne l'issue de chacune. La trace d'une phase interrompue distingue l'arrêt demandé de l'échec, et indique par où reprendre.
 
-Le câblage des adapters de chaque phase relève du composition root et n'est pas éprouvé ici : il est vérifié par le contrôle de types.
+Le câblage des adaptateurs de chaque phase relève du composition root ; le contrôle de types le vérifie.
 """
 
 import argparse
@@ -59,7 +59,7 @@ class TestSelectPhasesToRun:
         assert noms == [n for n in run_pipeline.PHASE_NAMES if n not in EXTRA_PHASES]
 
     def test_sans_extras_laisse_passer_une_phase_nommee(self):
-        """`--only` désigne explicitement : un enrichissement demandé est rendu."""
+        """`--only` prime sur `--no-extras` : l'enrichissement nommé est sélectionné."""
         choisies = run_pipeline._select_phases_to_run(_args(only="subjects", no_extras=True))
 
         assert [n for n, _ in choisies] == ["subjects"]
@@ -159,7 +159,7 @@ class TestRunOnePhase:
         assert not any(m.startswith("Total") for m in caplog.messages)
 
     def test_phase_sans_metriques(self):
-        """Une phase qui ne rend rien est consignée avec des compteurs vides, non ignorée."""
+        """Une phase qui ne renvoie rien est consignée avec des compteurs vides, non ignorée."""
         _, recorder = self._executer(lambda ctx: None)
 
         assert recorder.records[0]["status"] == "ok"
@@ -221,7 +221,7 @@ class TestRunOnePhase:
         assert "run_pipeline --from persons" in caplog.text
 
     def test_toute_exception_consignee_comme_un_echec(self):
-        """Une exception imprévue (erreur HTTP, clé absente…) termine la phase consignée, au lieu d'une trace d'appels sans enregistrement."""
+        """Une exception imprévue (erreur HTTP, clé absente…) termine la phase, consignée comme un échec."""
 
         def _en_echec(ctx):
             raise KeyError("champ")
@@ -236,7 +236,7 @@ class TestRunOnePhase:
         assert record["signals"][0]["code"] == "exception"
 
     def test_perte_de_la_base_consignee_comme_un_echec(self, caplog):
-        """Un serveur redémarré coupe les connexions : la phase se consigne et dit par où reprendre, au lieu d'une trace d'appels."""
+        """Un serveur redémarré coupe les connexions : la phase est consignée comme un échec et le journal dit par où reprendre."""
 
         def _connexion_perdue(ctx):
             raise OperationalError("SELECT 1", {}, Exception("server closed the connection"))
@@ -292,7 +292,7 @@ class TestExecutePhases:
         assert run_prepare.closed
 
     def test_wos_ecartee_des_sources_consignees(self, run_prepare):
-        """WoS n'est interrogée que sur demande : son crédit d'appels est limité."""
+        """WoS est interrogée seulement sur demande : son crédit d'appels est limité."""
         run_pipeline._execute_phases(_args(sources="hal,wos"), [])
 
         assert run_prepare.demarrage["sources"] == ["hal"]
@@ -335,7 +335,7 @@ class TestMain:
         assert executees == ["persons"]
 
     def test_l_aide_porte_le_catalogue_des_phases(self):
-        """`--help` remplace toute option de listage : il nomme les phases et les résume."""
+        """L'aide de `--help` nomme chaque phase et la résume."""
         catalogue = run_pipeline._catalogue_des_phases()
 
         for nom in run_pipeline.PHASE_NAMES:
@@ -359,7 +359,7 @@ class TestMain:
         assert "déjà en cours" in capsys.readouterr().err
 
     def test_options_du_run_reconnues(self, monkeypatch):
-        """Les options de la ligne de commande arrivent bien jusqu'à l'exécution."""
+        """Les options de la ligne de commande arrivent jusqu'à l'exécution."""
         recues: list = []
         monkeypatch.setattr(run_pipeline, "pipeline_lock", nullcontext)
         monkeypatch.setattr(

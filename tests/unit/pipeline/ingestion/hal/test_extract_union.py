@@ -1,6 +1,6 @@
 """Moissonnage HAL d'un périmètre temporel (`harvest_union`).
 
-Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée (fixture `ecritures`). On vérifie la pagination (jusqu'à stabilisation du marqueur) et la ventilation new/updated/unchanged.
+Un faux client sert des pages `cursorMark` scriptées ; l'écriture dans `staging` est remplacée (fixture `ecritures`). Les tests vérifient la pagination, jusqu'à ce que le marqueur reste inchangé, et la ventilation new/updated/unchanged.
 """
 
 from __future__ import annotations

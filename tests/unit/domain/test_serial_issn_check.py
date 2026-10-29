@@ -174,7 +174,7 @@ class TestSupport:
         assert _rows(check) == {"0767-9513": "print:active+L"}
 
     def test_several_issns_of_one_support_with_the_serial_issnl_stay_active(self):
-        """Cas réel (Review of Economic Dynamics) : la notice de Toxicological Sciences porte l'ISSN-L de la revue."""
+        """Cas réel (Review of Economic Dynamics) : la notice de Toxicological Sciences a l'ISSN-L de la revue."""
         check = check_serial_issns(
             _serial(issn="1096-6099", eissn="1096-0929", issnl="1094-2025"),
             {
@@ -424,7 +424,7 @@ class TestSetAside:
         assert check.released == (SerialIssn(issn="0031-899X", support=PRINT),)
 
     def test_supplement_is_set_aside(self):
-        """Cas réel : des enregistrements d'Acta Cardiologica portent l'ISSN de son supplément, dont la notice désigne la revue (`422`)."""
+        """Cas réel : des enregistrements d'Acta Cardiologica ont l'ISSN de son supplément, dont la notice désigne la revue (`422`)."""
         check = check_serial_issns(
             _serial(issn="0001-5385", title="Acta Cardiologica", candidates=("0373-7934",)),
             {
@@ -491,7 +491,7 @@ class TestCoherence:
         assert _rows(check) == {"1740-634X": "electronic:active", "0893-133X": "print:active+L"}
 
     def test_other_supports_form_one_group_despite_different_issnls(self):
-        """Cas réel (Journal of Applied Physiology) : la notice papier porte l'ISSN-L de l'ancien titre ; la zone `452` relie les deux supports."""
+        """Cas réel (Journal of Applied Physiology) : la notice papier a l'ISSN-L de l'ancien titre ; la zone `452` relie les deux supports."""
         check = check_serial_issns(
             _serial(issn="8750-7587", eissn="1522-1601", issnl="1522-1601"),
             {
@@ -727,7 +727,7 @@ class TestSetAsideReexamined:
 
 class TestDocumentIssns:
     def test_document_issn_of_the_serial_completes_a_column(self):
-        """Cas réel (Diabetes Care) : les enregistrements portent l'ISSN en ligne, absent de la revue."""
+        """Cas réel (Diabetes Care) : les enregistrements ont l'ISSN en ligne, absent de la revue."""
         check = check_serial_issns(
             _serial(issn="0149-5992", issnl="0149-5992", candidates=("1935-5548",)),
             {
@@ -738,7 +738,7 @@ class TestDocumentIssns:
         assert _rows(check) == {"0149-5992": "print:active+L", "1935-5548": "electronic:active"}
 
     def test_document_issn_of_another_publication_is_discarded(self):
-        """Cas réel : des enregistrements de Technè portent l'ISSN de la revue « Spotlight »."""
+        """Cas réel : des enregistrements de Technè ont l'ISSN de la revue « Spotlight »."""
         check = check_serial_issns(
             _serial(
                 issn="1254-7867",
@@ -757,7 +757,7 @@ class TestDocumentIssns:
         assert check.discarded == (("2750-6185", SetAsideReason.OTHER_PUBLICATION),)
 
     def test_document_issns_do_not_take_over_the_serial(self):
-        """Cas réel (INRAE productions animales) : les enregistrements portent les deux ISSN de l'ancien titre, qui forment le groupe le plus nombreux."""
+        """Cas réel (INRAE productions animales) : les enregistrements ont les deux ISSN de l'ancien titre, qui forment le groupe le plus nombreux."""
         check = check_serial_issns(
             _serial(
                 eissn="2824-3633",

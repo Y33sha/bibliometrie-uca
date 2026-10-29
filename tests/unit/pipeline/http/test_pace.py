@@ -22,10 +22,8 @@ async def test_caps_the_start_rate_across_concurrent_workers():
 
     await asyncio.gather(*(worker() for _ in range(4)))
     starts.sort()
-    # Le k-ième départ vient au plus tôt k intervalles après le début : l'ordonnancement peut
-    # retarder un worker, jamais avancer son départ. L'écart entre deux départs consécutifs, lui,
-    # dépend de la boucle d'événements : une pause de celle-ci en rapproche deux qui rattrapent
-    # leur retard, sans que le débit dépasse son plafond.
+    # Le k-ième départ vient au plus tôt k intervalles après le début.
+    # L'écart entre deux départs consécutifs dépend de la boucle d'événements : après une pause de celle-ci, deux départs en retard se rapprochent, sans que le débit dépasse son plafond.
     for rank, start in enumerate(starts):
         assert start >= rank * interval_s
 
