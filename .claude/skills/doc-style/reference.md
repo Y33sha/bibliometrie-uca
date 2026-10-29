@@ -218,6 +218,16 @@ AVANT :
 APRÈS :
     | structure | `structures` | Établissement, laboratoire, équipe, site ou service |
 
+## Étapes numérotées
+
+Le titre d'une étape la nomme ; un numéro n'apporte rien quand l'ordre se lit déjà dans la suite des paragraphes.
+
+AVANT :
+    **Étape 1 — `fetch_missing.hal_by_id` et `fetch_missing.scanr_by_hal_id` : documents manquants, par hal-id.**
+
+APRÈS :
+    **`fetch_missing.hal_by_id` et `fetch_missing.scanr_by_hal_id` : documents manquants, par hal-id.**
+
 ## Personnification du code
 
 Une phase, un module ou une étape ne « cherche » ni n'« essaie ». Quand l'action est celle du processus, « on » suffit.
