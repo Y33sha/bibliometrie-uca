@@ -1,11 +1,12 @@
 """Phase `affiliations` : rattachement des contributions sources aux structures du périmètre.
 
-La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure ; `run.py` matérialise `perimeter_structures` avant toute phase. Suivent quatre tâches (`pipeline.graph`), chacune dans sa propre transaction :
+La phase s'arrête en échec si le périmètre d'extraction ne contient aucune structure. Ses tâches (`pipeline.graph`) ont chacune leur transaction :
 
-1. **Référentiel ROR** (tâche `affiliations.refresh_ror`) : importe la dernière version du dump ROR si elle n'est pas déjà importée (`pipeline.transformation.structures.ror`).
-2. **Référentiel des structures HAL** (tâche `affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel (`pipeline.transformation.structures.hal_structures`).
-3. **Résolution des adresses** (tâche `affiliations.resolve_addresses`) : rattache les adresses aux structures connues (commits par lots), puis les PPN des laboratoires partenaires de thèse (tâche `affiliations.resolve_thesis_partners`).
-4. **Contributions sources du périmètre** (tâche `affiliations.populate`) : pose les indices de l'entrée dans le périmètre (`perimeter_evidence`) sur les `source_contributions`, d'après les structures qu'elles atteignent (vue `source_contribution_structures`) et les identifiants des personnes qui ont une fiche RH.
+1. **Référentiel ROR** (`affiliations.refresh_ror`) : importe la dernière version du dump ROR, si elle reste à importer.
+2. **Référentiel des structures HAL** (`affiliations.refresh_hal_structures`) : charge les structures HAL citées et absentes du référentiel.
+3. **Résolution des adresses** (`affiliations.resolve_addresses`) : rattache les adresses aux structures connues.
+4. **Partenaires de thèse** (`affiliations.resolve_thesis_partners`) : rattache aux structures les PPN des laboratoires partenaires de thèse.
+5. **Contributions sources du périmètre** (`affiliations.populate`) : pose sur chaque contribution source les indices de son entrée dans le périmètre, d'après les structures qu'elle atteint et les identifiants des personnes qui ont une fiche RH.
 """
 
 from __future__ import annotations
@@ -107,19 +108,13 @@ class AffiliationsPhase:
         return PhaseMetrics()
 
 
-# ── Contributions sources du périmètre ───────────────────────────────────
-
-
 def populate(conn: Connection, logger: logging.Logger, perimeter_ids: set[int]) -> None:
-    """Pose les indices de l'entrée dans le périmètre sur les `source_contributions` : rafraîchit la matview `source_contribution_structures`, puis synchronise `perimeter_evidence`. Le commit est à la charge de l'appelant."""
+    """Pose sur les contributions sources les indices de leur entrée dans le périmètre. L'appelant commite."""
     t0 = time.perf_counter()
     with waiting(f"{LAST_BRANCH}rattachement en cours", logger) as line:
         refresh_source_contribution_structures(conn)
         sync_perimeter_evidence(conn, perimeter_ids=list(perimeter_ids))
         line.conclude(f"{LAST_BRANCH}Terminé en {time.perf_counter() - t0:.1f}s")
-
-
-# ── Câblage ───────────────────────────────────────────────────
 
 
 def build() -> Phase:

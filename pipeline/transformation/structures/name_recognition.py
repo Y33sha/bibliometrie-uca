@@ -14,9 +14,7 @@ from domain.structures.structure import StructureType
 class MatchableNameForm(NamedTuple):
     """Forme normalisée d'une structure, avec ses options de reconnaissance.
 
-    `requires_context_of` : liste des structure_ids dont l'une doit aussi être reconnue dans le même texte, son propre contexte compris, pour valider cette forme (anti-faux-positifs cross-établissement : un code de laboratoire ambigu n'est retenu que si son université de tutelle est reconnue). `None` ou liste vide = pas de contexte requis.
-    `is_excluding` : si TRUE et que la forme matche, retire la structure des résultats même si d'autres formes la matchent.
-    `structure_type` : type de la structure de la forme. Détermine si un appariement vaut affiliation à retenir ou seulement contexte de reconnaissance (`StructureType.is_affiliation`).
+    Une forme qui demande un contexte vaut seulement si l'une des structures de ce contexte est aussi reconnue dans le texte : un code de laboratoire ambigu vaut seulement avec son université de tutelle. Une forme d'exclusion présente retire sa structure du résultat, quelles que soient ses autres formes. Le type de la structure dit si sa reconnaissance vaut affiliation ou seulement contexte (`StructureType.is_affiliation`).
     """
 
     id: int
@@ -29,7 +27,7 @@ class MatchableNameForm(NamedTuple):
 
 
 class StructureMatch(NamedTuple):
-    """Structure `structure_id` reconnue dans un texte par sa forme `form_id`."""
+    """Structure reconnue dans un texte, avec la forme de nom à l'origine."""
 
     structure_id: int
     form_id: int
@@ -62,16 +60,16 @@ def load_name_forms(conn: Connection) -> list[MatchableNameForm]:
 
 
 def _is_whole_word(text: str, start: int, end: int) -> bool:
-    """Vrai si `text[start:end+1]` est un mot entier : bord de chaîne ou caractère non alphanumérique de part et d'autre."""
+    """Vrai si la sous-chaîne de `start` à `end` inclus est un mot entier : bord du texte ou caractère non alphanumérique de part et d'autre."""
     before_ok = start == 0 or not text[start - 1].isalnum()
     after_ok = end + 1 >= len(text) or not text[end + 1].isalnum()
     return before_ok and after_ok
 
 
 class StructureNameMatcher:
-    """Matche les formes de structures dans un texte via un automate Aho-Corasick.
+    """Reconnaît les structures dans un texte par leurs formes de nom.
 
-    L'automate, construit une fois sur l'ensemble des formes, détecte en un seul passage par texte toutes les formes présentes (coût indépendant du nombre de formes).
+    Un automate Aho-Corasick détecte toutes les formes en un seul passage par texte, quel que soit leur nombre.
     """
 
     def __init__(self, forms: list[MatchableNameForm]) -> None:
@@ -89,11 +87,11 @@ class StructureNameMatcher:
 
     @classmethod
     def load(cls, conn: Connection) -> Self:
-        """Matcher construit sur les formes de nom de toutes les structures."""
+        """Reconnaissance sur les formes de nom de toutes les structures."""
         return cls(load_name_forms(conn))
 
     def _matched_form_ids(self, text_normalized: str) -> set[int]:
-        """Ids des formes présentes (sous-chaîne + contrainte de mot entier)."""
+        """Formes présentes dans le texte, comme mot entier pour celles qui l'exigent."""
         matched: set[int] = set()
         if self._empty:
             return matched
@@ -108,11 +106,11 @@ class StructureNameMatcher:
         return matched
 
     def resolve(self, text_normalized: str) -> list[StructureMatch]:
-        """Résout un texte normalisé : affiliations reconnues et forme à l'origine.
+        """Structures reconnues dans un texte normalisé, avec la forme de nom à l'origine de chacune.
 
-        Une structure est reconnue par une forme présente, hors exclusion, dont le contexte est une structure reconnue. Les contextes s'enchaînent : le calcul itère jusqu'à ce que plus aucune structure ne s'ajoute. Pour chaque structure, la première forme valide par `id` l'emporte.
+        Une structure est reconnue par une forme présente, hors exclusion, dont le contexte est une structure reconnue. Les contextes s'enchaînent : le calcul se répète tant qu'une structure s'ajoute. Pour chaque structure, la première forme valide par `id` l'emporte.
 
-        Les structures dont le type ne vaut pas affiliation (sites) servent de contexte sans figurer au résultat.
+        Les structures sans valeur d'affiliation (sites) servent de contexte sans figurer au résultat.
         """
         matched_ids = self._matched_form_ids(text_normalized)
         if not matched_ids:

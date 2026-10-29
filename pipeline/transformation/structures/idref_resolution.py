@@ -1,6 +1,6 @@
-"""Résolution des laboratoires partenaires de thèse : rattachement de leur PPN IdRef aux structures, par leur nom. Tâche `affiliations.resolve_thesis_partners`.
+"""Tâche `affiliations.resolve_thesis_partners` : rattachement aux structures des PPN IdRef des laboratoires partenaires de thèse, par leurs noms.
 
-Chaque PPN cité par un enregistrement source theses.fr (`source_extras.partenaires`) est résolu par les formes de noms de ses noms, comme les adresses. `idref_structures` garde la forme à l'origine de chaque détection. Comme pour les adresses, une détection qui disparaît est supprimée, et un lien confirmé ou infirmé par l'administration reste en place.
+Chaque PPN cité par un enregistrement source theses.fr est reconnu par les formes de nom de ses noms, comme une adresse. `idref_structures` garde la forme à l'origine de chaque détection ; ses liens se synchronisent comme ceux des adresses (`detections`).
 """
 
 import logging
@@ -28,7 +28,7 @@ _PARTNERS = text(f"""
 
 
 def resolve_thesis_partners(conn: Connection, logger: logging.Logger) -> int:
-    """Rattache chaque PPN de laboratoire partenaire aux structures que ses noms désignent. Rend le nombre de PPN rattachés à au moins une structure. Le commit est à la charge de l'appelant."""
+    """Rattache chaque PPN de laboratoire partenaire aux structures que ses noms désignent. Rend le nombre de PPN rattachés à au moins une structure. L'appelant commite."""
     step(logger, "Identification des laboratoires partenaires de thèse")
     matcher = StructureNameMatcher.load(conn)
     detected: dict[tuple[str, int], int] = {}

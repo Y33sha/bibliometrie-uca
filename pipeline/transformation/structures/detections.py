@@ -23,7 +23,7 @@ IDREF_STRUCTURES = DetectionTable("idref_structures", "idref_ppn", "text")
 
 
 class Detection(NamedTuple):
-    """Structure `structure_id` reconnue pour la clé `key` par la forme `form_id`."""
+    """Structure reconnue pour une clé par une forme de nom."""
 
     key: int | str
     structure_id: int
@@ -37,10 +37,9 @@ def sync_detections(
     *,
     scope: list[int] | list[str] | None = None,
 ) -> None:
-    """Aligne les liens de `table` sur `detections`, en trois requêtes ensemblistes.
+    """Aligne les liens de la table sur les détections.
 
-    Un lien automatique absent de `detections` est supprimé. Un lien confirmé ou infirmé par l'administration reste en place et perd sa forme d'origine. Les liens détectés sont insérés ou mis à jour, seulement s'ils changent.
-    `scope` restreint la synchronisation aux liens de ces clés ; `None` couvre toute la table.
+    Un lien automatique absent des détections est supprimé. Un lien confirmé ou infirmé par l'administration reste en place et perd sa forme d'origine. Les liens détectés sont insérés ou mis à jour, seulement s'ils changent. `scope` restreint la synchronisation aux liens de ces clés ; `None` couvre toute la table.
     """
     if scope is not None and not scope:
         return
