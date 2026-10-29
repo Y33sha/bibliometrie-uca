@@ -1,6 +1,6 @@
 """Lecture des réglages numériques du pipeline (`domain.config.ConfigKey`) : années couvertes, plafonds et délais d'interrogation.
 
-Ces paramètres vivent dans la table `config` et se modifient depuis l'interface d'administration. Le périmètre d'extraction se lit dans `infrastructure/read_models/perimeters.py`, les identifiants d'accès aux sources dans `pipeline/ingestion/credentials.py`.
+Ces réglages sont dans la table `config`, et se modifient dans l'interface d'administration.
 """
 
 import logging
@@ -40,10 +40,7 @@ def delay(conn: Connection, key: ConfigKey) -> int:
 
 
 def get_years(conn: Connection, start_year: int | None = None) -> list[int]:
-    """Retourne les années à extraire : `[start_year … année courante]`.
-
-    `start_year` est l'ancre absolue du range. Si `None`, on lit la config `pipeline_start_year_full`. Rétention cumulative. Fallback `[année courante]` si l'ancre est absente, invalide ou dans le futur.
-    """
+    """Années à moissonner, de `start_year` à l'année courante. Sans `start_year`, la clé `pipeline_start_year_full` donne la première année. Seule l'année courante si la première année manque ou est future."""
     current_year = today().year
     if start_year is None:
         start_year = _stored_int(conn, ConfigKey.PIPELINE_START_YEAR_FULL)

@@ -1,7 +1,4 @@
-"""Contexte d'exécution commun aux phases : journal du pipeline, transaction gérée.
-
-Les imports d'infrastructure restent locaux aux fonctions : charger ce module ne charge aucun client de source.
-"""
+"""Contexte d'exécution commun aux phases : journal du pipeline, transaction gérée."""
 
 from __future__ import annotations
 
