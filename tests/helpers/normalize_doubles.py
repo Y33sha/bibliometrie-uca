@@ -3,20 +3,19 @@
 Quelle que soit sa source, un normaliseur verse ses documents dans `source_records`, écrit leurs contributions sources et marque sa ligne de staging traitée. Ces doublures valent donc pour toutes les sources.
 """
 
-from domain.source_records.identifiers import SourceIdentifierType, normalize_identifiers
+from domain.source_records.identifiers import normalize_identifiers
 from pipeline.ingestion.common.source_contribution_store import StoredSourceContributionRow
 from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.common.staging import StagingRow
 
 
 def identifier_values(record: SourceRecordUpsert) -> dict[str, list[str]]:
-    """Valeurs des identifiants normalisés de `record`, par type, hors DOI de la colonne `doi`."""
+    """Valeurs des identifiants normalisés de `record`, par type, triées."""
     identifiers, _ = normalize_identifiers(record.identifiers)
     values: dict[str, list[str]] = {}
     for i in identifiers:
-        if not (i.id_type is SourceIdentifierType.DOI and i.value == record.doi):
-            values.setdefault(i.id_type.value, []).append(i.value)
-    return values
+        values.setdefault(i.id_type.value, []).append(i.value)
+    return {id_type: sorted(v) for id_type, v in values.items()}
 
 
 def staging_row(

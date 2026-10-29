@@ -27,11 +27,9 @@ def _doi(value, removed_by=None, role=SourceIdentifierRole.SECONDARY):
 
 def test_tally_doi_corrections_par_cas():
     updates = [
-        DoiCorrectionUpdate(1, None, {}, (_doi("10.9005/a", "OUVRAGE_VS_CHAPITRE"),)),
-        DoiCorrectionUpdate(
-            2, None, {}, (_doi("10.9005/b", "OUVRAGE_VS_CHAPITRE"), _doi("10.9005/c"))
-        ),
-        DoiCorrectionUpdate(3, None, {}, (_doi("10.9006/x", "UNRESOLVED_DOI_TO_NULL"),)),
+        DoiCorrectionUpdate(1, (_doi("10.9005/a", "OUVRAGE_VS_CHAPITRE"),)),
+        DoiCorrectionUpdate(2, (_doi("10.9005/b", "OUVRAGE_VS_CHAPITRE"), _doi("10.9005/c"))),
+        DoiCorrectionUpdate(3, (_doi("10.9006/x", "UNRESOLVED_DOI_TO_NULL"),)),
     ]
     assert tally_doi_corrections(updates) == {
         "OUVRAGE_VS_CHAPITRE": 2,
@@ -42,22 +40,24 @@ def test_tally_doi_corrections_par_cas():
 def _row(
     row_id,
     doc_type,
-    doi,
+    doi=None,
     title=None,
-    corrections=None,
     shared_doi="10.1/x",
     identifiers=(),
     has_target=False,
+    doi_removed_by=None,
 ) -> DoiClusterRow:
+    """Membre d'un groupe. `doi` s'écrit en tête de ses identifiants, retiré par `doi_removed_by`, quand `identifiers` ne contient aucun DOI."""
+    ids = tuple(identifiers)
+    if doi and not any(i.id_type is SourceIdentifierType.DOI for i in ids):
+        ids = (_doi(doi, doi_removed_by), *ids)
     return DoiClusterRow(
         row_id,
         doc_type,
-        doi,
         f"titre {'abcdefghij'[row_id % 10]}" if title is None else title,
-        corrections or {},
         shared_doi,
         has_target=has_target,
-        identifiers=tuple(identifiers),
+        identifiers=ids,
     )
 
 
@@ -258,53 +258,34 @@ def test_un_chapitre_perd_le_doi_de_l_ouvrage_et_garde_le_sien():
 
     updates = compute_updates([book, in_book_group, in_own_group])
 
-    assert updates == [
-        DoiCorrectionUpdate(
-            2, "10.1/chapitre", {}, (own, _doi("10.1/livre", "OUVRAGE_VS_CHAPITRE"))
-        )
-    ]
+    assert updates == [DoiCorrectionUpdate(2, (own, _doi("10.1/livre", "OUVRAGE_VS_CHAPITRE")))]
 
 
-def test_chapter_doi_nulled_book_untouched():
+def test_chapter_doi_removed_book_untouched():
     book = _row(1, "book", "10.1/x")
     chapter = _row(2, "book_chapter", "10.1/x")
     assert compute_updates([book, chapter]) == [
-        DoiCorrectionUpdate(
-            2, None, {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}, ()
-        )
+        DoiCorrectionUpdate(2, (_doi("10.1/x", "OUVRAGE_VS_CHAPITRE"),))
     ]
 
 
-def test_chapter_chapter_both_nulled():
+def test_chapter_chapter_both_removed():
     a = _row(1, "book_chapter", "10.1/x", title="premier chapitre distinct")
     b = _row(2, "book_chapter", "10.1/x", title="second chapitre autre")
     updates = compute_updates([a, b])
     assert {u.id for u in updates} == {1, 2}
-    assert all(u.doi is None for u in updates)
-    assert all(
-        u.corrections["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS" for u in updates
-    )
+    assert all(u.identifiers == (_doi("10.1/x", "CHAPITRES_TITRES_DIFFERENTS"),) for u in updates)
 
 
-def test_idempotent_when_already_nulled():
+def test_idempotent_when_already_removed():
     book = _row(1, "book", "10.1/x")
-    chapter = _row(
-        2,
-        "book_chapter",
-        None,
-        corrections={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
-    )
+    chapter = _row(2, "book_chapter", "10.1/x", doi_removed_by="OUVRAGE_VS_CHAPITRE")
     assert compute_updates([book, chapter]) == []
 
 
 def test_self_heals_when_book_gone():
-    chapter = _row(
-        2,
-        "book_chapter",
-        None,
-        corrections={"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}},
-    )
-    assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, "10.1/x", {}, ())]
+    chapter = _row(2, "book_chapter", "10.1/x", doi_removed_by="OUVRAGE_VS_CHAPITRE")
+    assert compute_updates([chapter]) == [DoiCorrectionUpdate(2, (_doi("10.1/x"),))]
 
 
 # Identifiants partagés avec une œuvre qui perd le DOI
@@ -322,48 +303,33 @@ def test_volume_perd_le_hal_id_de_ses_communications():
     communication = _row(2, "poster", "10.1/x", title="total pain", identifiers=_hal("hal-1"))
     updates = {u.id: u for u in compute_updates([volume, communication])}
 
-    assert updates[1].doi == "10.1/x"
-    assert _active(updates[1].identifiers) == {"hal_id": ["hal-2"], "pmid": ["99"]}
+    assert _active(updates[1].identifiers) == {
+        "doi": ["10.1/x"],
+        "hal_id": ["hal-2"],
+        "pmid": ["99"],
+    }
     assert updates[1].identifiers == (
+        _doi("10.1/x"),
         *_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"),
         *_hal("hal-2"),
         _PMID_99,
     )
-    assert updates[2].doi is None
     assert _active(updates[2].identifiers) == {"hal_id": ["hal-1"]}
-
-
-def test_doi_nulle_retire_dans_les_identifiants():
-    doi = SourceIdentifier(SourceIdentifierType.DOI, "10.1/x", SourceIdentifierRole.SECONDARY)
-    book = _row(1, "book", "10.1/x")
-    chapter = _row(2, "book_chapter", "10.1/x", identifiers=(doi,))
-    updates = {u.id: u for u in compute_updates([book, chapter])}
-    assert updates[2].identifiers == (
-        SourceIdentifier(
-            SourceIdentifierType.DOI,
-            "10.1/x",
-            SourceIdentifierRole.SECONDARY,
-            "OUVRAGE_VS_CHAPITRE",
-        ),
-    )
 
 
 def test_ouvrage_perd_le_hal_id_de_son_chapitre():
     book = _row(1, "book", "10.1/x", identifiers=_hal("hal-9"))
     chapter = _row(2, "book_chapter", "10.1/x", identifiers=_hal("hal-9"))
     updates = {u.id: u for u in compute_updates([book, chapter])}
-    assert _active(updates[1].identifiers) == {}
+    assert _active(updates[1].identifiers) == {"doi": ["10.1/x"]}
 
 
 def test_retrait_stable_d_un_run_a_l_autre():
     volume = _row(1, "proceedings", "10.1/x", title="eapc abstract book", identifiers=_hal("hal-1"))
     communication = _row(2, "poster", "10.1/x", title="total pain", identifiers=_hal("hal-1"))
     first = {u.id: u for u in compute_updates([volume, communication])}
-    volume = volume._replace(
-        corrections=first[1].corrections,
-        identifiers=first[1].identifiers,
-    )
-    communication = communication._replace(doi=None, corrections=first[2].corrections)
+    volume = volume._replace(identifiers=first[1].identifiers)
+    communication = communication._replace(identifiers=first[2].identifiers)
     assert compute_updates([volume, communication]) == []
 
 
@@ -376,7 +342,7 @@ def test_identifiants_restaures_quand_la_divergence_disparait():
         identifiers=(*_hal("hal-1", removed_by="ACTES_VS_COMMUNICATION"), *_hal("hal-2")),
     )
     assert compute_updates([volume]) == [
-        DoiCorrectionUpdate(1, "10.1/x", {}, _hal("hal-1", "hal-2"))
+        DoiCorrectionUpdate(1, (_doi("10.1/x"), *_hal("hal-1", "hal-2")))
     ]
 
 

@@ -452,7 +452,6 @@ def wos_source_record(
         source="wos",
         source_id=as_str(rec.get("ut")) or "",
         staging_id=staging_id,
-        doi=as_str(rec.get("doi")),
         identifiers=wos_identifiers(rec),
         title=as_str(rec.get("title")) or "",
         publication_year=as_int(rec.get("publication_year")),

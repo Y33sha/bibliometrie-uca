@@ -355,7 +355,6 @@ _RECORD = SourceRecordUpsert(
     source="test",
     source_id="a",
     staging_id=1,
-    doi=None,
     title="T",
     publication_year=2020,
     raw_doc_type=None,

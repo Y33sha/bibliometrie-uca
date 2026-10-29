@@ -46,7 +46,6 @@ class SourceRecordUpsert:
     staging_id: int
 
     # Rattachement
-    doi: str | None = None
     identifiers: tuple[SourceIdentifier, ...] = ()
     """Identifiants de l'enregistrement source, avec leur rôle, écrits dans `source_record_identifiers`. L'écriture les normalise."""
 

@@ -42,7 +42,7 @@ from pipeline.ingestion.crossref.normalize import (
     get_title,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import staging_row
+from tests.helpers.normalize_doubles import identifier_values, staging_row
 
 
 class TestGetLocations:
@@ -601,7 +601,7 @@ class TestCrossrefSourceRecord:
         assert document.source == "crossref"
         assert document.source_id == "10.1000/abc"
         assert document.staging_id == 42
-        assert document.doi == "10.1000/abc"
+        assert "10.1000/abc" in identifier_values(document)["doi"]
         assert document.publication_year == 2024
         assert document.raw_doc_type == "journal-article"
         assert document.oa_status is None  # Crossref ne renseigne pas le statut open access

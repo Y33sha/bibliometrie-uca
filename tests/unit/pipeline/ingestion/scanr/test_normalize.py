@@ -17,7 +17,6 @@ from pipeline.ingestion.common.source_records import SourceRecordUpsert
 from pipeline.ingestion.scanr.normalize import (
     ScanrNormalizer,
     build_scanr_author_records,
-    extract_doi,
     get_container_facts,
     get_locations,
     get_publisher,
@@ -101,7 +100,7 @@ class TestScanrSourceRecordExternalIds:
     def _call(self, doc) -> SourceRecordUpsert:
         return scanr_source_record(doc, staging_id=1, scanr_id="sc-1", containers=_NO_CONTAINERS)
 
-    def test_related_dois_excludes_primary(self):
+    def test_every_doi_of_the_external_ids(self):
         doc = {
             "externalIds": [
                 {"type": "doi", "id": "10.1/primary"},
@@ -110,14 +109,7 @@ class TestScanrSourceRecordExternalIds:
             ]
         }
         captured = self._call(doc)
-        assert captured.doi == "10.1/primary"
-        assert identifier_values(captured)["doi"] == ["10.2/anie"]
-
-    def test_related_dois_absent_when_only_primary(self):
-        doc = {"externalIds": [{"type": "doi", "id": "10.1/primary"}]}
-        captured = self._call(doc)
-        assert captured.doi == "10.1/primary"
-        assert "doi" not in identifier_values(captured)
+        assert identifier_values(captured)["doi"] == ["10.1/primary", "10.2/anie"]
 
 
 # ── build_scanr_author_records ─────────────────────
@@ -247,17 +239,6 @@ class TestBuildScanrAuthorRecords:
         ]
 
 
-class TestExtractDoi:
-    def test_doi_parmi_les_identifiants_externes(self):
-        doc = {"externalIds": [{"type": "hal", "id": "hal-1"}, {"type": "doi", "id": "10.1/a"}]}
-
-        assert extract_doi(doc) == "10.1/a"
-
-    def test_sans_doi(self):
-        assert extract_doi({"externalIds": [{"type": "hal", "id": "hal-1"}]}) is None
-        assert extract_doi({}) is None
-
-
 class TestGetTitle:
     def test_titre_multilingue(self):
         """ScanR renvoie un titre par langue ; celui de la langue par défaut fait foi."""
@@ -337,7 +318,7 @@ class TestScanrSourceRecordMetadonnees:
         assert record.title == "Un titre"
         assert record.publication_year == 2024
         assert record.raw_doc_type == "journal-article"
-        assert record.doi == "10.1/a"
+        assert identifier_values(record)["doi"] == ["10.1/a"]
         assert record.oa_status == "closed"
         assert "nnt" not in identifier_values(record)
         assert (

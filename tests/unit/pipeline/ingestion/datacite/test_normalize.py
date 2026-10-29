@@ -393,7 +393,7 @@ class TestSourceRecord:
         assert document.source == "datacite"
         assert document.source_id == "10.5281/zenodo.1"
         assert document.staging_id == 42
-        assert document.doi == "10.5281/zenodo.1"
+        assert identifier_values(document)["doi"] == ["10.5281/zenodo.1"]
         assert document.title == "Un jeu de données"
         assert document.publication_year == 2024
         assert document.oa_status is None  # DataCite ne renseigne pas le statut open access
@@ -411,7 +411,7 @@ class TestSourceRecord:
 
         document = datacite_source_record(attributs, 42, "10.5281/zenodo.1", Containers(None, None))
 
-        assert identifier_values(document) == {"doi": ["10.5281/zenodo.0"]}
+        assert identifier_values(document) == {"doi": ["10.5281/zenodo.0", "10.5281/zenodo.1"]}
 
     def test_titre_du_conteneur_garde_sans_revue_resolue(self):
         attributs = _attributs(container={"title": "Une collection"})
@@ -436,7 +436,7 @@ class TestDoi:
 
         document = normalizer.source_record(row, normalizer.parse(row), Containers(None, None))
 
-        assert document.doi == "10.5281/zenodo.9"
+        assert identifier_values(document)["doi"] == ["10.5281/zenodo.9"]
 
     def test_document_refuse_sans_doi(self):
         raw = {"attributes": {"titles": [{"title": "T"}], "publicationYear": 2024}}

@@ -28,7 +28,7 @@ class DoiTargetRule(StrEnum):
 
 
 class DoiClusterCase(StrEnum):
-    """Cas de retrait du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `corrections.doi.corrected_by` et dans `source_record_identifiers.removed_by`."""
+    """Cas de retrait du DOI d'un membre d'un groupe partageant un DOI. Inscrit dans `source_record_identifiers.removed_by`."""
 
     # Ouvrage et chapitre partageant un DOI : le DOI est celui de l'ouvrage, le chapitre d'un autre titre le perd.
     OUVRAGE_VS_CHAPITRE = "OUVRAGE_VS_CHAPITRE"

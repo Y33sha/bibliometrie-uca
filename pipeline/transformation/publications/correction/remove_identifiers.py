@@ -4,7 +4,7 @@ Un DOI que partagent des œuvres distinctes (ouvrage et chapitre, chapitres de t
 
 Après une divergence, les enregistrements sources qui gardent le DOI perdent les clés de confirmation qu'ils partagent avec ceux qui le perdent : par exemple le dépôt HAL d'une communication, recopié par l'enregistrement source OpenAlex du volume d'actes. Le cas de chaque identifiant retiré, DOI compris, est inscrit dans `source_record_identifiers.removed_by`.
 
-Les types lus sont ceux que la sous-étape unaire a corrigés. Chaque passage repart du DOI d'avant correction (`corrections.doi`) et de tous les identifiants : un enregistrement source dont le conflit disparaît retrouve son DOI et ses identifiants au run suivant.
+Les types lus sont ceux que la sous-étape unaire a corrigés. Chaque passage repart de tous les identifiants : un enregistrement source dont le conflit disparaît retrouve ses identifiants au run suivant.
 """
 
 import logging
@@ -15,13 +15,6 @@ from dataclasses import dataclass
 
 from sqlalchemy import Connection
 
-from domain.source_records.corrections import (
-    CLUSTER_KEYS,
-    CorrectionKey,
-    other_entries,
-    raw_value,
-    stash_entry,
-)
 from domain.source_records.identifiers import (
     SourceIdentifier,
     SourceIdentifierType,
@@ -59,32 +52,22 @@ def _compute_update(
     removed_dois: Mapping[str, str],
     confirmation_removals: Iterable[ConfirmationIdRemoval] = (),
 ) -> DoiCorrectionUpdate | None:
-    """État cible d'un enregistrement source, ou `None` si rien ne change.
+    """Identifiants d'un enregistrement source aux statuts recalculés, ou `None` si rien ne change.
 
-    `removed_dois` : cas de retrait de chaque DOI que l'enregistrement source perd, par DOI. Chacun est retiré des identifiants sous son cas. La colonne `doi` passe à NULL quand son DOI d'origine est retiré, et sa valeur d'origine est gardée sous le cas ; sinon le DOI d'origine revient. Un retrait de clés de confirmation retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés.
+    `removed_dois` : cas de retrait de chaque DOI que l'enregistrement source perd, par DOI. Chacun est retiré des identifiants sous son cas. Un retrait de clés de confirmation retire des identifiants sous son cas. Les retraits du passage précédent sont recalculés.
     """
-    raw_doi = raw_value(row.corrections, CorrectionKey.DOI, row.doi)
-    corrections = other_entries(row.corrections, CLUSTER_KEYS)
-
     removals: dict[tuple[SourceIdentifierType, str], str] = {
         (SourceIdentifierType.DOI, doi): case for doi, case in removed_dois.items()
     }
-    column_case = removed_dois.get(raw_doi.lower()) if raw_doi else None
-    if column_case is None:
-        new_doi = raw_doi
-    else:
-        new_doi = None
-        corrections[CorrectionKey.DOI] = stash_entry(raw_doi, column_case)
-
     for removal in confirmation_removals:
         for id_type, values in removal.removed.items():
             for value in values:
                 removals.setdefault((SourceIdentifierType(id_type), value), removal.case.value)
     identifiers = with_removals(row.identifiers, CLUSTER_IDENTIFIER_RULES, removals)
 
-    if new_doi == row.doi and corrections == row.corrections and identifiers == row.identifiers:
+    if identifiers == row.identifiers:
         return None
-    return DoiCorrectionUpdate(row.id, new_doi, corrections, identifiers)
+    return DoiCorrectionUpdate(row.id, identifiers)
 
 
 def compute_updates(rows: list[DoiClusterRow]) -> list[DoiCorrectionUpdate]:

@@ -307,7 +307,6 @@ def crossref_source_record(
         source="crossref",
         source_id=doi,
         staging_id=staging_id,
-        doi=doi,
         identifiers=crossref_identifiers(msg, doi),
         title=title,
         publication_year=publication_year,

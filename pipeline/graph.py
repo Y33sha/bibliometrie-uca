@@ -231,8 +231,7 @@ TASKS: tuple[Task, ...] = (
             "fetch_missing",
             # DOI candidats de la vue `candidate_dois`, bornés à la fenêtre d'années du run par les enregistrements sources de leur publication, et agence d'enregistrement pour Crossref et DataCite.
             reads=(
-                "source_records.doi",
-                "source_records.corrections",
+                "source_record_identifiers",
                 "source_records.publication_year",
                 "publication_relations",
                 *(("doi_prefixes.ra",) if PROFILES[source].registration_agency else ()),
@@ -464,8 +463,6 @@ TASKS: tuple[Task, ...] = (
         "resolve_ra",
         reads=(
             "doi_prefixes.id",
-            "source_records.doi",
-            "source_records.corrections",
             "source_record_identifiers",
             "publication_relations",
         ),
@@ -482,7 +479,7 @@ TASKS: tuple[Task, ...] = (
             "doi_prefixes.publisher_id",
             "doi_prefixes.publisher_name_normalized",
             "doi_prefixes.crossref_checked_at",
-            "source_records.doi",
+            "source_record_identifiers",
             "publishers.id",
             "publisher_name_forms",
         ),
@@ -498,7 +495,7 @@ TASKS: tuple[Task, ...] = (
         ),
         # L'agence et l'éditeur qu'a posés `resolve_datacite_publishers` sortent un préfixe de la sélection.
         previous_run=(
-            "source_records.doi",
+            "source_record_identifiers",
             "publishers",
             "publisher_name_forms",
             "doi_prefixes",
@@ -607,7 +604,6 @@ TASKS: tuple[Task, ...] = (
             "serials.manual_fields",
             "source_records.serial_id",
             "source_records.publication_year",
-            "source_records.doi",
             "source_records.publication_id",
             "source_record_identifiers",
             # Verdicts d'Unpaywall, lus par le recalcul des publications des revues fusionnées.
@@ -635,8 +631,7 @@ TASKS: tuple[Task, ...] = (
             "serial_issns",
             "source_records.publication_id",
             "source_records.serial_id",
-            "source_records.doi",
-            "source_record_identifiers.removed_by",
+            "source_record_identifiers",
             "unpaywall",
         ),
     ),
@@ -657,7 +652,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=(
             "serials",
             "serial_issns",
-            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            # Type brut de la source (`raw_doc_type`) : la correction ne le change pas.
             "source_records.corrections",
             "source_records.doc_type",
             "source_records.serial_id",
@@ -680,7 +675,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=(
             "serials",
             "serial_issns",
-            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            # Type brut de la source (`raw_doc_type`) : la correction ne le change pas.
             "source_records.corrections",
             "source_records.doc_type",
             "source_records.serial_id",
@@ -690,13 +685,14 @@ TASKS: tuple[Task, ...] = (
         "publishing.learn_serial_doi_namespaces",
         "publishing",
         reads=(
-            "source_records.doi",
+            "source_record_identifiers",
             "source_records.serial_id",
             "source_records.corrections",
             "serials.serial_type",
         ),
         writes=("serial_doi_namespaces",),
-        previous_run=("source_records", "serials"),
+        # Statuts posés par la correction de `metadata_correction`.
+        previous_run=("source_records", "serials", "source_record_identifiers.removed_by"),
     ),
     _task(
         "publishing.enrich_serials_from_doaj",
@@ -756,7 +752,7 @@ TASKS: tuple[Task, ...] = (
         previous_run=(
             "monographs",
             "serials",
-            # Type brut de la source (`raw_column`) : la correction ne le change pas.
+            # Type brut de la source (`raw_doc_type`) : la correction ne le change pas.
             "source_records.corrections",
             "source_records.doc_type",
         ),
@@ -766,7 +762,7 @@ TASKS: tuple[Task, ...] = (
         "metadata_correction",
         reads=(
             "serial_doi_namespaces",
-            "source_records.doi",
+            "source_record_identifiers",
             "source_records.serial_id",
             "source_records.corrections",
             "source_records.doc_type",
@@ -776,7 +772,7 @@ TASKS: tuple[Task, ...] = (
             "source_records.corrections",
             "source_record_keys_queue",
         ),
-        previous_run=("source_records",),
+        previous_run=("source_records", "source_record_identifiers.removed_by"),
     ),
     _task(
         "metadata_correction.unary",
@@ -885,8 +881,6 @@ TASKS: tuple[Task, ...] = (
             "contributor_information",
         ),
         writes=(
-            "source_records.doi",
-            "source_records.corrections",
             "source_record_identifiers.removed_by",
             "source_record_keys_queue",
         ),

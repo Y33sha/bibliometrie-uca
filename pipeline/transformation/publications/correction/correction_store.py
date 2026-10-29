@@ -115,13 +115,11 @@ class SecondaryFormRow(NamedTuple):
 class DoiClusterRow(NamedTuple):
     """Un enregistrement source membre d'un groupe candidat au retrait de DOI : les enregistrements sources qui ont le DOI `shared_doi`, de rôle autre que `related`, quel que soit son statut. Un enregistrement source appartient à un groupe par DOI.
 
-    `doi` est la colonne `doi`. Le titre normalisé sert à comparer deux chapitres."""
+    Le titre normalisé sert à comparer deux chapitres."""
 
     id: int
     doc_type: str | None
-    doi: str | None
     title_normalized: str | None
-    corrections: dict[str, JsonValue]
     shared_doi: str
     # `shared_doi` est inconnu de doi.org (`failed_lookups`, source `doi_org`).
     unresolved: bool = False
@@ -135,11 +133,9 @@ class DoiClusterRow(NamedTuple):
 
 
 class DoiCorrectionUpdate(NamedTuple):
-    """Une mise à jour du retrait de DOI par groupe : `doi`, retiré ou restauré, `corrections`, et identifiants aux statuts recalculés."""
+    """Une mise à jour du retrait de DOI par groupe : identifiants de l'enregistrement source aux statuts recalculés."""
 
     id: int
-    doi: str | None
-    corrections: dict[str, JsonValue]
     identifiers: tuple[SourceIdentifier, ...]
 
 
@@ -557,7 +553,7 @@ class SourceRecordCorrectionStore:
         rows = self._conn.execute(
             text(f"""
                 WITH sr_eff AS (
-                    SELECT id, source, source_id, doc_type, doi, title_normalized, corrections
+                    SELECT id, source, source_id, doc_type, title_normalized
                     FROM source_records
                 ),
                 record_dois AS (
@@ -600,19 +596,18 @@ class SourceRecordCorrectionStore:
                     SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
                     WHERE sr.doc_type IN ('{DocType.BOOK.value}', '{DocType.BOOK_CHAPTER.value}', '{DocType.PROCEEDINGS.value}')
                     UNION
-                    SELECT d.doi AS d FROM record_dois d JOIN sr_eff sr ON sr.id = d.id
-                    WHERE {corrected("doi", "sr")}
-                       OR EXISTS (
-                           SELECT 1 FROM source_record_identifiers i
-                           WHERE i.source_record_id = sr.id
-                             AND i.removed_by IN ({_CLUSTER_CASES_SQL})
-                       )
+                    SELECT d.doi AS d FROM record_dois d
+                    WHERE EXISTS (
+                        SELECT 1 FROM source_record_identifiers i
+                        WHERE i.source_record_id = d.id
+                          AND i.removed_by IN ({_CLUSTER_CASES_SQL})
+                    )
                     UNION
                     SELECT d FROM unresolved_dois
                     UNION
                     SELECT d FROM foreign_hal_dois
                 )
-                SELECT sr.id, sr.doc_type, sr.doi, sr.title_normalized, sr.corrections,
+                SELECT sr.id, sr.doc_type, sr.title_normalized,
                        sr.source::text AS source, sr.source_id,
                        {identifiers_json_sql("sr.id")} AS identifiers,
                        m.doi AS shared_doi,
@@ -634,9 +629,7 @@ class SourceRecordCorrectionStore:
             DoiClusterRow(
                 id=row.id,
                 doc_type=row.doc_type,
-                doi=row.doi,
                 title_normalized=row.title_normalized,
-                corrections=row.corrections,
                 shared_doi=row.shared_doi,
                 unresolved=row.unresolved,
                 has_target=row.has_target,
@@ -675,15 +668,16 @@ class SourceRecordCorrectionStore:
         enqueue(
             self._conn,
             Queue.SOURCE_RECORD_KEYS,
-            "SELECT id FROM source_records WHERE doi = ANY(:dois)",
+            f"""
+            SELECT DISTINCT source_record_id FROM source_record_identifiers
+            WHERE id_type = '{SourceIdentifierType.DOI.value}'
+              AND role <> '{SourceIdentifierRole.RELATED.value}' AND id_value = ANY(:dois)
+            """,
             {"dois": changed},
         )
         return len(changed)
 
     def persist_doi_corrections(self, updates: list[DoiCorrectionUpdate]) -> int:
-        """Écrit en lot `doi`, `corrections` et les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont le DOI et les identifiants sont des clés. Renvoie le nombre de lignes."""
+        """Écrit en lot les statuts des identifiants, et marque les enregistrements sources pour la réconciliation, dont les identifiants sont des clés. Renvoie le nombre de lignes."""
         _persist_statuses(self._conn, {u.id: u.identifiers for u in updates})
-        return _persist_updates(
-            self._conn,
-            [{"id": u.id, "doi": u.doi, "corrections": u.corrections} for u in updates],
-        )
+        return _persist_updates(self._conn, [{"id": u.id} for u in updates])

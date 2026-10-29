@@ -145,7 +145,6 @@ def theses_source_record(
         source="theses",
         source_id=theses_id,
         staging_id=staging_id,
-        doi=doi,
         identifiers=tuple(identifiers),
         title=get_title(thesis) or "",
         publication_year=get_publication_year(thesis),

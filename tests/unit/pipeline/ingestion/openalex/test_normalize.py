@@ -445,7 +445,7 @@ class TestOpenalexSourceRecordMetadata:
         )
         assert record.title == "T"
         assert record.publication_year == 2024
-        assert record.doi is None
+        assert "doi" not in identifier_values(record)
         assert "nnt" not in identifier_values(record)
         assert record.serial_id is None
 
@@ -531,7 +531,7 @@ class TestOpenalexSourceRecord:
         captured = self._call({"id": "https://openalex.org/W1", "biblio": {}})
         assert captured.biblio is None
 
-    def test_related_dois_excludes_primary(self):
+    def test_dois_of_the_work_and_its_locations(self):
         work = {
             "id": "https://openalex.org/W1",
             "doi": "https://doi.org/10.1/primary",
@@ -541,16 +541,16 @@ class TestOpenalexSourceRecord:
             ],
         }
         captured = self._call(work)
-        assert identifier_values(captured)["doi"] == ["10.2/preprint"]
+        assert identifier_values(captured)["doi"] == ["10.1/primary", "10.2/preprint"]
 
-    def test_related_dois_absent_when_only_primary(self):
+    def test_doi_written_once_when_the_location_repeats_it(self):
         work = {
             "id": "https://openalex.org/W1",
             "doi": "https://doi.org/10.1/primary",
             "locations": [{"landing_page_url": "https://doi.org/10.1/primary"}],
         }
         captured = self._call(work)
-        assert "doi" not in identifier_values(captured)
+        assert identifier_values(captured)["doi"] == ["10.1/primary"]
 
     def test_biblio_publisher_and_journal_from_primary_location(self):
         work = {

@@ -392,6 +392,19 @@ def _apply_cluster(conn) -> int:
     return store.persist_doi_corrections(compute_updates(store.fetch_doi_cluster_candidates()))
 
 
+def _doi_statuses(conn, source_record: int) -> dict[str, str | None]:
+    """Règle qui retire chaque DOI de l'enregistrement source, `None` pour un DOI actif."""
+    return dict(
+        conn.execute(
+            text("""
+                SELECT id_value, removed_by FROM source_record_identifiers
+                WHERE source_record_id = :id AND id_type = 'doi'
+            """),
+            {"id": source_record},
+        ).all()
+    )
+
+
 def _targets(conn) -> dict[str, str]:
     """Cible de chaque DOI de `doi_targets`."""
     return dict(conn.execute(text("SELECT doi, target_doi FROM doi_targets")).all())
@@ -411,29 +424,8 @@ def test_chapter_loses_doi_of_its_book(sa_sync_conn):
 
     assert _apply_cluster(conn) == 1  # seul le chapitre
 
-    book_doi, _ = _state(conn, book)
-    # l'ouvrage garde son DOI
-    assert (
-        conn.execute(
-            text("SELECT doi FROM source_records WHERE id = :id"), {"id": book}
-        ).scalar_one()
-        == "10.1/x"
-    )
-    chap_doi = conn.execute(
-        text("SELECT doi FROM source_records WHERE id = :id"), {"id": chapter}
-    ).scalar_one()
-    assert chap_doi is None
-    chap_raw = conn.execute(
-        text("SELECT corrections FROM source_records WHERE id = :id"), {"id": chapter}
-    ).scalar_one()
-    assert chap_raw == {"doi": {"raw": "10.1/x", "corrected_by": "OUVRAGE_VS_CHAPITRE"}}
-
-    # Le DOI d'origine du chapitre se reconstruit depuis `corrections`.
-    reconstructed = conn.execute(
-        text("SELECT COALESCE(corrections->'doi'->>'raw', doi) FROM source_records WHERE id = :id"),
-        {"id": chapter},
-    ).scalar_one()
-    assert reconstructed == "10.1/x"
+    assert _doi_statuses(conn, book) == {"10.1/x": None}
+    assert _doi_statuses(conn, chapter) == {"10.1/x": "OUVRAGE_VS_CHAPITRE"}
 
 
 def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
@@ -455,11 +447,7 @@ def test_idempotent_and_self_heals_when_book_retyped(sa_sync_conn):
         text("UPDATE source_records SET doc_type = 'article' WHERE id = :id"), {"id": book}
     )
     assert _apply_cluster(conn) == 1
-    chap_doi = conn.execute(
-        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": chapter}
-    ).one()
-    assert chap_doi.doi == "10.1/x"
-    assert chap_doi.corrections == {}
+    assert _doi_statuses(conn, chapter) == {"10.1/x": None}
 
 
 def test_chapters_same_title_untouched(sa_sync_conn):
@@ -509,12 +497,7 @@ def test_chapters_distinct_titles_both_lose_doi(sa_sync_conn):
     )
     assert _apply_cluster(conn) == 2
     for source_record in (c1, c2):
-        row = conn.execute(
-            text("SELECT doi, corrections FROM source_records WHERE id = :id"),
-            {"id": source_record},
-        ).one()
-        assert row.doi is None
-        assert row.corrections["doi"]["corrected_by"] == "CHAPITRES_TITRES_DIFFERENTS"
+        assert _doi_statuses(conn, source_record) == {"10.1/z": "CHAPITRES_TITRES_DIFFERENTS"}
 
 
 def test_chapters_number_prefix_same_chapter_untouched(sa_sync_conn):
@@ -561,22 +544,13 @@ def test_un_doi_inconnu_de_doi_org_est_nulle_puis_restaure(sa_sync_conn):
     )
 
     assert _apply_cluster(conn) == 2
-    raw = conn.execute(
-        text("SELECT doi, corrections FROM source_records WHERE id = :id"), {"id": first}
-    ).one()
-    assert raw.doi is None
-    assert raw.corrections == {
-        "doi": {"raw": "10.1364/ao.xx.xxxxxx", "corrected_by": "UNRESOLVED_DOI_TO_NULL"}
-    }
+    assert _doi_statuses(conn, first) == {"10.1364/ao.xx.xxxxxx": "UNRESOLVED_DOI_TO_NULL"}
 
     # doi.org connaît le DOI au run suivant : les enregistrements sources le retrouvent.
     conn.execute(text("DELETE FROM failed_lookups"))
     assert _apply_cluster(conn) == 2
-    dois = conn.execute(
-        text("SELECT doi FROM source_records WHERE id IN (:a, :b)"),
-        {"a": first, "b": second},
-    ).scalars()
-    assert set(dois) == {"10.1364/ao.xx.xxxxxx"}
+    for source_record in (first, second):
+        assert _doi_statuses(conn, source_record) == {"10.1364/ao.xx.xxxxxx": None}
 
 
 # ── Sous-étape cluster : copies de repository et versions (IsVariantFormOf, IsVersionOf) ──

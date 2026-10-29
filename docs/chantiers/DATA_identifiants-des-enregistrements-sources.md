@@ -135,7 +135,8 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Relations déclarées par Crossref et DataCite : DOI déclarant pris sur le DOI `primary`, quel que soit son statut. Résultat identique sur la base locale.
 - [x] Modèles de lecture de l'API et `report_open_science` : DOI affiché d'un enregistrement source pris sur le premier de ses DOI actifs de rôle autre que `related`, par rôle (`source_record_doi_sql`) ; file des conflits d'espace de noms sur `serial_doi_sql`. Sur la base locale, 616 enregistrements sources OpenAlex et ScanR affichent leur DOI `derived` au lieu d'un DOI `secondary` (preprint, copie Zenodo).
 - [x] Revues « Research Square » fusionnées et typées `preprint_server` : avec les DOI `derived` de ScanR, l'espace `10.21203/rs.` était attribué à l'une d'elles, typée `unknown`.
-- [ ] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
+- [x] Lectures du DOI dans la table : réconciliation, `metadata_correction`, `fetch_missing` et `known_dois`, `resolve_ra`, consolidation, statut open access, relations, modèles de lecture de l'API. Les lectures qui identifient l'œuvre passent par `doi_or_target_sql`, celles qui interrogent un service par DOI lisent le DOI tel quel.
+- [x] Écritures de la colonne retirées : normalisation, `remove_identifiers` (colonne et `corrections.doi`), déclarations de `pipeline/graph.py`.
 - [ ] Suppression de la colonne.
 
 ### Phase 7 — DOI bioRxiv et medRxiv

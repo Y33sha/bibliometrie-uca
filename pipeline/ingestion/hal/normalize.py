@@ -221,7 +221,6 @@ def hal_source_record(
         source="hal",
         source_id=hal_id,
         staging_id=staging_id,
-        doi=clean_doi(hal_text_field(doc.get("doiId_s"))),
         identifiers=build_hal_identifiers(doc, hal_id, nnt),
         title=get_title(doc),
         publication_year=as_int(doc.get("producedDateY_i")),

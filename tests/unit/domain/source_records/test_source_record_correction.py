@@ -28,10 +28,7 @@ def test_enregistrement_deja_corrige():
 
 
 def test_entrees_des_autres_sous_etapes_gardees():
-    others = {
-        CorrectionKey.DOI: stash_entry("10.1/x", "OUVRAGE_VS_CHAPITRE"),
-        CorrectionKey.SERIAL_ID: stash_entry(None, "SERIAL_BY_DOI_NAMESPACE"),
-    }
+    others = {CorrectionKey.SERIAL_ID: stash_entry(None, "SERIAL_BY_DOI_NAMESPACE")}
     corrected = correct_source_record(_facts(serial_type="media"), (), others)
     assert corrected is not None
     assert corrected.columns.corrections == {

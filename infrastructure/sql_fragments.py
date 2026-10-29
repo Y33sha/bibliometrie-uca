@@ -236,14 +236,6 @@ def stashed_raw(field: str, source_record: str = "sr") -> str:
     return f"{source_record}.corrections -> '{field}' ->> '{RAW}'"
 
 
-def raw_column(field: str, source_record: str = "sr") -> str:
-    """Valeur que la source donne pour la colonne texte `field` de l'enregistrement source aliasé `source_record` : la valeur conservée par une correction, sinon la colonne (`raw_value`)."""
-    return (
-        f"CASE WHEN {source_record}.corrections -> '{field}' ? '{RAW}'"
-        f" THEN {stashed_raw(field, source_record)} ELSE {source_record}.{field} END"
-    )
-
-
 def source_extra(key: SourceExtra, alias: str = "sr") -> str:
     """Valeur texte de la clé `key` des champs propres à la source de la ligne aliasée `alias`, enregistrement source ou publication."""
     return f"{alias}.source_extras ->> '{key}'"

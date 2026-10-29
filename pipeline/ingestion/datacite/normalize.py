@@ -220,7 +220,6 @@ def datacite_source_record(
         source="datacite",
         source_id=doi,
         staging_id=staging_id,
-        doi=doi,
         identifiers=datacite_identifiers(attributes, doi),
         title=title,
         publication_year=publication_year,

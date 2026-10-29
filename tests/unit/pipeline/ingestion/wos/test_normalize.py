@@ -34,9 +34,7 @@ from pipeline.ingestion.wos.normalize import (
     wos_source_record,
 )
 from pipeline.transformation.publishing.find_or_create import Containers
-from tests.helpers.normalize_doubles import (
-    staging_row,
-)
+from tests.helpers.normalize_doubles import identifier_values, staging_row
 
 # ── _safe_list ───────────────────────────────────────────────────
 
@@ -841,7 +839,7 @@ class TestWosSourceRecord:
         )
 
         assert row_arg.source_id == "WOS:1"
-        assert row_arg.doi == "10.1/x"
+        assert identifier_values(row_arg)["doi"] == ["10.1/x"]
         assert row_arg.title == "T"
         assert row_arg.publication_year == 2024
         assert row_arg.raw_doc_type == "article"
@@ -860,7 +858,7 @@ class TestWosSourceRecord:
 
         assert row_arg.serial_id is None
         assert row_arg.oa_status is None
-        assert row_arg.doi is None
+        assert "doi" not in identifier_values(row_arg)
 
     def test_container_title_absent_with_serial_id(self):
         rec = {

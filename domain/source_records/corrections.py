@@ -27,7 +27,6 @@ class CorrectionKey(StrEnum):
     DOC_TYPE = "doc_type"
     OA_STATUS = "oa_status"
     URLS = "urls"
-    DOI = "doi"
     SERIAL_ID = "serial_id"
 
 
@@ -39,14 +38,9 @@ UNARY_KEYS = frozenset(
         CorrectionKey.URLS,
     }
 )
-CLUSTER_KEYS = frozenset({CorrectionKey.DOI})
 SERIAL_BY_DOI_KEYS = frozenset({CorrectionKey.SERIAL_ID})
-assert UNARY_KEYS | CLUSTER_KEYS | SERIAL_BY_DOI_KEYS == set(CorrectionKey)
-assert not (
-    UNARY_KEYS & CLUSTER_KEYS
-    or UNARY_KEYS & SERIAL_BY_DOI_KEYS
-    or CLUSTER_KEYS & SERIAL_BY_DOI_KEYS
-)
+assert UNARY_KEYS | SERIAL_BY_DOI_KEYS == set(CorrectionKey)
+assert not UNARY_KEYS & SERIAL_BY_DOI_KEYS
 
 
 def other_entries(

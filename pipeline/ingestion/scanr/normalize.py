@@ -8,7 +8,7 @@ from domain.normalize import drop_flattened_mathml
 from domain.persons.contributor_name import ContributorName
 from domain.publications.contribution_roles import map_role, merge_roles
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
-from domain.publications.identifiers import clean_doi, extract_hal_id_from_url
+from domain.publications.identifiers import extract_hal_id_from_url
 from domain.publications.licenses import normalize_license
 from domain.serials.containers import ContainerDescription
 from domain.serials.issns import source_issns
@@ -44,14 +44,6 @@ from pipeline.ingestion.scanr.payload import (
 from pipeline.transformation.publishing.find_or_create import (
     Containers,
 )
-
-
-def extract_doi(doc: Mapping[str, JsonValue]) -> str | None:
-    for entry in as_sequence(doc.get("externalIds")):
-        ext = as_mapping(entry)
-        if as_str(ext.get("type")) == "doi":
-            return clean_doi(as_str(ext.get("id")))
-    return None
 
 
 def get_title(doc: Mapping[str, JsonValue]) -> str | None:
@@ -179,7 +171,6 @@ def scanr_source_record(  # noqa: C901
 
     Le titre du conteneur (`source.title`) est gardé seulement sans revue. L'API ScanR est sans langue.
     """
-    doi = extract_doi(doc)
     abstract = as_str(as_mapping(doc.get("summary")).get("default"))
 
     kw_val = as_mapping(doc.get("keywords")).get("default")
@@ -228,7 +219,6 @@ def scanr_source_record(  # noqa: C901
         source="scanr",
         source_id=scanr_id,
         staging_id=staging_id,
-        doi=doi,
         identifiers=scanr_identifiers(doc, scanr_id),
         title=get_title(doc) or "",
         publication_year=as_int(doc.get("year")),

@@ -157,7 +157,8 @@ class TestThesesSourceRecord:
         assert identifier_values(record) == {"nnt": ["2024CLFAC001"]}
 
     def test_doi_passthrough(self):
-        assert self._call({"titrePrincipal": "T", "doi": "10.1/abc"}).doi == "10.1/abc"
+        record = self._call({"titrePrincipal": "T", "doi": "10.1/abc"})
+        assert identifier_values(record)["doi"] == ["10.1/abc"]
 
     def test_nnt_goes_in_identifiers(self):
         record = self._call({"nnt": "2024CLFAC001"})

@@ -316,7 +316,6 @@ def openalex_source_record(  # noqa: C901
         source="openalex",
         source_id=openalex_id,
         staging_id=staging_id,
-        doi=doi,
         identifiers=openalex_identifiers(location_identifiers, doi, primary),
         title=get_title(work) or "",
         publication_year=get_publication_year(work),
