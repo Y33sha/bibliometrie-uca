@@ -36,13 +36,13 @@ def test_refuse_sans_empreinte_de_mot_de_passe(auth_settings):
         check_auth_config()
 
 
-def test_refuse_une_cle_de_contribution_source_absente(auth_settings):
+def test_refuse_une_cle_de_signature_absente(auth_settings):
     auth_settings(session_secret="")
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):
         check_auth_config()
 
 
-def test_refuse_une_cle_de_contribution_source_trop_courte(auth_settings):
+def test_refuse_une_cle_de_signature_trop_courte(auth_settings):
     """Une clé de signature courte se retrouve par force brute hors ligne ; le jeton de session se forge alors sans mot de passe."""
     auth_settings(session_secret="s" * (MIN_SESSION_SECRET_LENGTH - 1))
     with pytest.raises(RuntimeError, match="SESSION_SECRET"):

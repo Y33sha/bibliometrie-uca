@@ -127,7 +127,7 @@ def _alembic_config() -> Config:
     `configure_logger` à faux empêche `env.py` d'appeler `fileConfig`, pour tout usage d'Alembic dans une session de test. `fileConfig` désactive les loggers déjà créés que `alembic.ini` omet, donc ceux de l'application : un test qui observe le journal le trouverait vide.
     """
     cfg = Config(str(ALEMBIC_INI))
-    url = _source_contribution_url(identity="owner").render_as_string(hide_password=False)
+    url = _database_url(identity="owner").render_as_string(hide_password=False)
     cfg.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
     cfg.attributes["configure_logger"] = False
     return cfg
@@ -149,7 +149,7 @@ def db():
     conn.close()
 
 
-def _source_contribution_url(*, identity: str = "pipeline"):
+def _database_url(*, identity: str = "pipeline"):
     """URL SQLAlchemy de la base de test, sous le rôle `identity` (`pipeline`, `app` ou `owner`).
 
     Le propriétaire du schéma sert aux migrations ; les fixtures de données passent par le rôle du pipeline, celles qui exercent une opération de l'API par le rôle de l'API.
@@ -187,7 +187,7 @@ def sa_sync_conn_owner():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_source_contribution_url(identity="owner"))
+    engine = create_engine(_database_url(identity="owner"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -205,7 +205,7 @@ def sa_sync_conn_app():
     """
     from sqlalchemy import create_engine
 
-    engine = create_engine(_source_contribution_url(identity="app"))
+    engine = create_engine(_database_url(identity="app"))
     with engine.connect() as conn:
         trans = conn.begin()
         try:
@@ -225,7 +225,7 @@ def sa_engine_app():
 
     from infrastructure.db.engine import install_engine_guards
 
-    engine = create_engine(_source_contribution_url(identity="app"))
+    engine = create_engine(_database_url(identity="app"))
     install_engine_guards(engine)
     yield engine
     engine.dispose()
@@ -241,7 +241,7 @@ def sa_engine_pipeline():
 
     from infrastructure.db.engine import set_sync_engine
 
-    engine = create_engine(_source_contribution_url())
+    engine = create_engine(_database_url())
     set_sync_engine(engine)
     yield engine
     set_sync_engine(None)
@@ -253,7 +253,7 @@ def sa_sync_conn():
     """Connexion SQLAlchemy sous le rôle du pipeline ; la transaction est annulée à la fin du test."""
     from sqlalchemy import create_engine
 
-    engine = create_engine(_source_contribution_url())
+    engine = create_engine(_database_url())
     with engine.connect() as conn:
         trans = conn.begin()
         try:

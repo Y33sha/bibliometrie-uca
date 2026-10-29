@@ -110,7 +110,7 @@ class TestCheck:
         }
 
     def test_reports_forged_cookie_as_anonymous(self, client):
-        client.cookies.set("session", "admin|0.contribution source-inventee")
+        client.cookies.set("session", "admin|0.signature-inventee")
         try:
             r = client.get("/api/auth/check")
             assert r.json()["authenticated"] is False

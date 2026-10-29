@@ -16,19 +16,19 @@ def savepoint(
 
     Si l'annulation du SAVEPOINT échoue (transaction cassée), `on_rollback_failure`, en général `conn.rollback`, rend la connexion utilisable. L'exception d'origine remonte, même si cette seconde annulation échoue aussi (connexion perdue).
     """
-    source_record: NestedTransaction = conn.begin_nested()
+    nested: NestedTransaction = conn.begin_nested()
     try:
         yield
     except Exception:
         try:
-            source_record.rollback()
+            nested.rollback()
         except Exception:
             if on_rollback_failure is not None:
                 with suppress(Exception):
                     on_rollback_failure()
         raise
     else:
-        source_record.commit()
+        nested.commit()
 
 
 def rollback_unless_invalidated(conn: Connection) -> None:
