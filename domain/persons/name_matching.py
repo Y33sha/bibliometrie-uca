@@ -1,7 +1,4 @@
-"""Fonctions de comparaison et de parsing des noms de personnes.
-
-Utilisées par le pipeline (rattachement des groupes, `domain/persons/matching.py`) et par l'admin (rapprochement des doublons candidats dans les files de triage du hub personnes), qui partagent le même comparateur `names_compatible`.
-"""
+"""Découpage et comparaison des noms de personnes."""
 
 import re
 from enum import Enum
@@ -47,16 +44,15 @@ def _trailing_initials_start(words: list[str]) -> int | None:
 
 
 def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
-    """Parse un raw_author_name en (last_name, first_name).
+    """Nom de famille et prénom d'un nom brut.
 
-    Formats gérés :
-    - "LastName, FirstName" (WoS, HAL parfois) ; des initiales avant la virgule passent en prénom (« C., Küll »).
-    - "LastName I." : des initiales finales forment le prénom (« Del Buono L. »).
-    - "FirstName LastName" (OpenAlex) : le nom de famille commence à la première particule après le premier mot (« Alison da Silva »), sinon il se réduit au dernier mot.
+    - « Nom, Prénom » : des initiales avant la virgule passent en prénom (« C., Küll »).
+    - « Nom I. » : des initiales finales forment le prénom (« Del Buono L. »).
+    - « Prénom Nom » : le nom de famille commence à la première particule après le premier mot (« Alison da Silva »), sinon il se réduit au dernier mot.
     """
     if not raw_name:
         return "", ""
-    # Filet générique : une contribution source non passée par le writer (nom brut jamais assaini) ne doit pas transformer un identifiant parenthésé en nom de famille.
+    # Retire un identifiant entre parenthèses d'un nom brut lu sans nettoyage préalable.
     raw = clean_raw_author_name(raw_name).strip()
     if "," in raw:
         parts = raw.split(",", 1)
@@ -74,7 +70,7 @@ def parse_raw_author_name(raw_name: str | None) -> tuple[str, str]:
 
 
 def family_name_splits(raw_name: str | None) -> list[tuple[str, str]]:
-    """Découpages (nom de famille, prénom) possibles d'une contribution source.
+    """Découpages possibles d'un nom brut en nom de famille et prénom.
 
     Au format « Nom, Prénom » ou « Nom I. », le seul découpage de `parse_raw_author_name`. Sinon, chaque groupe de mots final après le premier mot, du plus long au plus court : « Florence Caldefie Chezet » donne (« Caldefie Chezet », « Florence ») puis (« Chezet », « Florence Caldefie »).
     """
@@ -123,26 +119,21 @@ def full_first_name_extends(initials: tuple[str, ...], first_name: str) -> bool:
 
 
 def _name_words(*parts: str) -> list[str]:
-    """Mots normalisés d'un nom, dans l'ordre, sans les chiffres.
-
-    `normalize_text` (minuscules, sans accent ni ponctuation) puis retrait des chiffres : les années de naissance collées aux noms en forme d'autorité (« Chiari, Sophie 1977- ») parasiteraient sinon les mots. Exception assumée à la normalisation habituelle, qui conserve les chiffres pour les identifiants.
-    """
+    """Mots normalisés d'un nom, sans les chiffres, qui sont souvent une année de naissance (« Chiari, Sophie 1977- »)."""
     text = re.sub(r"\d+", " ", normalize_text(" ".join(part for part in parts if part)))
     return text.split()
 
 
 def names_compatible(ln1: str, fn1: str, ln2: str, fn2: str) -> bool:
-    """Vrai si deux noms désignent la même personne, à une variation de graphie près.
+    """Vrai si deux noms désignent la même personne, à une variante de graphie près. Les noms sont bruts ou normalisés, et leur découpage en nom et prénom est indifférent.
 
-    Comparaison mot à mot, indépendante de l'ordre : chaque mot du nom le plus court doit s'apparier à un mot distinct de l'autre. Une initiale couvre donc un seul mot : « s solomon » et « sanya solodkov » restent distincts. Un appariement par initiale exige au moins un appariement entre deux mots entiers : « s pierre » et « p simon » restent distincts. Elle couvre l'inversion nom/prénom, les noms composés réordonnés (« Combes-Motel » ↔ « Motel Combes »), les initiales (« J-L Bailly » ↔ « Jean Luc Bailly »), et une faute de frappe ou de translittération par mot (« erick » ↔ « eric »). La faute n'est tolérée que si le nom le plus court compte au moins deux mots : un prénom seul, proche d'un prénom de l'autre nom, ne suffit pas. Un homonyme de patronyme au prénom franchement autre (« hervé chanal » / « hélène chanal ») ou deux initiales différentes (« b zhang » / « x zhang ») restent distincts.
-
-    Les entrées peuvent être brutes ou déjà normalisées. Le découpage nom/prénom est indifférent, ce qui autorise à passer un nom entier en `ln` et une chaîne vide en `fn`.
+    Chaque mot du nom le plus court s'apparie à un mot distinct de l'autre, dans n'importe quel ordre (« Combes-Motel », « Motel Combes »). Une initiale s'apparie au mot qu'elle commence (« J-L Bailly », « Jean Luc Bailly »), si une paire de mots entiers s'apparie aussi : « s pierre » et « p simon » sont distincts. Un mot peut différer d'une faute (« erick », « eric ») si le nom le plus court compte au moins deux mots.
     """
     return _words_compatible(_name_words(ln1, fn1), _name_words(ln2, fn2))
 
 
 def _edit_distance(a: str, b: str) -> int:
-    """Distance d'édition avec transposition adjacente (Damerau-Levenshtein restreinte, dite « optimal string alignment ») : insertion, suppression, substitution et échange de deux lettres voisines comptent chacun 1. La transposition couvre les coquilles fréquentes sur les noms (« doit » / « diot »)."""
+    """Distance d'édition où insertion, suppression, substitution et échange de deux lettres voisines (« doit », « diot ») coûtent 1 (optimal string alignment)."""
     if a == b:
         return 0
     la, lb = len(a), len(b)
@@ -172,7 +163,7 @@ class _Pairing(Enum):
 
 
 def _pairing(word: str, other: str, *, typo: bool) -> _Pairing | None:
-    """Nature de l'appariement de deux mots, `None` s'ils ne s'apparient pas. Un mot d'une lettre est une initiale ; la faute n'est tolérée qu'entre deux mots entiers, et seulement si `typo`."""
+    """Nature de l'appariement de deux mots, `None` s'ils ne s'apparient pas. Un mot d'une lettre est une initiale. Une faute est admise seulement entre deux mots entiers, et si `typo`."""
     if len(word) == 1 or len(other) == 1:
         if word == other:
             return _Pairing.INITIALS
@@ -185,7 +176,7 @@ def _pairing(word: str, other: str, *, typo: bool) -> _Pairing | None:
 
 
 def _words_compatible(words1: list[str], words2: list[str]) -> bool:
-    """Vrai si chaque mot du nom le plus court s'apparie à un mot distinct de l'autre ; la faute n'est tolérée que si ce nom compte au moins deux mots."""
+    """Vrai si chaque mot du nom le plus court s'apparie à un mot distinct de l'autre. Une faute est admise seulement si ce nom compte au moins deux mots."""
     if not words1 or not words2:
         return False
     small, big = (words1, words2) if len(words1) <= len(words2) else (words2, words1)
