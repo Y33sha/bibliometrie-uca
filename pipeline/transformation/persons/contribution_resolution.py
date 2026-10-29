@@ -132,7 +132,7 @@ _WRITE_SQL = text("""
       AND (g.person_id, g.resolution_mode::text) IS DISTINCT FROM (u.person_id, u.mode)
 """)
 
-# Contributions décidés dont la personne diffère de celle que désigne leur décision : ils la perdent.
+# Contributions décidées dont la personne diffère de celle que désigne leur décision : elles la perdent.
 _RELEASE_SQL = text(f"""
     UPDATE contributions g SET {DETACHED_CONTRIBUTION}
     FROM unnest(CAST(:ids AS integer[]), CAST(:persons AS integer[])) AS u(id, person_id)
@@ -141,7 +141,7 @@ _RELEASE_SQL = text(f"""
 
 
 def load_index(conn: Connection, conflicting: frozenset[int] = frozenset()) -> PersonIndex:
-    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit dont les contributions attestent plusieurs prénoms pleins (`Namesake.conflicting`)."""
+    """Index complet des personnes : identifiants attribués, formes de nom, verdicts des formes, homonymes par nom de famille. `conflicting` : personnes au prénom réduit à qui les contributions donnent plusieurs prénoms pleins (`Namesake.conflicting`)."""
     namesakes: dict[str, list[Namesake]] = defaultdict(list)
     for namesake in fetch_namesakes(conn):
         namesakes[normalize_text(namesake.last_name)].append(
@@ -291,7 +291,7 @@ def create_persons(
     taken: dict[int, frozenset[int]],
     progress: Progress | None = None,
 ) -> int:
-    """Traite une à une les contributions dont la décision est une création, contre l'index tenu à jour : une contribution que désigne une personne créée plus tôt dans le passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à un autre contribution de la publication n'est pas reprise. Met `decisions` à jour et rend le nombre de personnes créées. `progress` avance d'une contribution traité et retient les personnes créées."""
+    """Traite une à une les contributions dont la décision est une création, contre l'index tenu à jour : une contribution que désigne une personne créée dans le même passage la rejoint ; sinon une personne naît de son nom (`founding_name`), et l'index l'enregistre. Une personne déjà rattachée à une autre contribution de la publication reste à celle-ci. Met `decisions` à jour et rend le nombre de personnes créées. `progress` avance d'une contribution traitée et retient les personnes créées."""
     repo = PgPersonRepository(conn)
     created = 0
     for publication_id in sorted(candidates):

@@ -1,6 +1,6 @@
 """Complétion des prénoms réduits à des initiales, d'après les contributions sources des contributions rattachées aux personnes.
 
-Une personne créée depuis une contribution source « Tnourji, A. » a le prénom « A. ». Quand les contributions sources de ses contributions lui donnent un seul prénom plein compatible (« Abdellah »), elle prend ce prénom : le rattachement par initiales compatibles ne lui envoie ensuite que les contributions sources de ce prénom. Quand elles lui en donnent plusieurs, elle garde ses initiales et ne reçoit aucun prénom plein de plus (`Namesake.conflicting`).
+Une personne créée depuis une contribution source « Tnourji, A. » a le prénom « A. ». Quand les contributions sources de ses contributions lui donnent un seul prénom plein compatible (« Abdellah »), elle prend ce prénom : le rattachement par initiales compatibles lui envoie ensuite seulement les contributions sources de ce prénom. Quand elles lui en donnent plusieurs, elle garde ses initiales (`Namesake.conflicting`).
 """
 
 from typing import NamedTuple
@@ -47,7 +47,7 @@ class FirstNameCompletion(NamedTuple):
 def complete_reduced_first_names(
     conn: Connection, *, repo: PgPersonRepository
 ) -> FirstNameCompletion:
-    """Donne à chaque personne au prénom réduit le prénom plein que les contributions sources de ses contributions attestent seul."""
+    """Donne à chaque personne au prénom réduit le prénom plein que les contributions sources de ses contributions donnent seul."""
     reduced = {}
     for namesake in fetch_namesakes(conn):
         initials = first_name_initials(namesake.first_name)

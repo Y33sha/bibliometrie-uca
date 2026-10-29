@@ -1,6 +1,6 @@
 """Purge de la phase personnes : marquage des contributions à forme de nom ambiguë, suppression des attributions d'identifiant sans appui, puis suppression des personnes sans contribution du périmètre.
 
-La purge tourne après `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. Les contributions rattachées par cette forme sont marqués pour la redécision de leur personne : au run suivant, le rattachement des contributions les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. La contribution rejoint la personne au prénom plein au run d'après.
+La purge tourne après `populate_person_name_forms`, qui régénère les formes dérivées du nom des personnes. Une forme réduite (« j martin ») devient ambiguë quand elle désigne à la fois une personne au prénom réduit et une personne au prénom plein. Les contributions rattachées par cette forme sont marquées pour la redécision de leur personne : au run suivant, le rattachement des contributions les laisse sans personne. La personne réduite, sans autre contribution du périmètre, est alors supprimée avec ses formes de nom, et la forme réduite redevient univoque. La contribution rejoint la personne au prénom plein au run d'après.
 """
 
 from sqlalchemy import Connection, text
@@ -95,7 +95,7 @@ def delete_persons_out_of_perimeter(conn: Connection) -> int:
 def purge(conn: Connection) -> dict[str, int]:
     """Marque pour la redécision les contributions nominales à forme ambiguë, supprime les attributions d'identifiant sans appui, puis les personnes sans contribution du périmètre.
 
-    Rend les compteurs `{ambiguous_marked, deleted_attributions, deleted_persons}`. Le commit est laissé à l'appelant.
+    Rend les compteurs `{ambiguous_marked, deleted_attributions, deleted_persons}`. L'appelant commite.
     """
     return {
         "ambiguous_marked": mark_ambiguous_nominal(conn),

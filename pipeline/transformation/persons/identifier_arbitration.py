@@ -71,9 +71,10 @@ _MISPLACED = IdentifierNeutralization.MISPLACED.value
 
 
 def fetch_identifier_votes(conn: Connection, id_type: str) -> dict[str, dict[str, int]]:
-    """Pour chaque valeur du type, le nombre de **contributions sources** qui la contiennent sous chaque `author_name_normalized` (poids en contributions sources, et non en lignes de `contributor_information` — 99 correctes l'emportent sur 1 corrompue). Le rapprochement part des informations du contributeur qui contiennent le type (`contributor_information`), jointes aux `source_contributions` (index `contributor_information_id`) pour le comptage.
+    """Pour chaque valeur du type, le nombre de contributions sources qui la contiennent, par `author_name_normalized`.
 
-    Une contribution source hors contribution ne vote pas. Une contribution source qui neutralise la valeur pour cause de partage ne vote pas. Une contribution source qui la neutralise comme mal placée vote : le consensus ne dépend ainsi que des données, pas des requalifications précédentes. Seuls les identifiants fiables selon leur source votent (`trusted_identifier`), comme au matching."""
+    Votent les contributions sources rattachées à une contribution, dont la source est fiable pour l'identifiant (`trusted_identifier`), et qui ne neutralisent pas la valeur pour partage. Une contribution source qui la neutralise comme mal placée vote : le consensus dépend seulement des données.
+    """
     rows = conn.execute(
         text(f"""
             SELECT ci.identifiers->>:id_type AS id_value,
@@ -228,7 +229,7 @@ def _bears_identifier(id_type: str) -> str:
 def fetch_identifier_contribution_votes(
     conn: Connection, id_type: str
 ) -> dict[str, dict[int, int]]:
-    """Pour chaque valeur du type, les personnes des contributions qui la portent, avec leurs voix. Une contribution porte la valeur quand un de ses contributions sources la porte (`_bears_identifier`), et donne une voix à sa personne."""
+    """Pour chaque valeur du type, les personnes des contributions qui la portent, avec leurs voix. Une contribution porte la valeur quand une de ses contributions sources la porte (`_bears_identifier`), et donne une voix à sa personne."""
     rows = conn.execute(
         text(f"""
             SELECT ci.identifiers->>:id_type AS id_value, g.person_id,
@@ -314,7 +315,7 @@ class IdentifierConflict(NamedTuple):
 
 
 def detect_identifier_conflicts(conn: Connection) -> list[IdentifierConflict]:
-    """Conflits d'attribution des identifiants forts : valeurs attribuées qu'une contribution d'une autre personne que le titulaire porte. Lecture d'agrégat, à confier ensuite à `resolve_identifier_transfers`."""
+    """Conflits d'attribution des identifiants forts : valeurs attribuées qu'une contribution d'une autre personne que le titulaire porte."""
     conflicts: list[IdentifierConflict] = []
     for id_type in STRONG_PERSON_IDENTIFIER_TYPES:
         owners = fetch_identifier_owners(conn, id_type)
@@ -374,7 +375,7 @@ def arbitrate_identifier_conflicts(
 ) -> dict[str, int]:
     """Neutralise les identifiants mal placés, puis tranche les conflits d'attribution d'identifiant par transfert.
 
-    Retourne `{neutralized, marked_contributions, transferred}`. Le commit est laissé au caller.
+    Retourne `{neutralized, marked_contributions, transferred}`. L'appelant commite.
     """
     step(logger, "Conflits d'identifiants")
     with waiting(BRANCH, logger) as line:

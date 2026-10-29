@@ -1,12 +1,6 @@
-"""Peuplement de `person_name_forms` à partir des sources existantes.
+"""Synchronisation de `person_name_forms` avec les formes attendues de chaque personne : celles de son nom (source `persons`), exclues comprises, et les noms des contributions sources de ses contributions.
 
-Mode incrémental : à chaque run, recalcule l'ensemble des couples attendus `(name_form, person_id, sources)` depuis les sources (personnes et contributions sources de leurs contributions), puis synchronise la table par diff (insert/update/delete).
-
-Sources :
-1. `persons.last_name` + `persons.first_name` (source: `'persons'`) — inclut les personnes exclues, qui restent des ancres du matching.
-2. le nom normalisé des informations du contributeur des contributions sources des contributions rattachées à la personne (`contributor_information.author_name_normalized`, toutes sources biblio).
-
-L'orchestrateur produit les formes "persons" en Python via `compute_person_name_forms` (variantes prénom/nom/initiales) et les charge dans la table temp `_raw_forms`. La fusion et la synchronisation se font ensuite côté SQL via `sync_from_raw_forms` (GROUP BY (name_form, person_id), agrégation des sources, diff INSERT/UPDATE/DELETE).
+Les formes du nom se calculent en Python (`compute_person_name_forms`) et passent par la table temporaire `_raw_forms`. La synchronisation se fait en SQL (`sync_from_raw_forms`).
 """
 
 from typing import NamedTuple, TypedDict
@@ -20,7 +14,7 @@ from infrastructure.sql_fragments import CONTRIBUTIONS_AND_SOURCES
 
 
 class PersonNameRow(NamedTuple):
-    """Projection `persons` consommée par `populate_person_name_forms` : id + parts du nom (trimmées en SQL)."""
+    """Nom et prénom d'une personne, sans les espaces qui les entourent."""
 
     id: int
     first_name: str | None
@@ -28,7 +22,7 @@ class PersonNameRow(NamedTuple):
 
 
 class RawFormBatchItem(TypedDict):
-    """Ligne du batch vers la table temp `_raw_forms` : forme de nom normalisée."""
+    """Forme de nom à charger dans `_raw_forms`."""
 
     name_form: str
     person_id: int
@@ -44,7 +38,7 @@ class SyncCounts(NamedTuple):
 
 
 def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
-    """Inclut les personnes exclues : leurs name_forms restent dans `person_name_forms` comme ancres du matching, donc le pipeline ne les recrée pas à chaque run."""
+    """Nom de chaque personne, exclues comprises : leurs formes de nom servent au matching, qui ne recrée donc pas ces personnes."""
     rows = conn.execute(
         text("""
             SELECT id,
@@ -58,12 +52,12 @@ def fetch_persons_names(conn: Connection) -> list[PersonNameRow]:
 
 
 def create_temp_raw_forms_table(conn: Connection) -> None:
-    """Reçoit les triplets calculés en Python depuis `persons` (un par forme retournée par `compute_person_name_forms`, source `'persons'`). Les formes des contributions sources des contributions sont lues directement par la query d'agrégation, sans transiter par cette table."""
+    """Crée la table temporaire `_raw_forms`, qui reçoit les formes du nom des personnes."""
     conn.execute(text("CREATE TEMP TABLE _raw_forms (name_form TEXT, person_id INT, source TEXT)"))
 
 
 def insert_raw_forms_batch(conn: Connection, rows: list[RawFormBatchItem]) -> None:
-    """Insert massif de formes de nom dans la table temporaire `_raw_forms`."""
+    """Insère un lot de formes de nom dans `_raw_forms`."""
     if not rows:
         return
     conn.execute(
@@ -82,10 +76,7 @@ def drop_temp_raw_forms_table(conn: Connection) -> None:
 
 
 def sync_from_raw_forms(conn: Connection) -> SyncCounts:
-    """Construit en table temp `_expected_pnf` l'état attendu agrégé par `(name_form, person_id)`, sources triées dédupliquées. Puis 3 statements de sync : DELETE des couples manquants, INSERT des couples absents (statut `pending`), UPDATE des `sources` qui ont changé.
-
-    Le recompute respecte le `status` (validation du lien forme↔personne) : l'UPDATE touche seulement `sources`, laissant le `status` intact ; une ligne `confirmed`/`rejected` (verdict) survit à la purge, sauf une forme de source `'persons'` absente de l'état attendu — seule une édition du nom/prénom retire une forme canonique. L'appartenance au nom canonique se lit dans `sources` (`'persons'`), non dans le statut.
-    """
+    """Synchronise `person_name_forms` avec l'état attendu, agrégé par `(name_form, person_id)` : suppression des couples absents, insertion des nouveaux en `pending`, mise à jour des `sources`. Le statut reste inchangé. Une forme `confirmed` ou `rejected` reste en base, sauf une forme du nom de la personne (source `persons`) qu'une modification du nom retire."""
     conn.execute(
         text(f"""
             CREATE TEMP TABLE _expected_pnf AS
@@ -109,7 +100,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
     )
     conn.execute(text("CREATE INDEX ON _expected_pnf (name_form, person_id)"))
 
-    # La purge retire les `pending` orphelins et les formes `'persons'` absentes de l'état attendu (édition du nom) ; les verdicts `confirmed`/`rejected` sur des formes non-canoniques (bibliographiques) survivent.
+    # Seules les formes `pending` et les formes du nom de la personne absentes de l'état attendu sont supprimées.
     deleted = conn.execute(
         text(f"""
             DELETE FROM person_name_forms p
@@ -122,7 +113,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
         """)
     ).rowcount
 
-    # Toute forme insérée entre en `pending` ; seule une action admin tranche. L'appartenance au nom canonique se lit dans `sources` (`'persons'`).
+    # Une forme insérée est `pending` ; seule l'administration la tranche.
     inserted = conn.execute(
         text(f"""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
@@ -136,7 +127,7 @@ def sync_from_raw_forms(conn: Connection) -> SyncCounts:
         """)
     ).rowcount
 
-    # Resynchronise les seules `sources` ; le statut (verdict admin ou `pending`) est préservé.
+    # Seules les `sources` changent ; le statut reste.
     updated = conn.execute(
         text("""
             UPDATE person_name_forms p
