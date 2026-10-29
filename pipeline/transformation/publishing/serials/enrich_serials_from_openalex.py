@@ -1,6 +1,6 @@
-"""Sous-étape de la phase `publishing` — renseigne le `serial_type` des revues à partir de l'API OpenAlex Sources, quand le mapping local du `type` OpenAlex renvoie une valeur exploitable.
+"""Sous-étape de la phase `publishing` : type des revues de type inconnu, d'après le type de leur source OpenAlex.
 
-Le fetch OpenAlex est injecté (le HTTP vit dans `pipeline/ingestion/openalex`). L'orchestrateur s'arrête quand le circuit-breaker de la source coupe. Appelé par `run_pipeline`.
+Les requêtes à OpenAlex sont injectées (`pipeline/ingestion/openalex`). La sous-étape s'arrête quand le circuit-breaker de la source coupe.
 """
 
 import logging
@@ -19,13 +19,13 @@ LABEL = "Type des publications en série sur OpenAlex"
 """Libellé de la sous-étape dans le journal de la phase."""
 
 BATCH_SIZE = 50
-COMMIT_EVERY = 500  # commit DB tous les N serials traités
+COMMIT_EVERY = 500  # revues traitées par commit
 
 
 def find_serials_of_unknown_type(
     conn: Connection, *, limit: int | None = None
 ) -> list[tuple[int, str]]:
-    """`(id, openalex_id)` des revues au `serial_type` indéterminé qui ont un `openalex_id`, à typer via OpenAlex. Le type étant stable par revue, une revue typée sort de la file. `limit` cape le run."""
+    """`(id, openalex_id)` des revues de type inconnu qui ont un `openalex_id`. Une revue typée sort de la sélection. `limit` plafonne le nombre de revues."""
     rows = conn.execute(
         select(serials.c.id, serials.c.openalex_id)
         .where(serials.c.openalex_id.is_not(None))
@@ -45,17 +45,14 @@ _OPENALEX_SOURCE_TYPE_MAP: dict[str, SerialType] = {
 
 
 def map_openalex_source_type(raw: str | None) -> SerialType | None:
-    """Mappe le champ `type` d'une source OpenAlex vers l'enum `serial_type`, ou `None` pour les types sans signal exploitable (`metadata`, `other`) et les types inconnus.
-
-    `preprint_server` et `media` sont absents de la table (sans équivalent dans la taxonomie OpenAlex) et restent posés à la main. Une plateforme d'ebooks (`ebook platform`) n'est pas une série : son type est sans signal.
-    """
+    """`serial_type` du `type` d'une source OpenAlex, ou `None` pour un type sans équivalent : `metadata`, `other`, `ebook platform`, type inconnu. `preprint_server` et `media` se posent à la main."""
     if not raw:
         return None
     return _OPENALEX_SOURCE_TYPE_MAP.get(raw.lower())
 
 
 FetchSourcesBatch = Callable[[list[str]], dict[str, str | None]]
-"""Signature du fetch injecté : `(openalex_ids) -> {short_id: raw_type}`."""
+"""Requête injectée : type brut de chaque source OpenAlex, par identifiant court."""
 
 
 def run_enrich_serials_from_openalex(
@@ -92,7 +89,7 @@ def run_enrich_serials_from_openalex(
                 processed += 1
                 continue
             raw_type = sources[oa_id]
-            # serial_type : seules les revues `unknown` sont traitées (cf. `fetch_serials_of_unknown_type`). On écrit dès que le mapping OpenAlex renvoie une valeur ; une revue au type `metadata`/`other` reste `unknown` et repasse au prochain run.
+            # Une revue au type OpenAlex sans équivalent reste `unknown`, et repasse au run suivant.
             mapped_type = map_openalex_source_type(raw_type)
             if mapped_type is not None:
                 store.set_serial_type(serial_id, mapped_type)

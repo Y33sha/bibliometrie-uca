@@ -26,8 +26,8 @@ _EMPTY_SERIALS = text(f"""
     ORDER BY j.id
 """)
 
-# Un ISSN déjà présent sans revue tient lieu de la ligne de même valeur des revues supprimées ; leurs autres ISSN
-# restent sans revue (`ON DELETE SET NULL`). Les formes de nom partent avec la revue (`ON DELETE CASCADE`).
+# Un ISSN déjà présent sans revue prévaut sur la ligne de même valeur d'une revue supprimée ; les autres ISSN restent sans revue (`ON DELETE SET NULL`).
+# Les formes de nom partent avec la revue (`ON DELETE CASCADE`).
 _DELETE_ISSNS_KNOWN_WITHOUT_SERIAL = text("""
     DELETE FROM serial_issns i
     WHERE i.serial_id = ANY(:ids)
