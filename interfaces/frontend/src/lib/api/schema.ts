@@ -5627,9 +5627,7 @@ export interface components {
         };
         /**
          * StructureType
-         * @description Type d'une structure de recherche / d'enseignement.
-         *
-         *     Mappe sur l'enum Postgres `structure_type`. `StrEnum` garde la valeur sérialisable telle quelle vers SQL et API.
+         * @description Type de structure. Reflet du type PostgreSQL `structure_type`.
          * @enum {string}
          */
         StructureType: "universite" | "chu" | "ecole" | "labo" | "equipe" | "site" | "onr" | "admin" | "autre";
