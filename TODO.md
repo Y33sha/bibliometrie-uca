@@ -1,11 +1,9 @@
-python interfaces/cli/oneshot/fill_source_record_identifiers.py
-la migration b8e3c1d7a4f2 doit passer après le remplissage
-
 # Pipeline
 * [ ] bloquer les opérations destructrices côté admin lorsque le pipeline est actif (recenser les actions qui peuvent poser problème)
 ## Extraction
-* [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS?
+* [ ] Dimensions?; ArXiv, PMC, Pubmed; Sudoc? (liens personnes-thèses plus complets que theses.fr, j'ai l'impression); Cairn, Persée pour augmenter couverture SHS? Inspire-HEP
 * [ ] payloads bruts: ne plus faire transiter par la base?
+* [ ] ScanR est-il utile comme source? mesurer la fiabilité des idref/orcid qu'il apporte
 ## Suite du traitement
 * [ ] normalisation en parallèle de l'extraction?
 * [ ] déduplication par métadonnées: ajouter condition journal_id pour les articles? container title pour les chapitres?
