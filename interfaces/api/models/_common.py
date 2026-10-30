@@ -36,7 +36,7 @@ class TotalCountResponse(BaseModel):
 
 
 class EnumOption(BaseModel):
-    """Une valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de la constante du domaine (`domain.publishers.PUBLISHER_TYPES`, par exemple)."""
+    """Valeur d'enum pour les listes déroulantes de l'interface (publisher_type, serial_type…) : `{value, label_fr}`. L'ordre vient de la constante du domaine (`domain.publishers.PUBLISHER_TYPES`, par exemple)."""
 
     value: str
     label_fr: str
@@ -46,7 +46,7 @@ class EnumOption(BaseModel):
 
 
 class MergeRequest(BaseModel):
-    """Fusionne l'entité `source_id` dans celle désignée par le chemin."""
+    """Demande de fusion de l'entité `source_id` dans celle désignée par le chemin."""
 
     source_id: int
 

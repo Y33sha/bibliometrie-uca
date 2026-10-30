@@ -22,18 +22,18 @@ class PersonNameForm:
 
 
 def name_form(last_name: str, first_name: str | None) -> str:
-    """Forme « prénom nom » d'un nom et d'un prénom normalisés, parties vides omises."""
+    """Renvoie la forme « prénom nom » d'un nom et d'un prénom normalisés, parties vides omises."""
     return " ".join(part for part in (first_name, last_name) if part)
 
 
 def contributor_name_forms(last_name: str, first_name: str | None) -> tuple[str, ...]:
-    """Formes cherchées pour une contribution source : « prénom nom », puis « nom prénom », pour une source qui inverse nom et prénom."""
+    """Renvoie les formes cherchées pour une contribution source : « prénom nom », puis « nom prénom », pour une source qui inverse nom et prénom."""
     forms = (name_form(last_name, first_name), name_form(first_name or "", last_name))
     return tuple(dict.fromkeys(form for form in forms if form))
 
 
 def compute_person_name_forms(last_name: str, first_name: str) -> set[str]:
-    """Formes de nom d'une personne : « prénom nom » et « initiales nom », initiales séparées (« j m dupont »). Sans prénom, le nom seul.
+    """Calcule les formes de nom d'une personne : « prénom nom » et « initiales nom », initiales séparées (« j m dupont »). Sans prénom, le nom seul.
 
     Le prénom est normalisé comme celui des contributions sources (`normalize_first_name`).
     """

@@ -61,14 +61,14 @@ class ContainerLevel(StrEnum):
 
 
 def container_level(title: str) -> ContainerLevel:
-    """Niveau d'un titre de conteneur, d'après ses marques d'édition ou de tome."""
+    """Renvoie le niveau d'un titre de conteneur, d'après ses marques d'édition ou de tome."""
     if names_a_dated_event(title) or _ORDINAL.search(title) or _VOLUME_NUMBER.search(title):
         return ContainerLevel.VOLUME
     return ContainerLevel.SERIES
 
 
 def split_collection_and_volume(first: str, second: str) -> tuple[str, str]:
-    """Collection et volume parmi deux titres de conteneur. Le volume est le seul titre qui a la forme d'un volume (`container_level`) ; à défaut, l'ordre des titres tranche."""
+    """Distingue la collection et le volume parmi deux titres de conteneur. Le volume est le seul titre qui a la forme d'un volume (`container_level`) ; à défaut, l'ordre des titres tranche."""
     if (
         container_level(first) is ContainerLevel.VOLUME
         and container_level(second) is ContainerLevel.SERIES
@@ -78,7 +78,7 @@ def split_collection_and_volume(first: str, second: str) -> tuple[str, str]:
 
 
 def series_title(title: str) -> str:
-    """Titre de la série d'un titre de volume : le titre sans dates, années, ordinaux d'édition ni numéros de volume, casse et ponctuation conservées.
+    """Renvoie le titre de la série d'un titre de volume : le titre sans dates, années, ordinaux d'édition ni numéros de volume, casse et ponctuation conservées.
 
     « Proceedings of the 12th International Conference on Operations Research and Enterprise Systems (ICORES 2023) » donne « Proceedings of the International Conference on Operations Research and Enterprise Systems (ICORES) ».
     """
@@ -93,7 +93,7 @@ def series_title(title: str) -> str:
 
 
 def reference_series_title(title: str, sudoc_title: str | None) -> str | None:
-    """Titre de référence d'une série à ISSN dont le titre en base a la forme d'un volume, ou `None` pour garder ce titre.
+    """Renvoie le titre de référence d'une série à ISSN dont le titre en base a la forme d'un volume, ou `None` pour garder ce titre.
 
     Le titre de la notice Sudoc fait référence, s'il a lui-même la forme d'une série. À défaut, le titre de série du titre en base (`series_title`).
     """
@@ -106,7 +106,7 @@ def reference_series_title(title: str, sudoc_title: str | None) -> str | None:
 
 
 def series_key(title: str) -> str:
-    """Clé de série d'un titre : son titre de série, normalisé. « NuFACT 2022 » et « NuFACT 2023 » partagent la clé « nufact »."""
+    """Renvoie la clé de série d'un titre : son titre de série, normalisé. « NuFACT 2022 » et « NuFACT 2023 » partagent la clé « nufact »."""
     return normalize_text(series_title(title))
 
 
@@ -127,7 +127,7 @@ class SeriesGroup(NamedTuple):
 
 
 def group_series(volumes: Sequence[VolumeTitle]) -> list[SeriesGroup]:
-    """Séries reconnues entre plusieurs volumes : titres de volume (`container_level`) de même clé de série, chez le même éditeur.
+    """Reconnaît les séries entre plusieurs volumes : titres de volume (`container_level`) de même clé de série, chez le même éditeur.
 
     Des titres sans marque d'édition identiques désignent un ouvrage en plusieurs volumes, pas une série. Le titre de la série est le titre de série du plus ancien volume.
     """

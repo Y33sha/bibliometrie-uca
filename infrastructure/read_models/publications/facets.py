@@ -62,7 +62,7 @@ class _PublicationFacetsBuilder:
         self.context = context
 
     def _clauses_skipping(self, skip: FilterDimension) -> tuple[str, dict[str, object]]:
-        """WHERE sous tous les filtres sauf celui de `skip`."""
+        """Renvoie le WHERE sous tous les filtres sauf celui de `skip`."""
         return publication_filter_where(self.filters, self.context, skip)
 
     # ── Facettes ────────────────────────────────────────────────
@@ -122,7 +122,7 @@ class _PublicationFacetsBuilder:
         return rows_as(FacetOption, rows)
 
     def _facet_licenses(self) -> list[FacetOption]:
-        """Licence de la version éditeur, `NO_LICENSE` pour les publications sans licence connue."""
+        """Renvoie la facette des licences de la version éditeur, `NO_LICENSE` pour les publications sans licence connue."""
         where_sql, binds = self._clauses_skipping("license")
         rows = self.conn.execute(
             text(f"""
@@ -143,7 +143,7 @@ class _PublicationFacetsBuilder:
         ]
 
     def _facet_doi_agencies(self) -> list[FacetOption]:
-        """Agence d'enregistrement du DOI. Une option sans publication compte zéro."""
+        """Renvoie la facette des agences d'enregistrement du DOI. Une option sans publication compte zéro."""
         where_sql, binds = self._clauses_skipping("doi_agency")
         rows = self.conn.execute(
             text(f"""
@@ -227,7 +227,7 @@ class _PublicationFacetsBuilder:
         ]
 
     def _facet_source_counts(self) -> dict[str, YesNoCount]:
-        """Décomptes oui et non de chaque source, sans aucun filtre de source."""
+        """Renvoie les décomptes oui et non de chaque source, sans aucun filtre de source."""
         where_sql, binds = self._clauses_skipping("source")
         row = self.conn.execute(
             text(f"""
@@ -256,7 +256,7 @@ class _PublicationFacetsBuilder:
         }
 
     def _facet_apc(self) -> list[FacetOption]:
-        """APC payées par le périmètre : oui ou non."""
+        """Renvoie la facette des APC payées par le périmètre : oui ou non."""
         where, binds = self._clauses_skipping("apc")
         paid = institution_apc_payment_sql("apc_facet_root_ids")
         r = self.conn.execute(
@@ -316,7 +316,7 @@ class _PublicationFacetsBuilder:
         return [FacetOption(value=r.code, label=r.name, count=r.n) for r in rows]
 
     def _facet_hal_status(self) -> list[FacetOption]:
-        """Statut HAL, quand un seul laboratoire est sélectionné."""
+        """Renvoie la facette du statut HAL, quand un seul laboratoire est sélectionné."""
         if len(self.filters.lab_ids) != 1:
             return []
         where_sql, binds = self._clauses_skipping("hal_status")
@@ -371,7 +371,7 @@ class PublicationFacetQueries:
     _open_connection: Callable[[], Connection]
 
     def publications_facets(self, *, filters: PublicationFilters) -> PublicationsFacetsResponse:
-        """Facettes de la liste : chacune exclut son propre filtre et applique tous les autres.
+        """Renvoie les facettes de la liste : chacune exclut son propre filtre et applique tous les autres.
 
         Les facettes, une dizaine, sont indépendantes ; chacune agrège l'ensemble filtré en une demi-seconde environ. Elles s'exécutent en parallèle, chacune dans un thread avec sa connexion (`_open_connection`) : psycopg libère le GIL pendant la requête. Le contexte de filtrage se lit une fois.
         """
@@ -433,7 +433,7 @@ class PublicationFacetQueries:
         search: str,
         filters: PublicationFilters,
     ) -> EntityFacetResponse:
-        """Facette d'entité de la liste (éditeur, revue, auteur, sujet) : les premières entités sous les filtres actifs, hors filtre de la dimension demandée. Les autres filtres, dont celui de l'autre entité, s'appliquent. La recherche par nom se fait côté serveur."""
+        """Renvoie la facette d'entité de la liste (éditeur, revue, auteur, sujet) : les premières entités sous les filtres actifs, hors filtre de la dimension demandée. Les autres filtres, dont celui de l'autre entité, s'appliquent. La recherche par nom se fait côté serveur."""
         context = filter_context(self._conn, filters)
         where_sql, binds = publication_filter_where(filters, context, kind)
         return EntityFacetResponse(

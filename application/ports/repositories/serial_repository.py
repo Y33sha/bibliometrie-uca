@@ -10,7 +10,7 @@ from domain.serials.serial import OaModel, Serial, SerialType
 
 
 class SerialIssnInput(BaseModel):
-    """Un ISSN d'une revue, saisi dans l'administration."""
+    """ISSN d'une revue, saisi dans l'administration."""
 
     issn: str
     support: IssnSupport | None = None
@@ -19,7 +19,7 @@ class SerialIssnInput(BaseModel):
 
 
 class SerialUpdate(BaseModel):
-    """Champs modifiables d'une revue ; seuls les champs fournis sont écrits."""
+    """Champs modifiables d'une revue. Seuls les champs fournis sont écrits."""
 
     title: str | None = None
     issns: list[SerialIssnInput] | None = None
@@ -44,5 +44,5 @@ class SerialRepository(Protocol):
         target_publisher_id: int,
         source_publisher_id: int,
     ) -> list[SharedTitlePair]:
-        """Paires de revues de même titre normalisé, l'une de l'éditeur cible, l'autre de l'éditeur absorbé, avec leurs titres et leurs ISSN."""
+        """Renvoie les paires de revues de même titre normalisé, l'une de l'éditeur cible, l'autre de l'éditeur absorbé, avec leurs titres et leurs ISSN."""
         ...

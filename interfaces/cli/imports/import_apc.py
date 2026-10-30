@@ -1,17 +1,17 @@
 # STATUS: recurring (imports)
 """Importe un fichier de frais de publication dans `apc_payments`.
 
-Trois formats, reconnus aux colonnes du fichier :
+Formats reconnus aux colonnes du fichier :
 
 - le jeu de données Open APC (frais d'open access) ;
 - le fichier « frais hors OA » de l'enquête nationale (autres frais de publication) ;
 - la réponse d'un établissement à l'enquête APC, export CSV de sa feuille de paiements. Ses montants négatifs annulent un paiement.
 
-Sont importés les paiements dont le DOI désigne une publication de la base. Avec `--institution`, les paiements à DOI de l'établissement désigné le sont aussi, sans publication ; ils la rejoignent quand elle entre dans la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
+Sont importés les paiements dont le DOI désigne une publication de la base. Avec `--institution`, les paiements à DOI de l'établissement désigné le sont aussi, sans publication ; ils sont rattachés à leur publication quand elle entre dans la base. Un paiement déjà présent, même DOI, même payeur, même montant et même type de frais, reste tel quel : le script se rejoue sans créer de doublon.
 
 Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms des structures, comme les adresses d'affiliation. Le script liste les libellés sans structure.
 
-La réponse d'un établissement à l'enquête l'emporte sur OpenAPC : un frais d'open access OpenAPC d'un article que la réponse de son payeur décrit déjà est retiré (`drop_open_apc_superseded_by_institution`).
+La réponse d'un établissement à l'enquête l'emporte sur OpenAPC : un frais d'open access OpenAPC d'un article déjà décrit par la réponse de son payeur est retiré (`drop_open_apc_superseded_by_institution`).
 
 Usage :
     uv run python -m interfaces.cli.imports.import_apc data/apc/apc_de.csv --institution "Université Clermont Auvergne"
@@ -88,7 +88,7 @@ def clean(cell: str | None) -> str | None:
 
 
 def parse_amount(cell: str | None) -> float | None:
-    """Montant en euros, au format français (espaces, virgule décimale) ou anglais. None faute de valeur lisible."""
+    """Renvoie le montant en euros, au format français (espaces, virgule décimale) ou anglais. None faute de valeur lisible."""
     value = (cell or "").replace("\xa0", "").replace(" ", "").replace(" ", "").replace(",", ".")
     try:
         return round(float(value), 2)
@@ -97,7 +97,7 @@ def parse_amount(cell: str | None) -> float | None:
 
 
 def parse_year(cell: str | None) -> int | None:
-    """Année entre 1990 et 2100, ou None."""
+    """Renvoie l'année entre 1990 et 2100, ou None."""
     value = (cell or "").strip()
     if not value.isdigit():
         return None
@@ -106,7 +106,7 @@ def parse_year(cell: str | None) -> int | None:
 
 
 def detect_format(columns: list[str]) -> FileFormat:
-    """Format d'un fichier, d'après ses colonnes. Lève `ValueError` pour un fichier d'un autre format."""
+    """Renvoie le format d'un fichier, d'après ses colonnes. Lève `ValueError` pour un fichier d'un autre format."""
     for marker, file_format in _FORMAT_MARKERS.items():
         if marker in columns:
             return file_format
@@ -116,9 +116,9 @@ def detect_format(columns: list[str]) -> FileFormat:
 
 
 def open_apc_payment(row: Mapping[str, str]) -> Payment:
-    """Paiement d'une ligne Open APC.
+    """Renvoie le paiement d'une ligne Open APC.
 
-    La période déclarée tient lieu d'année de facturation et de publication. L'ISSN retenu est celui de la revue, à défaut son ISSN de liaison. La mention `hybrid` signale une revue sur abonnement dont cet article est ouvert.
+    La période déclarée tient lieu d'année de facturation et de publication. L'ISSN retenu est celui de la revue, à défaut son ISSN de liaison. La mention `hybrid` signale une revue sur abonnement, avec cet article en accès ouvert.
     """
     period = parse_year(row.get("period"))
     return {
@@ -139,7 +139,7 @@ def open_apc_payment(row: Mapping[str, str]) -> Payment:
 
 
 def non_oa_fee_payment(row: Mapping[str, str]) -> Payment:
-    """Paiement d'une ligne du fichier des frais hors OA. Le payeur est la colonne « Budget »."""
+    """Renvoie le paiement d'une ligne du fichier des frais hors OA. Le payeur est la colonne « Budget »."""
     coman_id = (row.get("CoMan Id.") or "").strip()
     budget = clean(row.get("Budget"))
     return {
@@ -160,7 +160,7 @@ def non_oa_fee_payment(row: Mapping[str, str]) -> Payment:
 
 
 def institution_survey_payment(row: Mapping[str, str], *, open_access_fee: bool) -> Payment:
-    """Paiement d'une ligne de la réponse d'un établissement à l'enquête APC.
+    """Renvoie le paiement d'une ligne de la réponse d'un établissement à l'enquête APC.
 
     Le payeur est désigné par son ROR (`payer_ror`), nommé à l'import. La remarque réunit le commentaire de l'établissement et la réponse de Couperin.
     """
@@ -186,7 +186,7 @@ def institution_survey_payment(row: Mapping[str, str], *, open_access_fee: bool)
 
 
 def institution_survey_payments(rows: Iterable[Mapping[str, str]]) -> list[Payment]:
-    """Paiements de la réponse d'un établissement à l'enquête APC.
+    """Lit les paiements de la réponse d'un établissement à l'enquête APC.
 
     Les lignes qui suivent le titre « Pas d'APC… » sont des frais hors open access. Celles qui suivent « Retour Couperin » sont écartées par Couperin et ignorées. Une ligne sans laboratoire, comme le total, est ignorée.
     """
@@ -253,7 +253,7 @@ _MAPPERS: dict[FileFormat, Callable[[Mapping[str, str]], Payment]] = {
 
 
 def read_payments(path: Path) -> tuple[FileFormat, list[Payment]]:
-    """Format du fichier et paiements de ses lignes. L'en-tête est la première ligne qui désigne un format : les lignes qui la précèdent sont ignorées."""
+    """Lit le format du fichier et les paiements de ses lignes. L'en-tête est la première ligne désignant un format ; les lignes précédentes sont ignorées."""
     with path.open(encoding="utf-8-sig", newline="") as f:
         lines = [line for line in csv.reader(f) if any(cell.strip() for cell in line)]
     header_index = next(
@@ -284,9 +284,10 @@ class StructureResolver:
     def resolve(
         self, label: str, types: frozenset[StructureType], context: str | None = None
     ) -> int | None:
-        """Seule structure reconnue dans `label` parmi les `types` donnés. None si aucune ou plusieurs.
+        """Renvoie la seule structure reconnue dans `label` parmi les `types` donnés, ou None si aucune ou plusieurs.
 
-        `context` : libellé lu avec `label`, qui satisfait les formes de noms valables seulement en présence d'une autre structure.
+        Args:
+            context: libellé lu avec `label`, qui satisfait les formes de noms valables seulement en présence d'une autre structure.
         """
         ids = {
             m.structure_id
@@ -298,12 +299,14 @@ class StructureResolver:
 
 @dataclass(frozen=True, slots=True)
 class UnresolvedLabel:
-    """Libellé sans structure : colonne d'origine, texte, contexte, nombre de paiements."""
+    """Libellé sans structure."""
 
     column: str
+    """Colonne d'origine du libellé."""
     label: str
     context: str | None
     payments: int
+    """Nombre de paiements à ce libellé."""
 
 
 # Colonne du libellé, colonne de son contexte, colonne de la structure, types de structure admis.
@@ -355,13 +358,17 @@ def map_structures(conn: Connection, resolver: StructureResolver) -> list[Unreso
 
 @dataclass(frozen=True, slots=True)
 class ImportStats:
-    """Bilan d'un import : lignes lues, lignes à DOI de la base, lignes à DOI de l'établissement hors de la base, paiements insérés, paiements OpenAPC retirés au profit d'une réponse d'établissement, libellés sans structure."""
+    """Bilan d'un import."""
 
     read: int
+    """Nombre de lignes lues."""
     in_base: int
+    """Nombre de lignes à DOI de la base."""
     outside_base: int
+    """Nombre de lignes à DOI de l'établissement hors de la base."""
     inserted: int
     superseded: int
+    """Nombre de paiements OpenAPC retirés au profit d'une réponse d'établissement."""
     unresolved: list[UnresolvedLabel]
 
 
@@ -374,7 +381,8 @@ def import_payments(
 ) -> ImportStats:
     """Insère les paiements dont le DOI désigne une publication de la base, puis rattache revues, éditeurs et structures.
 
-    `from_institution` reconnaît les paiements de l'établissement : ceux qui ont un DOI absent de la base sont insérés sans publication.
+    Args:
+        from_institution: reconnaît les paiements de l'établissement ; ceux à DOI absent de la base sont insérés sans publication.
     """
     payments = name_payers(conn, payments)
     publication_by_doi = {
@@ -416,9 +424,9 @@ def import_payments(
 
 
 def drop_open_apc_superseded_by_institution(conn: Connection) -> int:
-    """Retire les frais d'open access OpenAPC d'un article que la réponse de son établissement payeur décrit déjà. Renvoie le nombre de paiements retirés.
+    """Retire les frais d'open access OpenAPC d'un article déjà décrit par la réponse de son établissement payeur. Renvoie le nombre de paiements retirés.
 
-    OpenAPC reprend les réponses à l'enquête sous une forme variable (lignes additionnées, première seule, ou toutes), que la clé d'unicité ne dédoublonne pas. La réponse de l'établissement, facturée ligne à ligne et rattachée au laboratoire, l'emporte. Un frais d'open access sans laboratoire vient d'OpenAPC, qui ne nomme pas le laboratoire ; avec laboratoire, il vient d'une réponse d'établissement. La règle vaut quel que soit l'ordre des imports.
+    OpenAPC reprend les réponses à l'enquête sous une forme variable (lignes additionnées, première seule, ou toutes). La clé d'unicité laisse passer ces doublons. La réponse de l'établissement, facturée ligne à ligne et rattachée au laboratoire, l'emporte. Un frais d'open access sans laboratoire vient d'OpenAPC, qui ne nomme pas le laboratoire ; avec laboratoire, il vient d'une réponse d'établissement. La règle vaut quel que soit l'ordre des imports.
     """
     return conn.execute(
         text("""
@@ -458,7 +466,7 @@ def name_payers(conn: Connection, payments: list[Payment]) -> list[Payment]:
 
 
 def map_publications(conn: Connection) -> int:
-    """Rattache à leur publication les paiements dont le DOI désigne une publication de la base."""
+    """Rattache à leur publication les paiements à DOI d'une publication de la base."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap
@@ -472,7 +480,7 @@ def map_publications(conn: Connection) -> int:
 
 
 def map_serials(conn: Connection) -> int:
-    """Rattache à leur revue les paiements dont l'ISSN désigne un ISSN actif d'une revue."""
+    """Rattache à leur revue les paiements à ISSN actif d'une revue."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap
@@ -488,7 +496,7 @@ def map_serials(conn: Connection) -> int:
 
 
 def map_publishers(conn: Connection) -> int:
-    """Rattache à leur éditeur les paiements dont le nom d'éditeur est celui d'un éditeur de la base."""
+    """Rattache à leur éditeur les paiements au nom d'un éditeur de la base."""
     return conn.execute(
         text("""
             UPDATE apc_payments ap

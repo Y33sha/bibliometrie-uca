@@ -9,7 +9,11 @@ from domain.persons.name_forms import PersonNameForm
 
 
 def validated_name(last_name: str, first_name: str) -> tuple[str, str]:
-    """Nom et prénom sans les espaces qui les entourent. Lève `ValidationError` sans nom de famille : les formes de nom en dérivent."""
+    """Renvoie le nom et le prénom sans les espaces qui les entourent.
+
+    Raises:
+        ValidationError: nom de famille vide, dont dérivent les formes de nom.
+    """
     last_name, first_name = last_name.strip(), first_name.strip()
     if not last_name:
         raise ValidationError("Le nom est requis")

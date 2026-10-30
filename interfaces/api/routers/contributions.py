@@ -1,6 +1,6 @@
 """Router des contributions : exclusion d'une contribution, et revue des contributions orphelines. Sert `/api/contributions/*`.
 
-L'exclusion vise une contribution rattachée à une personne, par son `contribution_id`. Les orphelines sont les contributions du périmètre, sous un rôle d'auteur, rattachées à aucune personne, que le router liste et attribue sous `/orphans`, par leur `contribution_id`.
+L'exclusion vise une contribution rattachée à une personne, par son `contribution_id`. Les contributions orphelines sont les contributions du périmètre, sous un rôle d'auteur, sans personne rattachée. Le router les liste et les attribue sous `/orphans`, par leur `contribution_id`.
 
 Les routes sont groupées par sujet, et les chemins littéraux précèdent celui à identifiant : déclaré après `/{contribution_id}`, un chemin littéral s'y ferait absorber.
 """
@@ -39,12 +39,12 @@ router = APIRouter(prefix="/api/contributions", tags=["contributions"])
 def orphan_contributions_count(
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanCountResponse:
-    """Nombre de contributions orphelines."""
+    """Renvoie le nombre de contributions orphelines."""
     return queries.orphan_contributions_count()
 
 
 def orphan_filters(search: SearchTerm = "", lab_id: str = Query("")) -> OrphanFilters:
-    """Filtres communs à la liste des contributions orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les contributions sans laboratoire."""
+    """Lit les filtres communs à la liste des contributions orphelines et à sa facette. `lab_id` prend des identifiants de laboratoires et `none` pour les contributions sans laboratoire."""
     lab_ids, lab_none = parse_lab_id(lab_id)
     return OrphanFilters(search=search, lab_ids=lab_ids, lab_none=lab_none)
 
@@ -65,7 +65,7 @@ def orphan_contributions_facets(
     filters: OrphanFilters = Depends(orphan_filters),
     queries: ContributionsQueries = Depends(contributions_queries),
 ) -> OrphanContributionsFacetsResponse:
-    """Facette laboratoires des contributions orphelines."""
+    """Renvoie la facette laboratoires des contributions orphelines."""
     return queries.orphan_contributions_facets(filters=filters)
 
 
@@ -78,9 +78,11 @@ def assign_orphan_contribution(
     body: AssignOrphanContribution,
     contributions: ContributionService = Depends(contribution_service),
 ) -> OrphanAssignResponse:
-    """Attribue une contribution orpheline à une personne, que la requête désigne ou fait créer.
+    """Attribue une contribution orpheline à une personne, désignée ou créée par la requête.
 
-    Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`) ; 404 sur une personne ou une contribution introuvable ; 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage, sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
+    Renvoie 422 sans `person_id` ni `create_person`, et sans nom de famille à la création (`assign_orphan_contribution_to_new_person`). Renvoie 404 sur une personne ou une contribution introuvable.
+
+    Renvoie 409 sur une paire déjà rejetée (`RejectedPairError`), sauf si `force` retire le rejet au passage. Renvoie aussi 409 sur une contribution déjà rattachée à une personne (`ContributionAlreadyAssignedError`), et quand la personne a déjà une contribution manuelle dans la publication (`PersonAlreadyInPublicationError`).
     """
     if body.create_person is not None:
         person_id = contributions.assign_orphan_contribution_to_new_person(
@@ -106,7 +108,7 @@ def batch_assign_orphan_contributions(
 ) -> OrphanBatchAssignResponse:
     """Attribue plusieurs contributions orphelines à une personne existante.
 
-    Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte rendu compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
+    Les contributions absentes ou déjà rattachées sont écartées du lot et journalisées ; le décompte renvoyé compte les contributions rattachées. Renvoie 404 sur une personne introuvable, 409 (`RejectedPairError`) dès qu'une paire du lot est déjà rejetée, sauf si `force` retire les rejets au passage.
     """
     if not body.contribution_ids:
         return OrphanBatchAssignResponse(assigned=0)
@@ -127,7 +129,7 @@ def exclude_contribution(
 ) -> OkResponse:
     """Rejette une contribution : la personne n'a pas signé la publication.
 
-    Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache la contribution et les contributions sources de la personne. Le rejet survit aux runs suivants ; seule une attribution forcée d'une contribution orpheline le retire.
+    Enregistre la paire (publication, personne) dans `rejected_contributions`, puis détache la contribution et les contributions sources de la personne. Le rejet persiste d'une exécution du pipeline à l'autre ; seule une attribution forcée d'une contribution orpheline le retire.
     """
     contributions.exclude_contribution(contribution_id)
     return OkResponse()

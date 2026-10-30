@@ -51,7 +51,7 @@ router = APIRouter(prefix="/api/serials", tags=["serials"])
 
 @router.get("/oa-models", response_model=list[EnumOption])
 def list_oa_models() -> list[EnumOption]:
-    """Valeurs possibles de `oa_model` avec leur libellé français.
+    """Liste les valeurs possibles de `oa_model` avec leur libellé français.
 
     Les valeurs viennent de `domain.serials.serial.OA_MODELS` et `OA_MODEL_LABELS_FR`. Alimente la facette « Modèle OA » des listes de revues et la liste déroulante de la fenêtre d'édition de l'administration.
     """
@@ -60,9 +60,9 @@ def list_oa_models() -> list[EnumOption]:
 
 @router.get("/types", response_model=list[EnumOption])
 def list_serial_types() -> list[EnumOption]:
-    """Valeurs possibles de l'enum `serial_type` avec leur libellé français.
+    """Liste les valeurs possibles de l'enum `serial_type` avec leur libellé français.
 
-    Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
+    Les valeurs viennent de `domain.serials.serial.SERIAL_TYPES` et `SERIAL_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des revues et la colonne « Type » des pages publiques.
     """
     return [EnumOption(value=v, label_fr=SERIAL_TYPE_LABELS_FR[v]) for v in SERIAL_TYPES]
 
@@ -75,7 +75,7 @@ def serial_filters(
     oa_model: str = Query(""),
     has_publications: bool | None = Query(None),
 ) -> SerialFilters:
-    """Filtres communs à la liste des revues et à ses facettes.
+    """Lit les filtres communs à la liste des revues et à ses facettes.
 
     `serial_type` et `oa_model` acceptent plusieurs valeurs séparées par des virgules, prises dans les énumérations du domaine ; une valeur inconnue renvoie 422. `search` vise le titre et les ISSN de la revue, à partir de deux caractères.
     """
@@ -94,9 +94,9 @@ def serials_facets(
     filters: SerialFilters = Depends(serial_filters),
     queries: SerialQueries = Depends(serial_queries),
 ) -> SerialsFacetsResponse:
-    """Comptes par option des facettes de la liste des revues.
+    """Renvoie les décomptes par option des facettes de la liste des revues.
 
-    Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée.
+    Convention partagée avec `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE. Son décompte annonce donc le nombre de revues atteignables si l'option était cochée ou décochée.
     """
     return queries.serials_facets(filters=filters)
 
@@ -108,7 +108,7 @@ def serials_entity_facet(
     filters: SerialFilters = Depends(serial_filters),
     queries: SerialQueries = Depends(serial_queries),
 ) -> EntityFacetResponse:
-    """Facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
+    """Renvoie la facette contextuelle des éditeurs : les premiers éditeurs sous les filtres actifs, avec leur nombre de revues.
 
     Les éditeurs sont trop nombreux pour être tous proposés, d'où une facette bornée et une recherche par nom. `entity_search` cherche dans les noms d'éditeur, là où `search` filtre les revues sur leur titre et leurs ISSN.
 
@@ -125,7 +125,7 @@ def list_serials(
     filters: SerialFilters = Depends(serial_filters),
     queries: SerialQueries = Depends(serial_queries),
 ) -> SerialListResponse:
-    """Liste paginée des revues, avec le décompte de leurs publications.
+    """Liste les revues par page, avec le décompte de leurs publications.
 
     `has_publications` retient les revues qui ont au moins une publication (`true`) ou aucune (`false`). `sort` accepte `title`, `publisher` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
     """
@@ -140,7 +140,7 @@ def export_serials_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la liste des revues, aux filtres et au tri de la liste."""
+    """Exporte en CSV la liste des revues, aux filtres et au tri de la liste."""
     return csv_response(
         queries.export_serials_csv(filters=filters, sort=sort),
         filename="publications-en-serie.csv",
@@ -155,7 +155,7 @@ def export_serials_csv(
 def serials_with_same_title_count(
     queries: SerialQueries = Depends(serial_queries),
 ) -> TotalCountResponse:
-    """Compteur de l'onglet « Titres identiques » (badge)."""
+    """Renvoie le compteur de l'onglet « Titres identiques » (badge)."""
     return TotalCountResponse(total=len(queries.serials_with_same_title().groups))
 
 
@@ -163,9 +163,9 @@ def serials_with_same_title_count(
 def serials_with_same_title(
     queries: SerialQueries = Depends(serial_queries),
 ) -> SerialDuplicatesResponse:
-    """Groupes de revues de même titre normalisé, à fusionner à la main.
+    """Liste les groupes de revues de même titre normalisé, à fusionner à la main.
 
-    Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées.
+    Deux revues de même titre pourvues chacune d'un ISSN sont des homonymes probables : elles sont écartées.
     """
     return queries.serials_with_same_title()
 
@@ -174,7 +174,7 @@ def serials_with_same_title(
 def serials_sharing_issn_count(
     queries: SerialQueries = Depends(serial_queries),
 ) -> TotalCountResponse:
-    """Compteur de l'onglet « ISSN partagés » (badge)."""
+    """Renvoie le compteur de l'onglet « ISSN partagés » (badge)."""
     return TotalCountResponse(total=len(queries.serials_sharing_issn().groups))
 
 
@@ -182,7 +182,7 @@ def serials_sharing_issn_count(
 def serials_sharing_issn(
     queries: SerialQueries = Depends(serial_queries),
 ) -> SerialDuplicatesResponse:
-    """Groupes de revues où le même ISSN est actif, à fusionner à la main."""
+    """Liste les groupes de revues où le même ISSN est actif, à fusionner à la main."""
     return queries.serials_sharing_issn()
 
 
@@ -190,7 +190,7 @@ def serials_sharing_issn(
 def likely_proceedings_count(
     queries: SerialQueries = Depends(serial_queries),
 ) -> TotalCountResponse:
-    """Compteur de l'onglet « Recueils d'actes probables » (badge)."""
+    """Renvoie le compteur de l'onglet « Recueils d'actes probables » (badge)."""
     return TotalCountResponse(total=len(queries.likely_proceedings().serials))
 
 
@@ -198,7 +198,7 @@ def likely_proceedings_count(
 def likely_proceedings(
     queries: SerialQueries = Depends(serial_queries),
 ) -> LikelyProceedingsResponse:
-    """Revues typées `journal` dont la majorité des documents sont des articles de congrès, à typer à la main."""
+    """Liste les revues typées `journal` dont la majorité des documents sont des articles de congrès, à typer à la main."""
     return queries.likely_proceedings()
 
 
@@ -206,7 +206,7 @@ def likely_proceedings(
 def doi_namespace_conflicts_count(
     queries: SerialQueries = Depends(serial_queries),
 ) -> TotalCountResponse:
-    """Compteur de l'onglet « Contredites par le DOI » (badge)."""
+    """Renvoie le compteur de l'onglet « Contredites par le DOI » (badge)."""
     return TotalCountResponse(total=len(queries.doi_namespace_conflicts().conflicts))
 
 
@@ -214,7 +214,7 @@ def doi_namespace_conflicts_count(
 def doi_namespace_conflicts(
     queries: SerialQueries = Depends(serial_queries),
 ) -> DoiNamespaceConflictsResponse:
-    """Paires de revues dont l'une a des enregistrements dont le DOI relève de l'espace de noms de l'autre."""
+    """Liste les paires de revues où l'une a des enregistrements sources à DOI relevant de l'espace de noms de l'autre."""
     return queries.doi_namespace_conflicts()
 
 
@@ -224,9 +224,9 @@ def get_serial(
     queries: SerialQueries = Depends(serial_queries),
     detail: EntityDetail = Depends(entity_detail(MergedEntity.SERIAL)),
 ) -> SerialDetailResponse:
-    """Profil complet d'une revue, pour sa page publique.
+    """Renvoie le profil complet d'une revue, pour sa page publique.
 
-    Contient ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
+    Le profil contient ses métadonnées, la réponse DOAJ brute et sa date d'import, et le décompte de ses publications.
     """
     return detail.found(queries.get_serial_detail(serial_id))
 
@@ -237,9 +237,9 @@ def get_serial_subjects(
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: SerialQueries = Depends(serial_queries),
 ) -> list[SubjectFrequency]:
-    """Sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
+    """Renvoie les sujets les plus fréquents des publications de la revue, pour l'onglet tableau de bord.
 
-    Les sujets trop génériques sont écartés : ils noieraient les autres. Une revue sans publication indexée donne une liste vide.
+    Les sujets trop génériques sont écartés. Une revue sans publication indexée donne une liste vide.
     """
     return queries.get_serial_subjects(serial_id, limit=limit)
 
@@ -253,11 +253,11 @@ def get_type_change_impact(
     body: SerialTypeChange,
     serials: SerialService = Depends(serial_service),
 ) -> SerialTypeChangeImpact:
-    """Compte les publications de la revue dont le type changerait avec le type de revue demandé.
+    """Compte les publications de la revue à changer de type avec le type de revue demandé.
 
-    L'aperçu applique réellement le changement (écriture du type, recalcul des corrections des enregistrements sources, recalcul des publications) dans un `SAVEPOINT` annulé ensuite : il emprunte le chemin exact de l'édition, et aucune écriture ne survit. Renvoie 404 sur une revue inconnue, comme l'édition qu'il simule.
+    L'aperçu applique le changement (écriture du type, recalcul des corrections des enregistrements sources, recalcul des publications) dans un `SAVEPOINT` annulé ensuite. Il suit ainsi le chemin exact de l'édition. Renvoie 404 sur une revue inconnue.
 
-    La méthode est POST, bien qu'aucune écriture ne survive : l'aperçu écrit, pose les verrous de l'édition et en coûte le prix. Un GET s'annonce sans effet, et échapperait à la garde d'authentification des méthodes d'écriture.
+    La méthode est POST : l'aperçu écrit et pose les verrous de l'édition. Un GET échapperait à la garde d'authentification des méthodes d'écriture.
     """
     count = serials.preview_type_change_impact(serial_id, body.serial_type)
     return SerialTypeChangeImpact(count=count)

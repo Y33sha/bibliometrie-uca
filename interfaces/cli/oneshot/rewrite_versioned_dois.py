@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-30)
 """Écrit, depuis le raw store, les DOI des enregistrements sources avec leur suffixe de version (`.v1`, `/v2`).
 
-Chez Crossref et DataCite, l'identifiant que la source donne au payload devient le `source_id` de l'enregistrement source, de sa ligne de `staging` et de sa clé au raw store. Quand un enregistrement source a déjà cet identifiant, l'enregistrement source tronqué est un doublon : sa ligne de `staging` est marquée disparue, et la normalisation le supprime. Quand seule une ligne de `staging` a cet identifiant, l'enregistrement source y est rattaché, et son ancienne ligne de `staging` est supprimée. Dans toutes les sources, l'enregistrement source reçoit les identifiants DOI que la normalisation tire du payload : un DOI inchangé garde son statut, un DOI écrit est actif. Les enregistrements sources modifiés sont marqués pour la réconciliation.
+Chez Crossref et DataCite, l'identifiant donné au payload par la source devient le `source_id` de l'enregistrement source, de sa ligne de `staging` et de sa clé au raw store. Quand un enregistrement source a déjà cet identifiant, l'enregistrement source tronqué est un doublon : sa ligne de `staging` est marquée disparue, et la normalisation le supprime. Quand seule une ligne de `staging` a cet identifiant, l'enregistrement source y est rattaché, et sa ligne de `staging` d'origine est supprimée. Dans toutes les sources, l'enregistrement source reçoit les identifiants DOI tirés du payload par la normalisation : un DOI inchangé garde son statut, un DOI écrit est actif. Les enregistrements sources modifiés sont marqués pour la réconciliation.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.rewrite_versioned_dois [--sources crossref,datacite] [--dry-run]
@@ -167,7 +167,7 @@ class _Rewriter:
             self._rename(r.id, r.source_id, source_id, payload)
 
     def _duplicate(self, old: str, new: str) -> bool:
-        """Vrai si un enregistrement source a déjà l'identifiant `new` : la ligne de staging de `old` est marquée disparue, et la normalisation supprime ce doublon."""
+        """Marque disparue la ligne de staging de `old` si un enregistrement source a déjà l'identifiant `new`, et renvoie vrai dans ce cas. La normalisation supprime ensuite ce doublon."""
         if not self.conn.execute(
             _RECORD_EXISTS, {"source": self.source, "source_id": new}
         ).scalar():

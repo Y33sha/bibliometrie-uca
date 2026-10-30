@@ -18,25 +18,25 @@ _CONFERENCE_PAPER = "conference_paper"
 
 
 class ContainerRole(StrEnum):
-    """Ce que le conteneur d'un document désigne."""
+    """Rôle du conteneur d'un document."""
 
     JOURNAL = "journal"
     """Le document paraît dans une revue."""
     BOOK = "book"
-    """Le document est lui-même un livre : sa monographie porte son titre."""
+    """Le document est lui-même un livre : sa monographie a son titre."""
     PART = "part"
     """Le document est un chapitre ou un article de congrès : sa monographie est le livre ou le volume d'actes qui le contient."""
 
 
 def _doc_types(raw_doc_type: str | None, source: str) -> set[str]:
-    """Valeurs `doc_type` d'un type brut, composite ou non (WoS « Book Chapter; Proceedings Paper »). Une partie inconnue donne `other`."""
+    """Renvoie les valeurs `doc_type` d'un type brut, composite ou non (WoS « Book Chapter; Proceedings Paper »). Une partie inconnue donne `other`."""
     return {map_doc_type(part, source) or "other" for part in (raw_doc_type or "").split(";")}
 
 
 def container_role(
     raw_doc_type: str | None, source: str, *, declares_conference: bool = False
 ) -> ContainerRole:
-    """Rôle du conteneur d'un document, d'après son type brut dans la source. Un document qui déclare un congrès (`declares_conference`) est un article de congrès."""
+    """Renvoie le rôle du conteneur d'un document, d'après son type brut dans la source. Un document qui déclare un congrès (`declares_conference`) est un article de congrès."""
     types = _doc_types(raw_doc_type, source)
     if declares_conference or types & {_BOOK_CHAPTER, _CONFERENCE_PAPER}:
         return ContainerRole.PART
@@ -59,9 +59,10 @@ def is_conference(
 
 
 def conference_paper_share(records: Iterable[tuple[str, str | None]]) -> tuple[int, int]:
-    """Nombre d'articles de congrès et nombre de documents d'une revue.
+    """Compte les articles de congrès et les documents d'une revue.
 
-    `records` : `(source, type brut)` de chaque document. Le type brut évite de compter les documents que la correction a retypés d'après le type de la revue.
+    Args:
+        records: `(source, type brut)` de chaque document. Le type brut ignore les retypages de la correction d'après le type de la revue.
     """
     total = conference = 0
     for source, raw_doc_type in records:
@@ -95,19 +96,24 @@ def holds_mostly_articles(records: Iterable[tuple[str, str | None]]) -> bool:
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ContainerDescription:
-    """Ce qu'une source dit du conteneur d'un document, tous niveaux mêlés.
+    """Conteneur d'un document décrit par une source, tous niveaux mêlés.
 
-    `journal_title` est la revue d'un article. Pour un livre, un chapitre ou un article de congrès, `collection_title` nomme la collection et `book_title` le livre ou le volume d'actes qui contient le document ; le titre d'un livre est `document_title`. Les ISSN sont ceux de la revue ou de la collection, avec le support que donne la source ; la construction les normalise (`received_issns`). Elle retire aussi les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
+    La construction normalise les ISSN (`received_issns`). Elle retire les titres de plateforme d'ebooks (`names_ebook_platform`), qui ne nomment aucun conteneur.
     """
 
     source: str
     raw_doc_type: str | None
     declares_conference: bool = False
     document_title: str | None = None
+    """Titre du document, qui est celui du livre pour un livre."""
     journal_title: str | None = None
+    """Revue d'un article."""
     collection_title: str | None = None
+    """Collection d'un livre, d'un chapitre ou d'un article de congrès."""
     book_title: str | None = None
+    """Livre ou volume d'actes qui contient un chapitre ou un article de congrès."""
     issns: tuple[SerialIssn, ...] = ()
+    """ISSN de la revue ou de la collection, avec le support donné par la source."""
     openalex_id: str | None = None
     oa_model: OaModel | None = None
     isbns: tuple[str, ...] = ()
@@ -157,7 +163,7 @@ def determine_container_type(
 ) -> tuple[SeriesDescription | None, VolumeDescription | None]:
     """Sépare le conteneur d'un document en série et volume, chacun pouvant manquer.
 
-    Un article a sa revue pour série ; sans ISSN, un conteneur qui nomme une édition datée de congrès (« 2021 ICCAS ») est un volume d'actes. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection que désigne un ISSN : sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
+    Un article a sa revue pour série ; sans ISSN, un conteneur qui nomme une édition datée de congrès (« 2021 ICCAS ») est un volume d'actes. Un livre, un chapitre ou un article de congrès a pour volume le livre ou le volume d'actes, et pour série la collection désignée par un ISSN : sans ISSN, sa série se reconnaît seulement entre plusieurs volumes. Un titre de collection qui a la forme d'un volume (« ICORES 2023 ») nomme le volume, à défaut d'autre titre, et sa série prend le titre de série. Un titre de volume identique à celui de la collection, sans marque d'édition, désigne la collection seule : c'est le cas d'un article de congrès paru dans une revue.
     """
     d = description
     role = container_role(d.raw_doc_type, d.source, declares_conference=d.declares_conference)

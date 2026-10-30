@@ -9,8 +9,9 @@ class LoginRequest(BaseModel):
 
 
 class AuthCheckResponse(BaseModel):
-    """État de la session : `authenticated` dit si la requête a une session valide, `login` et `roles` désignent son utilisateur."""
+    """État de la session et, si elle est valide, son utilisateur."""
 
     authenticated: bool
+    """Vrai si la requête a une session valide."""
     login: str | None = None
     roles: list[str] = []

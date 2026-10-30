@@ -1,6 +1,6 @@
 """Repository PostgreSQL des adresses : liens entre adresse et structure, pays saisis à la main (candidats `manual`, un par un ou par lot).
 
-La résolution des pays d'une adresse et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline (`pipeline/transformation/countries/`). Chaque saisie met l'adresse dans la file `address_candidates_queue` : le run suivant résout l'adresse si la résolution immédiate a échoué.
+La résolution des pays d'une adresse et le recalcul des pays des enregistrements sources et des publications appartiennent au pipeline (`pipeline/transformation/countries/`). Chaque saisie met l'adresse dans la file `address_candidates_queue` : si la résolution immédiate échoue, l'adresse est résolue à l'exécution suivante du pipeline.
 """
 
 from sqlalchemy import Connection, delete, select, text, update
@@ -110,7 +110,10 @@ class PgAddressRepository(AddressRepository):
         address_ids: list[int],
         structure_id: int,
     ) -> set[int]:
-        """Condition miroir du lien entre adresse et structure de la vue matérialisée `source_contribution_structures`, à tenir alignée."""
+        """Renvoie les adresses de `address_ids` à lien non rejeté vers la structure.
+
+        La condition reproduit celle de la vue matérialisée `source_contribution_structures`. Les deux restent alignées.
+        """
         if not address_ids:
             return set()
         result = self._conn.execute(

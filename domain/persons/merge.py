@@ -7,7 +7,14 @@ from domain.persons.person import PersonExclusion
 
 
 def merge_roles(target_id: int, source_id: int, *, with_rh: Collection[int]) -> tuple[int, int]:
-    """Personnes conservée et absorbée d'une fusion demandée de `source` dans `target`. Une personne qui a une fiche RH est conservée. `with_rh` : personnes qui ont une fiche RH. Lève `ConflictError` si les deux en ont une."""
+    """Renvoie les personnes conservée et absorbée d'une fusion demandée de `source` dans `target`. Une personne qui a une fiche RH est conservée.
+
+    Args:
+        with_rh: personnes qui ont une fiche RH.
+
+    Raises:
+        ConflictError: les deux personnes ont une fiche RH.
+    """
     if target_id in with_rh and source_id in with_rh:
         raise ConflictError(
             f"REFUS de fusion : les personnes #{target_id} et #{source_id} "
@@ -28,5 +35,5 @@ _EXCLUSION_STRENGTH = {
 def merged_exclusion(
     target: PersonExclusion | None, source: PersonExclusion | None
 ) -> PersonExclusion | None:
-    """Exclusion de la personne fusionnée : `not_a_person` l'emporte sur `out_of_perimeter`, qui l'emporte sur l'absence d'exclusion."""
+    """Renvoie l'exclusion de la personne fusionnée : `not_a_person` l'emporte sur `out_of_perimeter`, qui l'emporte sur l'absence d'exclusion."""
     return max(target, source, key=_EXCLUSION_STRENGTH.__getitem__)

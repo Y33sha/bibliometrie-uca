@@ -30,12 +30,12 @@ def resolve_pg_tool(name: str) -> str:
 
 
 def owner_connection_args() -> list[str]:
-    """Arguments de connexion au serveur sous le propriétaire du schéma, sans la base visée."""
+    """Renvoie les arguments de connexion au serveur sous le propriétaire du schéma, sans la base visée."""
     return ["-U", settings.db_owner_user, "-h", settings.db_host, "-p", str(settings.db_port)]
 
 
 def owner_env() -> dict[str, str]:
-    """Environnement du processus, complété du mot de passe du propriétaire et du mode SSL."""
+    """Renvoie l'environnement du processus, complété du mot de passe du propriétaire et du mode SSL."""
     env = {**os.environ, "PGPASSWORD": settings.db_owner_password.get_secret_value()}
     if settings.db_sslmode:
         env["PGSSLMODE"] = settings.db_sslmode

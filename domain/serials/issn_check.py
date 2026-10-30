@@ -49,12 +49,12 @@ class SerialIssns:
     title: str
     issns: tuple[SerialIssn, ...]
     candidates: tuple[str, ...] = ()
-    """ISSN portés par les enregistrements de la revue, absents de ses ISSN."""
+    """ISSN donnés par les enregistrements sources de la revue, absents de ses ISSN."""
     holds_volumes: bool = False
     """La revue réunit des volumes (`holds_volumes`) : un titre de volume y est remplacé par son titre de série."""
 
     def active(self) -> tuple[str, ...]:
-        """ISSN actifs et ISSN-L de la revue."""
+        """Renvoie les ISSN actifs et l'ISSN-L de la revue."""
         return tuple(r.issn for r in self.issns if r.status is IssnStatus.ACTIVE or r.linking)
 
     def malformed(self) -> tuple[str, ...]:
@@ -64,7 +64,7 @@ class SerialIssns:
         return next((r.issn for r in self.issns if r.linking), None)
 
     def examined(self) -> tuple[str, ...]:
-        """ISSN actifs, puis autres ISSN valides de la revue et ISSN valides des enregistrements, sans doublon."""
+        """Renvoie les ISSN actifs, puis les autres ISSN valides de la revue et les ISSN valides des enregistrements sources, sans doublon."""
         valid = (
             i
             for i in (*(r.issn for r in self.issns), *self.candidates)
@@ -96,7 +96,7 @@ class SudocCheck:
 
 
 def correction_candidates(malformed: Sequence[str]) -> frozenset[str]:
-    """ISSN à chercher dans le Sudoc pour corriger des valeurs mal formées."""
+    """Renvoie les ISSN à chercher dans le Sudoc pour corriger des valeurs mal formées."""
     return frozenset(c for raw in malformed for c in issn_typo_candidates(raw))
 
 
@@ -113,12 +113,12 @@ def _same_title(a: str | None, b: str | None) -> bool:
 
 
 def _complementary(a: IssnSupport | None, b: IssnSupport | None) -> bool:
-    """L'un des supports est le papier, l'autre l'en ligne."""
+    """Vrai si l'un des supports est le papier, l'autre l'en ligne."""
     return {a, b} == {IssnSupport.PRINT, IssnSupport.ELECTRONIC}
 
 
 def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
-    """Même ISSN-L, désignation en `452`, ou supports complémentaires et titres emboîtés. Une notice qui désigne son autre support en `452` ne se réunit qu'à celui-là."""
+    """Vrai pour deux notices de même ISSN-L, liées en `452`, ou de supports complémentaires et de titres emboîtés. Une notice qui désigne son autre support en `452` se réunit seulement à celui-là."""
     if a.issnl is not None and a.issnl == b.issnl:
         return True
     if (b.issn in a.other_support_issns) or (a.issn in b.other_support_issns):
@@ -131,7 +131,7 @@ def _same_publication(a: SudocSerialRecord, b: SudocSerialRecord) -> bool:
 def _support_change(
     linking: SudocSerialRecord, issn: str, linked: SudocSerialRecord | None
 ) -> bool:
-    """`issn`, que `linking` désigne comme titre précédent ou suivant, est la même publication sur l'autre support. Le Sudoc code ainsi l'arrêt du papier au profit de l'en ligne.
+    """Vrai si `issn`, désigné par `linking` comme titre précédent ou suivant, est la même publication sur l'autre support. Le Sudoc code ainsi l'arrêt du papier au profit de l'en ligne.
 
     La notice `linked` de `issn` a le même titre ou le même ISSN-L. Sans notice, `linking` désigne aussi `issn` comme autre support, avec une mention de support (`452$t`).
     """
@@ -144,7 +144,7 @@ def _support_change(
 
 
 def _groups(known: Sequence[str], records: Mapping[str, SudocSerialRecord]) -> list[list[str]]:
-    """ISSN regroupés par publication (`_same_publication`)."""
+    """Regroupe les ISSN par publication (`_same_publication`)."""
     parent = {i: i for i in known}
 
     def root(i: str) -> str:
@@ -164,7 +164,7 @@ def _groups(known: Sequence[str], records: Mapping[str, SudocSerialRecord]) -> l
 def _succeeds(
     later: Sequence[str], earlier: Sequence[str], records: Mapping[str, SudocSerialRecord]
 ) -> bool:
-    """Une notice de `later` désigne un ISSN de `earlier` comme titre précédent, ou une notice de `earlier` désigne un ISSN de `later` comme titre suivant."""
+    """Vrai si une notice de `later` désigne un ISSN de `earlier` comme titre précédent, ou une notice de `earlier` désigne un ISSN de `later` comme titre suivant."""
     return any(x in earlier for i in later for x in records[i].preceding_issns) or any(
         x in later for i in earlier for x in records[i].succeeding_issns
     )
@@ -173,7 +173,7 @@ def _succeeds(
 def _main_group(
     groups: Sequence[list[str]], records: Mapping[str, SudocSerialRecord], title: str
 ) -> list[str] | None:
-    """Groupe le plus nombreux, départagé par la proximité des titres puis par la succession des titres, ou `None` en cas d'égalité."""
+    """Renvoie le groupe le plus nombreux, départagé par la proximité des titres puis par la succession des titres, ou `None` en cas d'égalité."""
 
     def score(group: list[str]) -> tuple[int, float]:
         return len(group), max(_title_ratio(title, records[i].title) for i in group)
@@ -188,20 +188,23 @@ def _main_group(
 def _reference_issnl(
     members: Sequence[str], records: Mapping[str, SudocSerialRecord]
 ) -> str | None:
-    """ISSN-L des notices du groupe. Un ISSN-L qui est l'ISSN d'un membre l'emporte : une notice donne parfois l'ISSN-L d'un titre précédent."""
+    """Renvoie l'ISSN-L des notices du groupe. Un ISSN-L qui est l'ISSN d'un membre l'emporte : une notice donne parfois l'ISSN-L d'un titre précédent."""
     issnls = [issnl for i in members if (issnl := records[i].issnl)]
     pool = [issnl for issnl in issnls if issnl in members] or issnls
     return Counter(pool).most_common(1)[0][0] if pool else None
 
 
 def check_serial_issns(serial: SerialIssns, records: Mapping[str, SudocSerialRecord]) -> SudocCheck:
-    """Vérifie les ISSN d'une revue, et ceux de ses enregistrements sources. `records` : notice Sudoc de chaque ISSN connu du Sudoc, parmi les ISSN de la revue, les candidats à la correction de ses valeurs mal formées (`correction_candidates`) et les ISSN d'autre support de ses notices.
+    """Vérifie les ISSN d'une revue, et ceux de ses enregistrements sources.
 
     Les ISSN connus du Sudoc sont regroupés. Deux ISSN vont ensemble si leurs notices ont le même ISSN-L, si l'une désigne l'autre comme la même publication sur un autre support (`452`), ou si l'un est papier, l'autre en ligne, et que les mots d'un titre sont tous dans l'autre. Le groupe principal se choisit parmi les groupes qui contiennent un ISSN actif, à défaut parmi ceux dont le titre est emboîté dans celui de la revue. C'est le plus nombreux, départagé par la proximité des titres, puis par la succession des titres : le titre suivant l'emporte. Ses ISSN restent actifs, avec le support de leur notice.
 
     Les autres ISSN prennent un statut. Un autre support que le papier et l'en ligne (CD-ROM) reste actif. Un ISSN annulé devient `cancelled`, un titre précédent ou suivant de la revue (`430`, `440`) `related_title`, l'ISSN de son supplément ou de la revue dont elle est le supplément (`421`, `422`) `supplement`. Un titre précédent ou suivant sur l'autre support, de même titre ou de même ISSN-L, marque un changement de support : il reste actif. Les ISSN d'une autre publication sont écartés : erreurs de source, titres issus d'une scission, d'une fusion ou d'une absorption.
 
     Les valeurs mal formées sont corrigées à une faute de frappe près.
+
+    Args:
+        records: notice Sudoc de chaque ISSN connu du Sudoc, parmi les ISSN de la revue, les candidats à la correction de ses valeurs mal formées (`correction_candidates`) et les ISSN d'autre support de ses notices.
     """
     own = serial.examined()
     active = set(serial.active())
@@ -229,7 +232,7 @@ def check_serial_issns(serial: SerialIssns, records: Mapping[str, SudocSerialRec
     main_records = [records[i] for i in main]
 
     def title_links(links: Callable[[SudocSerialRecord], tuple[str, ...]]) -> set[str]:
-        """ISSN que les notices du groupe principal désignent comme titres précédents ou suivants, hors changements de support."""
+        """Renvoie les ISSN désignés par les notices du groupe principal comme titres précédents ou suivants, hors changements de support."""
         return {
             x for r in main_records for x in links(r) if not _support_change(r, x, records.get(x))
         }
@@ -310,7 +313,7 @@ def check_serial_issns(serial: SerialIssns, records: Mapping[str, SudocSerialRec
 def _corrections(
     serial: SerialIssns, records: Mapping[str, SudocSerialRecord], reference: str | None
 ) -> list[tuple[str, str]]:
-    """Correction de chaque valeur mal formée : le seul ISSN à une faute de frappe près dont la notice a un titre proche de celui de la revue, et l'ISSN-L de la revue s'il est connu."""
+    """Renvoie la correction de chaque valeur mal formée : le seul ISSN à une faute de frappe près dont la notice a un titre proche de celui de la revue, et l'ISSN-L de la revue s'il est connu."""
     corrections: list[tuple[str, str]] = []
     for raw in serial.malformed():
         matches = sorted(
@@ -336,9 +339,9 @@ def _serial_rows(
     without_record: set[str],
     support_of: Callable[[str], IssnSupport | None],
 ) -> tuple[SerialIssn, ...]:
-    """ISSN de la revue après vérification.
+    """Renvoie les ISSN de la revue après vérification.
 
-    Un ISSN retenu est actif, avec son support. Sans notice (`without_record`), un ISSN de la revue garde son statut, un ISSN d'enregistrement devient `unverified`. Un ISSN mis de côté prend le statut de son motif. L'ISSN-L est actif.
+    Un ISSN retenu est actif, avec son support. Sans notice (`without_record`), un ISSN de la revue garde son statut, un ISSN d'enregistrement source devient `unverified`. Un ISSN mis de côté prend le statut de son motif. L'ISSN-L est actif.
     """
     previous = {r.issn: r for r in serial.issns}
     rows: dict[str, SerialIssn] = {}
@@ -369,7 +372,7 @@ def _linked(
     records: Mapping[str, SudocSerialRecord],
     links: Callable[[SudocSerialRecord], tuple[str, ...]],
 ) -> bool:
-    """`i` et le groupe principal `main` se désignent par ces zones, dans un sens ou dans l'autre : le Sudoc code parfois la liaison d'un seul côté."""
+    """Vrai si `i` et le groupe principal `main` se désignent par ces zones, dans un sens ou dans l'autre : le Sudoc code parfois la liaison d'un seul côté."""
     record = records.get(i)
     return any(i in links(records[m]) for m in main) or (
         record is not None and any(x in main for x in links(record))
@@ -379,7 +382,7 @@ def _linked(
 def _outside_reason(
     i: str, main: Sequence[str], records: Mapping[str, SudocSerialRecord], *, related_title: bool
 ) -> SetAsideReason:
-    """Motif d'un ISSN hors de la revue : même revue sous un autre titre, supplément, ou autre publication."""
+    """Renvoie le motif d'un ISSN hors de la revue : même revue sous un autre titre, supplément, ou autre publication."""
     if _linked(i, main, records, lambda r: r.continuation_issns):
         return SetAsideReason.RELATED_TITLE
     if _linked(i, main, records, lambda r: r.supplement_issns):
@@ -394,7 +397,7 @@ def _by_support(
     support_of: Callable[[str], IssnSupport | None],
     reference: str | None,
 ) -> tuple[list[str], list[str]]:
-    """ISSN retenus et ISSN d'une autre publication : `(retenus, autres publications)`.
+    """Sépare les ISSN retenus des ISSN d'une autre publication : `(retenus, autres publications)`.
 
     Un support papier ou en ligne absent des ISSN retenus se complète par un ISSN d'autre support d'une notice de la revue. Parmi plusieurs ISSN d'un même support, ceux dont la notice donne un autre ISSN-L que la revue sont d'une autre publication.
     """

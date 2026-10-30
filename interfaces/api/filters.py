@@ -1,6 +1,6 @@
 """Lecture des paramètres de requête à plusieurs valeurs séparées par des virgules.
 
-Les constructeurs de filtres SQL vivent dans `infrastructure/read_models/filters.py`.
+Les constructeurs de filtres SQL sont dans `infrastructure/read_models/filters.py`.
 """
 
 from collections.abc import Collection
@@ -68,7 +68,7 @@ def parse_ids_with_none(s: str, *, param: str) -> tuple[list[int], bool]:
 def parse_lab_id(lab_id: str) -> tuple[list[int], bool]:
     """Découpe `lab_id` en identifiants de laboratoires et en drapeau « sans laboratoire ».
 
-    `lab_id=12,none` retient ce que le laboratoire 12 signe et ce qu'aucun laboratoire ne signe.
+    `lab_id=12,none` retient les publications du laboratoire 12 et celles sans laboratoire.
     """
     return parse_ids_with_none(lab_id, param="lab_id")
 
@@ -83,7 +83,7 @@ Les deux valeurs se combinent en OU : en cocher deux ou aucune laisse tout passe
 def parse_vocabulary_csv(s: str, *, allowed: Collection[str], param: str) -> list[str]:
     """Découpe une liste de valeurs prises dans un vocabulaire fermé, et refuse les intruses.
 
-    Le découpage par virgules garde les URL lisibles, mais soustrait la liste à la validation de FastAPI : sans ce contrôle, une valeur hors vocabulaire irait jusqu'au SQL, qui la laisserait de côté, et la liste rendue serait trompeuse. Le refus prend le code de la validation native.
+    Le découpage par virgules garde les URL lisibles, mais soustrait la liste à la validation de FastAPI : sans ce contrôle, une valeur hors vocabulaire irait jusqu'au SQL, qui l'ignorerait, et la liste renvoyée serait trompeuse. Le refus prend le code de la validation native.
     """
     values = parse_str_csv(s)
     unknown = sorted({v for v in values if v not in allowed})

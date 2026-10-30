@@ -56,7 +56,7 @@ NO_LICENSE_LABEL = "Aucune licence"
 
 
 def license_label(value: str | None) -> str:
-    """Libellé français d'une licence, `NO_LICENSE_LABEL` sans licence."""
+    """Renvoie le libellé français d'une licence, `NO_LICENSE_LABEL` sans licence."""
     return LICENSE_LABELS[License(value)] if value else NO_LICENSE_LABEL
 
 
@@ -80,7 +80,7 @@ DEPOSIT_LICENSE_SOURCE = Source.HAL
 
 
 def publisher_license_sources(doc_type: str | None) -> tuple[Source, ...]:
-    """Sources de la licence de la version éditeur, par priorité, selon le type de document."""
+    """Renvoie les sources de la licence de la version éditeur, par priorité, selon le type de document."""
     return DATA_LICENSE_SOURCES if doc_type in DATA_DOC_TYPES else PUBLISHER_LICENSE_SOURCES
 
 
@@ -138,7 +138,7 @@ _SPDX_URL = re.compile(r"^spdx\.org/licenses/([^/]+?)(\.html)?$")
 
 
 def _cc_code(elements: str) -> License | None:
-    """Licence Creative Commons de code `elements` (`by-nc-nd`, `by-nd-nc`), dans n'importe quel ordre des éléments."""
+    """Renvoie la licence Creative Commons de code `elements` (`by-nc-nd`, `by-nd-nc`), dans n'importe quel ordre des éléments."""
     parts = elements.split("-")
     if not parts or parts[0] != "by" or any(p not in _CC_ELEMENTS for p in parts):
         return None
@@ -146,7 +146,7 @@ def _cc_code(elements: str) -> License | None:
 
 
 def _from_code(code: str) -> License | None:
-    """Licence d'un code sans URL : identifiant SPDX, libellé DataCite, code OpenAlex ou scanR."""
+    """Renvoie la licence d'un code sans URL : identifiant SPDX, libellé DataCite, code OpenAlex ou scanR."""
     code = re.sub(r"\s+", "-", code.strip().lower())
     if code in _CODES:
         return _CODES[code]
@@ -161,7 +161,7 @@ def _from_code(code: str) -> License | None:
 
 
 def _from_url(url: str) -> License | None:
-    """Licence d'une URL de licence."""
+    """Renvoie la licence d'une URL de licence."""
     u = re.sub(r"^https?://", "", url.strip().lower())
     u = re.sub(r"^www\.", "", u).rstrip("/")
     for prefix, matched in _URL_PREFIXES:
@@ -183,7 +183,7 @@ def is_access_right(raw: str) -> bool:
 
 
 def normalize_license(raw: str | None) -> License | None:
-    """Licence que désigne une forme brute, ou `None` pour une forme vide, non reconnue, ou qui n'est pas une licence (droit d'accès, URL d'éditeur)."""
+    """Renvoie la licence désignée par une forme brute, ou `None` pour une forme vide, non reconnue, ou qui n'est pas une licence (droit d'accès, URL d'éditeur)."""
     if not raw or not raw.strip() or is_access_right(raw):
         return None
     value = raw.strip()
@@ -193,7 +193,7 @@ def normalize_license(raw: str | None) -> License | None:
 
 
 def crossref_license(entries: JsonValue) -> License | None:
-    """Licence de la version éditeur d'un enregistrement source Crossref (`license`) : entrée `vor`, à défaut `unspecified`."""
+    """Renvoie la licence de la version éditeur d'un enregistrement source Crossref (`license`) : entrée `vor`, à défaut `unspecified`."""
     for version in ("vor", "unspecified"):
         for entry in as_sequence(entries):
             item = as_mapping(entry)
@@ -204,7 +204,7 @@ def crossref_license(entries: JsonValue) -> License | None:
 
 
 def datacite_license(rights: JsonValue) -> License | None:
-    """Licence d'un enregistrement source DataCite (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
+    """Renvoie la licence d'un enregistrement source DataCite (`rightsList`) : identifiant SPDX, à défaut URI. Une licence déclarée par son URI mais non reconnue vaut `OTHER`."""
     declared = False
     for entry in as_sequence(rights):
         item = as_mapping(entry)

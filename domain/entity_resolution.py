@@ -6,9 +6,12 @@ from collections.abc import Iterable
 def connected_components(
     members: Iterable[tuple[int, frozenset[tuple[str, str]]]],
 ) -> list[list[int]]:
-    """Composantes connexes : groupes d'identifiants reliés, directement ou de proche en proche, par une clé partagée.
+    """Renvoie les composantes connexes : groupes d'identifiants reliés, directement ou de proche en proche, par une clé partagée.
 
-    `members` : couples `(id, clés)`. Un élément sans clé forme un groupe à lui seul. Chaque groupe est trié, et les groupes sont triés par leur plus petit identifiant.
+    Un élément sans clé forme un groupe à lui seul. Chaque groupe est trié, et les groupes sont triés par leur plus petit identifiant.
+
+    Args:
+        members: couples `(id, clés)`.
     """
     parent: dict[int, int] = {}
 

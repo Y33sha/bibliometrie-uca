@@ -55,13 +55,13 @@ MIN_FORM_LENGTH = 3
 # Code d'unité de recherche (« UMR 7039 », « EA4432 »), écarté comme nom de structure.
 _UNIT_CODE = re.compile(r"^(?:UMR|UMRS|UR|EA|UPR|FRE|UMS|USR|UAR|IRL)(?:\s|\d)", re.IGNORECASE)
 
-# Collection HAL d'une structure : part minimale de ses dépôts que la collection contient, et indice de Jaccard minimal entre les dépôts de la structure et ceux de la collection.
+# Collection HAL d'une structure : part minimale de ses dépôts contenus dans la collection, et indice de Jaccard minimal entre les dépôts de la structure et ceux de la collection.
 MIN_COLLECTION_COVERAGE = 0.5
 MIN_COLLECTION_JACCARD = 0.15
 # Collections examinées : les plus fréquentes parmi les dépôts de la structure.
 HAL_COLLECTION_CANDIDATES = 25
 
-# Le périmètre de l'établissement sert à l'extraction et à la création des personnes.
+# Le périmètre de l'établissement sert au moissonnage et à la création des personnes.
 _PERIMETER_DESCRIPTIONS = {
     PERIMETER_EXTRACTION_KEY: "Périmètre pour déterminer les structures à interroger lors de l'extraction",
     PERIMETER_PERSONS_KEY: "Périmètre pour la création des personnes",
@@ -75,7 +75,7 @@ _INSTITUTION_COUNTRY_DESCRIPTION = "Pays de l'établissement, code ISO 3166-1. U
 
 @dataclass(frozen=True)
 class RorOrganization:
-    """Ce que le seed retient d'une fiche ROR."""
+    """Fiche ROR réduite aux champs retenus par le seed."""
 
     ror_id: str
     name: str
@@ -99,7 +99,7 @@ class InstitutionSeed:
 
 
 def parse_organization(record: Mapping[str, JsonValue]) -> RorOrganization:
-    """Fiche ROR (API v2) réduite à son identifiant, ses noms, ses types, ses filles et le pays de sa première localisation.
+    """Réduit une fiche ROR (API v2) à son identifiant, ses noms, ses types, ses filles et le pays de sa première localisation.
 
     Quand le nom affiché tient en un mot (« CRAN »), le nom est le premier libellé de plusieurs mots, et le nom affiché sert d'acronyme.
     """
@@ -147,14 +147,14 @@ def _ror_short_id(ror_url: str) -> str:
 
 
 def child_structure_type(org: RorOrganization) -> StructureType | None:
-    """Type de structure d'une fille ROR, d'après le premier de ses types ROR qui en a un."""
+    """Renvoie le type de structure d'une fille ROR, d'après le premier de ses types ROR associé à un type de structure."""
     return next((_CHILD_TYPES[t] for t in org.types if t in _CHILD_TYPES), None)
 
 
 def name_forms(
     org: RorOrganization, *, context_id: int | None
 ) -> dict[str, tuple[bool, list[int] | None]]:
-    """Formes de noms normalisées d'une structure : `{forme: (frontière de mot, contexte requis)}`.
+    """Renvoie les formes de noms normalisées d'une structure : `{forme: (frontière de mot, contexte requis)}`.
 
     Une forme d'un seul mot exige une frontière de mot. Sans chiffre (acronyme, « Silva », « DynAMic »), elle exige aussi la présence de `context_id` dans l'adresse quand il est fourni. Un code d'unité (« umr7503 ») désigne une seule unité et se passe de contexte.
     """
@@ -172,7 +172,7 @@ def name_forms(
 
 
 def _structure_code(org: RorOrganization, taken: set[str]) -> str:
-    """Code unique de la structure : acronyme ou nom normalisé, suffixé de l'identifiant ROR en cas de doublon."""
+    """Renvoie le code unique de la structure : acronyme ou nom normalisé, suffixé de l'identifiant ROR en cas de doublon."""
     base = normalize_text(org.acronym or org.name).replace(" ", "_")[:40] or org.ror_id
     code = base if base not in taken else f"{base}_{org.ror_id}"
     taken.add(code)
@@ -193,9 +193,10 @@ def build_institution_seed(
     perimeter_code: str,
     hal_collections: Mapping[str, str] | None = None,
 ) -> InstitutionSeed:
-    """Structures, tutelles, périmètre, formes de noms et configuration du seed d'un établissement.
+    """Construit les structures, tutelles, périmètre, formes de noms et configuration du seed d'un établissement.
 
-    `hal_collections` : collection HAL par identifiant ROR.
+    Args:
+        hal_collections: collection HAL par identifiant ROR.
     """
     hal_collections = hal_collections or {}
     taken: set[str] = set()
@@ -298,7 +299,7 @@ def fetch_ror(ror_id: str) -> RorOrganization:
 
 
 def fetch_openalex_ids(ror_id: str) -> list[str]:
-    """Identifiant OpenAlex de l'institution désignée par `ror_id`."""
+    """Renvoie l'identifiant OpenAlex de l'institution désignée par `ror_id`."""
     params: dict[str, str | int | float | bool | None] = {"select": "id"}
     if api_key := get_openalex_api_key():
         params["api_key"] = api_key
@@ -319,9 +320,11 @@ def fetch_openalex_ids(ror_id: str) -> list[str]:
 def choose_collection(
     structure_docs: int, candidates: Sequence[tuple[str, int]], size_of: Callable[[str], int]
 ) -> str | None:
-    """Collection HAL dont les dépôts sont les plus proches de ceux d'une structure, au sens de l'indice de Jaccard.
+    """Choisit la collection HAL aux dépôts les plus proches de ceux d'une structure, au sens de l'indice de Jaccard.
 
-    `candidates` : `(code, dépôts de la structure dans la collection)`. `size_of` : nombre de dépôts d'une collection, appelé pour les seules collections qui couvrent assez la structure.
+    Args:
+        candidates: `(code, dépôts de la structure dans la collection)`.
+        size_of: nombre de dépôts d'une collection, appelé seulement pour les collections couvrant assez la structure.
     """
     best: tuple[float, str] | None = None
     for code, shared in candidates:
@@ -334,7 +337,7 @@ def choose_collection(
 
 
 def acronym_collection_accepted(collection_docs: int, institution_docs: int) -> bool:
-    """Vrai quand la collection existe et que la plupart de ses dépôts appartiennent à l'établissement."""
+    """Renvoie vrai quand la collection existe et que la plupart de ses dépôts appartiennent à l'établissement."""
     return collection_docs > 0 and institution_docs >= MIN_COLLECTION_COVERAGE * collection_docs
 
 
@@ -350,7 +353,7 @@ def _hal_count(query: str) -> int:
 
 
 def fetch_hal_structure_ids(ror_id: str) -> list[str]:
-    """Structures du référentiel HAL, valides ou anciennes, désignées par `ror_id`. Le référentiel écrit le ROR en URL ou en identifiant seul."""
+    """Renvoie les structures du référentiel HAL, valides ou anciennes, désignées par `ror_id`. Le référentiel écrit le ROR en URL ou en identifiant seul."""
     data = _hal_get(
         API_BASE_URLS["hal_structures"],
         {"q": f'ror_s:("https://ror.org/{ror_id}" OR "{ror_id}")', "fl": "docid", "rows": 100},
@@ -361,12 +364,12 @@ def fetch_hal_structure_ids(ror_id: str) -> list[str]:
 
 
 def structures_query(structure_ids: Collection[str]) -> str:
-    """Requête HAL des dépôts d'une des structures `structure_ids`."""
+    """Renvoie la requête HAL des dépôts d'une des structures `structure_ids`."""
     return f"structId_i:({' OR '.join(structure_ids)})"
 
 
 def collection_of_structures(structure_ids: Collection[str]) -> str | None:
-    """Collection HAL choisie par `choose_collection` parmi les plus fréquentes des dépôts des structures HAL `structure_ids`."""
+    """Renvoie la collection HAL choisie par `choose_collection` parmi les plus fréquentes des dépôts des structures HAL `structure_ids`."""
     query = structures_query(structure_ids)
     data = _hal_get(
         API_BASE_URLS["hal"],
@@ -394,7 +397,7 @@ def collection_of_structures(structure_ids: Collection[str]) -> str | None:
 
 
 def fetch_hal_collection(org: RorOrganization, institution_query: str | None) -> str | None:
-    """Collection HAL d'une fille de l'établissement.
+    """Renvoie la collection HAL d'une fille de l'établissement.
 
     Les dépôts des structures HAL de même ROR désignent la collection (`collection_of_structures`). Sans structure HAL de ce ROR, le sigle de `org` sert de code de collection, à condition que `acronym_collection_accepted` le valide d'après les dépôts de l'établissement (`institution_query`).
     """
@@ -412,7 +415,7 @@ def fetch_hal_collection(org: RorOrganization, institution_query: str | None) ->
 
 
 def fetch_hal_collections(root: RorOrganization, children: list[RorOrganization]) -> dict[str, str]:
-    """Collection HAL par identifiant ROR, pour l'établissement et celles de ses filles qui ont un type de structure."""
+    """Renvoie la collection HAL par identifiant ROR, pour l'établissement et ses filles pourvues d'un type de structure."""
     collections: dict[str, str] = {}
     root_structure_ids = fetch_hal_structure_ids(root.ror_id)
     institution_query = None

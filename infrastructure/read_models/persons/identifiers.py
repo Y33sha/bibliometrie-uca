@@ -9,9 +9,10 @@ from infrastructure.read_models.persons.models import PersonIdentifierOut
 def person_identifiers(
     conn: Connection, person_ids: list[int], *, public_only: bool
 ) -> dict[int, list[PersonIdentifierOut]]:
-    """Identifiants indexés par personne, chacun avec son type et son statut.
+    """Renvoie les identifiants indexés par personne, chacun avec son type et son statut.
 
-    `public_only` sert le profil public : seuls les types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`), sans les attributions rejetées. Sinon, la lecture renvoie tous les identifiants : l'interface d'administration les arbitre tous, et l'annuaire public filtre types et statuts à l'affichage.
+    Args:
+        public_only: restreint aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`) et écarte les attributions rejetées, pour le profil public.
     """
     if not person_ids:
         return {}

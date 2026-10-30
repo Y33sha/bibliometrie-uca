@@ -40,14 +40,15 @@ _PAGE_COUNT = re.compile(r"^\d+\s*p\.?$")
 
 
 class PageRange(NamedTuple):
-    """Première et dernière page ; `last_page` vaut `None` pour une page seule. Les champs ont le nom de leur clé de `biblio`."""
+    """Première et dernière page. Les champs ont le nom de leur clé de `biblio`."""
 
     first_page: str | None = None
     last_page: str | None = None
+    """`None` pour une page seule."""
 
 
 def parse_pages(raw: str | None) -> PageRange:
-    """Pagination donnée en texte : intervalle (`45-67`, `pp. 465-470`) ou page seule (`45`, `p. 3`).
+    """Lit une pagination donnée en texte : intervalle (`45-67`, `pp. 465-470`) ou page seule (`45`, `p. 3`).
 
     Un nombre de pages (`728 p.`) et une valeur sans page (`np`) donnent une `PageRange` vide.
     """
@@ -75,7 +76,7 @@ def compact_biblio(
     journal_issnl: str | None = None,
     journal_openalex_id: str | None = None,
 ) -> dict[str, JsonValue] | None:
-    """`biblio` réduit aux valeurs non vides ; `None` sans aucune valeur."""
+    """Construit `biblio` réduit aux valeurs non vides ; `None` sans aucune valeur."""
     journal: dict[str, JsonValue] = {
         key: value
         for key, value in (

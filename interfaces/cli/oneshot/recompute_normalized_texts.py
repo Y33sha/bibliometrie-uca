@@ -89,7 +89,7 @@ _COLUMNS = (
 
 
 def _recompute_column(conn: Connection, column: _Column, *, apply: bool) -> int:
-    """Écrit les valeurs de `column` qui changent. Renvoie leur nombre."""
+    """Écrit les valeurs modifiées de `column`. Renvoie leur nombre."""
     rows = conn.execute(
         text(
             f"SELECT {column.key} AS key, {column.source} AS source, {column.target} AS target"

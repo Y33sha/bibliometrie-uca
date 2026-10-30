@@ -26,7 +26,7 @@ def _text(mapping: Mapping[str, object], key: str) -> str | None:
 
 
 def _pages(biblio: Mapping[str, object]) -> str | None:
-    """Plage de pages composée de `first_page` et `last_page`."""
+    """Renvoie la plage de pages composée de `first_page` et `last_page`."""
     first, last = _text(biblio, BiblioKey.FIRST_PAGE), _text(biblio, BiblioKey.LAST_PAGE)
     if first and last and first != last:
         return f"{first}-{last}"
@@ -71,7 +71,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
 
 
 def _source_contributions(conn: Connection, publication_id: int) -> list[SourceContributionOut]:
-    """Contributions sources des enregistrements sources de la publication, hors doublons d'auteur et collectifs, exclus de l'alignement, avec leur contribution et leur entrée dans la contribution."""
+    """Renvoie les contributions sources des enregistrements sources de la publication, hors doublons d'auteur et collectifs (exclus de l'alignement), avec leur contribution et leur entrée dans la contribution."""
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
@@ -120,7 +120,7 @@ class PublicationSourceRecordQueries:
     _conn: Connection
 
     def get_publication_sources(self, publication_id: int) -> PublicationSourcesResponse | None:
-        """Métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
+        """Renvoie les métadonnées et contributions sources de chaque enregistrement source de la publication `publication_id`, ou `None` si la publication n'existe pas."""
         title = self._conn.execute(
             text("SELECT title FROM publications WHERE id = :pid"), {"pid": publication_id}
         ).scalar_one_or_none()

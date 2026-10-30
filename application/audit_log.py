@@ -2,9 +2,9 @@
 
 Un service émet l'événement après l'écriture qu'il décrit : `emit_event("person.merged", "person", target_id, {"source_id": source_id})`.
 
-L'événement rejoint la file de la requête en cours. `db_conn` écrit cette file dans `audit_log` juste avant le commit de la requête (`record_pending_events`) : la trace partage le sort de l'écriture qu'elle décrit.
+L'événement rejoint la file de la requête en cours. `db_conn` écrit cette file dans `audit_log` juste avant le commit de la requête (`record_pending_events`). La trace est donc commitée ou annulée avec l'écriture décrite.
 
-La requête et son utilisatrice vivent dans un ContextVar, posé par le middleware d'authentification. Hors requête d'administration (pipeline, scripts, tests qui n'auditent pas), `emit_event` ne consigne rien. Chaque requête HTTP a son propre contexte. Une copie du contexte, celle d'un thread du threadpool, contient la même file.
+Le middleware d'authentification pose l'utilisatrice de la requête dans un ContextVar. Chaque requête HTTP a son propre contexte. Un thread du threadpool reçoit une copie du contexte, donc la même file. Hors requête d'administration (pipeline, scripts), `emit_event` ignore l'événement.
 """
 
 import contextvars
@@ -38,7 +38,7 @@ _session: contextvars.ContextVar[_AuditSession | None] = contextvars.ContextVar(
 
 
 def set_current_user(user_id: str | None) -> contextvars.Token[_AuditSession | None]:
-    """Ouvre la session d'audit de la requête en cours, au nom de l'utilisatrice (aucune avec `None`), et renvoie le jeton qui restaure l'état précédent (`reset_current_user`)."""
+    """Ouvre la session d'audit de la requête en cours au nom de l'utilisatrice, ou la ferme avec `None`. Renvoie le jeton attendu par `reset_current_user`."""
     return _session.set(_AuditSession(user_id) if user_id is not None else None)
 
 
@@ -48,7 +48,7 @@ def reset_current_user(token: contextvars.Token[_AuditSession | None]) -> None:
 
 
 def get_current_user() -> str | None:
-    """Utilisatrice de la requête en cours, ou `None` hors requête d'administration."""
+    """Renvoie l'utilisatrice de la requête en cours, ou `None` hors requête d'administration."""
     session = _session.get()
     return session.user_id if session is not None else None
 
@@ -59,9 +59,13 @@ def emit_event(
     entity_id: int | None = None,
     payload: dict[str, JsonValue] | None = None,
 ) -> None:
-    """Ajoute un événement à la file de la requête en cours ; sans requête d'administration, ne consigne rien.
+    """Ajoute un événement à la file de la requête en cours. Hors requête d'administration, l'événement est ignoré.
 
-    `event_type` est en notation pointée (`person.merged`, `structure.deleted`), `entity_type` est le type de l'entité touchée (person, publication, structure, serial, publisher, address…). `entity_id` est nul quand l'entité disparaît sans équivalent, ou quand l'événement concerne un lot. `payload` contient les données utiles, sérialisables en JSON (source d'une fusion, champs modifiés…).
+    Args:
+        event_type: notation pointée (`person.merged`, `structure.deleted`).
+        entity_type: type de l'entité touchée (person, publication, structure, serial, publisher, address…).
+        entity_id: `None` quand l'entité disparaît sans équivalent, ou quand l'événement concerne un lot.
+        payload: données sérialisables en JSON (source d'une fusion, champs modifiés…).
     """
     session = _session.get()
     if session is not None:
@@ -70,7 +74,7 @@ def emit_event(
 
 @contextmanager
 def discarded_events() -> Iterator[None]:
-    """Écarte les événements émis dans le bloc : l'écriture qu'ils décrivent y est annulée (aperçu dans un `SAVEPOINT`)."""
+    """Écarte les événements émis dans le bloc, pour un aperçu dans un `SAVEPOINT` annulé."""
     session = _session.get()
     mark = len(session.events) if session is not None else 0
     try:

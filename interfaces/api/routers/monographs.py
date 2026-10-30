@@ -35,7 +35,7 @@ def monograph_filters(
     publisher_id: int | None = None,
     serial_id: int | None = None,
 ) -> MonographFilters:
-    """Filtres partagés par la liste et ses facettes.
+    """Lit les filtres partagés par la liste et ses facettes.
 
     `search` vise le titre, ou l'ISBN quand le terme commence par 978 ou 979. `type` liste, séparés par des virgules, les types retenus : `book` (livre), `proceedings` (volume d'actes). `year` liste les années retenues. `publisher_id` et `serial_id` restreignent à un éditeur et à une collection.
     """
@@ -57,7 +57,7 @@ def list_monographs(
     filters: MonographFilters = Depends(monograph_filters),
     queries: MonographQueries = Depends(monograph_queries),
 ) -> MonographListResponse:
-    """Liste paginée des monographies, avec leur éditeur, leur collection et le nombre de publications qu'elles contiennent."""
+    """Liste les monographies par page, avec leur éditeur, leur collection et leur nombre de publications."""
     return queries.list_monographs(filters=filters, sort=sort, page=page, per_page=per_page)
 
 
@@ -69,7 +69,7 @@ def export_monographs_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la liste des monographies, aux filtres et au tri de la liste."""
+    """Exporte en CSV la liste des monographies, aux filtres et au tri de la liste."""
     return csv_response(
         queries.export_monographs_csv(filters=filters, sort=sort),
         filename="monographies.csv",
@@ -82,7 +82,7 @@ def monographs_facets(
     filters: MonographFilters = Depends(monograph_filters),
     queries: MonographQueries = Depends(monograph_queries),
 ) -> MonographsFacetsResponse:
-    """Nombre de monographies par type et par année. Chaque décompte écarte le filtre de sa dimension."""
+    """Compte les monographies par type et par année. Chaque décompte écarte le filtre de sa dimension."""
     return queries.monographs_facets(filters=filters)
 
 
@@ -93,7 +93,7 @@ def monographs_entity_facet(
     filters: MonographFilters = Depends(monograph_filters),
     queries: MonographQueries = Depends(monograph_queries),
 ) -> EntityFacetResponse:
-    """Facette contextuelle des éditeurs ou des collections : les premiers sous les filtres actifs, avec leur nombre de monographies.
+    """Renvoie la facette contextuelle des éditeurs ou des collections : les premiers sous les filtres actifs, avec leur nombre de monographies.
 
     `entity_search` cherche dans les noms d'éditeur ou les titres de collection, là où `search` filtre les monographies.
     """
@@ -106,5 +106,5 @@ def get_monograph(
     queries: MonographQueries = Depends(monograph_queries),
     detail: EntityDetail = Depends(entity_detail(MergedEntity.MONOGRAPH)),
 ) -> MonographListItem:
-    """Fiche d'une monographie."""
+    """Renvoie la fiche d'une monographie."""
     return detail.found(queries.get_monograph(monograph_id))

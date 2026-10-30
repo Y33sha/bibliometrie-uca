@@ -16,7 +16,11 @@ _RANK = {reason: rank for rank, reason in enumerate(MATCH_REASON_PRIORITY)}
 
 
 def check_mergeable(dois: Iterable[str | None]) -> None:
-    """Refuse la fusion de publications à DOI distincts (`ValidationError`) : un DOI désigne une seule œuvre."""
+    """Refuse la fusion de publications à DOI distincts : un DOI désigne une seule œuvre.
+
+    Raises:
+        ValidationError: DOI distincts.
+    """
     distinct = sorted({doi.lower() for doi in dois if doi})
     if len(distinct) > 1:
         raise ValidationError(f"Fusion impossible : DOI distincts ({', '.join(distinct)})")
@@ -32,20 +36,24 @@ class Attribution:
 
 @dataclass(frozen=True, slots=True)
 class MergedAttributions:
-    """`attributions` : attribution de chaque contribution qui reçoit une personne. `conflicts` : contributions dont les contributions sources désignent plusieurs personnes."""
+    """Attributions des contributions réalignées après une fusion manuelle."""
 
     attributions: dict[int, Attribution]
+    """Attribution de chaque contribution qui reçoit une personne."""
     conflicts: frozenset[int]
+    """Contributions dont les contributions sources désignent plusieurs personnes."""
 
 
 def merge_attributions(
     previous: Mapping[int, Attribution], contributions: Mapping[int, Collection[int]]
 ) -> MergedAttributions:
-    """Attributions des contributions réalignées après la fusion.
+    """Renvoie les attributions des contributions réalignées après la fusion.
 
     Une contribution reçoit la personne de ses contributions sources, avec le mode de rattachement le plus prioritaire (`MATCH_REASON_PRIORITY`). Une contribution dont les contributions sources désignent deux personnes est en conflit, et reste sans personne. Une personne désignée par plusieurs contributions revient à la mieux appuyée (`settle_publication`).
 
-    `previous` : attribution avant la fusion de chaque contribution source dont la contribution a une personne. `contributions` : contributions sources de chaque contribution réalignée.
+    Args:
+        previous: attribution avant la fusion de chaque contribution source dont la contribution a une personne.
+        contributions: contributions sources de chaque contribution réalignée.
     """
     conflicts: set[int] = set()
     decisions: dict[int, tuple[ContributionDecision, int]] = {}

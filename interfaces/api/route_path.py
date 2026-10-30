@@ -25,9 +25,9 @@ class RootPath:
 
 
 def route_path(scope: Scope) -> str:
-    """Chemin sur lequel le routage apparie ses routes.
+    """Renvoie le chemin sur lequel le routage apparie ses routes.
 
-    Le préfixe est retiré seulement s'il ouvre le chemin sur une frontière de segment : un chemin qui commence par les mêmes lettres sans être sous le préfixe — `/bibliometrie-bis` sous `/bibliometrie` — est rendu intact.
+    Le préfixe est retiré seulement s'il ouvre le chemin sur une frontière de segment : un chemin qui commence par les mêmes lettres sans être sous le préfixe — `/bibliometrie-bis` sous `/bibliometrie` — est renvoyé intact.
     """
     path: str = scope["path"]
     root_path: str = scope.get("root_path", "")

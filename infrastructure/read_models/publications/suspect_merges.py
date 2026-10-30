@@ -35,7 +35,7 @@ class SuspectMergeQueries:
     _conn: Connection
 
     def suspect_merges_count(self) -> int:
-        """Nombre de publications de la file (badge de l'onglet)."""
+        """Renvoie le nombre de publications de la file (badge de l'onglet)."""
         return int(
             self._conn.execute(
                 text(f"SELECT count(*) FROM publication_author_alignment pa WHERE {_SUSPECT}")  # noqa: S608
@@ -43,7 +43,7 @@ class SuspectMergeQueries:
         )
 
     def suspect_merges(self, *, page: int, per_page: int) -> SuspectMergesResponse:
-        """Publications de la file, la plus faible part de contributions sources d'auteur avec correspondant d'abord, avec le décompte de chaque enregistrement source."""
+        """Renvoie les publications de la file, la plus faible part de contributions sources d'auteur avec correspondant d'abord, avec le décompte de chaque enregistrement source."""
         total = self.suspect_merges_count()
         rows = self._conn.execute(
             text(f"""

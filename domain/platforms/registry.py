@@ -11,16 +11,15 @@ from domain.urls import is_host, url_host
 
 @dataclass(frozen=True, slots=True)
 class KnownPlatform:
-    """Plateforme de la liste fermée : nom, type, préfixes DOI, sources OpenAlex (la principale en tête) et hôtes.
-
-    Un hôte vaut pour ses sous-domaines. Il peut se compléter d'un début de chemin (`ncbi.nlm.nih.gov/pmc`).
-    """
+    """Plateforme de la liste fermée."""
 
     name: str
     platform_type: PlatformType
     doi_prefixes: frozenset[str] = frozenset()
     openalex_ids: tuple[str, ...] = ()
+    """Sources OpenAlex, la principale en tête."""
     hosts: tuple[str, ...] = ()
+    """Hôtes de la plateforme. Un hôte vaut pour ses sous-domaines. Il peut se compléter d'un début de chemin (`ncbi.nlm.nih.gov/pmc`)."""
 
 
 def _preprint_server(
@@ -139,7 +138,7 @@ _BY_PREFIX = {prefix: ps[0] for prefix, ps in _PLATFORMS_OF_PREFIX.items() if le
 
 
 def known_platform_of_source(openalex_id: str) -> KnownPlatform | None:
-    """Plateforme de la liste dont `openalex_id` est une source OpenAlex."""
+    """Renvoie la plateforme de la liste dont `openalex_id` est une source OpenAlex."""
     return _BY_OPENALEX_ID.get(openalex_id)
 
 
@@ -149,7 +148,7 @@ def _matches(url: str, host: str) -> bool:
 
 
 def known_platform_of_url(url: str) -> KnownPlatform | None:
-    """Plateforme de la liste que désigne `url` : par son hôte, à défaut par le préfixe d'une URL doi.org propre à une seule plateforme."""
+    """Renvoie la plateforme de la liste désignée par `url` : par son hôte, à défaut par le préfixe d'une URL doi.org propre à une seule plateforme."""
     host = url_host(url)
     if not host:
         return None
@@ -164,19 +163,19 @@ def known_platform_of_url(url: str) -> KnownPlatform | None:
 
 
 def known_platform_of_copy(url: str, openalex_id: str | None) -> KnownPlatform | None:
-    """Plateforme de la liste d'une copie : celle de son URL, à défaut celle de sa source OpenAlex."""
+    """Renvoie la plateforme de la liste d'une copie : celle de son URL, à défaut celle de sa source OpenAlex."""
     if known := known_platform_of_url(url):
         return known
     return known_platform_of_source(openalex_id) if openalex_id else None
 
 
 def is_publisher_platform_prefix(prefix: str) -> bool:
-    """Vrai si `prefix` est le préfixe DOI d'une plateforme d'éditeurs. Une telle plateforme enregistre sous son préfixe les articles des revues qu'elle diffuse : le titulaire du préfixe est la plateforme."""
+    """Vrai si `prefix` est le préfixe DOI d'une plateforme d'éditeurs. Une telle plateforme enregistre sous son préfixe les articles des revues diffusées : le titulaire du préfixe est la plateforme."""
     return prefix in _PUBLISHER_PLATFORM_PREFIXES
 
 
 def preprint_servers_of_prefix(prefix: str) -> tuple[KnownPlatform, ...]:
-    """Serveurs de preprints dont `prefix` est un préfixe DOI, dans l'ordre de la liste."""
+    """Renvoie les serveurs de preprints dont `prefix` est un préfixe DOI, dans l'ordre de la liste."""
     return tuple(
         p
         for p in KNOWN_PLATFORMS

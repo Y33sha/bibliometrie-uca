@@ -1,7 +1,7 @@
 # STATUS: maintenance
 """Marque toutes les adresses pour une nouvelle détection de leur pays, après une modification de `place_name_forms`.
 
-Le run suivant de la phase `countries` recalcule les candidats `country_name`, `institution` et `city` de tout le stock, puis résout chaque adresse.
+À l'exécution suivante, la phase `countries` recalcule les candidats `country_name`, `institution` et `city` de tout le stock, puis résout chaque adresse.
 
 Usage :
     uv run python -m interfaces.cli.maintenance.redetect_address_countries [--dry-run]

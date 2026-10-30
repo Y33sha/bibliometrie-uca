@@ -26,7 +26,7 @@ log = setup_logger("delete_raw_store_orphans", os.path.dirname(__file__))
 
 
 def fetch_existing_source_ids(conn: Connection, source: str) -> set[str]:
-    """`source_id` présents dans `staging` pour une source."""
+    """Renvoie les `source_id` présents dans `staging` pour une source."""
     rows: ScalarResult[str] = conn.execute(
         text("SELECT source_id FROM staging WHERE source = :source"),
         {"source": source},

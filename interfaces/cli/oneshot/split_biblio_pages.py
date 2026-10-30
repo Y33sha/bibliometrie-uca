@@ -34,7 +34,7 @@ _CROSSREF_PAGE = "page"
 def split_pages(
     source: str, raw_doc_type: str | None, biblio: Mapping[str, JsonValue]
 ) -> dict[str, JsonValue]:
-    """`biblio` dont la pagination HAL ou Crossref est remplacée par `first_page` et `last_page`."""
+    """Renvoie `biblio` avec la pagination HAL ou Crossref remplacée par `first_page` et `last_page`."""
     if source == "hal":
         pages = hal_page_range(as_str(biblio.get(_HAL_PAGES)), raw_doc_type)
     else:
@@ -46,7 +46,7 @@ def split_pages(
 
 
 def plan(conn: Connection) -> tuple[list[dict[str, JsonValue]], Counter[str]]:
-    """Mises à jour `{id, biblio}` des enregistrements sources, et décompte du résultat par forme."""
+    """Calcule les mises à jour `{id, biblio}` des enregistrements sources, et le décompte du résultat par forme."""
     rows = conn.execute(
         text(f"""
             SELECT id, source::text AS source, raw_doc_type, biblio

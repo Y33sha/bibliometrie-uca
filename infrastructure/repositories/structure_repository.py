@@ -64,7 +64,7 @@ class _StructureRow(NamedTuple):
 
 
 def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameForm:
-    """Forme de nom de domaine d'une ligne de `structure_name_forms`."""
+    """Renvoie la forme de nom de domaine d'une ligne de `structure_name_forms`."""
     return StructureNameForm(
         form_text=row.form_text,
         is_word_boundary=row.is_word_boundary,
@@ -74,7 +74,7 @@ def _structure_name_form_from_row(row: _StructureNameFormRow) -> StructureNameFo
 
 
 def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm, ...]) -> Structure:
-    """Structure de domaine d'une ligne de `structures`, avec ses formes de nom, chargées à part par `find_by_id`.
+    """Renvoie la structure de domaine d'une ligne de `structures`, avec ses formes de nom, chargées à part par `find_by_id`.
 
     Le ROR et la collection HAL se lisent en strict : une valeur mal normalisée en base lève `ValidationError`, et signale une corruption.
     """
@@ -93,9 +93,9 @@ def _structure_from_row(row: _StructureRow, name_forms: tuple[StructureNameForm,
 
 
 def _normalize_api_ids(raw: dict[str, list[str]] | None) -> dict[str, list[str]] | None:
-    """Forme normalisée de `api_ids` (`StructureApiIds`), ou `None` pour une entrée vide. Lève `ValidationError` si le schéma est violé.
+    """Renvoie la forme normalisée de `api_ids` (`StructureApiIds`), ou `None` pour une entrée vide. Lève `ValidationError` si le schéma est violé.
 
-    La validation se fait dans le repository : toute écriture y passe, y compris celle des scripts qui contournent la couche application.
+    La validation se fait dans le repository : toute écriture passe par lui, y compris celle des scripts hors couche application.
     """
     if not raw:
         return None

@@ -44,7 +44,7 @@ from infrastructure.read_models.serials.models import (
 from infrastructure.read_models.subjects.models import SubjectFrequency
 from infrastructure.sql_fragments import active_issns, corrected, has_active_issn
 
-# Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; la jointure `publishers p` est attendue par `publisher_name`.
+# Colonnes de la ligne de liste d'une revue. `doaj_id` et `doaj_url_csv` sont les deux entrées de `resolve_doaj_url` ; `publisher_name` suppose la jointure `publishers p`.
 _SERIAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS publisher_name,
@@ -61,7 +61,7 @@ _SERIAL_DETAIL_COLUMNS = f"""
 
 
 def _list_sql(where: str, sort: SerialSort) -> str:
-    """Requête triée de la liste des publications en série, sans pagination."""
+    """Renvoie la requête triée de la liste des revues, sans pagination."""
     return f"""
         SELECT {_SERIAL_LIST_COLUMNS}
         FROM serials j
@@ -72,7 +72,7 @@ def _list_sql(where: str, sort: SerialSort) -> str:
 
 
 def _serial_list_item(row: Row[tuple[object, ...]]) -> SerialListItem:
-    """`SerialListItem` lu d'une ligne de `_SERIAL_LIST_COLUMNS`."""
+    """Construit le `SerialListItem` d'une ligne de `_SERIAL_LIST_COLUMNS`."""
     return SerialListItem(
         id=row.id,
         title=row.title,
@@ -102,7 +102,7 @@ def _build_serial_where(
     skip_oa_models: bool = False,
     skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de `list_serials` et `serials_facets`.
+    """Renvoie la clause WHERE de `list_serials` et `serials_facets`.
 
     Le terme de recherche vise le titre et, quand il a la forme d'un ISSN, les ISSN de la revue. Les drapeaux `skip_*` écartent le filtre de la dimension d'une facette, comme pour les publications.
     """
@@ -151,7 +151,7 @@ _SORT_MAP = {
 }
 
 
-# Revues de même titre normalisé, hors paire de deux revues qui ont chacune un ISSN. Un titre que la normalisation vide (alphabet non latin, symboles) reste à l'écart.
+# Revues de même titre normalisé, hors paire de deux revues ayant chacune un ISSN. Un titre vidé par la normalisation (alphabet non latin, symboles) reste à l'écart.
 _SAME_TITLE_GROUPS = f"""
     SELECT title_normalized AS value, array_agg(id) AS ids
     FROM serials j
@@ -161,7 +161,7 @@ _SAME_TITLE_GROUPS = f"""
         OR (count(*) = 2 AND count(*) FILTER (WHERE {has_active_issn("j.id")}) < 2)
 """
 
-# Type brut de chaque document des revues typées `journal`, celui de la source avant correction.
+# Type brut de chaque enregistrement source des revues typées `journal`, avant correction.
 _SERIAL_RECORD_TYPES = """
     SELECT j.id,
            array_agg(s.source::text ORDER BY s.id) AS sources,
@@ -172,7 +172,7 @@ _SERIAL_RECORD_TYPES = """
     GROUP BY j.id
 """
 
-# Enregistrements sources à DOI et à revue, un couple par DOI que l'enregistrement source donne avec sa revue, comme pour le calcul des espaces de noms. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
+# Enregistrements sources à DOI et à revue, un couple par DOI donné par l'enregistrement source avec sa revue, comme pour le calcul des espaces de noms. Une revue posée par l'espace de noms du DOI s'accorde avec lui par construction.
 _RECORDS_WITH_DOI_AND_SERIAL = f"""
     SELECT d.id_value AS doi, s.serial_id, s.source::text AS source
     FROM source_records s
@@ -198,7 +198,7 @@ class SerialQueries:
         self._conn = conn
 
     def likely_proceedings(self) -> LikelyProceedingsResponse:
-        """Revues typées `journal` dont la majorité stricte des documents sont des articles de congrès."""
+        """Renvoie les revues typées `journal` dont la majorité stricte des enregistrements sources sont des articles de congrès."""
         shares: dict[int, tuple[int, int]] = {}
         for candidate in self._conn.execute(text(_SERIAL_RECORD_TYPES)):
             records = list(zip(candidate.sources, candidate.raw_types, strict=True))
@@ -225,16 +225,16 @@ class SerialQueries:
         return LikelyProceedingsResponse(serials=items)
 
     def doi_namespace_conflicts(self) -> DoiNamespaceConflictsResponse:
-        """Enregistrements dont la revue diffère de celle que désigne l'espace de noms de leur DOI, groupés par paire de revues."""
+        """Renvoie les enregistrements sources dont la revue diffère de celle désignée par l'espace de noms de leur DOI, groupés par paire de revues."""
         namespaces = {
             r.namespace: DoiNamespace(r.namespace, r.serial_id, r.dois, r.share)
             for r in self._conn.execute(
                 text("SELECT namespace, serial_id, dois, share FROM serial_doi_namespaces")
             )
         }
-        # Paire (revue de l'enregistrement, revue de l'espace de noms) → enregistrements.
+        # Paire (revue de l'enregistrement source, revue de l'espace de noms) → enregistrements sources.
         pairs: dict[tuple[int, int], list[tuple[str, DoiNamespace]]] = defaultdict(list)
-        # Espace de noms → ses DOI distincts et ses enregistrements.
+        # Espace de noms → ses DOI distincts et ses enregistrements sources.
         dois: defaultdict[str, set[str]] = defaultdict(set)
         documents: Counter[str] = Counter()
         for r in self._conn.execute(text(_RECORDS_WITH_DOI_AND_SERIAL)):
@@ -277,15 +277,15 @@ class SerialQueries:
         return DoiNamespaceConflictsResponse(conflicts=conflicts)
 
     def serials_with_same_title(self) -> SerialDuplicatesResponse:
-        """Revues de même titre normalisé. Deux revues de même titre qui ont chacune un ISSN sont des homonymes probables : elles sont écartées."""
+        """Renvoie les revues de même titre normalisé. Deux revues de même titre ayant chacune un ISSN sont des homonymes probables, donc écartées."""
         return self._duplicate_groups(_SAME_TITLE_GROUPS)
 
     def serials_sharing_issn(self) -> SerialDuplicatesResponse:
-        """Revues où le même ISSN est actif."""
+        """Renvoie les groupes de revues où le même ISSN est actif."""
         return self._duplicate_groups(_SHARED_ISSN_GROUPS)
 
     def _duplicate_groups(self, groups_sql: str) -> SerialDuplicatesResponse:
-        """Groupes `(value, ids)` rendus avec la ligne de liste de chaque revue, les plus riches en publications en tête."""
+        """Renvoie les groupes `(value, ids)` avec la ligne de liste de chaque revue, les plus riches en publications en tête."""
         groups = self._conn.execute(text(groups_sql)).all()
         ids = sorted({i for g in groups for i in g.ids})
         rows = self._conn.execute(
@@ -335,7 +335,7 @@ class SerialQueries:
         )
 
     def export_serials_csv(self, *, filters: SerialFilters, sort: SerialSort) -> Iterator[str]:
-        """Export CSV de la liste des publications en série, aux filtres et au tri de la liste.
+        """Renvoie l'export CSV de la liste des revues, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
@@ -371,7 +371,7 @@ class SerialQueries:
             binds_jt,
         ).all()
         jt_counts = {r.value: r.n for r in jt_rows}
-        # Toutes les options de l'enum sont rendues, à 0 si absentes, comme les facettes des publications montrent toutes les options connues.
+        # Toutes les options de l'enum sont renvoyées, à 0 si absentes, comme pour les facettes des publications.
         serial_types_facet = [
             FacetOption(
                 value=v,
@@ -495,9 +495,9 @@ class SerialQueries:
         )
 
     def get_serial_subjects(self, serial_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Sujets des publications de la revue, les plus fréquents d'abord.
+        """Renvoie les sujets des publications de la revue, les plus fréquents d'abord.
 
-        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui a une ligne par source pour une même paire (publication, sujet).
+        `COUNT(DISTINCT p.id)` est nécessaire : `publication_subjects` a une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(entity_subjects_sql("p.serial_id = :id")),

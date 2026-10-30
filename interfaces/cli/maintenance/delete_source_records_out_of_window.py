@@ -1,5 +1,5 @@
 # STATUS: maintenance
-"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours reste : elle est sans année de soutenance.
+"""Supprime les enregistrements sources parus avant l'année de début du pipeline (`config.pipeline_start_year_full`), avec leur ligne de `staging`. Une thèse en cours, sans année de soutenance, est conservée.
 
 Les enregistrements sources de la même publication sont marqués à réconcilier (`delete_source_records_before`). Le pipeline supprime ensuite les publications vidées (phase `publications`), puis les personnes vidées (phase `persons`).
 
@@ -24,7 +24,7 @@ log = setup_logger("delete_source_records_out_of_window", os.path.dirname(__file
 
 
 def fetch_cutoff(conn: Connection) -> int:
-    """Année de début du pipeline (`config.pipeline_start_year_full`)."""
+    """Renvoie l'année de début du pipeline (`config.pipeline_start_year_full`)."""
     return scalar_int(
         conn.execute(
             text("SELECT (value #>> '{}')::int FROM config WHERE key = 'pipeline_start_year_full'")
@@ -33,7 +33,7 @@ def fetch_cutoff(conn: Connection) -> int:
 
 
 def count_targets(conn: Connection, cutoff: int) -> dict[str, int]:
-    """Enregistrements sources parus avant `cutoff`, par source, hors thèses en cours."""
+    """Compte les enregistrements sources parus avant `cutoff`, par source, hors thèses en cours."""
     rows = conn.execute(
         text("""
             SELECT source::text, count(*) FROM source_records

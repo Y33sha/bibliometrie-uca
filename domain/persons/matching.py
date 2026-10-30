@@ -51,21 +51,22 @@ class MatchReason(StrEnum):
 
 
 class Namesake(NamedTuple):
-    """Personne d'un nom de famille donné, candidate au rattachement par initiales. `conflicting` : personne au prénom réduit à qui ses contributions sources donnent plusieurs prénoms pleins ; le rattachement par initiales l'écarte pour un prénom plein."""
+    """Personne d'un nom de famille donné, candidate au rattachement par initiales."""
 
     person_id: int
     last_name: str
     first_name: str
     conflicting: bool = False
+    """Vrai pour une personne au prénom réduit, à qui ses contributions sources donnent plusieurs prénoms pleins. Le rattachement par initiales l'écarte pour un prénom plein."""
 
 
 def full_namesakes(initials: tuple[str, ...], namesakes: Iterable[Namesake]) -> list[int]:
-    """Personnes au prénom plein dont les initiales commencent par `initials`."""
+    """Renvoie les personnes au prénom plein dont les initiales commencent par `initials`."""
     return [n.person_id for n in namesakes if full_first_name_extends(initials, n.first_name)]
 
 
 def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesake]) -> list[int]:
-    """Personnes de même nom de famille qu'une contribution source désigne par ses initiales.
+    """Renvoie les personnes de même nom de famille désignées par les initiales d'une contribution source.
 
     - Prénom réduit (« A. ») : toute personne dont les initiales du prénom commencent par celles de la contribution source (« Abdul-Majeed », « A. M. »).
     - Prénom plein (« Abdellah ») : toute personne au prénom réduit dont les initiales commencent celles de la contribution source (« A. »). Sont exclues les personnes `conflicting`, et celles dont les initiales commencent le prénom plein d'une autre personne de même nom.
@@ -95,7 +96,11 @@ def compatible_namesakes(contributor_first_name: str, namesakes: Sequence[Namesa
 def compatible_persons(
     source_contribution: ContributorName, namesakes_by_last_name: Mapping[str, Sequence[Namesake]]
 ) -> list[int]:
-    """Personnes que la contribution source désigne par ses initiales, pour chacun de ses découpages en nom et prénom, sans doublon. `namesakes_by_last_name` : personnes par nom de famille normalisé."""
+    """Renvoie les personnes désignées par les initiales de la contribution source, pour chacun de ses découpages en nom et prénom, sans doublon.
+
+    Args:
+        namesakes_by_last_name: personnes par nom de famille normalisé.
+    """
     found: list[int] = []
     for last, first in source_contribution.splits():
         namesakes = namesakes_by_last_name.get(normalize_text(last), ())
@@ -108,7 +113,7 @@ def compatible_persons(
 def attested_full_first_names(
     last_name: str, initials: tuple[str, ...], contributor_names: Iterable[ContributorName]
 ) -> dict[str, str]:
-    """Prénoms pleins que des contributions sources donnent à une personne au prénom réduit, par forme normalisée.
+    """Renvoie les prénoms pleins donnés par des contributions sources à une personne au prénom réduit, par forme normalisée.
 
     Un prénom compte s'il accompagne le même nom de famille et prolonge `initials`. Chaque prénom prend sa graphie la plus fréquente, puis la première dans l'ordre alphabétique.
     """
@@ -129,11 +134,12 @@ def attested_full_first_names(
 
 @dataclass(frozen=True)
 class NameFormDecision:
-    """Décision par forme de nom : rattacher (`match`), créer une personne (`create`) ou s'abstenir (`skip`). `reason` motive un `skip`, et marque un `match` par initiales compatibles."""
+    """Décision par forme de nom : rattacher (`match`), créer une personne (`create`) ou s'abstenir (`skip`)."""
 
     action: Literal["match", "create", "skip"]
     person_id: int | None = None
     reason: MatchReason | None = None
+    """Motif d'un `skip`, ou marque d'un `match` par initiales compatibles."""
 
 
 def decide_name_form_outcome(
@@ -142,14 +148,17 @@ def decide_name_form_outcome(
     rejected_person_ids: frozenset[int] = frozenset(),
     compatible_person_ids: Sequence[int] = (),
 ) -> NameFormDecision:
-    """Décision par forme de nom.
-
-    `person_ids` : personnes de la forme de nom exacte, `None` si la forme est inconnue. `compatible_person_ids` : personnes désignées par les initiales, candidates seulement si la forme est inconnue. `rejected_person_ids` : personnes rejetées pour la publication, écartées des candidats.
+    """Décide par forme de nom.
 
     - Un candidat → `match`.
     - Plusieurs candidats → `skip`, `ambiguous_name_form`.
     - Candidats tous rejetés → `skip`, `all_candidates_rejected`.
     - Aucun candidat → `create` si `allow_create`, sinon `skip`, `creation_not_allowed`.
+
+    Args:
+        person_ids: personnes de la forme de nom exacte, `None` si la forme est inconnue.
+        rejected_person_ids: personnes rejetées pour la publication, écartées des candidats.
+        compatible_person_ids: personnes désignées par les initiales, candidates seulement si la forme est inconnue.
     """
     match_reason: MatchReason | None = None
     if person_ids is None:
@@ -169,10 +178,12 @@ def decide_name_form_outcome(
 
 @dataclass(frozen=True)
 class IdentifierMatch:
-    """Rattachement par identifiant. `person_id` : personne désignée, si son nom est compatible. `rejection` : personne désignée et son nom, si ce nom est incompatible ; sert à journaliser le refus."""
+    """Rattachement par identifiant."""
 
     person_id: int | None = None
+    """Personne désignée, si son nom est compatible."""
     rejection: tuple[int, str] | None = None
+    """Personne désignée et son nom, si ce nom est incompatible. Sert à journaliser le refus."""
 
 
 def decide_match_by_identifier(
@@ -182,9 +193,12 @@ def decide_match_by_identifier(
     contributor_name_forms: Sequence[str],
     name_form_status: Mapping[tuple[str, int], str],
 ) -> IdentifierMatch:
-    """Personne désignée par une valeur d'identifiant, corroborée par le nom de la contribution source. `identifier_map` : personnes par valeur d'identifiant, attributions rejetées exclues.
+    """Renvoie la personne désignée par une valeur d'identifiant, corroborée par le nom de la contribution source.
 
     Le statut d'une forme de nom de la contribution source pour cette personne tranche d'abord : `confirmed` corrobore, `rejected` refuse. Sinon, les noms doivent être compatibles. La compatibilité admet une variante de graphie (« Toufic », « Toufik ») ou un nom réduit au nom de famille. Elle refuse un co-auteur ou un autre auteur de même nom de famille.
+
+    Args:
+        identifier_map: personnes par valeur d'identifiant, attributions rejetées exclues.
     """
     if not value:
         return IdentifierMatch()
@@ -217,7 +231,7 @@ def decide_match_by_identifier(
 
 
 def strict_majority[K](votes: Mapping[K, int]) -> K | None:
-    """Clé qui a strictement plus de voix que chacune des autres. `None` en cas d'égalité en tête ou sans aucune voix."""
+    """Renvoie la clé qui a strictement plus de voix que chacune des autres. `None` en cas d'égalité en tête ou sans aucune voix."""
     if not votes:
         return None
     best, *others = sorted(votes.values(), reverse=True)

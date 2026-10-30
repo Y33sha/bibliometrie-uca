@@ -1,7 +1,4 @@
-"""Modèles de réponse : lectures sur les contributions.
-
-La file des contributions orphelines lit les contributions du périmètre rattachées à aucune personne.
-"""
+"""Modèles de réponse : lectures sur les contributions."""
 
 from dataclasses import dataclass, field
 
@@ -40,16 +37,21 @@ class OrphanContributionsResponse(PaginatedResponse):
 class OrphanFilters:
     """Filtres de la file des contributions orphelines.
 
-    `search` vise le nom des contributions sources de la contribution. `lab_ids` et `lab_none` se combinent en OU : contributions dont les adresses des contributions sources désignent l'un des laboratoires, ou aucun laboratoire. Vides, ils laissent tout passer.
+    `lab_ids` et `lab_none` se combinent en OU. Vides, ils laissent tout passer.
     """
 
     search: str = ""
+    """Terme cherché dans le nom des contributions sources de la contribution."""
     lab_ids: list[int] = field(default_factory=list)
+    """Laboratoires désignés par les adresses des contributions sources."""
     lab_none: bool = False
+    """Retient les contributions sans laboratoire."""
 
 
 class OrphanContributionsFacetsResponse(BaseModel):
-    """Facette laboratoires de la file des contributions orphelines : décompte par laboratoire détecté dans les contributions sources de la contribution, et nombre de contributions sans laboratoire."""
+    """Facette laboratoires de la file des contributions orphelines."""
 
     labs: list[FacetOption]
+    """Décompte par laboratoire détecté dans les contributions sources de la contribution."""
     no_lab_count: int
+    """Nombre de contributions sans laboratoire."""

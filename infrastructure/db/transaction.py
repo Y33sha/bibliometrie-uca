@@ -1,8 +1,8 @@
-"""Transaction gérée, qui satisfait le port `OpenTransaction`.
+"""Transaction gérée, conforme au port `OpenTransaction`.
 
-Une phase du pipeline reçoit un `OpenTransaction`, qui renvoie une transaction gérée en context manager : elle ouvre ses transactions sans connaître l'engine.
+Une phase du pipeline reçoit un `OpenTransaction`, qui renvoie une transaction gérée en context manager. La phase ouvre ainsi ses transactions sans connaître l'engine.
 
-À la différence d'`Engine.begin`, `managed_transaction` admet les commits faits dans le bloc : une phase qui commite par lots garde ce comportement, et le commit de sortie valide le reste éventuel. Sous `Engine.begin`, un commit dans le bloc ferme la transaction, et la sortie lève `InvalidRequestError`.
+À la différence d'`Engine.begin`, `managed_transaction` admet les commits faits dans le bloc. Une phase peut donc commiter par lots, et le commit de sortie valide le reste éventuel. Sous `Engine.begin`, un commit dans le bloc ferme la transaction, et la sortie lève `InvalidRequestError`.
 """
 
 from collections.abc import Iterator

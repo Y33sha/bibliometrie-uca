@@ -29,7 +29,7 @@ _GENERIC_DOMAIN_LABELS = frozenset({"autre", "autres"})
 
 
 def hal_domain_labels(facet_entry: str) -> list[str]:
-    """Libellés de chaque niveau d'un domaine, depuis une entrée de `fr_domainAllCodeLabel_fs`.
+    """Renvoie les libellés de chaque niveau d'un domaine, depuis une entrée de `fr_domainAllCodeLabel_fs`.
 
     L'entrée contient le code du domaine et le chemin de ses libellés, de la racine à la feuille : `sdv.bbm.bm_FacetSep_Sciences du Vivant [q-bio]/Biochimie, Biologie Moléculaire/Biologie moléculaire` donne `["Sciences du Vivant", "Biochimie, Biologie Moléculaire", "Biologie moléculaire"]`.
 

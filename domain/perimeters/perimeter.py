@@ -6,7 +6,7 @@ from domain.errors import ValidationError
 
 
 def _require_nonempty(value: str | None, field_label: str) -> str:
-    """`value`, ou `ValidationError` si elle est vide ou blanche."""
+    """Renvoie `value`, ou lève `ValidationError` si elle est vide ou blanche."""
     if value is None or not value.strip():
         raise ValidationError(f"Le {field_label} du périmètre est requis")
     return value
@@ -23,7 +23,7 @@ class Perimeter:
 
     @classmethod
     def create(cls, *, code: str, name: str, root_structure_ids: list[int]) -> Perimeter:
-        """Périmètre à enregistrer, sans `id`."""
+        """Construit un périmètre à enregistrer, sans `id`."""
         return cls(
             id=None,
             code=_require_nonempty(code, "code"),
@@ -35,5 +35,5 @@ class Perimeter:
         self.name = _require_nonempty(name, "nom")
 
     def set_root_structure_ids(self, root_structure_ids: list[int] | None) -> None:
-        """`None` vaut une liste vide."""
+        """Pose les structures racines. `None` vaut une liste vide."""
         self.root_structure_ids = tuple(root_structure_ids or ())

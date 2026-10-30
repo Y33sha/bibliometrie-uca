@@ -23,7 +23,7 @@ log = setup_logger("backfill_best_copy_urls", os.path.dirname(__file__))
 
 
 def backfill_batch(conn: Connection, lo: int, hi: int) -> int:
-    """Écrit `best_copy_url` des publications `[lo, hi]` dont la valeur change. Renvoie le nombre de publications modifiées."""
+    """Écrit `best_copy_url` des publications `[lo, hi]`, quand la valeur change. Renvoie le nombre de publications modifiées."""
     rows = conn.execute(
         text("SELECT id, doi, best_copy_url FROM publications WHERE id BETWEEN :lo AND :hi"),
         {"lo": lo, "hi": hi},

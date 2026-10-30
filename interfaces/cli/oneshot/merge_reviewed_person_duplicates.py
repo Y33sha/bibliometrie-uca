@@ -28,13 +28,13 @@ log = setup_logger("merge_reviewed_person_duplicates", os.path.dirname(__file__)
 
 
 def read_pairs(path: Path) -> list[tuple[int, int]]:
-    """Couples (conservée, absorbée) du fichier CSV."""
+    """Lit les couples (conservée, absorbée) du fichier CSV."""
     with path.open(newline="") as f:
         return [(int(row["conservée"]), int(row["absorbée"])) for row in csv.DictReader(f)]
 
 
 def current_person(conn: Connection, person_id: int) -> int | None:
-    """Personne désignée par l'identifiant `person_id` après les fusions, ou `None` si elle a disparu sans redirection."""
+    """Renvoie la personne désignée par l'identifiant `person_id` après les fusions, ou `None` si elle a disparu sans redirection."""
     return conn.execute(
         text("""
             SELECT p.id FROM persons p

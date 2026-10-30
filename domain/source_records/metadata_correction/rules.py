@@ -23,34 +23,34 @@ from domain.source_records.identifiers import SourceIdentifier, SourceIdentifier
 
 @dataclass(frozen=True, slots=True)
 class MetadataForCorrection:
-    """Faits que lisent les règles de correction, pour un enregistrement source ou une publication."""
+    """Faits lus par les règles de correction, pour un enregistrement source ou une publication."""
 
     title: str
     doc_type: str | None
     serial_id: int | None
-    # DOI propres actifs d'un enregistrement source (`own_dois`), DOI d'une publication.
     dois: frozenset[str] = frozenset()
+    """DOI propres actifs d'un enregistrement source (`own_dois`), DOI d'une publication."""
     serial_type: str | None = None
     oa_status: str | None = None
     oa_model: str | None = None
     urls: list[str] | None = None
-    # `embargo_until <= current_date`.
     embargo_expired: bool | None = None
-    # L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre.
+    """`embargo_until <= current_date`."""
     self_declared_preprint: bool | None = None
-    # L'enregistrement source nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer).
+    """L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre."""
     declares_conference: bool | None = None
-    # Types des éditeurs qui ont déposé le préfixe de l'un des `dois` (`doi_prefixes`).
+    """L'enregistrement source nomme le congrès dont il est issu (Crossref `event`, ou `assertion` Springer)."""
     registrant_publisher_types: frozenset[str] = frozenset()
-    # La monographie de l'enregistrement source est un volume d'actes (`monographs.proceedings`).
+    """Types des éditeurs qui ont déposé le préfixe de l'un des `dois` (`doi_prefixes`)."""
     in_proceedings_volume: bool | None = None
-    # Forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`).
+    """La monographie de l'enregistrement source est un volume d'actes (`monographs.proceedings`)."""
     group_title: str | None = None
-    # La revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais).
+    """Forme de présentation d'un `posted-content` Crossref (`oral`, `pico`, `display`)."""
     journal_diamond: bool | None = None
+    """La revue rattachée est diamant (marquée `diamond`, ou dans le DOAJ sans APC ni autres frais)."""
     source: str | None = None
-    # `source_records.author_count` : contributions sources d'auteur non collectives.
     author_count: int | None = None
+    """`source_records.author_count` : contributions sources d'auteur non collectives."""
 
     @classmethod
     def for_publication(
@@ -62,7 +62,7 @@ class MetadataForCorrection:
         serial_id: int | None,
         serial_type: str | None,
     ) -> MetadataForCorrection:
-        """Faits d'une publication : les champs que l'agrégation arbitre, et le type de sa revue."""
+        """Construit les faits d'une publication : les champs arbitrés par l'agrégation, et le type de sa revue."""
         return cls(
             title=title,
             doc_type=doc_type,
@@ -191,41 +191,40 @@ _THESIS_REGISTRY_DOI_PREFIXES = ("10.70675",)
 class _AppliesTo(TypedDict, total=False):
     """Prédicats d'une règle, tous requis.
 
-    Une clé au nom d'un champ de `MetadataForCorrection` est une égalité sur ce champ. Les autres :
-
-    - `doc_type` : `str` ou `frozenset[str]`, comparé en minuscules. Limite la règle aux types plausibles.
-    - `doc_type_not_in` : `frozenset[str]`, types que la règle laisse en l'état. Un type absent est hors de l'ensemble.
-    - `group_title` : `frozenset[str]`, comparé en minuscules.
-    - `url_contains` : sous-chaîne d'au moins une des `urls`.
-    - `doi_contains` : sous-chaîne d'au moins un des `dois`.
-    - `title_prefix_normalized` : préfixes de `normalize_text(title)`.
-    - `title_regex` : motif cherché dans le titre.
-    - `serial_id_present` : présence d'un `serial_id`.
-    - `doi_prefix_not_in` : au moins un des `dois` a un préfixe hors du tuple.
-    - `registrant_publisher_type` : élément de `registrant_publisher_types`.
-    - `author_count_max` : `author_count` connu et au plus égal à la valeur.
+    Une clé au nom d'un champ de `MetadataForCorrection` est une égalité sur ce champ.
     """
 
     doc_type: str | frozenset[str]
+    """Type ou types de document, comparés en minuscules. Limite la règle aux types plausibles."""
     doc_type_not_in: frozenset[str]
+    """Types laissés en l'état par la règle. Un type absent est hors de l'ensemble."""
     serial_type: str
     oa_model: str
     url_contains: str
+    """Sous-chaîne d'au moins une des `urls`."""
     doi_contains: str
+    """Sous-chaîne d'au moins un des `dois`."""
     title_prefix_normalized: tuple[str, ...]
+    """Préfixes de `normalize_text(title)`."""
     title_regex: re.Pattern[str]
+    """Motif cherché dans le titre."""
     serial_id_present: bool
+    """Présence d'un `serial_id`."""
     doi_prefix_not_in: tuple[str, ...]
+    """Au moins un des `dois` a un préfixe hors du tuple."""
     oa_status: str
     embargo_expired: bool
     self_declared_preprint: bool
     declares_conference: bool
     registrant_publisher_type: str
+    """Élément de `registrant_publisher_types`."""
     in_proceedings_volume: bool
     group_title: frozenset[str]
+    """Valeurs admises, comparées en minuscules."""
     journal_diamond: bool
     source: str
     author_count_max: int
+    """`author_count` connu et au plus égal à la valeur."""
 
 
 class _AppliesCorrection(TypedDict, total=False):
@@ -536,7 +535,7 @@ def _rule_applies(source_record: MetadataForCorrection, rule_def: _RuleDefinitio
 
 
 def _correct_field(source_record: MetadataForCorrection, field: str) -> Correction[str] | None:
-    """Correction de `field` par la première règle de `_RULES` qui le corrige et s'applique."""
+    """Renvoie la correction de `field` par la première règle de `_RULES` qui le corrige et s'applique."""
     for rule_id, rule_def in _RULES.items():
         if field not in rule_def["applies_correction"]:
             continue
@@ -546,7 +545,7 @@ def _correct_field(source_record: MetadataForCorrection, field: str) -> Correcti
 
 
 def effective_metadata(source_record: MetadataForCorrection) -> CorrectedFields:
-    """Corrections de `doc_type` et `oa_status`, indépendantes l'une de l'autre. Une correction qui dépend d'une autre, comme un type corrigé selon le type de la revue rattachée, passe par l'ordre des sous-étapes de la phase `metadata_correction`."""
+    """Calcule les corrections de `doc_type` et `oa_status`, indépendantes l'une de l'autre. Une correction qui dépend d'une autre, comme un type corrigé selon le type de la revue rattachée, passe par l'ordre des sous-étapes de la phase `metadata_correction`."""
     return CorrectedFields(
         doc_type=_correct_field(source_record, "doc_type"),
         oa_status=_correct_field(source_record, "oa_status"),
@@ -569,7 +568,11 @@ def is_dissertation_identifier(identifier: SourceIdentifier) -> bool:
 def origin_doc_type_correction(
     doc_type: str | None, origin_doc_type: str | None
 ) -> Correction[str] | None:
-    """Un enregistrement source ScanR issu d'un dépôt HAL prend le type corrigé de ce dépôt. `origin_doc_type` : type corrigé du dépôt HAL, `None` si l'enregistrement source n'en est pas issu ou si le dépôt est absent."""
+    """Renvoie la correction de type d'un enregistrement source ScanR issu d'un dépôt HAL : il prend le type corrigé de ce dépôt.
+
+    Args:
+        origin_doc_type: type corrigé du dépôt HAL, `None` pour un enregistrement source issu d'aucun dépôt HAL ou pour un dépôt absent.
+    """
     if origin_doc_type is None or origin_doc_type == doc_type:
         return None
     return Correction(origin_doc_type, MetadataCorrectionRule.SCANR_FROM_HAL_TO_HAL_TYPE)

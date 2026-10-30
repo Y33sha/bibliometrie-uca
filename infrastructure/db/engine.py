@@ -18,9 +18,13 @@ DbIdentity = Literal["owner", "app", "pipeline"]
 
 
 def db_url(identity: DbIdentity = "pipeline") -> URL:
-    """URL de connexion PostgreSQL, construite depuis les réglages. Alembic s'en sert aussi.
+    """Renvoie l'URL de connexion PostgreSQL, construite depuis les réglages. Alembic l'utilise aussi.
 
-    `identity` désigne le rôle PostgreSQL du processus (cf. `infrastructure/db/roles.sql`) : celui du pipeline par défaut. Un rôle non configuré fait échouer la construction.
+    Args:
+        identity: rôle PostgreSQL du processus (cf. `infrastructure/db/roles.sql`).
+
+    Raises:
+        RuntimeError: le rôle n'est pas configuré.
     """
     username: str = getattr(settings, f"db_{identity}_user")
     secret: SecretStr = getattr(settings, f"db_{identity}_password")
@@ -48,7 +52,7 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
 
     Pool : `db_pool_min` connexions persistantes, jusqu'à `db_pool_max` sous charge ; `pool_pre_ping` écarte les connexions perdues.
 
-    Sous pytest, refuse toute base sans suffixe `_test` : le conftest redirige l'engine vers la base de test, et ce contrôle protège la base de production si la redirection échoue.
+    Sous pytest, refuse toute base sans suffixe `_test`. Le conftest redirige l'engine vers la base de test ; ce contrôle protège la base de production si la redirection échoue.
     """
     if os.environ.get("PYTEST_CURRENT_TEST") and not settings.db_name.endswith("_test"):
         raise RuntimeError(
@@ -68,7 +72,7 @@ def build_sync_engine(identity: DbIdentity = "pipeline") -> Engine:
 def install_engine_guards(engine: Engine) -> None:
     """Attache les garde-fous de toute connexion du projet : refus d'écrire pendant une requête de lecture, sortie du recensement des annulations au retour dans le pool.
 
-    Un engine monté hors de `build_sync_engine`, comme celui des tests, les reçoit en un appel.
+    Un engine construit hors de `build_sync_engine`, comme celui des tests, les reçoit en un appel.
     """
     install_read_only_guard(engine)
     install_query_cancellation(engine)
@@ -81,7 +85,7 @@ def set_sync_engine(engine: Engine | None) -> None:
 
 
 def get_sync_engine() -> Engine:
-    """Engine global, construit au premier appel pour le pipeline et les scripts ; l'API le construit au démarrage."""
+    """Renvoie l'engine global. Le pipeline et les scripts le construisent au premier appel, l'API au démarrage."""
     global _sync_engine
     if _sync_engine is None:
         _sync_engine = build_sync_engine()

@@ -9,7 +9,7 @@ from domain.source_records.source_extras import SourceExtra, declares_conference
 from domain.source_records.source_record import SourceRecord
 from domain.types import as_str, as_strs
 
-# Types qu'une source désignant explicitement une communication supplante : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`.
+# Types supplantés par une source désignant explicitement une communication : Crossref dépose un résumé en revue comme `journal-article` et un résumé de réunion comme `posted-content`.
 _SUPPLANTED_BY_CONFERENCE = frozenset(
     {DocType.ARTICLE, DocType.CONFERENCE_PAPER, DocType.PREPRINT, DocType.CONFERENCE}
 )
@@ -22,7 +22,7 @@ _UNKNOWN_PUBLISHERS = frozenset({"s n", "sn", "sans nom", "unknown"})
 
 
 def _hal_titles(source: SourceRecord) -> list[str]:
-    """Titre de la source et collections qu'un enregistrement source HAL associe à une communication."""
+    """Renvoie le titre de la source et les collections associés par un enregistrement source HAL à une communication."""
     source_extras = source.source_extras or {}
     titles = as_strs(source_extras.get(SourceExtra.SERIES))
     if source_title := as_str(source_extras.get(SourceExtra.SOURCE_TITLE)):
@@ -38,7 +38,7 @@ def names_abstracts(source: SourceRecord) -> bool:
 
 
 def _hal_editorial_fields(source: SourceRecord) -> bool:
-    """L'enregistrement source HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
+    """Vrai si l'enregistrement source HAL décrit une publication : indicateur « avec actes », plage de pages, éditeur, collection, ou titre de source distinct du congrès."""
     source_extras = source.source_extras or {}
     biblio = source.biblio or {}
     if source_extras.get(SourceExtra.PROCEEDINGS) is True:
@@ -62,7 +62,7 @@ def attests_publication(source: SourceRecord) -> bool:
 
 
 def arbitrate_conference(doc_type: str, sources: list[SourceRecord]) -> str:
-    """Type d'une publication qui relève d'un congrès.
+    """Arbitre le type d'une publication issue d'un congrès.
 
     Un enregistrement source qui désigne une communication (`conference`, recueil de résumés HAL) l'emporte sur `article`, `conference_paper` et `preprint`. Une `conference_paper` sans enregistrement source qui décrive un texte publié devient une `conference`.
     """

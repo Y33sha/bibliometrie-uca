@@ -11,15 +11,18 @@ class PerimeterStructureItem(BaseModel):
 
 
 class PerimeterOut(BaseModel):
-    """Un périmètre : ses structures racines, en identifiants et résolues, et `structure_count`, le nombre de structures des racines et de leurs sous-structures. `is_persons` désigne le périmètre des personnes, celui de la liste publique des structures."""
+    """Périmètre et ses structures racines."""
 
     id: int
     code: str
     name: str
     root_structure_ids: list[int]
     structures: list[PerimeterStructureItem]
+    """Structures racines."""
     structure_count: int
+    """Nombre de structures des racines et de leurs sous-structures."""
     is_persons: bool
+    """Vrai pour le périmètre des personnes, celui de la liste publique des structures."""
 
 
 class PerimeterCountryOut(BaseModel):

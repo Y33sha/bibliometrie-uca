@@ -1,6 +1,6 @@
 """Modèles de réponse : lectures sur les exécutions de phase du pipeline (/api/pipeline/runs/*).
 
-La liste regroupe les exécutions par `run_id` ; le statut d'un run est le pire de ses phases. Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec son écart de durée au médian historique, recalculé à la lecture.
+La liste regroupe les exécutions par `run_id` ; le statut d'un run est le pire de ses phases. Le détail d'un run renvoie ses phases dans l'ordre d'exécution, chacune avec son écart de durée à la médiane historique, recalculé à la lecture.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ class PhaseBrief(BaseModel):
 
 
 class RunSummary(BaseModel):
-    """Une ligne dans la liste des runs (agrégat des exécutions d'un même `run_id`)."""
+    """Ligne de la liste des runs : exécutions d'un même `run_id` regroupées."""
 
     run_id: int
     started_at: datetime
@@ -35,7 +35,7 @@ class RunSummary(BaseModel):
 
 
 class PhaseExecutionDetail(BaseModel):
-    """Une exécution de phase, enrichie des valeurs recalculées à la lecture."""
+    """Exécution de phase, avec les valeurs recalculées à la lecture."""
 
     phase: str
     started_at: datetime
@@ -50,7 +50,7 @@ class PhaseExecutionDetail(BaseModel):
 
 
 class RunDetail(BaseModel):
-    """Détail d'un run : ses phases et les agrégats de run."""
+    """Détail d'un run : ses phases et ses totaux."""
 
     run_id: int
     started_at: datetime

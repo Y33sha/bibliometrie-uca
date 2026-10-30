@@ -4,9 +4,9 @@
 Compare l'ensemble des pays de chaque moyen, adresse par adresse :
 
 - à `addresses.countries` : identique, sur-ensemble (pays en trop), sous-ensemble (pays manquants), recouvrement, disjoint ; et le nombre d'adresses sans pays retenu où le moyen propose un pays ;
-- à chaque autre moyen, sur les adresses que les deux couvrent.
+- à chaque autre moyen, sur les adresses couvertes par les deux.
 
-Compare aussi à `addresses.countries` les pays que compose la préséance du domaine (`retained_countries`) : pays identique, gagné, perdu ou changé. Les moyens écartés de la préséance (`similarity`) n'y entrent pas.
+Compare aussi à `addresses.countries` les pays composés par la préséance du domaine (`retained_countries`) : pays identique, gagné, perdu ou changé. Les moyens écartés de la préséance (`similarity`) n'y entrent pas.
 
 `addresses.countries` est lui-même produit par une partie des moyens (ScanR, nom de pays, nom de lieu) : leur accord avec lui est surestimé. L'accord entre moyens deux à deux reste la mesure indépendante.
 
@@ -69,7 +69,7 @@ def load_candidates(path: Path) -> dict[str, CountrySets]:
 
 
 def load_retained(conn: Connection) -> tuple[CountrySets, dict[int, str]]:
-    """Pays retenus (`addresses.countries`, `xx` retiré) et texte brut de chaque adresse."""
+    """Charge les pays retenus (`addresses.countries`, `xx` retiré) et le texte brut de chaque adresse."""
     retained: CountrySets = {}
     raw_text: dict[int, str] = {}
     for r in conn.execute(text("SELECT id, raw_text, countries FROM addresses")):
@@ -85,7 +85,7 @@ def load_retained(conn: Connection) -> tuple[CountrySets, dict[int, str]]:
 
 
 def compare(a: frozenset[str], b: frozenset[str]) -> str:
-    """Relation de l'ensemble `a` à l'ensemble `b`."""
+    """Renvoie la relation de l'ensemble `a` à l'ensemble `b`."""
     if a == b:
         return "identical"
     if a > b:
@@ -141,7 +141,7 @@ def pairwise_table(candidates: dict[str, CountrySets]) -> str:
 def precedence_table(
     candidates: dict[str, CountrySets], retained: CountrySets, address_ids: Iterable[int]
 ) -> str:
-    """Pays composés par `retained_countries`, comparés à `addresses.countries` sur les adresses `address_ids`. Les candidats d'une adresse supprimée depuis leur calcul sont ignorés."""
+    """Compare à `addresses.countries` les pays composés par `retained_countries`, sur les adresses `address_ids`. Les candidats d'une adresse supprimée depuis leur calcul sont ignorés."""
     methods = {m: CountryDetectionMethod(m) for m in candidates if m in CountryDetectionMethod}
     by_address: defaultdict[int, dict[CountryDetectionMethod, frozenset[str]]] = defaultdict(dict)
     for name, method in methods.items():

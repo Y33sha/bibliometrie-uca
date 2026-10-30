@@ -10,9 +10,9 @@ class SerialRecompute(Protocol):
     """Recalculs ciblés des publications d'une revue."""
 
     def requalify_publications(self, serial_id: int) -> int:
-        """Rejoue les corrections des enregistrements sources de la revue et recalcule ses publications. Renvoie le nombre de publications dont le type change."""
+        """Rejoue les corrections des enregistrements sources de la revue et recalcule ses publications. Renvoie le nombre de publications à type modifié."""
         ...
 
     def merge_serials(self, target_id: int, source_id: int) -> None:
-        """Fusionne la revue `source_id` dans `target_id`, puis requalifie les publications absorbées contre le `serial_type` de la cible."""
+        """Fusionne la revue `source_id` dans `target_id`, puis requalifie les publications absorbées selon le `serial_type` de la cible."""
         ...

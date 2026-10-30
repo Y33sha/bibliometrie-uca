@@ -34,9 +34,9 @@ def is_published(doc_type: str | None) -> bool:
 
 
 def source_record_has_publisher(doc_type: str | None, source: str, *, has_container: bool) -> bool:
-    """Vrai quand l'éditeur que nomme la source est celui du document.
+    """Vrai quand l'éditeur nommé par la source est celui du document.
 
-    Chez DataCite, un document sans série ni monographie est hébergé par un entrepôt, que la source nomme comme éditeur.
+    Chez DataCite, un document sans série ni monographie est hébergé par un entrepôt, nommé comme éditeur par la source.
     """
     return is_published(doc_type) and (has_container or source != Source.DATACITE)
 
@@ -48,7 +48,7 @@ def publication_publisher(
     *,
     platform_prefix: bool = False,
 ) -> int | None:
-    """Éditeur d'une publication à la date de sa publication.
+    """Renvoie l'éditeur d'une publication à la date de sa publication.
 
     C'est le titulaire du préfixe de son DOI Crossref, à défaut le premier éditeur de `record_publisher_ids`, rangés dans l'ordre de priorité des sources. Si `platform_prefix`, le titulaire du préfixe est une plateforme d'éditeurs, écartée aussi des éditeurs des enregistrements sources.
     """

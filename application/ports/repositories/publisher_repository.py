@@ -8,7 +8,7 @@ from domain.publishers.publisher import Publisher, PublisherType
 
 
 class PublisherUpdate(BaseModel):
-    """Champs modifiables d'un éditeur ; seuls les champs fournis sont écrits."""
+    """Champs modifiables d'un éditeur. Seuls les champs fournis sont écrits."""
 
     name: str | None = None
     country: str | None = None
@@ -35,7 +35,7 @@ class PublisherRepository(Protocol):
     # ── Fusion ─────────────────────────────────────────────────────
 
     def crossref_member_ids(self, publisher_id: int) -> tuple[int, ...]:
-        """Membres Crossref de l'éditeur, tirés de ses préfixes DOI."""
+        """Renvoie les membres Crossref de l'éditeur, tirés de ses préfixes DOI."""
         ...
 
     def merge_publisher_into(self, target_id: int, source_id: int) -> None:

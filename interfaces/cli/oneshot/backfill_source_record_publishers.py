@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-25)
-"""Rattache les enregistrements sources du stock à l'éditeur que nomme leur source, comme la normalisation.
+"""Rattache les enregistrements sources du stock à l'éditeur nommé par leur source, comme la normalisation.
 
 Le nom d'éditeur se lit dans `biblio.publisher`. L'éditeur est trouvé ou créé par ses formes de nom (`find_or_create_publisher`). Une production hébergée sans être publiée reste sans éditeur (`source_record_has_publisher`). Les enregistrements sources dont l'éditeur change passent dans la file de réconciliation : la phase `publications` recalcule ensuite l'éditeur de leurs publications. Idempotent.
 
@@ -41,7 +41,7 @@ _UPDATE = text("""
 
 
 def changes(conn: Connection) -> list[tuple[int, int | None]]:
-    """`(id, éditeur)` des enregistrements sources dont l'éditeur change. Trouve ou crée les éditeurs nommés."""
+    """Renvoie `(id, éditeur)` des enregistrements sources à éditeur modifié. Trouve ou crée les éditeurs nommés."""
     store = PublisherStore(conn)
     publishers: dict[str, int | None] = {}
     result: list[tuple[int, int | None]] = []

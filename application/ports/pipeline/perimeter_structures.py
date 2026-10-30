@@ -14,5 +14,5 @@ class PerimeterStructures(Protocol):
         ...
 
     def persons_structure_ids(self) -> list[int]:
-        """Structures du périmètre des personnes, en liste, la forme qu'attend `ANY(:ids)`."""
+        """Renvoie les ids des structures du périmètre des personnes, en liste pour `ANY(:ids)`."""
         ...

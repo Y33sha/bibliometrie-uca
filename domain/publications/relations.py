@@ -125,24 +125,24 @@ _INVERSE_RELATIONS: dict[RelationType, RelationType] = {
 
 
 def inverse_relation(relation: RelationType) -> RelationType:
-    """Type inverse (la relation vue depuis l'autre bout). `is_related_to`, symétrique, est son propre inverse."""
+    """Renvoie le type inverse (la relation vue depuis l'autre bout). `is_related_to`, symétrique, est son propre inverse."""
     return _INVERSE_RELATIONS[relation]
 
 
 def map_datacite_relation(relation_type: str) -> RelationType | None:
-    """Type d'un `relationType` DataCite, ou `None`."""
+    """Renvoie le type d'un `relationType` DataCite, ou `None`."""
     return _DATACITE_MAP.get(relation_type)
 
 
 def map_crossref_relation(relation_key: str) -> RelationType | None:
-    """Type d'une clé de `relation` Crossref, ou `None`."""
+    """Renvoie le type d'une clé de `relation` Crossref, ou `None`."""
     return _CROSSREF_MAP.get(relation_key)
 
 
 def extract_datacite_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
-    """Relations du vocabulaire déclarées par un enregistrement source DataCite : `(type, DOI cible)`. Les entrées sans DOI sont ignorées."""
+    """Renvoie les relations du vocabulaire déclarées par un enregistrement source DataCite : `(type, DOI cible)`. Les entrées sans DOI sont ignorées."""
     related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
     if not isinstance(related, list):
         return []
@@ -160,9 +160,9 @@ def extract_datacite_relations(
 def extract_datacite_distinct_works(
     source_extras: dict[str, JsonValue] | None, own_doi: str | None, doc_type: str | None
 ) -> list[str]:
-    """DOI qu'un enregistrement source DataCite déclare comme autre forme de son œuvre, quand la relation relie deux œuvres.
+    """Renvoie les DOI déclarés par un enregistrement source DataCite comme autre forme de son œuvre, quand la relation relie deux œuvres.
 
-    `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, que lit `meme_oeuvre_declaree`.
+    `own_doi` et `doc_type` sont ceux de l'enregistrement source déclarant, lus par `meme_oeuvre_declaree`.
     """
     related = (source_extras or {}).get(SourceExtra.RELATED_IDENTIFIERS)
     if not isinstance(related, list):
@@ -192,7 +192,7 @@ DEPENDENT_DOC_TYPE_RELATIONS: dict[str, RelationType] = {
 def infer_shared_key_relation(
     doc_type_a: str | None, doc_type_b: str | None
 ) -> tuple[RelationType, str] | None:
-    """Relation de deux publications distinctes qui partagent une clé de confirmation, d'après leurs types de document : `(type, sujet)`, le sujet valant `"a"`, `"b"`, ou `"sym"` pour `is_related_to`. `None` pour une évaluation par les pairs.
+    """Déduit la relation de deux publications distinctes qui partagent une clé de confirmation, d'après leurs types de document : `(type, sujet)`, le sujet valant `"a"`, `"b"`, ou `"sym"` pour `is_related_to`. `None` pour une évaluation par les pairs.
 
     Un preprint, un erratum, un jeu de données, ou un chapitre face à son ouvrage, donnent une relation orientée. Les autres couples donnent `is_related_to`.
     """
@@ -214,7 +214,7 @@ def infer_shared_key_relation(
 def extract_crossref_relations(
     source_extras: dict[str, JsonValue] | None,
 ) -> list[tuple[RelationType, str]]:
-    """Relations du vocabulaire déclarées par un enregistrement source Crossref : `(type, DOI cible)`. Seules comptent les cibles de type DOI."""
+    """Renvoie les relations du vocabulaire déclarées par un enregistrement source Crossref : `(type, DOI cible)`. Seules comptent les cibles de type DOI."""
     relation = (source_extras or {}).get(SourceExtra.RELATION)
     if not isinstance(relation, dict):
         return []

@@ -19,7 +19,7 @@ def refresh_canonical_name_forms(
 ) -> None:
     """Pose les formes du nom de la personne (`compute_person_name_forms`) sous la source `CANONICAL_NAME_FORM_SOURCE`. Les formes du nom précédent perdent cette source, et une forme sans autre source est supprimée.
 
-    Version unitaire de la synchronisation que la phase `persons` fait en masse (`populate_person_name_forms`), qui dérive les formes de la même fonction.
+    Version unitaire de la synchronisation en masse de la phase `persons` (`populate_person_name_forms`). Les deux dérivent les formes de la même fonction.
     """
     params = {"pid": person_id, "src": CANONICAL_NAME_FORM_SOURCE}
     conn.execute(
@@ -43,7 +43,7 @@ def refresh_canonical_name_forms(
 def add_name_form(
     conn: Connection, person_id: int, full_name: str, source: str | None = None
 ) -> None:
-    """Pose le couple `(name_form, person_id)` avec `sources = [source]` (vide si `source` est None) ; sur conflit, fusionne avec les sources existantes."""
+    """Ajoute à la personne la forme normalisée de `full_name`, sous la source `source` si elle est donnée. Sur conflit, la source rejoint les sources existantes."""
     if not full_name or not full_name.strip():
         return
     norm = normalize_text(full_name)
@@ -55,7 +55,7 @@ def add_name_form(
 def update_name_form_status(
     conn: Connection, person_id: int, name_form: str, status: str
 ) -> NameFormStatusRow:
-    """Pose le statut d'une forme de nom. Une forme dérivée du nom de la personne est confirmée d'office : son statut se refuse (`ConflictError`)."""
+    """Pose le statut d'une forme de nom. Lève `ConflictError` pour une forme dérivée du nom de la personne, confirmée d'office."""
     row = conn.execute(
         text(
             "UPDATE person_name_forms SET status = CAST(:st AS identifier_status) "
@@ -80,7 +80,7 @@ def update_name_form_status(
 
 
 def delete_orphan_name_forms_for_person(conn: Connection, person_id: int) -> int:
-    """Supprime les formes de nom en attente de la personne, hors formes dérivées de son nom, absentes des contributions sources de ses contributions. Renvoie le nombre de formes supprimées."""
+    """Supprime les formes de nom en attente de la personne absentes des contributions sources de ses contributions, hors formes dérivées de son nom. Renvoie le nombre de formes supprimées."""
     result = conn.execute(
         text(f"""
             DELETE FROM person_name_forms pnf

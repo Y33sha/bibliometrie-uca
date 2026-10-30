@@ -16,7 +16,7 @@ class ValidationError(DomainError):
 
 
 class ConflictError(DomainError):
-    """Opération refusée, car elle violerait un invariant métier."""
+    """Opération refusée : elle violerait un invariant métier."""
 
 
 class IdentifierAttributionConflictError(ConflictError):
@@ -45,7 +45,8 @@ class BlockingSerial(TypedDict):
     target_title: str
     source_serial_id: int
     source_title: str
-    reason: str  # explication lisible, p. ex. « ISSN différents : 0028-0836 vs 9999-9999 »
+    reason: str
+    """Explication lisible : « ISSN différents : 0028-0836 vs 9999-9999 »."""
 
 
 class PublisherMergeBlockedError(ConflictError):

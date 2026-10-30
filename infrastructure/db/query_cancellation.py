@@ -1,6 +1,6 @@
 """Annulation des requêtes SQL d'une requête HTTP abandonnée par le client.
 
-`QueryCancellation` recense les connexions ouvertes pour une requête HTTP. `cancel` interrompt la requête SQL en cours sur chacune, depuis un autre thread que celui qui l'exécute. Une connexion sort du recensement à son retour dans le pool : une annulation tardive atteint donc seulement les connexions de la requête HTTP, jamais celles qu'une autre requête a reprises du pool.
+`QueryCancellation` recense les connexions ouvertes pour une requête HTTP. `cancel` interrompt la requête SQL en cours sur chacune, depuis un autre thread que le thread d'exécution. Une connexion sort du recensement à son retour dans le pool. Une annulation tardive atteint donc seulement les connexions de la requête HTTP, jamais les connexions reprises du pool par une autre requête.
 """
 
 import logging
@@ -17,7 +17,7 @@ _INFO_KEY = "query_cancellation"
 
 
 class QueryCancellation:
-    """Connexions d'une requête HTTP, dont `cancel` interrompt les requêtes SQL en cours."""
+    """Connexions d'une requête HTTP, avec l'interruption de leurs requêtes SQL en cours."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()

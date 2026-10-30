@@ -1,6 +1,6 @@
 """Repository PostgreSQL de l'entité Person.
 
-Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms`. `PgPersonRepository` borne la connexion et délègue. Le renommage et l'attribution d'un identifiant y appliquent les règles de `domain.persons`, pour l'API comme pour la phase `persons`.
+Implémente le port `application.ports.repositories.person_repository.PersonRepository`. Le SQL est réparti par thème dans les sous-modules `_core`, `_identifiers`, `_merge`, `_name_forms`. `PgPersonRepository` détient la connexion et délègue aux sous-modules. Le renommage et l'attribution d'un identifiant y appliquent les règles de `domain.persons`, pour l'API comme pour la phase `persons`.
 """
 
 from typing import TYPE_CHECKING

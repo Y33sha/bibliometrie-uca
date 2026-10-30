@@ -46,12 +46,13 @@ _ROLE_RANK = {role: rank for rank, role in enumerate(SourceIdentifierRole)}
 
 @dataclass(frozen=True, slots=True)
 class SourceIdentifier:
-    """Identifiant d'un enregistrement source, avec son rôle. `removed_by` : règle de correction qui le retire, `None` pour un identifiant actif."""
+    """Identifiant d'un enregistrement source, avec son rôle."""
 
     id_type: SourceIdentifierType
     value: str
     role: SourceIdentifierRole
     removed_by: str | None = None
+    """Règle de correction qui retire l'identifiant, `None` pour un identifiant actif."""
 
     @property
     def key(self) -> tuple[SourceIdentifierType, str]:
@@ -60,17 +61,17 @@ class SourceIdentifier:
 
 
 def by_role(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
-    """Identifiants triés par rôle, dans l'ordre de `SourceIdentifierRole`, puis par valeur."""
+    """Trie les identifiants par rôle, dans l'ordre de `SourceIdentifierRole`, puis par valeur."""
     return sorted(identifiers, key=lambda i: (_ROLE_RANK[i.role], i.value))
 
 
 def active(identifiers: Iterable[SourceIdentifier]) -> list[SourceIdentifier]:
-    """Identifiants qu'aucune règle de correction ne retire."""
+    """Renvoie les identifiants retirés par aucune règle de correction."""
     return [i for i in identifiers if i.removed_by is None]
 
 
 def own_dois(identifiers: Iterable[SourceIdentifier]) -> set[str]:
-    """DOI propres d'un enregistrement source parmi `identifiers` : ses DOI `primary` ou `derived`, à défaut ses DOI `secondary`."""
+    """Renvoie les DOI propres d'un enregistrement source parmi `identifiers` : ses DOI `primary` ou `derived`, à défaut ses DOI `secondary`."""
     dois = [
         i
         for i in identifiers
@@ -89,7 +90,11 @@ def with_removals(
     owned_rules: Set[str],
     removals: Mapping[tuple[SourceIdentifierType, str], str],
 ) -> tuple[SourceIdentifier, ...]:
-    """Identifiants dont les retraits par les règles de `owned_rules` sont recalculés : `removals` donne la règle qui retire chaque identifiant, par type et valeur. Un identifiant retiré par une autre règle reste retiré."""
+    """Recalcule les retraits d'identifiants par les règles de `owned_rules`. Un identifiant retiré par une autre règle reste retiré.
+
+    Args:
+        removals: règle qui retire chaque identifiant, par type et valeur.
+    """
     return tuple(
         i
         if i.removed_by is not None and i.removed_by not in owned_rules
@@ -101,7 +106,7 @@ def with_removals(
 def isbn_role(
     raw_doc_type: str | None, source: str, *, declares_conference: bool = False
 ) -> SourceIdentifierRole:
-    """Rôle d'un ISBN qu'une source donne sans le qualifier : secondaire pour un livre, lié pour un autre document. L'ISBN d'un chapitre ou d'un article de congrès désigne l'ouvrage qui le contient."""
+    """Renvoie le rôle d'un ISBN donné sans qualification par une source : secondaire pour un livre, lié pour un autre document. L'ISBN d'un chapitre ou d'un article de congrès désigne l'ouvrage qui le contient."""
     role = container_role(raw_doc_type, source, declares_conference=declares_conference)
     return (
         SourceIdentifierRole.SECONDARY
@@ -134,7 +139,7 @@ _NORMALIZERS: dict[SourceIdentifierType, Callable[[str], str | None]] = {
 def normalize_identifiers(
     identifiers: Iterable[SourceIdentifier],
 ) -> tuple[tuple[SourceIdentifier, ...], tuple[SourceIdentifier, ...]]:
-    """Identifiants normalisés, puis identifiants écartés pour valeur invalide.
+    """Normalise les identifiants. Renvoie les identifiants normalisés, puis les identifiants écartés pour valeur invalide.
 
     Chaque valeur passe par le value object de son type. Un identifiant présent plusieurs fois garde la place de sa première occurrence et le plus fort de ses rôles, dans l'ordre de `SourceIdentifierRole`.
     """

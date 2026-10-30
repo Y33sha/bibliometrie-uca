@@ -19,7 +19,7 @@ class EntityLabelQueries:
         self._conn = conn
 
     def resolve_entity_label(self, *, kind: EntityKind, entity_id: str) -> EntityLabelResponse:
-        """Libellé de l'entité `entity_id`, `None` si l'id est inconnu ou mal formé. Même libellé que dans la facette."""
+        """Renvoie le libellé de l'entité `entity_id`, ou `None` si l'id est inconnu ou mal formé."""
         sql = ENTITY_SQL[kind]
         if sql.id_type == "integer" and not entity_id.isdigit():
             return EntityLabelResponse(label=None)

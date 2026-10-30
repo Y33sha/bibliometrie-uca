@@ -22,7 +22,7 @@ from infrastructure.db.engine import get_sync_engine
 from infrastructure.settings import settings
 from interfaces.cli.dev.pg_tools import owner_connection_args, owner_env, resolve_pg_tool
 
-# `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt ; schema.sql vit sous infrastructure/db/.
+# `parents[3]` remonte interfaces/cli/dev/ → racine du dépôt ; schema.sql est sous infrastructure/db/.
 SCHEMA_PATH = Path(__file__).resolve().parents[3] / "infrastructure" / "db" / "schema.sql"
 
 _LOCAL_SCHEMAS_SQL = text(r"""
@@ -34,7 +34,7 @@ _LOCAL_SCHEMAS_SQL = text(r"""
 
 
 def _local_schemas() -> list[str]:
-    """Schémas de la base absents de son `search_path`."""
+    """Renvoie les schémas de la base absents de son `search_path`."""
     with get_sync_engine().connect() as conn:
         return list(conn.execute(_LOCAL_SCHEMAS_SQL).scalars())
 

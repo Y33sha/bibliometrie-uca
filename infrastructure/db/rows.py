@@ -1,8 +1,8 @@
 """Construction d'une ligne typée depuis un relevé SQL.
 
-Le type se construit par appariement de noms : chaque champ prend la colonne de même nom. L'accord entre les deux se contrôle ici, à l'endroit où la ligne passe du SQL au Python.
+Chaque champ du type prend la colonne de même nom. L'accord entre champs et colonnes se contrôle au passage du SQL au Python.
 
-Un désaccord lève, en nommant l'écart : colonnes que le type n'attend pas, champs qu'aucune colonne n'alimente. Le relevé connaît le nom de ses colonnes même sans ligne, donc le contrôle vaut aussi sur un ensemble vide.
+Un désaccord lève une erreur nommant l'écart : colonnes inattendues, champs sans colonne. Le relevé connaît le nom de ses colonnes même sans ligne, donc le contrôle vaut aussi sur un ensemble vide.
 """
 
 import inspect
@@ -13,7 +13,7 @@ from sqlalchemy import RowMapping
 
 
 class FetchedRow(Protocol):
-    """Ce qu'une ligne de relevé expose pour être appariée : le nom de ses colonnes et leurs valeurs.
+    """Ligne de relevé : le nom de ses colonnes et leurs valeurs.
 
     Un `Row` SQLAlchemy la satisfait, quel que soit son tuple de types.
     """
@@ -26,7 +26,7 @@ class FetchedRow(Protocol):
 
 
 class RowsResult(Protocol):
-    """Un relevé rendant des lignes, dont il nomme les colonnes."""
+    """Relevé de lignes, avec le nom de ses colonnes."""
 
     def keys(self) -> Iterable[object]: ...
 
@@ -34,9 +34,9 @@ class RowsResult(Protocol):
 
 
 def _fields_of(cls: type) -> tuple[frozenset[str], frozenset[str]]:
-    """Champs que `cls` accepte, et ceux qu'il exige.
+    """Renvoie les champs acceptés par `cls`, et les champs exigés.
 
-    Lus sur la signature de construction : elle vaut pour un `NamedTuple` comme pour un modèle Pydantic, et contient les valeurs par défaut, qui disent quels champs une colonne peut ne pas alimenter.
+    Les champs sont lus sur la signature de construction, valable pour un `NamedTuple` comme pour un modèle Pydantic. Un champ à valeur par défaut est facultatif.
     """
     parameters = inspect.signature(cls).parameters
     accepted = frozenset(parameters)
@@ -47,7 +47,11 @@ def _fields_of(cls: type) -> tuple[frozenset[str], frozenset[str]]:
 
 
 def check_fields_match(cls: type, columns: Iterable[str]) -> None:
-    """Confronte les colonnes d'un relevé aux champs de `cls`, et lève en nommant l'écart."""
+    """Confronte les colonnes d'un relevé aux champs de `cls`.
+
+    Raises:
+        TypeError: colonnes et champs en désaccord ; le message nomme l'écart.
+    """
     present = frozenset(columns)
     accepted, required = _fields_of(cls)
     missing = required - present
@@ -63,12 +67,12 @@ def check_fields_match(cls: type, columns: Iterable[str]) -> None:
 
 
 def row_as[T](cls: type[T], row: FetchedRow) -> T:
-    """La ligne `row` construite en `cls`, chaque champ prenant la colonne de même nom."""
+    """Renvoie la ligne `row` construite en `cls`, chaque champ prenant la colonne de même nom."""
     check_fields_match(cls, row._fields)
     return cls(**row._mapping)
 
 
 def rows_as[T](cls: type[T], result: RowsResult) -> list[T]:
-    """Les lignes de `result` construites en `cls`, l'accord se vérifiant sur ses colonnes."""
+    """Renvoie les lignes de `result` construites en `cls`, après contrôle de ses colonnes."""
     check_fields_match(cls, (str(column) for column in result.keys()))
     return [cls(**row._mapping) for row in result.all()]

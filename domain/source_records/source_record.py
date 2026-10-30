@@ -16,8 +16,8 @@ class SourceRecord:
     title: str
     publication_year: int | None
     doc_type: str | None
-    # DOI actifs de rôle autre que `related`, cible appliquée.
     dois: DoiKeys
+    """DOI actifs de rôle autre que `related`, cible appliquée."""
     serial_id: int | None
     monograph_id: int | None
     container_title: str | None
@@ -31,6 +31,6 @@ class SourceRecord:
     topics: dict[str, JsonValue] | None
     biblio: dict[str, JsonValue] | None
     source_extras: dict[str, JsonValue] | None
-    # Licence normalisée (valeur de `License`).
     license: str | None = None
+    """Licence normalisée (valeur de `License`)."""
     publisher_id: int | None = None

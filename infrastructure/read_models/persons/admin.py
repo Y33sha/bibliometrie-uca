@@ -55,7 +55,7 @@ _AMBIGUOUS_FORMS_SQL = f"""
 # Liste SQL des types d'identifiant à examiner, dérivée du vocabulaire `PersonIdentifierType`.
 _ID_TYPES_ARRAY_SQL = "ARRAY[" + ", ".join(f"'{t.value}'" for t in PERSON_IDENTIFIER_TYPES) + "]"
 
-# Paires de personnes non exclues au même identifiant brut, hors identifiants que la contribution source neutralise et hors paires déjà distinctes. Seules comptent les valeurs dont l'attribution est `pending` : la requête part d'elles.
+# Paires de personnes non exclues au même identifiant brut, hors identifiants neutralisés par la contribution source et hors paires déjà distinctes. Seules comptent les valeurs à attribution `pending`.
 _IDENTIFIER_CONFLICT_PAIRS = f"""
     WITH pending AS (
         SELECT DISTINCT id_type::text AS id_type, id_value
@@ -98,7 +98,7 @@ _IDENTIFIER_CONFLICT_PAIRS = f"""
 
 
 def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPersonOut]:
-    """Fiche allégée de chaque personne (nom, fiche RH, nombre de publications, laboratoires), pour les files de triage."""
+    """Renvoie la fiche allégée de chaque personne (nom, fiche RH, nombre de publications, laboratoires), pour les files de triage."""
     if not ids:
         return {}
     rows = conn.execute(
@@ -261,7 +261,7 @@ def _overlap_sets(conn: Connection, sql: str, ids: list[int]) -> dict[int, set[i
 
 
 def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
-    """Paires de personnes aux noms compatibles. Étape la moins coûteuse : elle sert le badge sans calculer les recouvrements de réseau."""
+    """Renvoie les paires de personnes aux noms compatibles, sans recouvrements de réseau. Étape la moins coûteuse, suffisante pour le badge."""
     seen: set[tuple[int, int]] = set()
     candidates: list[tuple[int, int]] = []
     for sql in PERSON_DUP_QUERIES:
@@ -276,7 +276,7 @@ def _name_duplicate_candidates(conn: Connection) -> list[tuple[int, int]]:
 
 
 def _name_duplicate_pairs(conn: Connection) -> list[tuple[int, int, dict[str, int]]]:
-    """Paires candidates enrichies de leurs recouvrements de réseau, triées par force décroissante (doublons évidents d'abord, homonymes en fin de file)."""
+    """Renvoie les paires candidates enrichies de leurs recouvrements de réseau, triées par force décroissante (doublons évidents d'abord, homonymes en fin de file)."""
     candidates = _name_duplicate_candidates(conn)
     if not candidates:
         return []
@@ -309,7 +309,7 @@ class PersonAdminQueries:
     def name_form_contributions(
         self, person_id: int, name_form: str
     ) -> NameFormContributionsResponse:
-        """Contributions sources d'une personne sous une forme de nom donnée : contributions sources de ses contributions. S'y ajoutent les autres personnes qui ont cette forme sans l'avoir rejetée."""
+        """Renvoie les contributions sources de la personne sous une forme de nom donnée, et les autres personnes ayant cette forme non rejetée."""
         auth_rows = self._conn.execute(
             text(f"""
                 SELECT sc.source, sc.id AS source_contribution_id,
@@ -360,14 +360,14 @@ class PersonAdminQueries:
         )
 
     def ambiguous_name_forms_count(self) -> int:
-        """Nombre de formes de nom ambiguës restant à trancher (badge de l'onglet)."""
+        """Renvoie le nombre de formes de nom ambiguës restant à trancher (badge de l'onglet)."""
         row = self._conn.execute(
             text(f"SELECT count(*) AS total FROM ({_AMBIGUOUS_FORMS_SQL}) t")
         ).one()
         return int(row.total)
 
     def ambiguous_name_forms(self, *, page: int, per_page: int) -> AmbiguousNameFormsResponse:
-        """Formes de nom ambiguës paginées, avec les personnes qui les ont au sens de `name_form_holder`.
+        """Renvoie les formes de nom ambiguës paginées, avec les personnes ayant chaque forme au sens de `name_form_holder`.
 
         Chaque personne a son statut pour la forme, et le drapeau `compatible` : son nom est compatible avec la forme. Compatible, la personne est un homonyme ou un doublon ; incompatible, une erreur d'attribution. Une forme dérivée du nom de la personne a le drapeau `canonical` et le statut `confirmed`.
         """
@@ -416,14 +416,14 @@ class PersonAdminQueries:
         )
 
     def identifier_conflicts_count(self) -> int:
-        """Nombre de paires de personnes au même identifiant brut en attente de validation (badge de l'onglet)."""
+        """Renvoie le nombre de paires de personnes au même identifiant brut en attente de validation (badge de l'onglet)."""
         row = self._conn.execute(
             text(f"SELECT count(*) AS total FROM ({_IDENTIFIER_CONFLICT_PAIRS}) sub")
         ).one()
         return int(row.total)
 
     def identifier_conflicts(self, *, page: int, per_page: int) -> IdentifierConflictsResponse:
-        """Paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. L'administration distingue doublon et erreur d'attribution."""
+        """Renvoie les paires de personnes au même identifiant brut en attente de validation, paginées, avec vue allégée des deux personnes et l'identifiant partagé en évidence. L'administration distingue doublon et erreur d'attribution."""
         # Les paires sont peu nombreuses : une seule exécution de la requête donne le total et la page.
         all_rows = self._conn.execute(
             text(f"{_IDENTIFIER_CONFLICT_PAIRS} ORDER BY id_a, id_b")
@@ -447,11 +447,11 @@ class PersonAdminQueries:
         return IdentifierConflictsResponse(total=total, page=page, per_page=per_page, pairs=pairs)
 
     def name_duplicates_count(self) -> int:
-        """Nombre de paires candidates par nom (badge de l'onglet)."""
+        """Renvoie le nombre de paires candidates par nom (badge de l'onglet)."""
         return len(_name_duplicate_candidates(self._conn))
 
     def name_duplicates(self, *, page: int, per_page: int) -> NameDuplicatesResponse:
-        """Paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. L'administration décide de la fusion ou de la distinction."""
+        """Renvoie les paires candidates par nom, paginées, avec vue allégée des deux personnes, recouvrements de réseau chiffrés et pastille de force. L'administration décide de la fusion ou de la distinction."""
         pairs = _name_duplicate_pairs(self._conn)
         total = len(pairs)
         offset = (page - 1) * per_page
@@ -477,7 +477,7 @@ class PersonAdminQueries:
         return NameDuplicatesResponse(total=total, page=page, per_page=per_page, pairs=items)
 
     def distinct_persons(self, person_id: int) -> list[DistinctPersonOut]:
-        """Personnes déclarées distinctes de `person_id` (`distinct_persons`)."""
+        """Renvoie les personnes déclarées distinctes de `person_id` (`distinct_persons`)."""
         rows = self._conn.execute(
             text("""
                 SELECT p.id AS person_id, p.first_name, p.last_name,
@@ -501,9 +501,10 @@ class PersonAdminQueries:
         ]
 
     def persons_sharing_name_form(self, person_id: int) -> list[SharingPersonOut]:
-        """Autres personnes qui ont au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.
+        """Renvoie les autres personnes ayant au moins une forme de nom non rejetée de `person_id`, au sens de `other_name_form_holders`.
 
-        Candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun — éléments de décision affichés dans le panneau latéral."""
+        Ce sont les candidates à l'absorption (fusion vers `person_id`). `shared_forms` liste les formes en commun.
+        """
         rows = self._conn.execute(
             text(f"""
                 SELECT p2.id AS person_id, p2.first_name, p2.last_name,

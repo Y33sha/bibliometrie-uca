@@ -1,6 +1,6 @@
 """Modèles Pydantic du router des structures : corps des requêtes entrantes et réponses composées après mutation.
 
-Les contrats de création et d'édition des structures et de leurs formes de nom vivent dans le port `application/ports/repositories/structure_repository.py`.
+Les contrats de création et d'édition des structures et de leurs formes de nom sont déclarés dans le port `application/ports/repositories/structure_repository.py`.
 """
 
 from pydantic import BaseModel

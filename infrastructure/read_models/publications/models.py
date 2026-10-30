@@ -37,7 +37,7 @@ PublicationSort = Literal[
 ]
 
 
-# Vocabulaire des colonnes que l'export des publications sait émettre, dans l'ordre où elles paraissent. L'appelant nomme celles qu'il veut voir ; une liste vide les demande toutes. Le titre et les liens paraissent quoi qu'il arrive.
+# Vocabulaire des colonnes de l'export des publications. L'appelant nomme les colonnes voulues ; une liste vide les demande toutes. Le titre et les liens sont toujours présents.
 EXPORT_COLUMNS: frozenset[str] = frozenset(
     {
         "type",
@@ -58,7 +58,7 @@ EXPORT_COLUMNS: frozenset[str] = frozenset(
 )
 
 
-# Vocabulaire des colonnes que l'export des thèses sait émettre, aux règles de `EXPORT_COLUMNS`.
+# Vocabulaire des colonnes de l'export des thèses, aux règles de `EXPORT_COLUMNS`.
 THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
     {
         "inscription",
@@ -78,7 +78,7 @@ THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
 NO_LICENSE = "none"
 LICENSE_FILTER_VALUES: frozenset[str] = frozenset({*License, NO_LICENSE})
 
-# Vocabulaire du filtre par agence d'enregistrement du DOI, dans l'ordre de la facette : les sources qui représentent une agence (`registration_agency`), `other` pour les autres agences, `none` pour une publication sans DOI.
+# Vocabulaire du filtre par agence d'enregistrement du DOI, dans l'ordre de la facette : les sources représentant une agence (`registration_agency`), `other` pour les autres agences, `none` pour une publication sans DOI.
 DOI_AGENCY_SOURCES: tuple[Source, ...] = tuple(
     source for source, profile in PROFILES.items() if profile.registration_agency
 )
@@ -91,16 +91,13 @@ DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGEN
 class PublicationFilters:
     """Filtres de la page publications, partagés par la liste, les facettes et l'export.
 
-    Les trois lectures comptent le même ensemble sous les mêmes filtres. Tous les champs ont un défaut : une construction partielle est possible.
-
-    Une liste vide laisse tout passer. `lab_none` retient les publications sans laboratoire ; `is_corresponding`, `in_perimeter` et `has_apc` prennent des valeurs `yes` et `no` combinées en OR : cocher les deux laisse tout passer. `has_apc` retient les publications dont un paiement d'APC est imputé au budget d'une structure du périmètre.
-
-    `person_id` définit l'ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui. `author_id` restreint l'ensemble courant aux publications d'un auteur ; les deux se combinent.
+    Les trois lectures comptent le même ensemble sous les mêmes filtres. Une liste vide laisse tout passer.
     """
 
     search: str = ""
     lab_ids: list[int] = field(default_factory=list)
     lab_none: bool = False
+    """Retient les publications sans laboratoire."""
     years: list[int] = field(default_factory=list)
     publisher_id: int | None = None
     serial_id: int | None = None
@@ -113,13 +110,18 @@ class PublicationFilters:
     doc_types: list[str] = field(default_factory=list)
     excluded_types: list[str] = field(default_factory=list)
     person_id: int | None = None
+    """Ensemble d'une page personne : toutes les publications de la personne, dans le périmètre ou hors de lui."""
     author_id: int | None = None
+    """Restreint l'ensemble courant aux publications d'un auteur ; se combine avec `person_id`."""
     is_corresponding: list[str] = field(default_factory=list)
+    """Valeurs `yes` et `no`, combinées en OR."""
     has_apc: list[str] = field(default_factory=list)
+    """Valeurs `yes` et `no`, combinées en OR. `yes` retient les publications à paiement d'APC imputé au budget d'une structure du périmètre."""
     country_values: list[str] = field(default_factory=list)
     language_codes: list[str] = field(default_factory=list)
     hal_status_values: list[str] = field(default_factory=list)
     in_perimeter: list[str] = field(default_factory=list)
+    """Valeurs `yes` et `no`, combinées en OR."""
     subject_ids: list[int] = field(default_factory=list)
     partner_rors: list[str] = field(default_factory=list)
 
@@ -135,15 +137,15 @@ class PublicationLabItem(BaseModel):
 
 
 class PublicationApcPayment(BaseModel):
-    """Détail d'un paiement APC (une ligne d'`apc` dans la liste)."""
+    """Paiement d'APC, ligne de `apc` dans la liste."""
 
     amount: float
     institution: str | None
     lab_id: int | None
     lab_acronym: str | None
     budget_structure_id: int | None
-    # Paiement sur le budget d'une structure du périmètre des personnes, même règle que le filtre `has_apc`.
     in_perimeter: bool
+    """Paiement sur le budget d'une structure du périmètre des personnes, même règle que le filtre `has_apc`."""
 
 
 class PublicationListItem(BaseModel):
@@ -157,7 +159,8 @@ class PublicationListItem(BaseModel):
     oa_status: str
     access_url: str | None
     """Lien d'accès (`domain.publications.access.access_url`)."""
-    license: str | None  # licence de la version éditeur
+    license: str | None
+    """Licence de la version éditeur."""
     serial: str | None
     serial_id: int | None
     publisher: str | None
@@ -194,7 +197,7 @@ class PublicationListItem(BaseModel):
     is_corresponding: bool | None
     contribution_id: int | None
     hal_status: str | None
-    """Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, quand la liste porte sur un seul laboratoire ; `None` sinon."""
+    """Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon."""
 
 
 class PublicationListResponse(PaginatedResponse):
@@ -207,10 +210,7 @@ class PublicationListResponse(PaginatedResponse):
 
 
 class PublicationsFacetsResponse(BaseModel):
-    """Facettes dynamiques pour la page publications.
-
-    Chaque facette exclut son propre filtre mais applique tous les autres. `hal_status` est rempli seulement quand un seul laboratoire est sélectionné, `corresponding` et `in_perimeter` seulement avec `person_id`.
-    """
+    """Facettes dynamiques de la page publications. Chaque facette exclut son propre filtre et applique tous les autres."""
 
     years: list[FacetOption]
     labs: list[FacetOption]
@@ -221,12 +221,15 @@ class PublicationsFacetsResponse(BaseModel):
     licenses: list[FacetOption]
     doi_agencies: list[FacetOption]
     corresponding: list[FacetOption]
+    """Rempli seulement avec `person_id`."""
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]
     countries: list[FacetOption]
     languages: list[FacetOption]
     hal_status: list[FacetOption]
+    """Rempli seulement quand un seul laboratoire est sélectionné."""
     in_perimeter: list[FacetOption]
+    """Rempli seulement avec `person_id`."""
 
 
 # ---------------------------------------------------------------------------
@@ -241,13 +244,14 @@ class PublicationDetailCore(BaseModel):
     title: str
     publication_year: int | None
     doi: str | None
-    doi_ra: (
-        str | None
-    )  # Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`.
+    doi_ra: str | None
+    """Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`."""
     doc_type: str
     oa_status: str
-    license: str | None  # licence de la version éditeur
-    deposit_license: str | None  # licence du fichier déposé dans HAL
+    license: str | None
+    """Licence de la version éditeur."""
+    deposit_license: str | None
+    """Licence du fichier déposé dans HAL."""
     language: str | None
     container_title: str | None
     abstract: str | None
@@ -257,7 +261,7 @@ class PublicationDetailCore(BaseModel):
     """ISSN actifs de la revue."""
     oa_model: str | None
     monograph_id: int | None
-    """Livre ou volume d'actes qui contient la publication."""
+    """Livre ou volume d'actes contenant la publication."""
     monograph_title: str | None
     publisher_id: int | None
     """Éditeur de la revue, à défaut celui de la monographie."""
@@ -309,7 +313,8 @@ class ConsolidatedContributionOut(BaseModel):
     person_id: int
     last_name: str
     first_name: str
-    has_rh: bool  # la personne est rattachée au référentiel RH (hr_records)
+    has_rh: bool
+    """La personne a une fiche RH (`hr_records`)."""
 
 
 class ThesesContributionOut(BaseModel):
@@ -322,19 +327,21 @@ class ThesesContributionOut(BaseModel):
 
 
 class EcoleDoctorale(BaseModel):
-    """École doctorale d'une thèse, d'après theses.fr (`source_extras.ecoles_doctorales`). `extra="allow"` accepte les clés inconnues."""
+    """École doctorale d'une thèse, d'après theses.fr (`source_extras.ecoles_doctorales`)."""
 
     model_config = ConfigDict(extra="allow")
     nom: str
-    ppn: str | None = None  # PPN IdRef de l'école doctorale, s'il est connu.
+    ppn: str | None = None
+    """PPN IdRef de l'école doctorale, s'il est connu."""
 
 
 class PartenaireThese(BaseModel):
-    """Partenaire de recherche d'une thèse, d'après theses.fr (`source_extras.partenaires`). `extra="allow"` accepte les clés inconnues."""
+    """Partenaire de recherche d'une thèse, d'après theses.fr (`source_extras.partenaires`)."""
 
     model_config = ConfigDict(extra="allow")
     nom: str
-    type: str | None = None  # `etablissement`, `laboratoire`…
+    type: str | None = None
+    """`etablissement`, `laboratoire`…"""
 
 
 class ThesisMeta(BaseModel):
@@ -353,12 +360,13 @@ class StructureInfo(BaseModel):
 
 
 class RelatedPublicationOut(BaseModel):
-    """Une publication apparentée, vue depuis la publication courante.
+    """Publication apparentée, vue depuis la publication courante.
 
-    `relation_type` se lit depuis la publication courante : les relations entrantes sont inversées. Une cible du corpus a son identifiant, son titre, son année et son type, et son DOI s'il existe ; elle se lie par son identifiant. Une cible hors corpus a son seul DOI.
+    Une cible du corpus a son identifiant, son titre, son année et son type, et son DOI s'il existe ; elle se lie par son identifiant. Une cible hors corpus a son seul DOI.
     """
 
     relation_type: str
+    """Type lu depuis la publication courante : les relations entrantes sont inversées."""
     doi: str | None = None
     publication_id: int | None = None
     title: str | None = None
@@ -377,51 +385,62 @@ class PublicationDetailResponse(BaseModel):
     thesis_meta: ThesisMeta | None
     structures: dict[str, StructureInfo]
     subjects: list[SubjectOut]
-    keywords: list[str]  # mots-clés libres agrégés des sources (hors référentiel `subjects`)
+    keywords: list[str]
+    """Mots-clés libres réunis depuis les sources, hors référentiel `subjects`."""
     relations: list[RelatedPublicationOut]
     access_url: str | None
     """Lien d'accès (`domain.publications.access.access_url`)."""
     access: list[AccessLinkOut]
     """Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI."""
     referenced_by: list[SourceRecordOut]
-    """Sources qui référencent la publication sans en donner de copie : toutes, sauf Crossref et DataCite, que couvre le DOI, et HAL quand HAL figure parmi les liens d'accès."""
+    """Sources référençant la publication sans en donner de copie : toutes, sauf Crossref et DataCite, couvertes par le DOI, et HAL quand HAL figure parmi les liens d'accès."""
     external_identifiers: list[ExternalIdentifierOut]
 
 
 class SourceRecordMetadataOut(BaseModel):
     """Métadonnées d'un enregistrement source, après normalisation.
 
-    `serial_id` et `journal_title` désignent la revue du référentiel où l'enregistrement est rattaché, `publisher_id` et `publisher_name` l'éditeur que nomme la source, rattaché au référentiel. Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne. `pages` reprend la plage de pages de la source, ou la compose de la première et de la dernière page. `language_name` est le nom de la langue dans le référentiel ; `language_raw`, la valeur que donnait la source quand la normalisation l'a changée. `raw_doc_type` est le type dans le vocabulaire de la source. Pour un type corrigé, `doc_type_uncorrected` est le type d'avant correction et `doc_type_corrected_by` la règle de correction.
+    Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne.
     """
 
     id: int
     source: str
     source_id: str
     doi: str | None
-    identifiers: list[ExternalIdentifierOut]  # identifiants actifs, hors DOI du champ `doi`
+    identifiers: list[ExternalIdentifierOut]
+    """Identifiants actifs, hors DOI du champ `doi`."""
     title: str
-    title_normalized: str | None  # forme de comparaison du titre
+    title_normalized: str | None
+    """Forme de comparaison du titre."""
     doc_type: str | None
     raw_doc_type: str | None
+    """Type dans le vocabulaire de la source."""
     doc_type_uncorrected: str | None
+    """Type avant correction, pour un type corrigé."""
     doc_type_corrected_by: str | None
+    """Règle de correction, pour un type corrigé."""
     publication_year: int | None
     language: str | None
     language_name: str | None
+    """Nom de la langue dans le référentiel."""
     language_raw: str | None
+    """Valeur donnée par la source, quand la normalisation l'a changée."""
     oa_status: str | None
     serial_id: int | None
+    """Revue du référentiel rattachée à l'enregistrement source."""
     journal_title: str | None
     journal_raw_title: str | None
     journal_raw_issn: str | None
     journal_raw_eissn: str | None
     publisher_id: int | None
+    """Éditeur nommé par la source, rattaché au référentiel."""
     publisher_name: str | None
     publisher_raw_name: str | None
     container_title: str | None
     volume: str | None
     issue: str | None
     pages: str | None
+    """Plage de pages de la source, ou composée de la première et de la dernière page."""
     article_number: str | None
 
     @computed_field
@@ -432,30 +451,35 @@ class SourceRecordMetadataOut(BaseModel):
 
 
 class SourceContributionOut(BaseModel):
-    """Contribution source d'un enregistrement source, avec sa contribution : les contributions sources d'un même auteur dans la publication.
-
-    `position` est le rang d'auteur dans l'enregistrement source, à partir de 0 ; il manque pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes. `contribution_id` et `reference_position` (position de la contribution source de référence de la contribution) manquent pour une contribution source en attente d'alignement. `person_id` est la personne de la contribution. `method`, `score` et `margin` décrivent l'entrée de la contribution source dans sa contribution ; score et marge sont en bits.
-    """
+    """Contribution source d'un enregistrement source, avec sa contribution (contributions sources d'un même auteur dans la publication)."""
 
     id: int
     source_record_id: int
     position: int | None
+    """Rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs."""
     full_name: str | None
     roles: list[str] | None
     person_id: int | None
+    """Personne de la contribution."""
     in_perimeter: bool
     structure_ids: list[int] | None
     raw_affiliation: str | None
+    """Adresses brutes réunies."""
     countries: list[str] | None
     contribution_id: int | None
+    """Absent pour une contribution source en attente d'alignement."""
     reference_position: int | None
+    """Position de la contribution source de référence de la contribution ; absente en attente d'alignement."""
     method: str | None
+    """Méthode d'entrée de la contribution source dans sa contribution."""
     score: float | None
+    """Score de l'entrée, en bits."""
     margin: float | None
+    """Marge de l'entrée, en bits."""
 
 
 class PublicationSourcesResponse(BaseModel):
-    """Enregistrements sources d'une publication, toutes sources confondues, leurs contributions sources, et les structures que ces contributions sources citent."""
+    """Enregistrements sources d'une publication, toutes sources confondues, leurs contributions sources, et les structures citées par ces contributions sources."""
 
     title: str
     source_records: list[SourceRecordMetadataOut]
@@ -479,7 +503,7 @@ class SuspectMergeSourceRecordOut(BaseModel):
 
 
 class SuspectMergeOut(BaseModel):
-    """Publication dont moins de la moitié des contributions sources d'auteur ont un correspondant dans un autre enregistrement source : ses enregistrements sources ont des listes d'auteurs qui ne se recouvrent pas."""
+    """Publication de la file des fusions suspectes : moins de la moitié de ses contributions sources d'auteur ont un correspondant dans un autre enregistrement source."""
 
     publication_id: int
     title: str
@@ -495,7 +519,7 @@ class SuspectMergesResponse(PaginatedResponse):
 
 
 class MergeCandidateOut(BaseModel):
-    """Publication fusionnable avec une autre. `similarity` : similarité trigramme de son titre normalisé avec le titre de référence. `sources` : sources de ses enregistrements sources."""
+    """Publication fusionnable avec une autre."""
 
     publication_id: int
     title: str
@@ -503,4 +527,6 @@ class MergeCandidateOut(BaseModel):
     doc_type: str
     doi: str | None
     similarity: float
+    """Similarité trigramme de son titre normalisé avec le titre de référence."""
     sources: list[str]
+    """Sources de ses enregistrements sources."""

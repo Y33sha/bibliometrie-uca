@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 
 
 def url_host(url: str | None) -> str | None:
-    """Hôte de l'URL, en minuscules, ou `None`. Une URL sans schéma (`doi.org/10.1234/x`) est acceptée."""
+    """Renvoie l'hôte de l'URL, en minuscules, ou `None`. Une URL sans schéma (`doi.org/10.1234/x`) est acceptée."""
     if not url:
         return None
     candidate = url.strip()

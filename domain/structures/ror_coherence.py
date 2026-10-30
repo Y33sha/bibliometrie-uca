@@ -12,20 +12,18 @@ from domain.structures.identifiers import RorId
 
 @dataclass(frozen=True, slots=True)
 class TutelleCoherence:
-    """Écarts entre les deux référentiels.
-
-    - `absent_from_ror` : tutelles `(parent, enfant)` dont le parent est absent des ancêtres ROR de l'enfant.
-    - `uncovered_ror_parents` : couples `(parent, enfant)` de structures dont le parent ROR est absent des ancêtres de l'enfant dans `structure_parents`.
-    - `outside_parents` : couples `(structure, parent ROR)` dont le parent est absent de `structures`.
-    - `outside_children` : couples `(structure, enfant ROR)` dont l'enfant est absent de `structures`.
-    - `shared_ror_ids` : ROR attribués à plusieurs structures.
-    """
+    """Écarts entre les deux référentiels."""
 
     absent_from_ror: frozenset[tuple[int, int]]
+    """Tutelles `(parent, enfant)` dont le parent est absent des ancêtres ROR de l'enfant."""
     uncovered_ror_parents: frozenset[tuple[int, int]]
+    """Couples `(parent, enfant)` de structures dont le parent ROR est absent des ancêtres de l'enfant dans `structure_parents`."""
     outside_parents: frozenset[tuple[int, RorId]]
+    """Couples `(structure, parent ROR)` dont le parent est absent de `structures`."""
     outside_children: frozenset[tuple[int, RorId]]
+    """Couples `(structure, enfant ROR)` dont l'enfant est absent de `structures`."""
     shared_ror_ids: frozenset[RorId]
+    """ROR attribués à plusieurs structures."""
 
 
 def _parents_by_child[T: Hashable](edges: Iterable[tuple[T, T]]) -> dict[T, set[T]]:
@@ -36,7 +34,7 @@ def _parents_by_child[T: Hashable](edges: Iterable[tuple[T, T]]) -> dict[T, set[
 
 
 def _ancestors[T: Hashable](node: T, parents: Mapping[T, set[T]]) -> set[T]:
-    """Ancêtres stricts de `node`."""
+    """Renvoie les ancêtres stricts de `node`."""
     seen: set[T] = set()
     todo = list(parents.get(node, ()))
     while todo:
@@ -56,7 +54,9 @@ def tutelle_coherence(
 ) -> TutelleCoherence:
     """Compare les tutelles aux relations du ROR.
 
-    `structure_rors` associe chaque structure qui a un ROR à son ROR. `scope` restreint aux structures du périmètre la recherche de parents et d'enfants ROR absents de `structures`.
+    Args:
+        structure_rors: ROR de chaque structure qui en a un.
+        scope: structures du périmètre, seules examinées pour les parents et les enfants ROR absents de `structures`.
     """
     internal_parents = _parents_by_child(tutelles)
     ror_edges = list(ror_edges)

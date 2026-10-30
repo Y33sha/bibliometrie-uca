@@ -26,11 +26,11 @@ class Copy:
     version: str | None
     is_oa: bool | None
     platform: str | None
-    """Nom de la plateforme qui héberge la copie : celui de la liste pour une plateforme connue, sinon celui que donne la source."""
+    """Nom de la plateforme qui héberge la copie : celui de la liste pour une plateforme connue, sinon celui donné par la source."""
     known_platform: KnownPlatform | None
     """Plateforme de la liste qui héberge la copie (`known_platform_of_copy`)."""
     described_by_platform: bool
-    """La copie vient de l'enregistrement source que la plateforme donne elle-même."""
+    """La copie vient de l'enregistrement source donné par la plateforme elle-même."""
     arrival: int
     """Ordre d'arrivée de l'enregistrement source."""
 
@@ -74,7 +74,7 @@ def _rank(copy: Copy) -> tuple[int, int]:
 
 
 def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
-    """Adresse d'accès et liens d'accès d'une publication de DOI `doi`."""
+    """Calcule l'adresse d'accès et les liens d'accès d'une publication de DOI `doi`."""
     copies = list(copies)
     self_described = {c.platform for c in copies if c.described_by_platform}
     open_copies = [
@@ -99,7 +99,7 @@ def access(copies: Iterable[Copy], *, doi: str | None) -> Access:
 
 
 def access_url(best_copy_url: str | None, *, oa_status: str | None, doi: str | None) -> str | None:
-    """Lien d'accès d'une publication : la meilleure copie, à défaut la page du DOI d'une publication ouverte. `None` pour une publication fermée ou sous embargo."""
+    """Renvoie le lien d'accès d'une publication : la meilleure copie, à défaut la page du DOI d'une publication ouverte. `None` pour une publication fermée ou sous embargo."""
     if oa_status in (OaStatus.CLOSED, OaStatus.EMBARGOED):
         return None
     if best_copy_url:

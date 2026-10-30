@@ -26,7 +26,9 @@ class PublicationMergeRequest(BaseModel):
 
 
 class PublicationMergeResult(BaseModel):
-    """Résultat d'une fusion manuelle, ou de son aperçu. `publication_id` : publication issue de la fusion. `conflicts` : contributions dont les contributions sources désignaient deux personnes, laissées sans personne."""
+    """Résultat d'une fusion manuelle, ou de son aperçu."""
 
     publication_id: int
+    """Publication issue de la fusion."""
     conflicts: int
+    """Nombre de contributions laissées sans personne : leurs contributions sources désignaient deux personnes."""

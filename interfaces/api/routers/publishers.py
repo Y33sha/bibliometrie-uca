@@ -38,9 +38,9 @@ router = APIRouter(prefix="/api/publishers", tags=["publishers"])
 
 @router.get("/types", response_model=list[EnumOption])
 def list_publisher_types() -> list[EnumOption]:
-    """Valeurs possibles de l'enum `publisher_type` avec leur libellé français.
+    """Liste les valeurs possibles de l'enum `publisher_type` avec leur libellé français.
 
-    Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`, dont un test d'intégration vérifie l'accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
+    Les valeurs viennent de `domain.publishers.publisher.PUBLISHER_TYPES` et `PUBLISHER_TYPE_LABELS_FR`. Un test d'intégration vérifie leur accord avec l'enum SQL. Alimente la liste déroulante de la page d'administration des éditeurs et la colonne « Type » des pages publiques.
     """
     return [EnumOption(value=v, label_fr=PUBLISHER_TYPE_LABELS_FR[v]) for v in PUBLISHER_TYPES]
 
@@ -51,7 +51,7 @@ def publisher_filters(
     country: str = Query(""),
     has_publications: bool | None = Query(None),
 ) -> PublisherFilters:
-    """Filtres communs à la liste des éditeurs et à ses facettes.
+    """Lit les filtres communs à la liste des éditeurs et à ses facettes.
 
     `publisher_type` accepte plusieurs valeurs séparées par des virgules, prises dans l'énumération du domaine ; une valeur inconnue renvoie 422. `country` suit la même convention multi-valeurs, sur les codes du référentiel. `search` agit à partir de deux caractères.
     """
@@ -70,7 +70,7 @@ def publishers_facets(
     filters: PublisherFilters = Depends(publisher_filters),
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublishersFacetsResponse:
-    """Comptes par option des facettes de la liste des éditeurs.
+    """Renvoie les décomptes par option des facettes de la liste des éditeurs.
 
     Convention partagée avec `/api/serials/facets` et `/api/publications/facets` : chaque facette écarte sa propre dimension de la clause WHERE.
     """
@@ -85,7 +85,7 @@ def export_publishers_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la liste des éditeurs, aux filtres et au tri de la liste."""
+    """Exporte en CSV la liste des éditeurs, aux filtres et au tri de la liste."""
     return csv_response(
         queries.export_publishers_csv(filters=filters, sort=sort),
         filename="editeurs.csv",
@@ -101,9 +101,9 @@ def list_publishers(
     filters: PublisherFilters = Depends(publisher_filters),
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> PublisherListResponse:
-    """Liste paginée des éditeurs, avec le décompte de leurs revues et de leurs publications.
+    """Liste les éditeurs par page, avec le décompte de leurs revues et de leurs publications.
 
-    `has_publications` retient les éditeurs dont le décompte de publications est non nul (`true`) ou nul (`false`). Ce compteur retient les seules publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
+    `has_publications` retient les éditeurs à décompte de publications non nul (`true`) ou nul (`false`). Ce décompte retient seulement les publications du périmètre, atteintes par les revues de l'éditeur. `sort` accepte `name`, `serials` et `publications`, suffixés de `_asc` ou `_desc` ; toute autre valeur renvoie un 422.
     """
     return queries.list_publishers(filters=filters, sort=sort, page=page, per_page=per_page)
 
@@ -114,9 +114,9 @@ def get_publisher(
     queries: PublisherQueries = Depends(publisher_queries),
     detail: EntityDetail = Depends(entity_detail(MergedEntity.PUBLISHER)),
 ) -> Publisher:
-    """Profil complet d'un éditeur, pour sa page publique.
+    """Renvoie le profil complet d'un éditeur, pour sa page publique.
 
-    Contient ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
+    Le profil contient ses métadonnées, ses préfixes DOI, et le décompte de ses revues et de ses publications.
     """
     return detail.found(queries.get_publisher_detail(publisher_id))
 
@@ -127,7 +127,7 @@ def get_publisher_subjects(
     limit: TopSubjectsLimit = TOP_SUBJECTS_LIMIT,
     queries: PublisherQueries = Depends(publisher_queries),
 ) -> list[SubjectFrequency]:
-    """Sujets les plus fréquents des publications de l'éditeur, pour l'onglet tableau de bord.
+    """Renvoie les sujets les plus fréquents des publications de l'éditeur, pour l'onglet tableau de bord.
 
     Les sujets trop génériques sont écartés. Un éditeur sans publication indexée donne une liste vide.
     """
@@ -164,7 +164,7 @@ def merge(
 
     Deux éditeurs aux membres Crossref distincts sont deux maisons : la fusion est refusée par un 409.
 
-    La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`), dont le corps énumère toutes les paires bloquantes ; l'administration les traite dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
+    La fusion des revues bloque sur des ISSN divergents pour un même titre, ou sur un doublon de titre chez l'un des éditeurs. La fusion entière est alors refusée par un 409 (`PublisherMergeBlockedResponse`). Son corps énumère toutes les paires bloquantes, à traiter dans les revues avant de relancer. Renvoie aussi 422 sur deux identifiants égaux, 404 si l'un des deux éditeurs est introuvable.
     """
     publishers.merge_publishers(publisher_id, body.source_id)
     return MergeResponse(merged=True, source_id=body.source_id, target_id=publisher_id)

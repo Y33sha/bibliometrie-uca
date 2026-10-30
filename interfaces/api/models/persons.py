@@ -63,11 +63,12 @@ class AddIdentifierResponse(BaseModel):
 
 
 class IdentifierStatusResponse(BaseModel):
-    """Identifiant après changement de statut : son id, son statut, et le nombre d'identifiants de ses comptes HAL qui ont reçu le même statut."""
+    """Identifiant après changement de statut."""
 
     id: int
     status: str
     propagated: int
+    """Nombre d'identifiants des comptes HAL de l'identifiant passés au même statut."""
 
 
 class NameFormStatusResponse(BaseModel):
@@ -79,7 +80,8 @@ class NameFormStatusResponse(BaseModel):
 
 
 class DetachContributionsResponse(BaseModel):
-    """Décompte d'un détachement de contributions : contributions détachées de la personne, formes de nom supprimées."""
+    """Décompte d'un détachement de contributions."""
 
     detached: int
     cleaned_forms: int
+    """Nombre de formes de nom supprimées."""

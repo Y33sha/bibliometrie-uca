@@ -1,8 +1,8 @@
-"""Files d'attente de recalcul (schéma `queues`) : identifiants des lignes qu'une tâche du pipeline doit traiter.
+"""Files d'attente de recalcul (schéma `queues`) : identifiants des lignes à traiter par une tâche du pipeline.
 
-Marquer une ligne, c'est insérer son identifiant dans la file avec un nouveau numéro de marquage `seq`. Une tâche relève les couples `(id, seq)` de la file au début, puis supprime exactement ceux-là à la fin. Un marquage fait pendant la tâche change `seq`, donc reste dans la file pour l'exécution suivante.
+Marquer une ligne consiste à insérer son identifiant dans la file avec un nouveau numéro de marquage `seq`. Une tâche relève les couples `(id, seq)` de la file au début, puis supprime exactement ces couples à la fin. Un marquage fait pendant la tâche change `seq`, donc reste dans la file pour l'exécution suivante.
 
-Les files sont sans clé étrangère. L'identifiant d'une ligne supprimée reste en file : la tâche qui lit la file l'ignore en joignant la table traitée, puis supprime son marquage avec les autres.
+Les files sont sans clé étrangère. L'identifiant d'une ligne supprimée reste en file. La tâche l'ignore en joignant la table traitée, puis supprime son marquage avec les autres.
 """
 
 from collections.abc import Sequence
@@ -31,9 +31,12 @@ class Queue(StrEnum):
 
 
 def enqueue_sql(queue: Queue, ids_sql: str) -> str:
-    """Instruction qui marque dans `queue` les identifiants que renvoie la requête `ids_sql`, à une colonne. Un identifiant déjà en file reçoit un nouveau `seq`.
+    """Renvoie l'instruction de marquage dans `queue` des identifiants renvoyés par `ids_sql`. Un identifiant déjà en file reçoit un nouveau `seq`.
 
-    L'instruction peut servir de requête d'une CTE, pour marquer les lignes qu'une autre CTE écrit.
+    L'instruction peut servir de requête d'une CTE, pour marquer les lignes écrites par une autre CTE.
+
+    Args:
+        ids_sql: requête à une colonne.
     """
     # noqa S608 : les noms de file et de table, et `ids_sql`, viennent du code, jamais d'une entrée.
     return f"""
@@ -44,14 +47,14 @@ def enqueue_sql(queue: Queue, ids_sql: str) -> str:
 
 
 def enqueue(conn: Connection, queue: Queue, ids_sql: str, params: dict[str, object]) -> int:
-    """Marque dans `queue` les identifiants que renvoie la requête `ids_sql`, à une colonne. Renvoie le nombre d'identifiants marqués."""
+    """Marque dans `queue` les identifiants renvoyés par la requête `ids_sql`, à une colonne. Renvoie le nombre d'identifiants marqués."""
     return conn.execute(text(enqueue_sql(queue, ids_sql)), params).rowcount
 
 
 def snapshot(conn: Connection, queue: Queue, table: str) -> None:
     """Relève les couples `(id, seq)` de `queue` dans la table temporaire `table`, indexée par `id`.
 
-    Une table temporaire déjà commitée survit à une exception dans la session de la connexion : un relevé antérieur de même nom est remplacé.
+    Une table temporaire déjà commitée survit à une exception dans la session de la connexion. Un relevé antérieur de même nom est donc remplacé.
     """
     conn.execute(text(f"DROP TABLE IF EXISTS pg_temp.{table}"))
     conn.execute(text(f"CREATE TEMP TABLE {table} AS SELECT id, seq FROM {queue}"))  # noqa: S608

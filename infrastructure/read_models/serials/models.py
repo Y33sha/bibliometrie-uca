@@ -27,31 +27,33 @@ SerialSort = Literal[
 
 @dataclass(frozen=True, slots=True)
 class SerialFilters:
-    """Filtres que la liste des revues et ses facettes honorent toutes deux.
-
-    `search` cherche dans le titre, et dans tous les ISSN de la revue, quel que soit leur statut. `serial_types` et `oa_models` sont multi-valués : une option cochée s'ajoute aux autres. `has_publications` retient les revues qui ont au moins une publication (`True`) ou aucune (`False`).
-    """
+    """Filtres communs à la liste des revues et à ses facettes."""
 
     search: str = ""
+    """Terme cherché dans le titre, et dans tous les ISSN de la revue, quel que soit leur statut."""
     publisher_id: int | None = None
     serial_types: list[str] = field(default_factory=list)
+    """Multi-valué : une option cochée s'ajoute aux autres."""
     is_in_doaj: bool | None = None
     oa_models: list[str] = field(default_factory=list)
+    """Multi-valué : une option cochée s'ajoute aux autres."""
     has_publications: bool | None = None
+    """Retient les revues à au moins une publication (`True`) ou sans publication (`False`)."""
 
 
 class SerialIssnDetail(BaseModel):
-    """Un ISSN d'une revue : support, ISSN-L, statut, ISSN successeur et date de vérification au Sudoc."""
+    """ISSN d'une revue, avec son support, son statut et sa date de vérification au Sudoc."""
 
     issn: str
     support: IssnSupport | None
     linking: bool
+    """ISSN de liaison (ISSN-L)."""
     status: IssnStatus
     sudoc_checked_at: datetime | None
 
 
 class SerialListItem(BaseModel):
-    """Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`). Le nom de l'éditeur vient de `publishers`, le nombre de publications des publications."""
+    """Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`)."""
 
     id: int
     title: str
@@ -70,33 +72,35 @@ class SerialListResponse(PaginatedResponse):
 
 
 class SerialDetailResponse(SerialListItem):
-    """GET /api/serials/{id} : profil complet de la revue, pour sa page publique et l'édition admin.
-
-    Étend la ligne de liste des champs propres au détail (ISSN-L, identifiants, modèle OA), plus la réponse DOAJ brute et sa date d'import. Le payload DOAJ est rendu tel quel.
-    """
+    """Profil complet de la revue (GET /api/serials/{id}), pour sa page publique et l'édition admin : la ligne de liste et les champs propres au détail."""
 
     issn_details: list[SerialIssnDetail]
     openalex_id: str | None
     oa_model: OaModel | None
     is_academic: bool | None
     doaj_payload: dict[str, str] | None
+    """Réponse DOAJ brute, renvoyée telle quelle."""
     doaj_imported_at: datetime | None
 
 
 class SerialsFacetsResponse(BaseModel):
     """Facettes de `/api/serials`.
 
-    Chaque dimension écarte son propre filtre de la condition WHERE, de sorte que son décompte annonce le nombre de revues atteignables si l'option était cochée ou décochée. `label` reprend `SERIAL_TYPE_LABELS_FR` ou `OA_MODEL_LABELS_FR` selon la dimension ; la facette DOAJ a pour libellés `Indexée` et `Non indexée`. `publications` compte les revues avec et sans publication.
+    Chaque dimension écarte son propre filtre de la condition WHERE : son décompte donne le nombre de revues retenues si l'option est cochée ou décochée.
     """
 
     serial_types: list[FacetOption]
+    """Libellés tirés de `SERIAL_TYPE_LABELS_FR`."""
     oa_models: list[FacetOption]
+    """Libellés tirés de `OA_MODEL_LABELS_FR`."""
     doaj: list[FacetOption]
+    """Libellés `Indexée` et `Non indexée`."""
     publications: YesNoCount
+    """Revues avec et sans publication."""
 
 
 class SerialDuplicateGroup(BaseModel):
-    """Revues en double potentiel : la valeur qu'elles partagent, puis les revues, la plus riche en publications en tête."""
+    """Groupe de revues en double potentiel, la plus riche en publications en tête."""
 
     value: str
     """Titre normalisé, ou ISSN actif dans chacune des revues."""
@@ -110,36 +114,40 @@ class SerialDuplicatesResponse(BaseModel):
 
 
 class LikelyProceedingsItem(BaseModel):
-    """Revue typée `journal` qui contient surtout des articles de congrès : `conference_papers` sur `records` documents, d'après le type donné par chaque source."""
+    """Revue typée `journal` contenant surtout des articles de congrès, d'après le type donné par chaque source."""
 
     serial: SerialListItem
     conference_papers: int
+    """Enregistrements sources typés article de congrès."""
     records: int
+    """Enregistrements sources de la revue."""
 
 
 class LikelyProceedingsResponse(BaseModel):
-    """File des recueils d'actes probables : les revues sans ISSN en tête, puis les plus riches en documents."""
+    """File des recueils d'actes probables : les revues sans ISSN en tête, puis les plus riches en enregistrements sources."""
 
     serials: list[LikelyProceedingsItem]
 
 
 class DoiNamespaceConflict(BaseModel):
-    """Enregistrements de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`.
-
-    `dois`, `documents` et `share` décrivent l'espace de noms : ses DOI distincts, ses enregistrements, et la part des DOI qui désigne `namespace_serial`, un DOI partagé entre plusieurs revues au prorata de ses enregistrements. `records` compte les enregistrements de `record_serial`, `sources` les répartit par source.
-    """
+    """Enregistrements sources de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`."""
 
     namespace: str
     dois: int
+    """DOI distincts de l'espace de noms."""
     documents: int
+    """Enregistrements sources de l'espace de noms."""
     share: float
+    """Part des DOI de l'espace de noms désignant `namespace_serial` ; un DOI partagé entre plusieurs revues compte au prorata de ses enregistrements sources."""
     namespace_serial: SerialListItem
     record_serial: SerialListItem
     records: int
+    """Enregistrements sources de `record_serial`."""
     sources: dict[str, int]
+    """Répartition de `records` par source."""
 
 
 class DoiNamespaceConflictsResponse(BaseModel):
-    """Paires de revues que contredisent les espaces de noms DOI, les plus fournies en enregistrements d'abord."""
+    """Paires de revues contredites par les espaces de noms DOI, les plus fournies en enregistrements sources d'abord."""
 
     conflicts: list[DoiNamespaceConflict]

@@ -1,6 +1,6 @@
 """Agrégat des collaborations internationales par pays.
 
-Compte, pour chaque pays étranger, le nombre de publications du périmètre qui lui sont co-affiliées, en dépliant la colonne `publications.countries` (ensemble des pays présents dans les affiliations d'une publication). Le pays de l'établissement et l'absence de pays sont écartés (`non_international_country_codes`).
+Le nombre de publications du périmètre co-affiliées à chaque pays étranger se compte en dépliant `publications.countries`, ensemble des pays des affiliations d'une publication. Le pays de l'établissement et l'absence de pays sont écartés (`non_international_country_codes`).
 """
 
 from sqlalchemy import Connection, text
@@ -22,7 +22,7 @@ class StatsCollaborationQueries:
     _conn: Connection
 
     def collaborations(self, *, filters: PublicationFilters) -> CollaborationsResponse:
-        """Collaborations internationales sous les filtres : nombre de publications co-affiliées à chaque pays étranger, du plus fréquent au moins fréquent, nombre de publications en collaboration internationale (au moins un pays étranger) et total du corpus filtré, pour exprimer une part."""
+        """Renvoie les collaborations internationales sous les filtres, par pays étranger, du plus fréquent au moins fréquent."""
         where, binds = publication_filter_where(filters, filter_context(self._conn, filters))
         binds["non_international"] = non_international_country_codes(
             get_institution_country(self._conn)

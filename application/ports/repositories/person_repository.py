@@ -8,15 +8,16 @@ from domain.persons.person import Person, PersonExclusion
 
 
 class IdentifierStatusRow(TypedDict):
-    """Ligne rendue par `update_identifier_status` (changement de statut d'un identifiant ; `person_id` sert à l'audit)."""
+    """Identifiant après changement de statut, renvoyé par `update_identifier_status`."""
 
     id: int
     status: str
     person_id: int
+    """Personne de l'identifiant, pour l'audit."""
 
 
 class NameFormStatusRow(TypedDict):
-    """Ligne rendue par `update_name_form_status` (changement de statut d'une forme de nom)."""
+    """Forme de nom après changement de statut, renvoyée par `update_name_form_status`."""
 
     person_id: int
     name_form: str
@@ -24,36 +25,39 @@ class NameFormStatusRow(TypedDict):
 
 
 class PersonRepository(Protocol):
-    """Contrat d'accès à l'entité Person (tables persons, person_identifiers, person_name_forms, distinct_persons, et certaines opérations sur source_contributions)."""
+    """Contrat d'accès à l'entité Person : tables `persons`, `person_identifiers`, `person_name_forms`, `distinct_persons`, et une partie de `source_contributions`."""
 
     # ── persons ────────────────────────────────────────────────────
 
     def find_by_id(self, person_id: int) -> Person | None:
-        """Charge l'entité `Person` complète (avec `identifiers` et `name_forms`), ou `None` si la personne n'existe pas. Identifiants et formes de nom l'accompagnent en lecture ; leurs modifications passent par les méthodes dédiées."""
+        """Charge l'entité `Person` avec `identifiers` et `name_forms`, ou `None` si la personne est introuvable. Identifiants et formes de nom se modifient par les méthodes dédiées."""
         ...
 
     def create(self, last_name: str, first_name: str = "") -> int:
         """Crée une personne avec ses formes de nom (`compute_person_name_forms`), et renvoie son id.
 
-        Lève `ValidationError` sans nom de famille : les formes qui rattachent des contributions à la personne en dérivent.
+        Raises:
+            ValidationError: nom de famille vide, nécessaire aux formes de nom.
         """
         ...
 
     def rename(self, person_id: int, last_name: str, first_name: str) -> tuple[str, str]:
         """Change le nom d'une personne et recalcule ses formes de nom (`compute_person_name_forms`). Renvoie le nom validé (`validated_name`).
 
-        Lève `ValidationError` sans nom de famille, `NotFoundError` si la personne est introuvable.
+        Raises:
+            ValidationError: nom de famille vide.
+            NotFoundError: personne introuvable.
         """
         ...
 
     def set_exclusion(self, person_id: int, exclusion: PersonExclusion | None) -> None:
-        """Pose le motif d'exclusion d'une personne (`None` la retient). Lève `NotFoundError` si la personne est introuvable."""
+        """Pose le motif d'exclusion d'une personne, ou retire l'exclusion avec `None`. Lève `NotFoundError` si la personne est introuvable."""
         ...
 
     # ── Fusion ─────────────────────────────────────────────────────
 
     def ids_with_rh(self, person_ids: list[int]) -> set[int]:
-        """Ids, parmi `person_ids`, des personnes qui ont une fiche RH (`hr_records`)."""
+        """Renvoie, parmi `person_ids`, les personnes ayant une fiche RH (`hr_records`)."""
         ...
 
     def merge_into(self, target_id: int, source_id: int) -> None:
@@ -81,19 +85,20 @@ class PersonRepository(Protocol):
         ...
 
     def insert_identifier(self, ident: IdentifierAttribution) -> int:
-        """Insère l'attribution et renvoie son id, posé aussi sur `ident.id`. Lève si `(id_type, id_value)` existe déjà : l'appelant vérifie l'unicité par `find_identifier`."""
+        """Insère l'attribution et renvoie son id, posé aussi sur `ident.id`. Lève une erreur si `(id_type, id_value)` existe déjà. L'appelant vérifie l'unicité par `find_identifier`."""
         ...
 
     def update_identifier(self, ident: IdentifierAttribution) -> None:
-        """Écrit les modifications d'une attribution existante (personne, statut, source) ; le type et la valeur restent. `ident.id` doit être posé."""
+        """Écrit la personne, le statut et la source d'une attribution existante. `ident.id` doit être posé."""
         ...
 
     def attribute_identifier(
         self, person_id: int, id_type: str, id_value: str, *, source: IdentifierOrigin
     ) -> AttributionResult:
-        """Attribue l'identifiant à la personne selon `attribution_outcome` : insertion en `pending`, ou reprise d'une attribution `rejected`. Une attribution que détient une autre personne reste à elle.
+        """Attribue l'identifiant à la personne selon `attribution_outcome` : insertion en `pending`, ou reprise d'une attribution `rejected`. Une attribution détenue par une autre personne reste inchangée.
 
-        La valeur est normalisée par `normalized_identifier_value`, qui lève `ValidationError` sur une valeur mal formée.
+        Raises:
+            ValidationError: valeur mal formée (`normalized_identifier_value`).
         """
         ...
 
@@ -102,11 +107,14 @@ class PersonRepository(Protocol):
         ...
 
     def propagate_status_to_hal_accounts(self, ident_id: int, status: str) -> int:
-        """Pose `status` sur les identifiants `pending` de la même personne trouvés dans les contributions sources de ses comptes HAL. Ces comptes sont ceux des contributions sources HAL qui contiennent l'identifiant `ident_id`. Renvoie le nombre d'identifiants modifiés."""
+        """Pose `status` sur les identifiants `pending` de la personne présents dans les contributions sources de ses comptes HAL. Ces comptes HAL sont ceux des contributions sources HAL contenant l'identifiant `ident_id`. Renvoie le nombre d'identifiants modifiés."""
         ...
 
     def mark_contributions_of_rejected_identifiers(self, person_id: int) -> int:
-        """Marque pour la redécision de leur personne les contributions de la personne rattachées par un identifiant `rejected` : le mode de résolution de la contribution est le type de l'identifiant, et l'une de ses contributions sources contient la valeur. Les contributions `manual` et celles d'un autre mode restent en l'état. Renvoie le nombre de contributions marquées."""
+        """Marque pour redécision les contributions de la personne rattachées par un identifiant `rejected`. Renvoie le nombre de contributions marquées.
+
+        Une telle contribution a pour mode de résolution le type de l'identifiant, et une de ses contributions sources contient la valeur.
+        """
         ...
 
     # ── person_name_forms ──────────────────────────────────────────
@@ -117,15 +125,18 @@ class PersonRepository(Protocol):
         full_name: str,
         source: str | None = None,
     ) -> None:
-        """Ajoute une forme de nom à une personne, si elle manque. Le nom est normalisé ; un nom vide après normalisation n'ajoute rien."""
+        """Ajoute à une personne la forme normalisée du nom, si cette forme est non vide et absente."""
         ...
 
     def update_name_form_status(
         self, person_id: int, name_form: str, status: str
     ) -> NameFormStatusRow:
-        """Change le statut d'une forme de nom et renvoie la ligne. Lève `NotFoundError` si le couple (forme, personne) est absent. Une forme rejetée sort durablement du rattachement par nom ; une forme confirmée corrobore les rattachements par identifiant et dispense du test de nom."""
+        """Change le statut d'une forme de nom et renvoie la ligne. Lève `NotFoundError` si le couple (forme, personne) est absent.
+
+        Une forme rejetée sort durablement du rattachement par nom. Une forme confirmée corrobore les rattachements par identifiant et dispense du test de nom.
+        """
         ...
 
     def delete_orphan_name_forms_for_person(self, person_id: int) -> int:
-        """Supprime les formes de nom en attente de la personne qu'aucune de ses contributions sources ne contient. Les formes dérivées de son nom (source `persons`) et les formes confirmées ou rejetées restent. Renvoie le nombre de formes supprimées."""
+        """Supprime les formes de nom en attente de la personne, absentes de ses contributions sources. Les formes dérivées de son nom (source `persons`) sont conservées. Renvoie le nombre de formes supprimées."""
         ...

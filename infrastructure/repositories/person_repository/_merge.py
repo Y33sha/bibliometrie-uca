@@ -20,7 +20,7 @@ from infrastructure.sql_fragments import DETACHED_CONTRIBUTION
 
 
 def _merge_distinct_persons(conn: Connection, target_id: int, source_id: int) -> None:
-    """Les non-doublons de l'absorbée sont recopiés sur la conservée, sauf celui qui les oppose. Les lignes de l'absorbée disparaissent avec elle (`ON DELETE CASCADE`)."""
+    """Recopie sur la personne conservée les non-doublons de l'absorbée, sauf celui qui les oppose. Les lignes de l'absorbée disparaissent avec elle (`ON DELETE CASCADE`)."""
     conn.execute(
         text("""
             INSERT INTO distinct_persons (person_id_a, person_id_b)
@@ -38,7 +38,7 @@ def _merge_distinct_persons(conn: Connection, target_id: int, source_id: int) ->
 
 
 def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
-    """Sur une forme de nom commune, le statut de la conservée l'emporte, sauf s'il est en attente."""
+    """Fusionne les formes de nom. Sur une forme commune, le statut de la conservée l'emporte, sauf s'il est en attente."""
     conn.execute(
         text(f"""
             INSERT INTO person_name_forms (name_form, person_id, sources, status)
@@ -67,7 +67,7 @@ def _merge_name_forms(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> None:
-    """La contribution de l'absorbée dans une publication où la conservée en a déjà une perd sa personne ; les autres passent à la conservée."""
+    """Transfère les contributions de l'absorbée à la conservée. Dans une publication où la conservée a déjà une contribution, celle de l'absorbée perd sa personne."""
     conn.execute(
         text(f"""
             UPDATE contributions s SET {DETACHED_CONTRIBUTION}
@@ -85,7 +85,7 @@ def _merge_contributions(conn: Connection, target_id: int, source_id: int) -> No
 
 
 def _merge_exclusion(conn: Connection, target_id: int, source_id: int) -> None:
-    """La plus forte des deux exclusions l'emporte (`merged_exclusion`)."""
+    """Pose sur la conservée la plus forte des deux exclusions (`merged_exclusion`)."""
     rows: dict[int, str | None] = {
         r.id: r.exclusion
         for r in conn.execute(
@@ -143,5 +143,5 @@ def merge_into(conn: Connection, target_id: int, source_id: int) -> None:
 
 
 def person_without_decision_sql(alias: str) -> str:
-    """Condition SQL vraie quand la personne `alias` n'a aucune décision humaine : rejet, confirmation, non-doublon, exclusion (étapes de nature décision de `MERGE_STEPS`)."""
+    """Renvoie la condition SQL vraie quand la personne `alias` est sans décision humaine : rejet, confirmation, non-doublon, exclusion (étapes de nature décision de `MERGE_STEPS`)."""
     return without_decision_sql("persons", alias, MERGE_STEPS)

@@ -21,7 +21,11 @@ _GENERIC_WORDS = frozenset(
 
 
 def prefix_holder(holders: Mapping[int, int]) -> int | None:
-    """Titulaire de préfixe qui réunit au moins `MIN_SHARE` des enregistrements sources d'un éditeur, eux-mêmes au moins `MIN_RECORDS`. `holders` : nombre d'enregistrements par titulaire."""
+    """Renvoie le titulaire de préfixe qui réunit au moins `MIN_SHARE` des enregistrements sources d'un éditeur, eux-mêmes au moins `MIN_RECORDS`.
+
+    Args:
+        holders: nombre d'enregistrements sources par titulaire.
+    """
     total = sum(holders.values())
     if total < MIN_RECORDS:
         return None

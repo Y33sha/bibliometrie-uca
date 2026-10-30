@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-25)
-"""Fusionne les autres noms d'éditeurs que la fusion automatique ne reconnaît pas (`merge_duplicate_publishers`).
+"""Fusionne les autres noms d'éditeurs, non reconnus par la fusion automatique (`merge_duplicate_publishers`).
 
 Chaque paire nomme un autre nom et l'éditeur qui l'absorbe : renommage, faute de frappe, nom traduit, ou variante non reconnue par la comparaison des noms. Les marques et les éditeurs rachetés restent distincts. Un nom absent de la base est ignoré. La fusion est celle de l'administration : elle refuse deux membres Crossref distincts et deux revues homonymes aux ISSN différents. Chaque fusion est commitée seule. Idempotent.
 
@@ -85,7 +85,7 @@ ALIASES: tuple[tuple[str, str], ...] = (
 
 
 def publisher_ids(conn: Connection, name: str) -> list[int]:
-    """Éditeurs dont le nom est exactement `name`."""
+    """Renvoie les éditeurs au nom exactement égal à `name`."""
     return list(
         conn.execute(
             text("SELECT id FROM publishers WHERE name = :name ORDER BY id"), {"name": name}

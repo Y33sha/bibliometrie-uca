@@ -21,7 +21,7 @@ from typing import TextIO
 from infrastructure import PROJECT_ROOT as _PROJECT_ROOT
 
 EcrivainConsole = Callable[[str, TextIO], None]
-"""Écrit une ligne de console sur le flux donné, en préservant ce qui s'y affiche déjà."""
+"""Écrit une ligne de console sur le flux donné, en préservant l'affichage en cours."""
 
 _ecrivain_console: EcrivainConsole | None = None
 
@@ -29,7 +29,7 @@ _ecrivain_console: EcrivainConsole | None = None
 def set_console_writer(ecrire: EcrivainConsole | None) -> None:
     """Détourne l'écriture des lignes de console vers `ecrire`.
 
-    Sert au pipeline, dont les barres de progression occupent le bas du terminal : une écriture directe s'y insère au milieu. Posé par le composition root, l'écrivain vaut pour tous les loggers configurés par ce module.
+    Le pipeline l'utilise : ses barres de progression occupent le bas du terminal, et une écriture directe s'insérerait au milieu. Posé par le composition root, l'écrivain vaut pour tous les loggers configurés par ce module.
     """
     global _ecrivain_console
     _ecrivain_console = ecrire
@@ -59,7 +59,7 @@ _console: TextIO | None = None
 
 
 def console_stream() -> TextIO:
-    """Flux de console, partagé par les loggers et par ce qui s'affiche à côté d'eux.
+    """Renvoie le flux de console, partagé par les loggers et les autres affichages du terminal.
 
     Un flux unique permet aux barres de progression et aux lignes de journal de s'effacer mutuellement : deux enveloppes du même descripteur s'ignoreraient.
 
@@ -73,13 +73,13 @@ def console_stream() -> TextIO:
     return _console
 
 
-# Marqueurs délimitant runs et phases dans le flux de log, émis par `run_pipeline` : ils situent une ligne dans son run et sa phase pour qui lit le flux.
+# Marqueurs des runs et des phases dans le flux de log, émis par `run_pipeline`. Ils situent chaque ligne dans son run et sa phase.
 RUN_MARKER = "Run pipeline #"
 PHASE_MARKER = "PHASE : "
 RUN_END_MARKER = "PIPELINE TERMINÉ"
 
-# Phase du pipeline en cours, qui devient le nom du logger de chaque record émis pendant la phase (`_PhaseNameFilter`).
-# L'orchestrateur la pose ; hors run (API, scripts), elle reste vide.
+# Phase du pipeline en cours, nom du logger de chaque record émis pendant la phase (`_PhaseNameFilter`).
+# Posée par l'orchestrateur ; vide hors run (API, scripts).
 _log_phase: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "pipeline_log_phase", default=None
 )
@@ -96,7 +96,7 @@ def reset_log_phase(token: contextvars.Token[str | None]) -> None:
 
 
 class _PhaseNameFilter(logging.Filter):
-    """Écrit la phase du pipeline en cours dans `record.name` : chaque ligne dit sa phase (`normalize:`, `subjects:`…). Sans phase (API, scripts), le nom du logger d'origine reste."""
+    """Filtre écrivant la phase du pipeline en cours dans `record.name` (`normalize:`, `subjects:`…). Sans phase (API, scripts), le nom du logger d'origine reste."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         phase = _log_phase.get()
@@ -135,7 +135,7 @@ _STD_RECORD_ATTRS = {
 class JsonFormatter(logging.Formatter):
     """Formatter produisant une ligne JSON par record.
 
-    Champs : timestamp (ISO UTC), level, logger, message, et `template` quand le message est formaté à l'émission. Le gabarit reste identique d'une occurrence à l'autre là où le message contient les valeurs du moment : un collecteur y regroupe les lignes d'un même événement, les compte et les surveille sans lire le texte. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
+    Champs : timestamp (ISO UTC), level, logger, message, et `template` quand le message est formaté à l'émission. Le gabarit reste identique d'une occurrence à l'autre, le message contient les valeurs. Un collecteur regroupe ainsi les lignes d'un même événement sans lire le texte. Les `extra={...}` passés au logger sont fusionnés à la racine ; les exceptions (`exc_info`) sont formatées dans `exception`.
     """
 
     def format(self, record: logging.LogRecord) -> str:
@@ -166,7 +166,7 @@ class _FormatTexte(logging.Formatter):
 
 
 def _make_formatter() -> logging.Formatter:
-    """Formatter choisi par `LOG_FORMAT` : JSON par défaut, texte sur demande."""
+    """Renvoie le formatter choisi par `LOG_FORMAT` : JSON par défaut, texte sur demande."""
     fmt = os.environ.get("LOG_FORMAT", "json").lower()
     if fmt == "text":
         return _FormatTexte("%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -190,12 +190,12 @@ class _FormatConsole(_FormatTexte):
 
 
 def _console_lisible() -> bool:
-    """La console s'adresse à quelqu'un qui la lit : format texte et terminal."""
+    """Vrai si la console s'adresse à une personne : format texte et terminal."""
     return os.environ.get("LOG_FORMAT", "json").lower() == "text" and sys.stdout.isatty()
 
 
 def _make_console_formatter() -> logging.Formatter:
-    """Formatter des lignes de console.
+    """Renvoie le formatter des lignes de console.
 
     Devant un terminal, le format texte se réduit au message. Une sortie redirigée ou capturée ajoute l'horodatage, le niveau et la phase.
     """
@@ -207,7 +207,7 @@ def _make_console_formatter() -> logging.Formatter:
 class _FiltreDetail(logging.Filter):
     """Écarte les lignes de détail, émises avec `extra={"detail": True}`.
 
-    Une telle ligne rapporte le cas d'une donnée parmi des milliers, par exemple un identifiant écarté à l'écriture. Elle vaut pour qui relit le journal, et encombre le terminal pendant un run.
+    Une telle ligne rapporte le cas d'une donnée parmi des milliers, par exemple un identifiant écarté à l'écriture. Elle sert à la relecture du journal, et encombre le terminal pendant un run.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
@@ -221,7 +221,7 @@ def _add_console_filters(handler: logging.Handler) -> None:
 
 
 def _rebase_log_dir(log_dir: str) -> Path:
-    """Répertoire `PROJECT_ROOT/logs/<chemin relatif>/` de `log_dir`.
+    """Renvoie le répertoire `PROJECT_ROOT/logs/<chemin relatif>/` de `log_dir`.
 
     Le chemin relatif part de la racine du projet. Un `logs` final est retiré, pour éviter `logs/.../logs/`. Un chemin hors projet se range sous `PROJECT_ROOT/logs/`, avec ses segments nommés.
     """
@@ -245,7 +245,7 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
     """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
-    # Le logger a ses propres handlers : propager émettrait chaque record une seconde fois par ceux du root.
+    # Le logger a ses propres handlers : propager émettrait chaque record une seconde fois par les handlers du root.
     logger.propagate = False
 
     # Évite les doublons quand le logger est configuré plusieurs fois.
@@ -264,7 +264,10 @@ def setup_logger(name: str, log_dir: str) -> logging.Logger:
 
 
 def setup_file_logger(name: str, log_dir: str) -> logging.Logger:
-    """Logger à sortie fichier seule, pour un journal de détail que la console n'affiche pas. Même fichier et même opt-in `LOG_TO_FILE` que `setup_logger` ; sans `LOG_TO_FILE`, le logger n'écrit rien."""
+    """Configure un logger à sortie fichier seule, pour un journal de détail absent de la console.
+
+    Même fichier et même opt-in `LOG_TO_FILE` que `setup_logger`. Sans `LOG_TO_FILE`, le logger n'écrit rien.
+    """
     logger = logging.getLogger(name)
     logger.setLevel(logging.INFO)
     logger.propagate = False
@@ -282,7 +285,7 @@ def _attach_file_handler(
 ) -> None:
     """Ajoute au logger un fichier sous `PROJECT_ROOT/logs/`, ou s'en passe si le disque le refuse.
 
-    Un système de fichiers en lecture seule — le conteneur de production est cloisonné ainsi — ou un répertoire fermé en écriture rend le fichier impossible. La journalisation retombe alors sur la seule sortie standard, que le runtime collecte, avec un avertissement : l'application démarre quand même.
+    Un système de fichiers en lecture seule, comme celui du conteneur de production, ou un répertoire fermé en écriture rend le fichier impossible. La journalisation se limite alors à la sortie standard, collectée par le runtime, avec un avertissement. L'application démarre quand même.
     """
     target_dir = _rebase_log_dir(log_dir)
     try:
@@ -302,9 +305,9 @@ def _attach_file_handler(
 
 
 def configure_root_logging(level: int = logging.INFO) -> None:
-    """Configure le root logger, que rejoignent les records des modules appelant `logging.getLogger(__name__)`.
+    """Configure le root logger, destinataire des records des modules appelant `logging.getLogger(__name__)`.
 
-    Sans ce handler, `logging` se rabat sur son handler de dernier recours : la ligne part sur la sortie d'erreur, sans format, hors de portée de l'écrivain de console. Elle s'inscrit alors au milieu de ce que le terminal affiche déjà.
+    Sans ce handler, `logging` se rabat sur son handler de dernier recours. La ligne part alors sur la sortie d'erreur, sans format, hors de portée de l'écrivain de console, et s'insère au milieu de l'affichage du terminal.
     """
     root = logging.getLogger()
     root.setLevel(level)

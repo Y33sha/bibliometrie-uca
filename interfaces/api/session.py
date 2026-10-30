@@ -39,7 +39,7 @@ def check_auth_config() -> None:
 
 
 def session_cookie_secure() -> bool:
-    """Attribut `Secure` du cookie de session (transmis uniquement sur HTTPS), lu depuis la configuration."""
+    """Renvoie l'attribut `Secure` du cookie de session (transmis uniquement sur HTTPS), lu depuis la configuration."""
     return settings.cookie_secure
 
 
@@ -52,13 +52,13 @@ def _sign(payload: str) -> str:
 
 
 def issue_token(admin_user: str) -> str:
-    """Jeton de session signé pour `admin_user`, horodaté de l'instant d'émission."""
+    """Renvoie un jeton de session signé pour `admin_user`, horodaté de l'instant d'émission."""
     payload = f"{admin_user}{_PAYLOAD_SEPARATOR}{int(time.time())}"
     return f"{payload}.{_sign(payload)}"
 
 
 def read_session(token: str) -> str | None:
-    """Utilisateur du jeton, ou `None` si la signature est fausse, la forme illisible ou `SESSION_MAX_AGE` dépassé."""
+    """Renvoie l'utilisateur du jeton, ou `None` si la signature est fausse, la forme illisible ou `SESSION_MAX_AGE` dépassé."""
     if not token or "." not in token:
         return None
     payload, signature = token.rsplit(".", 1)

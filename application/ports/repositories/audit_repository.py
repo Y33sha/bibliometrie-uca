@@ -19,5 +19,10 @@ class AuditRepository(Protocol):
         payload: dict[str, JsonValue],
         user_id: str,
     ) -> None:
-        """Insère un événement d'audit. `entity_id` : NULL si l'entité affectée n'a pas d'équivalent survivant (suppression). `payload` : données utiles sérialisées en `jsonb`."""
+        """Insère un événement d'audit.
+
+        Args:
+            entity_id: `None` si l'entité touchée disparaît sans équivalent (suppression).
+            payload: données sérialisées en `jsonb`.
+        """
         ...

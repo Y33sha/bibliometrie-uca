@@ -4,7 +4,7 @@ from domain.persons.identifiers import AttributionStatus
 
 
 def contributor_display_name(source_contribution: str = "sc") -> str:
-    """Nom de la contribution source aliasée `source_contribution` tel que la source le donne : chaîne brute, ou « Prénom Nom » (`ContributorName.display`)."""
+    """Renvoie le nom de la contribution source aliasée `source_contribution`, tel que donné par la source : chaîne brute, ou « Prénom Nom » (`ContributorName.display`)."""
     return (
         f"coalesce({source_contribution}.raw_author_name,"
         f" concat_ws(' ', {source_contribution}.raw_first_name, {source_contribution}.raw_last_name))"
@@ -12,7 +12,10 @@ def contributor_display_name(source_contribution: str = "sc") -> str:
 
 
 def source_contribution_structure_ids(source_contribution: str = "sc") -> str:
-    """Sous-requête (`structure_id`) des structures atteintes par la contribution source aliasée `source_contribution`, chacune une fois. La vue matérialisée `source_contribution_structures` contient une ligne par indice (adresse, ROR, structure HAL) : une structure atteinte par deux indices y figure deux fois."""
+    """Renvoie la sous-requête (`structure_id`) des structures atteintes par la contribution source aliasée `source_contribution`, chacune une fois.
+
+    La vue matérialisée `source_contribution_structures` contient une ligne par indice (adresse, ROR, structure HAL) : une structure atteinte par deux indices y figure deux fois.
+    """
     return (
         "SELECT DISTINCT scs.structure_id FROM source_contribution_structures scs"
         f" WHERE scs.source_contribution_id = {source_contribution}.id"
@@ -20,7 +23,7 @@ def source_contribution_structure_ids(source_contribution: str = "sc") -> str:
 
 
 def contribution_has_source(source: str, group: str = "a") -> str:
-    """Condition vraie quand le groupe aliasé `group` a un membre dont l'enregistrement source est de `source`."""
+    """Renvoie la condition : la contribution aliasée `group` a une contribution source alignée dont l'enregistrement source est de `source`."""
     return (
         "EXISTS (SELECT 1 FROM aligned_source_contributions m_src"
         " JOIN source_records sr_src ON sr_src.id = m_src.source_record_id"
@@ -29,12 +32,12 @@ def contribution_has_source(source: str, group: str = "a") -> str:
 
 
 def name_form_holder(form: str, person: str) -> str:
-    """Condition vraie quand la personne aliasée `person` détient la forme de nom aliasée `form` : forme non rejetée, personne non exclue."""
+    """Renvoie la condition : la personne aliasée `person` détient la forme de nom aliasée `form` (forme non rejetée, personne non exclue)."""
     return f"{form}.status <> '{AttributionStatus.REJECTED.value}' AND {person}.exclusion IS NULL"
 
 
 def other_name_form_holders(name_form: str, person_id: str) -> str:
-    """Sous-requête (`person_id`) des autres personnes qui détiennent la forme de nom au sens de `name_form_holder`, `person_id` exclu.
+    """Renvoie la sous-requête (`person_id`) des autres personnes détenant la forme de nom au sens de `name_form_holder`, `person_id` exclu.
 
     `name_form` et `person_id` sont des expressions SQL : paramètres (`:nf`) ou colonnes de la requête hôte.
     """

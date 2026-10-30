@@ -13,9 +13,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 def instance_env_file(project_root: Path, environ: Mapping[str, str]) -> Path | None:
-    """Fichier de l'instance que désigne `BIBLIO_INSTANCE`, ou `None` si la variable est vide.
+    """Renvoie le fichier de l'instance désignée par `BIBLIO_INSTANCE`, ou `None` si la variable est vide.
 
-    Lève `FileNotFoundError` si le fichier manque : le processus viserait sinon la base de l'instance par défaut.
+    Raises:
+        FileNotFoundError: le fichier manque ; le processus viserait sinon la base de l'instance par défaut.
     """
     name = environ.get("BIBLIO_INSTANCE", "").strip()
     if not name:
@@ -27,14 +28,14 @@ def instance_env_file(project_root: Path, environ: Mapping[str, str]) -> Path | 
 
 
 def _file_values(path: Path) -> dict[str, str]:
-    """Variables définies dans le fichier `path`, vide s'il est absent."""
+    """Renvoie les variables définies dans le fichier `path`, vide s'il est absent."""
     return {key: value for key, value in dotenv_values(path).items() if value is not None}
 
 
 def load_env_files(project_root: Path, environ: MutableMapping[str, str]) -> Path | None:
     """Charge le fichier de l'instance et le `.env` racine dans `environ`, et renvoie le fichier de l'instance.
 
-    Le fichier de l'instance prime sur l'environnement du processus, où un terminal VSCode injecte le `.env` racine. Le `.env` racine complète seulement les variables absentes : celles que l'orchestrateur injecte en production restent prioritaires. Les variables non déclarées dans `Settings` (LOG_TO_FILE, LOG_FORMAT, ROOT_PATH…) se lisent par `os.environ.get(...)`.
+    Le fichier de l'instance prime sur l'environnement du processus. Un terminal VSCode injecte le `.env` racine dans cet environnement. Le `.env` racine complète seulement les variables absentes : les variables injectées par l'orchestrateur en production restent prioritaires. Les variables non déclarées dans `Settings` (LOG_TO_FILE, LOG_FORMAT, ROOT_PATH…) se lisent par `os.environ.get(...)`.
     """
     instance = instance_env_file(project_root, environ)
     if instance is not None:

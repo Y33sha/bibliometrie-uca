@@ -19,7 +19,7 @@ def collaborations(
     filters: StatsFilters,
     queries: StatsQueries = Depends(stats_queries),
 ) -> CollaborationsResponse:
-    """Collaborations internationales : le nombre de publications co-affiliées à chaque pays étranger, sous les filtres actifs.
+    """Compte les publications co-affiliées à chaque pays étranger (collaborations internationales), sous les filtres actifs.
 
     Le décompte se lit dans la colonne `countries` des publications, le pays de l'établissement écarté.
     """
@@ -30,7 +30,7 @@ def collaborations(
 def pivot_schema(
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotSchemaResponse:
-    """Vocabulaire du pivot (dimensions, indicateurs) dont l'interface tire ses sélecteurs."""
+    """Renvoie le vocabulaire du pivot (dimensions, indicateurs), source des sélecteurs de l'interface."""
     return queries.pivot_schema()
 
 
@@ -41,7 +41,7 @@ def pivot(
     compare: str = Query(""),
     queries: StatsQueries = Depends(stats_queries),
 ) -> PivotResponse:
-    """Agrégation d'un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.
+    """Agrège un indicateur, ventilé par sa dimension puis par l'axe `compare` s'il est renseigné, sous les filtres actifs.
 
     Un indicateur inconnu ou un axe non comparable donnent un 422.
     """

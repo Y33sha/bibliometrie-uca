@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-25)
 """Applique au stock la liste des plateformes connues (`domain.platforms.registry`).
 
-Les plateformes prennent le nom et le type que leur donne la liste, à défaut le type entrepôt. Les enregistrements sources des publications dont le DOI a un préfixe de plateforme d'éditeurs passent dans la file de réconciliation : la phase `publications` recalcule ensuite leur éditeur. Idempotent.
+Les plateformes prennent le nom et le type donnés par la liste, à défaut le type entrepôt. Les enregistrements sources des publications à préfixe DOI de plateforme d'éditeurs passent dans la file de réconciliation : la phase `publications` recalcule ensuite leur éditeur. Idempotent.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.apply_known_platforms [--dry-run]

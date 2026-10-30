@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import Query
 from pydantic import AfterValidator
 
-# Nombre de sujets que renvoient les nuages de mots (éditeur, revue, laboratoire, personne).
+# Nombre de sujets renvoyés par les nuages de mots (éditeur, revue, laboratoire, personne).
 TOP_SUBJECTS_LIMIT = 30
 
 TopSubjectsLimit = Annotated[int, Query(ge=1, le=200)]
@@ -41,14 +41,14 @@ Sert les paramètres qui reçoivent du texte sans vocabulaire fermé ni format i
 SearchTerm = Annotated[TextParam, Query(max_length=MAX_SEARCH_LENGTH)]
 """Terme de recherche textuelle, borné en longueur. Sa valeur par défaut appartient à la route, la chaîne vide valant absence de recherche."""
 
-# Taille de page retenue par les listes qui n'en reçoivent pas.
+# Taille de page par défaut des listes.
 _DEFAULT_PER_PAGE = 50
 
 
 def requested_offset(query_params: Mapping[str, str]) -> int | None:
-    """Décalage qu'une requête demande, `(page - 1) * per_page`, ou `None` sans pagination lisible.
+    """Renvoie le décalage demandé par une requête, `(page - 1) * per_page`.
 
-    Renvoie `None` quand la requête est sans rang de page, et quand les valeurs sont illisibles ou hors bornes : leur refus appartient à la validation de la route, qui le formule dans les termes du contrat d'API.
+    Renvoie `None` quand la requête est sans rang de page, et quand les valeurs sont illisibles ou hors bornes : leur refus appartient à la validation de la route, formulé dans les termes du contrat d'API.
     """
     if "page" not in query_params:
         return None

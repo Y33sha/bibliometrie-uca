@@ -10,7 +10,7 @@ from infrastructure.db.tables import serial_issns
 
 
 def journal_issn(row: Row[tuple[object, ...]]) -> SerialIssn:
-    """ISSN d'une ligne de `serial_issns`."""
+    """Renvoie l'ISSN d'une ligne de `serial_issns`."""
     return SerialIssn(
         issn=str(row.issn),
         support=IssnSupport(row.support) if row.support else None,
@@ -22,7 +22,7 @@ def journal_issn(row: Row[tuple[object, ...]]) -> SerialIssn:
 def issn_values(
     row: SerialIssn, *, serial_id: int | None, checked_at: datetime | None = None
 ) -> dict[str, object]:
-    """Valeurs d'insertion d'un ISSN. Un ISSN sans revue reste sans marque ISSN-L."""
+    """Renvoie les valeurs d'insertion d'un ISSN. Un ISSN sans revue reste sans marque ISSN-L."""
     return {
         "issn": row.issn,
         "serial_id": serial_id,
@@ -36,7 +36,7 @@ def issn_values(
 def issns_by_serial(
     conn: Connection, serial_ids: Sequence[int] | None = None
 ) -> dict[int, tuple[SerialIssn, ...]]:
-    """ISSN de chaque revue, dans l'ordre d'enregistrement. Sans `serial_ids`, ceux de toutes les revues."""
+    """Renvoie les ISSN de chaque revue, dans l'ordre d'enregistrement. Sans `serial_ids`, ceux de toutes les revues."""
     stmt = select(serial_issns).where(serial_issns.c.serial_id.is_not(None))
     if serial_ids is not None:
         stmt = stmt.where(serial_issns.c.serial_id.in_(serial_ids))

@@ -23,7 +23,7 @@ log = setup_logger("detach_ebook_platforms", os.path.dirname(__file__))
 
 
 def ebook_platform_serials(conn: Connection) -> list[int]:
-    """Revues sans ISSN au titre de plateforme d'ebooks."""
+    """Renvoie les revues sans ISSN au titre de plateforme d'ebooks."""
     rows = conn.execute(
         text("""
             SELECT s.id, s.title FROM serials s
@@ -35,7 +35,7 @@ def ebook_platform_serials(conn: Connection) -> list[int]:
 
 
 def ebook_platform_container_records(conn: Connection) -> list[int]:
-    """Enregistrements sources dont le titre de conteneur est un titre de plateforme d'ebooks."""
+    """Renvoie les enregistrements sources dont le titre de conteneur est un titre de plateforme d'ebooks."""
     rows = conn.execute(
         text("SELECT id, container_title FROM source_records WHERE container_title LIKE '%eBooks'")
     ).all()
@@ -48,7 +48,7 @@ _DETACH_SERIALS = text(
 
 
 def detach(conn: Connection, serial_ids: list[int], record_ids: list[int]) -> tuple[int, int, int]:
-    """Retire les revues `serial_ids` de leurs enregistrements sources, et le titre de conteneur des enregistrements `record_ids`, puis les met en file. Renvoie le nombre d'enregistrements sources détachés de leur revue, privés de leur titre de conteneur, et mis en file."""
+    """Retire les revues `serial_ids` de leurs enregistrements sources, et le titre de conteneur des enregistrements sources `record_ids`, puis les met en file. Renvoie le nombre d'enregistrements sources détachés de leur revue, privés de leur titre de conteneur, et mis en file."""
     detached = conn.execute(_DETACH_SERIALS, {"serial_ids": serial_ids}).scalars().all()
     cleared = conn.execute(
         text("UPDATE source_records SET container_title = NULL WHERE id = ANY(:ids)"),

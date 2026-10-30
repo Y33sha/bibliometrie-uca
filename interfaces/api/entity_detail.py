@@ -25,7 +25,7 @@ class EntityDetail:
     redirects: MergeRedirectQueries
 
     def found[T](self, detail: T | None) -> T:
-        """Retourne `detail`. Sans détail, lève une redirection 308 vers l'identifiant conservé, ou un 404 sans redirection.
+        """Renvoie `detail`. Sans détail, lève une redirection 308 vers l'identifiant conservé, ou un 404 sans redirection.
 
         La redirection garde la route et la query string de la requête, et seul l'identifiant change. Son `Location` est relatif : il passe par le même hôte que la requête.
         """

@@ -24,17 +24,21 @@ MonographEntityKind = Literal["publisher", "serial"]
 
 @dataclass(frozen=True, slots=True)
 class MonographFilters:
-    """Filtres de la liste des monographies. `search` porte sur le titre, ou sur l'ISBN quand le terme en a la forme. `kinds` et `years` retiennent les types et les années listés ; vides, ils retiennent tout. `publisher_id` et `serial_id` restreignent à un éditeur et à une collection."""
+    """Filtres de la liste des monographies."""
 
     search: str = ""
+    """Terme cherché dans le titre, ou dans l'ISBN quand le terme a la forme d'un ISBN."""
     kinds: tuple[str, ...] = ()
+    """Types retenus ; vide, tous les types."""
     years: tuple[int, ...] = ()
+    """Années retenues ; vide, toutes les années."""
     publisher_id: int | None = None
     serial_id: int | None = None
+    """Collection de la monographie."""
 
 
 class MonographListItem(BaseModel):
-    """Ligne de la liste des monographies. `publication_count` compte les publications qu'elle contient."""
+    """Ligne de la liste des monographies."""
 
     id: int
     title: str
@@ -47,6 +51,7 @@ class MonographListItem(BaseModel):
     serial_id: int | None
     journal_title: str | None
     publication_count: int
+    """Nombre de publications de la monographie."""
 
 
 class MonographListResponse(PaginatedResponse):
@@ -54,7 +59,7 @@ class MonographListResponse(PaginatedResponse):
 
 
 class MonographsFacetsResponse(BaseModel):
-    """Facettes de la liste des monographies. Chaque décompte écarte le filtre de sa dimension : il annonce le nombre de monographies atteignables si l'option était cochée."""
+    """Facettes de la liste des monographies. Chaque décompte écarte le filtre de sa dimension : il donne le nombre de monographies retenues si l'option est cochée."""
 
     kinds: list[FacetOption]
     years: list[FacetOption]

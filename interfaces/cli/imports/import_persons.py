@@ -94,7 +94,7 @@ def import_rh_person(
 
 
 def parse_date(val: object) -> str | None:
-    """Date lue dans l'un des formats reconnus."""
+    """Lit une date dans l'un des formats reconnus, et la renvoie au format ISO."""
     if not val or str(val).strip() == "":
         return None
     val = str(val).strip()
@@ -157,7 +157,7 @@ COLUMN_ALIASES = {
 
 
 def resolve_columns(headers: list[str]) -> dict[str, int]:
-    """Indice de chaque colonne attendue dans le fichier."""
+    """Renvoie l'indice de chaque colonne attendue dans le fichier."""
     normalized = [h.lower().strip().replace(" ", "_") for h in headers]
     mapping = {}
     for field, aliases in COLUMN_ALIASES.items():
@@ -174,7 +174,7 @@ def resolve_columns(headers: list[str]) -> dict[str, int]:
 
 
 def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
-    """Lignes d'un fichier CSV ou TSV, en dictionnaires."""
+    """Lit les lignes d'un fichier CSV ou TSV, en dictionnaires."""
     with open(filepath, encoding="utf-8-sig") as f:
         sample = f.read(4096)
         f.seek(0)
@@ -190,7 +190,7 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
         col_map = resolve_columns(headers)
 
         if "last_name" not in col_map or "first_name" not in col_map:
-            # Le séparateur détecté peut être faux : un second essai en tabulations est retenu s'il reconnaît davantage de colonnes. Sans cette comparaison, un fichier bien lu mais privé d'une colonne attendue serait relu en une colonne unique, et le manque signalé désignerait la mauvaise.
+            # Le séparateur détecté peut être faux : un second essai en tabulations est retenu s'il reconnaît davantage de colonnes.
             f.seek(0)
             reader_tab = csv.reader(f, delimiter="\t")
             headers_tab = next(reader_tab)
@@ -216,9 +216,7 @@ def read_csv_tsv(filepath: str) -> list[dict[str, str]]:
                 continue  # ligne vide
             record = {}
             for field, idx in col_map.items():
-                # Mise à plat comme sur les champs moissonnés : un export RH transite par un
-                # tableur, d'où des espaces insécables et, sur les cellules recopiées depuis une
-                # page web, du balisage et des entités HTML.
+                # Mise à plat comme sur les champs moissonnés : un export RH transite par un tableur, d'où des espaces insécables et, sur les cellules recopiées depuis une page web, du balisage et des entités HTML.
                 cell = sanitize_optional_text(row[idx]) if idx < len(row) else None
                 record[field] = cell or ""
             rows.append(record)

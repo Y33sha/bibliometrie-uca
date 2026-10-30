@@ -28,7 +28,7 @@ def _build_publisher_where(
     skip_countries: bool = False,
     skip_publications: bool = False,
 ) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de `list_publishers` et `publishers_facets`. Les drapeaux `skip_*` écartent le filtre de la dimension d'une facette, comme pour les revues et les publications."""
+    """Renvoie la clause WHERE de `list_publishers` et `publishers_facets`. Les drapeaux `skip_*` écartent le filtre de la dimension d'une facette, comme pour les revues et les publications."""
     binds: dict[str, object] = {}
     parts: list[str] = []
     if filters.search and len(filters.search) >= 2:
@@ -61,7 +61,7 @@ _SORT_MAP = {
 
 
 def _doi_prefixes_sql() -> str:
-    """Sous-requête `jsonb_agg` des préfixes DOI d'un éditeur, pour la liste et le profil."""
+    """Renvoie la sous-requête `jsonb_agg` des préfixes DOI d'un éditeur, pour la liste et le profil."""
     return """
         COALESCE(
             (SELECT jsonb_agg(jsonb_build_object(
@@ -87,7 +87,7 @@ _PUBLISHER_COLUMNS = f"""
 
 
 def _list_sql(where: str, sort: PublisherSort) -> str:
-    """Requête triée de la liste des éditeurs, sans pagination."""
+    """Renvoie la requête triée de la liste des éditeurs, sans pagination."""
     return f"SELECT {_PUBLISHER_COLUMNS} FROM publishers p WHERE {where} ORDER BY {_SORT_MAP[sort]}"
 
 
@@ -140,7 +140,7 @@ class PublisherQueries:
     def export_publishers_csv(
         self, *, filters: PublisherFilters, sort: PublisherSort
     ) -> Iterator[str]:
-        """Export CSV de la liste des éditeurs, aux filtres et au tri de la liste.
+        """Renvoie l'export CSV de la liste des éditeurs, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
@@ -199,7 +199,7 @@ class PublisherQueries:
             """),
             binds_c,
         ).all()
-        # `value` est le code observé sur l'éditeur ; `label` est le nom du référentiel des pays, ou le code en majuscules s'il en est absent.
+        # `value` est le code observé sur l'éditeur ; `label` est le nom du référentiel des pays, ou le code en majuscules à défaut.
         countries_facet = [
             FacetOption(value=r.value, label=r.label, count=r.n) for r in country_rows
         ]
@@ -235,9 +235,9 @@ class PublisherQueries:
         return _row_to_publisher(row)
 
     def get_publisher_subjects(self, publisher_id: int, *, limit: int) -> list[SubjectFrequency]:
-        """Sujets des publications de l'éditeur, les plus fréquents d'abord.
+        """Renvoie les sujets des publications de l'éditeur, les plus fréquents d'abord.
 
-        Le `COUNT(DISTINCT p.id)` tient au grain de `publication_subjects`, qui a une ligne par source pour une même paire (publication, sujet).
+        `COUNT(DISTINCT p.id)` est nécessaire : `publication_subjects` a une ligne par source pour une même paire (publication, sujet).
         """
         rows = self._conn.execute(
             text(entity_subjects_sql("p.publisher_id = :id")),

@@ -66,7 +66,7 @@ def _language(text: str) -> str:
 
 
 def _canonical(label: str) -> str:
-    """Forme comparable d'un libellé OpenAlex : `Biochemistry, Genetics and Molecular Biology` et `biochemistry genetics and molecular biology` se rejoignent."""
+    """Renvoie la forme comparable d'un libellé OpenAlex : `Biochemistry, Genetics and Molecular Biology` et `biochemistry genetics and molecular biology` se rejoignent."""
     return " ".join(re.sub(r"[^a-z ]", " ", label.lower()).split())
 
 
@@ -112,7 +112,11 @@ def call_services(sample: list[dict]) -> dict[str, dict]:
 
 
 def _rule_scores(decisions: list[tuple[bool, str]]) -> str:
-    """`decisions` : (rejeté par la règle, verdict de référence). Les libellés limites sont décomptés à part."""
+    """Calcule la précision et le rappel de la règle de rejet. Les libellés limites sont décomptés à part.
+
+    Args:
+        decisions: (rejeté par la règle, verdict de référence).
+    """
     counts = Counter((rejected, verdict) for rejected, verdict in decisions)
     true_positive = counts[(True, "aberrant")]
     false_positive = counts[(True, "pertinent")]

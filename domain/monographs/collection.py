@@ -14,7 +14,7 @@ class MonographSerialChoice(NamedTuple):
 def choose_monograph_serial(
     with_issn: Sequence[int], without_issn: Sequence[int], series_id: int | None = None
 ) -> MonographSerialChoice:
-    """Entrée retenue : l'entrée à ISSN, qui est la collection, sinon la série sans ISSN reconnue entre plusieurs volumes (`series_id`), sinon l'entrée sans ISSN, qui décrit le volume. Plusieurs entrées au même rang forment un conflit."""
+    """Choisit l'entrée de `serials` d'une monographie : l'entrée à ISSN, qui est la collection, sinon la série sans ISSN reconnue entre plusieurs volumes (`series_id`), sinon l'entrée sans ISSN, qui décrit le volume. Plusieurs entrées au même rang forment un conflit."""
     if len(with_issn) > 1:
         return MonographSerialChoice(None, tuple(with_issn))
     if with_issn:

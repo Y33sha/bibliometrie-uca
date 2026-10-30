@@ -94,7 +94,7 @@ _HAL = PersonIdentifierType.HAL_PERSON_ID.value
 
 # Comptes HAL d'un identifiant : `hal_person_id` des contributions sources HAL des contributions de sa personne qui le contiennent.
 # Lot : identifiants des contributions sources HAL des contributions de la personne sous ces comptes.
-# Un identifiant neutralisé par sa contribution source reste hors de l'un et de l'autre.
+# Un identifiant neutralisé par sa contribution source est exclu des comptes comme du lot.
 _HAL_ACCOUNT_PEERS_SQL = text(f"""
     WITH src AS (
         SELECT id AS src_id, person_id, id_type, id_value

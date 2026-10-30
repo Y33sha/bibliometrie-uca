@@ -337,7 +337,7 @@ def main() -> int:
 
 
 def _merge_biomedical(votes: Counter[str]) -> Counter[str]:
-    """Health et Life se recouvrent : un soutien à l'un vaut soutien à l'autre."""
+    """Confond Health et Life : un soutien à l'un vaut soutien à l'autre."""
     merged = Counter(votes)
     biomedical = votes[H] + votes[L]
     if biomedical:

@@ -1,6 +1,6 @@
 """`RawStore` qui ne conserve rien.
 
-L'archivage des réponses brutes sert à rejouer les traitements sans interroger de nouveau les sources. Un déploiement qui s'en passe évite d'ouvrir un emplacement en écriture : ce store accepte les écritures et les oublie, et se lit comme un store vide.
+L'archivage des réponses brutes sert à rejouer les traitements sans interroger de nouveau les sources. Sans archivage, un déploiement évite d'ouvrir un emplacement en écriture. Ce store accepte les écritures sans les conserver, et se lit comme un store vide.
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from collections.abc import Iterator
 
 
 class NullRawStore:
-    """`RawStore` sans stockage : ce qui y entre n'en ressort pas."""
+    """`RawStore` sans stockage."""
 
     def put(self, source: str, source_id: str, payload: bytes) -> None:
         return None

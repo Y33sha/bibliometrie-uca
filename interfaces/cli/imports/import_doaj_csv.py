@@ -3,7 +3,7 @@
 
 Le pipeline télécharge et importe le dump automatiquement, au terme du délai `doaj_refresh_after_days` (`run_enrich_serials_from_doaj`). Cette commande force l'import d'un fichier déjà téléchargé (https://doaj.org/csv), hors de la cadence du pipeline.
 
-La logique vit dans `pipeline/transformation/publishing/serials/enrich_serials_from_doaj.py`.
+La logique est dans `pipeline/transformation/publishing/serials/enrich_serials_from_doaj.py`.
 
 Usage :
     uv run python -m interfaces.cli.imports.import_doaj_csv data/doaj/doaj_dump.csv

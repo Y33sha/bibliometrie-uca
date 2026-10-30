@@ -18,10 +18,7 @@ from infrastructure.read_models.subjects.models import (
 
 
 def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[str, object]]:
-    """Clause de recherche de l'annuaire des sujets, avec ses paramètres.
-
-    La liste et son total la partagent : un critère ajouté d'un seul côté fausserait la pagination.
-    """
+    """Renvoie la clause de recherche de l'annuaire des sujets, avec ses paramètres. La liste et son total la partagent."""
     where = "usage_count >= :min_count"
     binds: dict[str, object] = {"min_count": min_usage_count}
     if search:
@@ -31,7 +28,7 @@ def _search_clause(search: str | None, min_usage_count: int) -> tuple[str, dict[
 
 
 def _list_sql(where: str) -> str:
-    """Requête triée de la liste des sujets, sans pagination : les plus fréquents d'abord."""
+    """Renvoie la requête de la liste des sujets, sans pagination, les plus fréquents d'abord."""
     return f"""
         SELECT id, label, language, usage_count
         FROM subjects
@@ -72,7 +69,7 @@ class SubjectsQueries:
         return SubjectListResponse(items=items, total=total, page=page, per_page=per_page)
 
     def export_subjects_csv(self, *, search: str | None, min_usage_count: int) -> Iterator[str]:
-        """Export CSV de la liste des sujets, aux filtres et au tri de la liste.
+        """Renvoie l'export CSV de la liste des sujets, aux filtres et au tri de la liste.
 
         La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """

@@ -33,11 +33,15 @@ class PublicationsQueries(
 ):
     """Lectures sur les publications.
 
-    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre `persons`. La lecture résout ce périmètre elle-même : ses appelants se passent de le connaître.
+    Le filtre `has_apc` classe un paiement d'APC en « interne » quand sa structure de budget appartient au périmètre des personnes. Ce périmètre est résolu par la lecture, sans intervention des appelants.
     """
 
     def __init__(self, conn: Connection, *, open_connection: Callable[[], Connection]) -> None:
-        """`open_connection` ouvre les connexions supplémentaires dont le calcul parallèle des facettes se sert. La composition root la fournit, avec les caractéristiques de la requête en cours : l'adaptateur reçoit ses connexions, sans en ouvrir lui-même."""
+        """Reçoit la connexion de la requête et l'ouverture des connexions supplémentaires.
+
+        Args:
+            open_connection: ouvre les connexions du calcul parallèle des facettes. La composition root la fournit, avec les caractéristiques de la requête en cours.
+        """
         self._conn = conn
         self._open_connection = open_connection
 

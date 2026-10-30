@@ -60,13 +60,13 @@ OA_MODEL_LABELS_FR: dict[OaModel, str] = {
 
 
 class ManualField(StrEnum):
-    """Champ d'une revue que l'administration peut saisir et que le pipeline écrit aussi. Le pipeline laisse inchangé un champ saisi à la main."""
+    """Champ d'une revue saisissable par l'administration et écrit aussi par le pipeline. Le pipeline laisse inchangé un champ saisi à la main."""
 
     TITLE = "title"
     SERIAL_TYPE = "serial_type"
     OA_MODEL = "oa_model"
-    # La liste des ISSN, avec leur support, leur statut et l'ISSN de liaison.
     ISSNS = "issns"
+    """Liste des ISSN, avec leur support, leur statut et l'ISSN de liaison."""
 
 
 class SerialEdit(TypedDict, total=False):
@@ -114,7 +114,7 @@ class Serial:
         return changed
 
     def _manual_values(self) -> dict[ManualField, object]:
-        """Valeur de chaque champ que l'administration peut saisir."""
+        """Renvoie la valeur de chaque champ saisissable par l'administration."""
         return {
             ManualField.TITLE: self.title,
             ManualField.ISSNS: list(self.issns),

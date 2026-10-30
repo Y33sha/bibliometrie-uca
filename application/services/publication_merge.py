@@ -1,6 +1,6 @@
 """Service de la fusion manuelle de deux publications.
 
-La fusion manuelle enregistre un verdict, que la réconciliation relit à chaque passage du pipeline. Le service l'applique aussitôt par les recalculs ciblés du pipeline (`PublicationRecompute`). Les contributions réalignées reçoivent la personne de leurs contributions sources d'avant la fusion (`merge_attributions`).
+La fusion manuelle enregistre un verdict, relu par la réconciliation à chaque exécution du pipeline. Le service applique aussitôt ce verdict par les recalculs ciblés du pipeline (`PublicationRecompute`). Les contributions réalignées reçoivent la personne de leurs contributions sources d'avant la fusion (`merge_attributions`).
 """
 
 from typing import NamedTuple
@@ -19,10 +19,12 @@ from domain.publications.manual_merge import check_mergeable, merge_attributions
 
 
 class MergeOutcome(NamedTuple):
-    """`publication_id` : publication issue de la fusion. `conflicts` : contributions dont les contributions sources désignaient deux personnes, laissées sans personne."""
+    """Résultat d'une fusion manuelle de publications."""
 
     publication_id: int
+    """Publication issue de la fusion."""
     conflicts: int
+    """Nombre de contributions laissées sans personne : leurs contributions sources désignaient deux personnes."""
 
 
 class PublicationMergeService:
@@ -45,9 +47,11 @@ class PublicationMergeService:
         self._conn = conn
 
     def merge(self, publication_id: int, other_id: int) -> MergeOutcome:
-        """Fusionne les deux publications. La réconciliation choisit la publication conservée : celle qui a le DOI, quand l'une des deux en a un.
+        """Fusionne les deux publications. La réconciliation choisit la publication conservée : la publication à DOI, si l'une des deux en a un.
 
-        Lève `ValidationError` sur deux identifiants égaux ou deux DOI distincts, `NotFoundError` sur une publication introuvable.
+        Raises:
+            ValidationError: deux identifiants égaux, deux DOI distincts, ou réconciliation sans publication unique.
+            NotFoundError: publication introuvable.
         """
         dois = self._merges.dois([publication_id, other_id])
         check_merge_pair(
@@ -80,9 +84,9 @@ class PublicationMergeService:
         return MergeOutcome(merged_id, len(result.conflicts))
 
     def preview_merge(self, publication_id: int, other_id: int) -> MergeOutcome:
-        """Résultat qu'aurait la fusion des deux publications.
+        """Renvoie le résultat qu'aurait la fusion des deux publications.
 
-        Applique réellement la fusion (`merge`) dans un `SAVEPOINT` annulé : aucune écriture ne survit, ni aucun événement d'audit. Lève les mêmes erreurs que la fusion.
+        Applique réellement la fusion (`merge`) dans un `SAVEPOINT` annulé, sans conserver d'écriture ni d'événement d'audit. Lève les mêmes erreurs que `merge`.
         """
         savepoint = self._conn.begin_nested()
         try:

@@ -166,9 +166,9 @@ async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSON
 
 @app.exception_handler(DataError)
 async def data_error_handler(request: Request, exc: DataError) -> JSONResponse:
-    """Traduit en 422 une valeur que le driver refuse d'envoyer à la base (octet NUL, par exemple), et laisse le reste en 500.
+    """Traduit en 422 une valeur refusée par le driver (octet NUL, par exemple), et laisse le reste en 500.
 
-    Un refus du driver se reconnaît à l'absence de `sqlstate`, que seul le serveur renseigne. `TextParam` écarte ces valeurs des paramètres de route ; ce handler couvre les corps de requête et les paramètres déclarés sans `TextParam`. Une erreur avec `sqlstate` signale un contrôle manquant en amont : elle reste en 500.
+    Un refus du driver se reconnaît à l'absence de `sqlstate`, renseigné seulement par le serveur. `TextParam` écarte ces valeurs des paramètres de route ; ce handler couvre les corps de requête et les paramètres déclarés sans `TextParam`. Une erreur avec `sqlstate` signale un contrôle manquant en amont : elle reste en 500.
     """
     if getattr(exc.orig, "sqlstate", None) is not None:
         raise exc
@@ -301,7 +301,7 @@ async def read_rate_limit_middleware(
 ) -> Response:
     """Plafonne le nombre de lectures d'une même adresse IP sur les routes `/api/`.
 
-    Les fichiers de l'interface sont exclus du décompte : une page en charge des dizaines sans toucher la base.
+    Les fichiers de l'interface sont exclus du décompte : une page charge des dizaines de fichiers sans toucher la base.
     """
     if request.method != "GET" or not route_path(request.scope).startswith("/api/"):
         return await call_next(request)
@@ -341,7 +341,7 @@ _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",  # Interdit au navigateur de deviner le type MIME.
     "X-Frame-Options": "DENY",  # Contre le clickjacking.
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    # Retire l'accès aux capteurs et périphériques du navigateur, dont aucune page ne se sert.
+    # Retire l'accès aux capteurs et périphériques du navigateur, inutilisés par les pages.
     "Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
     # Une page ouverte depuis l'application (fiche HAL, profil ORCID…) reste sans référence vers l'application (`window.opener`).
     "Cross-Origin-Opener-Policy": "same-origin",

@@ -18,7 +18,7 @@ class Impact:
     top_1_percent: bool | None = None
 
     def to_json(self) -> dict[str, JsonValue] | None:
-        """Objet JSON des indicateurs renseignés, `None` si aucun ne l'est."""
+        """Renvoie l'objet JSON des indicateurs renseignés, `None` si aucun ne l'est."""
         values: dict[str, JsonValue] = {
             f.name: value for f in fields(self) if (value := getattr(self, f.name)) is not None
         }

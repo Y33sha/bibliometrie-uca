@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-30)
 """Champs de date des enregistrements sources, lus dans le raw store, pour mesurer leur précision et leurs écarts.
 
-Deux étapes, rejouables séparément :
+Chaque étape est rejouable séparément :
 
 - `extract` lit chaque enregistrement source de la base et son payload dans le raw store. Il écrit un fichier CSV compressé, une ligne par champ de date renseigné : `source_record_id,publication_id,source,field,raw,value`. `value` est la date normalisée, `AAAA`, `AAAA-MM` ou `AAAA-MM-JJ` selon sa précision ; vide si le champ est illisible. Le champ `publication_year` reprend la colonne de `source_records`.
 - `analyze` lit ce fichier et écrit un rapport Markdown.
@@ -54,7 +54,7 @@ _WOS_YEAR_FIRST = re.compile(r"^(\d{4})\s+([A-Z]{3})\s*(\d{1,2})?$")
 
 
 def _format(year: int | None, month: int | None = None, day: int | None = None) -> str | None:
-    """Date `AAAA[-MM[-JJ]]`, tronquée au premier élément manquant ou invalide."""
+    """Formate une date `AAAA[-MM[-JJ]]`, tronquée au premier élément manquant ou invalide."""
     if year is None or not 1000 <= year <= 2100:
         return None
     if month is None or not 1 <= month <= 12:
@@ -72,7 +72,7 @@ def parse_iso(raw: str | None) -> str | None:
 
 
 def parse_date_parts(value: JsonValue) -> str | None:
-    """Date Crossref : `{"date-parts": [[année, mois, jour]]}`, mois et jour facultatifs."""
+    """Lit une date Crossref : `{"date-parts": [[année, mois, jour]]}`, mois et jour facultatifs."""
     parts = as_sequence(as_mapping(value).get("date-parts"))
     first = as_sequence(parts[0]) if parts else []
     year, month, day = (list(map(as_int, first)) + [None, None, None])[:3]
@@ -80,7 +80,7 @@ def parse_date_parts(value: JsonValue) -> str | None:
 
 
 def parse_wos(raw: str | None, year: int | None = None) -> str | None:
-    """Date WoS en mois abrégé (« OCT 10 2023 », « DEC 2024 », « 2025 », « 2026 AUG 31 ») ; `year` à défaut d'année dans le texte."""
+    """Lit une date WoS en mois abrégé (« OCT 10 2023 », « DEC 2024 », « 2025 », « 2026 AUG 31 ») ; `year` à défaut d'année dans le texte."""
     cleaned = (raw or "").strip().upper()
     if m := _WOS_YEAR_FIRST.match(cleaned):
         text_year, month_name, day = m.groups()
@@ -145,7 +145,7 @@ def theses_fields(thesis: Mapping[str, JsonValue]) -> Iterator[Field]:
 
 
 def wos_fields(raw: Mapping[str, JsonValue]) -> Iterator[Field]:
-    """Champs de date WoS. Ligne d'export tabulé (balise `UT`) : `PY`, `PD`, `EA`. Payload de l'API : `pub_info`."""
+    """Renvoie les champs de date WoS. Ligne d'export tabulé (balise `UT`) : `PY`, `PD`, `EA`. Payload de l'API : `pub_info`."""
     if "UT" in raw:
         year = as_str(raw.get("PY"))
         year_int = int(year) if year and year.isdigit() else None
@@ -188,7 +188,7 @@ type Row = tuple[int, int | None, str, str, str | None, str | None]
 
 
 def _extract_chunk(records: Sequence[Record]) -> tuple[list[Row], int, int]:
-    """Lignes de date d'un lot d'enregistrements sources, avec le nombre de payloads absents et illisibles."""
+    """Renvoie les lignes de date d'un lot d'enregistrements sources, avec le nombre de payloads absents et illisibles."""
     store = get_raw_store()
     rows: list[Row] = []
     missing = unreadable = 0
@@ -282,7 +282,7 @@ class SourceRecordDates(NamedTuple):
 
 
 def _load(path: Path) -> tuple[dict[int, SourceRecordDates], dict[int, list[int]], Counter[tuple]]:
-    """Dates par enregistrement source, enregistrements sources par publication, et valeurs illisibles par (source, champ, valeur brute)."""
+    """Charge les dates par enregistrement source, les enregistrements sources par publication, et les valeurs illisibles par (source, champ, valeur brute)."""
     records: dict[int, SourceRecordDates] = {}
     by_publication: dict[int, list[int]] = defaultdict(list)
     unparsed: Counter[tuple] = Counter()
@@ -309,7 +309,7 @@ def _wos_cover(fields: Mapping[str, str]) -> str | None:
 
 
 def _wos_reference(fields: Mapping[str, str]) -> str | None:
-    """`sortdate` de l'API, à défaut la plus ancienne des dates d'accès anticipé et de parution, à défaut l'année."""
+    """Renvoie la date de référence WoS : `sortdate` de l'API, à défaut la plus ancienne des dates d'accès anticipé et de parution, à défaut l'année."""
     if sortdate := fields.get("api.sortdate"):
         return sortdate
     if dates := [d for d in (_wos_early_access(fields), _wos_cover(fields)) if d]:
@@ -318,7 +318,7 @@ def _wos_reference(fields: Mapping[str, str]) -> str | None:
 
 
 def _reference(record: SourceRecordDates) -> str | None:
-    """Date de référence de l'enregistrement source : le premier champ renseigné parmi ceux de `_REFERENCE`."""
+    """Renvoie la date de référence de l'enregistrement source : le premier champ renseigné parmi ceux de `_REFERENCE`."""
     if record.source == "wos":
         return _wos_reference(record.fields)
     return next(
@@ -383,7 +383,7 @@ def _unparsed_section(unparsed: Counter[tuple]) -> list[str]:
 
 
 def _compare(a: str, b: str) -> str:
-    """Accord de deux dates à leur précision commune."""
+    """Renvoie l'accord de deux dates à leur précision commune."""
     common = min(len(a), len(b))
     if a[:common] == b[:common]:
         return "accord"
@@ -408,7 +408,7 @@ _FIRST_OF_MONTH_GROUPS = ("1er janvier", "1er d'un autre mois", "autre jour")
 def _first_of_month_section(
     records: dict[int, SourceRecordDates], by_publication: dict[int, list[int]]
 ) -> list[str]:
-    """Dates au 1er du mois d'OpenAlex et de ScanR, confrontées aux dates des autres sources de la même publication."""
+    """Rédige la section des dates au 1er du mois d'OpenAlex et de ScanR, confrontées aux dates des autres sources de la même publication."""
     lines = [
         "## 1er du mois d'OpenAlex et de ScanR",
         "",
@@ -490,7 +490,7 @@ _BUCKETS = ("0 j", "≤ 7 j", "≤ 31 j", "≤ 1 an", "> 1 an")
 def _pairs_section(
     records: dict[int, SourceRecordDates], by_publication: dict[int, list[int]]
 ) -> list[str]:
-    """Écarts entre les dates de référence de deux enregistrements sources de sources différentes d'une même publication. Une paire de sources compte une fois par publication."""
+    """Rédige la section des écarts entre les dates de référence de deux enregistrements sources de sources différentes d'une même publication. Une paire de sources compte une fois par publication."""
     agreement: dict[tuple[str, str], Counter[str]] = defaultdict(Counter)
     gaps: dict[tuple[str, str], Counter[str]] = defaultdict(Counter)
     for rids in by_publication.values():
@@ -543,7 +543,7 @@ def _pairs_section(
 
 
 def _crossref_section(records: dict[int, SourceRecordDates]) -> list[str]:
-    """Date en ligne et date papier de Crossref, et date `issued` rapportée à chacune."""
+    """Rédige la section de la date en ligne et de la date papier de Crossref, avec la date `issued` rapportée à chacune."""
     issued_is: Counter[str] = Counter()
     gaps: Counter[str] = Counter()
     later: Counter[str] = Counter()
@@ -595,7 +595,7 @@ def _crossref_section(records: dict[int, SourceRecordDates]) -> list[str]:
 def _online_or_print_section(
     records: dict[int, SourceRecordDates], by_publication: dict[int, list[int]]
 ) -> list[str]:
-    """Pour les publications où Crossref a une date en ligne et une date papier de mois différents, mois de la date de référence de chaque autre source rapporté à ces deux dates."""
+    """Rédige la section des publications à date en ligne et date papier Crossref de mois différents : mois de la date de référence de chaque autre source, rapporté à ces deux dates."""
     stats: dict[str, Counter[str]] = defaultdict(Counter)
     for rids in by_publication.values():
         crossref = [records[rid] for rid in rids if records[rid].source == "crossref"]
@@ -642,7 +642,7 @@ def _online_or_print_section(
 
 
 def _year_column_section(records: dict[int, SourceRecordDates]) -> list[str]:
-    """Année de la date de référence rapportée à `source_records.publication_year`."""
+    """Rédige la section de l'année de la date de référence, rapportée à `source_records.publication_year`."""
     stats: dict[str, Counter[str]] = defaultdict(Counter)
     for r in records.values():
         ref = _reference(r)
@@ -662,7 +662,7 @@ def _year_column_section(records: dict[int, SourceRecordDates]) -> list[str]:
 
 
 def _wos_section(records: dict[int, SourceRecordDates]) -> list[str]:
-    """Champs WoS : `sortdate` rapporté aux dates d'accès anticipé et de parution."""
+    """Rédige la section des champs WoS : `sortdate` rapporté aux dates d'accès anticipé et de parution."""
     c: Counter[str] = Counter()
     for r in records.values():
         if r.source != "wos":

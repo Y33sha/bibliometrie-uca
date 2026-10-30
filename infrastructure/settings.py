@@ -32,16 +32,16 @@ class Settings(BaseSettings):
     session_secret: SecretStr = SecretStr("")
 
     # ----- Sécurité HTTP -----
-    # Cookie de session réservé à HTTPS.
     cookie_secure: bool = True
-    # Docs interactives (`/docs`, `/redoc`, `/openapi.json`).
+    """Réserve le cookie de session à HTTPS."""
     expose_api_docs: bool = False
-    # Origines autorisées à appeler l'API depuis un navigateur, séparées par des virgules. Vide quand l'API sert le frontend.
+    """Expose les docs interactives (`/docs`, `/redoc`, `/openapi.json`)."""
     cors_origins: Annotated[list[str], NoDecode] = []
+    """Origines autorisées à appeler l'API depuis un navigateur, séparées par des virgules. Vide quand l'API sert le frontend."""
 
     # ----- Serveur de développement -----
-    # Port de l'API lancée par `start.sh`. Le proxy de vite en déduit sa cible (cf. `interfaces/frontend/vite.config.ts`).
     api_port: int = 8000
+    """Port de l'API lancée par `start.sh`. Le proxy de vite en déduit sa cible (cf. `interfaces/frontend/vite.config.ts`)."""
 
     # ----- Base de données -----
     db_host: str = "localhost"
@@ -58,20 +58,20 @@ class Settings(BaseSettings):
     # Pipeline et scripts en ligne de commande : écriture sur les données, entretien des vues matérialisées et des statistiques, aucun droit sur le schéma.
     db_pipeline_user: str = ""
     db_pipeline_password: SecretStr = SecretStr("")
-    # Mode SSL de libpq. Vide : `prefer`, chiffrement sans vérification du certificat. `verify-full` authentifie le serveur.
     db_sslmode: str = ""
+    """Mode SSL de libpq. Vide : `prefer`, chiffrement sans vérification du certificat. `verify-full` authentifie le serveur."""
 
-    # Décalage maximal d'une lecture paginée : une page profonde fait trier à la base tout le résultat. La valeur dépasse le plus gros ensemble servi.
     max_pagination_offset: int = 500_000
+    """Décalage maximal d'une lecture paginée : une page profonde fait trier à la base tout le résultat. La valeur dépasse le plus gros ensemble servi."""
 
-    # Exports simultanés. Un export compose sa réponse en mémoire : 59 Mo sans filtre pour 61 877 publications (août 2026), soit environ 300 Mo pour cinq exports, sur les 2 Go du conteneur.
     max_concurrent_exports: int = 5
+    """Nombre maximal d'exports simultanés. Un export compose sa réponse en mémoire : 59 Mo sans filtre pour 61 877 publications (août 2026), soit environ 300 Mo pour cinq exports, sur les 2 Go du conteneur."""
 
     # ----- Concurrence de l'API -----
-    # Taille du threadpool d'anyio, qui exécute les routes synchrones ; fixée au démarrage de l'API. `db_pool_max` doit la couvrir.
     api_threadpool_size: int = 40
-    # Durée maximale d'une requête SQL servant une lecture de l'API (GET), en secondes. L'export complet des publications prend une dizaine de secondes.
+    """Taille du threadpool d'anyio, exécutant les routes synchrones ; fixée au démarrage de l'API. `db_pool_max` doit la couvrir."""
     api_read_statement_timeout_s: int = 30
+    """Durée maximale, en secondes, d'une requête SQL servant une lecture de l'API (GET). L'export complet des publications prend une dizaine de secondes."""
 
     # ----- Pool de connexions -----
     # `db_pool_min` connexions toujours ouvertes ; les suivantes, jusqu'à `db_pool_max`, s'ouvrent à la demande. `db_pool_max` égale `api_threadpool_size` : chaque thread de l'API trouve une connexion.
@@ -84,12 +84,12 @@ class Settings(BaseSettings):
     wos_api_key: SecretStr = SecretStr("")
     scanr_username: str = ""
     scanr_password: SecretStr = SecretStr("")
-    # Adresse annoncée aux API à polite pool : exigée par Crossref, DataCite et Unpaywall ; pour OpenAlex, à défaut de clé d'API.
     polite_pool_email: str = ""
+    """Adresse annoncée aux API à polite pool : exigée par Crossref, DataCite et Unpaywall ; pour OpenAlex, à défaut de clé d'API."""
 
     # ----- Raw store (réponses brutes des sources) -----
-    # Répertoire de l'archive, quand le pipeline tourne avec `--raw-store`. Vide : `data/raw_store` à la racine du dépôt.
     biblio_raw_store_dir: str = ""
+    """Répertoire de l'archive, quand le pipeline tourne avec `--raw-store`. Vide : `data/raw_store` à la racine du dépôt."""
 
     @field_validator("cors_origins", mode="before")
     @classmethod

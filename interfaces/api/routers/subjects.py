@@ -48,7 +48,7 @@ def list_subjects(
     per_page: int = Query(50, ge=1, le=200),
     queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectListResponse:
-    """Liste paginée des sujets, les plus fréquents dans les publications d'abord."""
+    """Liste les sujets par page, les plus fréquents dans les publications d'abord."""
     return queries.list_subjects(
         search=filters.search, page=page, per_page=per_page, min_usage_count=filters.min_count
     )
@@ -61,7 +61,7 @@ def export_subjects_csv(
     _rate_limit: None = Depends(export_rate_limit),
     slot: ExportSlot = Depends(export_slot),
 ) -> StreamingResponse:
-    """Export CSV de la liste des sujets, aux filtres et au tri de la liste."""
+    """Exporte en CSV la liste des sujets, aux filtres et au tri de la liste."""
     return csv_response(
         queries.export_subjects_csv(search=filters.search, min_usage_count=filters.min_count),
         filename="sujets.csv",
@@ -76,7 +76,7 @@ def get_subject(
     min_cooccurrence: int = Query(2, ge=1),
     queries: SubjectsQueries = Depends(subjects_queries),
 ) -> SubjectDetailResponse:
-    """Détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
+    """Renvoie le détail d'un sujet, avec ses voisins par co-occurrence, les plus fréquents d'abord."""
     detail = queries.get_subject_detail(
         subject_id, neighbors_limit=neighbors_limit, min_cooccurrence_count=min_cooccurrence
     )

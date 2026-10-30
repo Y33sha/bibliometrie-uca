@@ -1,13 +1,13 @@
 # STATUS: oneshot (2026-10-16)
 """Pays des contributions sources, hors pipeline : contradictions entre leurs sources, et effet sur les pays des publications.
 
-Le pays d'une contribution source réunit trois sources :
+Le pays d'une contribution source réunit les sources suivantes :
 
 - `adresse` : pays retenu de ses adresses, composé par `retained_countries` à partir du fichier de `measure_address_country_candidates` ; il inclut les ROR de l'affiliation de l'adresse ;
 - `ror` : pays des organisations ROR de la contribution source sans texte d'affiliation ;
 - `hal` : pays des structures HAL de la contribution source (`ref.hal_structures.country_code`).
 
-Le rapport donne, par source d'enregistrement, la couverture de chacune, leurs relations deux à deux, et les pays des publications qu'en tire chaque règle — adresses seules, ou les trois sources — comparés à `publications.countries`. Un échantillon de contributions sources dont l'adresse contredit le ROR ou la structure HAL s'écrit à part, pour une revue à la main. Lecture seule sur la base.
+Le rapport donne, par source d'enregistrement, la couverture de chacune, leurs relations deux à deux, et les pays des publications tirés par chaque règle — adresses seules, ou les trois sources — comparés à `publications.countries`. Un échantillon de contributions sources dont l'adresse contredit le ROR ou la structure HAL s'écrit à part, pour une revue à la main. Lecture seule sur la base.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.measure_signature_countries

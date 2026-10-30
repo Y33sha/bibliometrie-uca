@@ -40,7 +40,7 @@ _LAB_SCOPED_CONTRIBUTIONS = (
 
 
 def _contribution_counts_sql(*, lab_scoped: bool) -> str:
-    """Les deux dénombrements de contributions en tant qu'auteur, sous la même condition de scope."""
+    """Renvoie les deux dénombrements de contributions d'auteur, sous la même restriction au laboratoire."""
     scope = _LAB_SCOPED_CONTRIBUTIONS if lab_scoped else ""
     return f"""
         (SELECT COUNT(*) FROM contributions a
@@ -52,7 +52,7 @@ def _contribution_counts_sql(*, lab_scoped: bool) -> str:
 
 
 def _person_where(filters: PersonFilters) -> tuple[str, dict[str, object]]:
-    """Clause WHERE de la liste des personnes, sur les alias `p` (`persons`) et `prh` (`hr_records`)."""
+    """Renvoie la clause WHERE de la liste des personnes, sur les alias `p` (`persons`) et `prh` (`hr_records`)."""
     clauses: list[WhereClause | None] = [
         person_search_clause(filters.search),
         person_department_clause(filters.departments),
@@ -71,7 +71,7 @@ def _person_where(filters: PersonFilters) -> tuple[str, dict[str, object]]:
 
 
 def _list_sql(filters: PersonFilters, where_sql: str, sort: str) -> str:
-    """Requête triée de la liste des personnes, sans pagination."""
+    """Renvoie la requête triée de la liste des personnes, sans pagination."""
     return f"""
         SELECT p.id, p.last_name, p.first_name,
             prh.role_title, prh.department_name, prh.start_date, prh.end_date,
@@ -85,7 +85,7 @@ def _list_sql(filters: PersonFilters, where_sql: str, sort: str) -> str:
 
 
 def _person_out(row: Row[tuple[object, ...]], identifiers: list[PersonIdentifierOut]) -> PersonOut:
-    """`PersonOut` d'une ligne de la projection commune à la liste et à `person_curation`."""
+    """Construit le `PersonOut` d'une ligne de la projection commune à la liste et à `person_curation`."""
     return PersonOut(
         id=row.id,
         last_name=row.last_name,
@@ -106,7 +106,7 @@ class PersonListQueries:
     _conn: Connection
 
     def search_persons(self, *, search: str, limit: int) -> list[PersonSearchResult]:
-        """Autocomplétion : personnes non exclues dont le nom répond à la recherche, par la règle de l'annuaire (`person_search_clause`)."""
+        """Renvoie, pour l'autocomplétion, les personnes non exclues trouvées par la recherche par nom de l'annuaire (`person_search_clause`)."""
         search_clause = person_search_clause(search)
         if search_clause is None:
             return []
@@ -137,9 +137,9 @@ class PersonListQueries:
     def list_persons(
         self, *, filters: PersonFilters, page: int, per_page: int, sort: str
     ) -> PersonListResponse:
-        """Liste paginée des personnes.
+        """Renvoie la liste paginée des personnes.
 
-        L'annuaire public et la liste d'administration sont deux appels de cette lecture : le premier écarte les personnes rejetées et se restreint à un laboratoire, le second garde tout et ajoute les filtres des files à confirmer.
+        L'annuaire public et la liste d'administration appellent tous deux cette lecture. L'annuaire écarte les personnes exclues et se restreint à un laboratoire. La liste d'administration garde tout et ajoute les filtres des files à confirmer.
         """
         offset = (page - 1) * per_page
         where_sql, binds = _person_where(filters)
@@ -164,7 +164,7 @@ class PersonListQueries:
         return PersonListResponse(total=total, page=page, per_page=per_page, persons=persons)
 
     def export_persons_csv(self, *, filters: PersonFilters, sort: str) -> Iterator[str]:
-        """Export CSV de la liste des personnes, aux filtres et au tri de la liste.
+        """Renvoie l'export CSV de la liste des personnes, aux filtres et au tri de la liste.
 
         Les identifiants exportés sont ceux de l'annuaire public : ORCID, idHAL et IdRef, sans les attributions rejetées. La requête s'exécute à l'appel. Le parcours qui suit lit des lignes en mémoire.
         """
@@ -208,9 +208,9 @@ class PersonListQueries:
         )
 
     def person_name_forms(self, person_id: int) -> list[NameFormSummaryOut]:
-        """Formes de nom d'une personne, avec leur état d'arbitrage.
+        """Renvoie toutes les formes de nom d'une personne, avec leur état d'arbitrage, y compris les formes dérivées de son nom (source `persons`).
 
-        Toutes les formes, y compris celles dérivées du nom de la personne (source `persons`). `shared_count` compte les autres personnes qui ont la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes où une contribution source d'une contribution de la personne signe sous cette forme.
+        `shared_count` compte les autres personnes ayant la forme, au sens de `other_name_form_holders`. `publication_count` compte les publications distinctes où une contribution source d'une contribution de la personne a cette forme.
         """
         rows = self._conn.execute(
             text(f"""
@@ -243,7 +243,7 @@ class PersonListQueries:
         ]
 
     def person_curation(self, person_id: int) -> PersonOut | None:
-        """Une personne par id, même projection que la liste. None si absente."""
+        """Renvoie une personne par id, avec la projection de la liste, ou `None` si elle est absente."""
         row = self._conn.execute(
             text(f"""
                 SELECT p.id, p.last_name, p.first_name,

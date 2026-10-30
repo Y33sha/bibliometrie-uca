@@ -29,7 +29,7 @@ _BASE_FROM = "persons p LEFT JOIN hr_records prh ON prh.person_id = p.id"
 
 
 def _yesno(predicate: str, prefix: str = "") -> str:
-    """Fragment SELECT comptant les personnes qui vérifient `predicate` (`{prefix}yes`) et les autres (`{prefix}no`)."""
+    """Renvoie le fragment SELECT comptant les personnes vérifiant `predicate` (`{prefix}yes`) et les autres (`{prefix}no`)."""
     return (
         f"COUNT(*) FILTER (WHERE {predicate}) AS {prefix}yes, "
         f"COUNT(*) FILTER (WHERE NOT ({predicate})) AS {prefix}no"
@@ -40,7 +40,7 @@ class PersonFacetQueries:
     _conn: Connection
 
     def persons_facets(self, *, filters: PersonFilters) -> PersonsFacetsResponse:
-        """Facettes dynamiques (chaque facette exclut son propre filtre)."""
+        """Renvoie les facettes dynamiques ; chaque facette exclut son propre filtre."""
 
         def base_clauses(*, skip: str) -> list[WhereClause | None]:
             # Laboratoire, recherche par nom, exclusion et activité délimitent la population décomptée : ils valent pour toutes les facettes. Chaque autre filtre est exclu de sa propre facette.

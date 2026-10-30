@@ -82,14 +82,14 @@ YEAR_KEYS = _keys_of(ConfigKind.YEAR)
 
 
 def cap_value(key: ConfigKey, stored: int | None) -> int | None:
-    """Plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro ou une valeur négative retire la borne."""
+    """Renvoie le plafond à appliquer pour `key` d'après la valeur stockée, `None` pour illimité. Une valeur absente donne le défaut ; zéro ou une valeur négative retire la borne."""
     value = SETTINGS[key].default if stored is None else stored
     assert value is not None
     return value if value > 0 else None
 
 
 def delay_value(key: ConfigKey, stored: int | None) -> int:
-    """Délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente ou inférieure à un jour donne le défaut."""
+    """Renvoie le délai à appliquer pour `key` d'après la valeur stockée, en jours. Une valeur absente ou inférieure à un jour donne le défaut."""
     default = SETTINGS[key].default
     assert default is not None
     return stored if stored is not None and stored >= 1 else default
@@ -142,7 +142,7 @@ MAX_YEAR = 2100
 
 
 def _as_int(value: JsonValue) -> int | None:
-    """Entier contenu dans `value`, entier ou texte ; sinon `None`. Écarte les booléens, que Python tient pour des entiers."""
+    """Renvoie l'entier contenu dans `value`, entier ou texte ; sinon `None`. Écarte les booléens, tenus pour des entiers par Python."""
     if isinstance(value, bool):
         return None
     if isinstance(value, int):
@@ -178,7 +178,7 @@ def _institution_country(key: str, value: JsonValue) -> JsonValue:
 
 
 def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
-    """Types sans doublon, dans l'ordre de `StructureType`."""
+    """Renvoie les types sans doublon, dans l'ordre de `StructureType`."""
     if not isinstance(value, list) or not value:
         raise ValidationError(
             f"`{key}` attend une liste non vide de types de structure ; reçu : {value!r}"
@@ -232,9 +232,12 @@ _NORMALIZERS: dict[str, Callable[[str, JsonValue], JsonValue]] = {
 
 
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
-    """Valeur à écrire pour `key`, ramenée à la forme que la clé impose.
+    """Renvoie la valeur à écrire pour `key`, ramenée à la forme imposée par la clé.
 
-    Lève `ValidationError` pour une valeur hors de cette forme. Une valeur absente ou vide vaut zéro pour un plafond, un texte vide pour le titre. Les clés sans forme imposée passent telles quelles.
+    Une valeur absente ou vide vaut zéro pour un plafond, un texte vide pour le titre. Les clés sans forme imposée passent telles quelles.
+
+    Raises:
+        ValidationError: valeur hors de la forme imposée.
     """
     normalizer = _NORMALIZERS.get(key)
     return value if normalizer is None else normalizer(key, value)

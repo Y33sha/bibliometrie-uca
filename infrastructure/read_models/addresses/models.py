@@ -29,7 +29,7 @@ class TextPredicate:
 class StructurePredicate:
     """Filtre « structure reconnue » multi-structures.
 
-    `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` celles qui ne le sont comme aucune d'elles. Une adresse est reconnue comme une structure dès que le lien existe, qu'il soit en attente de validation ou confirmé.
+    `recognized` retient les adresses reconnues comme au moins une des `structure_ids`, `not_recognized` les adresses reconnues comme aucune. Une adresse est reconnue comme une structure dès que le lien existe, en attente de validation ou confirmé.
     """
 
     operator: StructurePredicateOperator
@@ -58,9 +58,10 @@ class AddressStructureSummary(BaseModel):
 
 
 class StructureLinkState(BaseModel):
-    """État d'un lien entre adresse et structure : détection automatique et arbitrage manuel. `is_confirmed` : `None` en attente, vrai si confirmé, faux si rejeté."""
+    """État d'un lien entre adresse et structure : détection automatique et arbitrage manuel."""
 
     is_confirmed: bool | None
+    """`None` en attente, vrai si confirmé, faux si rejeté."""
     is_detected: bool
 
 
@@ -76,13 +77,11 @@ class AddressOut(BaseModel):
 
 
 class AddressListResponse(PaginatedResponse):
-    """Réponse paginée de `/api/addresses`.
-
-    `requires_search` vrai signale une liste vide rendue sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base.
-    """
+    """Réponse paginée de `/api/addresses`."""
 
     addresses: list[AddressOut]
     requires_search: bool = False
+    """Vrai pour une liste vide renvoyée sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base."""
 
 
 class AddressPublicationItem(BaseModel):
@@ -97,28 +96,31 @@ class AddressPublicationItem(BaseModel):
 
 
 class FoundCountry(BaseModel):
-    """Pays trouvé pour une adresse, et les moyens de détection qui le trouvent."""
+    """Pays trouvé pour une adresse, avec ses moyens de détection."""
 
     country_code: str
     methods: list[CountryDetectionMethod]
 
 
 class AddressForCountryAttribution(BaseModel):
-    """Ligne de `/api/addresses/countries`. `countries` : pays retenus. `found_countries` : tous les pays trouvés, retenus ou non."""
+    """Ligne de `/api/addresses/countries`."""
 
     id: int
     raw_text: str
     countries: list[str] | None
+    """Pays retenus."""
     found_countries: list[FoundCountry]
+    """Tous les pays trouvés, retenus ou non."""
     publication_count: int
 
 
 class AddressesCountriesResponse(PaginatedResponse):
-    """`without_country` : nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`."""
+    """Réponse paginée de `/api/addresses/countries`."""
 
     addresses: list[AddressForCountryAttribution]
     country_facets: list[FacetOption]
     without_country: int
+    """Nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`."""
 
 
 class AddressStatsResponse(BaseModel):
@@ -129,6 +131,3 @@ class AddressStatsResponse(BaseModel):
     pending: int
     rejected: int
     confirmed: int
-
-
-# ----- Port -----

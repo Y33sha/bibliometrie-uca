@@ -10,41 +10,41 @@ type JsonValue = str | int | float | bool | None | Sequence[JsonValue] | Mapping
 
 
 def as_str(value: JsonValue) -> str | None:
-    """`value` si c'est une chaîne, sinon `None`, même pour un nombre."""
+    """Renvoie `value` si c'est une chaîne, sinon `None`, même pour un nombre."""
     return value if isinstance(value, str) else None
 
 
 def as_text(value: JsonValue) -> str | None:
-    """Comme `as_str`, sans les espaces qui entourent la chaîne ; `None` pour une chaîne vide ou blanche."""
+    """Renvoie, comme `as_str`, la chaîne sans les espaces qui entourent la chaîne ; `None` pour une chaîne vide ou blanche."""
     return (as_str(value) or "").strip() or None
 
 
 def as_int(value: JsonValue) -> int | None:
-    """`value` si c'est un entier, sinon `None`, même pour un booléen."""
+    """Renvoie `value` si c'est un entier, sinon `None`, même pour un booléen."""
     if isinstance(value, bool):
         return None
     return value if isinstance(value, int) else None
 
 
 def as_float(value: JsonValue) -> float | None:
-    """`value` en flottant si c'est un nombre, sinon `None`, même pour un booléen."""
+    """Renvoie `value` en flottant si c'est un nombre, sinon `None`, même pour un booléen."""
     if isinstance(value, bool):
         return None
     return float(value) if isinstance(value, int | float) else None
 
 
 def as_bool(value: JsonValue) -> bool | None:
-    """`value` si c'est un booléen, sinon `None`, même pour `0` ou `"false"`."""
+    """Renvoie `value` si c'est un booléen, sinon `None`, même pour `0` ou `"false"`."""
     return value if isinstance(value, bool) else None
 
 
 def as_mapping(value: JsonValue) -> Mapping[str, JsonValue]:
-    """`value` si c'est un objet, sinon un objet vide. Les lectures imbriquées s'enchaînent donc sans vérification."""
+    """Renvoie `value` si c'est un objet, sinon un objet vide. Les lectures imbriquées s'enchaînent donc sans vérification."""
     return value if isinstance(value, Mapping) else {}
 
 
 def at_path(root: JsonValue, *keys: str) -> Mapping[str, JsonValue]:
-    """Objet atteint en descendant `keys` depuis `root`, ou un objet vide si un niveau manque."""
+    """Renvoie l'objet atteint en descendant `keys` depuis `root`, ou un objet vide si un niveau manque."""
     courant = as_mapping(root)
     for cle in keys:
         courant = as_mapping(courant.get(cle))
@@ -52,12 +52,12 @@ def at_path(root: JsonValue, *keys: str) -> Mapping[str, JsonValue]:
 
 
 def as_sequence(value: JsonValue) -> Sequence[JsonValue]:
-    """`value` si c'est une liste, sinon une liste vide, même pour une chaîne."""
+    """Renvoie `value` si c'est une liste, sinon une liste vide, même pour une chaîne."""
     if isinstance(value, (str, Mapping)):
         return []
     return value if isinstance(value, Sequence) else []
 
 
 def as_strs(value: JsonValue) -> list[str]:
-    """Chaînes non vides de la liste `value` ; les autres éléments sont écartés."""
+    """Renvoie les chaînes non vides de la liste `value` ; les autres éléments sont écartés."""
     return [texte for element in as_sequence(value) if (texte := as_str(element))]

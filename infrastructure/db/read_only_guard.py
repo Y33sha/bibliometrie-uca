@@ -1,8 +1,8 @@
 """Garde-fou d'exécution : aucune connexion en écriture pendant une requête de lecture.
 
-Une requête de lecture ouvre ses connexions par la composition root de l'API, qui les met en lecture seule. Une connexion ouverte par un autre chemin, en remontant à l'engine depuis une connexion reçue, pourrait écrire : le garde-fou l'arrête à sa première instruction. Ni le contrat d'architecture ni l'analyse statique ne ferment ce chemin.
+Une requête de lecture ouvre ses connexions par la composition root de l'API, en lecture seule. Une connexion ouverte par un autre chemin, en remontant à l'engine depuis une connexion reçue, pourrait écrire. Le garde-fou l'arrête à sa première instruction. Ni le contrat d'architecture ni l'analyse statique ne ferment ce chemin.
 
-Un middleware de l'API déclare la requête de lecture par `read_request()`. Hors de cette déclaration, le garde-fou reste muet : le pipeline et les scripts en ligne de commande écrivent.
+Un middleware de l'API déclare la requête de lecture par `read_request()`. Hors de cette déclaration, le garde-fou laisse tout passer : le pipeline et les scripts en ligne de commande écrivent.
 """
 
 from collections.abc import Iterator
@@ -16,9 +16,9 @@ _read_request: ContextVar[bool] = ContextVar("read_request", default=False)
 
 @contextmanager
 def read_request() -> Iterator[None]:
-    """Déclare que le travail conduit ici sert une requête de lecture.
+    """Déclare le bloc au service d'une requête de lecture.
 
-    La déclaration suit le contexte d'exécution : elle vaut pour le thread où la route s'exécute, et pour ceux qu'une lecture parallélisée démarre en leur passant une copie du contexte.
+    La déclaration suit le contexte d'exécution. Elle vaut pour le thread de la route, et pour les threads démarrés par une lecture parallélisée avec une copie du contexte.
     """
     token = _read_request.set(True)
     try:
@@ -48,5 +48,5 @@ def _refuse_writable_connection(
 
 
 def install_read_only_guard(engine: Engine) -> None:
-    """Attache le contrôle sur l'engine, pour toutes les connexions qui en sortent."""
+    """Attache le contrôle à toutes les connexions de l'engine."""
     event.listen(engine, "before_cursor_execute", _refuse_writable_connection)

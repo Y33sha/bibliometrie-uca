@@ -32,7 +32,7 @@ from infrastructure.read_models.perimeters.queries import get_persons_structure_
 from infrastructure.read_models.sql_fragments import contributor_display_name
 from infrastructure.sql_fragments import usable_identifier
 
-# Identifiants d'une contribution source `sc`, hors ceux qu'elle neutralise.
+# Identifiants d'une contribution source `sc`, hors identifiants neutralisés.
 _HAL_PERSON_ID = usable_identifier("'hal_person_id'")
 _ORCID = usable_identifier("'orcid'")
 _IDHAL = usable_identifier("'idhal'")
@@ -44,7 +44,7 @@ _HAL_ACCOUNT_ATTRIBUTION = (
     f" AND pi.status <> '{AttributionStatus.REJECTED.value}'"
 )
 
-# Personnes auxquelles au moins deux comptes HAL sont attribués : l'anomalie que la page recense, et la même population pour le comptage comme pour la liste.
+# Personnes à au moins deux comptes HAL attribués. Même population pour le comptage et pour la liste.
 _PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS = f"""
     SELECT pi.person_id
     FROM person_identifiers pi
@@ -63,9 +63,9 @@ class HalProblemsQueries:
     def _hal_publication_details(
         self, publication_ids: list[int]
     ) -> dict[int, HalPublicationDetail]:
-        """Détail des publications d'une page et de leurs dépôts HAL, indexé par identifiant.
+        """Renvoie le détail des publications d'une page et de leurs dépôts HAL, indexé par identifiant.
 
-        Deux requêtes pour la page entière : les paires de doublons se comptent par centaines, et une lecture par publication en ferait autant d'allers-retours.
+        Deux requêtes couvrent la page entière, plutôt qu'une par publication : les paires de doublons se comptent par centaines.
         """
         if not publication_ids:
             return {}
@@ -117,14 +117,14 @@ class HalProblemsQueries:
         }
 
     def hal_duplicate_accounts(self, *, page: int, per_page: int) -> HalDuplicateAccountsResponse:
-        # Pour un même `hal_person_id`, le nom et les identifiants des contributions sources HAL sont en principe constants : ils tiennent au compte HAL. Des imports de dates différentes peuvent pourtant diverger ; MIN() en retient une valeur déterministe.
+        # Pour un même `hal_person_id`, le nom et les identifiants des contributions sources HAL sont en principe constants. Des imports de dates différentes divergent parfois ; MIN() retient une valeur déterministe.
         offset = (page - 1) * per_page
         total_row = self._conn.execute(
             text(f"SELECT COUNT(*) AS total FROM ({_PERSONS_WITH_DUPLICATE_HAL_ACCOUNTS}) sub")
         ).one()
         total = total_row.total
 
-        # Chaque compte HAL attribué se détaille par les contributions sources HAL des contributions de la personne qui contiennent sa référence. Un compte absent de ces contributions a un nom vide et zéro publication.
+        # Détail de chaque compte HAL attribué : contributions sources HAL des contributions de la personne contenant sa référence. Un compte absent de ces contributions a un nom vide et zéro publication.
         rows = self._conn.execute(
             text(f"""
                 WITH page_persons AS MATERIALIZED (
@@ -288,10 +288,7 @@ class HalProblemsQueries:
         )
 
     def hal_missing_collections_labs(self) -> list[HalCollectionLab]:
-        """Structures du périmètre dont une collection HAL est renseignée : celles dont la collection se compare.
-
-        Sans collection, la question « que manque-t-il à sa collection ? » est sans objet.
-        """
+        """Renvoie les structures du périmètre à collection HAL renseignée."""
         rows = self._conn.execute(
             text("""
                 SELECT s.id, s.acronym, s.name, s.hal_collection
@@ -472,7 +469,7 @@ class HalProblemsQueries:
     # Chaque export lit sa liste en une seule page, de la taille du plafond commun plus une ligne : la ligne excédentaire signale la coupe.
 
     def export_duplicate_accounts_csv(self) -> Iterator[str]:
-        """Export CSV des comptes auteur HAL en double : une ligne par compte HAL d'une personne."""
+        """Renvoie l'export CSV des comptes auteur HAL en double : une ligne par compte HAL d'une personne."""
         persons, truncated = _capped(
             self.hal_duplicate_accounts(page=1, per_page=_EXPORT_PAGE).persons
         )
@@ -507,7 +504,7 @@ class HalProblemsQueries:
         )
 
     def export_duplicate_publications_by_doi_csv(self) -> Iterator[str]:
-        """Export CSV des dépôts HAL en double par DOI : une ligne par DOI."""
+        """Renvoie l'export CSV des dépôts HAL en double par DOI : une ligne par DOI."""
         pairs, truncated = _capped(
             self.hal_duplicate_publications_by_doi(page=1, per_page=_EXPORT_PAGE).pairs
         )
@@ -527,7 +524,7 @@ class HalProblemsQueries:
         )
 
     def export_duplicate_publications_by_metadata_csv(self) -> Iterator[str]:
-        """Export CSV des doublons possibles par métadonnées : une ligne par paire de publications."""
+        """Renvoie l'export CSV des doublons possibles par métadonnées : une ligne par paire de publications."""
         pairs, truncated = _capped(
             self.hal_duplicate_publications_by_metadata(page=1, per_page=_EXPORT_PAGE).pairs
         )
@@ -550,7 +547,7 @@ class HalProblemsQueries:
     def export_missing_collections_csv(
         self, *, lab_id: int
     ) -> Iterator[str] | NoMissingCollections:
-        """Export CSV des publications du laboratoire absentes de sa collection HAL."""
+        """Renvoie l'export CSV des publications du laboratoire absentes de sa collection HAL."""
         result = self.hal_missing_collections(lab_id=lab_id, page=1, per_page=_EXPORT_PAGE)
         if isinstance(result, NoMissingCollections):
             return result
@@ -571,7 +568,7 @@ class HalProblemsQueries:
         )
 
     def export_affiliation_conflicts_csv(self) -> Iterator[str]:
-        """Export CSV des publications aux affiliations HAL divergentes."""
+        """Renvoie l'export CSV des publications aux affiliations HAL divergentes."""
         publications, truncated = _capped(
             self.hal_affiliation_conflicts(page=1, per_page=_EXPORT_PAGE).publications
         )
@@ -597,7 +594,7 @@ _EXPORT_PAGE = MAX_EXPORT_ROWS + 1
 
 
 def _capped[T](items: Sequence[T]) -> tuple[Sequence[T], bool]:
-    """Éléments ramenés au plafond des exports, et si la coupe a eu lieu."""
+    """Renvoie les éléments ramenés au plafond des exports, et si la coupe a eu lieu."""
     return items[:MAX_EXPORT_ROWS], len(items) > MAX_EXPORT_ROWS
 
 

@@ -92,7 +92,7 @@ class HalMissingCollectionsResponse(PaginatedResponse):
 
 
 class NoMissingCollections(StrEnum):
-    """Raison pour laquelle la question « que manque-t-il à sa collection ? » reste sans réponse pour ce laboratoire : laboratoire inexistant, ou laboratoire réel sans collection HAL configurée."""
+    """Raison de l'absence de liste des manques de collection d'un laboratoire : laboratoire inexistant, ou laboratoire sans collection HAL configurée."""
 
     UNKNOWN_LAB = "unknown_lab"
     NO_COLLECTION = "no_collection"

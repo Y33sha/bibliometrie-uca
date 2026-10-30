@@ -44,37 +44,47 @@ class _TableExportee(TypedDict):
 class TableSpec(_TableExportee, total=False):
     """Table de référence à exporter.
 
-    Toutes les colonnes de la table sont exportées, sauf celles de `EXCLUDED_COLUMNS`, et les lignes sont triées par clé. `where` restreint les lignes exportées et supprimées au chargement. `key` identifie une ligne d'une base à l'autre, à défaut de la clé primaire : la clé primaire est alors absente de l'export. `keep_existing` garde les lignes de la base au chargement : le seed ajoute seulement les lignes absentes. `rows` fournit les lignes à la place de la base.
+    Toutes les colonnes de la table sont exportées, sauf celles de `EXCLUDED_COLUMNS`, et les lignes sont triées par clé.
     """
 
     where: str
+    """Restreint les lignes exportées et supprimées au chargement."""
     key: tuple[str, ...]
+    """Identifie une ligne d'une base à l'autre, à défaut de la clé primaire, alors absente de l'export."""
     keep_existing: bool
+    """Garde les lignes de la base au chargement : le seed ajoute seulement les lignes absentes."""
     rows: Callable[[Connection], list[tuple[JsonValue, ...]]]
+    """Fournit les lignes à la place de la base."""
 
 
 @dataclass(frozen=True)
 class SeedSpec:
-    """Seed à produire : description en tête de fichier, tables dans l'ordre d'insertion (celui des clés étrangères), fichier par défaut."""
+    """Seed à produire."""
 
     description: str
+    """Description en tête de fichier."""
     tables: tuple[TableSpec, ...]
+    """Tables dans l'ordre d'insertion, celui des clés étrangères."""
     default_path: Path
 
 
 @dataclass(frozen=True)
 class SeedSection:
-    """Lignes d'une table à écrire dans un seed, valeurs dans l'ordre de `exported_columns`. `where` restreint les lignes supprimées au chargement. `key` identifie une ligne, à défaut de la clé primaire. `keep_existing` garde les lignes de la base au chargement."""
+    """Lignes d'une table à écrire dans un seed."""
 
     table: SeedTable
     rows: list[tuple[JsonValue, ...]]
+    """Valeurs dans l'ordre de `exported_columns`."""
     where: str | None = None
+    """Restreint les lignes supprimées au chargement."""
     key: tuple[str, ...] | None = None
+    """Identifie une ligne, à défaut de la clé primaire."""
     keep_existing: bool = False
+    """Garde les lignes de la base au chargement."""
 
 
 def initial_config_rows(conn: Connection) -> list[tuple[JsonValue, ...]]:
-    """Clés communes de la configuration avec leur valeur initiale (`INITIAL_CONFIG_VALUES`), et la description que la base leur donne."""
+    """Renvoie les clés communes de la configuration avec leur valeur initiale (`INITIAL_CONFIG_VALUES`) et leur description en base."""
     descriptions = dict(
         conn.execute(
             text("SELECT key, description FROM config WHERE key = ANY(:keys)"),
@@ -126,7 +136,7 @@ INSTITUTION_SEED = SeedSpec(
 
 
 def exported_columns(table: SeedTable, key: Sequence[str] | None = None) -> list[str]:
-    """Colonnes exportées de `table`, dans l'ordre de sa définition. Avec une clé `key`, la clé primaire est omise."""
+    """Renvoie les colonnes exportées de `table`, dans l'ordre de sa définition. Avec une clé `key`, la clé primaire est omise."""
     omitted = EXCLUDED_COLUMNS | (
         {c.name for c in table.primary_key.columns} - set(key) if key else set()
     )
@@ -134,7 +144,7 @@ def exported_columns(table: SeedTable, key: Sequence[str] | None = None) -> list
 
 
 def row_key(table: SeedTable, key: Sequence[str] | None = None) -> list[str]:
-    """Colonnes qui identifient une ligne de `table` : `key`, à défaut la clé primaire."""
+    """Renvoie les colonnes identifiant une ligne de `table` : `key`, à défaut la clé primaire."""
     return list(key) if key else [c.name for c in table.primary_key.columns]
 
 
@@ -161,7 +171,7 @@ def escape_sql(value: JsonValue, is_jsonb: bool = False) -> str:
 
 
 def _display_path(path: Path) -> str:
-    """Chemin relatif à la racine du dépôt quand le fichier s'y trouve, absolu sinon. Les séparateurs sont des barres obliques, quel que soit le système."""
+    """Renvoie le chemin relatif à la racine du dépôt quand le fichier s'y trouve, absolu sinon. Les séparateurs sont des barres obliques, quel que soit le système."""
     resolved = path.resolve()
     if resolved.is_relative_to(PROJECT_ROOT):
         return resolved.relative_to(PROJECT_ROOT).as_posix()
@@ -169,7 +179,7 @@ def _display_path(path: Path) -> str:
 
 
 def _upsert_clause(columns: Sequence[str], key: Sequence[str]) -> str:
-    """Clause `ON CONFLICT` qui met à jour une ligne existante de même clé primaire avec les valeurs du seed."""
+    """Renvoie la clause `ON CONFLICT` qui met à jour une ligne existante de même clé primaire avec les valeurs du seed."""
     updated = [c for c in columns if c not in key]
     if not updated:
         return f" ON CONFLICT ({', '.join(key)}) DO NOTHING"
@@ -178,7 +188,7 @@ def _upsert_clause(columns: Sequence[str], key: Sequence[str]) -> str:
 
 
 def render_seed(description: str, output_path: Path, sections: Sequence[SeedSection]) -> str:
-    """Texte SQL d'un seed : une transaction qui aligne chaque table sur le seed, et recale les séquences.
+    """Renvoie le texte SQL d'un seed : une transaction qui aligne chaque table sur le seed, et recale les séquences.
 
     Une table perd les lignes absentes du seed. Elle reçoit les autres, mises à jour sur place quand leur clé (`row_key`) existe : les lignes qui les référencent restent intactes. Une section `keep_existing` garde toutes les lignes de la base et ajoute seulement les lignes absentes.
     """
@@ -244,7 +254,7 @@ def write_seed(description: str, output_path: Path, sections: Sequence[SeedSecti
 
 
 def read_sections(conn: Connection, seed: SeedSpec) -> list[SeedSection]:
-    """Lignes de chaque table du seed : celles de `rows` s'il est donné, sinon celles de la base courante, triées par clé (`row_key`)."""
+    """Lit les lignes de chaque table du seed : celles de `rows` s'il est donné, sinon celles de la base courante, triées par clé (`row_key`)."""
     sections = []
     for spec in seed.tables:
         table = spec["table"]

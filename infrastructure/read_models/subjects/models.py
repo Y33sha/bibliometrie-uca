@@ -11,12 +11,13 @@ from infrastructure.read_models._common import PaginatedResponse
 
 
 class SubjectOut(BaseModel):
-    """Sujet attaché à une publication. Les annotations des différentes sources sont agrégées en une ligne par sujet, `sources` retenant celles qui l'ont fourni."""
+    """Sujet attaché à une publication, une ligne par sujet toutes sources réunies."""
 
     id: int
     label: str
     language: str | None
     sources: list[str]
+    """Sources ayant fourni le sujet."""
 
 
 class SubjectListItem(BaseModel):
@@ -58,7 +59,7 @@ class SubjectDetailResponse(BaseModel):
 
 
 class SubjectFrequency(BaseModel):
-    """Sujet et son nombre de publications au sein d'une entité donnée — personne, laboratoire, revue ou éditeur. Alimente les sujets principaux de leurs tableaux de bord."""
+    """Sujet et son nombre de publications au sein d'une personne, d'un laboratoire, d'une revue ou d'un éditeur, pour les sujets principaux de son tableau de bord."""
 
     id: int
     label: str

@@ -14,17 +14,19 @@ class PhaseStatus(StrEnum):
 
 
 def worst_status(statuses: Iterable[PhaseStatus]) -> PhaseStatus:
-    """Statut le plus grave, ou `OK` pour une liste vide."""
+    """Renvoie le statut le plus grave, ou `OK` pour une liste vide."""
     order = list(PhaseStatus)
     return max(statuses, key=order.index, default=PhaseStatus.OK)
 
 
 class Signal(TypedDict):
-    """Fait notable remonté par une phase : source indisponible, série de réponses 429, conflit d'identifiant… `code` sert au regroupement, `message` s'affiche tel quel."""
+    """Fait notable remonté par une phase : source indisponible, série de réponses 429, conflit d'identifiant…"""
 
     level: PhaseStatus
     code: str
+    """Clé de regroupement des signaux."""
     message: str
+    """Texte affiché tel quel."""
 
 
 class PhaseMetricsPayload(TypedDict):

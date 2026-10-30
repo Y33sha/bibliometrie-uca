@@ -9,13 +9,14 @@ from typing import Protocol
 
 @dataclass(frozen=True, slots=True)
 class AddressCountryFilter:
-    """Critères de sélection d'adresses par leur pays, pour la liste d'attribution et l'attribution en masse.
-
-    Combinés en AND. `search` : sous-chaîne cherchée dans le texte de l'adresse, insensible à la casse et aux accents. `has_country` : vrai pour un pays renseigné, faux pour aucun, `None` sans critère. `country_code` : pays retenu."""
+    """Critères de sélection d'adresses par leur pays, combinés en AND, pour la liste d'attribution et l'attribution en masse."""
 
     search: str | None = None
+    """Sous-chaîne du texte de l'adresse, insensible à la casse et aux accents."""
     has_country: bool | None = None
+    """Vrai pour un pays renseigné, faux pour aucun pays, `None` sans critère."""
     country_code: str | None = None
+    """Pays retenu."""
 
     @property
     def is_empty(self) -> bool:
@@ -29,7 +30,7 @@ class AddressRepository(Protocol):
     # ── Liens adresse ↔ structure ──────────────────────────────────
 
     def reset_manual_link(self, address_id: int, structure_id: int) -> None:
-        """Annule la décision manuelle sur un rattachement : supprime le lien qu'aucune détection n'atteste, et rend une détection à l'état non décidé."""
+        """Annule la décision manuelle sur un rattachement. Supprime un lien sans détection, et remet une détection à l'état non décidé."""
         ...
 
     def upsert_structure_link(
@@ -38,7 +39,7 @@ class AddressRepository(Protocol):
         structure_id: int,
         is_confirmed: bool,
     ) -> None:
-        """Pose la décision manuelle sur un rattachement (`is_confirmed` : TRUE confirmé, FALSE rejeté), en créant le lien s'il n'existe pas."""
+        """Confirme (`is_confirmed` vrai) ou rejette à la main un rattachement, en créant le lien au besoin."""
         ...
 
     def batch_reset_manual_links(
@@ -46,7 +47,7 @@ class AddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> int:
-        """`reset_manual_link` sur un lot. Renvoie le nombre de rattachements touchés : liens manuels supprimés et détections remises en attente."""
+        """Applique `reset_manual_link` à un lot. Renvoie le nombre de liens manuels supprimés et de détections remises en attente."""
         ...
 
     def batch_upsert_structure_links(
@@ -55,7 +56,7 @@ class AddressRepository(Protocol):
         structure_id: int,
         is_confirmed: bool,
     ) -> None:
-        """`upsert_structure_link` sur un lot."""
+        """Applique `upsert_structure_link` à un lot."""
         ...
 
     def which_contribute_to_perimeter(
@@ -63,25 +64,31 @@ class AddressRepository(Protocol):
         address_ids: list[int],
         structure_id: int,
     ) -> set[int]:
-        """Adresses, parmi celles données, dont le lien à la structure compte pour le périmètre : lien confirmé ou non décidé."""
+        """Renvoie, parmi les adresses données, celles à lien confirmé ou non décidé avec la structure. Ces liens comptent pour le périmètre."""
         ...
 
     # ── Pays ───────────────────────────────────────────────────────
 
     def country_exists(self, code: str) -> bool:
-        """Vrai si le code figure au référentiel `countries`. Les saisies de pays refusent ainsi un code inconnu."""
+        """Indique si le code figure au référentiel `countries`."""
         ...
 
     def set_manual_countries(self, address_id: int, countries: list[str] | None) -> None:
-        """Fait de `countries` les pays saisis à la main (candidats `manual`) de l'adresse, et la met dans la file `address_candidates_queue`. Liste vide ou `None` : l'adresse est rendue aux moyens automatiques. Lève `NotFoundError` si l'adresse est introuvable."""
+        """Enregistre `countries` comme pays saisis à la main de l'adresse (candidats `manual`), et met l'adresse dans la file `address_candidates_queue`.
+
+        Une liste vide ou `None` supprime la saisie manuelle.
+
+        Raises:
+            NotFoundError: adresse introuvable.
+        """
         ...
 
     def add_manual_country_by_ids(self, country_code: str, address_ids: list[int]) -> list[int]:
-        """Saisit à la main, pour chaque adresse, ses pays retenus et `country_code` (candidats `manual`), et la met dans la file `address_candidates_queue`. Renvoie les ids atteints."""
+        """Enregistre comme pays saisis à la main de chaque adresse (candidats `manual`) ses pays retenus et `country_code`, et met l'adresse dans la file `address_candidates_queue`. Renvoie les ids des adresses trouvées."""
         ...
 
     def add_manual_country_by_filter(
         self, country_code: str, criteria: AddressCountryFilter
     ) -> list[int]:
-        """Comme `add_manual_country_by_ids`, sur les adresses retenues par les critères. Renvoie les ids atteints ; sans critère, n'écrit rien et renvoie `[]`."""
+        """Applique `add_manual_country_by_ids` aux adresses sélectionnées par les critères. Renvoie leurs ids, ou `[]` sans critère."""
         ...
