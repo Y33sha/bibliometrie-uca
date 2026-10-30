@@ -11,7 +11,7 @@ Documentation API :
 DataCite est l'agence d'enregistrement des DOI des données de la recherche : jeux de données, logiciels, *preprints*, thèses, et plus largement tout ce que déposent les entrepôts institutionnels et disciplinaires (Zenodo, figshare, recherche-data-gouv, theses.fr, NAKALA…). Chaque préfixe DOI est rattaché à un *provider* (l'organisation déposante) et à un *client* (l'entrepôt précis).
 
 Le pipeline interroge DataCite de trois façons :
-- [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), en mode `full` : par année, les DOI dont une affiliation de créateur contient l'un des mots-clés saisis pour les structures du périmètre (champ DataCite des identifiants de structure) ;
+- [moissonnage](../pipeline/02-harvest.md#moissonnage-par-affiliation-harvest), en mode `full` : par année, les DOI avec une affiliation de créateur contenant l'un des mots-clés saisis pour les structures du périmètre (champ DataCite des identifiants de structure) ;
 - [`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing) : les DOI rattachés à DataCite et trouvés seulement dans les autres sources ;
 - [moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person) : les DOI dont un créateur a l'ORCID d'une personne RH (`creators.nameIdentifiers.nameIdentifier`).
 
@@ -35,7 +35,7 @@ Les DOI d'un entrepôt sans affiliation renseignée (NAKALA, notamment) entrent 
 
 ## Exemple de payload
 
-*Preprint* `10.17181/b5jnp-h2c36` (déposé sur l'entrepôt du CERN). Réduit aux champs que le pipeline lit ; résumé tronqué.
+*Preprint* `10.17181/b5jnp-h2c36` (déposé sur l'entrepôt du CERN). Réduit aux champs lus par le pipeline ; résumé tronqué.
 
 ```json
 {
@@ -101,13 +101,13 @@ DataCite déduit `container` des éléments liés ou de la description `SeriesIn
 
 ### Affiliations textuelles
 
-Les affiliations des créateurs sont du texte, parfois avec un ROR. Elles deviennent des adresses, que la phase [`affiliations`](../pipeline/04-affiliations.md) examine.
+Les affiliations des créateurs sont du texte, parfois avec un ROR. Elles deviennent des adresses, examinées par la phase [`affiliations`](../pipeline/04-affiliations.md).
 
 ### DOI liés et concept/version
 
 Un entrepôt comme Zenodo attribue un DOI distinct à chaque version d'un dépôt, plus un **DOI concept** stable couvrant toutes les versions. Le champ `relatedIdentifiers` expose ces liens, et la relation `IsVersionOf` pointe d'une version vers son concept. La phase [`metadata_correction`](../pipeline/06-metadata-correction.md) s'en sert pour réunir les versions et le concept dans une seule publication.
 
-Les DOI apparentés (versions, formes, parties, suppléments) deviennent des identifiants liés, que la phase `fetch_missing` cherche.
+Les DOI apparentés (versions, formes, parties, suppléments) deviennent des identifiants liés, cherchés par la phase `fetch_missing`.
 
 ### Statut open access
 

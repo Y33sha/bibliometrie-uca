@@ -10,7 +10,7 @@ Schéma PostgreSQL `publishing`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `serials` | Titre, type (`serial_type`), éditeur, modèle open access, présence dans le DOAJ, nombre de publications. `manual_fields` : champs saisis à la main, que le pipeline conserve | Identifiant OpenAlex unique |
+| `serials` | Titre, type (`serial_type`), éditeur, modèle open access, présence dans le DOAJ, nombre de publications. `manual_fields` : champs saisis à la main, conservés par le pipeline | Identifiant OpenAlex unique |
 | `serial_issns` | ISSN, support, ISSN de liaison, statut, date de vérification dans le Sudoc. Un ISSN vérifié sans publication en série désigne une publication absente de la base | Un ISSN de liaison par publication en série |
 | `serial_name_forms` | Formes du titre qui désignent la publication en série, avec l'éditeur de la source | Une forme par éditeur, éditeur absent compris |
 | `serial_doi_namespaces` | Espaces de noms DOI qui désignent une publication en série, avec la part de leurs DOI qui la désignent | |
@@ -45,7 +45,7 @@ Une copie est rattachée à une plateforme connue (`domain/platforms/registry.py
 |---|---|---|
 | `apc_payments` | Paiement importé d'un fichier ([import](../sources/10-imports-manuels.md#données-apc)) : DOI, montant, années, laboratoire et payeur, publication, publication en série, éditeur. `open_access_fee` distingue les frais d'open access des autres frais | Un paiement par DOI, payeur, montant et nature |
 
-Seuls les paiements dont le payeur est dans le périmètre sont retenus par les lectures.
+Seuls les paiements d'un payeur du périmètre sont retenus par les lectures.
 
 ## Écriture
 

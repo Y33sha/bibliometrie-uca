@@ -24,7 +24,7 @@ https://scanr.enseignementsup-recherche.gouv.fr/docs/overview
 
 ## Exemple de payload
 
-Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). `summary` tronqué, `domains` réduit à 2 entrées. Champs que le pipeline ne lit pas retirés.
+Document `doi10.1001/jama.2021.7683` (2 auteurs JAMA). Réduit aux champs lus par le pipeline ; `summary` tronqué, `domains` réduit à 2 entrées.
 
 ```json
 {

@@ -11,7 +11,7 @@ Fichier CSV importé via [interfaces/cli/imports/import_persons.py](https://gith
 
 Le département RH est affiché pour information. Les liens entre personnes et structures viennent des [contributions](../glossaire.md#contribution).
 
-L'import crée la personne et sa fiche RH. La fiche enrichit la personne, et une personne qui en a une est toujours conservée par une fusion.
+L'import crée la personne et sa fiche RH. La fiche enrichit la personne, et une personne avec une fiche RH est toujours conservée par une fusion.
 
 ## Données APC
 
@@ -21,7 +21,7 @@ L'import crée la personne et sa fiche RH. La fiche enrichit la personne, et une
 - le fichier « frais hors OA » de l'enquête nationale : autres frais de publication ;
 - la réponse d'un établissement à l'enquête APC. Un montant négatif y annule un paiement.
 
-Le script importe les paiements dont le DOI désigne une publication de la base. Avec `--institution`, il importe aussi les paiements à DOI de l'établissement absents de la base, qui rejoignent leur publication quand elle entre dans la base. L'établissement se désigne par son nom (OpenAPC), son `coman_id` (frais hors OA) ou son ROR (réponse à l'enquête). Un réimport ne crée pas de doublon.
+Le script importe les paiements rattachés par DOI à une publication de la base. Avec `--institution`, il importe aussi les paiements à DOI de l'établissement absents de la base, qui rejoignent leur publication quand elle entre dans la base. L'établissement se désigne par son nom (OpenAPC), son `coman_id` (frais hors OA) ou son ROR (réponse à l'enquête). Un réimport ne crée pas de doublon.
 
 La colonne `institution` désigne le payeur. Le laboratoire et le payeur sont rattachés à leur structure par les formes de noms ; le script liste les libellés sans structure. La réponse d'un établissement l'emporte sur OpenAPC, qui reprend les réponses à l'enquête sous une forme variable.
 

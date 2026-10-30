@@ -2,7 +2,7 @@
 
 *À jour le 2026-10-30.*
 
-Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref ou DataCite. Une contribution source est une personne telle que la source la nomme dans un enregistrement source, avec son rôle. Ces tables conservent ce que dit chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
+Un enregistrement source est la description d'un document par une source : HAL, OpenAlex, Web of Science, ScanR, theses.fr, Crossref ou DataCite. Une contribution source est une personne nommée par la source dans un enregistrement source, avec son rôle. Ces tables conservent les données de chaque source, avant tout regroupement. Toutes les sources partagent les mêmes tables, et la colonne `source` les distingue.
 
 Seul le pipeline écrit ces tables. Une métadonnée fausse se corrige par une règle de [correction](../pipeline/06-metadata-correction.md), qui garde la valeur d'origine.
 
@@ -36,7 +36,7 @@ Schéma PostgreSQL `sources`.
 
 | Table | Contenu | Contrainte |
 |---|---|---|
-| `source_contributions` | Position, rôles, auteur correspondant, nom brut. `collective` : collaboration, consortium ou groupe d'étude. `duplicate_of` : doublon d'un autre auteur de la liste. `neutralized_identifiers` : identifiants que la résolution des personnes ignore pour cette contribution source, avec leur motif. `perimeter_evidence`, `in_perimeter` : indices de périmètre. `countries` : pays | Une contribution source par position dans un enregistrement source |
+| `source_contributions` | Position, rôles, auteur correspondant, nom brut. `collective` : collaboration, consortium ou groupe d'étude. `duplicate_of` : doublon d'un autre auteur de la liste. `neutralized_identifiers` : identifiants ignorés par la résolution des personnes pour cette contribution source, avec leur motif. `perimeter_evidence`, `in_perimeter` : indices de périmètre. `countries` : pays | Une contribution source par position dans un enregistrement source |
 | `contributor_information` | Nom normalisé et identifiants, partagés par les contributions sources qui ont les mêmes | Une ligne par combinaison de nom et d'identifiants |
 | `source_contribution_addresses` | [Adresses](06-structures.md) de la contribution source | |
 | `source_contribution_rors` | ROR attribués par la source, rattachés à l'adresse de leur affiliation quand elle a un texte | |

@@ -23,7 +23,7 @@ https://developers.openalex.org/
 - **Publications** : identifiant OpenAlex, titre, DOI, année et date de publication, type, langue, statut open access, nombre de citations, indication de rétractation, résumé (reconstruit depuis l'inverted index), mots-clés, topics (hiérarchie domain/field/subfield/topic + score), biblio (volume/numéro/pages), URLs des copies de l'article
 - **Licence** : licence de la localisation principale (`primary_location`)
 - **Localisations** (`source_record_locations`) : chaque copie du document, avec son URL, son PDF, son identifiant OAI-PMH, sa version, sa licence et son accès. La source d'une copie de type `repository` donne sa plateforme (`platforms`), sous le nom qu'OpenAlex lui donne. Les fiches du DOAJ, sans copie du texte, sont écartées.
-- **Auteurs** : nom tel qu'il apparaît dans la contribution source, auteur correspondant, ORCID si présent.
+- **Auteurs** : nom brut, auteur correspondant, ORCID si présent.
 - **Affiliations** : adresse textuelle + identifiants OpenAlex des institutions
 - **Revues et éditeurs** : titre, ISSN, eISSN, ISSN-L, type, modèle OA, identifiants OpenAlex du journal et de l'éditeur
 
@@ -177,4 +177,4 @@ Document `W4395704497` (2 auteurs, article de mathématiques). `abstract_inverte
 ## Particularités
 
 - Les requêtes paginées tronquent les `authorships` à **100 auteurs** par publication. Ces works sont marqués `staging.authors_truncated` au moissonnage, et [fetch_truncated](https://github.com/Y33sha/bibliometrie-uca/blob/master/pipeline/ingestion/openalex/fetch_truncated.py) les retélécharge un par un pour lire la liste complète.
-- OpenAlex rattache chaque auteur à une entité auteur qu'il construit par algorithme, souvent fautive (`author.display_name`, `author.orcid`). Le pipeline lit le nom (`raw_author_name`) et l'ORCID (`raw_orcid`) que donne la source amont d'OpenAlex. Cet ORCID sert au rattachement des personnes, comme ceux de Crossref, DataCite et HAL (`ORCID_MATCH_SOURCES`).
+- OpenAlex rattache chaque auteur à une entité auteur construite par algorithme, souvent fautive (`author.display_name`, `author.orcid`). Le pipeline lit le nom (`raw_author_name`) et l'ORCID (`raw_orcid`) donnés par la source amont d'OpenAlex. Cet ORCID sert au rattachement des personnes, comme ceux de Crossref, DataCite et HAL (`ORCID_MATCH_SOURCES`).

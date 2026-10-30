@@ -130,4 +130,4 @@ Le statut open access vient de la diffusion de la thèse. `cas` est le cas de di
 
 ### Langue et résumé
 
-La langue est la première de `langues`. Le résumé est celui de la première langue qui en a un.
+La langue est la première de `langues`. Le résumé est le premier disponible, dans l'ordre des langues.

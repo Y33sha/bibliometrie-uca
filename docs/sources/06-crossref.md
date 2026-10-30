@@ -8,7 +8,7 @@ Documentation API:
 - https://www.crossref.org/documentation/retrieve-metadata/rest-api/
 - https://api.crossref.org/swagger-ui/index.html
 
-Le pipeline interroge Crossref par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person)). Crossref fait autorité, après theses.fr, sur les métadonnées des DOI qu'il enregistre.
+Le pipeline interroge Crossref par DOI, pour les documents découverts par les autres sources ([`fetch_missing_doi`](../pipeline/02-harvest.md#documents-absents-dune-source-fetch_missing)), et par l'ORCID des personnes RH ([moissonnage par personne](../pipeline/02-harvest.md#moissonnage-par-personne-harvest_by_person)). Crossref fait autorité, après theses.fr, sur les métadonnées des DOI Crossref.
 
 ## API utilisée
 
@@ -29,7 +29,7 @@ Le pipeline interroge Crossref par DOI, pour les documents découverts par les a
 
 ## Exemple de payload
 
-Document `10.1063/5.0056957` (2 auteurs en mécanique). Réduit aux champs que le pipeline lit ; résumé tronqué.
+Document `10.1063/5.0056957` (2 auteurs en mécanique). Réduit aux champs lus par le pipeline ; résumé tronqué.
 
 ```json
 {
@@ -81,11 +81,11 @@ Crossref déclare ses relations dans `source_extras.relation`, sous des clés co
 
 ### Affiliations mal renseignées
 
-Crossref donne une affiliation pour 29 % des auteurs (sondage sur 1 000 payloads), souvent la seule tutelle. Ces affiliations deviennent des adresses, que la phase `affiliations` examine. Leur pauvreté exclut le moissonnage par affiliation.
+Crossref donne une affiliation pour 29 % des auteurs (sondage sur 1 000 payloads), souvent la seule tutelle. Ces affiliations deviennent des adresses, examinées par la phase `affiliations`. Leur pauvreté exclut le moissonnage par affiliation.
 
 ### Type de document
 
-Crossref donne `journal-article` pour tous les sous-types d'article (synthèse, data paper, éditorial…). L'agrégation retient le sous-type qu'une autre source donne ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)).
+Crossref donne `journal-article` pour tous les sous-types d'article (synthèse, data paper, éditorial…). L'agrégation retient le sous-type donné par une autre source ([`arbitrate_doc_type_with_article_subtype`](https://github.com/Y33sha/bibliometrie-uca/blob/master/domain/publications/aggregation.py)).
 
 ### Statut open access
 
