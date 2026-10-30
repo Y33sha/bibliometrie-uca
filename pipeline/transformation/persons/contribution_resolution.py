@@ -33,6 +33,7 @@ from domain.persons.contributor_name import ContributorName
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import Namesake
 from domain.persons.person import validated_name
+from domain.publications.contribution_roles import ContributionRole
 from infrastructure.db.queues import Queue, delete_processed, snapshot
 from infrastructure.repositories.person_repository import PgPersonRepository
 from infrastructure.sql_fragments import (
@@ -417,6 +418,21 @@ def _log_identified(
     )
 
 
+def unidentified_orphans(
+    candidates: dict[int, dict[int, list[AlignedSourceContribution]]],
+    decisions: dict[int, ContributionDecision],
+) -> list[ContributionDecision]:
+    """Décisions des contributions laissées sans personne parmi les contributions orphelines : contributions du périmètre, sous un rôle d'auteur."""
+    return [
+        decisions[contribution_id]
+        for by_contribution in candidates.values()
+        for contribution_id, members in by_contribution.items()
+        if decisions[contribution_id].outcome != ContributionOutcome.MATCH
+        and any(m.in_perimeter for m in members)
+        and any(ContributionRole.AUTHOR in m.roles for m in members)
+    ]
+
+
 def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict[str, int]:
     """Rattache les contributions aux personnes et crée les personnes manquantes. Renvoie les compteurs par issue et par motif.
 
@@ -452,21 +468,11 @@ def resolve_contributions(conn: Connection, logger: ScopedOrPlainLogger) -> dict
     _log_identified(logger, decisions, pinned)
 
     step(logger, "Création de nouvelles personnes")
-    # Contributions du périmètre sans personne, hors rôles interdisant la création.
-    unidentified = [
-        d
-        for d in decisions.values()
-        if d.outcome != ContributionOutcome.MATCH
-        and d.reason
-        not in (
-            ContributionSkipReason.OUT_OF_PERIMETER,
-            ContributionSkipReason.CREATION_NOT_ALLOWED,
-        )
-    ]
-    to_create = sum(1 for d in unidentified if d.outcome == ContributionOutcome.CREATE)
-    undecidable = len(unidentified) - to_create
+    unidentified = unidentified_orphans(candidates, decisions)
+    undecidable = sum(1 for d in unidentified if d.outcome == ContributionOutcome.SKIP)
+    to_create = sum(1 for d in decisions.values() if d.outcome == ContributionOutcome.CREATE)
     logger.info(
-        "%s%s du périmètre %s",
+        "%s%s d'auteur du périmètre %s",
         BRANCH,
         quantity(len(unidentified), "contribution"),
         inflect(len(unidentified), "non identifiée"),

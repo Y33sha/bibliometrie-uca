@@ -455,7 +455,7 @@ def test_un_role_sans_creation_ne_compte_pas_parmi_les_non_identifiees(sa_sync_c
     with caplog.at_level(logging.INFO):
         resolve_contributions(conn, logging.getLogger("test"))
 
-    assert "  ├─ 1 contribution du périmètre non identifiée" in caplog.messages
+    assert "  ├─ 1 contribution d'auteur du périmètre non identifiée" in caplog.messages
     assert "  ├─ 0 indécidable" in caplog.messages
     assert "  └─ 1 personne créée" in caplog.messages
 
