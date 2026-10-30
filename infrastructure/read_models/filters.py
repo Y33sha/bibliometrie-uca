@@ -16,14 +16,13 @@ from domain.publications.metadata import (
     OaStatus,
 )
 from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
-from domain.structures.structure import StructureType
 from infrastructure.read_models.publications.models import (
     DOI_AGENCY_SOURCES,
     NO_DOI,
     NO_LICENSE,
     OTHER_DOI_AGENCY,
 )
-from infrastructure.sql_fragments import has_author_role, pending_name_form
+from infrastructure.sql_fragments import has_author_role, is_laboratory, pending_name_form
 
 
 def _sql_list(values: Iterable[str]) -> str:
@@ -414,7 +413,7 @@ def no_lab_clause() -> WhereClause:
             SELECT 1 FROM publication_structures ps
             JOIN structures s ON s.id = ps.structure_id
             WHERE ps.publication_id = p.id
-              AND s.structure_type = '{StructureType.LABO.value}'
+              AND {is_laboratory("s")}
         )""",
         {},
     )

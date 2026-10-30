@@ -179,9 +179,9 @@
     return configs.find((c) => c.key === key);
   }
 
-  // Types de structure affichés sur la page publique des laboratoires (clé de config éditable).
-  const labDisplayTypes = $derived.by(() => {
-    const v = configByKey("laboratories_display_types")?.value;
+  const LABORATORY_TYPES_KEY = "laboratory_types";
+  const laboratoryTypes = $derived.by(() => {
+    const v = configByKey(LABORATORY_TYPES_KEY)?.value;
     return Array.isArray(v) ? (v as string[]) : [];
   });
 
@@ -234,9 +234,13 @@
     }
   }
 
-  async function toggleLabType(type: string) {
-    const next = labDisplayTypes.includes(type) ? labDisplayTypes.filter((t) => t !== type) : [...labDisplayTypes, type];
-    await configApi.setValue("laboratories_display_types", next);
+  async function toggleLaboratoryType(type: string) {
+    const next = laboratoryTypes.includes(type) ? laboratoryTypes.filter((t) => t !== type) : [...laboratoryTypes, type];
+    try {
+      await configApi.setValue(LABORATORY_TYPES_KEY, next);
+    } catch (e) {
+      toast("Erreur : " + errorMessage(e), "error");
+    }
     await load();
   }
 
@@ -518,11 +522,11 @@
       </div>
     {/if}
     <div class="config-row stacked">
-      <span class="config-label">Types de structures affichés sur la page Laboratoires</span>
+      <span class="config-label">Types de structures traités comme laboratoires</span>
       <div class="type-checks">
         {#each STRUCTURE_TYPES as t (t.value)}
           <label class="type-check">
-            <input type="checkbox" checked={labDisplayTypes.includes(t.value)} onchange={() => toggleLabType(t.value)} />
+            <input type="checkbox" checked={laboratoryTypes.includes(t.value)} onchange={() => toggleLaboratoryType(t.value)} />
             {t.label}
           </label>
         {/each}

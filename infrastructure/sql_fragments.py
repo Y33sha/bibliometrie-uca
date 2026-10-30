@@ -3,7 +3,10 @@
 Trois formes : des fragments rendus depuis des constantes du domaine (`in_clause`, `case_priority`), valeurs d'enums ou ordres de priorité, sans entrée utilisateur, donc sûrs à interpoler ; des expressions rendues depuis les alias de la requête hôte ; des expressions SQL figées.
 """
 
+import json
+
 from application.ports.repositories.address_repository import AddressCountryFilter
+from domain.config import DEFAULT_LABORATORY_TYPES, LABORATORY_TYPES_KEY
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.matching import ORCID_MATCH_SOURCES, STRONG_PERSON_IDENTIFIER_TYPES
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
@@ -74,6 +77,16 @@ def diamond_journal_sql(serial: str = "j") -> str:
         f"({serial}.oa_model = '{OaModel.DIAMOND.value}' OR ({serial}.is_in_doaj"
         f" AND {serial}.doaj_payload->>'APC' = 'No'"
         f" AND {serial}.doaj_payload->>'Has other fees' = 'No'))"
+    )
+
+
+def is_laboratory(structure: str = "s") -> str:
+    """Condition vraie quand la structure aliasée `structure` est d'un type traité comme laboratoire (clé de config `LABORATORY_TYPES_KEY`, `DEFAULT_LABORATORY_TYPES` en son absence). La liste des types se calcule une fois par requête."""
+    default = json.dumps([t.value for t in DEFAULT_LABORATORY_TYPES])
+    return (
+        f"{structure}.structure_type = ANY(ARRAY(SELECT jsonb_array_elements_text(COALESCE("
+        f"(SELECT value FROM config WHERE key = '{LABORATORY_TYPES_KEY}'), '{default}'::jsonb)"
+        "))::structure_type[])"
     )
 
 

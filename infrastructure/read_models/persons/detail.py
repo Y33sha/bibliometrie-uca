@@ -5,7 +5,6 @@ from sqlalchemy import Connection, text
 from domain.publications.contribution_roles import ContributionRole
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.sources.registry import Source
-from domain.structures.structure import StructureType
 from infrastructure.read_models._common import (
     StructureRef,
     page_count,
@@ -23,7 +22,7 @@ from infrastructure.read_models.persons.models import (
     PersonThesis,
 )
 from infrastructure.read_models.subjects.models import SubjectFrequency
-from infrastructure.sql_fragments import has_author_role, in_clause
+from infrastructure.sql_fragments import has_author_role, in_clause, is_laboratory
 
 _THESIS_ROLES = (
     ContributionRole.THESIS_DIRECTOR,
@@ -106,7 +105,7 @@ class PersonDetailQueries:
                         JOIN contribution_structures aus ON aus.contribution_id = a2.id
                         JOIN structures st ON st.id = aus.structure_id
                         WHERE a2.publication_id = p.id AND a2.in_perimeter
-                          AND st.structure_type = '{StructureType.LABO.value}'
+                          AND {is_laboratory("st")}
                        ) AS structure_ids
                 FROM contributions a
                 JOIN publications p ON p.id = a.publication_id

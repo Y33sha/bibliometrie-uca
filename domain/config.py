@@ -1,19 +1,22 @@
 """Règles des paramètres applicatifs : forme imposée à chaque clé, valeur appliquée quand la clé est absente."""
 
+from collections.abc import Callable
 from enum import StrEnum
 from typing import NamedTuple
 
 from domain.countries import NO_COUNTRY_CODE, normalize_country_code
 from domain.errors import ValidationError
+from domain.structures.structure import StructureType
 from domain.types import JsonValue
 
+LABORATORY_TYPES_KEY = "laboratory_types"
+"""Clé des types de structure traités comme laboratoires."""
+
+DEFAULT_LABORATORY_TYPES: tuple[StructureType, ...] = (StructureType.LABO,)
+"""Types de structure traités comme laboratoires quand la clé est absente."""
+
 # Clés de configuration consommées par une page publique
-PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset(
-    {
-        # Types de structure affichés par la page des laboratoires.
-        "laboratories_display_types",
-    }
-)
+PUBLIC_CONFIG_KEYS: frozenset[str] = frozenset({LABORATORY_TYPES_KEY})
 
 
 class ConfigKey(StrEnum):
@@ -142,46 +145,86 @@ def _as_int(value: JsonValue) -> int | None:
     return None
 
 
+def _site_title(key: str, value: JsonValue) -> JsonValue:
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValidationError(f"`{key}` attend un texte ; reçu : {value!r}")
+    return value.strip()
+
+
+def _brand_hue(key: str, value: JsonValue) -> JsonValue:
+    teinte = _as_int(value)
+    if teinte is None or not (0 <= teinte <= 359):
+        raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
+    return teinte
+
+
+def _institution_country(key: str, value: JsonValue) -> JsonValue:
+    code = normalize_country_code(value) if isinstance(value, str) else None
+    if code is None or code == NO_COUNTRY_CODE:
+        raise ValidationError(f"`{key}` attend un code pays à deux lettres ; reçu : {value!r}")
+    return code
+
+
+def _laboratory_types(key: str, value: JsonValue) -> JsonValue:
+    """Types sans doublon, dans l'ordre de `StructureType`."""
+    if not isinstance(value, list) or not value:
+        raise ValidationError(
+            f"`{key}` attend une liste non vide de types de structure ; reçu : {value!r}"
+        )
+    inconnus = [v for v in value if v not in set(StructureType)]
+    if inconnus:
+        raise ValidationError(f"`{key}` : types de structure inconnus : {inconnus!r}")
+    return [t.value for t in StructureType if t in value]
+
+
+def _cap(key: str, value: JsonValue) -> JsonValue:
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return 0
+    plafond = _as_int(value)
+    if plafond is None or plafond < 0:
+        raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
+    return plafond
+
+
+def _delay(key: str, value: JsonValue) -> JsonValue:
+    delai = _as_int(value)
+    if delai is None or delai < 1:
+        raise ValidationError(
+            f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
+        )
+    return delai
+
+
+def _year(key: str, value: JsonValue) -> JsonValue:
+    annee = _as_int(value)
+    if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):
+        raise ValidationError(
+            f"`{key}` attend une année entre {MIN_YEAR} et {MAX_YEAR} ; reçu : {value!r}"
+        )
+    return annee
+
+
+_BY_KIND: dict[ConfigKind, Callable[[str, JsonValue], JsonValue]] = {
+    ConfigKind.CAP: _cap,
+    ConfigKind.DELAY: _delay,
+    ConfigKind.YEAR: _year,
+}
+
+_NORMALIZERS: dict[str, Callable[[str, JsonValue], JsonValue]] = {
+    SITE_TITLE_KEY: _site_title,
+    BRAND_HUE_KEY: _brand_hue,
+    INSTITUTION_COUNTRY_KEY: _institution_country,
+    LABORATORY_TYPES_KEY: _laboratory_types,
+    **{key.value: _BY_KIND[setting.kind] for key, setting in SETTINGS.items()},
+}
+
+
 def normalize_config_value(key: str, value: JsonValue) -> JsonValue:
     """Valeur à écrire pour `key`, ramenée à la forme que la clé impose.
 
     Lève `ValidationError` pour une valeur hors de cette forme. Une valeur absente ou vide vaut zéro pour un plafond, un texte vide pour le titre. Les clés sans forme imposée passent telles quelles.
     """
-    if key == SITE_TITLE_KEY:
-        if value is None:
-            return ""
-        if not isinstance(value, str):
-            raise ValidationError(f"`{key}` attend un texte ; reçu : {value!r}")
-        return value.strip()
-    if key == BRAND_HUE_KEY:
-        teinte = _as_int(value)
-        if teinte is None or not (0 <= teinte <= 359):
-            raise ValidationError(f"`{key}` attend un entier de 0 à 359 ; reçu : {value!r}")
-        return teinte
-    if key == INSTITUTION_COUNTRY_KEY:
-        code = normalize_country_code(value) if isinstance(value, str) else None
-        if code is None or code == NO_COUNTRY_CODE:
-            raise ValidationError(f"`{key}` attend un code pays à deux lettres ; reçu : {value!r}")
-        return code
-    if key in CAP_KEYS:
-        if value is None or (isinstance(value, str) and not value.strip()):
-            return 0
-        plafond = _as_int(value)
-        if plafond is None or plafond < 0:
-            raise ValidationError(f"`{key}` attend un entier positif ou nul ; reçu : {value!r}")
-        return plafond
-    if key in DELAY_KEYS:
-        delai = _as_int(value)
-        if delai is None or delai < 1:
-            raise ValidationError(
-                f"`{key}` attend un nombre entier de jours, au moins 1 ; reçu : {value!r}"
-            )
-        return delai
-    if key in YEAR_KEYS:
-        annee = _as_int(value)
-        if annee is None or not (MIN_YEAR <= annee <= MAX_YEAR):
-            raise ValidationError(
-                f"`{key}` attend une année entre {MIN_YEAR} et {MAX_YEAR} ; reçu : {value!r}"
-            )
-        return annee
-    return value
+    normalizer = _NORMALIZERS.get(key)
+    return value if normalizer is None else normalizer(key, value)

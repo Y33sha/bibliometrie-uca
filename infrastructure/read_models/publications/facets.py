@@ -15,7 +15,6 @@ from domain.publications.licenses import license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
 from domain.sources.registry import source_label
-from domain.structures.structure import StructureType
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models._common import (
     EntityFacetResponse,
@@ -30,6 +29,7 @@ from infrastructure.read_models.filters import (
     OA_OPEN_SQL,
     hal_status_expression,
     institution_apc_payment_sql,
+    no_lab_clause,
     own_structure_ids,
 )
 from infrastructure.read_models.perimeters.queries import get_persons_perimeter_name
@@ -48,6 +48,7 @@ from infrastructure.read_models.publications.models import (
     PublicationFilters,
     PublicationsFacetsResponse,
 )
+from infrastructure.sql_fragments import is_laboratory
 
 
 class _PublicationFacetsBuilder:
@@ -90,7 +91,7 @@ class _PublicationFacetsBuilder:
                 JOIN publications p ON p.id = ps.publication_id
                 JOIN structures s ON s.id = ps.structure_id
                 WHERE {where_sql}
-                  AND s.structure_type = '{StructureType.LABO.value}'
+                  AND {is_laboratory("s")}
                 GROUP BY s.id, s.acronym, s.name
                 ORDER BY count DESC
             """),
@@ -101,13 +102,7 @@ class _PublicationFacetsBuilder:
         no_lab_row = self.conn.execute(
             text(f"""
                 SELECT COUNT(*) AS total FROM publications p
-                WHERE {where_sql}
-                  AND NOT EXISTS (
-                      SELECT 1 FROM publication_structures ps
-                      JOIN structures s ON s.id = ps.structure_id
-                      WHERE ps.publication_id = p.id
-                        AND s.structure_type = '{StructureType.LABO.value}'
-                  )
+                WHERE {where_sql} AND {no_lab_clause().sql}
             """),
             binds,
         ).one()

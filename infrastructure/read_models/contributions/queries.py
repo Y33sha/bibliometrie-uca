@@ -4,7 +4,6 @@ from sqlalchemy import Connection, text
 
 from domain.persons.contributor_name import ContributorName
 from domain.sources.registry import SOURCE_PRIORITY
-from domain.structures.structure import StructureType
 from infrastructure.db.scalars import scalar_int
 from infrastructure.read_models._common import FacetOption
 from infrastructure.read_models.contributions.models import (
@@ -16,7 +15,7 @@ from infrastructure.read_models.contributions.models import (
 )
 from infrastructure.read_models.publications.models import PublicationLabItem
 from infrastructure.read_models.sql_fragments import contributor_display_name
-from infrastructure.sql_fragments import case_priority, has_author_role
+from infrastructure.sql_fragments import case_priority, has_author_role, is_laboratory
 
 # Contribution orpheline, matière de la file de rattachement : contribution du périmètre, sous un rôle d'auteur, sans personne.
 _ORPHAN_BASE = f"g.person_id IS NULL AND g.in_perimeter AND {has_author_role('g')}"
@@ -49,7 +48,7 @@ _DISPLAYED_MEMBER = f"CROSS JOIN LATERAL ({_displayed_member('sc_m.*')}) sc"
 # Laboratoires atteints par les contributions sources de la contribution `g`, chacun une fois : clause `FROM … WHERE` sur `structures s`.
 _CONTRIBUTION_LABS = f"""
     structures s
-    WHERE s.structure_type = '{StructureType.LABO.value}'
+    WHERE {is_laboratory("s")}
       AND s.id IN (
           SELECT scs.structure_id FROM source_contribution_structures scs
           JOIN aligned_source_contributions gm_s

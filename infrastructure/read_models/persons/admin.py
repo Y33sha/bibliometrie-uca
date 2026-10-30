@@ -7,7 +7,6 @@ from sqlalchemy import Connection, bindparam, text
 from domain.persons.identifiers import PERSON_IDENTIFIER_TYPES, AttributionStatus
 from domain.persons.name_forms import CANONICAL_NAME_FORM_SOURCE
 from domain.persons.name_matching import names_compatible
-from domain.structures.structure import StructureType
 from infrastructure.db.source_record_identifiers import source_record_doi_sql
 from infrastructure.read_models.persons.models import (
     AmbiguousFormPersonOut,
@@ -34,6 +33,7 @@ from infrastructure.sql_fragments import (
     CONTRIBUTIONS_AND_SOURCES,
     has_author_role,
     identifier_neutralized,
+    is_laboratory,
     pending_name_form,
 )
 
@@ -111,7 +111,7 @@ def _curation_persons(conn: Connection, ids: list[int]) -> dict[int, CurationPer
                        SELECT array_agg(DISTINCT COALESCE(s.acronym, s.name)
                                         ORDER BY COALESCE(s.acronym, s.name))
                        FROM structures s
-                       WHERE s.structure_type = '{StructureType.LABO.value}' AND s.id IN (
+                       WHERE {is_laboratory("s")} AND s.id IN (
                            SELECT scs.structure_id FROM source_contribution_structures scs
                            JOIN aligned_source_contributions m
                              ON m.source_contribution_id = scs.source_contribution_id
@@ -241,7 +241,7 @@ _OVERLAP_DIMENSIONS: dict[str, str] = {
         SELECT a.person_id AS person, aus.structure_id AS val
         FROM contributions a
         JOIN contribution_structures aus ON aus.contribution_id = a.id
-        JOIN structures s ON s.id = aus.structure_id AND s.structure_type = '{StructureType.LABO.value}'
+        JOIN structures s ON s.id = aus.structure_id AND {is_laboratory("s")}
         WHERE a.person_id = ANY(:ids)
     """,
     "serials": """

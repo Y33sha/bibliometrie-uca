@@ -23,7 +23,6 @@ from sqlalchemy import Connection, text
 from domain.errors import ValidationError
 from domain.publications.doc_types import DOC_TYPE_FAMILIES
 from domain.publications.metadata import OaStatus
-from domain.structures.structure import StructureType
 from infrastructure.read_models.filters import (
     OA_OPEN_SQL,
     OWN_RORS_SQL,
@@ -40,6 +39,7 @@ from infrastructure.read_models.stats.models import (
     PivotResponse,
     PivotSchemaResponse,
 )
+from infrastructure.sql_fragments import is_laboratory
 
 Cardinality = Literal["low", "high"]
 
@@ -135,7 +135,7 @@ DIMENSIONS: dict[str, Dimension] = {
             group_sql="COALESCE(ls.acronym, ls.name)",
             join_sql=(
                 "JOIN publication_structures lps ON lps.publication_id = p.id "
-                f"JOIN structures ls ON ls.id = lps.structure_id AND ls.structure_type = '{StructureType.LABO.value}'"
+                f"JOIN structures ls ON ls.id = lps.structure_id AND {is_laboratory('ls')}"
             ),
         ),
         # Forte cardinalité : comparaison et facette (filtre par éditeur, recherche serveur). Jointure interne : exclut les publications sans éditeur.

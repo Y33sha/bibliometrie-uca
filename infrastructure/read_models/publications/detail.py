@@ -28,7 +28,7 @@ from infrastructure.read_models.sql_fragments import (
     contributor_display_name,
 )
 from infrastructure.read_models.subjects.models import SubjectOut
-from infrastructure.sql_fragments import active_issns
+from infrastructure.sql_fragments import active_issns, is_laboratory
 
 
 def get_publication_relations(conn: Connection, publication_id: int) -> list[RelatedPublicationOut]:
@@ -85,17 +85,24 @@ def get_publication_relations(conn: Connection, publication_id: int) -> list[Rel
 
 
 def structures_by_id(conn: Connection, ids: set[int]) -> dict[str, StructureInfo]:
-    """Acronyme, nom et type des structures données, par identifiant en texte."""
+    """Acronyme, nom et type des structures données, par identifiant en texte, et si chacune est un laboratoire."""
     if not ids:
         return {}
     rows = conn.execute(
-        text("""
-            SELECT id, acronym, name, structure_type::text AS type FROM structures
-            WHERE id = ANY(:ids)
+        text(f"""
+            SELECT s.id, s.acronym, s.name, s.structure_type::text AS type,
+                   {is_laboratory("s")} AS is_laboratory
+            FROM structures s
+            WHERE s.id = ANY(:ids)
         """),
         {"ids": list(ids)},
     ).all()
-    return {str(s.id): StructureInfo(acronym=s.acronym, name=s.name, type=s.type) for s in rows}
+    return {
+        str(s.id): StructureInfo(
+            acronym=s.acronym, name=s.name, type=s.type, is_laboratory=s.is_laboratory
+        )
+        for s in rows
+    }
 
 
 # Identifiants de bases qui référencent la publication, affichés dans la colonne latérale, dans l'ordre d'affichage. Le lien source HAL couvre le `hal_id`, le DOI de la publication ses DOI. arXiv et PMCID désignent des copies, qui sont des localisations.

@@ -5561,6 +5561,8 @@ export interface components {
             name: string;
             /** Type */
             type: string;
+            /** Is Laboratory */
+            is_laboratory: boolean;
         };
         /**
          * StructureListItem

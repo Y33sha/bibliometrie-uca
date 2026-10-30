@@ -190,7 +190,7 @@
 			api<ConfigItem[]>('/api/config'),
 			api<Perimeter[]>('/api/perimeters'),
 		]);
-		defaultTypes = (config.find((c) => c.key === 'laboratories_display_types')?.value ?? ['labo']) as string[];
+		defaultTypes = (config.find((c) => c.key === 'laboratory_types')?.value ?? ['labo']) as string[];
 		const persons = perimeterList.find((p) => p.is_persons);
 		defaultPerimeters = persons ? [String(persons.id)] : [];
 

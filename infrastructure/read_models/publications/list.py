@@ -12,7 +12,6 @@ from domain.publications.licenses import license_label
 from domain.source_records.source_extras import SourceExtra
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS
 from domain.sources.registry import Source, source_record_url
-from domain.structures.structure import StructureType
 from infrastructure.read_models.csv_export import (
     MAX_EXPORT_ROWS,
     CsvWriter,
@@ -29,7 +28,7 @@ from infrastructure.read_models.publications.models import (
     PublicationListItem,
     PublicationListResponse,
 )
-from infrastructure.sql_fragments import has_author_role, source_extra
+from infrastructure.sql_fragments import has_author_role, is_laboratory, source_extra
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +80,7 @@ def _perimeter_labs(*, person_filter: bool = False, correlated: bool = True) -> 
     person_clause = "AND lc.person_id = :lab_person" if person_filter else ""
     return f"""FROM contributions lc
                  JOIN contribution_structures lcs ON lcs.contribution_id = lc.id
-                 JOIN structures s ON s.id = lcs.structure_id AND s.structure_type = '{StructureType.LABO.value}'
+                 JOIN structures s ON s.id = lcs.structure_id AND {is_laboratory("s")}
                  WHERE {publication_clause} lc.in_perimeter = TRUE
                    AND {has_author_role("lc")}
                    {person_clause}"""

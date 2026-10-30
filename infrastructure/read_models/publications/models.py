@@ -349,6 +349,7 @@ class StructureInfo(BaseModel):
     acronym: str | None
     name: str
     type: str
+    is_laboratory: bool
 
 
 class RelatedPublicationOut(BaseModel):

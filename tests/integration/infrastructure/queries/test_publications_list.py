@@ -4,11 +4,13 @@ from functools import partial
 
 from sqlalchemy import text
 
+from domain.config import LABORATORY_TYPES_KEY
 from infrastructure.read_models.publications.facets import _PublicationFacetsBuilder
 from infrastructure.read_models.publications.filtering import FilterContext, filter_context
 from infrastructure.read_models.publications.models import PublicationFilters
 from infrastructure.read_models.stats.queries import StatsQueries
 from tests.integration.helpers.alignment import align_source_contributions
+from tests.integration.helpers.config import set_config
 from tests.integration.helpers.contributions import contribution_id_of, insert_contribution
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
@@ -449,6 +451,41 @@ class TestLabScope:
 
         labs, _ = builder._facet_labs()
         assert [(o.value, o.count) for o in labs] == [(str(lab), 1)]
+
+
+class TestLaboratoryTypes:
+    """La clé `laboratory_types` définit les types de structure traités comme laboratoires : facette, décompte « Sans laboratoire » et colonne de la liste."""
+
+    def _seed(self, conn):
+        institute = insert_structure(conn, "INST", structure_type="admin")
+        _attach(conn, insert_publication(conn, in_perimeter=True), institute)
+        return institute
+
+    def _facet(self, conn):
+        filters = PublicationFilters()
+        return _PublicationFacetsBuilder(conn, filters, filter_context(conn, filters))._facet_labs()
+
+    def _labs_column(self, conn):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(), page=1, per_page=50, sort="year_desc"
+        )
+        return [[lab.label for lab in p.lab_items or []] for p in res.publications]
+
+    def test_structure_outside_the_types_is_not_a_laboratory(self, sa_sync_conn):
+        self._seed(sa_sync_conn)
+        set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo"])
+
+        assert self._facet(sa_sync_conn) == ([], 1)
+        assert self._labs_column(sa_sync_conn) == [[]]
+
+    def test_structure_of_a_listed_type_is_a_laboratory(self, sa_sync_conn):
+        institute = self._seed(sa_sync_conn)
+        set_config(sa_sync_conn, LABORATORY_TYPES_KEY, ["labo", "admin"])
+
+        labs, no_lab_count = self._facet(sa_sync_conn)
+        assert [(o.value, o.count) for o in labs] == [(str(institute), 1)]
+        assert no_lab_count == 0
+        assert self._labs_column(sa_sync_conn) == [["INST"]]
 
 
 class TestHalStatusNeedsASingleLab:
