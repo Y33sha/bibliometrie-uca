@@ -148,12 +148,12 @@ La normalisation retire le suffixe `.vN`. Chez Figshare et les repositories sur 
 - [x] Normalisation : DOI gardé avec son suffixe de version ; `doi_version` donne sa forme sans version et son numéro.
 - [x] Formes sans version parmi les DOI candidats de `fetch_missing`. `doi_targets` en déduit la cible : la forme sans version quand c'est le DOI `primary` d'un enregistrement source, sinon la version la plus récente. Une cible déclarée prime.
 - [x] `is_matchable` : enregistrement source DataCite écarté seulement quand sa cible est le DOI `primary` d'un autre enregistrement source. Sur la base locale, 119 des 6 137 enregistrements sources DataCite écartés reviennent, leur cible étant présente seulement comme DOI d'un autre rôle.
-- [ ] Stock : identifiants DOI réécrits depuis le raw store (oneshot).
+- [x] Stock : identifiants DOI et identifiants Crossref et DataCite réécrits depuis le raw store (oneshot `rewrite_versioned_dois`). Sur la base locale, 548 DOI ont pour cible leur forme sans version, 121 leur version la plus récente.
 
 ### Phase 8 — Documentation
 
 - [x] Mise à jour de la documentation.
-- [ ] Suffixes de version et cibles de version.
+- [x] Suffixes de version et cibles de version.
 
 ## Questions ouvertes
 

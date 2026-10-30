@@ -1,6 +1,6 @@
 # Moissonnage
 
-*À jour le 2026-10-28.*
+*À jour le 2026-10-30.*
 
 Récupère les données brutes depuis les API et les stocke en JSONB dans le *staging*.
 
@@ -35,7 +35,7 @@ Dans HAL, les documents dont le hal-id figure dans OpenAlex ou ScanR et qui sont
 Dans HAL, en mode full, les thèses de theses.fr sans document HAL. Dans theses.fr, les thèses dont le NNT figure dans une autre source et qui sont absentes de theses.fr dans `staging`, par exemple une thèse soutenue dans un autre établissement.
 
 **`fetch_missing.doi.<source>` : DOI manquants par source.**
-Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
+Pour chacune des six sources interrogeables par DOI — HAL, OpenAlex, WoS, ScanR, Crossref, DataCite —, recherche les documents présents dans les autres sources et non trouvés dans celle-ci par le moissonnage initial. Les DOI cherchés sont ceux des publications de la fenêtre d'années du run : l'un des enregistrements sources de la publication a son année dans la fenêtre. Un DOI à suffixe de version (`.v2`, `/v2`) ajoute sa forme sans version, cherchée dans toutes les sources. Crossref, non interrogeable par affiliation, est seulement interrogé ici et par personne.
 
 Crossref et DataCite reçoivent seulement les DOI dont le préfixe est enregistré chez eux, d'après l'agence que la phase [resolve_ra](05-publishing.md#agences-denregistrement-doi-resolve_ra) a résolue. Un DOI dont le préfixe est sans agence attend le run suivant.
 
