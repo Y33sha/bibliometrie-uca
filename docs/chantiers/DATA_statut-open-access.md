@@ -41,7 +41,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 - [x] Registre des plateformes : theses.fr, `hdl.handle.net`, archives institutionnelles, serveurs de preprints reconnus par préfixe DOI. Fiches du DOAJ, du DOAB et de PubMed écartées des copies. Reste `green` → `bronze` : 789 publications, à copie sur une plateforme d'éditeurs (OpenEdition, Cairn) ou à lien `doi.org` de ScanR. 2d9d97af7
 - [x] La description d'une copie par sa propre plateforme prime : une copie HAL suit l'enregistrement HAL. `green` → `closed` : 1 019 publications. Parmi elles, 270 enregistrements sources HAL sans fichier, 224 dépôts HAL sans fichier principal, environ 300 publications à seule copie ouverte sur une fiche de catalogue. ef34b5ae0
-- [ ] `is_oa` de ScanR sur les liens `doi.org` : mesurer contre Unpaywall, l'écarter s'il est peu fiable.
+- [x] `is_oa` de ScanR sur les liens `doi.org` : mesurer contre Unpaywall, l'écarter s'il est peu fiable. Copies ouvertes à DOI vérifié par Unpaywall, hors DOI d'archive : verdict `closed` ou `green` pour 5,6 % des copies ScanR, 4,6 % des copies OpenAlex. ScanR est aussi fiable qu'OpenAlex.
 
 ### Phase 2 — Embargo sur les copies
 
@@ -63,3 +63,4 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 
 - Le statut déclaré par chaque source (`source_records.oa_status`) sert-il encore, hors embargo de theses.fr ?
 - Dépôt HAL sans fichier principal, dit ouvert par HAL (`openAccess_bool`, annexe seule) : copie ouverte ou fermée ? La normalisation HAL la tient pour fermée. 224 publications.
+- Copie ouverte sur `doi.org`, à DOI vérifié par Unpaywall : le verdict décide-t-il de son ouverture ? Unpaywall décrit la page de l'éditeur, comme HAL décrit ses dépôts. Le plancher compte sinon environ 5 % de copies faussement ouvertes.
