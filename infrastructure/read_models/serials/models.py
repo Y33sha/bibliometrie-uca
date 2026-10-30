@@ -62,6 +62,7 @@ class SerialListItem(Model):
     publisher_name: str | None
     is_in_doaj: bool
     serial_type: SerialType | None
+    oa_model: OaModel | None
     publication_count: int
     doaj_url: str | None
 
@@ -75,7 +76,6 @@ class SerialDetailResponse(SerialListItem):
 
     issn_details: list[SerialIssnDetail]
     openalex_id: str | None
-    oa_model: OaModel | None
     is_academic: bool | None
     doaj_payload: dict[str, str] | None
     """Réponse DOAJ brute, renvoyée telle quelle."""

@@ -234,6 +234,7 @@
 <table class="data-table journals-table">
 	<thead>
 		<tr>
+			<th class="diamond-col" aria-label="Revue diamant"></th>
 			<th class="sortable" onclick={() => setSort('title')}>
 				{columnLabels.title} <SortChevron direction={sortDirection(currentSort, 'title')} />
 			</th>
@@ -253,6 +254,17 @@
 	<tbody>
 		{#each serials.items as j (j.id)}
 			<tr>
+				<td class="diamond-col">
+					{#if j.oa_model === 'diamond'}
+						<span class="diamond" title="Revue diamant&nbsp;: open access sans frais de publication" aria-label="Revue diamant">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+								<path d="M6 3h12l4 6-10 13L2 9Z" />
+								<path d="M11 3 8 9l4 13 4-13-3-6" />
+								<path d="M2 9h20" />
+							</svg>
+						</span>
+					{/if}
+				</td>
 				<td>
 					<a href={resolve(`journals/${j.id}`)} class="entity-link">{j.title}</a>
 					{#if j.is_in_doaj}
@@ -280,7 +292,7 @@
 			</tr>
 		{/each}
 		{#if serials.items.length === 0}
-			<TableStatusRow loading={serials.loading} error={serials.error} colspan={(publisherFixed ? 4 : 5) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
+			<TableStatusRow loading={serials.loading} error={serials.error} colspan={(publisherFixed ? 5 : 6) + (actionCell ? 1 : 0)} emptyText="Aucune publication en série ne correspond aux filtres." />
 		{/if}
 	</tbody>
 </table>
@@ -299,6 +311,8 @@
 <style>
 	.journals-table { min-width: 660px; }
 	.journals-table td.num { color: var(--muted); }
+	.diamond-col { width: 1.5rem; padding-right: 0; }
+	.diamond { display: inline-flex; color: var(--diamond-text); vertical-align: middle; }
 	.muted { color: var(--muted); }
 
 

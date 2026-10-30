@@ -48,7 +48,7 @@ from infrastructure.sql_fragments import active_issns, corrected, has_active_iss
 _SERIAL_LIST_COLUMNS = f"""
     j.id, j.title, {active_issns("j.id")} AS issns,
     j.publisher_id, p.name AS publisher_name,
-    j.is_in_doaj, j.serial_type, j.publication_count,
+    j.is_in_doaj, j.serial_type, j.oa_model, j.publication_count,
     j.doaj_payload->>'DOAJ id' AS doaj_id,
     j.doaj_payload->>'URL in DOAJ' AS doaj_url_csv
 """
@@ -56,7 +56,7 @@ _SERIAL_LIST_COLUMNS = f"""
 # Colonnes du profil complet : la ligne de liste plus les champs propres au détail (page publique, édition admin).
 _SERIAL_DETAIL_COLUMNS = f"""
     {_SERIAL_LIST_COLUMNS},
-    j.openalex_id, j.oa_model, j.is_academic
+    j.openalex_id, j.is_academic
 """
 
 
@@ -81,6 +81,7 @@ def _serial_list_item(row: Row[tuple[object, ...]]) -> SerialListItem:
         publisher_name=row.publisher_name,
         is_in_doaj=row.is_in_doaj,
         serial_type=row.serial_type,
+        oa_model=row.oa_model,
         publication_count=row.publication_count,
         doaj_url=resolve_doaj_url(row.doaj_url_csv, row.doaj_id),
     )
@@ -488,7 +489,6 @@ class SerialQueries:
                 )
             ],
             openalex_id=row.openalex_id,
-            oa_model=row.oa_model,
             is_academic=row.is_academic,
             doaj_payload=row.doaj_payload,
             doaj_imported_at=row.doaj_imported_at,

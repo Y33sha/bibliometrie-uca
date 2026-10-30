@@ -5424,6 +5424,7 @@ export interface components {
             /** Is In Doaj */
             is_in_doaj: boolean;
             serial_type: components["schemas"]["SerialType"] | null;
+            oa_model: components["schemas"]["OaModel"] | null;
             /** Publication Count */
             publication_count: number;
             /** Doaj Url */
@@ -5432,7 +5433,6 @@ export interface components {
             issn_details: components["schemas"]["SerialIssnDetail"][];
             /** Openalex Id */
             openalex_id: string | null;
-            oa_model: components["schemas"]["OaModel"] | null;
             /** Is Academic */
             is_academic: boolean | null;
             /**
@@ -5520,6 +5520,7 @@ export interface components {
             /** Is In Doaj */
             is_in_doaj: boolean;
             serial_type: components["schemas"]["SerialType"] | null;
+            oa_model: components["schemas"]["OaModel"] | null;
             /** Publication Count */
             publication_count: number;
             /** Doaj Url */

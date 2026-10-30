@@ -68,6 +68,7 @@
 	--closed: #4b5260;
 	--unknown: #c9ced6;
 	--diamond: #d0d4fb;
+	--diamond-text: #0288a8; /* lisible en texte sur fond clair */
 	--gold: #ffd700;
 	--hybrid: #b366f2;
 	--bronze: #cd7f32;
@@ -1230,7 +1231,7 @@ a.badge-doaj:hover {
 
 .oa-diamond {
 	background: #e0f2f7;
-	color: #0288a8;
+	color: var(--diamond-text);
 }
 
 .oa-hybrid {
