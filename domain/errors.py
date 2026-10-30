@@ -77,10 +77,7 @@ class PersonAlreadyInPublicationError(ConflictError):
     def __init__(self, publication_id: int, contribution_id: int) -> None:
         self.publication_id = publication_id
         self.contribution_id = contribution_id
-        super().__init__(
-            f"La personne a déjà la contribution #{contribution_id} dans la publication "
-            f"#{publication_id}, rattachée par une décision humaine."
-        )
+        super().__init__("Cette personne est déjà rattachée à cette publication.")
 
 
 class RejectedPair(TypedDict):

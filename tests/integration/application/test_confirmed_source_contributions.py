@@ -111,3 +111,4 @@ def test_attach_refuse_quand_la_personne_a_une_contribution_manuelle_dans_la_pub
     with pytest.raises(PersonAlreadyInPublicationError) as error:
         contribution_service(sa_sync_conn).assign_orphan_contribution(pid, contribution)
     assert error.value.contribution_id == manual
+    assert str(error.value) == "Cette personne est déjà rattachée à cette publication."
