@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Logo de la Licence Ouverte Etalab. Source : https://commons.wikimedia.org/wiki/File:Logo-licence-ouverte2.svg, sous licence CC BY 2.0 FR. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 693.5 1122.5">
+  <rect x="13.38" y="13.38" width="666.75" height="1095.74" ry="78.65" fill="#000" stroke="#000" stroke-width="26.76" stroke-linejoin="round"/>
+  <rect x="31.16" y="39.39" width="628.45" height="534.87" ry="60.28" fill="#fff"/>
+  <ellipse cx="426.22" cy="288.48" rx="158.13" ry="161.84"/>
+  <ellipse cx="274.37" cy="852.83" rx="161.55" ry="167.21" fill="#fff"/>
+  <ellipse cx="270.82" cy="850.97" rx="88.19" ry="96.02"/>
+  <rect x="481.27" y="694.87" width="73.88" height="310.9" fill="#fff"/>
+  <rect x="147.06" y="134.64" width="68.72" height="311.35"/>
+  <ellipse cx="427.63" cy="288.81" rx="89.75" ry="97.91" fill="#fff"/>
+</svg>
