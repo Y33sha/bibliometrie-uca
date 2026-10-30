@@ -91,15 +91,15 @@ audit_log = Table(
         ),
     ),
     Column(
-        "aggregate_type",
+        "entity_type",
         Text,
         nullable=False,
         comment=(
-            "Type de l'entité affectée : address, journal, perimeter, person, publication, structure."
+            "Type de l'entité affectée : address, config, perimeter, person, publication, publisher, serial, structure."
         ),
     ),
     Column(
-        "aggregate_id",
+        "entity_id",
         Integer,
         comment=(
             "ID de l'entité affectée, NULL si l'entité a été supprimée et "

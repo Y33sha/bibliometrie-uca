@@ -226,7 +226,7 @@ class TestDeleteStructure:
         with owner_pool() as cur:
             cur.execute(
                 "SELECT payload::text AS payload FROM audit_log"
-                " WHERE event_type = 'structure.deleted' AND aggregate_id = %s",
+                " WHERE event_type = 'structure.deleted' AND entity_id = %s",
                 (sid,),
             )
             payload = json.loads(cur.fetchone()["payload"])

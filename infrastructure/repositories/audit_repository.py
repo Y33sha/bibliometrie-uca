@@ -16,16 +16,16 @@ class PgAuditRepository(AuditRepository):
     def record_event(
         self,
         event_type: str,
-        aggregate_type: str,
-        aggregate_id: int | None,
+        entity_type: str,
+        entity_id: int | None,
         payload: dict[str, JsonValue],
         user_id: str,
     ) -> None:
         self._conn.execute(
             insert(audit_log).values(
                 event_type=event_type,
-                aggregate_type=aggregate_type,
-                aggregate_id=aggregate_id,
+                entity_type=entity_type,
+                entity_id=entity_id,
                 payload=payload,
                 user_id=user_id,
             )

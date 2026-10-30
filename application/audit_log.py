@@ -19,8 +19,8 @@ from domain.types import JsonValue
 @dataclass(frozen=True, slots=True)
 class _AuditEvent:
     event_type: str
-    aggregate_type: str
-    aggregate_id: int | None
+    entity_type: str
+    entity_id: int | None
     payload: dict[str, JsonValue]
 
 
@@ -55,17 +55,17 @@ def get_current_user() -> str | None:
 
 def emit_event(
     event_type: str,
-    aggregate_type: str,
-    aggregate_id: int | None = None,
+    entity_type: str,
+    entity_id: int | None = None,
     payload: dict[str, JsonValue] | None = None,
 ) -> None:
     """Ajoute un événement à la file de la requête en cours ; sans requête d'administration, ne consigne rien.
 
-    `event_type` est en notation pointée (`person.merged`, `structure.deleted`), `aggregate_type` est le type de l'entité touchée (person, publication, structure, serial, publisher, address…). `aggregate_id` est nul quand l'entité disparaît sans équivalent, ou quand l'événement concerne un lot. `payload` contient les données utiles, sérialisables en JSON (source d'une fusion, champs modifiés…).
+    `event_type` est en notation pointée (`person.merged`, `structure.deleted`), `entity_type` est le type de l'entité touchée (person, publication, structure, serial, publisher, address…). `entity_id` est nul quand l'entité disparaît sans équivalent, ou quand l'événement concerne un lot. `payload` contient les données utiles, sérialisables en JSON (source d'une fusion, champs modifiés…).
     """
     session = _session.get()
     if session is not None:
-        session.events.append(_AuditEvent(event_type, aggregate_type, aggregate_id, payload or {}))
+        session.events.append(_AuditEvent(event_type, entity_type, entity_id, payload or {}))
 
 
 @contextmanager
@@ -88,8 +88,8 @@ def record_pending_events(repo: AuditRepository) -> None:
     for event in session.events:
         repo.record_event(
             event.event_type,
-            event.aggregate_type,
-            event.aggregate_id,
+            event.entity_type,
+            event.entity_id,
             event.payload,
             session.user_id,
         )

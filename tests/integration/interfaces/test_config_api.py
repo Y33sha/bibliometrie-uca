@@ -30,16 +30,16 @@ class TestTracabilite:
 
         with owner_pool() as cur:
             cur.execute(
-                "SELECT aggregate_type, aggregate_id, payload, user_id FROM audit_log "
+                "SELECT entity_type, entity_id, payload, user_id FROM audit_log "
                 "WHERE event_type = 'config.updated' ORDER BY id"
             )
             evenements = cur.fetchall()
 
         assert len(evenements) == 1
         evenement = evenements[0]
-        assert evenement["aggregate_type"] == "config"
-        # La clé est un texte et l'identifiant d'entité (`aggregate_id`) un entier : la clé est dans la charge utile.
-        assert evenement["aggregate_id"] is None
+        assert evenement["entity_type"] == "config"
+        # La clé est un texte et l'identifiant d'entité (`entity_id`) un entier : la clé est dans la charge utile.
+        assert evenement["entity_id"] is None
         assert evenement["payload"] == {"key": cle_posee, "value": "apres"}
         assert evenement["user_id"]
 

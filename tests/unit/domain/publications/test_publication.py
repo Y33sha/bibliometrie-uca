@@ -1,4 +1,4 @@
-"""Tests de l'aggregate root `Publication`."""
+"""Tests de l'entité `Publication`."""
 
 from domain.publications.identifiers import DOI
 from domain.publications.publication import Publication

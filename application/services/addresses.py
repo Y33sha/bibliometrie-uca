@@ -80,7 +80,7 @@ class AddressService:
 
         Renvoie le nombre d'adresses touchées et les adresses dont la contribution au périmètre change. Pour une annulation, le nombre touché est celui des lignes modifiées ; pour une décision, la taille du lot. L'appelant propage les adresses changées en tâche de fond.
 
-        Un lot est une décision unique : un seul événement d'audit, sans identifiant d'entité (`aggregate_id`), avec les adresses visées et le nombre touché.
+        Un lot est une décision unique : un seul événement d'audit, sans identifiant d'entité (`entity_id`), avec les adresses visées et le nombre touché.
         """
         if not address_ids:
             return 0, []

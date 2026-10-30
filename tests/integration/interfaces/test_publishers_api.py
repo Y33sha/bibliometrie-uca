@@ -396,7 +396,7 @@ class TestTracabilite:
         with owner_pool() as cur:
             cur.execute(
                 "SELECT payload, user_id FROM audit_log "
-                "WHERE event_type = 'publisher.updated' AND aggregate_id = %s ORDER BY id",
+                "WHERE event_type = 'publisher.updated' AND entity_id = %s ORDER BY id",
                 (pid,),
             )
             evenements = cur.fetchall()

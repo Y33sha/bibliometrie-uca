@@ -712,7 +712,7 @@ class TestTracabiliteEdition:
         with owner_pool() as cur:
             cur.execute(
                 "SELECT payload, user_id FROM audit_log "
-                "WHERE event_type = 'serial.updated' AND aggregate_id = %s ORDER BY id",
+                "WHERE event_type = 'serial.updated' AND entity_id = %s ORDER BY id",
                 (jid,),
             )
             evenements = cur.fetchall()

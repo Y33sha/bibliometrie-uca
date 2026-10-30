@@ -41,7 +41,7 @@ _NAME_FORM_COLUMNS = (
 
 
 class _StructureNameFormRow(NamedTuple):
-    """Projection SQL sur `structure_name_forms` (find_by_id de l'aggregate Structure)."""
+    """Projection SQL sur `structure_name_forms` (find_by_id de l'entité Structure)."""
 
     form_text: str
     is_word_boundary: bool

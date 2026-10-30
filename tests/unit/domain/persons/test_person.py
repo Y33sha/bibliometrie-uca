@@ -1,4 +1,4 @@
-"""Tests de l'aggregate root `Person`."""
+"""Tests de l'entité `Person`."""
 
 from domain.persons.identifier_attribution import IdentifierAttribution
 from domain.persons.identifiers import AttributionStatus

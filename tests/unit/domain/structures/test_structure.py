@@ -1,4 +1,4 @@
-"""Tests de l'aggregate root `Structure`."""
+"""Tests de l'entité `Structure`."""
 
 import pytest
 

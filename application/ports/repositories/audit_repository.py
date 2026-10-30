@@ -14,10 +14,10 @@ class AuditRepository(Protocol):
     def record_event(
         self,
         event_type: str,
-        aggregate_type: str,
-        aggregate_id: int | None,
+        entity_type: str,
+        entity_id: int | None,
         payload: dict[str, JsonValue],
         user_id: str,
     ) -> None:
-        """Insère un événement d'audit. `aggregate_id` : NULL si l'entité affectée n'a pas d'équivalent survivant (suppression). `payload` : données utiles sérialisées en `jsonb`."""
+        """Insère un événement d'audit. `entity_id` : NULL si l'entité affectée n'a pas d'équivalent survivant (suppression). `payload` : données utiles sérialisées en `jsonb`."""
         ...

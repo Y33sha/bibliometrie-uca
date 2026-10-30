@@ -311,7 +311,7 @@ def _evenements(event_type: str) -> list[dict]:
     """Lignes d'audit d'un type donné, dans l'ordre d'émission."""
     with owner_pool() as cur:
         cur.execute(
-            "SELECT aggregate_type, aggregate_id, payload, user_id "
+            "SELECT entity_type, entity_id, payload, user_id "
             "FROM audit_log WHERE event_type = %s ORDER BY id",
             (event_type,),
         )
@@ -338,8 +338,8 @@ class TestTracabilite:
         evenements = _evenements("address.link_reviewed")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_type"] == "address"
-        assert dernier["aggregate_id"] == addr
+        assert dernier["entity_type"] == "address"
+        assert dernier["entity_id"] == addr
         assert dernier["payload"]["structure_id"] == struct
         assert dernier["payload"]["is_confirmed"] is True
         assert dernier["user_id"]
@@ -359,7 +359,7 @@ class TestTracabilite:
         evenements = _evenements("address.batch_link_reviewed")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_id"] is None
+        assert dernier["entity_id"] is None
         assert sorted(dernier["payload"]["address_ids"]) == sorted([a1, a2])
         assert dernier["payload"]["structure_id"] == struct
         assert dernier["payload"]["updated"] == 2
@@ -374,7 +374,7 @@ class TestTracabilite:
         evenements = _evenements("address.country_set")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_id"] == addr
+        assert dernier["entity_id"] == addr
         assert dernier["payload"]["countries"] == ["FR"]
 
     def test_un_lot_de_pays_par_identifiants_porte_les_identifiants(self, auth_client):
@@ -390,7 +390,7 @@ class TestTracabilite:
         evenements = _evenements("address.batch_country_set")
         assert len(evenements) == avant + 1
         dernier = evenements[-1]
-        assert dernier["aggregate_id"] is None
+        assert dernier["entity_id"] is None
         assert dernier["payload"]["country_code"] == "FR"
         assert dernier["payload"]["address_ids"] == [addr]
 

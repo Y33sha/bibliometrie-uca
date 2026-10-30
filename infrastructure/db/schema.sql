@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict 10pFFsCU0jYfTKEy8Y0W3IuFYlJk8sjjgpFfpPObSZlQNu0MvNKVVVVDdg0Umeu
+\restrict U7oZJ88CjVDQkTFKqhuExBa62ScQxrlkZoUm8XPzi88A7tfcWfuRmo5BZn8VKqF
 
--- Dumped from database version 18.4
--- Dumped by pg_dump version 18.4
+-- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
+-- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -591,8 +591,8 @@ SET default_table_access_method = heap;
 CREATE TABLE ops.audit_log (
     id bigint NOT NULL,
     event_type text NOT NULL,
-    aggregate_type text NOT NULL,
-    aggregate_id integer,
+    entity_type text CONSTRAINT audit_log_aggregate_type_not_null NOT NULL,
+    entity_id integer,
     payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     user_id text,
     created_at timestamp with time zone DEFAULT now() NOT NULL
@@ -614,17 +614,17 @@ COMMENT ON COLUMN ops.audit_log.event_type IS 'Type d''événement, notation poi
 
 
 --
--- Name: COLUMN audit_log.aggregate_type; Type: COMMENT; Schema: ops; Owner: -
+-- Name: COLUMN audit_log.entity_type; Type: COMMENT; Schema: ops; Owner: -
 --
 
-COMMENT ON COLUMN ops.audit_log.aggregate_type IS 'Type de l''entité affectée : address, journal, perimeter, person, publication, structure.';
+COMMENT ON COLUMN ops.audit_log.entity_type IS 'Type de l''entité affectée : address, config, perimeter, person, publication, publisher, serial, structure.';
 
 
 --
--- Name: COLUMN audit_log.aggregate_id; Type: COMMENT; Schema: ops; Owner: -
+-- Name: COLUMN audit_log.entity_id; Type: COMMENT; Schema: ops; Owner: -
 --
 
-COMMENT ON COLUMN ops.audit_log.aggregate_id IS 'ID de l''entité affectée, NULL si l''entité a été supprimée et n''a pas d''équivalent survivant.';
+COMMENT ON COLUMN ops.audit_log.entity_id IS 'ID de l''entité affectée, NULL si l''entité a été supprimée et n''a pas d''équivalent survivant.';
 
 
 --
@@ -4145,17 +4145,17 @@ ALTER TABLE ONLY structures.structure_name_forms
 
 
 --
--- Name: audit_log_aggregate_idx; Type: INDEX; Schema: ops; Owner: -
---
-
-CREATE INDEX audit_log_aggregate_idx ON ops.audit_log USING btree (aggregate_type, aggregate_id);
-
-
---
 -- Name: audit_log_created_at_idx; Type: INDEX; Schema: ops; Owner: -
 --
 
 CREATE INDEX audit_log_created_at_idx ON ops.audit_log USING btree (created_at DESC);
+
+
+--
+-- Name: audit_log_entity_idx; Type: INDEX; Schema: ops; Owner: -
+--
+
+CREATE INDEX audit_log_entity_idx ON ops.audit_log USING btree (entity_type, entity_id);
 
 
 --
@@ -5617,5 +5617,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 10pFFsCU0jYfTKEy8Y0W3IuFYlJk8sjjgpFfpPObSZlQNu0MvNKVVVVDdg0Umeu
+\unrestrict U7oZJ88CjVDQkTFKqhuExBa62ScQxrlkZoUm8XPzi88A7tfcWfuRmo5BZn8VKqF
 
