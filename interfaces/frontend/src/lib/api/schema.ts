@@ -5333,7 +5333,7 @@ export interface components {
          * SourceContributionOut
          * @description Contribution source d'un enregistrement source, avec sa contribution : les contributions sources d'un même auteur dans la publication.
          *
-         *     `position` est le rang d'auteur dans l'enregistrement source, à partir de 0 ; il manque pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes. `contribution_id` et `reference_position` (position de la contribution source de référence de la contribution) manquent pour une contribution source hors contribution : collective, ou d'un enregistrement écarté de l'alignement. `person_id` est la personne de la contribution. `method`, `score` et `margin` décrivent l'entrée de la contribution source dans sa contribution ; score et marge sont en bits.
+         *     `position` est le rang d'auteur dans l'enregistrement source, à partir de 0 ; il manque pour un rôle hors de la liste d'auteurs. `raw_affiliation` réunit les adresses brutes. `contribution_id` et `reference_position` (position de la contribution source de référence de la contribution) manquent pour une contribution source collective, hors contribution. `person_id` est la personne de la contribution. `method`, `score` et `margin` décrivent l'entrée de la contribution source dans sa contribution ; score et marge sont en bits.
          */
         SourceContributionOut: {
             /** Id */

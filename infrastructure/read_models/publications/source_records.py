@@ -71,7 +71,7 @@ def _record(r: Row[tuple[object, ...]]) -> SourceRecordMetadataOut:
 
 
 def _source_contributions(conn: Connection, publication_id: int) -> list[SourceContributionOut]:
-    """Contributions sources des enregistrements sources de la publication, avec leur contribution et leur entrée dans la contribution."""
+    """Contributions sources des enregistrements sources de la publication, doublons d'auteur exclus, avec leur contribution et leur entrée dans la contribution."""
     rows = conn.execute(
         text(f"""
             SELECT sc.id, sc.source_record_id, sc.author_position AS position,
@@ -89,7 +89,7 @@ def _source_contributions(conn: Connection, publication_id: int) -> list[SourceC
             JOIN source_contributions sc ON sc.source_record_id = sr.id
             LEFT JOIN aligned_source_contributions gs ON gs.source_contribution_id = sc.id
             LEFT JOIN contributions g ON g.id = gs.contribution_id
-            WHERE sr.publication_id = :pid
+            WHERE sr.publication_id = :pid AND sc.duplicate_of IS NULL
             ORDER BY sc.source_record_id, sc.author_position NULLS LAST, sc.id
         """),  # noqa: S608
         {"pid": publication_id},
