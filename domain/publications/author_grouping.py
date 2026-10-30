@@ -371,6 +371,21 @@ def _initial_key(s: SourceContribution) -> tuple[str, str] | None:
     return (s.last_name, s.first_name[:1]) if s.last_name and s.first_name else None
 
 
+def _swapped_full_name_key(s: SourceContribution) -> tuple[str, str] | None:
+    return _full_name_key(_swapped(s))
+
+
+def _swapped_initial_key(s: SourceContribution) -> tuple[str, str] | None:
+    return _initial_key(_swapped(s))
+
+
+_SWAPPED_KEYS = (
+    (_full_name_key, _swapped_full_name_key),
+    (_initial_key, _swapped_initial_key),
+)
+"""Clé d'une contribution source, et clé de la même forme sur une référence aux nom de famille et prénom intervertis."""
+
+
 class _SourceRecordLinks:
     """Liens de la règle entre un enregistrement source et les contributions déjà formées.
 
@@ -394,6 +409,8 @@ class _SourceRecordLinks:
         # Contributions liées : une contribution reçoit au plus un lien.
         self.taken: set[int] = set()
         self.forbidden: set[tuple[int, int]] = set()
+        # Contributions sources liées à une référence aux nom de famille et prénom intervertis.
+        self.swapped_references: set[int] = set()
         self.by_index = {g.index: g for g in contributions}
         self._contribution_indexes: dict[
             Callable[[SourceContribution], object], dict[object, list[Contribution]]
@@ -409,6 +426,7 @@ class _SourceRecordLinks:
         """Retire le lien de la contribution source et l'interdit."""
         contribution = self.links.pop(source_contribution_id)
         del self.methods[source_contribution_id]
+        self.swapped_references.discard(source_contribution_id)
         self.taken.discard(contribution)
         self.forbidden.add((source_contribution_id, contribution))
 
@@ -473,11 +491,32 @@ class _SourceRecordLinks:
             if len(candidates) == 1 and (index := next(iter(candidates))) not in self.taken:
                 self.link(s, self.by_index[index], GroupingMethod.IDENTIFIER)
 
+    def swapped_reference_pairs(self, record_contributions: Sequence[SourceContribution]) -> None:
+        """Lie une contribution source à la contribution de même clé, référence intervertie : nom de famille et prénom complet, ou nom de famille et initiale. Clé unique des deux côtés ; nom de famille de la contribution source absent des références sans lien."""
+        by_last_name = self._contributions_by(_name_key)
+        for key, swapped_key in _SWAPPED_KEYS:
+            by_source_contribution: dict[object, list[SourceContribution]] = {}
+            for s in record_contributions:
+                if s.id not in self.links and (k := key(s)):
+                    by_source_contribution.setdefault(k, []).append(s)
+            swapped = self._contributions_by(swapped_key)
+            for k, ss in by_source_contribution.items():
+                if len(ss) != 1 or any(
+                    g.index not in self.taken for g in by_last_name.get(ss[0].last_name, [])
+                ):
+                    continue
+                gs = [g for g in swapped.get(k, []) if g.index not in self.taken]
+                if len(gs) == 1:
+                    self.link(ss[0], gs[0], GroupingMethod.NAME)
+                    if ss[0].id in self.links:
+                        self.swapped_references.add(ss[0].id)
+
     def name_steps(self) -> None:
-        """Noms puis identifiants, sur les contributions sources et les contributions sans lien."""
+        """Noms, noms face aux références interverties, puis identifiants, sur les contributions sources et les contributions sans lien."""
         record_contributions = [s for s in self.record_contributions if s.id not in self.links]
         for key in (_name_key, _full_name_key, _initial_key):
             self.unique_pairs(key, record_contributions)
+        self.swapped_reference_pairs(record_contributions)
         self.shared_identifier(record_contributions)
 
     def _in_order(self, s: SourceContribution) -> bool:
@@ -566,7 +605,10 @@ class _SourceRecordLinks:
                     if g.index in contribution_gaps
                 ],
             )
-        links = {s: _Link(g, self.methods[s]) for s, g in self.links.items()}
+        links = {
+            s: _Link(g, self.methods[s], swapped_reference=s in self.swapped_references)
+            for s, g in self.links.items()
+        }
         if model is not None and assign is not None:
             residual = _residual_links(self, self.source_contributions, model, assign)
             for source_contribution_id, (g, score, margin) in residual.items():
@@ -575,12 +617,13 @@ class _SourceRecordLinks:
 
 
 class _Link(NamedTuple):
-    """Lien d'une contribution source vers la contribution d'indice `contribution`, avec le score et la marge d'un lien du modèle."""
+    """Lien d'une contribution source vers la contribution d'indice `contribution`, avec le score et la marge d'un lien du modèle. `swapped_reference` : le lien se fait face à la référence aux nom de famille et prénom intervertis."""
 
     contribution: int
     method: GroupingMethod
     score: float | None = None
     margin: float | None = None
+    swapped_reference: bool = False
 
 
 def _author(s: SourceContribution, gap_index: int) -> Author:
@@ -697,7 +740,7 @@ def align_publication(
 ) -> list[Contribution]:
     """Contributions d'une publication.
 
-    Les enregistrements sources se traitent du plus long au plus court, chacun face aux contributions déjà formées. À longueur égale, les enregistrements sources `deferred` passent après les autres, puis l'ordre suit leur identifiant. Un enregistrement source qui intervertit nom de famille et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
+    Les enregistrements sources se traitent du plus long au plus court, chacun face aux contributions déjà formées. À longueur égale, les enregistrements sources `deferred` passent après les autres, puis l'ordre suit leur identifiant. Un enregistrement source qui intervertit nom de famille et prénom (`_inverted`) s'aligne avec ses noms remis dans l'ordre. Une référence liée à une contribution source par ses nom de famille et prénom intervertis (`swapped_reference_pairs`) prend l'ordre de la contribution source. `model` et `assign` lient en plus le résidu. `on_residual` reçoit le résidu de la règle, avant le modèle.
     """
     source_contributions = {
         s.id: s for record_contributions in source_records.values() for s in record_contributions
@@ -716,6 +759,12 @@ def align_publication(
             if i
             else {}
         )
+        by_index = {g.index: g for g in contributions}
+        for link in links.values():
+            if link.swapped_reference:
+                g = by_index[link.contribution]
+                g.reference = _swapped(g.reference)
+                source_contributions[g.reference.id] = g.reference
         contributions = _with_new_contributions(
             contributions, record_contributions, links, source_record_id
         )

@@ -207,6 +207,77 @@ class TestAlignPublication:
             [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
         ]
 
+    def test_une_reference_qui_intervertit_nom_et_prenom_de_quelques_auteurs_s_aligne(self):
+        """La référence intervertit nom de famille et prénom de deux auteurs sur neuf : ils se lient par l'initiale puis par le nom, et la référence prend l'ordre des autres enregistrements sources."""
+        authors = [
+            ("trefond", "jeromine"),
+            ("vorilhon", "philippe"),
+            ("coudeyre", "emmanuel"),
+            ("richard", "amelie"),
+            ("pereira", "bruno"),
+            ("cambon", "benoit"),
+            ("roche", "marie claude"),
+            ("gocko", "xavier"),
+            ("vaillant roussel", "helene"),
+        ]
+        reference = [
+            (first, last) if pos in (0, 7) else (last, first)
+            for pos, (last, first) in enumerate(authors)
+        ]
+        initials = [(last, first[:1]) for last, first in authors]
+        contributions = align_publication(
+            {
+                1: _source_record(1, reference),
+                2: _source_record(2, initials),
+                3: _source_record(3, authors),
+            }
+        )
+        assert _aligned(contributions) == [
+            [
+                (100 + pos, GroupingMethod.REFERENCE),
+                (200 + pos, GroupingMethod.NAME),
+                (300 + pos, GroupingMethod.NAME),
+            ]
+            for pos in range(9)
+        ]
+        assert [(g.reference.last_name, g.reference.first_name) for g in contributions] == authors
+
+    def test_un_auteur_interverti_dans_le_deuxieme_enregistrement_source_s_aligne(self):
+        """Le deuxième enregistrement source intervertit un auteur aux prénoms complets : la référence prend son ordre, et le troisième la remet dans l'ordre."""
+        authors = [("martin", "anne"), ("gocko", "xavier"), ("durand", "claire")]
+        swapped = [("martin", "anne"), ("xavier", "gocko"), ("durand", "claire")]
+        initials = [(last, first[:1]) for last, first in authors]
+        contributions = align_publication(
+            {
+                1: _source_record(1, authors),
+                2: _source_record(2, swapped),
+                3: _source_record(3, initials),
+            }
+        )
+        assert _aligned(contributions) == [
+            [
+                (100 + pos, GroupingMethod.REFERENCE),
+                (200 + pos, GroupingMethod.NAME),
+                (300 + pos, GroupingMethod.NAME),
+            ]
+            for pos in range(3)
+        ]
+        assert contributions[1].reference.last_name == "gocko"
+
+    def test_un_nom_de_famille_present_tel_quel_ne_se_lie_pas_a_une_reference_intervertie(self):
+        """Une référence sans lien a le nom de famille cheng : « Cheng C L » se lie par le nom à « Cheng Alkaid », hors de la contribution de « Chen Cheng »."""
+        reference = [("chen", "cheng"), ("chen", "chunhui"), ("cheng", "bo"), ("cheng", "alkaid")]
+        other = [("chen", "c"), ("chen", "c h"), ("cheng", "b"), ("cheng", "c l")]
+        contributions = align_publication(
+            {1: _source_record(1, reference), 2: _source_record(2, other)}
+        )
+        assert _aligned(contributions) == [
+            [(100, GroupingMethod.REFERENCE), (200, GroupingMethod.ORDER)],
+            [(101, GroupingMethod.REFERENCE), (201, GroupingMethod.ORDER)],
+            [(102, GroupingMethod.REFERENCE), (202, GroupingMethod.NAME)],
+            [(103, GroupingMethod.REFERENCE), (203, GroupingMethod.NAME)],
+        ]
+
     def test_a_longueur_egale_un_enregistrement_source_reporte_ne_fonde_pas_les_contributions(self):
         first = _source_record(1, [("hollandts", "xavier"), ("hollandts", "xavier")])
         second = _source_record(2, [("valiorgue", "bertrand"), ("hollandts", "xavier")])
