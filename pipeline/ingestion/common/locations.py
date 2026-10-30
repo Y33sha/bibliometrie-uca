@@ -10,7 +10,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
-from domain.platforms.platform import PlatformType
+from domain.platforms.platform import PlatformType, is_catalog_record
 from domain.platforms.registry import IDENTIFIER_COPIES
 from domain.publications.licenses import License
 from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
@@ -95,7 +95,7 @@ class LocationStore:
         return self._platforms[platform.openalex_id]
 
     def replace_locations(self, source_record_id: int, locations: Sequence[LocationFacts]) -> None:
-        """Réécrit les localisations de l'enregistrement source avec `locations`, une par URL."""
+        """Réécrit les localisations de l'enregistrement source avec `locations`, une par URL, hors fiches de catalogue."""
         self._conn.execute(_DELETE_LOCATIONS, {"id": source_record_id})
         # Parcours à rebours : une URL en double garde sa première localisation.
         rows = {
@@ -109,6 +109,7 @@ class LocationStore:
                 "platform_id": self.platform_id(loc.platform) if loc.platform else None,
             }
             for loc in reversed(locations)
+            if not is_catalog_record(loc.url)
         }
         if rows:
             self._conn.execute(

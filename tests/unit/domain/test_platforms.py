@@ -12,6 +12,7 @@ from domain.platforms.registry import (
     known_platform_of_copy,
     known_platform_of_source,
     known_platform_of_url,
+    platform_type_of_copy,
     preprint_servers_of_prefix,
 )
 
@@ -21,6 +22,9 @@ from domain.platforms.registry import (
     [
         ("https://doaj.org/article/abc", True),
         ("https://www.doaj.org/article/abc", True),
+        ("https://pubmed.ncbi.nlm.nih.gov/1/", True),
+        ("https://eprints.gla.ac.uk/view/journal_volume/Physics_Letters_B.html>,", True),
+        ("https://eprints.gla.ac.uk/153180/1/153180.pdf", False),
         ("https://hal.science/hal-1", False),
     ],
 )
@@ -76,6 +80,10 @@ class TestKnownPlatformOfUrl:
             ("https://shs.cairn.info/revue-x", "Cairn"),
             ("https://doi.org/10.48550/arxiv.2108.03135", "arXiv"),
             ("https://dx.doi.org/10.2139/ssrn.1", "SSRN"),
+            ("http://www.theses.fr/2018CLFAC093/document", "theses.fr"),
+            ("http://hdl.handle.net/10138/345747", "Handle"),
+            ("https://doi.org/10.3204/pubdb-2026-02456", "DESY Publication Database"),
+            ("https://doi.org/10.13140/rg.2.2.35033.38245", "ResearchGate"),
         ],
     )
     def test_plateforme_reconnue(self, url, expected):
@@ -109,3 +117,16 @@ class TestKnownPlatformOfUrl:
         assert known is not None
         assert known.name == "PsyArXiv"
         assert known_platform_of_copy("https://osf.io/esfm6", None) is None
+
+
+class TestPlatformTypeOfCopy:
+    def test_le_doi_commun_a_bioRxiv_et_medRxiv_donne_un_serveur_de_preprints(self):
+        url = "https://doi.org/10.1101/2025.06.28.662115"
+        assert platform_type_of_copy(url, None) is PlatformType.PREPRINT_SERVER
+
+    def test_une_revue_de_cold_spring_harbor_n_est_pas_un_serveur_de_preprints(self):
+        assert platform_type_of_copy("https://doi.org/10.1101/gad.353948.126", None) is None
+
+    def test_plateforme_de_la_liste(self):
+        url = "https://research.wur.nl/en/publications/x"
+        assert platform_type_of_copy(url, None) is PlatformType.REPOSITORY

@@ -1,7 +1,8 @@
 """Plateformes qui hébergent des publications."""
 
 from enum import StrEnum
-from urllib.parse import urlparse
+
+from domain.urls import is_on_site
 
 
 class PlatformType(StrEnum):
@@ -18,10 +19,10 @@ class PlatformType(StrEnum):
 
 PLATFORM_TYPES: tuple[PlatformType, ...] = tuple(PlatformType)
 
-_CATALOG_DOMAINS = frozenset({"doaj.org"})
+_CATALOG_SITES = ("doaj.org", "doabooks.org", "pubmed.ncbi.nlm.nih.gov", "eprints.gla.ac.uk/view")
+"""Fiches du DOAJ, du DOAB et de PubMed, listes de l'archive de l'université de Glasgow."""
 
 
 def is_catalog_record(url: str) -> bool:
     """Vrai si l'URL mène à la fiche d'un catalogue, qui décrit le document sans en donner le texte. Une telle fiche est exclue des localisations."""
-    host = urlparse(url).netloc.lower().removeprefix("www.")
-    return host in _CATALOG_DOMAINS
+    return any(is_on_site(url, site) for site in _CATALOG_SITES)

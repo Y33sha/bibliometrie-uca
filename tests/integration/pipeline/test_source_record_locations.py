@@ -43,6 +43,21 @@ def test_les_localisations_remplacent_les_precedentes(sa_sync_conn):
     ]
 
 
+def test_les_fiches_de_catalogue_sont_ecartees(sa_sync_conn):
+    source_record = insert_source_record(sa_sync_conn, source="openalex", source_id="W3")
+
+    LocationStore(sa_sync_conn).replace_locations(
+        source_record,
+        [
+            LocationFacts("https://doaj.org/article/abc"),
+            LocationFacts("https://pubmed.ncbi.nlm.nih.gov/1/"),
+            LocationFacts("https://a.org/3"),
+        ],
+    )
+
+    assert _locations(sa_sync_conn, source_record) == [("https://a.org/3", None, None)]
+
+
 def test_la_plateforme_suit_le_nom_et_le_type_de_la_source(sa_sync_conn):
     platform_id = LocationStore(sa_sync_conn).platform_id(_HAL)
 

@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-30)
 """Simulation du statut open access des publications du périmètre, tiré des copies ouvertes et relevé par le verdict d'Unpaywall.
 
-Le plancher d'une publication vient de sa meilleure copie ouverte. Une copie d'archive ou de serveur de preprints donne `green`. Une autre copie ouverte est comptée côté éditeur : le modèle de la revue décide. Une revue `full_oa` donne `gold`, une revue `diamond` donne `diamond`. Une revue `subscription` donne `hybrid` avec une licence ouverte, `bronze` sans. Le verdict d'Unpaywall relève ce plancher, jamais ne l'abaisse. Un `gold` d'Unpaywall dans une revue `diamond` devient `diamond`.
+Le plancher d'une publication vient de sa meilleure copie ouverte. Les fiches de catalogue sont écartées, comme à la normalisation. Une copie d'archive ou de serveur de preprints donne `green`. Une autre copie ouverte est comptée côté éditeur : le modèle de la revue décide. Une revue `full_oa` donne `gold`, une revue `diamond` donne `diamond`. Une revue `subscription` donne `hybrid` avec une licence ouverte, `bronze` sans. Le verdict d'Unpaywall relève ce plancher, jamais ne l'abaisse. Un `gold` d'Unpaywall dans une revue `diamond` devient `diamond`.
 
 Chaque étape est rejouable séparément :
 
@@ -24,8 +24,8 @@ from urllib.parse import urlparse
 
 from sqlalchemy import Connection, text
 
-from domain.platforms.platform import PlatformType
-from domain.platforms.registry import known_platform_of_copy
+from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.registry import platform_type_of_copy
 from domain.publications.metadata import OA_RANK
 from infrastructure.db.engine import build_sync_engine
 
@@ -55,8 +55,9 @@ _OPEN_COPIES = text("""
 
 def _is_archive(url: str, openalex_id: str | None, ptype: str | None) -> bool:
     """Vrai pour une copie d'archive ou de serveur de preprints, d'après le registre des plateformes, à défaut la plateforme OpenAlex."""
-    known = known_platform_of_copy(url, openalex_id)
-    platform_type = known.platform_type if known else (PlatformType(ptype) if ptype else None)
+    platform_type = platform_type_of_copy(url, openalex_id) or (
+        PlatformType(ptype) if ptype else None
+    )
     return platform_type in _ARCHIVE_TYPES
 
 
@@ -96,6 +97,8 @@ def simulate(conn: Connection, output: Path) -> None:
     """Écrit le statut actuel et le statut simulé de chaque publication, puis affiche la matrice des passages."""
     copies: dict[int, list[tuple[bool, bool]]] = defaultdict(list)
     for r in conn.execute(_OPEN_COPIES, {"ids": None}):
+        if is_catalog_record(r.url):
+            continue
         licensed = bool(r.license) and r.license.lower().startswith(_OPEN_LICENSE_PREFIXES)
         copies[r.pid].append((_is_archive(r.url, r.openalex_id, r.ptype), licensed))
     matrix: Counter[tuple[str, str]] = Counter()
