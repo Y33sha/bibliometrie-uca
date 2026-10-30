@@ -48,12 +48,12 @@
     {#if related.length === 0}
       <span class="none-text">{emptyText}</span>
     {:else}
-      {#each related as r (r.relation_id)}
+      {#each related as r (r.tutelle_id)}
         <span class="tag">
           <button class="tag-name" onclick={() => onselect(r.id)}>{structureLabel(r)}</button>
           <button
             class="remove"
-            onclick={() => ondeleteTutelle(r.relation_id)}
+            onclick={() => ondeleteTutelle(r.tutelle_id)}
             title="Retirer {structureLabel(r)}"
             aria-label="Retirer {structureLabel(r)}">×</button
           >

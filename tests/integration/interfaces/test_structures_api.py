@@ -282,8 +282,7 @@ class TestCreateRelation:
         )
         assert r.status_code == 200
         body = r.json()
-        # La route renvoie la relation créée, ou {"status": "already_exists"}.
-        assert "status" in body or "id" in body or "relation_id" in body
+        assert "id" in body
 
     def test_duplicate_already_exists(self, auth_client):
         parent = seed_structure(type_="universite")

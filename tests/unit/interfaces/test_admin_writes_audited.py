@@ -56,8 +56,8 @@ AUDITE: dict[tuple[str, str], str] = {
     ("POST", "/api/structures/name-forms"): "structure_name_form.created",
     ("PUT", "/api/structures/name-forms/{form_id}"): "structure_name_form.updated",
     ("DELETE", "/api/structures/name-forms/{form_id}"): "structure_name_form.deleted",
-    ("POST", "/api/structures/tutelles"): "structure_relation.created",
-    ("DELETE", "/api/structures/tutelles/{tutelle_id}"): "structure_relation.deleted",
+    ("POST", "/api/structures/tutelles"): "structure_tutelle.created",
+    ("DELETE", "/api/structures/tutelles/{tutelle_id}"): "structure_tutelle.deleted",
 }
 """Route d'écriture → type d'événement émis."""
 

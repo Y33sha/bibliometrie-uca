@@ -5094,8 +5094,8 @@ export interface components {
             acronym: string | null;
             /** Type */
             type: string;
-            /** Relation Id */
-            relation_id: number;
+            /** Tutelle Id */
+            tutelle_id: number;
         };
         /** ReviewAction */
         ReviewAction: {
@@ -5557,7 +5557,7 @@ export interface components {
         };
         /**
          * StructureDeletionImpact
-         * @description Ce que la suppression d'une structure emporte.
+         * @description Données supprimées avec une structure.
          */
         StructureDeletionImpact: {
             /** Name Forms */
@@ -5636,7 +5636,7 @@ export interface components {
         };
         /**
          * StructureOut
-         * @description Structure complète, rendue par GET, POST et PUT sur `/api/structures`.
+         * @description Structure complète, renvoyée par GET, POST et PUT sur `/api/structures`.
          */
         StructureOut: {
             /** Id */
@@ -5662,7 +5662,7 @@ export interface components {
         };
         /**
          * StructurePartner
-         * @description Organisation partenaire d'une structure : un ROR des auteurs de ses publications, avec le nombre de copublications.
+         * @description Organisation partenaire d'une structure : un ROR des auteurs de ses publications.
          */
         StructurePartner: {
             /** Ror Id */
@@ -5753,9 +5753,7 @@ export interface components {
         };
         /**
          * StructuresFacetsResponse
-         * @description Facettes de la liste des structures.
-         *
-         *     `types` laisse le libellé au client. `tutelles` et `perimeters` donnent le libellé de la structure ou du périmètre ; `perimeters` se termine par l'option `none`, hors de tout périmètre. Chaque décompte écarte le filtre de sa propre facette.
+         * @description Facettes de la liste des structures. Chaque décompte écarte le filtre de sa propre facette.
          */
         StructuresFacetsResponse: {
             /** Types */
