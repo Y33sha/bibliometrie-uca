@@ -1,6 +1,6 @@
 # Création et résolution des publications
 
-*À jour le 2026-10-26.*
+*À jour le 2026-10-30.*
 
 La phase `publications` maintient les [publications](../donnees/03-publications.md) à partir des enregistrements sources. Une publication regroupe tous les enregistrements sources qui décrivent le même document, quelles que soient leurs sources. La phase rattache chaque enregistrement source à sa publication, en crée une au besoin, et fusionne ou scinde les publications existantes quand le regroupement le commande.
 
@@ -8,16 +8,16 @@ La phase `publications` maintient les [publications](../donnees/03-publications.
 
 Deux enregistrements sources désignent la même publication s'ils partagent une **clé de confirmation**.
 
-- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), identifiant arXiv. Égalité directe.
+- **Identifiants** : DOI, NNT (numéro national de thèse), identifiant HAL, PMID (PubMed), identifiant arXiv. Égalité directe. Seuls comptent les identifiants actifs ; un DOI `related` désigne une autre œuvre et reste hors des clés. Le DOI d'une forme secondaire (version, variante) cède la place à sa cible (`doi_targets`).
 - **Bloc de métadonnées** : le triplet `type de document | titre normalisé | année`. Deux documents de même type, même titre et même année sont tenus pour identiques. Une longueur minimale de titre écarte les collisions de titres trop génériques.
 
-`domain/source_records/keys.py` calcule ces clés, à partir des colonnes normalisées (phase `normalize`) puis corrigées (phase `metadata_correction`).
+`domain/source_records/keys.py` calcule ces clés, à partir des métadonnées et des identifiants que la phase `metadata_correction` laisse actifs.
 
 ## Regrouper, puis rattacher
 
 Les enregistrements sources reliés par au moins une clé partagée forment les **composantes connexes** d'un graphe.
 
-Une règle prime sur le regroupement : **deux DOI distincts désignent toujours deux documents distincts**. Une composante qui contient plusieurs DOI est donc découpée en une partition par DOI.
+Une règle prime sur le regroupement : **deux ancres distinctes désignent deux documents distincts**. Les ancres d'une composante sont ses DOI `primary` ou `derived`, à défaut les DOI des enregistrements sources qui en ont un seul. Une composante à plusieurs ancres est découpée en une partition par ancre. Un enregistrement source rejoint l'ancre de son DOI `primary` ou `derived`, sinon l'unique ancre parmi ses autres DOI. À défaut, il reste sur sa publication.
 
 Chaque partition aboutit à une seule publication :
 

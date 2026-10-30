@@ -139,13 +139,9 @@ Les autres usages acceptent plusieurs DOI : `fetch_missing`, `known_dois`, `reso
 - [x] Écritures de la colonne retirées : normalisation, `remove_identifiers` (colonne et `corrections.doi`), déclarations de `pipeline/graph.py`.
 - [x] Suppression de la colonne et de l'entrée `doi` de `corrections` (b6d1f9a3c8e2).
 
-### Phase 7 — DOI bioRxiv et medRxiv
+### Phase 7 — Documentation
 
-- [ ] DOI bioRxiv et medRxiv (préfixe 10.1101) exposés par les sources, par exemple dans les localisations OpenAlex (publication 2757).
-
-### Phase 8 — Documentation
-
-- [ ] Mise à jour de la documentation.
+- [x] Mise à jour de la documentation.
 
 ## Questions ouvertes
 
