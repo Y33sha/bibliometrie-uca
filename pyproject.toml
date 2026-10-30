@@ -11,8 +11,8 @@ dependencies = [
     "psycopg[binary]==3.3.6",    # driver PostgreSQL de SQLAlchemy
     "sqlalchemy==2.1.6",         # query builder Core
     "alembic==1.20.1",           # migrations DB
-    "fastapi==0.159.1",
-    "starlette==1.9.0",          # importé directement (Response, Scope, RequestResponseEndpoint)
+    "fastapi==0.162.0",
+    "starlette==1.10.0",          # importé directement (Response, Scope, RequestResponseEndpoint)
     "anyio==4.15.1",             # importé directement : taille du threadpool posée au démarrage de l'API
     "uvicorn==0.54.0",           # serveur ASGI ; lancé en ligne de commande, jamais importé
     "bcrypt==5.0.0",
@@ -36,9 +36,9 @@ migrate_all = "interfaces.cli.dev.migrate_all:main"
 [dependency-groups]
 dev = [
     "pytest==9.1.1",
-    "pytest-asyncio==1.4.0",   # tests des moissonnages HTTP async du pipeline
+    "pytest-asyncio==1.4.1",   # tests des moissonnages HTTP async du pipeline
     "pytest-cov==7.1.0",
-    "ruff==0.17.1",
+    "ruff==0.17.3",
     "pyrefly==1.4.0",
     "deptry==0.25.1",
     "pip-audit==2.10.1",
@@ -52,7 +52,7 @@ dev = [
     "pyarrow==26.0.0",         # écriture des fichiers Parquet de l'estimation des poids
     "zensical==0.0.73",            # site de la documentation, construit depuis docs/ et zensical.toml
     "mkdocstrings-python==2.0.10", # référence du code dans le site, générée depuis les docstrings
-    "playwright==1.58.0",          # captures d'écran du guide utilisateur (interfaces/cli/dev/screenshots.py)
+    "playwright==1.64.1",          # captures d'écran du guide utilisateur (interfaces/cli/dev/screenshots.py)
 ]
 
 [tool.setuptools]
