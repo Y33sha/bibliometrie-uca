@@ -3,8 +3,9 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, computed_field
+from pydantic import ConfigDict, computed_field
 
+from application.ports.model import Model
 from domain.publications.licenses import License
 from domain.sources.registry import PROFILES, Source, source_record_url
 from infrastructure.read_models._common import (
@@ -131,12 +132,12 @@ class PublicationFilters:
 # ---------------------------------------------------------------------------
 
 
-class PublicationLabItem(BaseModel):
+class PublicationLabItem(Model):
     id: int
     label: str
 
 
-class PublicationApcPayment(BaseModel):
+class PublicationApcPayment(Model):
     """Paiement d'APC, ligne de `apc` dans la liste."""
 
     amount: float
@@ -148,7 +149,7 @@ class PublicationApcPayment(BaseModel):
     """Paiement sur le budget d'une structure du périmètre des personnes, même règle que le filtre `has_apc`."""
 
 
-class PublicationListItem(BaseModel):
+class PublicationListItem(Model):
     """Ligne de `/api/publications` (liste et recherche)."""
 
     id: int
@@ -209,7 +210,7 @@ class PublicationListResponse(PaginatedResponse):
 # ---------------------------------------------------------------------------
 
 
-class PublicationsFacetsResponse(BaseModel):
+class PublicationsFacetsResponse(Model):
     """Facettes dynamiques de la page publications. Chaque facette exclut son propre filtre et applique tous les autres."""
 
     years: list[FacetOption]
@@ -237,7 +238,7 @@ class PublicationsFacetsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PublicationDetailCore(BaseModel):
+class PublicationDetailCore(Model):
     """Métadonnées de la publication (bloc `publication` du détail)."""
 
     id: int
@@ -268,7 +269,7 @@ class PublicationDetailCore(BaseModel):
     publisher_name: str | None
 
 
-class SourceRecordOut(BaseModel):
+class SourceRecordOut(Model):
     source: str
     source_id: str
     oa_status: str | None
@@ -283,14 +284,14 @@ class SourceRecordOut(BaseModel):
         return source_record_url(self.source, self.source_id, self.oa_status)
 
 
-class ExternalIdentifierOut(BaseModel):
+class ExternalIdentifierOut(Model):
     """Identifiant d'une publication ou d'un enregistrement source : type de `source_record_identifiers` et valeur."""
 
     type: str
     value: str
 
 
-class AccessLinkOut(BaseModel):
+class AccessLinkOut(Model):
     """Copie ouverte d'une publication, nommée par sa plateforme (`domain.publications.access`)."""
 
     label: str
@@ -299,7 +300,7 @@ class AccessLinkOut(BaseModel):
     """La copie est hébergée par une plateforme du registre."""
 
 
-class ConsolidatedContributionOut(BaseModel):
+class ConsolidatedContributionOut(Model):
     """Contribution d'une personne à la publication."""
 
     author_position: int | None
@@ -317,7 +318,7 @@ class ConsolidatedContributionOut(BaseModel):
     """La personne a une fiche RH (`hr_records`)."""
 
 
-class ThesesContributionOut(BaseModel):
+class ThesesContributionOut(Model):
     id: int
     author_position: int | None
     full_name: str | None
@@ -326,7 +327,7 @@ class ThesesContributionOut(BaseModel):
     in_perimeter: bool
 
 
-class EcoleDoctorale(BaseModel):
+class EcoleDoctorale(Model):
     """École doctorale d'une thèse, d'après theses.fr (`source_extras.ecoles_doctorales`)."""
 
     model_config = ConfigDict(extra="allow")
@@ -335,7 +336,7 @@ class EcoleDoctorale(BaseModel):
     """PPN IdRef de l'école doctorale, s'il est connu."""
 
 
-class PartenaireThese(BaseModel):
+class PartenaireThese(Model):
     """Partenaire de recherche d'une thèse, d'après theses.fr (`source_extras.partenaires`)."""
 
     model_config = ConfigDict(extra="allow")
@@ -344,7 +345,7 @@ class PartenaireThese(BaseModel):
     """`etablissement`, `laboratoire`…"""
 
 
-class ThesisMeta(BaseModel):
+class ThesisMeta(Model):
     discipline: str | None
     ecoles_doctorales: list[EcoleDoctorale] | None
     partenaires: list[PartenaireThese] | None
@@ -352,14 +353,14 @@ class ThesisMeta(BaseModel):
     date_inscription: str | None
 
 
-class StructureInfo(BaseModel):
+class StructureInfo(Model):
     acronym: str | None
     name: str
     type: str
     is_laboratory: bool
 
 
-class RelatedPublicationOut(BaseModel):
+class RelatedPublicationOut(Model):
     """Publication apparentée, vue depuis la publication courante.
 
     Une cible du corpus a son identifiant, son titre, son année et son type, et son DOI s'il existe ; elle se lie par son identifiant. Une cible hors corpus a son seul DOI.
@@ -375,7 +376,7 @@ class RelatedPublicationOut(BaseModel):
     source: str
 
 
-class PublicationDetailResponse(BaseModel):
+class PublicationDetailResponse(Model):
     """Détail complet d'une publication : métadonnées, sources et contributions."""
 
     publication: PublicationDetailCore
@@ -397,7 +398,7 @@ class PublicationDetailResponse(BaseModel):
     external_identifiers: list[ExternalIdentifierOut]
 
 
-class SourceRecordMetadataOut(BaseModel):
+class SourceRecordMetadataOut(Model):
     """Métadonnées d'un enregistrement source, après normalisation.
 
     Les champs `journal_raw_*` et `publisher_raw_name` contiennent la revue et l'éditeur tels que la source les donne.
@@ -450,7 +451,7 @@ class SourceRecordMetadataOut(BaseModel):
         return source_record_url(self.source, self.source_id, self.oa_status)
 
 
-class SourceContributionOut(BaseModel):
+class SourceContributionOut(Model):
     """Contribution source d'un enregistrement source, avec sa contribution (contributions sources d'un même auteur dans la publication)."""
 
     id: int
@@ -478,7 +479,7 @@ class SourceContributionOut(BaseModel):
     """Marge de l'entrée, en bits."""
 
 
-class PublicationSourcesResponse(BaseModel):
+class PublicationSourcesResponse(Model):
     """Enregistrements sources d'une publication, toutes sources confondues, leurs contributions sources, et les structures citées par ces contributions sources."""
 
     title: str
@@ -487,7 +488,7 @@ class PublicationSourcesResponse(BaseModel):
     structures: dict[str, StructureInfo]
 
 
-class SuspectMergeSourceRecordOut(BaseModel):
+class SuspectMergeSourceRecordOut(Model):
     """Enregistrement source d'une publication de la file des fusions suspectes, et ses contributions sources d'auteur."""
 
     source: str
@@ -502,7 +503,7 @@ class SuspectMergeSourceRecordOut(BaseModel):
         return source_record_url(self.source, self.source_id)
 
 
-class SuspectMergeOut(BaseModel):
+class SuspectMergeOut(Model):
     """Publication de la file des fusions suspectes : moins de la moitié de ses contributions sources d'auteur ont un correspondant dans un autre enregistrement source."""
 
     publication_id: int
@@ -518,7 +519,7 @@ class SuspectMergesResponse(PaginatedResponse):
     publications: list[SuspectMergeOut]
 
 
-class MergeCandidateOut(BaseModel):
+class MergeCandidateOut(Model):
     """Publication fusionnable avec une autre."""
 
     publication_id: int

@@ -3,8 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.country_detection import CountryDetectionMethod
 from infrastructure.read_models._common import FacetOption, PaginatedResponse
 
@@ -47,7 +46,7 @@ class AddressListFilters:
 # ----- Réponses -----
 
 
-class AddressStructureSummary(BaseModel):
+class AddressStructureSummary(Model):
     """Lien entre une adresse et une structure, dans la liste des adresses."""
 
     id: int
@@ -57,7 +56,7 @@ class AddressStructureSummary(BaseModel):
     is_detected: bool
 
 
-class StructureLinkState(BaseModel):
+class StructureLinkState(Model):
     """État d'un lien entre adresse et structure : détection automatique et arbitrage manuel."""
 
     is_confirmed: bool | None
@@ -65,7 +64,7 @@ class StructureLinkState(BaseModel):
     is_detected: bool
 
 
-class AddressOut(BaseModel):
+class AddressOut(Model):
     """Ligne de `/api/addresses` (liste paginée pour validation)."""
 
     id: int
@@ -84,7 +83,7 @@ class AddressListResponse(PaginatedResponse):
     """Vrai pour une liste vide renvoyée sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base."""
 
 
-class AddressPublicationItem(BaseModel):
+class AddressPublicationItem(Model):
     id: int
     title: str
     publication_year: int | None
@@ -95,14 +94,14 @@ class AddressPublicationItem(BaseModel):
     source_id: str | None
 
 
-class FoundCountry(BaseModel):
+class FoundCountry(Model):
     """Pays trouvé pour une adresse, avec ses moyens de détection."""
 
     country_code: str
     methods: list[CountryDetectionMethod]
 
 
-class AddressForCountryAttribution(BaseModel):
+class AddressForCountryAttribution(Model):
     """Ligne de `/api/addresses/countries`."""
 
     id: int
@@ -123,7 +122,7 @@ class AddressesCountriesResponse(PaginatedResponse):
     """Nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`."""
 
 
-class AddressStatsResponse(BaseModel):
+class AddressStatsResponse(Model):
     """Compteurs d'adresses d'une structure, par état de détection et de validation."""
 
     total: int

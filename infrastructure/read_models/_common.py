@@ -3,8 +3,9 @@
 import math
 from typing import Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Field, computed_field
 
+from application.ports.model import Model
 from domain.sources.registry import Source, source_record_url
 
 
@@ -13,7 +14,7 @@ def page_count(total: int, per_page: int) -> int:
     return math.ceil(total / per_page)
 
 
-class PaginatedResponse(BaseModel):
+class PaginatedResponse(Model):
     """Base des lectures paginées : la tranche demandée et sa position dans l'ensemble.
 
     `pages` se déduit de `total` et `per_page`. Les réponses héritées ajoutent leur liste de résultats et leurs champs propres.
@@ -29,7 +30,7 @@ class PaginatedResponse(BaseModel):
         return page_count(self.total, self.per_page)
 
 
-class SourceLink(BaseModel):
+class SourceLink(Model):
     """Identifiant d'un enregistrement source et son lien vers le portail de la source."""
 
     source_id: str
@@ -43,7 +44,7 @@ def hal_links(halids: list[str] | None) -> list[SourceLink]:
     ]
 
 
-class FacetOption(BaseModel):
+class FacetOption(Model):
     """Option d'une facette de liste : la valeur filtrable, son libellé d'affichage, le décompte."""
 
     value: str
@@ -55,14 +56,14 @@ class FacetOption(BaseModel):
 EntityKind = Literal["publisher", "serial", "person", "subject", "partner"]
 
 
-class EntityFacetItem(BaseModel):
+class EntityFacetItem(Model):
     id: int | str
     """Identifiant de l'entité : un entier, ou un ROR pour une organisation partenaire."""
     label: str
     count: int
 
 
-class EntityFacetResponse(BaseModel):
+class EntityFacetResponse(Model):
     """Facette d'entité à forte cardinalité (éditeur, revue, auteur, sujet).
 
     Les options sont calculées côté serveur sous les filtres actifs du contexte (tableau de bord ou liste de publications). Les décomptes dépendent donc du contexte, et les entités se restreignent mutuellement : une revue sélectionnée restreint les éditeurs proposés. La recherche par nom borne la requête.
@@ -71,12 +72,12 @@ class EntityFacetResponse(BaseModel):
     entities: list[EntityFacetItem]
 
 
-class YesNoCount(BaseModel):
+class YesNoCount(Model):
     yes: int
     no: int
 
 
-class StructureRef(BaseModel):
+class StructureRef(Model):
     """Référence courte à une structure (acronyme + nom)."""
 
     acronym: str | None

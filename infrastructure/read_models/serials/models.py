@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.serials.issns import IssnStatus, IssnSupport
 from domain.serials.serial import OaModel, SerialType
 from infrastructure.read_models._common import (
@@ -41,7 +40,7 @@ class SerialFilters:
     """Retient les revues à au moins une publication (`True`) ou sans publication (`False`)."""
 
 
-class SerialIssnDetail(BaseModel):
+class SerialIssnDetail(Model):
     """ISSN d'une revue, avec son support, son statut et sa date de vérification au Sudoc."""
 
     issn: str
@@ -52,7 +51,7 @@ class SerialIssnDetail(BaseModel):
     sudoc_checked_at: datetime | None
 
 
-class SerialListItem(BaseModel):
+class SerialListItem(Model):
     """Ligne de la liste paginée `/api/serials`, résumé du profil complet (`SerialDetailResponse`)."""
 
     id: int
@@ -83,7 +82,7 @@ class SerialDetailResponse(SerialListItem):
     doaj_imported_at: datetime | None
 
 
-class SerialsFacetsResponse(BaseModel):
+class SerialsFacetsResponse(Model):
     """Facettes de `/api/serials`.
 
     Chaque dimension écarte son propre filtre de la condition WHERE : son décompte donne le nombre de revues retenues si l'option est cochée ou décochée.
@@ -99,7 +98,7 @@ class SerialsFacetsResponse(BaseModel):
     """Revues avec et sans publication."""
 
 
-class SerialDuplicateGroup(BaseModel):
+class SerialDuplicateGroup(Model):
     """Groupe de revues en double potentiel, la plus riche en publications en tête."""
 
     value: str
@@ -107,13 +106,13 @@ class SerialDuplicateGroup(BaseModel):
     serials: list[SerialListItem]
 
 
-class SerialDuplicatesResponse(BaseModel):
+class SerialDuplicatesResponse(Model):
     """File de groupes de revues en double potentiel, les plus riches en publications en tête."""
 
     groups: list[SerialDuplicateGroup]
 
 
-class LikelyProceedingsItem(BaseModel):
+class LikelyProceedingsItem(Model):
     """Revue typée `journal` contenant surtout des articles de congrès, d'après le type donné par chaque source."""
 
     serial: SerialListItem
@@ -123,13 +122,13 @@ class LikelyProceedingsItem(BaseModel):
     """Enregistrements sources de la revue."""
 
 
-class LikelyProceedingsResponse(BaseModel):
+class LikelyProceedingsResponse(Model):
     """File des recueils d'actes probables : les revues sans ISSN en tête, puis les plus riches en enregistrements sources."""
 
     serials: list[LikelyProceedingsItem]
 
 
-class DoiNamespaceConflict(BaseModel):
+class DoiNamespaceConflict(Model):
     """Enregistrements sources de `record_serial` dont le DOI relève de l'espace de noms `namespace` de `namespace_serial`."""
 
     namespace: str
@@ -147,7 +146,7 @@ class DoiNamespaceConflict(BaseModel):
     """Répartition de `records` par source."""
 
 
-class DoiNamespaceConflictsResponse(BaseModel):
+class DoiNamespaceConflictsResponse(Model):
     """Paires de revues contredites par les espaces de noms DOI, les plus fournies en enregistrements sources d'abord."""
 
     conflicts: list[DoiNamespaceConflict]

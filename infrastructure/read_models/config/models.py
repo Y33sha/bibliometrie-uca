@@ -2,10 +2,10 @@
 
 from typing import Any
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 
-class ConfigItem(BaseModel):
+class ConfigItem(Model):
     """Ligne de la table `config` (paramètres applicatifs clé/valeur)."""
 
     key: str

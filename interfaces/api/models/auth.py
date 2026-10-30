@@ -1,14 +1,14 @@
 """Modèles Pydantic pour l'authentification."""
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 
-class LoginRequest(BaseModel):
+class LoginRequest(Model):
     username: str
     password: str
 
 
-class AuthCheckResponse(BaseModel):
+class AuthCheckResponse(Model):
     """État de la session et, si elle est valide, son utilisateur."""
 
     authenticated: bool

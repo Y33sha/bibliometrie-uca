@@ -5,7 +5,9 @@ Le contrat d'édition `PerimeterUpdate` est déclaré dans le port `application/
 
 from typing import Annotated
 
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import Field, StringConstraints
+
+from application.ports.model import Model
 
 _Trimmed = Annotated[str, StringConstraints(strip_whitespace=True)]
 
@@ -16,7 +18,7 @@ _PerimeterCode = Annotated[
 ]
 
 
-class PerimeterCreate(BaseModel):
+class PerimeterCreate(Model):
     code: _PerimeterCode
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     root_structure_ids: list[int] = Field(default_factory=list)

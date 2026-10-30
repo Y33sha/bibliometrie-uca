@@ -7,8 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal, cast
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.structures.structure import Structure
 from infrastructure.read_models._common import (
     FacetOption,
@@ -41,7 +40,7 @@ class StructureFilters:
     """Retient les structures hors de tout périmètre."""
 
 
-class StructureListItem(BaseModel):
+class StructureListItem(Model):
     """Ligne résumée d'une structure, dans la liste paginée et dans le référentiel complet."""
 
     id: int
@@ -61,7 +60,7 @@ class StructureListResponse(PaginatedResponse):
     structures: list[StructureListItem]
 
 
-class StructuresFacetsResponse(BaseModel):
+class StructuresFacetsResponse(Model):
     """Facettes de la liste des structures. Chaque décompte écarte le filtre de sa propre facette."""
 
     types: list[FacetOption]
@@ -71,7 +70,7 @@ class StructuresFacetsResponse(BaseModel):
     """Options terminées par l'option `none`, hors de tout périmètre."""
 
 
-class StructureOut(BaseModel):
+class StructureOut(Model):
     """Structure complète, renvoyée par GET, POST et PUT sur `/api/structures`."""
 
     id: int
@@ -100,7 +99,7 @@ class StructureOut(BaseModel):
         )
 
 
-class RelatedStructureOut(BaseModel):
+class RelatedStructureOut(Model):
     """Structure voisine (tutelle ou sous-structure) dans le détail d'une structure."""
 
     id: int
@@ -111,7 +110,7 @@ class RelatedStructureOut(BaseModel):
     tutelle_id: int
 
 
-class NameFormOut(BaseModel):
+class NameFormOut(Model):
     """Forme de nom d'une structure."""
 
     id: int
@@ -123,7 +122,7 @@ class NameFormOut(BaseModel):
     created_at: datetime | None = None
 
 
-class StructureDetailResponse(BaseModel):
+class StructureDetailResponse(Model):
     """Détail complet renvoyé par GET /api/structures/{id}."""
 
     structure: StructureOut
@@ -133,7 +132,7 @@ class StructureDetailResponse(BaseModel):
     theses_count: int
 
 
-class StructureAddressOut(BaseModel):
+class StructureAddressOut(Model):
     id: int
     raw_text: str
     is_confirmed: bool | None
@@ -143,7 +142,7 @@ class StructureAddressesResponse(PaginatedResponse):
     addresses: list[StructureAddressOut]
 
 
-class StructurePartner(BaseModel):
+class StructurePartner(Model):
     """Organisation partenaire d'une structure : un ROR des auteurs de ses publications."""
 
     ror_id: str
@@ -156,7 +155,7 @@ class StructurePartner(BaseModel):
     """Nombre de copublications."""
 
 
-class PartnerFacetOption(BaseModel):
+class PartnerFacetOption(Model):
     value: str
     label: str
     count: int
@@ -172,7 +171,7 @@ class StructurePartnersResponse(PaginatedResponse):
     types: list[PartnerFacetOption]
 
 
-class StructureDeletionImpact(BaseModel):
+class StructureDeletionImpact(Model):
     """Données supprimées avec une structure."""
 
     name_forms: int

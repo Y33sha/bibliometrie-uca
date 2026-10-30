@@ -3,13 +3,12 @@
 from datetime import datetime
 from typing import Protocol, TypedDict
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.structures.structure import Structure, StructureType
 from domain.types import JsonValue
 
 
-class StructureCreate(BaseModel):
+class StructureCreate(Model):
     """Champs d'une structure à créer."""
 
     code: str
@@ -23,7 +22,7 @@ class StructureCreate(BaseModel):
     """Une valeur seule (`str`) devient une liste à l'écriture (`StructureApiIds`)."""
 
 
-class NameFormCreate(BaseModel):
+class NameFormCreate(Model):
     """Champs d'une forme de nom de structure à créer."""
 
     structure_id: int
@@ -33,7 +32,7 @@ class NameFormCreate(BaseModel):
     requires_context_of: list[int] | None = None
 
 
-class StructureUpdate(BaseModel):
+class StructureUpdate(Model):
     """Champs modifiables d'une structure. Seuls les champs fournis sont écrits. `null` efface un champ facultatif."""
 
     name: str | None = None
@@ -45,7 +44,7 @@ class StructureUpdate(BaseModel):
     api_ids: dict[str, str | list[str]] | None = None
 
 
-class NameFormUpdate(BaseModel):
+class NameFormUpdate(Model):
     """Champs modifiables d'une forme de nom de structure. Seuls les champs fournis sont écrits."""
 
     form_text: str | None = None

@@ -3,10 +3,10 @@
 Le référentiel alimente les listes de choix d'attribution et de filtre par pays.
 """
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 
-class CountryOut(BaseModel):
+class CountryOut(Model):
     """Pays du référentiel : code ISO à deux lettres et libellé."""
 
     code: str

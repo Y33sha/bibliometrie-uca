@@ -2,8 +2,9 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Field, computed_field
 
+from application.ports.model import Model
 from domain.sources.registry import Source, source_record_url
 from infrastructure.read_models._common import (
     PaginatedResponse,
@@ -13,7 +14,7 @@ from infrastructure.read_models._common import (
 )
 
 
-class HalDocSummary(BaseModel):
+class HalDocSummary(Model):
     """Détail d'un dépôt HAL rattaché à une publication."""
 
     halid: str
@@ -30,7 +31,7 @@ class HalDocSummary(BaseModel):
         return source_record_url(Source.HAL, self.halid)
 
 
-class HalPublicationDetail(BaseModel):
+class HalPublicationDetail(Model):
     """Métadonnées et dépôts HAL d'une publication, communs aux listes de doublons HAL."""
 
     id: int
@@ -42,7 +43,7 @@ class HalPublicationDetail(BaseModel):
     hal_docs: list[HalDocSummary]
 
 
-class HalDoiDuplicatePair(BaseModel):
+class HalDoiDuplicatePair(Model):
     doi: str
     halids: list[str]
     publication: HalPublicationDetail
@@ -52,7 +53,7 @@ class HalDoiDuplicatesResponse(PaginatedResponse):
     pairs: list[HalDoiDuplicatePair]
 
 
-class HalMetaDuplicatePair(BaseModel):
+class HalMetaDuplicatePair(Model):
     publication_a: HalPublicationDetail
     publication_b: HalPublicationDetail
 
@@ -61,7 +62,7 @@ class HalMetaDuplicatesResponse(PaginatedResponse):
     pairs: list[HalMetaDuplicatePair]
 
 
-class HalCollectionLab(BaseModel):
+class HalCollectionLab(Model):
     """Laboratoire doté d'une collection HAL, pour le sélecteur des manques de collection."""
 
     id: int
@@ -70,7 +71,7 @@ class HalCollectionLab(BaseModel):
     hal_collection: str
 
 
-class HalMissingCollectionPublication(BaseModel):
+class HalMissingCollectionPublication(Model):
     id: int
     title: str
     publication_year: int | None
@@ -98,7 +99,7 @@ class NoMissingCollections(StrEnum):
     NO_COLLECTION = "no_collection"
 
 
-class HalAffiliationConflictPublication(BaseModel):
+class HalAffiliationConflictPublication(Model):
     id: int
     title: str
     publication_year: int | None
@@ -119,7 +120,7 @@ class HalAffiliationConflictsResponse(PaginatedResponse):
     publications: list[HalAffiliationConflictPublication]
 
 
-class HalAccountSummary(BaseModel):
+class HalAccountSummary(Model):
     hal_person_id: int
     full_name: str | None
     idhal: str | None
@@ -128,7 +129,7 @@ class HalAccountSummary(BaseModel):
     publication_count: int
 
 
-class HalDuplicateAccountPerson(BaseModel):
+class HalDuplicateAccountPerson(Model):
     person_id: int
     last_name: str
     first_name: str

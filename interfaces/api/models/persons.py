@@ -2,8 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.persons.identifiers import AttributionStatus, PersonIdentifierType
 from domain.persons.person import PersonExclusion
 from interfaces.api.models.contributions import SourceContributionRef
@@ -11,38 +10,38 @@ from interfaces.api.models.contributions import SourceContributionRef
 # ----- Corps des requêtes -----
 
 
-class AddIdentifier(BaseModel):
+class AddIdentifier(Model):
     # Le service restreint l'ajout manuel aux types publics (`PUBLIC_PERSON_IDENTIFIER_TYPES`).
     id_type: PersonIdentifierType
     id_value: str
 
 
-class UpdateIdentifierStatus(BaseModel):
+class UpdateIdentifierStatus(Model):
     # `authenticated` est exclu : posé seulement par l'import ORCID, protégé par un trigger.
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
     ]
 
 
-class SetPersonExclusion(BaseModel):
+class SetPersonExclusion(Model):
     exclusion: PersonExclusion | None
 
 
-class UpdatePersonName(BaseModel):
+class UpdatePersonName(Model):
     last_name: str
     first_name: str = ""
 
 
-class MarkDistinctPersons(BaseModel):
+class MarkDistinctPersons(Model):
     person_id_a: int
     person_id_b: int
 
 
-class DetachContributions(BaseModel):
+class DetachContributions(Model):
     contributions: list[SourceContributionRef]
 
 
-class UpdateNameFormStatus(BaseModel):
+class UpdateNameFormStatus(Model):
     name_form: str
     status: Literal[
         AttributionStatus.PENDING, AttributionStatus.CONFIRMED, AttributionStatus.REJECTED
@@ -52,7 +51,7 @@ class UpdateNameFormStatus(BaseModel):
 # ----- Réponses composées par le router -----
 
 
-class AddIdentifierResponse(BaseModel):
+class AddIdentifierResponse(Model):
     """Réponse de `POST /api/persons/{id}/identifiers`, selon l'issue : doublon exact (`added` faux, avec `reason`), ajout (`added` vrai, avec `id_type` et `id_value`), ou réattribution depuis une autre personne (`reassigned` vrai en plus)."""
 
     added: bool
@@ -62,7 +61,7 @@ class AddIdentifierResponse(BaseModel):
     reassigned: bool | None = None
 
 
-class IdentifierStatusResponse(BaseModel):
+class IdentifierStatusResponse(Model):
     """Identifiant après changement de statut."""
 
     id: int
@@ -71,7 +70,7 @@ class IdentifierStatusResponse(BaseModel):
     """Nombre d'identifiants des comptes HAL de l'identifiant passés au même statut."""
 
 
-class NameFormStatusResponse(BaseModel):
+class NameFormStatusResponse(Model):
     """Forme de nom après changement de statut, pour la personne concernée."""
 
     person_id: int
@@ -79,7 +78,7 @@ class NameFormStatusResponse(BaseModel):
     status: str
 
 
-class DetachContributionsResponse(BaseModel):
+class DetachContributionsResponse(Model):
     """Décompte d'un détachement de contributions."""
 
     detached: int

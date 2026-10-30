@@ -2,10 +2,10 @@
 
 from typing import Literal
 
-from pydantic import BaseModel
+from application.ports.model import Model
 
 
-class PivotDimensionOut(BaseModel):
+class PivotDimensionOut(Model):
     """Métadonnée d'une dimension, lue par les sélecteurs de l'interface."""
 
     key: str
@@ -16,7 +16,7 @@ class PivotDimensionOut(BaseModel):
     """Vrai si la dimension sert d'axe de comparaison (abscisse)."""
 
 
-class PivotIndicatorOut(BaseModel):
+class PivotIndicatorOut(Model):
     """Indicateur du sélecteur de l'interface."""
 
     key: str
@@ -27,14 +27,14 @@ class PivotIndicatorOut(BaseModel):
     """Dimension empilée dans chaque barre."""
 
 
-class PivotSchemaResponse(BaseModel):
+class PivotSchemaResponse(Model):
     """Vocabulaire du pivot exposé à l'interface (sans liaison SQL)."""
 
     dimensions: list[PivotDimensionOut]
     indicators: list[PivotIndicatorOut]
 
 
-class PivotResponse(BaseModel):
+class PivotResponse(Model):
     """Résultat d'une agrégation."""
 
     measure: str
@@ -43,7 +43,7 @@ class PivotResponse(BaseModel):
     """Valeur de chaque groupement (clés de `groups`), et mesure sous la clé `value`, `null` si le dénominateur est nul."""
 
 
-class CountryCollaboration(BaseModel):
+class CountryCollaboration(Model):
     """Décompte de collaborations pour un pays."""
 
     code: str
@@ -52,7 +52,7 @@ class CountryCollaboration(BaseModel):
     """Nombre de publications co-affiliées au pays."""
 
 
-class CollaborationsResponse(BaseModel):
+class CollaborationsResponse(Model):
     """Collaborations internationales ventilées par pays étranger (source `publications.countries`)."""
 
     rows: list[CountryCollaboration]

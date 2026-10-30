@@ -8,19 +8,18 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.pipeline_runs import PhaseMetricsPayload, PhaseStatus, Signal
 
 
-class PhaseBrief(BaseModel):
+class PhaseBrief(Model):
     """Statut d'une phase au sein d'un run, pour le ruban de la liste."""
 
     phase: str
     status: PhaseStatus
 
 
-class RunSummary(BaseModel):
+class RunSummary(Model):
     """Ligne de la liste des runs : exécutions d'un même `run_id` regroupées."""
 
     run_id: int
@@ -34,7 +33,7 @@ class RunSummary(BaseModel):
     phases: list[PhaseBrief]
 
 
-class PhaseExecutionDetail(BaseModel):
+class PhaseExecutionDetail(Model):
     """Exécution de phase, avec les valeurs recalculées à la lecture."""
 
     phase: str
@@ -49,7 +48,7 @@ class PhaseExecutionDetail(BaseModel):
     signals: list[Signal]
 
 
-class RunDetail(BaseModel):
+class RunDetail(Model):
     """Détail d'un run : ses phases et ses totaux."""
 
     run_id: int

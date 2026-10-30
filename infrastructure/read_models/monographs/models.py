@@ -3,8 +3,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from infrastructure.read_models._common import (
     FacetOption,
     PaginatedResponse,
@@ -37,7 +36,7 @@ class MonographFilters:
     """Collection de la monographie."""
 
 
-class MonographListItem(BaseModel):
+class MonographListItem(Model):
     """Ligne de la liste des monographies."""
 
     id: int
@@ -58,7 +57,7 @@ class MonographListResponse(PaginatedResponse):
     monographs: list[MonographListItem]
 
 
-class MonographsFacetsResponse(BaseModel):
+class MonographsFacetsResponse(Model):
     """Facettes de la liste des monographies. Chaque décompte écarte le filtre de sa dimension : il donne le nombre de monographies retenues si l'option est cochée."""
 
     kinds: list[FacetOption]

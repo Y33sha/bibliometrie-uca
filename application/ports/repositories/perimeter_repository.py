@@ -2,12 +2,13 @@
 
 from typing import Annotated, Protocol
 
-from pydantic import BaseModel, StringConstraints
+from pydantic import StringConstraints
 
+from application.ports.model import Model
 from domain.perimeters.perimeter import Perimeter
 
 
-class PerimeterUpdate(BaseModel):
+class PerimeterUpdate(Model):
     """Champs modifiables d'un périmètre. Seuls les champs fournis sont écrits."""
 
     name: Annotated[str, StringConstraints(strip_whitespace=True)] | None = None

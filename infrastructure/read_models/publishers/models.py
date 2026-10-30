@@ -3,8 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from infrastructure.read_models._common import FacetOption, PaginatedResponse, YesNoCount
 
 # Vocabulaire de tri de la liste des éditeurs : le champ, puis le sens.
@@ -29,7 +28,7 @@ class PublisherFilters:
     """Retient les éditeurs à décompte de publications du périmètre non nul (`True`) ou nul (`False`)."""
 
 
-class DoiPrefixInfo(BaseModel):
+class DoiPrefixInfo(Model):
     """Préfixe DOI rattaché à un éditeur (`doi_prefixes`)."""
 
     prefix: str
@@ -37,7 +36,7 @@ class DoiPrefixInfo(BaseModel):
     crossref_member_id: int | None = None
 
 
-class PublisherListItem(BaseModel):
+class PublisherListItem(Model):
     """Ligne de la liste des éditeurs."""
 
     id: int
@@ -59,7 +58,7 @@ class PublisherListResponse(PaginatedResponse):
     publishers: list[PublisherListItem]
 
 
-class PublishersFacetsResponse(BaseModel):
+class PublishersFacetsResponse(Model):
     """Facettes dynamiques de `/api/publishers`. Chaque décompte écarte le filtre de sa dimension."""
 
     publisher_types: list[FacetOption]

@@ -2,14 +2,13 @@
 
 from typing import Protocol
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.publishers.merge import SharedTitlePair
 from domain.serials.issns import IssnStatus, IssnSupport
 from domain.serials.serial import OaModel, Serial, SerialType
 
 
-class SerialIssnInput(BaseModel):
+class SerialIssnInput(Model):
     """ISSN d'une revue, saisi dans l'administration."""
 
     issn: str
@@ -18,7 +17,7 @@ class SerialIssnInput(BaseModel):
     status: IssnStatus = IssnStatus.ACTIVE
 
 
-class SerialUpdate(BaseModel):
+class SerialUpdate(Model):
     """Champs modifiables d'une revue. Seuls les champs fournis sont écrits."""
 
     title: str | None = None

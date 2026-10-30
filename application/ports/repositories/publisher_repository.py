@@ -2,12 +2,13 @@
 
 from typing import Protocol
 
-from pydantic import BaseModel, field_validator
+from pydantic import field_validator
 
+from application.ports.model import Model
 from domain.publishers.publisher import Publisher, PublisherType
 
 
-class PublisherUpdate(BaseModel):
+class PublisherUpdate(Model):
     """Champs modifiables d'un éditeur. Seuls les champs fournis sont écrits."""
 
     name: str | None = None

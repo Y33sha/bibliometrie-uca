@@ -2,17 +2,16 @@
 
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from infrastructure.read_models._common import FacetOption, PaginatedResponse
 from infrastructure.read_models.publications.models import PublicationLabItem
 
 
-class OrphanCountResponse(BaseModel):
+class OrphanCountResponse(Model):
     total: int
 
 
-class OrphanContributionOut(BaseModel):
+class OrphanContributionOut(Model):
     """Contribution orpheline : contribution du périmètre, sous un rôle d'auteur, rattachée à aucune personne."""
 
     contribution_id: int
@@ -48,7 +47,7 @@ class OrphanFilters:
     """Retient les contributions sans laboratoire."""
 
 
-class OrphanContributionsFacetsResponse(BaseModel):
+class OrphanContributionsFacetsResponse(Model):
     """Facette laboratoires de la file des contributions orphelines."""
 
     labs: list[FacetOption]

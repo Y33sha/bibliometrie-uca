@@ -2895,7 +2895,10 @@ export interface components {
             label: string;
             /** Url */
             url: string;
-            /** Known */
+            /**
+             * Known
+             * @description La copie est hébergée par une plateforme du registre.
+             */
             known: boolean;
         };
         /** AddIdentifier */
@@ -2929,9 +2932,15 @@ export interface components {
             id: number;
             /** Raw Text */
             raw_text: string;
-            /** Countries */
+            /**
+             * Countries
+             * @description Pays retenus.
+             */
             countries: string[] | null;
-            /** Found Countries */
+            /**
+             * Found Countries
+             * @description Tous les pays trouvés, retenus ou non.
+             */
             found_countries: components["schemas"]["FoundCountry"][];
             /** Publication Count */
             publication_count: number;
@@ -2951,6 +2960,7 @@ export interface components {
             addresses: components["schemas"]["AddressOut"][];
             /**
              * Requires Search
+             * @description Vrai pour une liste vide renvoyée sans lecture : sans prédicat de texte ou de structure, les filtres demandés couvriraient toute la base.
              * @default false
              */
             requires_search: boolean;
@@ -3067,7 +3077,10 @@ export interface components {
             addresses: components["schemas"]["AddressForCountryAttribution"][];
             /** Country Facets */
             country_facets: components["schemas"]["FacetOption"][];
-            /** Without Country */
+            /**
+             * Without Country
+             * @description Nombre d'adresses sans pays retenu, sous les mêmes filtres que `country_facets`.
+             */
             without_country: number;
             /** Pages */
             readonly pages: number;
@@ -3085,11 +3098,17 @@ export interface components {
              * @enum {string}
              */
             status: "pending" | "confirmed" | "rejected";
-            /** Canonical */
+            /**
+             * Canonical
+             * @description Forme dérivée du nom de la personne : confirmée d'office, statut non modifiable.
+             */
             canonical: boolean;
             /** Has Rh */
             has_rh: boolean;
-            /** Compatible */
+            /**
+             * Compatible
+             * @description Nom de la personne compatible avec la forme (mêmes mots) : homonyme ou doublon si vrai, erreur d'attribution probable si faux.
+             */
             compatible: boolean;
         };
         /** AmbiguousNameFormOut */
@@ -3143,7 +3162,10 @@ export interface components {
          * @description État de la session et, si elle est valide, son utilisateur.
          */
         AuthCheckResponse: {
-            /** Authenticated */
+            /**
+             * Authenticated
+             * @description Vrai si la requête a une session valide.
+             */
             authenticated: boolean;
             /** Login */
             login?: string | null;
@@ -3235,9 +3257,15 @@ export interface components {
         CollaborationsResponse: {
             /** Rows */
             rows: components["schemas"]["CountryCollaboration"][];
-            /** International Count */
+            /**
+             * International Count
+             * @description Nombre de publications avec au moins un pays étranger.
+             */
             international_count: number;
-            /** Total Count */
+            /**
+             * Total Count
+             * @description Nombre de publications du corpus filtré, dénominateur de la part des collaborations internationales.
+             */
             total_count: number;
         };
         /**
@@ -3247,7 +3275,10 @@ export interface components {
         ConfigItem: {
             /** Key */
             key: string;
-            /** Value */
+            /**
+             * Value
+             * @description Valeur JSONB, libre côté API. Avec `JsonValue`, `openapi-typescript` produit un type autoréférent, refusé par TypeScript.
+             */
             value: unknown;
             /** Description */
             description: string | null;
@@ -3287,7 +3318,10 @@ export interface components {
             last_name: string;
             /** First Name */
             first_name: string;
-            /** Has Rh */
+            /**
+             * Has Rh
+             * @description La personne a une fiche RH (`hr_records`).
+             */
             has_rh: boolean;
         };
         /**
@@ -3295,9 +3329,15 @@ export interface components {
          * @description Décompte de collaborations pour un pays.
          */
         CountryCollaboration: {
-            /** Code */
+            /**
+             * Code
+             * @description Code ISO 3166-1 alpha-2, en minuscules.
+             */
             code: string;
-            /** Value */
+            /**
+             * Value
+             * @description Nombre de publications co-affiliées au pays.
+             */
             value: number;
         };
         /**
@@ -3347,7 +3387,10 @@ export interface components {
             last_name: string;
             /** Has Rh */
             has_rh: boolean;
-            /** Contribution Count */
+            /**
+             * Contribution Count
+             * @description Contributions où la personne tient le rôle d'auteur, même mesure que la liste des personnes.
+             */
             contribution_count: number;
             /** Labs */
             labs: string[];
@@ -3375,7 +3418,10 @@ export interface components {
         DetachContributionsResponse: {
             /** Detached */
             detached: number;
-            /** Cleaned Forms */
+            /**
+             * Cleaned Forms
+             * @description Nombre de formes de nom supprimées.
+             */
             cleaned_forms: number;
         };
         /**
@@ -3423,17 +3469,32 @@ export interface components {
         DoiNamespaceConflict: {
             /** Namespace */
             namespace: string;
-            /** Dois */
+            /**
+             * Dois
+             * @description DOI distincts de l'espace de noms.
+             */
             dois: number;
-            /** Documents */
+            /**
+             * Documents
+             * @description Enregistrements sources de l'espace de noms.
+             */
             documents: number;
-            /** Share */
+            /**
+             * Share
+             * @description Part des DOI de l'espace de noms désignant `namespace_serial` ; un DOI partagé entre plusieurs revues compte au prorata de ses enregistrements sources.
+             */
             share: number;
             namespace_serial: components["schemas"]["SerialListItem"];
             record_serial: components["schemas"]["SerialListItem"];
-            /** Records */
+            /**
+             * Records
+             * @description Enregistrements sources de `record_serial`.
+             */
             records: number;
-            /** Sources */
+            /**
+             * Sources
+             * @description Répartition de `records` par source.
+             */
             sources: {
                 [key: string]: number;
             };
@@ -3465,14 +3526,20 @@ export interface components {
         EcoleDoctorale: {
             /** Nom */
             nom: string;
-            /** Ppn */
+            /**
+             * Ppn
+             * @description PPN IdRef de l'école doctorale, s'il est connu.
+             */
             ppn?: string | null;
         } & {
             [key: string]: unknown;
         };
         /** EntityFacetItem */
         EntityFacetItem: {
-            /** Id */
+            /**
+             * Id
+             * @description Identifiant de l'entité : un entier, ou un ROR pour une organisation partenaire.
+             */
             id: number | string;
             /** Label */
             label: string;
@@ -3524,7 +3591,10 @@ export interface components {
         FacetOption: {
             /** Value */
             value: string;
-            /** Label */
+            /**
+             * Label
+             * @description Texte affiché, quand seule la requête le connaît (nom de laboratoire, intitulé traduit). `None` pour une valeur affichée telle quelle (année, statut) ou un libellé résolu côté client.
+             */
             label?: string | null;
             /** Count */
             count: number;
@@ -3542,7 +3612,10 @@ export interface components {
             publication_count: number;
             /** Structures */
             structures: components["schemas"]["AddressStructureSummary"][];
-            /** Matched Forms */
+            /**
+             * Matched Forms
+             * @description Rempli seulement pour les faux positifs.
+             */
             matched_forms?: components["schemas"]["FeedbackMatchedForm"][] | null;
         };
         /** FeedbackAddressesResponse */
@@ -3567,6 +3640,7 @@ export interface components {
             form_id: number;
             /** Form Text */
             form_text: string;
+            /** @description Structure de la forme ; l'affichage choisit entre acronyme et nom. */
             structure: components["schemas"]["StructureRef"];
             /** Requires Context Of */
             requires_context_of: number[] | null;
@@ -3631,7 +3705,10 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Laboratories */
+            /**
+             * Laboratories
+             * @description Laboratoires du périmètre de la publication ; l'affichage choisit entre acronyme et nom.
+             */
             laboratories: components["schemas"]["StructureRef"][];
             /**
              * Hal Links
@@ -3848,7 +3925,10 @@ export interface components {
             id: number;
             /** Status */
             status: string;
-            /** Propagated */
+            /**
+             * Propagated
+             * @description Nombre d'identifiants des comptes HAL de l'identifiant passés au même statut.
+             */
             propagated: number;
         };
         /**
@@ -3860,9 +3940,15 @@ export interface components {
             name: string;
             /** Root Structure Ids */
             root_structure_ids: number[];
-            /** Title */
+            /**
+             * Title
+             * @description Titre de l'application. Pour `None`, l'interface compose le titre avec `name`.
+             */
             title: string | null;
-            /** Brand Hue */
+            /**
+             * Brand Hue
+             * @description Teinte de l'interface, angle OKLCH en degrés.
+             */
             brand_hue: number;
         };
         /**
@@ -3883,9 +3969,15 @@ export interface components {
          */
         LikelyProceedingsItem: {
             serial: components["schemas"]["SerialListItem"];
-            /** Conference Papers */
+            /**
+             * Conference Papers
+             * @description Enregistrements sources typés article de congrès.
+             */
             conference_papers: number;
-            /** Records */
+            /**
+             * Records
+             * @description Enregistrements sources de la revue.
+             */
             records: number;
         };
         /**
@@ -3925,9 +4017,15 @@ export interface components {
             doc_type: string;
             /** Doi */
             doi: string | null;
-            /** Similarity */
+            /**
+             * Similarity
+             * @description Similarité trigramme de son titre normalisé avec le titre de référence.
+             */
             similarity: number;
-            /** Sources */
+            /**
+             * Sources
+             * @description Sources de ses enregistrements sources.
+             */
             sources: string[];
         };
         /**
@@ -3975,7 +4073,10 @@ export interface components {
             serial_id: number | null;
             /** Journal Title */
             journal_title: string | null;
-            /** Publication Count */
+            /**
+             * Publication Count
+             * @description Nombre de publications de la monographie.
+             */
             publication_count: number;
         };
         /** MonographListResponse */
@@ -4129,7 +4230,10 @@ export interface components {
             is_word_boundary?: boolean | null;
             /** Is Excluding */
             is_excluding?: boolean | null;
-            /** Requires Context Of */
+            /**
+             * Requires Context Of
+             * @description `null` efface la valeur.
+             */
             requires_context_of?: number[] | null;
         };
         /**
@@ -4182,9 +4286,15 @@ export interface components {
         OrphanContributionOut: {
             /** Contribution Id */
             contribution_id: number;
-            /** Sources */
+            /**
+             * Sources
+             * @description Sources des contributions sources de la contribution, sans doublon, par ordre de priorité.
+             */
             sources: string[];
-            /** Full Name */
+            /**
+             * Full Name
+             * @description Nom de la contribution source de la source la plus prioritaire.
+             */
             full_name: string;
             /** Last Name */
             last_name: string;
@@ -4196,7 +4306,10 @@ export interface components {
             publication_title: string;
             /** Publication Year */
             publication_year: number | null;
-            /** Labs */
+            /**
+             * Labs
+             * @description Laboratoires du périmètre détectés dans les adresses des contributions sources de la contribution.
+             */
             labs: components["schemas"]["PublicationLabItem"][];
         };
         /**
@@ -4204,9 +4317,15 @@ export interface components {
          * @description Facette laboratoires de la file des contributions orphelines.
          */
         OrphanContributionsFacetsResponse: {
-            /** Labs */
+            /**
+             * Labs
+             * @description Décompte par laboratoire détecté dans les contributions sources de la contribution.
+             */
             labs: components["schemas"]["FacetOption"][];
-            /** No Lab Count */
+            /**
+             * No Lab Count
+             * @description Nombre de contributions sans laboratoire.
+             */
             no_lab_count: number;
         };
         /** OrphanContributionsResponse */
@@ -4261,7 +4380,10 @@ export interface components {
         PartenaireThese: {
             /** Nom */
             nom: string;
-            /** Type */
+            /**
+             * Type
+             * @description `etablissement`, `laboratoire`…
+             */
             type?: string | null;
         } & {
             [key: string]: unknown;
@@ -4307,11 +4429,20 @@ export interface components {
             name: string;
             /** Root Structure Ids */
             root_structure_ids: number[];
-            /** Structures */
+            /**
+             * Structures
+             * @description Structures racines.
+             */
             structures: components["schemas"]["PerimeterStructureItem"][];
-            /** Structure Count */
+            /**
+             * Structure Count
+             * @description Nombre de structures des racines et de leurs sous-structures.
+             */
             structure_count: number;
-            /** Is Persons */
+            /**
+             * Is Persons
+             * @description Vrai pour le périmètre des personnes, celui de la liste publique des structures.
+             */
             is_persons: boolean;
         };
         /** PerimeterStructureItem */
@@ -4332,7 +4463,10 @@ export interface components {
         PerimeterUpdate: {
             /** Name */
             name?: string | null;
-            /** Root Structure Ids */
+            /**
+             * Root Structure Ids
+             * @description Structures racines. L'appelant recalcule leurs sous-structures (`perimeter_structures`).
+             */
             root_structure_ids?: number[] | null;
         };
         /** PersonAddressOut */
@@ -4341,7 +4475,10 @@ export interface components {
             id: number;
             /** Raw Text */
             raw_text: string;
-            /** Publication Count */
+            /**
+             * Publication Count
+             * @description Nombre de publications de la personne dont une contribution source porte l'adresse.
+             */
             publication_count: number;
             /** Structures */
             structures: components["schemas"]["PersonAddressStruct"][] | null;
@@ -4363,7 +4500,10 @@ export interface components {
             acronym: string | null;
             /** Name */
             name: string;
-            /** Publications */
+            /**
+             * Publications
+             * @description Nombre de publications de la personne dont une adresse est rattachée à la structure.
+             */
             publications: number;
         };
         /**
@@ -4371,13 +4511,25 @@ export interface components {
          * @description Structures reconnues dans les adresses de la personne, comptées en publications.
          */
         PersonAddressSummary: {
-            /** First Year */
+            /**
+             * First Year
+             * @description Année de la plus ancienne publication de la personne.
+             */
             first_year: number | null;
-            /** Last Year */
+            /**
+             * Last Year
+             * @description Année de la plus récente publication de la personne.
+             */
             last_year: number | null;
-            /** Publications */
+            /**
+             * Publications
+             * @description Nombre de publications de la personne.
+             */
             publications: number;
-            /** Publications With Address */
+            /**
+             * Publications With Address
+             * @description Nombre de publications de la personne dont une contribution source porte une adresse.
+             */
             publications_with_address: number;
             /** Structures */
             structures: components["schemas"]["PersonAddressStructureCount"][];
@@ -4457,9 +4609,15 @@ export interface components {
             /** Has Rh */
             has_rh: boolean;
             exclusion: components["schemas"]["PersonExclusion"] | null;
-            /** Contribution Count */
+            /**
+             * Contribution Count
+             * @description Contributions où la personne tient le rôle d'auteur.
+             */
             contribution_count: number;
-            /** In Perimeter Contribution Count */
+            /**
+             * In Perimeter Contribution Count
+             * @description Contributions d'auteur retenues dans le périmètre.
+             */
             in_perimeter_contribution_count: number;
             /** Identifiers */
             identifiers: components["schemas"]["PersonIdentifierOut"][];
@@ -4646,7 +4804,10 @@ export interface components {
             cardinality: "low" | "high";
             /** Ordinal */
             ordinal: boolean;
-            /** Comparable */
+            /**
+             * Comparable
+             * @description Vrai si la dimension sert d'axe de comparaison (abscisse).
+             */
             comparable: boolean;
         };
         /**
@@ -4658,9 +4819,15 @@ export interface components {
             key: string;
             /** Label */
             label: string;
-            /** Unit */
+            /**
+             * Unit
+             * @description Unité de la mesure, vide pour un nombre de publications.
+             */
             unit: string;
-            /** Breakdown */
+            /**
+             * Breakdown
+             * @description Dimension empilée dans chaque barre.
+             */
             breakdown: string;
         };
         /**
@@ -4672,7 +4839,10 @@ export interface components {
             measure: string;
             /** Groups */
             groups: string[];
-            /** Rows */
+            /**
+             * Rows
+             * @description Valeur de chaque groupement (clés de `groups`), et mesure sous la clé `value`, `null` si le dénominateur est nul.
+             */
             rows: {
                 [key: string]: string | number | null;
             }[];
@@ -4702,7 +4872,10 @@ export interface components {
             lab_acronym: string | null;
             /** Budget Structure Id */
             budget_structure_id: number | null;
-            /** In Perimeter */
+            /**
+             * In Perimeter
+             * @description Paiement sur le budget d'une structure du périmètre des personnes, même règle que le filtre `has_apc`.
+             */
             in_perimeter: boolean;
         };
         /**
@@ -4718,15 +4891,24 @@ export interface components {
             publication_year: number | null;
             /** Doi */
             doi: string | null;
-            /** Doi Ra */
+            /**
+             * Doi Ra
+             * @description Agence d'enregistrement du préfixe DOI (Crossref, DataCite), d'après `doi_prefixes`.
+             */
             doi_ra: string | null;
             /** Doc Type */
             doc_type: string;
             /** Oa Status */
             oa_status: string;
-            /** License */
+            /**
+             * License
+             * @description Licence de la version éditeur.
+             */
             license: string | null;
-            /** Deposit License */
+            /**
+             * Deposit License
+             * @description Licence du fichier déposé dans HAL.
+             */
             deposit_license: string | null;
             /** Language */
             language: string | null;
@@ -4738,15 +4920,24 @@ export interface components {
             serial_id: number | null;
             /** Journal Title */
             journal_title: string | null;
-            /** Serial Issns */
+            /**
+             * Serial Issns
+             * @description ISSN actifs de la revue.
+             */
             serial_issns: string[];
             /** Oa Model */
             oa_model: string | null;
-            /** Monograph Id */
+            /**
+             * Monograph Id
+             * @description Livre ou volume d'actes contenant la publication.
+             */
             monograph_id: number | null;
             /** Monograph Title */
             monograph_title: string | null;
-            /** Publisher Id */
+            /**
+             * Publisher Id
+             * @description Éditeur de la revue, à défaut celui de la monographie.
+             */
             publisher_id: number | null;
             /** Publisher Name */
             publisher_name: string | null;
@@ -4770,15 +4961,27 @@ export interface components {
             };
             /** Subjects */
             subjects: components["schemas"]["SubjectOut"][];
-            /** Keywords */
+            /**
+             * Keywords
+             * @description Mots-clés libres réunis depuis les sources, hors référentiel `subjects`.
+             */
             keywords: string[];
             /** Relations */
             relations: components["schemas"]["RelatedPublicationOut"][];
-            /** Access Url */
+            /**
+             * Access Url
+             * @description Lien d'accès (`domain.publications.access.access_url`).
+             */
             access_url: string | null;
-            /** Access */
+            /**
+             * Access
+             * @description Meilleure copie ouverte de chaque plateforme, la meilleure en tête, hors copies désignées par le DOI.
+             */
             access: components["schemas"]["AccessLinkOut"][];
-            /** Referenced By */
+            /**
+             * Referenced By
+             * @description Sources référençant la publication sans en donner de copie : toutes, sauf Crossref et DataCite, couvertes par le DOI, et HAL quand HAL figure parmi les liens d'accès.
+             */
             referenced_by: components["schemas"]["SourceRecordOut"][];
             /** External Identifiers */
             external_identifiers: components["schemas"]["ExternalIdentifierOut"][];
@@ -4807,9 +5010,15 @@ export interface components {
             doc_type: string;
             /** Oa Status */
             oa_status: string;
-            /** Access Url */
+            /**
+             * Access Url
+             * @description Lien d'accès (`domain.publications.access.access_url`).
+             */
             access_url: string | null;
-            /** License */
+            /**
+             * License
+             * @description Licence de la version éditeur.
+             */
             license: string | null;
             /** Serial */
             serial: string | null;
@@ -4845,7 +5054,10 @@ export interface components {
             is_corresponding: boolean | null;
             /** Contribution Id */
             contribution_id: number | null;
-            /** Hal Status */
+            /**
+             * Hal Status
+             * @description Statut de dépôt HAL (`HAL_DEPOSIT_STATUSES`) au regard de la collection du laboratoire, pour une liste restreinte à un seul laboratoire ; `None` sinon.
+             */
             hal_status: string | null;
             /**
              * Record Urls
@@ -4881,9 +5093,15 @@ export interface components {
          * @description Résultat d'une fusion manuelle, ou de son aperçu.
          */
         PublicationMergeResult: {
-            /** Publication Id */
+            /**
+             * Publication Id
+             * @description Publication issue de la fusion.
+             */
             publication_id: number;
-            /** Conflicts */
+            /**
+             * Conflicts
+             * @description Nombre de contributions laissées sans personne : leurs contributions sources désignaient deux personnes.
+             */
             conflicts: number;
         };
         /**
@@ -4923,7 +5141,10 @@ export interface components {
             licenses: components["schemas"]["FacetOption"][];
             /** Doi Agencies */
             doi_agencies: components["schemas"]["FacetOption"][];
-            /** Corresponding */
+            /**
+             * Corresponding
+             * @description Rempli seulement avec `person_id`.
+             */
             corresponding: components["schemas"]["FacetOption"][];
             /** Source Counts */
             source_counts: {
@@ -4935,9 +5156,15 @@ export interface components {
             countries: components["schemas"]["FacetOption"][];
             /** Languages */
             languages: components["schemas"]["FacetOption"][];
-            /** Hal Status */
+            /**
+             * Hal Status
+             * @description Rempli seulement quand un seul laboratoire est sélectionné.
+             */
             hal_status: components["schemas"]["FacetOption"][];
-            /** In Perimeter */
+            /**
+             * In Perimeter
+             * @description Rempli seulement avec `person_id`.
+             */
             in_perimeter: components["schemas"]["FacetOption"][];
         };
         /**
@@ -4957,7 +5184,10 @@ export interface components {
             publisher_type: string;
             /** Serial Count */
             serial_count: number;
-            /** Publication Count */
+            /**
+             * Publication Count
+             * @description Publications du périmètre seulement, sommées sur les revues de l'éditeur.
+             */
             publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
@@ -4979,7 +5209,10 @@ export interface components {
             publisher_type: string;
             /** Serial Count */
             serial_count: number;
-            /** Publication Count */
+            /**
+             * Publication Count
+             * @description Publications du périmètre seulement, sommées sur les revues de l'éditeur.
+             */
             publication_count: number;
             /** Doi Prefixes */
             doi_prefixes: components["schemas"]["DoiPrefixInfo"][];
@@ -5029,10 +5262,17 @@ export interface components {
          * @description Facettes dynamiques de `/api/publishers`. Chaque décompte écarte le filtre de sa dimension.
          */
         PublishersFacetsResponse: {
-            /** Publisher Types */
+            /**
+             * Publisher Types
+             * @description Libellés tirés de `PUBLISHER_TYPE_LABELS_FR`.
+             */
             publisher_types: components["schemas"]["FacetOption"][];
-            /** Countries */
+            /**
+             * Countries
+             * @description Code ISO observé en base, avec le nom du pays en libellé.
+             */
             countries: components["schemas"]["FacetOption"][];
+            /** @description Éditeurs avec et sans publication du périmètre. */
             publications: components["schemas"]["YesNoCount"];
         };
         /**
@@ -5064,7 +5304,10 @@ export interface components {
          *     Une cible du corpus a son identifiant, son titre, son année et son type, et son DOI s'il existe ; elle se lie par son identifiant. Une cible hors corpus a son seul DOI.
          */
         RelatedPublicationOut: {
-            /** Relation Type */
+            /**
+             * Relation Type
+             * @description Type lu depuis la publication courante : les relations entrantes sont inversées.
+             */
             relation_type: string;
             /** Doi */
             doi?: string | null;
@@ -5169,7 +5412,10 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Issns */
+            /**
+             * Issns
+             * @description ISSN actifs.
+             */
             issns: string[];
             /** Publisher Id */
             publisher_id: number | null;
@@ -5189,7 +5435,10 @@ export interface components {
             oa_model: components["schemas"]["OaModel"] | null;
             /** Is Academic */
             is_academic: boolean | null;
-            /** Doaj Payload */
+            /**
+             * Doaj Payload
+             * @description Réponse DOAJ brute, renvoyée telle quelle.
+             */
             doaj_payload: {
                 [key: string]: string;
             } | null;
@@ -5201,7 +5450,10 @@ export interface components {
          * @description Groupe de revues en double potentiel, la plus riche en publications en tête.
          */
         SerialDuplicateGroup: {
-            /** Value */
+            /**
+             * Value
+             * @description Titre normalisé, ou ISSN actif dans chacune des revues.
+             */
             value: string;
             /** Serials */
             serials: components["schemas"]["SerialListItem"][];
@@ -5222,7 +5474,10 @@ export interface components {
             /** Issn */
             issn: string;
             support: components["schemas"]["IssnSupport"] | null;
-            /** Linking */
+            /**
+             * Linking
+             * @description ISSN de liaison (ISSN-L).
+             */
             linking: boolean;
             status: components["schemas"]["IssnStatus"];
             /** Sudoc Checked At */
@@ -5253,7 +5508,10 @@ export interface components {
             id: number;
             /** Title */
             title: string;
-            /** Issns */
+            /**
+             * Issns
+             * @description ISSN actifs.
+             */
             issns: string[];
             /** Publisher Id */
             publisher_id: number | null;
@@ -5322,12 +5580,22 @@ export interface components {
          *     Chaque dimension écarte son propre filtre de la condition WHERE : son décompte donne le nombre de revues retenues si l'option est cochée ou décochée.
          */
         SerialsFacetsResponse: {
-            /** Serial Types */
+            /**
+             * Serial Types
+             * @description Libellés tirés de `SERIAL_TYPE_LABELS_FR`.
+             */
             serial_types: components["schemas"]["FacetOption"][];
-            /** Oa Models */
+            /**
+             * Oa Models
+             * @description Libellés tirés de `OA_MODEL_LABELS_FR`.
+             */
             oa_models: components["schemas"]["FacetOption"][];
-            /** Doaj */
+            /**
+             * Doaj
+             * @description Libellés `Indexée` et `Non indexée`.
+             */
             doaj: components["schemas"]["FacetOption"][];
+            /** @description Revues avec et sans publication. */
             publications: components["schemas"]["YesNoCount"];
         };
         /** SetCountry */
@@ -5361,9 +5629,15 @@ export interface components {
          */
         Signal: {
             level: components["schemas"]["PhaseStatus"];
-            /** Code */
+            /**
+             * Code
+             * @description Clé de regroupement des signaux.
+             */
             code: string;
-            /** Message */
+            /**
+             * Message
+             * @description Texte affiché tel quel.
+             */
             message: string;
         };
         /**
@@ -5375,31 +5649,55 @@ export interface components {
             id: number;
             /** Source Record Id */
             source_record_id: number;
-            /** Position */
+            /**
+             * Position
+             * @description Rang d'auteur dans l'enregistrement source, à partir de 0 ; absent pour un rôle hors de la liste d'auteurs.
+             */
             position: number | null;
             /** Full Name */
             full_name: string | null;
             /** Roles */
             roles: string[] | null;
-            /** Person Id */
+            /**
+             * Person Id
+             * @description Personne de la contribution.
+             */
             person_id: number | null;
             /** In Perimeter */
             in_perimeter: boolean;
             /** Structure Ids */
             structure_ids: number[] | null;
-            /** Raw Affiliation */
+            /**
+             * Raw Affiliation
+             * @description Adresses brutes réunies.
+             */
             raw_affiliation: string | null;
             /** Countries */
             countries: string[] | null;
-            /** Contribution Id */
+            /**
+             * Contribution Id
+             * @description Absent pour une contribution source en attente d'alignement.
+             */
             contribution_id: number | null;
-            /** Reference Position */
+            /**
+             * Reference Position
+             * @description Position de la contribution source de référence de la contribution ; absente en attente d'alignement.
+             */
             reference_position: number | null;
-            /** Method */
+            /**
+             * Method
+             * @description Méthode d'entrée de la contribution source dans sa contribution.
+             */
             method: string | null;
-            /** Score */
+            /**
+             * Score
+             * @description Score de l'entrée, en bits.
+             */
             score: number | null;
-            /** Margin */
+            /**
+             * Margin
+             * @description Marge de l'entrée, en bits.
+             */
             margin: number | null;
         };
         /** SourceContributionRef */
@@ -5434,31 +5732,55 @@ export interface components {
             source_id: string;
             /** Doi */
             doi: string | null;
-            /** Identifiers */
+            /**
+             * Identifiers
+             * @description Identifiants actifs, hors DOI du champ `doi`.
+             */
             identifiers: components["schemas"]["ExternalIdentifierOut"][];
             /** Title */
             title: string;
-            /** Title Normalized */
+            /**
+             * Title Normalized
+             * @description Forme de comparaison du titre.
+             */
             title_normalized: string | null;
             /** Doc Type */
             doc_type: string | null;
-            /** Raw Doc Type */
+            /**
+             * Raw Doc Type
+             * @description Type dans le vocabulaire de la source.
+             */
             raw_doc_type: string | null;
-            /** Doc Type Uncorrected */
+            /**
+             * Doc Type Uncorrected
+             * @description Type avant correction, pour un type corrigé.
+             */
             doc_type_uncorrected: string | null;
-            /** Doc Type Corrected By */
+            /**
+             * Doc Type Corrected By
+             * @description Règle de correction, pour un type corrigé.
+             */
             doc_type_corrected_by: string | null;
             /** Publication Year */
             publication_year: number | null;
             /** Language */
             language: string | null;
-            /** Language Name */
+            /**
+             * Language Name
+             * @description Nom de la langue dans le référentiel.
+             */
             language_name: string | null;
-            /** Language Raw */
+            /**
+             * Language Raw
+             * @description Valeur donnée par la source, quand la normalisation l'a changée.
+             */
             language_raw: string | null;
             /** Oa Status */
             oa_status: string | null;
-            /** Serial Id */
+            /**
+             * Serial Id
+             * @description Revue du référentiel rattachée à l'enregistrement source.
+             */
             serial_id: number | null;
             /** Journal Title */
             journal_title: string | null;
@@ -5468,7 +5790,10 @@ export interface components {
             journal_raw_issn: string | null;
             /** Journal Raw Eissn */
             journal_raw_eissn: string | null;
-            /** Publisher Id */
+            /**
+             * Publisher Id
+             * @description Éditeur nommé par la source, rattaché au référentiel.
+             */
             publisher_id: number | null;
             /** Publisher Name */
             publisher_name: string | null;
@@ -5480,7 +5805,10 @@ export interface components {
             volume: string | null;
             /** Issue */
             issue: string | null;
-            /** Pages */
+            /**
+             * Pages
+             * @description Plage de pages de la source, ou composée de la première et de la dernière page.
+             */
             pages: string | null;
             /** Article Number */
             article_number: string | null;
@@ -5550,7 +5878,10 @@ export interface components {
             rnsr_id?: string | null;
             /** Hal Collection */
             hal_collection?: string | null;
-            /** Api Ids */
+            /**
+             * Api Ids
+             * @description Une valeur seule (`str`) devient une liste à l'écriture (`StructureApiIds`).
+             */
             api_ids?: {
                 [key: string]: string | string[];
             } | null;
@@ -5616,9 +5947,15 @@ export interface components {
             ror_id: string | null;
             /** Hal Collection */
             hal_collection: string | null;
-            /** Perimeter Ids */
+            /**
+             * Perimeter Ids
+             * @description Périmètres qui contiennent la structure, directement ou par une tutelle ; vide hors de tout périmètre.
+             */
             perimeter_ids: number[];
-            /** Tutelles */
+            /**
+             * Tutelles
+             * @description Tutelles de la structure.
+             */
             tutelles: components["schemas"]["RelatedStructureOut"][] | null;
         };
         /** StructureListResponse */
@@ -5667,7 +6004,10 @@ export interface components {
         StructurePartner: {
             /** Ror Id */
             ror_id: string;
-            /** Name */
+            /**
+             * Name
+             * @description Nom du référentiel ROR ; absent quand le ROR est plus récent que le référentiel importé.
+             */
             name: string | null;
             /** Country Code */
             country_code: string | null;
@@ -5675,7 +6015,10 @@ export interface components {
             country_name: string | null;
             /** Types */
             types: string[];
-            /** Publications */
+            /**
+             * Publications
+             * @description Nombre de copublications.
+             */
             publications: number;
         };
         /**
@@ -5691,7 +6034,10 @@ export interface components {
             per_page: number;
             /** Partners */
             partners: components["schemas"]["StructurePartner"][];
-            /** Years */
+            /**
+             * Years
+             * @description Années des copublications, chacune avec son nombre de publications.
+             */
             years: components["schemas"]["PartnerFacetOption"][];
             /** Countries */
             countries: components["schemas"]["PartnerFacetOption"][];
@@ -5756,11 +6102,17 @@ export interface components {
          * @description Facettes de la liste des structures. Chaque décompte écarte le filtre de sa propre facette.
          */
         StructuresFacetsResponse: {
-            /** Types */
+            /**
+             * Types
+             * @description Options sans libellé, résolu par le client.
+             */
             types: components["schemas"]["FacetOption"][];
             /** Tutelles */
             tutelles: components["schemas"]["FacetOption"][];
-            /** Perimeters */
+            /**
+             * Perimeters
+             * @description Options terminées par l'option `none`, hors de tout périmètre.
+             */
             perimeters: components["schemas"]["FacetOption"][];
         };
         /**
@@ -5850,7 +6202,10 @@ export interface components {
             label: string;
             /** Language */
             language: string | null;
-            /** Sources */
+            /**
+             * Sources
+             * @description Sources ayant fourni le sujet.
+             */
             sources: string[];
         };
         /**

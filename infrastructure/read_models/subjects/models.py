@@ -5,12 +5,11 @@ Les écritures du référentiel appartiennent à la phase `subjects` (`pipeline/
 `SubjectFrequency` sert aussi les nuages de sujets des personnes, des laboratoires, des revues et des éditeurs.
 """
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from infrastructure.read_models._common import PaginatedResponse
 
 
-class SubjectOut(BaseModel):
+class SubjectOut(Model):
     """Sujet attaché à une publication, une ligne par sujet toutes sources réunies."""
 
     id: int
@@ -20,7 +19,7 @@ class SubjectOut(BaseModel):
     """Sources ayant fourni le sujet."""
 
 
-class SubjectListItem(BaseModel):
+class SubjectListItem(Model):
     """Sujet du référentiel et son nombre de publications, servi en liste comme en détail."""
 
     id: int
@@ -33,7 +32,7 @@ class SubjectListResponse(PaginatedResponse):
     items: list[SubjectListItem]
 
 
-class SubjectNeighborOut(BaseModel):
+class SubjectNeighborOut(Model):
     """Voisin d'un sujet par co-occurrence."""
 
     id: int
@@ -42,7 +41,7 @@ class SubjectNeighborOut(BaseModel):
     cooccurrence_count: int
 
 
-class SubjectNeighborLink(BaseModel):
+class SubjectNeighborLink(Model):
     """Co-occurrence entre deux voisins d'un sujet, `subject_a_id` < `subject_b_id`."""
 
     subject_a_id: int
@@ -50,7 +49,7 @@ class SubjectNeighborLink(BaseModel):
     cooccurrence_count: int
 
 
-class SubjectDetailResponse(BaseModel):
+class SubjectDetailResponse(Model):
     """Détail d'un sujet, ses voisins par co-occurrence et les co-occurrences entre ces voisins."""
 
     subject: SubjectListItem
@@ -58,7 +57,7 @@ class SubjectDetailResponse(BaseModel):
     neighbor_links: list[SubjectNeighborLink]
 
 
-class SubjectFrequency(BaseModel):
+class SubjectFrequency(Model):
     """Sujet et son nombre de publications au sein d'une personne, d'un laboratoire, d'une revue ou d'un éditeur, pour les sujets principaux de son tableau de bord."""
 
     id: int

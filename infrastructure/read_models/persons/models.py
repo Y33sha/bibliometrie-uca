@@ -4,8 +4,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from domain.persons.identifiers import AttributionStatus
 from domain.persons.person import PersonExclusion
 from infrastructure.read_models._common import (
@@ -63,7 +62,7 @@ class PersonFilters:
 # ---------------------------------------------------------------------------
 
 
-class PersonIdentifierOut(BaseModel):
+class PersonIdentifierOut(Model):
     """Identifiant (ORCID, idHAL, idRef) attaché à une personne."""
 
     id: int
@@ -73,7 +72,7 @@ class PersonIdentifierOut(BaseModel):
     status: AttributionStatus
 
 
-class NameFormSummaryOut(BaseModel):
+class NameFormSummaryOut(Model):
     """Forme de nom observée pour une personne, avec son état d'arbitrage."""
 
     name_form: str
@@ -90,7 +89,7 @@ class NameFormSummaryOut(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PersonSearchResult(BaseModel):
+class PersonSearchResult(Model):
     """Résultat d'autocomplétion de `/api/persons/search`."""
 
     id: int
@@ -100,7 +99,7 @@ class PersonSearchResult(BaseModel):
     has_rh: bool
 
 
-class PersonOut(BaseModel):
+class PersonOut(Model):
     """Ligne de `/api/persons`. Les dénombrements se restreignent au laboratoire avec `lab_id`."""
 
     id: int
@@ -128,7 +127,7 @@ class PersonListResponse(PaginatedResponse):
 # ---------------------------------------------------------------------------
 
 
-class PersonsFacetsResponse(BaseModel):
+class PersonsFacetsResponse(Model):
     """Réponse de `/api/persons/facets`."""
 
     departments: list[FacetOption]
@@ -146,7 +145,7 @@ class PersonsFacetsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class PersonProfileCore(BaseModel):
+class PersonProfileCore(Model):
     """Bloc `person` de `/api/persons/{id}`."""
 
     id: int
@@ -158,13 +157,13 @@ class PersonProfileCore(BaseModel):
     end_date: date | None
 
 
-class PersonProfileResponse(BaseModel):
+class PersonProfileResponse(Model):
     person: PersonProfileCore
     identifiers: list[PersonIdentifierOut]
     theses_count: int
 
 
-class PersonThesis(BaseModel):
+class PersonThesis(Model):
     id: int
     title: str
     publication_year: int | None
@@ -174,25 +173,25 @@ class PersonThesis(BaseModel):
     structure_ids: list[int]
 
 
-class PersonThesesSection(BaseModel):
+class PersonThesesSection(Model):
     role: str
     label: str
     theses: list[PersonThesis]
 
 
-class PersonThesesResponse(BaseModel):
+class PersonThesesResponse(Model):
     sections: list[PersonThesesSection]
     total: int
     structures: dict[int, StructureRef]
 
 
-class PersonAddressStruct(BaseModel):
+class PersonAddressStruct(Model):
     id: int
     acronym: str | None
     name: str
 
 
-class PersonAddressOut(BaseModel):
+class PersonAddressOut(Model):
     id: int
     raw_text: str
     publication_count: int
@@ -209,7 +208,7 @@ class PersonAddressStructureCount(PersonAddressStruct):
     """Nombre de publications de la personne dont une adresse est rattachée à la structure."""
 
 
-class PersonAddressSummary(BaseModel):
+class PersonAddressSummary(Model):
     """Structures reconnues dans les adresses de la personne, comptées en publications."""
 
     first_year: int | None
@@ -228,7 +227,7 @@ class PersonAddressSummary(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class NameFormContributionRef(BaseModel):
+class NameFormContributionRef(Model):
     source: str
     source_contribution_id: int
     publication_id: int
@@ -237,7 +236,7 @@ class NameFormContributionRef(BaseModel):
     doi: str | None
 
 
-class OtherPersonOut(BaseModel):
+class OtherPersonOut(Model):
     person_id: int
     first_name: str
     last_name: str
@@ -245,7 +244,7 @@ class OtherPersonOut(BaseModel):
     has_rh: bool
 
 
-class NameFormContributionsResponse(BaseModel):
+class NameFormContributionsResponse(Model):
     contributions: list[NameFormContributionRef]
     other_persons: list[OtherPersonOut]
 
@@ -255,7 +254,7 @@ class NameFormContributionsResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-class AmbiguousFormPersonOut(BaseModel):
+class AmbiguousFormPersonOut(Model):
     person_id: int
     first_name: str
     last_name: str
@@ -269,7 +268,7 @@ class AmbiguousFormPersonOut(BaseModel):
     """Nom de la personne compatible avec la forme (mêmes mots) : homonyme ou doublon si vrai, erreur d'attribution probable si faux."""
 
 
-class AmbiguousNameFormOut(BaseModel):
+class AmbiguousNameFormOut(Model):
     name_form: str
     persons: list[AmbiguousFormPersonOut]
 
@@ -278,7 +277,7 @@ class AmbiguousNameFormsResponse(PaginatedResponse):
     forms: list[AmbiguousNameFormOut]
 
 
-class CurationPersonOut(BaseModel):
+class CurationPersonOut(Model):
     """Fiche personne allégée, commune aux files de triage (conflits d'identifiant, doublons par nom)."""
 
     person_id: int
@@ -290,12 +289,12 @@ class CurationPersonOut(BaseModel):
     labs: list[str]
 
 
-class IdentifierRef(BaseModel):
+class IdentifierRef(Model):
     id_type: str
     id_value: str
 
 
-class IdentifierConflictPairOut(BaseModel):
+class IdentifierConflictPairOut(Model):
     """Deux personnes distinctes à même valeur brute d'identifiant (ORCID, IdRef, hal_person_id, idHAL) : doublon probable ou erreur d'attribution."""
 
     person_a: CurationPersonOut
@@ -307,7 +306,7 @@ class IdentifierConflictsResponse(PaginatedResponse):
     pairs: list[IdentifierConflictPairOut]
 
 
-class OverlapCountsOut(BaseModel):
+class OverlapCountsOut(Model):
     """Recouvrements de réseau entre deux personnes d'une paire candidate par nom."""
 
     coauthors: int
@@ -316,7 +315,7 @@ class OverlapCountsOut(BaseModel):
     serials: int
 
 
-class NameDuplicatePairOut(BaseModel):
+class NameDuplicatePairOut(Model):
     """Deux personnes aux noms compatibles, avec leurs recouvrements de réseau. Un réseau commun (co-auteurs, publications co-signées) indique un doublon ; des réseaux disjoints, un homonyme."""
 
     person_a: CurationPersonOut
@@ -328,7 +327,7 @@ class NameDuplicatesResponse(PaginatedResponse):
     pairs: list[NameDuplicatePairOut]
 
 
-class DistinctPersonOut(BaseModel):
+class DistinctPersonOut(Model):
     """Personne déclarée distincte d'une autre."""
 
     person_id: int
@@ -337,7 +336,7 @@ class DistinctPersonOut(BaseModel):
     has_rh: bool
 
 
-class SharingPersonOut(BaseModel):
+class SharingPersonOut(Model):
     """Personne partageant au moins une forme de nom avec une autre, candidate à l'absorption."""
 
     person_id: int

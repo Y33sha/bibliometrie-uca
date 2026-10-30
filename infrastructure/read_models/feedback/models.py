@@ -1,12 +1,11 @@
 """Modèles de réponse : lectures du tableau de bord de qualité de la détection d'adresses."""
 
-from pydantic import BaseModel
-
+from application.ports.model import Model
 from infrastructure.read_models._common import PaginatedResponse, StructureRef
 from infrastructure.read_models.addresses.models import AddressStructureSummary
 
 
-class FeedbackStats(BaseModel):
+class FeedbackStats(Model):
     """GET /api/feedback/stats : qualité de la détection d'adresses."""
 
     total_reviewed: int
@@ -17,7 +16,7 @@ class FeedbackStats(BaseModel):
     pending: int
 
 
-class FeedbackMatchedForm(BaseModel):
+class FeedbackMatchedForm(Model):
     """Forme de nom reconnue par la détection, dans un faux positif."""
 
     form_id: int
@@ -27,7 +26,7 @@ class FeedbackMatchedForm(BaseModel):
     requires_context_of: list[int] | None
 
 
-class FeedbackAddressItem(BaseModel):
+class FeedbackAddressItem(Model):
     """Adresse d'une liste de faux négatifs ou de faux positifs."""
 
     id: int
