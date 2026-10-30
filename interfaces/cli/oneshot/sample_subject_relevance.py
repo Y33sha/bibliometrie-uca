@@ -70,7 +70,7 @@ _DETAILS_SQL = """
 
 
 def _label_tree(topic_lists: list[list[dict]]) -> list[dict]:
-    """Libellés distincts par niveau, avec leur parent et le score maximal des topics qui les portent."""
+    """Libellés distincts par niveau, avec leur parent et le score maximal des topics qui en descendent."""
     nodes: dict[tuple[str, str], dict] = {}
     for topics in topic_lists:
         for entry in topics:

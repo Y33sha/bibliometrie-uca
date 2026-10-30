@@ -1,9 +1,9 @@
 # STATUS: oneshot (2026-09-21)
-"""Instantané (lecture seule) des conteneurs de chaque enregistrement : entrée de `serials` et monographie.
+"""Instantané (lecture seule) des conteneurs de chaque enregistrement source : entrée de `serials` et monographie.
 
 Sert à quantifier, par type de changement, l'effet d'une renormalisation du stock. L'entrée de `serials` retenue est celle que donne la normalisation, avant correction par espace de noms DOI.
 
-L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : pour chaque enregistrement présent dans les deux, le changement de son entrée de `serials` et celui de sa monographie, par source et type de document.
+L'instantané s'écrit en JSON compressé sous `data/snapshots/`. `--compare` confronte deux instantanés : pour chaque enregistrement source présent dans les deux, le changement de son entrée de `serials` et celui de sa monographie, par source et type de document.
 
 Usage :
     uv run python -m interfaces.cli.oneshot.snapshot_record_containers

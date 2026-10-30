@@ -85,7 +85,7 @@ ALIASES: tuple[tuple[str, str], ...] = (
 
 
 def publisher_ids(conn: Connection, name: str) -> list[int]:
-    """Éditeurs qui portent exactement le nom `name`."""
+    """Éditeurs dont le nom est exactement `name`."""
     return list(
         conn.execute(
             text("SELECT id FROM publishers WHERE name = :name ORDER BY id"), {"name": name}

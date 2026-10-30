@@ -1,10 +1,10 @@
 # STATUS: oneshot (2026-10-15)
-"""Rattache à une structure interne (`ref.hal_structures.structure_id`) les structures HAL que la résolution des noms rattache à une structure du périmètre d'extraction.
+"""Rattache à une structure interne (`ref.hal_structures.structure_id`) les structures HAL que la résolution des noms rattache à une structure du périmètre du moissonnage.
 
 Une structure HAL est candidate quand une contribution source la cite, que son statut est `VALID` ou `OLD`, qu'aucune structure interne n'a son ROR et qu'elle n'a pas déjà de structure interne. Deux voies proposent sa structure interne :
 
 - adresse : une adresse de même texte que son nom est rattachée à une structure du périmètre, par un lien non infirmé, détecté par une forme de nom ou confirmé ;
-- scanR : une affiliation scanR qui cite la structure HAL (`structId`) a un nom que les formes de noms rattachent à un seul laboratoire du périmètre, et à une autre structure du périmètre (université, organisme) qui en confirme le contexte. Les payloads se lisent dans le raw store.
+- ScanR : une affiliation ScanR qui cite la structure HAL (`structId`) a un nom que les formes de noms rattachent à un seul laboratoire du périmètre, et à une autre structure du périmètre (université, organisme) qui en confirme le contexte. Les payloads se lisent dans le raw store.
 
 Une structure HAL rattachée à plusieurs structures internes est signalée et laissée de côté. `--dry-run` écrit les candidates dans `data/measures/hal_structure_matches.csv` sans modifier la base.
 
@@ -71,7 +71,7 @@ _CANDIDATES = text(f"""
 
 
 def _scanr_candidates(conn: Connection) -> list[dict]:
-    """Candidates de la voie scanR : structure HAL citée par une affiliation scanR dont le nom désigne un seul laboratoire du périmètre, et une autre structure du périmètre."""
+    """Candidates de la voie ScanR : structure HAL citée par une affiliation ScanR dont le nom désigne un seul laboratoire du périmètre, et une autre structure du périmètre."""
     matcher = StructureNameMatcher.load(conn)
     labs = dict(
         conn.execute(

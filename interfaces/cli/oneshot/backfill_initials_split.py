@@ -59,7 +59,7 @@ _REPOINT_SQL = text(
 
 
 def backfill(conn: Connection, *, apply: bool) -> int:
-    """Rattache les contributions sources dont le découpage change. Retourne leur nombre."""
+    """Rattache les contributions sources dont le découpage change. Renvoie leur nombre."""
     payload = []
     for row in conn.execute(_CANDIDATES_SQL):
         name = ContributorName.from_columns(

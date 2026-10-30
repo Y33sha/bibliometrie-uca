@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-10)
 """Marque `authors_truncated` les enregistrements OpenAlex rapatriés par `fetch_missing` avec exactement 100 auteurs.
 
-La recherche par DOI de `fetch_missing` interroge l'endpoint de liste d'OpenAlex, qui plafonne les auteurs à 100, sans poser le marqueur que pose le moissonnage. Ces enregistrements sont restés tronqués. Une fois marqués, la phase `fetch_truncated` du run suivant les retélécharge en entier, et `normalize` réécrit leurs contributions sources.
+La recherche par DOI de `fetch_missing` interroge la route de liste d'OpenAlex, qui plafonne les auteurs à 100, sans poser le marqueur que pose le moissonnage. Ces enregistrements sont restés tronqués. Une fois marqués, la phase `fetch_truncated` du run suivant les retélécharge en entier, et `normalize` réécrit leurs contributions sources.
 
 Le nombre d'auteurs se lit dans `raw_data` pour un enregistrement pas encore normalisé, et dans ses contributions sources sinon.
 

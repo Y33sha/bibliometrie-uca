@@ -4,7 +4,7 @@
 Chez Crossref et DataCite, l'identifiant que la source donne au payload devient le `source_id` de l'enregistrement source, de sa ligne de `staging` et de sa clé au raw store. Quand un enregistrement source a déjà cet identifiant, l'enregistrement source tronqué est un doublon : sa ligne de `staging` est marquée disparue, et la normalisation le supprime. Quand seule une ligne de `staging` a cet identifiant, l'enregistrement source y est rattaché, et son ancienne ligne de `staging` est supprimée. Dans toutes les sources, l'enregistrement source reçoit les identifiants DOI que la normalisation tire du payload : un DOI inchangé garde son statut, un DOI écrit est actif. Les enregistrements sources modifiés sont marqués pour la réconciliation.
 
 Usage :
-    python -m interfaces.cli.oneshot.rewrite_versioned_dois [--sources crossref,datacite] [--dry-run]
+    uv run python -m interfaces.cli.oneshot.rewrite_versioned_dois [--sources crossref,datacite] [--dry-run]
 """
 
 from __future__ import annotations

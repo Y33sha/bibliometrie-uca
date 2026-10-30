@@ -1,5 +1,5 @@
 # STATUS: oneshot (2026-10-15)
-"""Alignement des listes d'auteurs d'une même publication entre sources : mesure, phase 1 du chantier `DATA_alignement-auteurs.md`.
+"""Alignement des listes d'auteurs d'une même publication entre sources : mesure.
 
 Pour chaque publication dont les enregistrements sources viennent d'au moins deux sources, et pour chaque paire d'enregistrements sources de sources différentes :
 
@@ -108,7 +108,7 @@ def _source_records(
 ) -> Iterator[tuple[int, dict[SourceRecordKey, list[SourceContribution]]]]:
     """Enregistrements sources de chaque publication : `(id d'enregistrement source, source, issu de HAL)` → contributions sources d'auteur individuelles triées par position.
 
-    Un enregistrement source est issu de HAL quand il recopie un dépôt HAL : enregistrement scanR à identifiant `hal…`, enregistrement OpenAlex dont la première URL, celle de la location principale, est une page HAL.
+    Un enregistrement source est issu de HAL quand il recopie un dépôt HAL : enregistrement ScanR à identifiant `hal…`, enregistrement OpenAlex dont la première URL, celle de la localisation principale, est une page HAL.
     """
     for start in range(0, len(publication_ids), _BATCH):
         ids = list(publication_ids[start : start + _BATCH])

@@ -48,7 +48,7 @@ _DETACH_SERIALS = text(
 
 
 def detach(conn: Connection, serial_ids: list[int], record_ids: list[int]) -> tuple[int, int, int]:
-    """Retire les revues `serial_ids` de leurs enregistrements sources, et le titre de conteneur des enregistrements `record_ids`, puis les met en file. Renvoie le nombre d'enregistrements détachés de leur revue, privés de leur titre de conteneur, et mis en file."""
+    """Retire les revues `serial_ids` de leurs enregistrements sources, et le titre de conteneur des enregistrements `record_ids`, puis les met en file. Renvoie le nombre d'enregistrements sources détachés de leur revue, privés de leur titre de conteneur, et mis en file."""
     detached = conn.execute(_DETACH_SERIALS, {"serial_ids": serial_ids}).scalars().all()
     cleared = conn.execute(
         text("UPDATE source_records SET container_title = NULL WHERE id = ANY(:ids)"),

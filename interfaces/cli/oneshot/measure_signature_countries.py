@@ -134,7 +134,7 @@ _OTHER_NAMES = {
 
 
 def load_retained(conn: Connection, path: Path) -> int:
-    """Charge dans la table temporaire `addr_retained` le pays retenu de chaque adresse existante, composé de ses candidats. Retourne le nombre d'adresses à pays."""
+    """Charge dans la table temporaire `addr_retained` le pays retenu de chaque adresse existante, composé de ses candidats. Renvoie le nombre d'adresses à pays."""
     existing = set(conn.execute(text("SELECT id FROM addresses")).scalars())
     candidates: defaultdict[int, defaultdict[CountryDetectionMethod, list[str]]] = defaultdict(
         lambda: defaultdict(list)
