@@ -15,7 +15,7 @@
 
 ## Familles d'adaptateurs
 
-Les adaptateurs de `repositories/` construisent des objets du domaine : ils hydratent un agrégat, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_doi`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
+Les adaptateurs de `repositories/` construisent des objets du domaine : ils hydratent un agrégat, garantissent ses invariants à l'écriture, et exposent des méthodes métier (`find_by_id`, `merge_into`, `save`). Le passage d'une ligne SQL à l'entité se fait dans une fonction libre `_<entité>_from_row`, au sein du module du repository.
 
 `read_models/` contient les lectures de l'API, sans hydratation : un paquet par lecture, avec sa classe (`queries.py`) et ses modèles de réponse (`models.py`). Chaque méthode de la classe contient sa requête. Un paquet découpé par thème déclare une classe par module, que `queries.py` réunit par héritage. Les routers reçoivent la classe directement, sans port.
 
@@ -25,4 +25,4 @@ Une unité de travail tient dans une transaction, que seul son appelant commite 
 
 Pour l'API, `db_conn` (`interfaces/api/deps.py`) ouvre la connexion de la requête, que les repositories partagent. Une requête d'écriture qui aboutit est commitée avant l'envoi de la réponse, avec les événements d'audit qu'elle a émis ; une exception l'annule. Une requête de lecture s'ouvre en lecture seule.
 
-Les phases du pipeline qui traitent de grands ensembles commitent par lots, toutes les N opérations, si bien qu'un plantage ne perd que le dernier lot. À l'intérieur d'un lot, chaque item est isolé dans un savepoint : une erreur annule l'item fautif seul, sans emporter les autres.
+Les phases du pipeline qui traitent de grands ensembles commitent par lots, toutes les N opérations, si bien qu'un plantage perd seulement le dernier lot. À l'intérieur d'un lot, chaque item est isolé dans un savepoint : une erreur annule l'item fautif seul, sans emporter les autres.
