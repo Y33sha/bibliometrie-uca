@@ -19,10 +19,15 @@ class PlatformType(StrEnum):
 
 PLATFORM_TYPES: tuple[PlatformType, ...] = tuple(PlatformType)
 
-_CATALOG_SITES = ("doaj.org", "doabooks.org", "pubmed.ncbi.nlm.nih.gov", "eprints.gla.ac.uk/view")
-"""Fiches du DOAJ, du DOAB et de PubMed, listes de l'archive de l'université de Glasgow."""
+_DESCRIPTIVE_PAGE_SITES = (
+    "doaj.org",
+    "doabooks.org",
+    "pubmed.ncbi.nlm.nih.gov",
+    "eprints.gla.ac.uk/view",
+)
+"""Pages du DOAJ, du DOAB et de PubMed, listes de l'archive de l'université de Glasgow."""
 
 
-def is_catalog_record(url: str) -> bool:
-    """Vrai si l'URL mène à la fiche d'un catalogue, qui décrit le document sans en donner le texte. Une telle fiche est exclue des localisations."""
-    return any(is_on_site(url, site) for site in _CATALOG_SITES)
+def is_descriptive_page(url: str) -> bool:
+    """Vrai si l'URL mène à une page descriptive : elle décrit le document sans en donner le texte. Une telle page est exclue des localisations."""
+    return any(is_on_site(url, site) for site in _DESCRIPTIVE_PAGE_SITES)

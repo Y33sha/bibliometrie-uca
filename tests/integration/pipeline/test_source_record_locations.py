@@ -43,7 +43,7 @@ def test_les_localisations_remplacent_les_precedentes(sa_sync_conn):
     ]
 
 
-def test_les_fiches_de_catalogue_sont_ecartees(sa_sync_conn):
+def test_les_pages_descriptives_sont_ecartees(sa_sync_conn):
     source_record = insert_source_record(sa_sync_conn, source="openalex", source_id="W3")
 
     LocationStore(sa_sync_conn).replace_locations(

@@ -11,7 +11,7 @@ from typing import NamedTuple
 from sqlalchemy import Connection, text
 
 from domain.normalize import normalize_text
-from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.platforms.registry import IDENTIFIER_COPIES
 from domain.publications.licenses import License
 from domain.source_records.identifiers import SourceIdentifier, normalize_identifiers
@@ -99,7 +99,7 @@ class LocationStore:
         return self._platforms[platform.openalex_id]
 
     def replace_locations(self, source_record_id: int, locations: Sequence[LocationFacts]) -> None:
-        """Réécrit les localisations de l'enregistrement source avec `locations`, une par URL, hors fiches de catalogue."""
+        """Réécrit les localisations de l'enregistrement source avec `locations`, une par URL, hors pages descriptives."""
         self._conn.execute(_DELETE_LOCATIONS, {"id": source_record_id})
         # Parcours à rebours : une URL en double garde sa première localisation.
         rows = {
@@ -114,7 +114,7 @@ class LocationStore:
                 "embargo_until": loc.embargo_until.isoformat() if loc.embargo_until else None,
             }
             for loc in reversed(locations)
-            if not is_catalog_record(loc.url)
+            if not is_descriptive_page(loc.url)
         }
         if rows:
             self._conn.execute(

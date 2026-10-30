@@ -40,7 +40,7 @@ Simulation sur les 76 591 publications du périmètre (`interfaces/cli/oneshot/m
 ### Phase 1 — Copies fiables
 
 - [x] Registre des plateformes : theses.fr, `hdl.handle.net`, archives institutionnelles, serveurs de preprints reconnus par préfixe DOI. Fiches du DOAJ, du DOAB et de PubMed écartées des copies. Reste `green` → `bronze` : 789 publications, à copie sur une plateforme d'éditeurs (OpenEdition, Cairn) ou à lien `doi.org` de ScanR. 2d9d97af7
-- [x] La description d'une copie par sa propre plateforme prime : une copie HAL suit l'enregistrement HAL. `green` → `closed` : 1 019 publications. Parmi elles, 270 enregistrements sources HAL sans fichier, 224 dépôts HAL sans fichier principal, environ 300 publications à seule copie ouverte sur une fiche de catalogue. ef34b5ae0
+- [x] La description d'une copie par sa propre plateforme prime : une copie HAL suit l'enregistrement HAL. `green` → `closed` : 1 019 publications. Parmi elles, 270 enregistrements sources HAL sans fichier, 224 dépôts HAL sans fichier principal, environ 300 publications dont la seule copie ouverte était une page du DOAJ, de PubMed ou une liste de Glasgow. ef34b5ae0
 - [x] `is_oa` de ScanR sur les liens `doi.org` : mesurer contre Unpaywall, l'écarter s'il est peu fiable. Copies ouvertes à DOI vérifié par Unpaywall, hors DOI d'archive : verdict `closed` ou `green` pour 5,6 % des copies ScanR, 4,6 % des copies OpenAlex. ScanR est aussi fiable qu'OpenAlex.
 
 ### Phase 2 — Embargo sur les copies

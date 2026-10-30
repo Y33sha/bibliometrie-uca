@@ -1,10 +1,10 @@
 # STATUS: oneshot (2026-10-30)
-"""Retire du stock les localisations qui sont des fiches de catalogue (`is_catalog_record`), comme l'écriture des localisations à la normalisation.
+"""Retire du stock les localisations qui sont des pages descriptives (`is_descriptive_page`), comme l'écriture des localisations à la normalisation.
 
 Les enregistrements sources qui perdent une localisation ouverte passent dans la file de réconciliation : la phase `publications` recalcule ensuite la meilleure copie de leur publication. Idempotent.
 
 Usage :
-    uv run python -m interfaces.cli.oneshot.purge_catalog_locations [--dry-run]
+    uv run python -m interfaces.cli.oneshot.purge_descriptive_page_locations [--dry-run]
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ import os
 
 from sqlalchemy import text
 
-from domain.platforms.platform import is_catalog_record
+from domain.platforms.platform import is_descriptive_page
 from infrastructure.db.engine import get_sync_engine
 from infrastructure.db.queues import Queue, enqueue
 from infrastructure.observability.log import setup_logger
 
-log = setup_logger("purge_catalog_locations", os.path.dirname(__file__))
+log = setup_logger("purge_descriptive_page_locations", os.path.dirname(__file__))
 
 
 def main() -> int:
@@ -31,7 +31,7 @@ def main() -> int:
         urls = [
             url
             for (url,) in conn.execute(text("SELECT DISTINCT url FROM source_record_locations"))
-            if is_catalog_record(url)
+            if is_descriptive_page(url)
         ]
         deleted = conn.execute(
             text("""

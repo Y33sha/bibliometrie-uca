@@ -4,7 +4,7 @@ from collections import Counter
 
 import pytest
 
-from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.platforms.registry import (
     HAL,
     KNOWN_PLATFORMS,
@@ -28,8 +28,8 @@ from domain.platforms.registry import (
         ("https://hal.science/hal-1", False),
     ],
 )
-def test_fiche_de_catalogue(url, expected):
-    assert is_catalog_record(url) is expected
+def test_page_descriptive(url, expected):
+    assert is_descriptive_page(url) is expected
 
 
 class TestKnownPlatforms:
@@ -94,7 +94,7 @@ class TestKnownPlatformOfUrl:
     @pytest.mark.parametrize(
         "url",
         [
-            "https://pubmed.ncbi.nlm.nih.gov/1",  # fiche de catalogue
+            "https://pubmed.ncbi.nlm.nih.gov/1",  # page descriptive
             "https://doi.org/10.1101/2020.01.01.1",  # préfixe commun à bioRxiv et medRxiv
             "https://osf.io/esfm6",  # hôte de plusieurs serveurs
             "https://doi.org/10.1016/j.x.2020.1",

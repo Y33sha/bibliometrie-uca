@@ -141,7 +141,7 @@ def get_locations(work: Mapping[str, JsonValue]) -> list[LocationFacts]:
 
 
 def _pmc_url(url: str, pdf_url: str | None) -> str:
-    """Renvoie l'adresse d'une copie rangée par OpenAlex sous PubMed Central. Une page PubMed, fiche de catalogue, devient la page de l'article sur PMC, d'après le PMCID de son PDF."""
+    """Renvoie l'adresse d'une copie rangée par OpenAlex sous PubMed Central. Une page PubMed, page descriptive, devient la page de l'article sur PMC, d'après le PMCID de son PDF."""
     if urlsplit(url).hostname == "pubmed.ncbi.nlm.nih.gov" and (pmcid := normalize_pmcid(pdf_url)):
         return PMC_ARTICLE_URL.format(pmcid)
     return url

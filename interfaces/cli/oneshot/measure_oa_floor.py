@@ -1,7 +1,7 @@
 # STATUS: oneshot (2026-10-30)
 """Simulation du statut open access des publications du périmètre, tiré des copies ouvertes et relevé par le verdict d'Unpaywall.
 
-Le plancher d'une publication vient de sa meilleure copie ouverte (`open_copies`) : une copie HAL suit l'enregistrement HAL. Les fiches de catalogue sont écartées, comme à la normalisation. Une copie d'archive ou de serveur de preprints donne `green`. Une autre copie ouverte est comptée côté éditeur : le modèle de la revue décide. Une revue `full_oa` donne `gold`, une revue `diamond` donne `diamond`. Une revue `subscription` donne `hybrid` avec une licence ouverte, `bronze` sans. Le verdict d'Unpaywall relève ce plancher, jamais ne l'abaisse. Un `gold` d'Unpaywall dans une revue `diamond` devient `diamond`.
+Le plancher d'une publication vient de sa meilleure copie ouverte (`open_copies`) : une copie HAL suit l'enregistrement HAL. Les pages descriptives sont écartées, comme à la normalisation. Une copie d'archive ou de serveur de preprints donne `green`. Une autre copie ouverte est comptée côté éditeur : le modèle de la revue décide. Une revue `full_oa` donne `gold`, une revue `diamond` donne `diamond`. Une revue `subscription` donne `hybrid` avec une licence ouverte, `bronze` sans. Le verdict d'Unpaywall relève ce plancher, jamais ne l'abaisse. Un `gold` d'Unpaywall dans une revue `diamond` devient `diamond`.
 
 Chaque étape est rejouable séparément :
 
@@ -24,7 +24,7 @@ from urllib.parse import urlparse
 
 from sqlalchemy import Connection, text
 
-from domain.platforms.platform import PlatformType, is_catalog_record
+from domain.platforms.platform import PlatformType, is_descriptive_page
 from domain.publications.access import Copy, open_copies
 from domain.publications.licenses import OPEN_LICENSES
 from domain.publications.metadata import OA_RANK
@@ -45,9 +45,9 @@ _PUBLICATIONS = text("""
 
 
 def _open_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Renvoie les copies ouvertes de chaque publication (`open_copies`), hors fiches de catalogue."""
+    """Renvoie les copies ouvertes de chaque publication (`open_copies`), hors pages descriptives."""
     return {
-        pid: [c for c in open_copies(copies) if not is_catalog_record(c.url)]
+        pid: [c for c in open_copies(copies) if not is_descriptive_page(c.url)]
         for pid, copies in publication_copies(conn, publication_ids).items()
     }
 
