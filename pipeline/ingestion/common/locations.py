@@ -5,6 +5,7 @@ Les localisations d'un enregistrement source se réécrivent à chaque normalisa
 
 import json
 from collections.abc import Iterable, Sequence
+from datetime import date
 from typing import NamedTuple
 
 from sqlalchemy import Connection, text
@@ -34,7 +35,9 @@ class LocationFacts(NamedTuple):
     version: str | None = None
     license: License | None = None
     is_oa: bool | None = None
+    """Copie ouverte, à la fin de son embargo s'il y en a un."""
     platform: PlatformFacts | None = None
+    embargo_until: date | None = None
 
 
 def identifier_locations(identifiers: Iterable[SourceIdentifier]) -> list[LocationFacts]:
@@ -61,12 +64,13 @@ _DELETE_LOCATIONS = text("DELETE FROM source_record_locations WHERE source_recor
 
 _INSERT_LOCATIONS = text("""
     INSERT INTO source_record_locations
-        (source_record_id, url, pdf_url, oai_id, version, license, is_oa, platform_id)
+        (source_record_id, url, pdf_url, oai_id, version, license, is_oa, platform_id,
+         embargo_until)
     SELECT :id, l.url, l.pdf_url, l.oai_id, l.version, CAST(l.license AS license_type), l.is_oa,
-           l.platform_id
+           l.platform_id, l.embargo_until
     FROM jsonb_to_recordset(CAST(:locations AS jsonb)) AS l(
         url text, pdf_url text, oai_id text, version text, license text, is_oa boolean,
-        platform_id integer
+        platform_id integer, embargo_until date
     )
 """)
 
@@ -107,6 +111,7 @@ class LocationStore:
                 "license": loc.license.value if loc.license else None,
                 "is_oa": loc.is_oa,
                 "platform_id": self.platform_id(loc.platform) if loc.platform else None,
+                "embargo_until": loc.embargo_until.isoformat() if loc.embargo_until else None,
             }
             for loc in reversed(locations)
             if not is_catalog_record(loc.url)

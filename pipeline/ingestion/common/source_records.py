@@ -9,7 +9,6 @@ import json
 import logging
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, fields
-from datetime import date
 
 from sqlalchemy import Connection, bindparam, text
 
@@ -34,7 +33,7 @@ logger = logging.getLogger(__name__)
 class SourceRecordUpsert:
     """Un enregistrement source fourni par une source, prêt à être écrit.
 
-    Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` et `embargo_until` existent seulement pour HAL, `is_retracted` seulement pour OpenAlex.
+    Le jeu de colonnes est commun à toutes les sources ; une colonne non renseignée par la source reste à `None`. Les absences suivent les données exposées par chaque source : theses.fr est sans résumé, HAL et theses.fr sans indicateur de citation ; `hal_collections` existe seulement pour HAL, `is_retracted` seulement pour OpenAlex.
 
     `title_normalized` se dérive de `title` à l'écriture, `doc_type` de `raw_doc_type` (`map_doc_type`) et `language` de `raw_language` (`language_code`). `publication_id`, rattachement à la publication, est posé par la phase `publications`.
     """
@@ -74,7 +73,6 @@ class SourceRecordUpsert:
     oa_status: str | None = None
     license: License | None = None
     urls: list[str] | None = None
-    embargo_until: date | None = None
 
     # Citations et drapeaux
     impact: JsonValue = None

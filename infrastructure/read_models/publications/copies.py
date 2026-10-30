@@ -13,10 +13,12 @@ from domain.sources.registry import Source
 
 
 def publication_copies(conn: Connection, publication_ids: Sequence[int]) -> dict[int, list[Copy]]:
-    """Renvoie les localisations des enregistrements sources de chaque publication. Une publication sans localisation est absente de la réponse. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
+    """Renvoie les localisations des enregistrements sources de chaque publication. Une publication sans localisation est absente de la réponse. Une copie sous embargo est fermée jusqu'à sa date de fin. La copie HAL d'un enregistrement HAL est décrite par sa plateforme."""
     rows = conn.execute(
         text("""
-            SELECT sr.publication_id, sr.source::text AS source, l.url, l.version, l.is_oa,
+            SELECT sr.publication_id, sr.source::text AS source, l.url, l.version,
+                   l.is_oa AND (l.embargo_until IS NULL OR l.embargo_until <= current_date)
+                       AS is_oa,
                    l.license::text AS license, pl.name AS platform,
                    pl.openalex_id AS platform_openalex_id, pl.platform_type::text AS platform_type,
                    sr.id AS arrival

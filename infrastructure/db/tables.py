@@ -1254,7 +1254,6 @@ source_records = Table(
     Column("oa_status", Text),
     # Licence normalisée de l'enregistrement source ; la forme brute reste dans `source_extras`.
     Column("license", license_type_enum),
-    Column("embargo_until", Date),
     Column("language", Text),
     Column(
         "raw_language",
@@ -1413,6 +1412,11 @@ source_record_locations = Table(
     Column("license", license_type_enum),
     Column("is_oa", Boolean),
     Column("platform_id", Integer),
+    Column(
+        "embargo_until",
+        Date,
+        comment="Date de fin d'embargo. La copie est fermée jusqu'à cette date.",
+    ),
     schema="sources",
     comment="Localisations d'un enregistrement source, réécrites à chaque normalisation.",
 )

@@ -35,7 +35,7 @@ class MetadataForCorrection:
     oa_model: str | None = None
     urls: list[str] | None = None
     embargo_expired: bool | None = None
-    """`embargo_until <= current_date`."""
+    """Une copie de l'enregistrement source a un embargo échu."""
     self_declared_preprint: bool | None = None
     """L'enregistrement source déclare la relation Crossref `is-preprint-of` : il est le preprint d'une autre œuvre."""
     declares_conference: bool | None = None

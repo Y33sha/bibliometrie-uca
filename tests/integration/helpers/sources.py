@@ -1,6 +1,5 @@
 """Semis des tables sources pour les tests de requêtes et de services, sur la connexion SQLAlchemy (`sa_sync_conn`) : enregistrements sources (`source_records`), contributions sources (`source_contributions`) et liens contribution source ↔ adresse (`source_contribution_addresses`)."""
 
-import datetime
 import json
 from collections.abc import Mapping, Sequence
 
@@ -81,7 +80,6 @@ def insert_source_record(
     urls: list[str] | None = None,
     oa_status: str | None = None,
     is_retracted: bool | None = None,
-    embargo_until: datetime.date | None = None,
     marked: bool = True,
     identifiers: Sequence[SourceIdentifier] = (),
     biblio: dict[str, object] | None = None,
@@ -117,7 +115,6 @@ def insert_source_record(
             "urls": urls,
             "oa_status": oa_status,
             "is_retracted": is_retracted,
-            "embargo_until": embargo_until,
             "biblio": _jsonb(biblio),
             "source_extras": _jsonb(source_extras),
             "topics": _jsonb(topics),

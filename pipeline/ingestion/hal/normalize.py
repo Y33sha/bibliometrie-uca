@@ -118,9 +118,7 @@ def get_oa_status(doc: Mapping[str, JsonValue], embargo_until: date | None) -> s
 
 
 def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> list[LocationFacts]:
-    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`) et sa licence.
-
-    La copie est ouverte quand un fichier est déposé, hors embargo actif (`embargo_until`)."""
+    """Renvoie la page du dépôt HAL (`uri_s`), avec le fichier déposé (`fileMain_s`), sa licence et la fin de son embargo. La copie est ouverte quand un fichier est déposé."""
     uri = hal_text_field(doc.get("uri_s"))
     if not uri:
         return []
@@ -130,7 +128,8 @@ def get_locations(doc: Mapping[str, JsonValue], embargo_until: date | None) -> l
             url=uri,
             pdf_url=file_main,
             license=normalize_license(hal_text_field(doc.get("licence_s"))),
-            is_oa=file_main is not None and embargo_until is None,
+            is_oa=file_main is not None,
+            embargo_until=embargo_until,
         )
     ]
 
@@ -238,7 +237,6 @@ def hal_source_record(
         oa_status=get_oa_status(doc, embargo_until),
         license=normalize_license(hal_text_field(doc.get("licence_s"))),
         urls=urls,
-        embargo_until=embargo_until,
         hal_collections=collections_array,
     )
 
@@ -260,7 +258,7 @@ def _parse_tei(label_xml: str) -> Element:
 def active_embargo_until(label_xml: str | None, today: date) -> date | None:
     """Renvoie la date de fin d'un embargo HAL encore actif, sinon `None`.
 
-    Lit `ref[@type='file']/date/@notBefore` du TEI : la date d'accès au fichier déposé. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None` : un embargo levé reste hors de la base. À l'échéance d'un embargo stocké, une règle de correction de `oa_status` le lève, sans nouvel import HAL.
+    Lit `ref[@type='file']/date/@notBefore` du TEI : la date d'accès au fichier déposé. Parmi plusieurs `ref` de type `file` (page et document), la plus tardive l'emporte. Une date échue renvoie `None`. À l'échéance d'un embargo stocké, la copie s'ouvre à la lecture, et une règle de correction lève le statut `embargoed`, sans nouvel import HAL.
     """
     if not label_xml:
         return None

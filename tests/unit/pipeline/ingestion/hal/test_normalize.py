@@ -263,13 +263,13 @@ class TestGetLocations:
         [location] = get_locations({"uri_s": "https://hal.science/hal-02"}, None)
         assert (location.pdf_url, location.is_oa) == (None, False)
 
-    def test_fichier_sous_embargo_ferme(self):
+    def test_fichier_sous_embargo_porte_sa_date(self):
         doc = {
             "uri_s": "https://hal.science/hal-03",
             "fileMain_s": "https://hal.science/hal-03/document",
         }
         [location] = get_locations(doc, date(2099, 1, 1))
-        assert location.is_oa is False
+        assert (location.is_oa, location.embargo_until) == (True, date(2099, 1, 1))
 
     def test_sans_page_de_depot(self):
         assert get_locations({}, None) == []
@@ -469,7 +469,6 @@ class TestHalSourceRecord:
         assert captured.serial_id is None
         assert captured.monograph_id == 8
         assert captured.oa_status == "embargoed"
-        assert captured.embargo_until == date(2999, 1, 1)
         assert captured.raw_language == "fr"
         assert captured.container_title == "Book"
 

@@ -781,10 +781,10 @@ TASKS: tuple[Task, ...] = (
                     "language",
                     "urls",
                     "corrections",
-                    "embargo_until",
                     "source_extras",
                 )
             ),
+            "source_record_locations.embargo_until",
             "serials.serial_type",
             "serials.oa_model",
             "serials.is_in_doaj",
