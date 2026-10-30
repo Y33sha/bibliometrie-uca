@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict U7oZJ88CjVDQkTFKqhuExBa62ScQxrlkZoUm8XPzi88A7tfcWfuRmo5BZn8VKqF
+\restrict NcDVQE2ZLpJHEZdnpkeMYdjdOBWqoB3aYHOgNhDFNsHQO4wb6hKHwz6qAUfFsCn
 
 -- Dumped from database version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
 -- Dumped by pg_dump version 18.6 (Ubuntu 18.6-1.pgdg22.04+2)
@@ -591,7 +591,7 @@ SET default_table_access_method = heap;
 CREATE TABLE ops.audit_log (
     id bigint NOT NULL,
     event_type text NOT NULL,
-    entity_type text CONSTRAINT audit_log_aggregate_type_not_null NOT NULL,
+    entity_type text NOT NULL,
     entity_id integer,
     payload jsonb DEFAULT '{}'::jsonb NOT NULL,
     user_id text,
@@ -5617,5 +5617,5 @@ ALTER TABLE ONLY structures.structure_parents
 -- PostgreSQL database dump complete
 --
 
-\unrestrict U7oZJ88CjVDQkTFKqhuExBa62ScQxrlkZoUm8XPzi88A7tfcWfuRmo5BZn8VKqF
+\unrestrict NcDVQE2ZLpJHEZdnpkeMYdjdOBWqoB3aYHOgNhDFNsHQO4wb6hKHwz6qAUfFsCn
 
