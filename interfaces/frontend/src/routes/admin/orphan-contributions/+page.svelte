@@ -315,7 +315,7 @@
 					<th class="fit">Nom</th>
 					<th class="publication-cell">Publication</th>
 					<th class="fit">{columnLabels.labs}</th>
-					<th class="action-col">Action</th>
+					<th class="fit">Action</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -345,36 +345,38 @@
 							</div>
 						</td>
 						<td>
-							{#if activeAssignIdx === i}
-								<div class="assign-panel">
-									<div class="assign-row">
-										<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
-												use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
-											oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
-										<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+							<div class="action-box">
+								{#if activeAssignIdx === i}
+									<div class="assign-panel">
+										<div class="assign-row">
+											<input type="search" placeholder="Nom de la personne" value={assignSearch.query}
+													use:autofocus onkeydown={(e) => { if (e.key === 'Escape') { closeAssign(); } }}
+												oninput={(e) => assignSearch.setQuery((e.target as HTMLInputElement).value)} />
+											<button class="btn btn-sm" onclick={closeAssign}>&times;</button>
+										</div>
+										{#if assignSearch.loading}
+											<span class="loading-text">…</span>
+										{:else if assignSearch.results.length}
+											<div class="assign-results" use:anchored>
+												{#each assignSearch.results as r (r.id)}
+													<button class="result-btn" onclick={() => assign(o, r.id)}>
+														<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
+														{#if r.has_rh}<RhCheck />{/if}
+														<span class="result-hint">{r.department_name || `#${r.id}`}</span>
+													</button>
+												{/each}
+											</div>
+										{:else if assignSearch.query.length >= 2}
+											<div class="assign-results" use:anchored>
+												<span class="loading-text">Aucun résultat</span>
+												<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
+											</div>
+										{/if}
 									</div>
-									{#if assignSearch.loading}
-										<span class="loading-text">…</span>
-									{:else if assignSearch.results.length}
-										<div class="assign-results" use:anchored>
-											{#each assignSearch.results as r (r.id)}
-												<button class="result-btn" onclick={() => assign(o, r.id)}>
-													<strong>{titleCase(r.last_name)}</strong> {titleCase(r.first_name)}
-													{#if r.has_rh}<RhCheck />{/if}
-													<span class="result-hint">{r.department_name || `#${r.id}`}</span>
-												</button>
-											{/each}
-										</div>
-									{:else if assignSearch.query.length >= 2}
-										<div class="assign-results" use:anchored>
-											<span class="loading-text">Aucun résultat</span>
-											<button class="btn btn-sm btn-create" onclick={() => createAndAssign(o)}>Créer « {o.full_name} »</button>
-										</div>
-									{/if}
-								</div>
-							{:else}
-								<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
-							{/if}
+								{:else}
+									<button class="btn btn-sm" onclick={() => openAssign(i)}>Attribuer…</button>
+								{/if}
+							</div>
 						</td>
 					</tr>
 				{/each}
@@ -443,8 +445,8 @@
 	.publication-cell { width: 100%; max-width: 0; }
 	/* Laboratoires à la largeur de leur contenu, passés à la ligne au-delà de 15em. */
 	.labs { width: max-content; max-width: 15em; }
-	/* Largeur fixe : le champ de recherche de l'attribution occupe la colonne sans l'élargir. */
-	.action-col { width: 11rem; }
+	/* Largeur fixe, portée par le contenu : la colonne Publication réduit les autres colonnes à la largeur minimale de leur contenu. */
+	.action-box { width: 11rem; }
 	.publication-row { display: flex; align-items: center; gap: 4px; }
 	.publication-link { display: flex; gap: 0.3em; min-width: 0; color: var(--accent); text-decoration: none; font-size: var(--fs-sm); }
 	.publication-link:hover { text-decoration: underline; }
@@ -452,8 +454,7 @@
 	.publication-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 	.assign-panel { position: relative; }
 	.assign-row { display: flex; gap: 4px; align-items: center; }
-	/* Largeur nulle avant `flex: 1` : sinon la largeur par défaut du champ élargit la colonne. */
-	.assign-row input { flex: 1; width: 0; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
+	.assign-row input { flex: 1; min-width: 0; padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
 	.assign-results {
 		display: flex; flex-direction: column; gap: 2px;
 		background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
