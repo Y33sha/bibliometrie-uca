@@ -15,6 +15,9 @@
   import { usePaginatedFetch } from "#lib/composables/usePaginatedFetch.svelte.js";
   import { autofocus } from "#lib/actions/focus.js";
   import { confirmDialog, toast } from '#lib/dialogs.svelte.js';
+  import IconButton from "#lib/components/IconButton.svelte";
+  import StructureDrawer from "#lib/components/structures/StructureDrawer.svelte";
+  import { useDrawerParam } from "#lib/composables/useDrawerParam.svelte.js";
 
   // ---------- Types ----------
 
@@ -45,6 +48,7 @@
 
   function syncUrl(): void {
     const sp = new URLSearchParams();
+    if (drawer.id !== null) sp.set(DRAWER_PARAM, String(drawer.id));
     if (currentStructureId) sp.set("structure_id", String(currentStructureId));
     if (currentTab !== "fn") sp.set("tab", currentTab);
     if (search) sp.set("search", search);
@@ -59,6 +63,9 @@
   let currentStructureId = $state<number | null>(null);
   let allStructures = $state<Structure[]>([]);
   const structureGroups = $derived(groupStructuresByType(allStructures));
+
+  const DRAWER_PARAM = "structure";
+  const drawer = useDrawerParam(DRAWER_PARAM);
 
   let stats: FeedbackStats | null = $state(null);
   let currentTab: Tab = $state("fn");
@@ -279,6 +286,7 @@
 
   <!-- Toolbar -->
   <div class="toolbar">
+    <IconButton icon="panel" label="Ouvrir le volet de la structure" disabled={!currentStructureId} onclick={() => drawer.open(currentStructureId)} />
     <select aria-label="Structure" value={currentStructureId ?? ""} onchange={onStructureChange}>
       {#each structureGroups as [type, group] (type)}
         <optgroup label={structureGroupLabel(type)}>
@@ -380,6 +388,15 @@
     </div>
   {/if}
 </div>
+
+{#if drawer.id !== null}
+  <StructureDrawer
+    id={drawer.id}
+    onclose={() => drawer.open(null)}
+    onchange={() => { loadStats(); loadTable(); }}
+    onopenStructure={drawer.open}
+  />
+{/if}
 
 <style>
 
