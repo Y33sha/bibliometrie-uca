@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from domain.publications.licenses import License
-from domain.sources.registry import Source, source_record_url
+from domain.sources.registry import PROFILES, Source, source_record_url
 from infrastructure.read_models._common import (
     FacetOption,
     PaginatedResponse,
@@ -78,6 +78,14 @@ THESIS_EXPORT_COLUMNS: frozenset[str] = frozenset(
 NO_LICENSE = "none"
 LICENSE_FILTER_VALUES: frozenset[str] = frozenset({*License, NO_LICENSE})
 
+# Vocabulaire du filtre par agence d'enregistrement du DOI, dans l'ordre de la facette : les sources qui représentent une agence (`registration_agency`), `other` pour les autres agences, `none` pour une publication sans DOI.
+DOI_AGENCY_SOURCES: tuple[Source, ...] = tuple(
+    source for source, profile in PROFILES.items() if profile.registration_agency
+)
+OTHER_DOI_AGENCY = "other"
+NO_DOI = "none"
+DOI_AGENCY_FILTER_VALUES: tuple[str, ...] = (*DOI_AGENCY_SOURCES, OTHER_DOI_AGENCY, NO_DOI)
+
 
 @dataclass(frozen=True, slots=True)
 class PublicationFilters:
@@ -100,6 +108,7 @@ class PublicationFilters:
     access: list[str] = field(default_factory=list)
     oa_status: list[str] = field(default_factory=list)
     license: list[str] = field(default_factory=list)
+    doi_agency: list[str] = field(default_factory=list)
     source_values: list[str] = field(default_factory=list)
     doc_types: list[str] = field(default_factory=list)
     excluded_types: list[str] = field(default_factory=list)
@@ -210,6 +219,7 @@ class PublicationsFacetsResponse(BaseModel):
     access: list[FacetOption]
     oa_statuses: list[FacetOption]
     licenses: list[FacetOption]
+    doi_agencies: list[FacetOption]
     corresponding: list[FacetOption]
     source_counts: dict[str, YesNoCount]
     apc: list[FacetOption]

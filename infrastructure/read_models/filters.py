@@ -15,9 +15,14 @@ from domain.publications.metadata import (
     OA_OPEN_STATUSES,
     OaStatus,
 )
-from domain.sources.registry import SOURCE_FILTER_PREFIXES, Source
+from domain.sources.registry import PROFILES, SOURCE_FILTER_PREFIXES, Source
 from domain.structures.structure import StructureType
-from infrastructure.read_models.publications.models import NO_LICENSE
+from infrastructure.read_models.publications.models import (
+    DOI_AGENCY_SOURCES,
+    NO_DOI,
+    NO_LICENSE,
+    OTHER_DOI_AGENCY,
+)
 from infrastructure.sql_fragments import has_author_role, pending_name_form
 
 
@@ -153,6 +158,30 @@ def license_clause(values: list[str]) -> WhereClause | None:
         parts.append("p.license IS NULL")
     sql = parts[0] if len(parts) == 1 else "(" + " OR ".join(parts) + ")"
     return WhereClause(sql, {"flt_license": named} if named else {})
+
+
+# Agence d'enregistrement du DOI de la publication `p`, au vocabulaire `DOI_AGENCY_FILTER_VALUES`, lue dans `doi_prefixes.ra` par le préfixe du DOI. Le filtre et la facette lisent cette expression, donc classent de la même façon.
+_DOI_AGENCY_CASES = " ".join(
+    f"WHEN '{PROFILES[source].registration_agency}' THEN '{source.value}'"
+    for source in DOI_AGENCY_SOURCES
+)
+DOI_AGENCY_SQL = f"""(CASE
+    WHEN p.doi IS NULL THEN '{NO_DOI}'
+    ELSE COALESCE(
+        (SELECT CASE dp.ra {_DOI_AGENCY_CASES} END
+         FROM doi_prefixes dp WHERE dp.prefix = p.doi_prefix),
+        '{OTHER_DOI_AGENCY}'
+    )
+END)"""
+
+
+def doi_agency_clause(values: list[str]) -> WhereClause | None:
+    """Filtre par agence d'enregistrement du DOI (`DOI_AGENCY_SQL`), les valeurs combinées en OR."""
+    if not values:
+        return None
+    return WhereClause(
+        f"{DOI_AGENCY_SQL} = ANY(CAST(:flt_doi_agency AS text[]))", {"flt_doi_agency": values}
+    )
 
 
 def oa_clause(oa_status: list[str]) -> WhereClause | None:

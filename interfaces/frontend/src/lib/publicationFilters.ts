@@ -183,6 +183,15 @@ export function publicationFilters(
 			fixed: () => contextEntityId(context, 'subject'),
 		},
 		{
+			key: 'doiAgency',
+			control: 'checkbox',
+			label: 'DOI',
+			param: 'doi_agency',
+			facet: { type: 'labeled', apiKey: 'doi_agencies' },
+			group: 'Détails',
+			tooltip: "Agence d'enregistrement du DOI",
+		},
+		{
 			key: 'sources',
 			control: 'presence',
 			label: filterLabels.sources,

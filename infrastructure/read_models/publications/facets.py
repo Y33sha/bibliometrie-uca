@@ -14,6 +14,7 @@ from domain.countries import NO_COUNTRY_CODE
 from domain.publications.licenses import license_label
 from domain.publications.metadata import OaStatus
 from domain.sources.hal import HAL_DEPOSIT_STATUS_LABELS, HAL_DEPOSIT_STATUSES
+from domain.sources.registry import source_label
 from domain.structures.structure import StructureType
 from infrastructure.db.rows import rows_as
 from infrastructure.read_models._common import (
@@ -24,6 +25,7 @@ from infrastructure.read_models._common import (
 )
 from infrastructure.read_models.entity_facet import entity_facet_rows
 from infrastructure.read_models.filters import (
+    DOI_AGENCY_SQL,
     OA_CLOSED_SQL,
     OA_OPEN_SQL,
     hal_status_expression,
@@ -38,7 +40,11 @@ from infrastructure.read_models.publications.filtering import (
     publication_filter_where,
 )
 from infrastructure.read_models.publications.models import (
+    DOI_AGENCY_FILTER_VALUES,
+    DOI_AGENCY_SOURCES,
+    NO_DOI,
     NO_LICENSE,
+    OTHER_DOI_AGENCY,
     PublicationFilters,
     PublicationsFacetsResponse,
 )
@@ -139,6 +145,28 @@ class _PublicationFacetsBuilder:
                 count=r.n,
             )
             for r in rows
+        ]
+
+    def _facet_doi_agencies(self) -> list[FacetOption]:
+        """Agence d'enregistrement du DOI. Une option sans publication compte zéro."""
+        where_sql, binds = self._clauses_skipping("doi_agency")
+        rows = self.conn.execute(
+            text(f"""
+                SELECT value, COUNT(*) AS n
+                FROM (SELECT {DOI_AGENCY_SQL} AS value FROM publications p WHERE {where_sql}) s
+                GROUP BY value
+            """),
+            binds,
+        ).all()
+        counts = {r.value: r.n for r in rows}
+        labels = {
+            **{source.value: source_label(source) for source in DOI_AGENCY_SOURCES},
+            OTHER_DOI_AGENCY: "Autre",
+            NO_DOI: "Pas de DOI",
+        }
+        return [
+            FacetOption(value=v, label=labels[v], count=counts.get(v, 0))
+            for v in DOI_AGENCY_FILTER_VALUES
         ]
 
     def _facet_access(self) -> list[FacetOption]:
@@ -367,6 +395,7 @@ class PublicationFacetQueries:
             "access": "_facet_access",
             "oa_statuses": "_facet_oa_statuses",
             "licenses": "_facet_licenses",
+            "doi_agencies": "_facet_doi_agencies",
             "corresponding": "_facet_corresponding",
             "source_counts": "_facet_source_counts",
             "apc": "_facet_apc",
@@ -392,6 +421,7 @@ class PublicationFacetQueries:
             access=results["access"],
             oa_statuses=results["oa_statuses"],
             licenses=results["licenses"],
+            doi_agencies=results["doi_agencies"],
             corresponding=results["corresponding"],
             source_counts=results["source_counts"],
             apc=results["apc"],

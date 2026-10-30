@@ -4878,6 +4878,8 @@ export interface components {
             oa_statuses: components["schemas"]["FacetOption"][];
             /** Licenses */
             licenses: components["schemas"]["FacetOption"][];
+            /** Doi Agencies */
+            doi_agencies: components["schemas"]["FacetOption"][];
             /** Corresponding */
             corresponding: components["schemas"]["FacetOption"][];
             /** Source Counts */
@@ -6058,6 +6060,7 @@ export interface operations {
                 access?: string;
                 oa_status?: string;
                 license?: string;
+                doi_agency?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -6129,6 +6132,7 @@ export interface operations {
                 access?: string;
                 oa_status?: string;
                 license?: string;
+                doi_agency?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -6218,6 +6222,7 @@ export interface operations {
                 access?: string;
                 oa_status?: string;
                 license?: string;
+                doi_agency?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -6272,6 +6277,7 @@ export interface operations {
                 access?: string;
                 oa_status?: string;
                 license?: string;
+                doi_agency?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -6326,6 +6332,7 @@ export interface operations {
                 access?: string;
                 oa_status?: string;
                 license?: string;
+                doi_agency?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;
@@ -6636,6 +6643,7 @@ export interface operations {
                 access?: string;
                 oa_status?: string;
                 license?: string;
+                doi_agency?: string;
                 source_filter?: string;
                 doc_type?: string;
                 excluded_doc_type?: string;

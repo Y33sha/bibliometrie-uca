@@ -13,7 +13,7 @@ from tests.integration.helpers.contributions import contribution_id_of, insert_c
 from tests.integration.helpers.persons import insert_person
 from tests.integration.helpers.publications import insert_publication
 from tests.integration.helpers.read_models import publications_queries
-from tests.integration.helpers.serials import insert_publisher, insert_serial
+from tests.integration.helpers.serials import insert_doi_prefix, insert_publisher, insert_serial
 from tests.integration.helpers.sources import insert_source_contribution, insert_source_record
 from tests.integration.helpers.structures import add_contribution_structure, insert_structure
 from tests.integration.helpers.subjects import insert_publication_subject, insert_subject
@@ -651,6 +651,62 @@ class TestLicense:
         )
         facet = {(o.value, o.label, o.count) for o in builder._facet_licenses()}
         assert facet == {("cc-by", "CC BY", 1), ("none", "Aucune licence", 1)}
+
+
+class TestDoiAgency:
+    """Filtre et facette de l'agence d'enregistrement du DOI, lue par le préfixe dans `doi_prefixes`."""
+
+    def _seed(self, conn):
+        lab = _lab(conn)
+        insert_doi_prefix(conn, "10.1", ra="Crossref")
+        insert_doi_prefix(conn, "10.2", ra="DataCite")
+        insert_doi_prefix(conn, "10.3", ra="mEDRA")
+        publications = {
+            "crossref": insert_publication(conn, "Crossref", doi="10.1/a"),
+            "datacite": insert_publication(conn, "DataCite", doi="10.2/a"),
+            "medra": insert_publication(conn, "mEDRA", doi="10.3/a"),
+            "unresolved": insert_publication(conn, "Préfixe inconnu", doi="10.4/a"),
+            "none": insert_publication(conn, "Sans DOI"),
+        }
+        for publication in publications.values():
+            _attach(conn, publication, lab)
+        return lab, publications
+
+    def _ids(self, conn, lab, doi_agency):
+        res = publications_queries(conn).list_publications(
+            filters=PublicationFilters(lab_ids=[lab], doi_agency=doi_agency),
+            page=1,
+            per_page=50,
+            sort="year_desc",
+        )
+        return {p.id for p in res.publications}
+
+    def test_filter(self, sa_sync_conn):
+        lab, pubs = self._seed(sa_sync_conn)
+
+        assert self._ids(sa_sync_conn, lab, ["crossref"]) == {pubs["crossref"]}
+        assert self._ids(sa_sync_conn, lab, ["datacite"]) == {pubs["datacite"]}
+        assert self._ids(sa_sync_conn, lab, ["other"]) == {pubs["medra"], pubs["unresolved"]}
+        assert self._ids(sa_sync_conn, lab, ["none"]) == {pubs["none"]}
+        assert self._ids(sa_sync_conn, lab, ["crossref", "none"]) == {
+            pubs["crossref"],
+            pubs["none"],
+        }
+
+    def test_facet_counts_and_labels(self, sa_sync_conn):
+        lab, _ = self._seed(sa_sync_conn)
+
+        builder = _PublicationFacetsBuilder(
+            sa_sync_conn,
+            PublicationFilters(lab_ids=[lab], doi_agency=["crossref"]),
+            FilterContext([], None),
+        )
+        assert [(o.value, o.label, o.count) for o in builder._facet_doi_agencies()] == [
+            ("crossref", "Crossref", 1),
+            ("datacite", "DataCite", 1),
+            ("other", "Autre", 2),
+            ("none", "Pas de DOI", 1),
+        ]
 
 
 def test_le_lien_d_acces_suit_la_meilleure_copie_et_le_statut(sa_sync_conn):
