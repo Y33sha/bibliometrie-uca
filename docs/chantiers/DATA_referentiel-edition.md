@@ -31,6 +31,10 @@ OpenAlex retire les apostrophes. 106 titres de revue ont la forme « Annales d E
 
 `publications.container_title` est renseigné pour 39 690 publications, dont 10 202 à revue et 8 876 à monographie. OpenAlex y met le nom d'un repository : « HAL (Le Centre pour la Communication Scientifique Directe) » pour 28 846 de ses 52 116 enregistrements sources à conteneur, puis arXiv, theses.fr, Figshare, Zenodo.
 
+### Plateformes typées comme revues
+
+Sept entrées de `serials` ont un type de plateforme, pour 560 publications : `repository` (SSRN Electronic Journal, AEA Randomized Controlled Trials, Global Monitoring Laboratory) et `preprint_server` (bioRxiv, Research Square, Preprints.org, ArXiv.org). Leurs 702 enregistrements sources viennent de ScanR (598), Crossref (78) et HAL (26). Trois ont un type saisi à la main, trois ont `oa_model = repository`. SSRN, bioRxiv, Research Square, Preprints.org et arXiv figurent dans la liste des plateformes connues (`domain/platforms/registry.py`). Lecteurs des deux types : enrichissement OpenAlex (`enrich_serials_from_openalex`), correction du type de document (`preprint_server` donne `preprint`), espaces de noms DOI.
+
 ### Listes de revues
 
 Aucune table ne rattache une revue à une liste de référence : revues indexées dans le WoS, revues de confiance recommandées par la conférence des doyens de médecine.
@@ -81,7 +85,14 @@ Les personnes et les publications ont un volet latéral (`PersonDrawer`, `Public
 - [ ] Source de chaque liste (question 4)
 - [ ] Mise à jour de chaque liste (question 5)
 
-### Phase 7 — Fin de chantier
+### Phase 7 — Plateformes typées comme revues
+
+- [ ] Normaliseurs ScanR, Crossref et HAL : un conteneur désignant une plateforme connue donne une localisation au lieu d'une revue
+- [ ] Lecteurs des types `repository` et `preprint_server` basculés sur les plateformes
+- [ ] Stock : entrées converties en plateformes, publications détachées
+- [ ] Migration : valeurs `repository` et `preprint_server` retirées de `serial_type`, valeur `repository` retirée de `oa_model`
+
+### Phase 8 — Fin de chantier
 
 - [ ] Mise à jour de la documentation
 
