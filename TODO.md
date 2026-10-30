@@ -34,3 +34,4 @@
 
 # Cas particuliers, bizarreries à élucider
 * 78490 "accès fermé" alors que le DOI renvoie vers le pdf => agence DOI Kisti mal couverte par unpaywall
+* 9705 accès ouvert "via l'éditeur" alors que c'est un DOI Zenodo (+ autre accès Zenodo en dessous)
