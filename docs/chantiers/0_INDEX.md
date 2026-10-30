@@ -15,6 +15,7 @@
 - [Pertinence des sujets](DATA_pertinence-des-sujets.md)
 - [Résolution probabiliste des personnes](DATA_resolution-personnes-probabiliste.md)
 - [Signatures institutionnelles](METIER_signatures-institutionnelles.md)
+- [Statut open access tiré des copies](DATA_statut-open-access.md)
 - [Types de document](DATA_types-document.md)
 - [Vérification des affiliations des sources](DATA_verification-affiliations.md)
 
