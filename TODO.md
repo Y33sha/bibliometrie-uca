@@ -13,6 +13,7 @@
 * [ ] gérer les adresses résultant d'une erreur de parsing (ex. publi 106296); quand un work openalex a les mêmes affiliations pour toutes les contributions => suspect (contrôler par les autres sources)
 * [ ] conserver l'historique des structures
 * [ ] financements (projets ANR, projets européens)
+* [ ] gérer les embargos au niveau des source_record_locations
 # UI
 ## Admin
 * [ ] créer des catégories de personnes (personnel UCA, chercheurs associés, anciens doctorants, méga-collab de physique des particules) => et pouvoir configurer la visibilité des groupes dans l'UI publique (beaucoup d'adresses UCA dans les collaborations ALICE/ATLAS sont décalées dans les sources, ce qui pourrit la base avec des milliers de fausses "personnes UCA")
@@ -22,7 +23,6 @@
 * [ ] icônes des licences
 * [ ] page "affiliations suspectes hal": requête incorrecte, capture trop de publis
 * [ ] mettre en place des slugs pour les URL? (personnes, labos, éditeurs, revues)
-* [ ] Filtres supplémentaires possibles: `has_doi` (crossref, datacite, other, none); repositories?
 * [ ] auteur premier, dernier, correspondant: sur les facettes et les stats
 * [ ] mesures d'impact à intégrer dans les stats, les dashboards, et les facettes
 * [ ] stats en compte fractionnaire vs compte entier
@@ -33,4 +33,4 @@
 * [ ] visualisation des collab avec carte (monde, Europe, France) qui les localise au niveau de leur ville
 
 # Cas particuliers, bizarreries à élucider
-* publi 165064: lien éditeur présenté comme "full text" alors que non
+* 78490 "accès fermé" alors que le DOI renvoie vers le pdf => agence DOI Kisti mal couverte par unpaywall
