@@ -22,6 +22,9 @@
 	import PublicationTitle from '#lib/components/PublicationTitle.svelte';
 	import Modal from '#lib/components/Modal.svelte';
 	import FacetDropdown from '#lib/components/FacetDropdown.svelte';
+	import IconButton from '#lib/components/IconButton.svelte';
+	import PublicationDrawer from '#lib/components/publications/PublicationDrawer.svelte';
+	import { useDrawerParam } from '#lib/composables/useDrawerParam.svelte.js';
 	import { columnLabels, filterLabels } from '#lib/labels.js';
 	import type { FacetOption } from '#lib/components/FacetDropdown.svelte';
 	import type { components } from '#lib/api/schema.js';
@@ -37,6 +40,8 @@
 	): Promise<PersonResult[]> {
 		return request<PersonResult[]>(`/api/persons/search?search=${encodeURIComponent(q)}`);
 	}
+
+	const drawer = useDrawerParam('publication');
 
 	let search = $state('');
 	let selectedLabs: string[] = $state([]);
@@ -239,6 +244,7 @@
 		if (list.page > 1) p.set('page', String(list.page));
 		if (search.trim()) p.set('search', search.trim());
 		if (selectedLabs.length) p.set('lab', selectedLabs.join(','));
+		if (drawer.id !== null) p.set('publication', String(drawer.id));
 		void replaceQuery(resolve('admin/orphan-contributions'), p);
 	}
 
@@ -314,7 +320,7 @@
 			</thead>
 			<tbody>
 				{#each orphans as o, i (o.contribution_id)}
-					<tr>
+					<tr class:active-row={o.publication_id === drawer.id}>
 						<td><input type="checkbox" aria-label="Sélectionner la contribution de {o.full_name}" checked={selectedIds.has(o.contribution_id)} onchange={() => toggleSelect(o)} /></td>
 						<td class="links-cell">
 							{#each o.sources as source (source)}
@@ -322,7 +328,8 @@
 							{/each}
 						</td>
 						<td>{o.full_name}</td>
-						<td>
+						<td class="row-actions">
+							<IconButton icon="panel" label="Ouvrir le volet" onclick={() => drawer.open(o.publication_id)} />
 							<a href={resolve(`publications/${o.publication_id}`)} class="publication-link">
 								{o.publication_year ?? '?'} — <span class="publication-title"><PublicationTitle titre={o.publication_title} /></span>
 							</a>
@@ -372,6 +379,10 @@
 
 	<Pagination page={list.page} pages={list.pages} onchange={(p) => { list.goToPage(p); syncUrl(); }} />
 </ListStatus>
+
+{#if drawer.id !== null}
+	<PublicationDrawer publicationId={drawer.id} onclose={() => drawer.open(null)} onopen={drawer.open} />
+{/if}
 
 {#if createModal}
 	<Modal
