@@ -24,37 +24,37 @@ Les données saisies dans l'administration (structures, périmètres, configurat
 
 ## Couches
 
-Le code de l'application web suit une architecture hexagonale.
+Le code de l'application web suit une architecture hexagonale. Le pipeline, traitement par lots, se tient hors de ces couches.
 
-- `domain/` contient les règles métier, sans entrée-sortie.
+- `domain/` contient les règles métier, sans entrée-sortie. Toutes les autres parties l'importent.
 - `application/` contient les services d'écriture. Ils atteignent l'extérieur par des ports (`Protocol`) déclarés dans `application/ports/`.
-- `infrastructure/` contient les adaptateurs sortants : SQL, journalisation. Ils implémentent les ports.
-- `interfaces/` contient les adaptateurs entrants : routes HTTP, frontend, scripts en ligne de commande. Son composition root instancie les adaptateurs.
+- `infrastructure/` contient les adaptateurs sortants : SQL, journalisation. Ses repositories implémentent les ports de `application/ports/repositories/`.
+- `interfaces/` contient les adaptateurs entrants : routes HTTP, frontend, scripts en ligne de commande. Son composition root instancie les implémentations des ports et les remet aux services.
+- `pipeline/` contient les phases du traitement par lots. Il importe `domain/` et `infrastructure/`. Seul `interfaces/` l'importe, par `pipeline/public.py`. Ses recalculs implémentent les ports de `application/ports/pipeline/` ([page](06-pipeline.md)).
 
 ```
-                    ┌─────────────────────────────┐
-                    │  domain/                    │
-                    │  entités, value objects,    │
-                    │  règles métier              │  (zéro I/O)
-                    └──────────────▲──────────────┘
-                                   │
-    ┌──────────────────────────────┴─────────────────────────────┐
-    │  application/                    ┌───────────────────────┐ │
-    │  services                        │  ports/  (Protocol)   │ │
-    │                                  └─────────────▲─────────┘ │
-    └───────────▲────────────────────────────────────┼───────────┘
-                │ services et ports                  │ implémente
-    ┌───────────┴─────────────┐           ┌──────────┴───────────┐
-    │  interfaces/            │           │  infrastructure/     │
-    │  adaptateurs entrants   │           │  adaptateurs sortants│
-    │  (routers, CLI)         │           │  (PostgreSQL, logs)  │
-    │  ┌───────────────────┐  │ instancie │                      │
-    │  │ composition root  ├──┼──────────►│                      │
-    │  └───────────────────┘  │           │                      │
-    └─────────────────────────┘           └──────────────────────┘
+┌───────────────────────┐                     ┌────────────────────────┐
+│ interfaces/           │                     │ pipeline/              │
+│ routes, frontend, CLI │───── public.py ────►│ phases et tâches       │
+│ composition roots     │                     └───┬────────────────┬───┘
+└──┬────────────────┬───┘                         │                │
+   │                ▼                             ▼                │
+   │          ┌────────────────────────────────────────────┐       │
+   │          │ infrastructure/                            │       │
+   │          │ SQL, journalisation                        │       │
+   │          └──────────────────────┬─────────────────────┘       │
+   ▼                                 │                             │
+┌───────────────────────┐            │                             │
+│ application/          │            │                             │
+│ services │ ports      │            │                             │
+└───────────┬───────────┘            │                             │
+            ▼                        ▼                             ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│ domain/   règles métier, sans entrée-sortie                          │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-Le pipeline est un paquet racine, hors de ces couches. Il importe `domain/` et les modules techniques d'`infrastructure/`. Seul `interfaces/` l'importe.
+Les flèches sont les imports. Un port est un `Protocol` : ses implémentations le satisfont sans importer `application/`.
 
 ## Contrats d'import
 
@@ -87,5 +87,6 @@ Des contrats `import-linter`, déclarés dans `pyproject.toml`, vérifient ces r
 - [`application/`](03-application.md)
 - [`infrastructure/`](04-infrastructure.md), avec les transactions
 - [`interfaces/`](05-interfaces.md)
-- [Composition roots](06-composition-roots.md)
-- [Tests](07-tests.md)
+- [`pipeline/`](06-pipeline.md)
+- [Composition roots](07-composition-roots.md)
+- [Tests](08-tests.md)

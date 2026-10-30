@@ -69,8 +69,9 @@ nav = [
     "architecture/03-application.md",
     "architecture/04-infrastructure.md",
     "architecture/05-interfaces.md",
-    "architecture/06-composition-roots.md",
-    "architecture/07-tests.md",
+    "architecture/06-pipeline.md",
+    "architecture/07-composition-roots.md",
+    "architecture/08-tests.md",
   ] },
   { "Exploitation" = [
     "exploitation/01-developpement-local.md",

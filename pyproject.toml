@@ -98,7 +98,7 @@ name = "Pipeline : hors des couches hexagonales"
 type = "forbidden"
 source_modules = ["pipeline"]
 forbidden_modules = ["application", "interfaces"]
-# Le pipeline importe `domain` et les modules techniques d'`infrastructure` (connexion, réglages, journalisation, fragments SQL). Le chemin indirect par les ports d'`application`, qu'`infrastructure` importe, est admis.
+# Le pipeline importe `domain` et `infrastructure`. Le chemin indirect par les ports d'`application`, qu'`infrastructure` importe, est admis.
 ignore_imports = ["infrastructure.** -> application.ports.**"]
 
 [[tool.importlinter.contracts]]
